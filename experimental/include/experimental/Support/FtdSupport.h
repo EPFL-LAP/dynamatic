@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_SUPPORT_FTD_SUPPORT_H
 #define DYNAMATIC_SUPPORT_FTD_SUPPORT_H
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
@@ -190,10 +191,12 @@ LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
                                  Operation *consumerOp);
 
 /// Add suppression mechanism to all the inputs and outputs of a producer
-LogicalResult addSuppToProducer(ConversionPatternRewriter &rewriter,
-                                handshake::FuncOp &funcOp,
-                                Operation *producerOp, ftd::BlockIndexing &bi,
-                                std::vector<Operation *> &producersToCover);
+LogicalResult
+addSuppToProducer(ConversionPatternRewriter &rewriter,
+                  handshake::FuncOp &funcOp, Operation *producerOp,
+                  ftd::BlockIndexing &bi,
+                  std::vector<Operation *> &producersToCover,
+                  ControlDependenceAnalysis::BlockControlDepsMap &cda);
 
 }; // namespace ftd
 }; // namespace experimental

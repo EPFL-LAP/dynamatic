@@ -52,7 +52,12 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
-    patterns.add<experimental::ftd::FtdLowerFuncToHandshake, ConvertCalls,
+    patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
+        getAnalysis<ControlDependenceAnalysis>(),
+        getAnalysis<gsa::GSAAnalysis>(), getAnalysis<NameAnalysis>(), converter,
+        ctx);
+
+    patterns.add<ConvertCalls,
                  ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -267,9 +272,9 @@ static LogicalResult joinInsertion(OpBuilder &builder,
   return success();
 }
 
-LogicalResult
-ftd::FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
-                                      handshake::FuncOp &funcOp) const {
+LogicalResult ftd::FtdLowerFuncToHandshake::addSupp(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps) const {
 
   // A set of relationships between producer and consumer needs to be covered.
   // To do that, we consider each possible operation in the circuit as
@@ -294,7 +299,7 @@ ftd::FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
   while (producerIndex < producersToCover.size()) {
     Operation *producerOp = producersToCover.at(producerIndex++);
     if (failed(addSuppToProducer(rewriter, funcOp, producerOp, bi,
-                                 producersToCover)))
+                                 producersToCover, cdaDeps)))
       return failure();
   }
 
@@ -681,10 +686,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addMergeNonLoop(
     indexPerBlock.insert({&bb, getBlockIndex(&bb)});
   }
 
-  // Stores the information related to the control dependencies ob basic
-  // blocks within an handshake::funcOp object
-  ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
-
   // For each group within the groups graph
   for (Group *producerGroup : groups) {
 
@@ -692,7 +693,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addMergeNonLoop(
     Block *producerBlock = producerGroup->bb;
 
     // Compute all the forward dependencies of that block
-    auto res = cdgAnalysis.getBlockForwardControlDeps(producerBlock);
+    auto res = cdAnalaysis.getBlockForwardControlDeps(producerBlock);
     DenseSet<Block *> producerControlDeps = res.value_or(DenseSet<Block *>());
 
     // For each successor (which is now considered as a consumer)
@@ -702,7 +703,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addMergeNonLoop(
       Block *consumerBlock = consumerGroup->bb;
 
       // Compute all the forward dependencies of that block
-      auto res = cdgAnalysis.getBlockForwardControlDeps(consumerBlock);
+      auto res = cdAnalaysis.getBlockForwardControlDeps(consumerBlock);
       DenseSet<Block *> consumerControlDeps = res.value_or(DenseSet<Block *>());
 
       // Remove the common forward dependencies among the two blocks
@@ -871,9 +872,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addMergeLoop(
   return success();
 }
 
-template <typename FunctionType>
 LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
-    FunctionType funcOp, ConversionPatternRewriter &rewriter) const {
+    func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
 
   using namespace experimental::gsa;
 
@@ -914,9 +914,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
   DenseSet<Operation *> oneInputGammaList;
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
-  ControlDependenceAnalysis<FunctionType> cdgAnalysis(funcOp);
-  GSAAnalysis gsaAnalysis(funcOp);
-  cdgAnalysis.printAllBlocksDeps();
 
   // For each block excluding the first one, which has no gsa
   for (Block &block : llvm::drop_begin(funcOp)) {
@@ -1078,6 +1075,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
 
+  // Get the map of control dependencies for the blocks in the function to lower
+  auto cdaDeps = cdAnalaysis.getAllBlockDeps();
+
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
   DenseMap<Value, unsigned> memrefToArgIdx;
@@ -1090,6 +1090,11 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(addExplicitPhi(lowerFuncOp, rewriter)))
     return failure();
 
+  // Save pointers to old block
+  SmallVector<Block *> blocksBefore;
+  for (auto &bb : lowerFuncOp.getBody())
+    blocksBefore.push_back(&bb);
+
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
   if (failed(funcOrFailure))
@@ -1097,6 +1102,26 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   handshake::FuncOp funcOp = *funcOrFailure;
   if (funcOp.isExternal())
     return success();
+
+  // Save pointers from new blocks
+  SmallVector<Block *> blocksAfter;
+  for (auto &bb : funcOp.getBody())
+    blocksAfter.push_back(&bb);
+
+  // Remap control dependency analysis
+  for (unsigned i = 0; i < blocksBefore.size(); i++) {
+    auto deps = cdaDeps[blocksBefore[i]];
+
+    for (unsigned i = 0; i < blocksBefore.size(); i++) {
+      if (deps.allControlDeps.contains(blocksBefore[i]))
+        deps.allControlDeps.insert(blocksAfter[i]);
+      if (deps.forwardControlDeps.contains(blocksBefore[i]))
+        deps.forwardControlDeps.insert(blocksAfter[i]);
+    }
+
+    cdaDeps.erase(blocksBefore[i]);
+    cdaDeps.insert({blocksAfter[i], deps});
+  }
 
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
@@ -1152,7 +1177,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     analyzeLoop(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp)))
+    if (failed(addSupp(rewriter, funcOp, cdaDeps)))
       return failure();
   }
 

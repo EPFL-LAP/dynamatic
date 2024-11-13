@@ -17,6 +17,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "vector"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
@@ -54,6 +55,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 
       // Analyze the function
       if (!functionsCovered) {
+        inputOp = funcOp;
         convertSSAToGSA(funcOp);
         functionsCovered++;
       } else {
@@ -473,7 +475,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(func::FuncOp &funcOp) {
 }
 
 ArrayRef<experimental::gsa::Gate *>
-experimental::gsa::GSAAnalysis::getGates(Block *bb) {
+experimental::gsa::GSAAnalysis::getGates(Block *bb) const {
   auto it = gatesPerBlock.find(bb);
   return it == gatesPerBlock.end() ? ArrayRef<Gate *>() : it->getSecond();
 }

@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -34,20 +35,30 @@ namespace ftd {
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
 public:
   // Use the same constructors from the base class
-  FtdLowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
+  FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
+                          NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit) {};
+      : LowerFuncToHandshake(namer, ctx, benefit), cdAnalaysis(cda),
+        gsaAnalysis(gsa) {};
 
-  FtdLowerFuncToHandshake(NameAnalysis &namer,
+  FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
+                          NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit) {};
+      : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
+        cdAnalaysis(cda), gsaAnalysis(gsa) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
+  /// Store the control dependency analysis over the input function
+  ControlDependenceAnalysis cdAnalaysis;
+
+  /// Store the GSA analysis over the input function
+  gsa::GSAAnalysis gsaAnalysis;
+
   LogicalResult
   ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
                                   ConversionPatternRewriter &rewriter,
@@ -107,14 +118,14 @@ protected:
   /// consumer, because of the control decisions. In this scenario, the token
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
-  LogicalResult addSupp(ConversionPatternRewriter &rewriter,
-                        handshake::FuncOp &funcOp) const;
+  LogicalResult
+  addSupp(ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+          ControlDependenceAnalysis::BlockControlDepsMap &cda) const;
 
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
-  template <typename FunctionType>
-  LogicalResult addExplicitPhi(FunctionType funcOp,
+  LogicalResult addExplicitPhi(func::FuncOp funcOp,
                                ConversionPatternRewriter &rewriter) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE

@@ -1137,12 +1137,12 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
-static LogicalResult
-insertDirectSuppression(ConversionPatternRewriter &rewriter,
-                        handshake::FuncOp &funcOp, Operation *consumer,
-                        Value connection, ftd::BlockIndexing &bi) {
+static LogicalResult insertDirectSuppression(
+    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+    Operation *consumer, Value connection, ftd::BlockIndexing &bi,
+    ControlDependenceAnalysis::BlockControlDepsMap &cdAnalysis) {
+
   Block *entryBlock = &funcOp.getBody().front();
-  ControlDependenceAnalysis<dynamatic::handshake::FuncOp> cdgAnalysis(funcOp);
   Block *producerBlock = connection.getParentBlock();
 
   DenseMap<Block *, unsigned> indexPerBlock;
@@ -1151,12 +1151,12 @@ insertDirectSuppression(ConversionPatternRewriter &rewriter,
   }
 
   // Get the control dependencies from the producer
-  auto res = cdgAnalysis.getBlockForwardControlDeps(producerBlock);
-  DenseSet<Block *> prodControlDeps = res.value_or(DenseSet<Block *>());
+  DenseSet<Block *> prodControlDeps =
+      cdAnalysis[producerBlock].forwardControlDeps;
 
   // Get the control dependencies from the consumer
-  res = cdgAnalysis.getBlockForwardControlDeps(consumer->getBlock());
-  DenseSet<Block *> consControlDeps = res.value_or(DenseSet<Block *>());
+  DenseSet<Block *> consControlDeps =
+      cdAnalysis[consumer->getBlock()].forwardControlDeps;
 
   // Get rid of common entries in the two sets
   ftd::eliminateCommonBlocks(prodControlDeps, consControlDeps);
@@ -1220,7 +1220,8 @@ LogicalResult
 ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
                        handshake::FuncOp &funcOp, Operation *producerOp,
                        ftd::BlockIndexing &bi,
-                       std::vector<Operation *> &producersToCover) {
+                       std::vector<Operation *> &producersToCover,
+                       ControlDependenceAnalysis::BlockControlDepsMap &cda) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -1337,7 +1338,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       // If no loop is involved, then there is a direct relationship between
       // consumer and producer
       else if (failed(insertDirectSuppression(rewriter, funcOp, consumerOp,
-                                              result, bi)))
+                                              result, bi, cda)))
         return failure();
     }
   }
@@ -1364,8 +1365,8 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       continue;
 
     // Handle the suppression
-    if (failed(
-            insertDirectSuppression(rewriter, funcOp, producerOp, operand, bi)))
+    if (failed(insertDirectSuppression(rewriter, funcOp, producerOp, operand,
+                                       bi, cda)))
       return failure();
   }
 

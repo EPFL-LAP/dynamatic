@@ -15,25 +15,30 @@
 #define DYNAMATIC_ANALYSIS_CONTROLDEPENDENCEANALYSIS_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <optional>
+
+using namespace mlir;
 
 namespace dynamatic {
 
 /// Analysis to obtain the control dependence analysis of each block in the CFG
-template <typename FunctionType>
 class ControlDependenceAnalysis {
+
 public:
-  ControlDependenceAnalysis(Operation *operation) {
-    // Run the analysis only on a valid operation of type `FunctionType`
-    FunctionType funcOp = dyn_cast<FunctionType>(operation);
-    if (funcOp) {
-      identifyAllControlDeps(funcOp);
-    } else {
-      llvm::errs() << "ControlDependenceAnalysis is instantiated over an "
-                      "operation that is not FuncOp!\n";
-    }
+  /// This structure contains all the control dependencies of a block, also
+  /// separating the forward ones
+  struct BlockControlDeps {
+    DenseSet<Block *> allControlDeps;
+    DenseSet<Block *> forwardControlDeps;
   };
+
+  /// Store the dependencies of each block into a map
+  using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
+
+  // Constructor for the analysis pass
+  ControlDependenceAnalysis(Operation *operation);
 
   // Given a BB, return all its control dependencies
   std::optional<DenseSet<Block *>> getBlockAllControlDeps(Block *block) const;
@@ -41,6 +46,9 @@ public:
   // Given a BB, return all its forward control dependencies
   std::optional<DenseSet<Block *>>
   getBlockForwardControlDeps(Block *block) const;
+
+  // Return the map of the control dependencies as
+  BlockControlDepsMap getAllBlockDeps() const;
 
   /// Invalidation hook to keep the analysis cached across passes. Returns true
   /// if the analysis should be invalidated and fully reconstructed the next
@@ -53,26 +61,17 @@ public:
   void printAllBlocksDeps() const;
 
 private:
-  /// This structure contains all the control dependencies of a block, also
-  /// separating the forward ones
-  struct BlockControlDeps {
-    DenseSet<Block *> allControlDeps;
-    DenseSet<Block *> forwardControlDeps;
-  };
-
-  /// Store the dependencies of each block into a map
-  using BlockControlDepsMap = DenseMap<Block *, BlockControlDeps>;
   BlockControlDepsMap blocksControlDeps;
 
   /// Get all the control dependencies of a block
-  void identifyAllControlDeps(FunctionType &funcOp);
+  void identifyAllControlDeps(mlir::func::FuncOp &funcOp);
 
   // Get the forward dependencies only of a block
-  void identifyForwardControlDeps(FunctionType &funcOp);
+  void identifyForwardControlDeps(mlir::func::FuncOp &funcOp);
 
   /// Modify the control dependencies to include the dependencies of each
   /// dependent block too
-  void addDepsOfDeps(FunctionType &funcOp);
+  void addDepsOfDeps(mlir::func::FuncOp &funcOp);
 };
 
 } // namespace dynamatic

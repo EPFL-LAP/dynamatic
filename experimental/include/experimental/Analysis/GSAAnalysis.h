@@ -19,7 +19,7 @@
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/Debug.h"
 #include <queue>
 #include <utility>
 
@@ -79,6 +79,8 @@ struct GateInput {
 
   /// Returns the input value (raise an error if input is not a value).
   Value getValue() { return std::get<Value>(input); }
+
+  ~GateInput() = default;
 };
 
 using ListExpressionsPerGate =
@@ -113,11 +115,16 @@ struct Gate {
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
         index(i) {}
 
+  /// Print the gate.
   void print();
 
+  /// Get the block the gate refers to.
   inline Block *getBlock() { return result.getParentBlock(); }
 
+  /// Get the argument numebr the gate refers to.
   inline unsigned getArgumentNumber() { return result.getArgNumber(); }
+
+  ~Gate() = default;
 };
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake
@@ -130,6 +137,13 @@ public:
   /// functino to get the SSA information from.
   GSAAnalysis(Operation *operation);
 
+  /// Copy constructor for the anlaysis pass, rerunning the anlaysis so that new
+  /// pointers are created
+  GSAAnalysis(GSAAnalysis &gsa) {
+    this->inputOp = gsa.inputOp;
+    this->convertSSAToGSA(this->inputOp);
+  }
+
   /// Invalidation hook to keep the analysis cached across passes. Returns
   /// true if the analysis should be invalidated and fully reconstructed the
   /// next time it is queried.
@@ -138,12 +152,15 @@ public:
   }
 
   /// Get a pointer to the vector containing the gate functions of a block.
-  ArrayRef<Gate *> getGates(Block *bb);
+  ArrayRef<Gate *> getGates(Block *bb) const;
 
   /// Deallocates all the gates created.
   ~GSAAnalysis();
 
 private:
+  /// Keep track of the original operation the analysis was run on
+  mlir::func::FuncOp inputOp;
+
   /// Associate an index to each gate.
   unsigned uniqueGateIndex;
 
