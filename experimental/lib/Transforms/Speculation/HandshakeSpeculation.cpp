@@ -62,7 +62,7 @@ private:
   LogicalResult routeCommitControl();
 
   /// Wrapper around routeCommitControl to prepare and invoke the placement
-  LogicalResult prepareAndPlaceCommits();
+  LogicalResult placeCommits();
 
   /// Place the SaveCommit operations and the control path
   LogicalResult prepareAndPlaceSaveCommits();
@@ -210,7 +210,7 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   return success(areAllCommitsRouted(fakeControlForCommits.value()));
 }
 
-LogicalResult HandshakeSpeculationPass::prepareAndPlaceCommits() {
+LogicalResult HandshakeSpeculationPass::placeCommits() {
   // Create a temporal value to connect the commits
   Value commitCtrl = specOp.getCommitCtrl();
   OpBuilder builder(&getContext());
@@ -410,7 +410,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     return signalPassFailure();
 
   // Place Commit operations and the Commit control path
-  if (failed(prepareAndPlaceCommits()))
+  if (failed(placeCommits()))
     return signalPassFailure();
 
   // Place SaveCommit operations and the SaveCommit control path
