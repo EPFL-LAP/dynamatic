@@ -180,10 +180,19 @@ static void routeCommitControlRecursive(
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
       for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
-        // Copy the current list. Can be optimized by using a data structure
-        // with reference
+        // Copy the current branchTracingList and add the current branch info to
+        // the new list.
+        // The items are referenced when the traversal hits a commit unit to
+        // build the commit control network.
+        // We avoid modifying the original list as it's referenced elsewhere.
+        // However, copying may impact performance for larger circuits. To
+        // optimize, we could use a structure that references the original list,
+        // adding only the new item, like a "Cons" structure in functional
+        // programming
         std::list<BranchTracingItem> newList(branchTracingList);
         newList.push_back({currOpOperand.get(), branchOp, i});
+
+        // Continue traversal with new branchTracingList
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
                                     newList);
       }
