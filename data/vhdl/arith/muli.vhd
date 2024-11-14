@@ -144,8 +144,26 @@ entity muli_with_tag is
 end entity;
 
 architecture arch of muli_with_tag is
+  signal spec_tag_inner : std_logic_vector(0 downto 0);
+  signal spec_tag_inner2 : std_logic_vector(0 downto 0);
 begin
-  result_spec_tag <= lhs_spec_tag or rhs_spec_tag;
+  spec_tag_inner(0) <= lhs_spec_tag or rhs_spec_tag;
+  result_spec_tag <= spec_tag_inner2(0);
+  spec_tag_tfifo : entity work.tfifo(arch)
+    generic map(
+      NUM_SLOTS => 4, -- 5?
+      DATA_TYPE => 1
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => spec_tag_inner,
+      ins_valid => lhs_valid and rhs_valid and lhs_ready and rhs_ready,
+      ins_ready => open,
+      outs => spec_tag_inner2,
+      outs_valid => open,
+      outs_ready => result_valid and result_ready
+    );
   muli_inner : entity work.muli(arch) generic map(DATA_TYPE)
     port map(
       clk          => clk,
