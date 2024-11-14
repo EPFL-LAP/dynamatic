@@ -66,6 +66,10 @@ struct BoolExpression {
   /// Converts a BoolExpression tree into its string representation
   std::string toString();
 
+  /// Return true if the expression contains the input mintern, either directed
+  /// or complemented
+  bool containsMintern(const std::string &toSearch);
+
   /// Retrieve all the variables inside a BoolExpression
   std::set<std::string> getVariables();
 
