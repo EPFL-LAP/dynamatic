@@ -129,7 +129,7 @@ static void routeCommitControlRecursive(
     return;
   arrived.insert(currOp);
 
-  // If the traversal reaches a speculator or a save commit unit, stop it
+  // If the traversal reaches a speculator or a save commit unit, end traversal
   // All commit units should be found within the same loop iteration
   // And passing through these units may result in the replication of redundant
   // branches
