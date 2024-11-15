@@ -70,33 +70,34 @@ export_dot() {
 
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+cp "$SRC_DIR/cf.mlir" "$COMP_DIR/cf.mlir"
 
-# source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
-  -I "$DYNAMATIC_DIR/include" \
-  -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE"
-exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
+# # source -> affine level
+# "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
+#   -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+#   -I "$DYNAMATIC_DIR/include" \
+#   -S -O3 --memref-fullrank --raise-scf-to-affine \
+#   > "$F_AFFINE"
+# exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
-# affine level -> pre-processing and memory analysis
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes \
-  --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-  --mark-memory-dependencies \
-  > "$F_AFFINE_MEM"
-exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
+# # affine level -> pre-processing and memory analysis
+# "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
+#   --remove-polygeist-attributes \
+#   --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
+#   --mark-memory-dependencies \
+#   > "$F_AFFINE_MEM"
+# exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
-# affine level -> scf level
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
-  --flatten-memref-row-major --scf-simple-if-to-select \
-  --scf-rotate-for-loops \
-  > "$F_SCF"
-exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
+# # affine level -> scf level
+# "$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
+#   --flatten-memref-row-major --scf-simple-if-to-select \
+#   --scf-rotate-for-loops \
+#   > "$F_SCF"
+# exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
-# scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
-exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
+# # scf level -> cf level
+# "$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
+# exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
 "$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
