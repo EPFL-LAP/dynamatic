@@ -1,7 +1,7 @@
 #ifndef SPARSE_H
 #define SPARSE_H
 
-#define N 5
+#define N 100 // 5
 
 typedef float in_float_t;
 
