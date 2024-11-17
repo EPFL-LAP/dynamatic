@@ -32,6 +32,8 @@ architecture arch of spec_save_commit is
     signal TailEn  : std_logic := '0';
     signal CurrEn  : std_logic := '0';
 
+    signal CurrHeadEqual : std_logic;
+
     signal PassEn  : std_logic := '0';
     signal KillEn  : std_logic := '0';
     signal ResendEn  : std_logic := '0';
@@ -59,9 +61,12 @@ begin
     validArray(0) <= (PassEn and (not CurrEmpty or pValidArray(0))) or (ResendEn and not Empty);
     --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
     
+    CurrHeadEqual <= '1' when Curr = Head else '0';
     TailEn <= not Full and pValidArray(0);
     HeadEn <= not Empty and ((nReadyArray(0) and ResendEn) or (readyArray(1) and KillEn));
-    CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) ) or (not Empty and (nReadyArray(0) and NoCmpEn) );
+    CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) ) or
+              (not Empty and (nReadyArray(0) and NoCmpEn) ) or
+              (CurrHeadEqual and readyArray(1) and KillEn);
 
     bypass <= pValidArray(0) and CurrEmpty;
 -------------------
