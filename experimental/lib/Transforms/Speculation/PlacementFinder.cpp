@@ -150,6 +150,9 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
           // A commit is needed in front of the memory controller
           // On the operand indicating the number of stores
           placements.addCommit(dstOpOperand);
+        } else if (dstOpOperand.getOperandNumber() == 3) {
+          // End signal
+          placements.addCommit(dstOpOperand);
         }
         // Exceptionally stop the traversal
         continue;
