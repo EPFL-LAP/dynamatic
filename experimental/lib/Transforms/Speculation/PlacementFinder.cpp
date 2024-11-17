@@ -215,14 +215,19 @@ void PlacementFinder::findCommitsBetweenBBs() {
     }
 
     if (countSpecInputs > 1) {
+      int placeIndex = 0;
+      int i = 0;
       // Potential ordering issue, add commits
       for (const BBArc &pred : predecessorArcs) {
-        for (CFGEdge *edge : pred.edges) {
-          // Add a Commit only in front of speculative inputs
-          if (speculativeEdges.count(edge))
-            placements.addCommit(*edge);
-          // Here, synchronizer operations will be needed in the future
+        if (i == placeIndex) {
+          for (CFGEdge *edge : pred.edges) {
+            // Add a Commit only in front of speculative inputs
+            if (speculativeEdges.count(edge))
+              placements.addCommit(*edge);
+            // Here, synchronizer operations will be needed in the future
+          }
         }
+        i++;
       }
     }
   }
