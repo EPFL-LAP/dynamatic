@@ -79,4 +79,4 @@ The following instructions can be used to setup Dynamatic from source. If you in
     ninja check-dynamatic
     ```
 
-    _**Important note: ** If Dynamatic is built in Release mode, one of the tests will crash (see #164), hence it is recommended to run these tests in the Debug build._
+    _**Important note:** If Dynamatic is built in Release mode, one of the tests will crash (see #164), hence it is recommended to run these tests in the Debug build._
