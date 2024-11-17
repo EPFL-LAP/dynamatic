@@ -46,11 +46,18 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
   is1 >> hex >> i1;
   is2 >> hex >> i2;
 
-  if (isnan(*((float *)&i1)) && isnan(*((float *)&i2)))
+  float f1 = decodeToken(i1);
+  float f2 = decodeToken(i2);
+
+  if (isnan(f1) && isnan(f2))
     return true;
 
-  float diff = abs(*((float *)&i1) - *((float *)&i2));
+  float diff = abs(f1 - f2);
   return (diff < threshold);
+}
+
+float FloatCompare::decodeToken(unsigned int token) const {
+  return *((float *) &token);
 }
 
 DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
@@ -63,11 +70,18 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
   is1 >> hex >> i1;
   is2 >> hex >> i2;
 
-  if (isnan(*((double *)&i1)) && isnan(*((double *)&i2)))
+  double d1 = decodeToken(i1);
+  double d2 = decodeToken(i2);
+
+  if (isnan(d1) && isnan(d2))
     return true;
 
-  double diff = abs(*((double *)&i1) - *((double *)&i2));
+  double diff = abs(d1 - d2);
   return (diff < threshold);
+}
+
+double DoubleCompare::decodeToken(unsigned int token) const {
+  return *((double *) &token);
 }
 
 string extractParentDirectoryPath(string filepath) {
