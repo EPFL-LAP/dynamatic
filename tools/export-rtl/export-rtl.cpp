@@ -20,6 +20,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/System.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -32,6 +33,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -43,6 +45,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <optional>
 #include <set>
 #include <string>
 #include <system_error>
@@ -51,6 +54,7 @@
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
 static cl::OptionCategory mainCategory("Tool options");
 
@@ -159,7 +163,7 @@ using FGetValueName = std::function<StringRef(Value)>;
 
 /// Aggregates all data one is likely to need when writing a module's RTL
 /// implementation to a file on disk.
-struct WriteData {
+struct WriteModData {
   /// Module being exported to RTL.
   hw::HWModuleOp modOp;
   /// Stream on which to write the RTL implementation.
@@ -171,8 +175,30 @@ struct WriteData {
 
   /// Constructs from the module being exported and from the stream to write the
   /// RTL implementation to.
-  WriteData(hw::HWModuleOp modOp, raw_indented_ostream &os)
+  WriteModData(hw::HWModuleOp modOp, raw_indented_ostream &os)
       : modOp(modOp), os(os) {}
+
+  using PortDeclarationWriter = void (*)(const llvm::Twine &name, PortType dir,
+                                         std::optional<unsigned> type,
+                                         raw_indented_ostream &os);
+
+  /// Writes the module's port declarations.
+  void writeIO(PortDeclarationWriter writeDeclaration, StringRef sep);
+
+  using SignalDeclarationWriter = void (*)(const llvm::Twine &name,
+                                           std::optional<unsigned> type,
+                                           raw_indented_ostream &os);
+
+  /// Writes the module's internal signal declarations.
+  void writeSignalDeclarations(SignalDeclarationWriter writeDeclaration);
+
+  using SignalAssignmentWriter = void (*)(const llvm::Twine &dst,
+                                          const llvm::Twine &src,
+                                          raw_indented_ostream &os);
+
+  /// Writes signal assignments between the top-level module's outputs and
+  /// the implementation's internal signals.
+  void writeSignalAssignments(SignalAssignmentWriter writeAssignment);
 
   /// Returns a function that maps SSA values to the name of the internal RTl
   /// signal that corresponds to it. The returned function asserts if the value
@@ -190,7 +216,8 @@ struct WriteData {
 /// writing RTL, regardless of the HDL.
 class RTLWriter {
 public:
-  /// A pair of strings.
+  /// The name of a port along with its type (`std::nullopt` for a 1-bit signal,
+  /// an unsigned number `n` for a vector of size `n + 1`)
   using IOPort = std::pair<std::string, std::optional<unsigned>>;
 
   /// Groups all of the top-level entity's IO as pairs of signal name and signal
@@ -235,7 +262,7 @@ public:
   /// Associates each SSA value inside the module to internal module signals.
   /// Fails when encoutering an unsupported operation inside the module;
   /// succeeds otherwise.
-  LogicalResult createInternalSignals(WriteData &data) const;
+  LogicalResult createInternalSignals(WriteModData &data) const;
 
   void fillIOMappings(hw::InstanceOp instOp, const FGetValueName &getValueName,
                       IOMap &mappings) const;
@@ -257,7 +284,7 @@ private:
 
 using PortMapWriter = void (*)(const RTLWriter::Port &port,
                                ArrayRef<std::string> signalNames,
-                               raw_indented_ostream &);
+                               raw_indented_ostream &os);
 
 /// Writes IO mappings to the output stream. Provided with a correct
 /// port-mapping function, this works for both VHDL and Verilog.
@@ -302,6 +329,96 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
   }
 }
 
+/// Returns the internal signal name for an extra channel signal.
+static std::string getExtraSignalName(StringRef baseName,
+                                      const ExtraSignal &extra) {
+  return baseName.str() + "_" + extra.name.str();
+}
+
+void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
+                           StringRef sep) {
+  const RTLWriter::EntityIO entityIO(modOp);
+  size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
+
+  auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
+                           PortType dir) -> void {
+    for (auto &[portName, portType] : io) {
+      writeDeclaration(portName, dir, portType, os);
+      if (--numIOLeft != 0)
+        os << sep;
+      os << "\n";
+    }
+  };
+
+  writePortsDir(entityIO.inputs, PortType::IN);
+  writePortsDir(entityIO.outputs, PortType::OUT);
+}
+
+void WriteModData::writeSignalDeclarations(
+    SignalDeclarationWriter writeDeclaration) {
+  auto isNotBlockArg = [](auto valAndName) -> bool {
+    return !isa<BlockArgument>(valAndName.first);
+  };
+
+  auto addValidReady = [&](StringRef name) -> void {
+    writeDeclaration(getInternalSignalName(name, SignalType::VALID),
+                     std::nullopt, os);
+    writeDeclaration(getInternalSignalName(name, SignalType::READY),
+                     std::nullopt, os);
+  };
+
+  for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
+    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<ChannelType>([&](ChannelType channelType) {
+          writeDeclaration(
+              getInternalSignalName(valueAndName.second, SignalType::DATA),
+              channelType.getDataBitWidth() - 1, os);
+          addValidReady(valueAndName.second);
+          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+            writeDeclaration(getExtraSignalName(valueAndName.second, extra),
+                             getRawType(cast<IntegerType>(extra.type)), os);
+          }
+        })
+        .Case<ControlType>(
+            [&](auto type) { addValidReady(valueAndName.second); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          writeDeclaration(valueAndName.second, getRawType(intType), os);
+        });
+  }
+}
+
+void WriteModData::writeSignalAssignments(
+    SignalAssignmentWriter writeAssignment) {
+  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
+    writeAssignment(signal + RTLWriter::VALID_SUFFIX,
+                    name + RTLWriter::VALID_SUFFIX, os);
+    writeAssignment(name + RTLWriter::READY_SUFFIX,
+                    signal + RTLWriter::READY_SUFFIX, os);
+  };
+
+  for (auto valAndName : llvm::zip(outputs, modOp.getOutputNamesStr())) {
+    Value val = std::get<0>(valAndName);
+    StringRef name = std::get<1>(valAndName).strref();
+    StringRef signal = signals[val];
+    llvm::TypeSwitch<Type, void>(val.getType())
+        .Case<ChannelType>([&](ChannelType channelType) {
+          writeAssignment(signal, name, os);
+          addValidReady(name, signal);
+          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+            std::string srcName = getExtraSignalName(signal, extra);
+            std::string dstName = getExtraSignalName(name, extra);
+            if (!extra.downstream)
+              std::swap(srcName, dstName);
+            writeAssignment(srcName, dstName, os);
+          }
+        })
+        .Case<ControlType>([&](auto type) { addValidReady(name, signal); })
+        .Case<IntegerType>([&](IntegerType intType) {
+          writeAssignment(signals[val], name, os);
+        });
+  }
+}
+
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
                               std::vector<IOPort> &up) -> void {
@@ -314,12 +431,18 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addPortType = [&](Type portType, StringRef portName,
                          std::vector<IOPort> &down, std::vector<IOPort> &up) {
     llvm::TypeSwitch<Type, void>(portType)
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+        .Case<ChannelType>([&](ChannelType channelType) {
           down.emplace_back(getInternalSignalName(portName, SignalType::DATA),
                             channelType.getDataBitWidth() - 1);
           addValidAndReady(portName, down, up);
+          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+            std::vector<IOPort> &portsDir = extra.downstream ? down : up;
+            IntegerType ty = cast<IntegerType>(extra.type);
+            portsDir.emplace_back(getExtraSignalName(portName, extra),
+                                  getRawType(ty));
+          }
         })
-        .Case<handshake::ControlType>(
+        .Case<ControlType>(
             [&](auto type) { addValidAndReady(portName, down, up); })
         .Case<IntegerType>([&](IntegerType intType) {
           down.emplace_back(portName, getRawType(intType));
@@ -335,7 +458,7 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     addPortType(resType, portAttr.str(), outputs, inputs);
 }
 
-LogicalResult RTLWriter::createInternalSignals(WriteData &data) const {
+LogicalResult RTLWriter::createInternalSignals(WriteModData &data) const {
   // Create signal names for all block arguments
   for (auto [arg, name] :
        llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
@@ -386,13 +509,16 @@ void RTLWriter::constructIOMappings(
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
     llvm::TypeSwitch<Type, void>(portType)
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
+        .Case<ChannelType>([&](ChannelType channelType) {
           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(
               getInternalSignalName(signal, SignalType::DATA));
           addValidAndReady(port, signal);
+          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+            mappings[{getExtraSignalName(port, extra), false}].push_back(
+                getExtraSignalName(signal, extra));
+          }
         })
-        .Case<handshake::ControlType>(
-            [&](auto type) { addValidAndReady(port, signal); })
+        .Case<ControlType>([&](auto type) { addValidAndReady(port, signal); })
         .Case<IntegerType>([&](IntegerType intType) {
           mappings[getSignalName(port)].push_back(signal.str());
         });
@@ -450,32 +576,21 @@ struct VHDLWriter : public RTLWriter {
                       raw_indented_ostream &os) const override;
 
 private:
-  std::string getVHDLType(std::optional<unsigned> width) const {
+  static std::string getVHDLType(std::optional<unsigned> width) {
     if (width)
       return "std_logic_vector(" + std::to_string(*width) + " downto 0)";
     return "std_logic";
   }
 
-  /// Writes the entry's IO ports.
-  void writeEntityIO(WriteData &data) const;
-
-  /// Writes all internal signal declarations inside the entity's
-  /// architecture.
-  void writeInternalSignals(WriteData &data) const;
-
-  /// Writes signal assignments betwween the top-level entity's outputs and
-  /// the architecture's internal signals.
-  void writeSignalAssignments(WriteData &data) const;
-
   /// Writes all module instantiations inside the entity's architecture.
-  void writeModuleInstantiations(WriteData &data) const;
+  void writeModuleInstantiations(WriteModData &data) const;
 };
 
 } // namespace
 
 LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
                                 raw_indented_ostream &os) const {
-  WriteData data(modOp, os);
+  WriteModData data(modOp, os);
   if (failed(createInternalSignals(data)))
     return failure();
 
@@ -490,7 +605,21 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os << "port (\n";
   os.indent();
 
-  writeEntityIO(data);
+  data.writeIO(
+      [](const llvm::Twine &name, PortType dir, std::optional<unsigned> type,
+         raw_indented_ostream &os) {
+        os << name << " : ";
+        switch (dir) {
+        case PortType::IN:
+          os << "in ";
+          break;
+        case PortType::OUT:
+          os << "out ";
+          break;
+        }
+        os << getVHDLType(type);
+      },
+      ";");
 
   // Close the entity declaration
   os.unindent();
@@ -503,15 +632,19 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
      << " is\n\n";
   os.indent();
 
-  // Declare signals inside the architecture
-  writeInternalSignals(data);
-
+  data.writeSignalDeclarations([](const llvm::Twine &name,
+                                  std::optional<unsigned> type,
+                                  raw_indented_ostream &os) {
+    os << "signal " << name << " : " << getVHDLType(type) << ";\n";
+  });
   os.unindent();
   os << "\nbegin\n\n";
   os.indent();
 
   // Architecture implementation
-  writeSignalAssignments(data);
+  data.writeSignalAssignments(
+      [](const llvm::Twine &src, const llvm::Twine &dst,
+         raw_indented_ostream &os) { os << dst << " <= " << src << ";\n"; });
   os << "\n";
   writeModuleInstantiations(data);
 
@@ -521,85 +654,7 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   return success();
 }
 
-void VHDLWriter::writeEntityIO(WriteData &data) const {
-  const EntityIO entityIO(data.modOp);
-  size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
-
-  raw_indented_ostream &os = data.os;
-  auto writePortsDir = [&](const std::vector<IOPort> &io, StringRef dir,
-                           StringRef name) -> void {
-    if (!io.empty())
-      os << "-- " << name << "\n";
-    for (auto &[portName, portType] : io) {
-      os << portName << " : " << dir << " " << getVHDLType(portType);
-      if (--numIOLeft != 0)
-        os << ";";
-      os << "\n";
-    }
-  };
-
-  writePortsDir(entityIO.inputs, "in", "inputs");
-  writePortsDir(entityIO.outputs, "out", "outputs");
-}
-
-void VHDLWriter::writeInternalSignals(WriteData &data) const {
-  auto isNotBlockArg = [](auto valAndName) -> bool {
-    return !isa<BlockArgument>(valAndName.first);
-  };
-
-  raw_indented_ostream &os = data.os;
-  auto addValidReady = [&](StringRef name) -> void {
-    os << "signal " << getInternalSignalName(name, SignalType::VALID)
-       << " : std_logic;\n";
-    os << "signal " << getInternalSignalName(name, SignalType::READY)
-       << " : std_logic;\n";
-  };
-
-  for (auto &valueAndName : make_filter_range(data.signals, isNotBlockArg)) {
-    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-          os << "signal "
-             << getInternalSignalName(valueAndName.second, SignalType::DATA)
-             << " : " << getVHDLType(channelType.getDataBitWidth() - 1)
-             << ";\n";
-          addValidReady(valueAndName.second);
-        })
-        .Case<handshake::ControlType>(
-            [&](auto type) { addValidReady(valueAndName.second); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          std::string type = getVHDLType(getRawType(intType));
-          os << "signal " << valueAndName.second << " : " << type << ";\n";
-        });
-  }
-}
-
-void VHDLWriter::writeSignalAssignments(WriteData &data) const {
-  raw_indented_ostream &os = data.os;
-  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
-    os << name << VALID_SUFFIX << " <= " << signal << VALID_SUFFIX << ";\n";
-    os << signal << READY_SUFFIX << " <= " << name << READY_SUFFIX << ";\n";
-  };
-
-  os << "-- entity outputs\n";
-  for (auto valAndName :
-       llvm::zip(data.outputs, data.modOp.getOutputNamesStr())) {
-    Value val = std::get<0>(valAndName);
-    StringRef name = std::get<1>(valAndName).strref();
-    StringRef signal = data.signals[val];
-    llvm::TypeSwitch<Type, void>(val.getType())
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-          os << name << " <= " << signal << ";\n";
-          addValidReady(name, signal);
-        })
-        .Case<handshake::ControlType>(
-            [&](auto type) { addValidReady(name, signal); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          os << name << " <= " << data.signals[val] << ";\n";
-        });
-  }
-}
-
-void VHDLWriter::writeModuleInstantiations(WriteData &data) const {
+void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
@@ -684,47 +739,57 @@ struct VerilogWriter : public RTLWriter {
                       raw_indented_ostream &os) const override;
 
 private:
-  std::string getVerilogType(std::optional<unsigned> width) const {
+  static std::string getVerilogType(std::optional<unsigned> width) {
     if (width)
       return "[" + std::to_string(*width) + ":0]";
     return "";
   }
 
-  /// Writes the entry's IO ports.
-  void writeEntityIO(WriteData &data) const;
-
-  /// Writes all internal signal declarations inside the entity's
-  /// architecture.
-  void writeInternalSignals(WriteData &data) const;
-
-  /// Writes signal assignments betwween the top-level entity's outputs and
-  /// the architecture's internal signals.
-  void writeSignalAssignments(WriteData &data) const;
-
   /// Writes all module instantiations inside the entity's architecture.
-  void writeModuleInstantiations(WriteData &data) const;
+  void writeModuleInstantiations(WriteModData &data) const;
 };
 
 } // namespace
 
 LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
                                    raw_indented_ostream &os) const {
-  WriteData data(modOp, os);
+  WriteModData data(modOp, os);
   if (failed(createInternalSignals(data)))
     return failure();
 
   os << "module " << modOp.getSymName() << "(\n";
 
   os.indent();
-  writeEntityIO(data);
+  data.writeIO(
+      [](const llvm::Twine &name, PortType dir, std::optional<unsigned> type,
+         raw_indented_ostream &os) {
+        switch (dir) {
+        case PortType::IN:
+          os << "input ";
+          break;
+        case PortType::OUT:
+          os << "output ";
+          break;
+        }
+        os << getVerilogType(type) << " " << name;
+      },
+      ",");
   os.unindent();
 
   os << ");\n";
   os.indent();
 
-  writeInternalSignals(data);
+  data.writeSignalDeclarations([](const llvm::Twine &name,
+                                  std::optional<unsigned> type,
+                                  raw_indented_ostream &os) {
+    os << "wire " << getVerilogType(type) << " " << name << ";\n";
+  });
+
   os << "\n";
-  writeSignalAssignments(data);
+  data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
+                                 raw_indented_ostream &os) {
+    os << "assign " << dst << " = " << src << ";\n";
+  });
   os << "\n";
   writeModuleInstantiations(data);
 
@@ -733,85 +798,7 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   return success();
 }
 
-void VerilogWriter::writeEntityIO(WriteData &data) const {
-  const EntityIO entityIO(data.modOp);
-  size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
-
-  raw_indented_ostream &os = data.os;
-  auto writePortsDir = [&](const std::vector<IOPort> &io, StringRef dir,
-                           StringRef name) -> void {
-    if (!io.empty())
-      os << "// " << name << "\n";
-    for (auto &[portName, portType] : io) {
-      os << dir << " " << getVerilogType(portType) << " " << portName;
-      if (--numIOLeft != 0)
-        os << ",";
-      os << "\n";
-    }
-  };
-
-  writePortsDir(entityIO.inputs, "input", "inputs");
-  writePortsDir(entityIO.outputs, "output", "outputs");
-}
-
-void VerilogWriter::writeInternalSignals(WriteData &data) const {
-  auto isNotBlockArg = [](auto valAndName) -> bool {
-    return !isa<BlockArgument>(valAndName.first);
-  };
-
-  raw_indented_ostream &os = data.os;
-  auto addValidReady = [&](StringRef name) -> void {
-    os << "wire " << getInternalSignalName(name, SignalType::VALID) << ";\n";
-    os << "wire " << getInternalSignalName(name, SignalType::READY) << ";\n";
-  };
-
-  for (auto &valueAndName : make_filter_range(data.signals, isNotBlockArg)) {
-    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-          os << "wire " << getVerilogType(channelType.getDataBitWidth() - 1)
-             << " "
-             << getInternalSignalName(valueAndName.second, SignalType::DATA)
-             << ";\n";
-          addValidReady(valueAndName.second);
-        })
-        .Case<handshake::ControlType>(
-            [&](auto type) { addValidReady(valueAndName.second); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          std::string type = getVerilogType(getRawType(intType));
-          os << "wire " << type << " " << valueAndName.second << ";\n";
-        });
-  }
-}
-
-void VerilogWriter::writeSignalAssignments(WriteData &data) const {
-  raw_indented_ostream &os = data.os;
-  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
-    os << "assign " << name << VALID_SUFFIX << " = " << signal << VALID_SUFFIX
-       << ";\n";
-    os << "assign " << signal << READY_SUFFIX << " = " << name << READY_SUFFIX
-       << ";\n";
-  };
-
-  os << "// module outputs\n";
-  for (auto valAndName :
-       llvm::zip(data.outputs, data.modOp.getOutputNamesStr())) {
-    Value val = std::get<0>(valAndName);
-    StringRef name = std::get<1>(valAndName).strref();
-    StringRef signal = data.signals[val];
-    llvm::TypeSwitch<Type, void>(val.getType())
-        .Case<handshake::ChannelType>([&](handshake::ChannelType channelType) {
-          os << "assign " << name << " = " << signal << ";\n";
-          addValidReady(name, signal);
-        })
-        .Case<handshake::ControlType>(
-            [&](auto type) { addValidReady(name, signal); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          os << "assign " << name << " = " << data.signals[val] << ";\n";
-        });
-  }
-}
-
-void VerilogWriter::writeModuleInstantiations(WriteData &data) const {
+void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
   using KeyValuePair = std::pair<StringRef, StringRef>;
 
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
