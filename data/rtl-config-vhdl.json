@@ -376,7 +376,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tfifo.vhd",
     "module-name": "tfifo_dataless",
-    "dependencies": ["elastic_fifo_inner_dataless"]
+    "dependencies": ["elastic_fifo_inner_dataless", "tfifo_dataless_with_tag"]
   },
   {
     "name": "handshake.buffer",
@@ -839,6 +839,11 @@
     "generic": "$DYNAMATIC/data/vhdl/support/dataless/tehb_with_tag.vhd",
     "module-name": "tehb_dataless_with_tag",
     "dependencies": ["tehb"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/tfifo_with_tag.vhd",
+    "module-name": "tfifo_dataless_with_tag",
+    "dependencies": ["tfifo"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old_dep.vhd"
