@@ -13,6 +13,7 @@
 
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
@@ -149,7 +150,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
           // A commit is needed in front of the memory controller
           // On the operand indicating the number of stores
           placements.addCommit(dstOpOperand);
-        } else if (dstOpOperand.getOperandNumber() == 3) {
+        } else if (dstOpOperand.get().getType().isa<handshake::ControlType>()) {
           // End signal
           placements.addCommit(dstOpOperand);
         }
