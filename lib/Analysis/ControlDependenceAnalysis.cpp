@@ -18,10 +18,11 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/Region.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace dynamatic;
+using namespace mlir;
+#define DEBUG_TYPE "control-dependence-analysis"
 
 using PathInDomTree = SmallVector<DominanceInfoNode *>;
 using PostDomTree = llvm::DominatorTreeBase<Block, true>;
@@ -56,9 +57,10 @@ ControlDependenceAnalysis::ControlDependenceAnalysis(Operation *operation) {
 
   // report an error indicating that the analysis is instantiated over
   // an inappropriate operation
-  if (functionsCovered != 1)
+  if (functionsCovered != 1) {
     llvm::errs() << "[CDA] Control Dependency Analysis failed due to a wrong "
                     "input type\n";
+  }
 };
 
 /// Utility function to DFS inside the post-dominator tree and find the path
@@ -222,20 +224,22 @@ dynamatic::ControlDependenceAnalysis::getAllBlockDeps() const {
 
 void dynamatic::ControlDependenceAnalysis::printAllBlocksDeps() const {
 
-  LLVM_DEBUG(llvm::dbgs() << "\n*********************************\n\n";
-             for (auto &elem : blocksControlDeps) {
-               Block *block = elem.first;
-               block->printAsOperand(llvm::dbgs());
-               llvm::dbgs() << " is control dependent on: ";
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n*********************************\n\n";
+    for (auto &elem : blocksControlDeps) {
+      Block *block = elem.first;
+      block->printAsOperand(llvm::dbgs());
+      llvm::dbgs() << " is control dependent on: ";
 
-               auto blockDeps = elem.second;
+      auto blockDeps = elem.second;
 
-               for (auto &oneDep : blockDeps.allControlDeps) {
-                 oneDep->printAsOperand(llvm::dbgs());
-                 llvm::dbgs() << ", ";
-               }
+      for (auto &oneDep : blockDeps.allControlDeps) {
+        oneDep->printAsOperand(llvm::dbgs());
+        llvm::dbgs() << ", ";
+      }
 
-               llvm::dbgs() << "\n";
-             } llvm::dbgs()
-             << "\n*********************************\n";);
+      llvm::dbgs() << "\n";
+    }
+    llvm::dbgs() << "\n*********************************\n";
+  });
 }

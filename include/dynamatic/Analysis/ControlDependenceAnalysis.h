@@ -19,10 +19,6 @@
 #include "mlir/Pass/AnalysisManager.h"
 #include <optional>
 
-#define DEBUG_TYPE "CONTROL_DEPENDENCE_ANALYSIS"
-
-using namespace mlir;
-
 namespace dynamatic {
 
 /// Analysis to obtain the control dependence analysis of each block in the CFG
