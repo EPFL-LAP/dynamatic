@@ -85,6 +85,40 @@ private:
 };
 } // namespace
 
+template <>
+LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
+    Value ctrlSignal) {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  for (OpOperand *operand :
+       placements.getPlacements<handshake::SpecCommitOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // We need a buffer in most cases
+    builder.setInsertionPoint(dstOp);
+    handshake::BufferOp bufferOp = builder.create<handshake::BufferOp>(
+        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
+    inheritBB(dstOp, bufferOp);
+
+    operand->set(bufferOp.getResult());
+    // Create and connect the new Operation
+    builder.setInsertionPoint(bufferOp);
+    handshake::SpecCommitOp newOp = builder.create<handshake::SpecCommitOp>(
+        bufferOp->getLoc(), bufferOp.getResult(), ctrlSignal);
+    inheritBB(dstOp, newOp);
+
+    // Connect the new Operation to dstOp
+    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
+    // because the uses of srcOpResult may include a newly created
+    // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
+  }
+
+  return success();
+}
+
 template <typename T>
 LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   MLIRContext *ctx = &getContext();
