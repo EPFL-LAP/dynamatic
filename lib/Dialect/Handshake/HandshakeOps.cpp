@@ -1858,8 +1858,9 @@ void UnbundleOp::print(OpAsmPrinter &p) {
   if (OperandRange upstreams = getUpstreams(); !upstreams.empty())
     p << "[ " << upstreams << " ] ";
   p.printOptionalAttrDict((*this)->getAttrs());
+  p << " : ";
   printHandshakeType(p, getChannelLike().getType());
-  p << " : to _ ";
+  p << " to _ ";
 }
 
 LogicalResult UnbundleOp::inferReturnTypes(
