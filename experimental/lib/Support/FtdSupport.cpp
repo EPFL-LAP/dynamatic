@@ -15,11 +15,13 @@
 #include "experimental/Support/FtdSupport.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Backedge.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <stack>
 #include <unordered_set>
 
 using namespace mlir;
@@ -528,59 +530,79 @@ DenseMap<Block *, DenseSet<Block *>> ftd::getDominanceFrontier(Region &region) {
   return result;
 }
 
-FailureOr<DenseMap<Block *, Value>>
-ftd::insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
-               SmallVector<Value> &vals) {
+FailureOr<DenseMap<Value, Value>>
+ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
+            SmallVector<Value> &vals) {
 
   auto dominanceFrontier = getDominanceFrontier(funcRegion);
 
   // The number of values to be considered cannot be empty
-  if (vals.empty())
+  if (vals.empty()) {
     return funcRegion.getParentOp()->emitError()
            << "The number values provided in `insertPhi` "
               "must be larger than 2\n";
-
-  // All the values provided must have the same type.
-  // As an additional constraint, all the values should be in a different basic
-  // block
-  DenseSet<Block *> foundBlocks;
-  for (auto &val : vals) {
-    if (val.getType() != vals[0].getType())
-      return funcRegion.getParentOp()->emitError()
-             << "The values provided to `addPhi` do not all have the same type";
-    if (foundBlocks.contains(val.getParentBlock()))
-      return funcRegion.getParentOp()->emitError()
-             << "Some of the values provided to `addPhi` "
-                "belong to the same basic block";
-    foundBlocks.insert(val.getParentBlock());
   }
 
-  llvm::dbgs() << "[NEW PHI] Producers in: {";
-  for (auto &val : vals) {
-    val.getParentBlock()->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << " ";
-  }
-  llvm::dbgs() << "}\n";
+  // Type of the
+  Type valueType = vals[0].getType();
+
+  // All the input values associated to one block
+  DenseMap<Block *, SmallVector<Value>> valuesPerBlock;
+
+  // Associate for each block the value that is dominated by all the others in
+  // the same block
+  DenseMap<Block *, Value> inputBlocks;
+
+  // In which block a new phi is necessary
+  DenseSet<Block *> blocksToAddPhi;
 
   // Temporary data structures to run the Cryton algorithm for phi positioning
   DenseMap<Block *, bool> work;
   DenseMap<Block *, bool> hasAlready;
   SmallVector<Block *> w;
 
-  // Initialize data structures
+  // Backedge builder to insert new merges
+  BackedgeBuilder edgeBuilder(rewriter, funcRegion.getLoc());
+
+  // Backedge corresponding to each phi
+  DenseMap<Block *, Backedge> resultPerPhi;
+
+  // Operands of each merge
+  DenseMap<Block *, SmallVector<Value>> operandsPerPhi;
+
+  // Which value should be the input of each input value
+  DenseMap<Value, Value> inputPerValue;
+
+  // Check that all the values have the same type, then collet them according to
+  // their input blocks
+  for (auto &val : vals) {
+    if (val.getType() != valueType) {
+      return funcRegion.getParentOp()->emitError()
+             << "All values must have the same type\n";
+    }
+    auto *bb = val.getParentBlock();
+    valuesPerBlock[bb].push_back(val);
+  }
+
+  // Sort the vectors of values in each block according to their dominance and
+  // get only the last input value for each block. This is necessary in case in
+  // the input sets there is more than one value per blocks
+  for (auto &[bb, vals] : valuesPerBlock) {
+    mlir::DominanceInfo domInfo;
+    std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
+      return domInfo.dominates(a.getDefiningOp(), b.getDefiningOp());
+    });
+    inputBlocks.insert({bb, vals[vals.size() - 1]});
+  }
+
+  // Initialize data structures to run the Cryton algorithm
   for (auto &bb : funcRegion.getBlocks()) {
     work.insert({&bb, false});
     hasAlready.insert({&bb, false});
   }
 
-  for (auto val : vals) {
-    w.push_back(val.getParentBlock());
-    work[val.getParentBlock()] = true;
-  }
-
-  // This vector ends up containig the blocks in which a new argument is to be
-  // added
-  DenseSet<Block *> blocksToAddPhi;
+  for (auto &[bb, val] : inputBlocks)
+    w.push_back(bb), work[bb] = true;
 
   // Until there are no more elements in `w`
   while (w.size() != 0) {
@@ -606,11 +628,8 @@ ftd::insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
     }
   }
 
-  // Get a location to insert the new phis
-  auto loc = UnknownLoc::get(vals[0].getContext());
-  for (auto &bb : blocksToAddPhi)
-    bb->addArgument(vals[0].getType(), loc);
-
+  // Once the cryton algorithm is done, `blocksToAddPhi` contains the set of
+  // blocks that require a phi
   llvm::dbgs() << "[NEW PHI] Insertion in { ";
   for (auto &bb : blocksToAddPhi) {
     bb->printAsOperand(llvm::dbgs());
@@ -621,179 +640,110 @@ ftd::insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
   if (blocksToAddPhi.empty())
     return success();
 
-  // Since a new block argument was added for each block in `blocksToAddPhi`,
-  // new values must be provided to them together with the branches (either
-  // conditional or non-conditional). The values might come from one of the
-  // input operations or from another of the added block arguments. In order to
-  // find the correct value, we first anlayzed the predecessor of each node: if
-  // it has a redefinition of the value, then we use it, otherwise we move the
-  // anlaysis to its immediate dominator. Since a definition of the value must
-  // always exist, BB0 must define the value as well.
+  // A backedge is created for each block in `blocksToAddPhi`, and it will
+  // contain the value used as placeholder for the phi
+  for (auto &bb : blocksToAddPhi) {
+    Backedge mergeResult = edgeBuilder.get(valueType, bb->front().getLoc());
+    operandsPerPhi.insert({bb, SmallVector<Value>()});
+    resultPerPhi.insert({bb, mergeResult});
+  }
 
+  // For each phi, we need one input for every predecessor of the block
   for (auto &bb : blocksToAddPhi) {
 
-    // For each bb in `blocksToAddPhi`, we need to modify the terminator of each
-    // of its predecessors
+    // Avoid to cover a predecessor twice
+    llvm::DenseSet<Block *> coveredPred;
     auto predecessors = bb->getPredecessors();
 
-    for (auto *pred : predecessors) {
-
-      auto *terminator = pred->getTerminator();
-      rewriter.setInsertionPointAfter(terminator);
+    for (Block *pred : predecessors) {
+      if (coveredPred.contains(pred))
+        continue;
+      coveredPred.insert(pred);
 
       // If the predecessor does not contains a definition of the value, we move
       // to its immediate dominator, until we have found a definition.
-      auto *predecessorOrDominator = pred;
-
+      Block *predecessorOrDominator = nullptr;
       Value valueToUse = nullptr;
 
-      while (valueToUse == nullptr) {
-
-        // For each of the values provided as input
-        for (auto &val : vals) {
-
-          // If the block of the current `predecessorOrDominator` contains a
-          // definition of the value, then we use it in the terminator
-          if (val.getParentBlock() == predecessorOrDominator) {
-            valueToUse = val;
-            break;
-          }
-        }
-
-        if (valueToUse == nullptr) {
-          // Go through the blocks having a new arugment for the value
-          for (auto &phibb : blocksToAddPhi) {
-            if (predecessorOrDominator == phibb) {
-              valueToUse = phibb->getArgument(phibb->getNumArguments() - 1);
-              break;
-            }
-          }
-        }
-
-        if (valueToUse) {
-
-          // Case in which the terminator is a branch
-          if (llvm::isa_and_nonnull<cf::BranchOp>(terminator)) {
-            auto branch = cast<cf::BranchOp>(terminator);
-            SmallVector<Value> operands = branch.getDestOperands();
-            operands.push_back(valueToUse);
-            auto newBranch = rewriter.create<cf::BranchOp>(
-                branch->getLoc(), branch.getDest(), operands);
-            rewriter.replaceOp(branch, newBranch);
-          }
-
-          // Case in which the terminator is a conditional branch
-          if (llvm::isa_and_nonnull<cf::CondBranchOp>(terminator)) {
-            auto branch = cast<cf::CondBranchOp>(terminator);
-            SmallVector<Value> trueOperands = branch.getTrueDestOperands();
-            SmallVector<Value> falseOperands = branch.getFalseDestOperands();
-
-            if (branch.getTrueDest() == bb)
-              trueOperands.push_back(valueToUse);
-            else
-              falseOperands.push_back(valueToUse);
-
-            auto newBranch = rewriter.create<cf::CondBranchOp>(
-                branch->getLoc(), branch.getCondition(), branch.getTrueDest(),
-                trueOperands, branch.getFalseDest(), falseOperands);
-            rewriter.replaceOp(branch, newBranch);
-            break;
-          }
-        }
-
-        // Terminate if the value was found
-        if (valueToUse != nullptr ||
-            predecessorOrDominator->hasNoPredecessors())
-          break;
-
-        // Move to the immediate dominator
+      do {
         predecessorOrDominator =
-            getImmediateDominator(funcRegion, predecessorOrDominator);
-      }
+            !predecessorOrDominator
+                ? pred
+                : getImmediateDominator(funcRegion, predecessorOrDominator);
 
-      if (!valueToUse)
-        return funcRegion.getParentOp()->emitError()
-               << "A branch could not be modified, because no definition of "
-                  "the value was found\n";
+        if (inputBlocks.contains(predecessorOrDominator))
+          valueToUse = inputBlocks[predecessorOrDominator];
+
+        if (!valueToUse && resultPerPhi.contains(predecessorOrDominator))
+          valueToUse = resultPerPhi.find(predecessorOrDominator)->getSecond();
+
+      } while (!valueToUse);
+
+      operandsPerPhi[bb].push_back(valueToUse);
     }
   }
 
-  DenseMap<Block *, Value> result;
+  // Create the merge and then replace the values
+  DenseMap<Block *, handshake::MergeOp> newMergePerPhi;
 
-  for (auto &bb : funcRegion.getBlocks()) {
+  for (auto *bb : blocksToAddPhi) {
+    rewriter.setInsertionPointToStart(bb);
+    auto mergeOp = rewriter.create<handshake::MergeOp>(bb->front().getLoc(),
+                                                       operandsPerPhi[bb]);
+    mergeOp->setAttr(ftd::FTD_MEM_DEP, rewriter.getUnitAttr());
+    newMergePerPhi.insert({bb, mergeOp});
+  }
 
-    if (blocksToAddPhi.contains(&bb)) {
-      result.insert({&bb, bb.getArgument(bb.getNumArguments() - 1)});
+  for (auto *bb : blocksToAddPhi)
+    resultPerPhi.find(bb)->getSecond().setValue(newMergePerPhi[bb].getResult());
+
+  // For each value input, find which is supposed to be the new input
+  for (auto &val : vals) {
+
+    Block *bb = val.getParentBlock();
+    Value foundValue = nullptr;
+    Block *blockOrDominator = bb;
+
+    for (unsigned i = 1; i < valuesPerBlock[bb].size() - 1; i++) {
+      if (valuesPerBlock[bb][i] == val)
+        inputPerValue[val] = valuesPerBlock[bb][i - 1];
+    }
+
+    if (blocksToAddPhi.contains(bb)) {
+      inputPerValue[val] = newMergePerPhi[bb].getResult();
       continue;
     }
 
-    auto predecessors = bb.getPredecessors();
+    do {
+      if (!blockOrDominator->hasNoPredecessors())
+        blockOrDominator = getImmediateDominator(funcRegion, blockOrDominator);
 
-    for (auto *pred : predecessors) {
-
-      auto *terminator = pred->getTerminator();
-      rewriter.setInsertionPointAfter(terminator);
-
-      // If the predecessor does not contains a definition of the value, we move
-      // to its immediate dominator, until we have found a definition.
-      auto *predecessorOrDominator = pred;
-
-      Value valueToUse = nullptr;
-
-      while (valueToUse == nullptr) {
-
-        // For each of the values provided as input
-        for (auto &val : vals) {
-
-          // If the block of the current `predecessorOrDominator` contains a
-          // definition of the value, then we use it in the terminator
-          if (val.getParentBlock() == predecessorOrDominator) {
-            valueToUse = val;
-            break;
-          }
-        }
-
-        if (valueToUse == nullptr) {
-          // Go through the blocks having a new arugment for the value
-          for (auto &phibb : blocksToAddPhi) {
-            if (predecessorOrDominator == phibb) {
-              valueToUse = phibb->getArgument(phibb->getNumArguments() - 1);
-              break;
-            }
-          }
-        }
-
-        if (valueToUse)
-          result.insert({&bb, valueToUse});
-
-        // Terminate if the value was found
-        if (valueToUse != nullptr ||
-            predecessorOrDominator->hasNoPredecessors())
-          break;
-
-        // Move to the immediate dominator
-        predecessorOrDominator =
-            getImmediateDominator(funcRegion, predecessorOrDominator);
+      if (blocksToAddPhi.contains(blockOrDominator)) {
+        foundValue = newMergePerPhi[blockOrDominator].getResult();
+        break;
       }
 
-      if (!valueToUse)
-        return funcRegion.getParentOp()->emitError()
-               << "Cannot find defintion of a value for a block";
-    }
+      if (inputBlocks.contains(blockOrDominator)) {
+        foundValue = inputBlocks[blockOrDominator];
+        break;
+      }
+
+    } while (!foundValue);
+
+    inputPerValue[val] = foundValue;
   }
 
-#define PRINT_DEBUG
-#ifdef PRINT_DEBUG
-  for (auto &entry : result) {
-    llvm::dbgs() << "[PHI RESULT] In ";
-    entry.first->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << " value is ";
-    entry.second.print(llvm::dbgs());
+  funcRegion.getParentOp()->print(llvm::dbgs());
+
+  for (auto &[in, out] : inputPerValue) {
+    llvm::dbgs() << "value ";
+    in.print(llvm::dbgs());
+    llvm::dbgs() << " requres ";
+    out.print(llvm::dbgs());
     llvm::dbgs() << "\n";
   }
-#endif
 
-  return result;
+  return inputPerValue;
 }
 
 SmallVector<CFGLoop *> ftd::getLoopsConsNotInProd(Block *cons, Block *prod,
@@ -1171,8 +1121,7 @@ static LogicalResult insertDirectSuppression(
   // added if the following conditions hold: The consumer is a mux; The
   // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
   // from the producer) is a data input.
-  if (llvm::isa_and_nonnull<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
+  if (ftd::isMergeOrMux(consumer) && consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
       consumer->getOperand(0) != connection &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
       consumer->getBlock() != producerBlock) {
@@ -1246,7 +1195,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
 
       // If the consumer and the producer are in the same block without the
       // consumer being a multiplxer skip because no delivery is needed
-      if (consumerBlock == producerBlock && !isa<handshake::MuxOp>(consumerOp))
+      if (consumerBlock == producerBlock && !isMergeOrMux(consumerOp))
         continue;
 
       // Skip the prod-cons if the consumer is part of the operations
@@ -1326,8 +1275,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       // We need to suppress a token if the consumer comes before the
       // producer (backward edge)
       else if ((bi.greaterIndex(producerBlock, consumerBlock) ||
-                (isa<handshake::MuxOp>(consumerOp) &&
-                 producerBlock == consumerBlock &&
+                (isMergeOrMux(consumerOp) && producerBlock == consumerBlock &&
                  ftd::isaMergeLoop(consumerOp, loopInfo))) &&
                consumerLoop) {
         addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
@@ -1360,8 +1308,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       continue;
 
     // Skip if we are in block 0 and no multiplexer is involved
-    if (operand.getParentBlock() == producerBlock &&
-        !isa<handshake::MuxOp>(producerOp))
+    if (operand.getParentBlock() == producerBlock && !isMergeOrMux(producerOp))
       continue;
 
     // Handle the suppression
@@ -1371,4 +1318,9 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
   }
 
   return success();
+}
+
+bool ftd::isMergeOrMux(Operation *op) {
+  return llvm::isa_and_nonnull<handshake::MergeOp>(op) ||
+         llvm::isa_and_nonnull<handshake::MuxOp>(op);
 }

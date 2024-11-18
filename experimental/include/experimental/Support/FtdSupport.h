@@ -175,9 +175,9 @@ DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region);
 /// final representation is coherent, so that in each block you can obtain one
 /// only definition for the value. The resulting map provides such association,
 /// with the value as it is available at the beginning of the block.
-FailureOr<DenseMap<Block *, Value>>
-insertPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
-          SmallVector<Value> &vals);
+FailureOr<DenseMap<Value, Value>> addPhi(Region &funcRegion,
+                                         ConversionPatternRewriter &rewriter,
+                                         SmallVector<Value> &vals);
 
 /// Get a list of all the loops in which the consumer is but the producer is
 /// not, starting from the innermost.
@@ -197,6 +197,8 @@ addSuppToProducer(ConversionPatternRewriter &rewriter,
                   ftd::BlockIndexing &bi,
                   std::vector<Operation *> &producersToCover,
                   ControlDependenceAnalysis::BlockControlDepsMap &cda);
+
+bool isMergeOrMux(Operation *op);
 
 }; // namespace ftd
 }; // namespace experimental

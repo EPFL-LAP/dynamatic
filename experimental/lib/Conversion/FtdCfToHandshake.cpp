@@ -575,18 +575,27 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
               rewriter, mcOp, lsqOp, groupsGraph, forksGraph, startValue)))
         return failure();
 
-      // [TBD] Instead of adding things this way, introduce a custom pass
-      // about the analysis of these merges. Unify them with SSA?
-      if (failed(addMergeNonLoop(funcOp, rewriter, allMemDeps, groupsGraph,
-                                 forksGraph, startValue)))
-        return failure();
+      SmallVector<Value> forkValuesToConnect;
+      for (auto &[bb, op] : forksGraph)
+        forkValuesToConnect.push_back(op->getResult(0));
+      forkValuesToConnect.push_back(startValue);
 
-      if (failed(addMergeLoop(funcOp, rewriter, allMemDeps, groupsGraph,
-                              forksGraph, startValue)))
+      auto phiNetworkOrFailure =
+          addPhi(funcOp.getRegion(), rewriter, forkValuesToConnect);
+
+      if (failed(phiNetworkOrFailure))
         return failure();
+      auto &phiNetwork = *phiNetworkOrFailure;
+
+      for (auto &[bb, op] : forksGraph) {
+        op->setOperand(0, phiNetwork[op->getResult(0)]);
+      }
 
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph)))
         return failure();
+
+      funcOp.print(llvm::dbgs());
+
     } else {
       handshake::MemoryControllerOp mcOp;
       handshake::LSQOp lsqOp;
@@ -1159,7 +1168,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
