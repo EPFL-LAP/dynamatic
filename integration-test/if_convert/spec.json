@@ -4,5 +4,21 @@
     "operand-idx": 0
   },
   "buffers": [
+    {
+      "operation-name": "muli0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "select0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci1",
+      "operand-idx": 0
+    }
   ]
 }
