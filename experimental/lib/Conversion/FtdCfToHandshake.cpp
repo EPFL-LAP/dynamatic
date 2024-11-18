@@ -571,30 +571,36 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // value associated to each basic block in the region
       DenseMap<Block *, Operation *> forksGraph;
 
+      // Instantiate the interfaces and a lazy fork for each group
       if (failed(memBuilder.instantiateInterfacesWithForks(
               rewriter, mcOp, lsqOp, groupsGraph, forksGraph, startValue)))
         return failure();
 
-      SmallVector<Value> forkValuesToConnect;
-      for (auto &[bb, op] : forksGraph)
-        forkValuesToConnect.push_back(op->getResult(0));
-      forkValuesToConnect.push_back(startValue);
+      for (Group *consumerGroup : groupsGraph) {
+        SmallVector<Value> differentInputs;
+        Operation *consumerLF = forksGraph[consumerGroup->bb];
+        for (Group *producerGroup : consumerGroup->preds) {
+          Operation *producerLF = forksGraph[producerGroup->bb];
+          SmallVector<Value> forkValuesToConnect = {startValue,
+                                                    producerLF->getResult(0)};
 
-      auto phiNetworkOrFailure =
-          addPhi(funcOp.getRegion(), rewriter, forkValuesToConnect);
+          auto phiNetworkOrFailure =
+              addPhi(funcOp.getRegion(), rewriter, forkValuesToConnect);
+          if (failed(phiNetworkOrFailure))
+            return failure();
 
-      if (failed(phiNetworkOrFailure))
-        return failure();
-      auto &phiNetwork = *phiNetworkOrFailure;
+          auto &phiNetwork = *phiNetworkOrFailure;
+          differentInputs.push_back(phiNetwork[consumerGroup->bb]);
+        }
 
-      for (auto &[bb, op] : forksGraph) {
-        op->setOperand(0, phiNetwork[op->getResult(0)]);
+        if (differentInputs.size() == 0)
+          differentInputs.push_back(startValue);
+
+        consumerLF->setOperands(differentInputs);
       }
 
       if (failed(joinInsertion(rewriter, groupsGraph, forksGraph)))
         return failure();
-
-      funcOp.print(llvm::dbgs());
 
     } else {
       handshake::MemoryControllerOp mcOp;
@@ -680,205 +686,6 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
       }
     }
   }
-}
-
-LogicalResult ftd::FtdLowerFuncToHandshake::addMergeNonLoop(
-    handshake::FuncOp &funcOp, OpBuilder &builder,
-    SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, Value startCtrl) const {
-
-  // Get entry block of the function to lower
-  Block *entryBlock = &funcOp.getRegion().front();
-
-  DenseMap<Block *, unsigned> indexPerBlock;
-  for (auto &bb : funcOp.getBlocks()) {
-    indexPerBlock.insert({&bb, getBlockIndex(&bb)});
-  }
-
-  // For each group within the groups graph
-  for (Group *producerGroup : groups) {
-
-    // Get the block associated to that same group
-    Block *producerBlock = producerGroup->bb;
-
-    // Compute all the forward dependencies of that block
-    auto res = cdAnalaysis.getBlockForwardControlDeps(producerBlock);
-    DenseSet<Block *> producerControlDeps = res.value_or(DenseSet<Block *>());
-
-    // For each successor (which is now considered as a consumer)
-    for (Group *consumerGroup : producerGroup->succs) {
-
-      // Get its basic block
-      Block *consumerBlock = consumerGroup->bb;
-
-      // Compute all the forward dependencies of that block
-      auto res = cdAnalaysis.getBlockForwardControlDeps(consumerBlock);
-      DenseSet<Block *> consumerControlDeps = res.value_or(DenseSet<Block *>());
-
-      // Remove the common forward dependencies among the two blocks
-      eliminateCommonBlocks(producerControlDeps, consumerControlDeps);
-
-      // Compute the boolean function `fProd`, that is true when the producer
-      // is going to produce the token (cfr. FPGA'22, IV.C: Generating and
-      // Suppressing Tokens)
-      BoolExpression *fProd = enumeratePaths(
-          entryBlock, producerBlock, indexPerBlock, producerControlDeps);
-
-      // Compute the boolean function `fCons`, that is true when the consumer
-      // is going to consume the token (cfr. FPGA'22, IV.C: Generating and
-      // Suppressing Tokens)
-      BoolExpression *fCons = enumeratePaths(
-          entryBlock, consumerBlock, indexPerBlock, consumerControlDeps);
-
-      // A token needs to be generated when the consumer consumes  but the
-      // producer does not producer. Compute the corresponding function and
-      // minimize it.
-      BoolExpression *fGen =
-          BoolExpression::boolAnd(fCons, fProd->boolNegate())->boolMinimize();
-
-      // If the condition for the generation is not zero a `GENERATE` block
-      // needs to be inserted, which is a multiplexer/mux
-      if (fGen->type != experimental::boolean::ExpressionType::Zero) {
-
-        // Find the memory dependence related to the current producer and
-        // consumer
-        auto *memDepIt = llvm::find_if(
-            allMemDeps,
-            [producerBlock, consumerBlock](const ProdConsMemDep &dep) {
-              return dep.prodBb == producerBlock && dep.consBb == consumerBlock;
-            });
-        if (memDepIt == allMemDeps.end())
-          return failure();
-        ProdConsMemDep &memDep = *memDepIt;
-
-        // The merge needs to be inserted before the consumer and its fork
-        builder.setInsertionPointToStart(consumerBlock);
-        Location loc = forksGraph[consumerBlock]->getLoc();
-
-        // Adjust insertion position: if there is a block which is always
-        // traversed between the producer and the consumer, the merge/generate
-        // block can be put right after it.
-        //
-        // If the relationship between consumer and producer is backward, we
-        // are interested in a block which is a successor of the producer and
-        // post-dominates the consumer. If the relationship is forward, we are
-        // interested in a block which dominates the consumer and
-        // post-dominates the consumer.
-        Block *bbNewLoc = nullptr;
-        if (memDep.isBackward) {
-          bbNewLoc = getPostDominantSuccessor(producerBlock, consumerBlock);
-        } else {
-          bbNewLoc = getPredecessorDominatingAndPostDominating(producerBlock,
-                                                               consumerBlock);
-        }
-        if (bbNewLoc) {
-          builder.setInsertionPointToStart(bbNewLoc);
-          loc = bbNewLoc->getOperations().front().getLoc();
-        }
-
-        // The possible inputs of the merge are the start value and the first
-        // output of the producer fork
-        SmallVector<Value> mergeOperands;
-        mergeOperands.push_back(startCtrl);
-        mergeOperands.push_back(forksGraph[producerBlock]->getResult(0));
-        auto mergeOp = builder.create<handshake::MergeOp>(loc, mergeOperands);
-
-        // At this point, the output of the merge is the new producer, which
-        // becomes an input for the consumer.
-        forksGraph[consumerBlock]->replaceUsesOfWith(
-            forksGraph[producerBlock]->getResult(0), mergeOp->getResult(0));
-      }
-    }
-  }
-  return success();
-}
-
-LogicalResult ftd::FtdLowerFuncToHandshake::addMergeLoop(
-    handshake::FuncOp &funcOp, OpBuilder &builder,
-    SmallVector<ProdConsMemDep> &allMemDeps, DenseSet<Group *> &groups,
-    DenseMap<Block *, Operation *> &forksGraph, Value startCtrl) const {
-
-  // Get the dominance info about the current region, in order to compute the
-  // properties of loop
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
-
-  // For each group within the groups graph
-  for (Group *consGroup : groups) {
-    Block *cons = consGroup->bb;
-
-    // For each predecessor (which is now considered as a producer)
-    for (Group *prodGroup : consGroup->preds) {
-      Block *prod = prodGroup->bb;
-
-      // If the consumer comes before a producer, it might mean the two basic
-      // blocks are within a loop
-      if (!greaterThanBlocks(prod, cons))
-        continue;
-
-      if (auto *loop = getInnermostCommonLoop(prod, cons, loopInfo); loop) {
-
-        // A merge is inserted at the beginning of the loop, getting as
-        // operands both `start` and the result of the producer as operand.
-        // As many merges must be added as the number of paths from the
-        // producer to the consumer (corresponding to the amount of loops
-        // which involve both of them).
-        Block *loopHeader = loop->getHeader();
-        builder.setInsertionPointToStart(loopHeader);
-
-        std::vector<std::vector<Operation *>> allPaths =
-            findAllPaths(forksGraph[prod], forksGraph[cons]);
-
-        // For each path
-        for (std::vector<Operation *> path : allPaths) {
-
-          SmallVector<Value> operands;
-          // Get the result of the operation before the consumer (this will
-          // become an input of the merge)
-          Value muxOperand = path.at(path.size() - 2)->getResult(0);
-          operands.push_back(startCtrl);
-          operands.push_back(muxOperand);
-
-          auto cstType = builder.getIntegerType(1);
-          auto cstAttr = IntegerAttr::get(cstType, 0);
-          auto constOp = builder.create<handshake::ConstantOp>(
-              muxOperand.getLoc(), cstAttr, startCtrl);
-
-          constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
-
-          Value conditionValue =
-              loop->getExitingBlock()->getTerminator()->getOperand(0);
-
-          SmallVector<Value> mergeOperands;
-          mergeOperands.push_back(constOp.getResult());
-          mergeOperands.push_back(conditionValue);
-
-          // Create the merge
-          auto initMergeOp = builder.create<handshake::MergeOp>(
-              muxOperand.getLoc(), mergeOperands);
-
-          auto selectSignal = initMergeOp->getResult(0);
-          selectSignal.setType(channelifyType(selectSignal.getType()));
-
-          initMergeOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
-
-          // Add the merge and update the FTD data structures
-          auto muxOp = builder.create<handshake::MuxOp>(muxOperand.getLoc(),
-                                                        muxOperand.getType(),
-                                                        selectSignal, operands);
-
-          muxOp->setAttr(FTD_MEM_DEP, builder.getUnitAttr());
-
-          // The merge becomes the producer now, so connect the result of
-          // the MERGE as an operand of the Consumer. Also remove the old
-          // connection between the producer's LazyFork and the consumer's
-          // LazyFork Connect the MERGE to the consumer's LazyFork
-          forksGraph[cons]->replaceUsesOfWith(muxOperand, muxOp->getResult(0));
-        }
-      }
-    }
-  }
-  return success();
 }
 
 LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(

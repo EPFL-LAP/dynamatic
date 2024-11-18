@@ -152,24 +152,6 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     forksGraph[bb] = forkOp;
   }
 
-  // For each group, its fork has as inputs the ouput of the forks of all its
-  // predecssors. Each lazy fork will be then updated so that its only input is
-  // the result of a `handshake::JoinOp` having the current values as inptus.
-  for (Group *group : groups) {
-    SmallVector<Value> predForkOuput;
-
-    // For each predecessor of the current group, get their fork output
-    for (Group *pred : group->preds)
-      predForkOuput.push_back(forksGraph[pred->bb]->getResult(0));
-
-    // If the node has more than one predecessor, set the collected values as
-    // inputs of the lazy fork. Otherwise, the input of the lazy fork remains
-    // the `start` control value
-    Operation *forkNode = forksGraph[group->bb];
-    if (predForkOuput.size() > 0)
-      forkNode->setOperands(predForkOuput);
-  }
-
   // The second output of each lazy fork must be connected to the LSQ, so that
   // they can activate the allocation for the operations of the corresponding
   // basic block

@@ -62,7 +62,7 @@ public:
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp");
 constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
-constexpr llvm::StringLiteral FTD_MEM_DEP("ftd.memdep");
+constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
@@ -94,19 +94,9 @@ bool isHandhsakeLSQOperation(Operation *op);
 /// Given two sets containing object of type `Block*`, remove the common entries
 void eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2);
 
-/// Given two blocks, return a reference to the innermost common loop. The
-/// result is `nullptr` if the two blocks are not within a loop
-mlir::CFGLoop *getInnermostCommonLoop(Block *block1, Block *block2,
-                                      mlir::CFGLoopInfo &li);
-
 /// Given an operation, returns true if the operation is a conditional branch
 /// which terminates a for loop
 bool isBranchLoopExit(Operation *op, mlir::CFGLoopInfo &li);
-
-/// Gets all the paths from operation `start` to operation `end` using a dfs
-/// search
-std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
-                                                   Operation *end);
 
 /// Gets all the paths from block `start` to block `end` using a dfs search. If
 /// `blockToTraverse` is non null, then we want the paths having that block in
@@ -115,18 +105,6 @@ std::vector<std::vector<Operation *>> findAllPaths(Operation *start,
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, Block *blockToTraverse = nullptr,
              ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
-
-/// Given a pair of consumer and producer, we are interested in a basic block
-/// which is a successor of the producer and post-dominates the consumer.
-/// If this block exists, the MERGE/GENERATE block can be put right after it,
-/// since all paths between the producer and the consumer pass through it.
-Block *getPostDominantSuccessor(Block *prod, Block *cons);
-
-/// Given a pair of consumer and producer, we are interested in a basic block
-/// which both dominates the consumer and post-dominates the producer. If this
-/// block exists, the MERGE/GENERATE block can be put right after it, since
-/// all paths between the producer and the consumer pass through it.
-Block *getPredecessorDominatingAndPostDominating(Block *prod, Block *cons);
 
 /// Given an operation, return true if the two operands of a merge come from
 /// two different loops. When this happens, the merge is connecting two loops
@@ -171,13 +149,10 @@ Block *getImmediateDominator(Region &region, Block *bb);
 DenseMap<Block *, DenseSet<Block *>> getDominanceFrontier(Region &region);
 
 /// Given a set of values defining the same value in different blocks of a CFG,
-/// modify the SSA representation to connect the values through some phi. The
-/// final representation is coherent, so that in each block you can obtain one
-/// only definition for the value. The resulting map provides such association,
-/// with the value as it is available at the beginning of the block.
-FailureOr<DenseMap<Value, Value>> addPhi(Region &funcRegion,
-                                         ConversionPatternRewriter &rewriter,
-                                         SmallVector<Value> &vals);
+/// modify the SSA representation to connect the values through some merges.
+FailureOr<DenseMap<Block *, Value>>
+createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
+                 SmallVector<Value> &vals);
 
 /// Get a list of all the loops in which the consumer is but the producer is
 /// not, starting from the innermost.

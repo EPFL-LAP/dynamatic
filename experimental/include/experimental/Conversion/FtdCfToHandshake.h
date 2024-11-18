@@ -76,23 +76,6 @@ protected:
                                   SmallVector<ProdConsMemDep> &allMemDeps,
                                   const mlir::CFGLoopInfo &li) const;
 
-  /// For each pair of producer and consumer which are not in loop (thus
-  /// considering, for each producer, only its forward dependenices) possibly
-  /// add a merge between the pair, so that the
-  LogicalResult addMergeNonLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
-                                SmallVector<ProdConsMemDep> &allMemDeps,
-                                DenseSet<Group *> &groups,
-                                DenseMap<Block *, Operation *> &forksGraph,
-                                Value startCtrl) const;
-
-  /// For each pair of producer and consumer which are in loop possibly
-  /// add a merge between the pair, so that the
-  LogicalResult addMergeLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
-                             SmallVector<ProdConsMemDep> &allMemDeps,
-                             DenseSet<Group *> &groups,
-                             DenseMap<Block *, Operation *> &forksGraph,
-                             Value startCtrl) const;
-
   /// Convers arith-level constants to handshake-level constants. Constants are
   /// triggered by the start value of the corresponding function. The FTD
   /// algorithm is then in charge of connecting the constants to the rest of the

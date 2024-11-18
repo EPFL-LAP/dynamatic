@@ -21,7 +21,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <stack>
 #include <unordered_set>
 
 using namespace mlir;
@@ -79,41 +78,6 @@ void ftd::eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2) {
     s1.erase(bb);
     s2.erase(bb);
   }
-}
-
-/// Helper recursive function to get the innermost common loop
-static CFGLoop *checkInnermostCommonLoop(CFGLoop *loop1, CFGLoop *loop2) {
-
-  // None of them is a loop
-  if (!loop1 || !loop2)
-    return nullptr;
-
-  // Same loop
-  if (loop1 == loop2)
-    return loop1;
-
-  // Check whether the parent loop of `loop1` is `loop2`
-  if (CFGLoop *pl = checkInnermostCommonLoop(loop1->getParentLoop(), loop2); pl)
-    return pl;
-
-  // Check whether the parent loop of `loop2` is `loop1`
-  if (CFGLoop *pl = checkInnermostCommonLoop(loop2->getParentLoop(), loop1); pl)
-    return pl;
-
-  // Check whether the parent loop of `loop1` is identical to the parent loop
-  // of `loop1`
-  if (CFGLoop *pl = checkInnermostCommonLoop(loop2->getParentLoop(),
-                                             loop1->getParentLoop());
-      pl)
-    return pl;
-
-  // If no common loop is found, return nullptr
-  return nullptr;
-}
-
-CFGLoop *ftd::getInnermostCommonLoop(Block *block1, Block *block2,
-                                     mlir::CFGLoopInfo &li) {
-  return checkInnermostCommonLoop(li.getLoopFor(block1), li.getLoopFor(block2));
 }
 
 bool ftd::isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
@@ -176,43 +140,6 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
   visited.erase(start);
 }
 
-/// Recursive function which allows to obtain all the paths from operation
-/// `start` to operation `end` using a DFS
-static void dfsAllPaths(Operation *current, Operation *end,
-                        std::unordered_set<Operation *> &visited,
-                        std::vector<Operation *> &path,
-                        std::vector<std::vector<Operation *>> &allPaths) {
-  visited.insert(current);
-  path.push_back(current);
-
-  if (current == end) {
-    // If the current operation is the end, add the path to allPaths
-    allPaths.push_back(path);
-  } else {
-    // Otherwise, explore the successors
-    for (auto result : current->getResults()) {
-      for (auto *successor : result.getUsers()) {
-        if (visited.find(successor) == visited.end()) {
-          dfsAllPaths(successor, end, visited, path, allPaths);
-        }
-      }
-    }
-  }
-
-  // Backtrack
-  path.pop_back();
-  visited.erase(current);
-}
-
-std::vector<std::vector<Operation *>> ftd::findAllPaths(Operation *start,
-                                                        Operation *end) {
-  std::vector<std::vector<Operation *>> allPaths;
-  std::unordered_set<Operation *> visited;
-  std::vector<Operation *> path;
-  dfsAllPaths(start, end, visited, path, allPaths);
-  return allPaths;
-}
-
 std::vector<std::vector<Block *>>
 ftd::findAllPaths(Block *start, Block *end, Block *blockToTraverse,
                   ArrayRef<Block *> blocksToAvoid) {
@@ -222,84 +149,6 @@ ftd::findAllPaths(Block *start, Block *end, Block *blockToTraverse,
   dfsAllPaths(start, end, path, visited, allPaths, blockToTraverse,
               blocksToAvoid, false);
   return allPaths;
-}
-
-/// Helper recursive function for getPostDominantSuccessor
-static Block *getPostDominantSuccessor(Block *prod, Block *cons,
-                                       std::unordered_set<Block *> &visited,
-                                       PostDominanceInfo &postDomInfo) {
-
-  // If the producer is not valid, return, otherwise insert it among the
-  // visited ones.
-  if (!prod)
-    return nullptr;
-
-  visited.insert(prod);
-
-  // For each successor of the producer
-  for (Block *successor : prod->getSuccessors()) {
-
-    // Check if the successor post-dominates cons
-    if (successor != cons && postDomInfo.postDominates(successor, cons))
-      return successor;
-
-    // If not visited, recursively search successors of the current successor
-    if (visited.find(successor) == visited.end()) {
-      Block *result =
-          getPostDominantSuccessor(successor, cons, visited, postDomInfo);
-      if (result)
-        return result;
-    }
-  }
-  return nullptr;
-}
-
-Block *ftd::getPostDominantSuccessor(Block *prod, Block *cons) {
-  std::unordered_set<Block *> visited;
-  PostDominanceInfo postDomInfo;
-  return ::getPostDominantSuccessor(prod, cons, visited, postDomInfo);
-}
-
-/// Helper recursive function for getPredecessorDominatingAndPostDominating
-static Block *getPredecessorDominatingAndPostDominating(
-    Block *producer, Block *consumer, std::unordered_set<Block *> &visited,
-    DominanceInfo &domInfo, PostDominanceInfo &postDomInfo) {
-
-  // If the consumer is not valid, return, otherwise insert it in the visited
-  // ones
-  if (!consumer)
-    return nullptr;
-  visited.insert(consumer);
-
-  // For each predecessor of the consumer
-  for (Block *predecessor : consumer->getPredecessors()) {
-
-    // If the current predecessor is not the producer itself, and this block
-    // both dominates the consumer and post-dominates the producer, return it
-    if (predecessor != producer &&
-        postDomInfo.postDominates(predecessor, producer) &&
-        domInfo.dominates(predecessor, consumer))
-      return predecessor;
-
-    // If not visited, recursively search predecessors of the current
-    // predecessor
-    if (visited.find(predecessor) == visited.end()) {
-      Block *result = getPredecessorDominatingAndPostDominating(
-          producer, predecessor, visited, domInfo, postDomInfo);
-      if (result)
-        return result;
-    }
-  }
-  return nullptr;
-}
-
-Block *ftd::getPredecessorDominatingAndPostDominating(Block *prod,
-                                                      Block *cons) {
-  std::unordered_set<Block *> visited;
-  DominanceInfo domInfo;
-  PostDominanceInfo postDomInfo;
-  return ::getPredecessorDominatingAndPostDominating(prod, cons, visited,
-                                                     domInfo, postDomInfo);
 }
 
 /// Given an operation, return true if the two operands of a merge come from
@@ -530,70 +379,19 @@ DenseMap<Block *, DenseSet<Block *>> ftd::getDominanceFrontier(Region &region) {
   return result;
 }
 
-FailureOr<DenseMap<Value, Value>>
-ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
-            SmallVector<Value> &vals) {
-
-  auto dominanceFrontier = getDominanceFrontier(funcRegion);
-
-  // The number of values to be considered cannot be empty
-  if (vals.empty()) {
-    return funcRegion.getParentOp()->emitError()
-           << "The number values provided in `insertPhi` "
-              "must be larger than 2\n";
-  }
-
-  // Type of the
-  Type valueType = vals[0].getType();
-
-  // All the input values associated to one block
-  DenseMap<Block *, SmallVector<Value>> valuesPerBlock;
-
-  // Associate for each block the value that is dominated by all the others in
-  // the same block
-  DenseMap<Block *, Value> inputBlocks;
-
-  // In which block a new phi is necessary
-  DenseSet<Block *> blocksToAddPhi;
+/// Run the cryton algorithm to determine, give a set of values, in which blocks
+/// should we add a merge in order for those values to be merged
+static DenseSet<Block *>
+runCrytonAlgorithm(Region &funcRegion, DenseMap<Block *, Value> &inputBlocks) {
+  // Get dominance frontier
+  auto dominanceFrontier = ftd::getDominanceFrontier(funcRegion);
 
   // Temporary data structures to run the Cryton algorithm for phi positioning
   DenseMap<Block *, bool> work;
   DenseMap<Block *, bool> hasAlready;
   SmallVector<Block *> w;
 
-  // Backedge builder to insert new merges
-  BackedgeBuilder edgeBuilder(rewriter, funcRegion.getLoc());
-
-  // Backedge corresponding to each phi
-  DenseMap<Block *, Backedge> resultPerPhi;
-
-  // Operands of each merge
-  DenseMap<Block *, SmallVector<Value>> operandsPerPhi;
-
-  // Which value should be the input of each input value
-  DenseMap<Value, Value> inputPerValue;
-
-  // Check that all the values have the same type, then collet them according to
-  // their input blocks
-  for (auto &val : vals) {
-    if (val.getType() != valueType) {
-      return funcRegion.getParentOp()->emitError()
-             << "All values must have the same type\n";
-    }
-    auto *bb = val.getParentBlock();
-    valuesPerBlock[bb].push_back(val);
-  }
-
-  // Sort the vectors of values in each block according to their dominance and
-  // get only the last input value for each block. This is necessary in case in
-  // the input sets there is more than one value per blocks
-  for (auto &[bb, vals] : valuesPerBlock) {
-    mlir::DominanceInfo domInfo;
-    std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
-      return domInfo.dominates(a.getDefiningOp(), b.getDefiningOp());
-    });
-    inputBlocks.insert({bb, vals[vals.size() - 1]});
-  }
+  DenseSet<Block *> result;
 
   // Initialize data structures to run the Cryton algorithm
   for (auto &bb : funcRegion.getBlocks()) {
@@ -620,7 +418,7 @@ ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
       // Add the block in the dominance frontier to the list of blocks which
       // require a new phi. If it was not analyzed yet, also add it to `w`
       if (!hasAlready[y]) {
-        blocksToAddPhi.insert(y);
+        result.insert(y);
         hasAlready[y] = true;
         if (!work[y])
           work[y] = true, w.push_back(y);
@@ -628,17 +426,69 @@ ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
     }
   }
 
-  // Once the cryton algorithm is done, `blocksToAddPhi` contains the set of
-  // blocks that require a phi
-  llvm::dbgs() << "[NEW PHI] Insertion in { ";
-  for (auto &bb : blocksToAddPhi) {
-    bb->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << " ";
-  }
-  llvm::dbgs() << "}\n";
+  return result;
+}
 
-  if (blocksToAddPhi.empty())
-    return success();
+FailureOr<DenseMap<Block *, Value>>
+ftd::createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
+                      SmallVector<Value> &vals) {
+
+  if (vals.empty()) {
+    llvm::errs() << "Input of \"createPhiNetwork\" is empty";
+    return failure();
+  }
+
+  // Type of the inputs
+  Type valueType = vals[0].getType();
+
+  // All the input values associated to one block
+  DenseMap<Block *, SmallVector<Value>> valuesPerBlock;
+
+  // Associate for each block the value that is dominated by all the others in
+  // the same block
+  DenseMap<Block *, Value> inputBlocks;
+
+  // Backedge builder to insert new merges
+  BackedgeBuilder edgeBuilder(rewriter, funcRegion.getLoc());
+
+  // Backedge corresponding to each phi
+  DenseMap<Block *, Backedge> resultPerPhi;
+
+  // Operands of each merge
+  DenseMap<Block *, SmallVector<Value>> operandsPerPhi;
+
+  // Which value should be the input of each input value
+  DenseMap<Block *, Value> inputPerBlock;
+
+  // Check that all the values have the same type, then collet them according to
+  // their input blocks
+  for (auto &val : vals) {
+    if (val.getType() != valueType) {
+      llvm::errs() << "All values must have the same type\n";
+      return failure();
+    }
+    auto *bb = val.getParentBlock();
+    valuesPerBlock[bb].push_back(val);
+  }
+
+  // Sort the vectors of values in each block according to their dominance and
+  // get only the last input value for each block. This is necessary in case in
+  // the input sets there is more than one value per blocks
+  for (auto &[bb, vals] : valuesPerBlock) {
+    mlir::DominanceInfo domInfo;
+    std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
+      if (!a.getDefiningOp())
+        return true;
+      if (!b.getDefiningOp())
+        return false;
+      return domInfo.dominates(a.getDefiningOp(), b.getDefiningOp());
+    });
+    inputBlocks.insert({bb, vals[vals.size() - 1]});
+  }
+
+  // In which block a new phi is necessary
+  DenseSet<Block *> blocksToAddPhi =
+      runCrytonAlgorithm(funcRegion, inputBlocks);
 
   // A backedge is created for each block in `blocksToAddPhi`, and it will
   // contain the value used as placeholder for the phi
@@ -690,27 +540,21 @@ ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
     rewriter.setInsertionPointToStart(bb);
     auto mergeOp = rewriter.create<handshake::MergeOp>(bb->front().getLoc(),
                                                        operandsPerPhi[bb]);
-    mergeOp->setAttr(ftd::FTD_MEM_DEP, rewriter.getUnitAttr());
+    mergeOp->setAttr(ftd::NEW_PHI, rewriter.getUnitAttr());
     newMergePerPhi.insert({bb, mergeOp});
   }
 
   for (auto *bb : blocksToAddPhi)
     resultPerPhi.find(bb)->getSecond().setValue(newMergePerPhi[bb].getResult());
 
-  // For each value input, find which is supposed to be the new input
-  for (auto &val : vals) {
+  // For each block, find the incoming value of the network
+  for (Block &bb : funcRegion.getBlocks()) {
 
-    Block *bb = val.getParentBlock();
     Value foundValue = nullptr;
-    Block *blockOrDominator = bb;
+    Block *blockOrDominator = &bb;
 
-    for (unsigned i = 1; i < valuesPerBlock[bb].size() - 1; i++) {
-      if (valuesPerBlock[bb][i] == val)
-        inputPerValue[val] = valuesPerBlock[bb][i - 1];
-    }
-
-    if (blocksToAddPhi.contains(bb)) {
-      inputPerValue[val] = newMergePerPhi[bb].getResult();
+    if (blocksToAddPhi.contains(&bb)) {
+      inputPerBlock[&bb] = newMergePerPhi[&bb].getResult();
       continue;
     }
 
@@ -718,32 +562,22 @@ ftd::addPhi(Region &funcRegion, ConversionPatternRewriter &rewriter,
       if (!blockOrDominator->hasNoPredecessors())
         blockOrDominator = getImmediateDominator(funcRegion, blockOrDominator);
 
-      if (blocksToAddPhi.contains(blockOrDominator)) {
-        foundValue = newMergePerPhi[blockOrDominator].getResult();
-        break;
-      }
-
       if (inputBlocks.contains(blockOrDominator)) {
         foundValue = inputBlocks[blockOrDominator];
         break;
       }
 
+      if (blocksToAddPhi.contains(blockOrDominator)) {
+        foundValue = newMergePerPhi[blockOrDominator].getResult();
+        break;
+      }
+
     } while (!foundValue);
 
-    inputPerValue[val] = foundValue;
+    inputPerBlock[&bb] = foundValue;
   }
 
-  funcRegion.getParentOp()->print(llvm::dbgs());
-
-  for (auto &[in, out] : inputPerValue) {
-    llvm::dbgs() << "value ";
-    in.print(llvm::dbgs());
-    llvm::dbgs() << " requres ";
-    out.print(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  }
-
-  return inputPerValue;
+  return inputPerBlock;
 }
 
 SmallVector<CFGLoop *> ftd::getLoopsConsNotInProd(Block *cons, Block *prod,
@@ -815,7 +649,7 @@ LogicalResult ftd::addRegenToConsumer(ConversionPatternRewriter &rewriter,
 
       // If we are in the innermost loop (thus the iterator is at its end)
       // and the consumer is a loop merge, stop
-      if (i == numberOfLoops - 1 && consumerOp->hasAttr(FTD_MEM_DEP))
+      if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
         break;
 
       // Add the merge to the network, by substituting the operand with
