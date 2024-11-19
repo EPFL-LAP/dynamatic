@@ -584,8 +584,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
           SmallVector<Value> forkValuesToConnect = {startValue,
                                                     producerLF->getResult(0)};
 
-          auto phiNetworkOrFailure =
-              addPhi(funcOp.getRegion(), rewriter, forkValuesToConnect);
+          auto phiNetworkOrFailure = createPhiNetwork(
+              funcOp.getRegion(), rewriter, forkValuesToConnect);
           if (failed(phiNetworkOrFailure))
             return failure();
 
