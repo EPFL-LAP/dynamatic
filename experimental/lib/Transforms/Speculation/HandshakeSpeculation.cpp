@@ -129,10 +129,10 @@ static void routeCommitControlRecursive(
     return;
   arrived.insert(currOp);
 
-  // If the traversal reaches a speculator or a save commit unit, end traversal
-  // All commit units should be found within the same loop iteration
-  // And passing through these units may result in the replication of redundant
-  // branches
+  // We assume there is a direct path from the speculator to all commits, and so
+  // traversal ends if we reach a save-commit or a speculator. See detailed
+  // documentation for full explanation of the speculative region and this
+  // assumption.
   if (isa<handshake::SpeculatorOp>(currOp))
     return;
   if (isa<handshake::SpecSaveCommitOp>(currOp))
