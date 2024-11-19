@@ -23,6 +23,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 
 namespace dynamatic {
@@ -59,10 +60,9 @@ protected:
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
 
-  LogicalResult
-  ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
-                                  ConversionPatternRewriter &rewriter,
-                                  MemInterfacesInfo &memInfo) const;
+  LogicalResult ftdVerifyAndCreateMemInterfaces(
+      handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
+      MemInterfacesInfo &memInfo, const BlockIndexing &bi) const;
 
   void analyzeLoop(handshake::FuncOp funcOp) const;
 
@@ -74,7 +74,8 @@ protected:
   // (2) RAW and WAR between Load and Store operations
   void identifyMemoryDependencies(const SmallVector<Operation *> &operations,
                                   SmallVector<ProdConsMemDep> &allMemDeps,
-                                  const mlir::CFGLoopInfo &li) const;
+                                  const mlir::CFGLoopInfo &li,
+                                  const BlockIndexing &bi) const;
 
   /// Convers arith-level constants to handshake-level constants. Constants are
   /// triggered by the start value of the corresponding function. The FTD
@@ -101,9 +102,10 @@ protected:
   /// consumer, because of the control decisions. In this scenario, the token
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
-  LogicalResult
-  addSupp(ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-          ControlDependenceAnalysis::BlockControlDepsMap &cda) const;
+  LogicalResult addSupp(ConversionPatternRewriter &rewriter,
+                        handshake::FuncOp &funcOp,
+                        ControlDependenceAnalysis::BlockControlDepsMap &cda,
+                        const ftd::BlockIndexing &bi) const;
 
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which

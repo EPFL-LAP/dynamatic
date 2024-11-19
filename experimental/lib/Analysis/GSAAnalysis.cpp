@@ -30,14 +30,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::ftd;
 using namespace dynamatic::experimental::boolean;
 
-Block *experimental::gsa::GSAAnalysis::getBlockFromIndex(unsigned index) {
-  for (auto const &[b, i] : indexPerBlock) {
-    if (index == i)
-      return b;
-  }
-  return nullptr;
-}
-
 experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 
   // Only one function should be present in the module, excluding external
@@ -75,7 +67,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 
 experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
     ListExpressionsPerGate &expressions, std::queue<unsigned> &conditions,
-    Gate *originalPhi) {
+    Gate *originalPhi, const BlockIndexing &bi) {
 
   // At each iteration, we want to use a cofactor that is present in all the
   // expressions in `expressions`. Since the cofactors are ordered according to
@@ -145,7 +137,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   // considered as empty.
   auto setGammaOperand = [&](int input, ListExpressionsPerGate &list) -> void {
     if (list.size() > 1) {
-      Gate *gamma = expandGammaTree(list, conditions, originalPhi);
+      Gate *gamma = expandGammaTree(list, conditions, originalPhi, bi);
       operandsGamma[input] = new GateInput(gamma);
       gateInputList.push_back(operandsGamma[input]);
     } else if (list.size() == 1) {
@@ -166,29 +158,10 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   // "indexPerBlock" mapping)
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, getBlockFromIndex(indexToUse));
+               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse));
   gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
 
   return newGate;
-}
-
-void experimental::gsa::GSAAnalysis::mapBlocksToIndex(func::FuncOp &funcOp) {
-  mlir::DominanceInfo domInfo;
-
-  // Create a vector with all the blocks
-  SmallVector<Block *> allBlocks;
-  for (Block &bb : funcOp.getBlocks())
-    allBlocks.push_back(&bb);
-
-  // Sort the vector according to the dominance information
-  std::sort(allBlocks.begin(), allBlocks.end(),
-            [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
-
-  // Associate a smalled index in the map to the blocks at higer levels of the
-  // dominance tree
-  unsigned bbIndex = 0;
-  for (Block *bb : allBlocks)
-    indexPerBlock.insert({bb, bbIndex++});
 }
 
 void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
@@ -198,7 +171,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
 
   // Associate an index to each basic block in "funcOp" so that if Bi
   // dominates Bj than i < j
-  mapBlocksToIndex(funcOp);
+  BlockIndexing bi(funcOp.getRegion());
 
   // This function works in two steps. First, all the block arguments in the
   // IR are converted into PHIs, taking care or properly extracting the
@@ -326,11 +299,12 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(func::FuncOp &funcOp) {
   }
 
   convertPhiToMu(funcOp);
-  convertPhiToGamma(funcOp);
+  convertPhiToGamma(funcOp, bi);
   printAllGates();
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
+void experimental::gsa::GSAAnalysis::convertPhiToGamma(
+    func::FuncOp &funcOp, const BlockIndexing &bi) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -382,7 +356,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
 
         // Find all the paths from `commonDominator` to `phiBlock` which pass
         // through operand's block but not through any of the `blocksToAvoid`
-        auto paths = findAllPaths(commonDominator, phiBlock,
+        auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
 
         BoolExpression *phiInputCondition = BoolExpression::boolZero();
@@ -390,7 +364,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
         // Sum all the conditions for each path
         for (std::vector<Block *> &path : paths) {
           boolean::BoolExpression *condition =
-              getPathExpression(path, blocksWithConditionInPath, indexPerBlock);
+              getPathExpression(path, blocksWithConditionInPath, bi);
           phiInputCondition =
               BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();
@@ -409,7 +383,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
 
       // Expand the expressions to get the tree of gammas
       Gate *gammaRoot =
-          expandGammaTree(expressionsList, conditionsOrdered, phi);
+          expandGammaTree(expressionsList, conditionsOrdered, phi, bi);
       gammaRoot->isRoot = true;
 
       // Once that a phi has been converted into a tree of gammas, all the

@@ -17,6 +17,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include "llvm/Support/Debug.h"
@@ -164,9 +165,6 @@ private:
   /// Associate an index to each gate.
   unsigned uniqueGateIndex;
 
-  /// Associate a index to each block.
-  DenseMap<Block *, unsigned> indexPerBlock;
-
   /// For each block in the function, keep a list of gate functions with all
   /// their information.
   DenseMap<Block *, SmallVector<Gate *>> gatesPerBlock;
@@ -186,21 +184,14 @@ private:
   void convertPhiToMu(mlir::func::FuncOp &funcOp);
 
   /// Convert some phi gates to trees of gamma gates.
-  void convertPhiToGamma(mlir::func::FuncOp &funcOp);
+  void convertPhiToGamma(mlir::func::FuncOp &funcOp,
+                         const experimental::ftd::BlockIndexing &bi);
 
   /// Given a boolean expression for each phi's inputs, expand it in a tree
   /// of gamma functions.
   Gate *expandGammaTree(ListExpressionsPerGate &expressions,
-                        std::queue<unsigned> &conditions, Gate *originalPhi);
-
-  /// Map each block to an unsigned index, so that the following relationship
-  /// holds: if Bi dominates Bj than i < j.
-  void mapBlocksToIndex(mlir::func::FuncOp &funcOp);
-
-  /// Return the index of a block
-  unsigned getIndexFromBlock(Block *bb) { return indexPerBlock[bb]; }
-
-  Block *getBlockFromIndex(unsigned index);
+                        std::queue<unsigned> &conditions, Gate *originalPhi,
+                        const ftd::BlockIndexing &bi);
 };
 
 } // namespace gsa

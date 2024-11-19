@@ -28,22 +28,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 
-unsigned ftd::getBlockIndex(Block *bb) {
-  std::string result1;
-  llvm::raw_string_ostream os1(result1);
-  bb->printAsOperand(os1);
-  std::string block1id = os1.str();
-  return std::stoi(block1id.substr(3));
-}
-
-bool ftd::lessThanBlocks(Block *block1, Block *block2) {
-  return getBlockIndex(block1) < getBlockIndex(block2);
-}
-
-bool ftd::greaterThanBlocks(Block *block1, Block *block2) {
-  return getBlockIndex(block1) > getBlockIndex(block2);
-}
-
 bool ftd::isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
   if (!loop1 || !loop2)
     return false;
@@ -55,11 +39,6 @@ bool ftd::isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
 bool ftd::isSameLoopBlocks(Block *source, Block *dest,
                            const mlir::CFGLoopInfo &li) {
   return isSameLoop(li.getLoopFor(source), li.getLoopFor(dest));
-}
-
-std::string ftd::getBlockCondition(Block *block) {
-  std::string blockCondition = "c" + std::to_string(ftd::getBlockIndex(block));
-  return blockCondition;
 }
 
 bool ftd::isHandhsakeLSQOperation(Operation *op) {
@@ -98,6 +77,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::vector<std::vector<Block *>> &allPaths,
                         Block *blockToTraverse,
                         const std::vector<Block *> &blocksToAvoid,
+                        const ftd::BlockIndexing &bi,
                         bool blockToTraverseFound) {
 
   // The current block is part of the current path
@@ -117,8 +97,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       // Do not run DFS if the successor is in the list of blocks to traverse
       bool incorrectPath = false;
       for (auto *toAvoid : blocksToAvoid) {
-        if (toAvoid == successor &&
-            ftd::getBlockIndex(toAvoid) > ftd::getBlockIndex(blockToTraverse)) {
+        if (toAvoid == successor && bi.greaterIndex(toAvoid, blockToTraverse)) {
           incorrectPath = true;
           break;
         }
@@ -129,7 +108,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
 
       if (visited.find(successor) == visited.end()) {
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
-                    blocksToAvoid, blockFound || blockToTraverseFound);
+                    blocksToAvoid, bi, blockFound || blockToTraverseFound);
       }
     }
   }
@@ -141,13 +120,13 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
 }
 
 std::vector<std::vector<Block *>>
-ftd::findAllPaths(Block *start, Block *end, Block *blockToTraverse,
-                  ArrayRef<Block *> blocksToAvoid) {
+ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
+                  Block *blockToTraverse, ArrayRef<Block *> blocksToAvoid) {
   std::vector<std::vector<Block *>> allPaths;
   std::vector<Block *> path;
   std::unordered_set<Block *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, blockToTraverse,
-              blocksToAvoid, false);
+              blocksToAvoid, bi, false);
   return allPaths;
 }
 
@@ -194,8 +173,8 @@ bool ftd::isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
 boolean::BoolExpression *
 ftd::getPathExpression(ArrayRef<Block *> path,
                        DenseSet<unsigned> &blockIndexSet,
-                       const DenseMap<Block *, unsigned> &mapBlockToIndex,
-                       const DenseSet<Block *> &deps, const bool ignoreDeps) {
+                       const BlockIndexing &bi, const DenseSet<Block *> &deps,
+                       const bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
@@ -217,8 +196,8 @@ ftd::getPathExpression(ArrayRef<Block *> path,
       Operation *terminatorOp = firstBlock->getTerminator();
 
       if (isa<cf::CondBranchOp>(terminatorOp)) {
-        unsigned blockIndex = mapBlockToIndex.lookup(firstBlock);
-        std::string blockCondition = "c" + std::to_string(blockIndex);
+        unsigned blockIndex = bi.getIndexFromBlock(firstBlock);
+        std::string blockCondition = bi.getBlockCondition(firstBlock);
 
         // Get a boolean condition out of the block condition
         boolean::BoolExpression *pathCondition =
@@ -244,16 +223,15 @@ ftd::getPathExpression(ArrayRef<Block *> path,
   return exp;
 }
 
-BoolExpression *
-ftd::enumeratePaths(Block *start, Block *end,
-                    const DenseMap<Block *, unsigned> &mapBlockToIndex,
-                    const DenseSet<Block *> &controlDeps) {
+BoolExpression *ftd::enumeratePaths(Block *start, Block *end,
+                                    const BlockIndexing &bi,
+                                    const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
 
   // Find all the paths from the producer to the consumer, using a DFS
-  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end);
+  std::vector<std::vector<Block *>> allPaths = findAllPaths(start, end, bi);
 
   // For each path
   for (const std::vector<Block *> &path : allPaths) {
@@ -261,8 +239,8 @@ ftd::enumeratePaths(Block *start, Block *end,
     DenseSet<unsigned> tempCofactorSet;
     // Compute the product of the conditions which allow that path to be
     // executed
-    BoolExpression *minterm = getPathExpression(
-        path, tempCofactorSet, mapBlockToIndex, controlDeps, false);
+    BoolExpression *minterm =
+        getPathExpression(path, tempCofactorSet, bi, controlDeps, false);
 
     // Add the value to the result
     sop = BoolExpression::boolOr(sop, minterm);
@@ -288,9 +266,10 @@ Type ftd::channelifyType(Type type) {
 }
 
 BoolExpression *ftd::getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                               CFGLoopInfo &li) {
+                                               CFGLoopInfo &li,
+                                               const BlockIndexing &bi) {
   BoolExpression *blockCond =
-      BoolExpression::parseSop(getBlockCondition(loopExit));
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
   auto *terminatorOperation = loopExit->getTerminator();
   assert(isa<cf::CondBranchOp>(terminatorOperation) &&
          "Terminator condition of a loop exit must be a conditional branch.");
@@ -440,23 +419,17 @@ ftd::createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
 
   // Type of the inputs
   Type valueType = vals[0].getType();
-
   // All the input values associated to one block
   DenseMap<Block *, SmallVector<Value>> valuesPerBlock;
-
   // Associate for each block the value that is dominated by all the others in
   // the same block
   DenseMap<Block *, Value> inputBlocks;
-
   // Backedge builder to insert new merges
   BackedgeBuilder edgeBuilder(rewriter, funcRegion.getLoc());
-
   // Backedge corresponding to each phi
   DenseMap<Block *, Backedge> resultPerPhi;
-
   // Operands of each merge
   DenseMap<Block *, SmallVector<Value>> operandsPerPhi;
-
   // Which value should be the input of each input value
   DenseMap<Block *, Value> inputPerBlock;
 
@@ -523,8 +496,7 @@ ftd::createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
 
         if (inputBlocks.contains(predecessorOrDominator))
           valueToUse = inputBlocks[predecessorOrDominator];
-
-        if (!valueToUse && resultPerPhi.contains(predecessorOrDominator))
+        else if (resultPerPhi.contains(predecessorOrDominator))
           valueToUse = resultPerPhi.find(predecessorOrDominator)->getSecond();
 
       } while (!valueToUse);
@@ -564,12 +536,8 @@ ftd::createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
 
       if (inputBlocks.contains(blockOrDominator)) {
         foundValue = inputBlocks[blockOrDominator];
-        break;
-      }
-
-      if (blocksToAddPhi.contains(blockOrDominator)) {
+      } else if (blocksToAddPhi.contains(blockOrDominator)) {
         foundValue = newMergePerPhi[blockOrDominator].getResult();
-        break;
       }
 
     } while (!foundValue);
@@ -701,6 +669,11 @@ LogicalResult ftd::addRegenToConsumer(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+std::string dynamatic::experimental::ftd::BlockIndexing::getBlockCondition(
+    Block *block) const {
+  return "c" + std::to_string(getIndexFromBlock(block));
+}
+
 dynamatic::experimental::ftd::BlockIndexing::BlockIndexing(Region &region) {
   mlir::DominanceInfo domInfo;
 
@@ -716,42 +689,47 @@ dynamatic::experimental::ftd::BlockIndexing::BlockIndexing(Region &region) {
   // Associate a smalled index in the map to the blocks at higer levels of the
   // dominance tree
   unsigned bbIndex = 0;
-  for (Block *bb : allBlocks)
-    blockIndexing.insert({bbIndex++, bb});
+  for (Block *bb : allBlocks) {
+    indexToBlock.insert({bbIndex, bb});
+    blockToIndex.insert({bb, bbIndex});
+    bbIndex++;
+  }
 }
 
-Block *
-dynamatic::experimental::ftd::BlockIndexing::getBlockFromIndex(unsigned index) {
-  auto it = blockIndexing.find(index);
-  return (it == blockIndexing.end()) ? nullptr : it->getSecond();
+Block *dynamatic::experimental::ftd::BlockIndexing::getBlockFromIndex(
+    unsigned index) const {
+  auto it = indexToBlock.find(index);
+  return (it == indexToBlock.end()) ? nullptr : it->getSecond();
 }
 
 Block *dynamatic::experimental::ftd::BlockIndexing::getBlockFromCondition(
-    const std::string &condition) {
+    const std::string &condition) const {
   std::string conditionNumber = condition;
   conditionNumber.erase(0, 1);
   unsigned index = std::stoi(conditionNumber);
   return this->getBlockFromIndex(index);
 }
 
-unsigned
-dynamatic::experimental::ftd::BlockIndexing::getIndexFromBlock(Block *bb) {
-  for (auto const &[i, b] : blockIndexing) {
-    if (bb == b)
-      return i;
-  }
-  return -1;
+unsigned dynamatic::experimental::ftd::BlockIndexing::getIndexFromBlock(
+    Block *bb) const {
+  auto it = blockToIndex.find(bb);
+  return (it == blockToIndex.end()) ? -1 : it->getSecond();
 }
 
-bool dynamatic::experimental::ftd::BlockIndexing::greaterIndex(Block *bb1,
-                                                               Block *bb2) {
+bool dynamatic::experimental::ftd::BlockIndexing::greaterIndex(
+    Block *bb1, Block *bb2) const {
   return getIndexFromBlock(bb1) > getIndexFromBlock(bb2);
+}
+
+bool dynamatic::experimental::ftd::BlockIndexing::lessIndex(Block *bb1,
+                                                            Block *bb2) const {
+  return getIndexFromBlock(bb1) < getIndexFromBlock(bb2);
 }
 
 /// Get a value out of the input boolean expression
 static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
-                                   Block *block, ftd::BlockIndexing &bi) {
+                                   Block *block, const ftd::BlockIndexing &bi) {
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
   auto condition =
       bi.getBlockFromCondition(singleCond->id)->getTerminator()->getOperand(0);
@@ -771,7 +749,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
 /// of expressions you might have
 static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
                                      BoolExpression *expr, Block *block,
-                                     ftd::BlockIndexing &bi) {
+                                     const ftd::BlockIndexing &bi) {
 
   // Variable case
   if (expr->type == ExpressionType::Variable)
@@ -798,7 +776,7 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
 static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
-                          Block *block, ftd::BlockIndexing &bi) {
+                          Block *block, const ftd::BlockIndexing &bi) {
   if (!bdd->inputs.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
@@ -829,7 +807,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
                                   Value connection, ftd::BranchToLoopType btlt,
                                   CFGLoopInfo &li,
                                   std::vector<Operation *> &producersToCover,
-                                  ftd::BlockIndexing &bi) {
+                                  const ftd::BlockIndexing &bi) {
 
   handshake::ConditionalBranchOp branchOp;
 
@@ -850,7 +828,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
     // A conditional branch is now to be added next to the loop terminator, so
     // that the token can be suppressed
-    auto *exitCondition = ftd::getBlockLoopExitCondition(loopExit, loop, li);
+    auto *exitCondition =
+        ftd::getBlockLoopExitCondition(loopExit, loop, li, bi);
     auto conditionValue =
         boolVariableToCircuit(rewriter, exitCondition, loopExit, bi);
 
@@ -875,9 +854,9 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
     // Get the list of all the cofactors related to possible exit conditions
     for (Block *exitBlock : exitBlocks) {
       BoolExpression *blockCond =
-          ftd::getBlockLoopExitCondition(exitBlock, loop, li);
+          ftd::getBlockLoopExitCondition(exitBlock, loop, li, bi);
       fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-      cofactorList.push_back(ftd::getBlockCondition(exitBlock));
+      cofactorList.push_back(bi.getBlockCondition(exitBlock));
     }
 
     // Sort the cofactors alphabetically
@@ -923,16 +902,12 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 /// producer and consumer
 static LogicalResult insertDirectSuppression(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    Operation *consumer, Value connection, ftd::BlockIndexing &bi,
+    Operation *consumer, Value connection, const ftd::BlockIndexing &bi,
     ControlDependenceAnalysis::BlockControlDepsMap &cdAnalysis) {
 
   Block *entryBlock = &funcOp.getBody().front();
   Block *producerBlock = connection.getParentBlock();
-
-  DenseMap<Block *, unsigned> indexPerBlock;
-  for (auto &bb : funcOp.getBlocks()) {
-    indexPerBlock.insert({&bb, ftd::getBlockIndex(&bb)});
-  }
+  Block *consumerBlock = consumer->getBlock();
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
@@ -946,10 +921,10 @@ static LogicalResult insertDirectSuppression(
   ftd::eliminateCommonBlocks(prodControlDeps, consControlDeps);
 
   // Compute the activation function of producer and consumer
-  BoolExpression *fProd = ftd::enumeratePaths(entryBlock, producerBlock,
-                                              indexPerBlock, prodControlDeps);
-  BoolExpression *fCons = ftd::enumeratePaths(entryBlock, consumer->getBlock(),
-                                              indexPerBlock, consControlDeps);
+  BoolExpression *fProd =
+      ftd::enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
+  BoolExpression *fCons =
+      ftd::enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
   // The condition related to the select signal of the consumer mux must be
   // added if the following conditions hold: The consumer is a mux; The
@@ -962,7 +937,7 @@ static LogicalResult insertDirectSuppression(
 
     auto selectOperand = consumer->getOperand(0);
     BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        ftd::getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
+        bi.getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
 
     // The condition must be taken into account for `fCons` only if the
     // producer is not control dependent from the block which produces the
@@ -1002,7 +977,7 @@ static LogicalResult insertDirectSuppression(
 LogicalResult
 ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
                        handshake::FuncOp &funcOp, Operation *producerOp,
-                       ftd::BlockIndexing &bi,
+                       const ftd::BlockIndexing &bi,
                        std::vector<Operation *> &producersToCover,
                        ControlDependenceAnalysis::BlockControlDepsMap &cda) {
 

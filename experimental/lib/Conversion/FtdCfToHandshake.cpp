@@ -13,7 +13,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -209,7 +208,8 @@ static void constructGroupsGraph(SmallVector<Operation *> &operations,
 /// graph can be simplified, saving and edge:
 ///
 /// B -> C -> D
-static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
+static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph,
+                                      const BlockIndexing &bi) {
 
   // Get the dominance info for the region
   DominanceInfo domInfo;
@@ -225,7 +225,7 @@ static void minimizeGroupsConnections(DenseSet<Group *> &groupsGraph) {
       for (auto &sp : group->preds) {
 
         // if we are considering the same elements, ignore them
-        if (sp->bb == bp->bb || greaterThanBlocks(sp->bb, bp->bb))
+        if (sp->bb == bp->bb || bi.greaterIndex(sp->bb, bp->bb))
           continue;
 
         // Add the small predecessors to the list of elements to remove in
@@ -274,7 +274,8 @@ static LogicalResult joinInsertion(OpBuilder &builder,
 
 LogicalResult ftd::FtdLowerFuncToHandshake::addSupp(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps) const {
+    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps,
+    const BlockIndexing &bi) const {
 
   // A set of relationships between producer and consumer needs to be covered.
   // To do that, we consider each possible operation in the circuit as
@@ -285,8 +286,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addSupp(
   // to rerun the analysis on the operations inserted throughout the
   // execution, but this is future work...
   std::vector<Operation *> producersToCover;
-
-  BlockIndexing bi(funcOp.getBody());
 
   // Add all the operations in the IR to the above vector
   for (Block &producerBlock : funcOp.getBlocks()) {
@@ -400,7 +399,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::convertConstants(
 
 LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-    MemInterfacesInfo &memInfo) const {
+    MemInterfacesInfo &memInfo, const BlockIndexing &bi) const {
 
   /// Given an LSQ, extract the list of operations which require that same LSQ
   auto getLSQOperations =
@@ -543,7 +542,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // 2. One of them is a write operations;
       // 3. They are not mutually exclusive.
       SmallVector<ProdConsMemDep> allMemDeps;
-      identifyMemoryDependencies(allOperations, allMemDeps, loopInfo);
+      identifyMemoryDependencies(allOperations, allMemDeps, loopInfo, bi);
 
       for (auto &dep : allMemDeps)
         dep.printDependency();
@@ -556,7 +555,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // analysis
       DenseSet<Group *> groupsGraph;
       constructGroupsGraph(allOperations, allMemDeps, groupsGraph);
-      minimizeGroupsConnections(groupsGraph);
+      minimizeGroupsConnections(groupsGraph, bi);
 
       for (auto &g : groupsGraph)
         g->printDependenices();
@@ -615,12 +614,12 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
 void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
     const SmallVector<Operation *> &operations,
-    SmallVector<ProdConsMemDep> &allMemDeps,
-    const mlir::CFGLoopInfo &li) const {
+    SmallVector<ProdConsMemDep> &allMemDeps, const mlir::CFGLoopInfo &li,
+    const BlockIndexing &bi) const {
 
   // Returns true if there exist a path between `op1` and `op2`
-  auto isThereAPath = [](Operation *op1, Operation *op2) -> bool {
-    return !findAllPaths(op1->getBlock(), op2->getBlock()).empty();
+  auto isThereAPath = [&](Operation *op1, Operation *op2) -> bool {
+    return !findAllPaths(op1->getBlock(), op2->getBlock(), bi).empty();
   };
 
   // Returns true if two operations are both load
@@ -671,7 +670,7 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
       // this case i is the producer, j is the consumer. If this doesn't
       // hold, the dependency will be added when the two blocks are analyzed
       // in the opposite direction
-      if (lessThanBlocks(bbJ, bbI)) {
+      if (bi.lessIndex(bbJ, bbI)) {
 
         // and add it to the list of dependencies
         ProdConsMemDep oneMemDep(bbJ, bbI, false);
@@ -907,9 +906,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   // Save pointers to old block
-  SmallVector<Block *> blocksBefore;
-  for (auto &bb : lowerFuncOp.getBody())
-    blocksBefore.push_back(&bb);
+  SmallVector<Block *> blocksCfFunction;
+  for (auto &bb : lowerFuncOp.getBlocks())
+    blocksCfFunction.push_back(&bb);
 
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
@@ -920,24 +919,27 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     return success();
 
   // Save pointers from new blocks
-  SmallVector<Block *> blocksAfter;
-  for (auto &bb : funcOp.getBody())
-    blocksAfter.push_back(&bb);
+  SmallVector<Block *> blocksHandshakeFunc;
+  for (auto &bb : funcOp.getBlocks())
+    blocksHandshakeFunc.push_back(&bb);
 
   // Remap control dependency analysis
-  for (unsigned i = 0; i < blocksBefore.size(); i++) {
-    auto deps = cdaDeps[blocksBefore[i]];
+  for (unsigned i = 0; i < blocksCfFunction.size(); i++) {
+    auto deps = cdaDeps[blocksCfFunction[i]];
 
-    for (unsigned i = 0; i < blocksBefore.size(); i++) {
-      if (deps.allControlDeps.contains(blocksBefore[i]))
-        deps.allControlDeps.insert(blocksAfter[i]);
-      if (deps.forwardControlDeps.contains(blocksBefore[i]))
-        deps.forwardControlDeps.insert(blocksAfter[i]);
+    for (unsigned i = 0; i < blocksCfFunction.size(); i++) {
+      if (deps.allControlDeps.contains(blocksCfFunction[i]))
+        deps.allControlDeps.insert(blocksHandshakeFunc[i]);
+      if (deps.forwardControlDeps.contains(blocksCfFunction[i]))
+        deps.forwardControlDeps.insert(blocksHandshakeFunc[i]);
     }
 
-    cdaDeps.erase(blocksBefore[i]);
-    cdaDeps.insert({blocksAfter[i], deps});
+    cdaDeps.erase(blocksCfFunction[i]);
+    cdaDeps.insert({blocksHandshakeFunc[i], deps});
   }
+
+  // Get the block indexing
+  BlockIndexing bi(funcOp.getRegion());
 
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
@@ -975,7 +977,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, bi)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
@@ -993,7 +995,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     analyzeLoop(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp, cdaDeps)))
+    if (failed(addSupp(rewriter, funcOp, cdaDeps, bi)))
       return failure();
   }
 
