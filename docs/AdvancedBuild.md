@@ -57,7 +57,7 @@ The build script builds the entire project in *Debug* mode by default, which ena
 
 ### Multi-threaded builds
 
-By default, *Ninja* builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly or making you run out of RAM (especially during linking of LLVM/MLIR). You can customize the maximum number of concurrent threads that are used to build the project using the `--threads` argument.
+By default, *Ninja* builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly. You can customize the maximum number of concurrent threads that are used to build the project using the `--threads` argument.
 
 ```sh
 # Build using at most one thread per logical core on your machine
@@ -68,6 +68,14 @@ By default, *Ninja* builds the project by concurrently using at most one thread 
 # Build using at most 4 concurrent threads
 ./build.sh --threads 4
 ```
+
+It is also common to run out of RAM especially during linking of LLVM/MLIR. If this is a problem, consider limiting the maximum number of parallel LLVM link jobs to one per 15GB of available RAM, using the `--llvm-parallel-link-jobs` flag:
+```sh
+# Perform at most 1 concurrent LLVM link jobs
+./build.sh --llvm-parallel-link-jobs 1
+```
+
+Note that this flag defaults to a value of `2`
 
 ### Forcing CMake re-configuration
 
