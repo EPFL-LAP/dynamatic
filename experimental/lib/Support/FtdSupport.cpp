@@ -13,9 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Support/FtdSupport.h"
-#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -27,6 +26,154 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
+
+DenseMap<unsigned, ftd::CFGEdge> ftd::getCFGEdges(Region &funcRegion,
+                                                  NameAnalysis &namer) {
+
+  DenseMap<unsigned, ftd::CFGEdge> edgeMap;
+
+  // Get the ID of a block through the ID annotated in the terminator operation
+  auto getIDBlock = [&](Block *bb) -> unsigned {
+    auto idOptional = getLogicBB(bb->getTerminator());
+    if (!idOptional.has_value())
+      bb->getTerminator()->emitError() << "Operation has no BB annotated\n";
+    return idOptional.value();
+  };
+
+  // For each block in the IR
+  for (auto &block : funcRegion.getBlocks()) {
+
+    // Get the terminator and its block ID
+    auto *terminator = block.getTerminator();
+    unsigned blockID = getIDBlock(&block);
+
+    // If the terminator is a branch, then the edge is unconditional. If the
+    // terminator is `cond_br`, then the branch is conditional.
+    if (auto branchOp = dyn_cast<cf::BranchOp>(terminator); branchOp) {
+      edgeMap.insert(
+          {blockID, ftd::CFGEdge(getIDBlock(branchOp->getSuccessor(0)))});
+    } else if (auto condBranchOp = dyn_cast<cf::CondBranchOp>(terminator);
+               condBranchOp) {
+      // Get the name of the operation which defines the condition used for the
+      // branch
+      std::string conditionName =
+          namer.getName(condBranchOp.getOperand(0).getDefiningOp()).str();
+
+      // Get IDs of both true and false destinations
+      unsigned trueDestID = getIDBlock(condBranchOp.getTrueDest());
+      unsigned falseDestID = getIDBlock(condBranchOp.getFalseDest());
+      edgeMap.insert(
+          {blockID, ftd::CFGEdge(trueDestID, falseDestID, conditionName)});
+    } else if (!llvm::isa_and_nonnull<func::ReturnOp>(terminator)) {
+      terminator->emitError()
+          << "Not a cf terminator for BB" << blockID << "\n";
+    }
+  }
+
+  for (auto &[start, edge] : edgeMap) {
+    llvm::dbgs() << start << " -> ";
+    edge.print();
+  }
+
+  return edgeMap;
+}
+
+LogicalResult ftd::restoreCfStructure(
+    handshake::FuncOp &funcOp, const DenseMap<unsigned, ftd::CFGEdge> &edges,
+    ConversionPatternRewriter &rewriter, NameAnalysis &namer) {
+
+  // Maintains the ID of the current block under analysis
+  unsigned currentBlockID = 0;
+
+  // Maintains the current block under analysis: all the operations in block 0
+  // are maintained in the same location, while the others operations are
+  // inserted in the new blocks
+  Block *currentBlock = &funcOp.getBlocks().front();
+
+  // Keep a mapping between each index and each block. Since the block 0 is kept
+  // as it is, it can be inserted already in the map.
+  DenseMap<unsigned, Block *> indexToBlock;
+  indexToBlock.insert({0, currentBlock});
+
+  // Temporary store all the operations in the original function
+  SmallVector<Operation *> originalOps;
+  for (auto &op : funcOp.getOps())
+    originalOps.push_back(&op);
+
+  // For each operation
+  for (auto *op : originalOps) {
+
+    // Get block ID of the current operation. If it is not annotated (end
+    // operation/LSQ/memory operation) then use the current ID
+    unsigned opBlock = getLogicBB(op).value_or(currentBlockID);
+
+    // Do not modify the block structure if we are in block 0
+    if (opBlock == 0)
+      continue;
+
+    // If a new ID is found with respect to the old one, then create a new block
+    // in the function
+    if (opBlock != currentBlockID) {
+      currentBlock = funcOp.addBlock();
+      currentBlockID++;
+      indexToBlock.insert({currentBlockID, currentBlock});
+    }
+
+    // Move the current operation at the end of the new block we are currently
+    // using
+    op->moveBefore(currentBlock, currentBlock->end());
+  }
+
+  // Once we are done creating the blocks, we need to insert the terminators to
+  // obtain a proper block structure, using the edge information provided as
+  // input
+
+  // For each block
+  for (auto [blockID, bb] : llvm::enumerate(funcOp.getBlocks())) {
+    rewriter.setInsertionPointToEnd(&bb);
+
+    if (!edges.contains(blockID))
+      return failure();
+
+    auto edge = edges.lookup(blockID);
+
+    // Either create a conditional or unconditional branch depending on the type
+    // of edge we have
+    if (edge.isConditional()) {
+      rewriter.create<cf::CondBranchOp>(
+          bb.getTerminator()->getLoc(),
+          namer.getOp(edge.getCondition())->getResult(0),
+          indexToBlock[edge.getTrueSuccessor()],
+          indexToBlock[edge.getFalseSuccessor()]);
+    } else {
+      unsigned successor = edge.getSuccessor();
+      rewriter.create<cf::BranchOp>(bb.getTerminator()->getLoc(),
+                                    indexToBlock[successor]);
+    }
+  }
+  return success();
+}
+
+LogicalResult ftd::flattenFunction(handshake::FuncOp &funcOp,
+                                   ConversionPatternRewriter &rewriter) {
+
+  // remove all the `cf.br` and `cf.cond_br` terminators
+  for (Block &block : funcOp) {
+    Operation *termOp = &block.back();
+    if (llvm::isa_and_nonnull<cf::CondBranchOp, cf::BranchOp>(termOp))
+      rewriter.eraseOp(termOp);
+  }
+
+  // Inline all non-entry blocks into the entry block, erasing them as we go
+  Operation *lastOp = &funcOp.front().back();
+  for (Block &block : llvm::make_early_inc_range(funcOp)) {
+    if (block.isEntryBlock())
+      continue;
+    rewriter.inlineBlockBefore(&block, lastOp);
+  }
+
+  return success();
+}
 
 bool ftd::isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
   if (!loop1 || !loop2)
@@ -339,21 +486,6 @@ DenseMap<Block *, DenseSet<Block *>> ftd::getDominanceFrontier(Region &region) {
       }
     }
   }
-
-#define PRINT_DEBUG
-#ifdef PRINT_DEBUG
-  for (auto &entry : result) {
-    llvm::dbgs() << "[DOM FRONT] Domination frontier of ";
-    entry.first->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << ": ";
-    llvm::dbgs() << "{";
-    for (auto &dom : entry.second) {
-      dom->printAsOperand(llvm::dbgs());
-      llvm::dbgs() << " ";
-    }
-    llvm::dbgs() << "}\n";
-  }
-#endif
 
   return result;
 }
@@ -1132,4 +1264,29 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
 bool ftd::isMergeOrMux(Operation *op) {
   return llvm::isa_and_nonnull<handshake::MergeOp>(op) ||
          llvm::isa_and_nonnull<handshake::MuxOp>(op);
+}
+
+unsigned ftd::CFGEdge::getSuccessor() const {
+  return isUnconditional() ? std::get<unsigned>(successors) : -1;
+}
+unsigned ftd::CFGEdge::getTrueSuccessor() const {
+  return isConditional()
+             ? std::get<std::pair<unsigned, unsigned>>(successors).first
+             : -1;
+}
+unsigned ftd::CFGEdge::getFalseSuccessor() const {
+  return isConditional()
+             ? std::get<std::pair<unsigned, unsigned>>(successors).second
+             : -1;
+}
+std::string ftd::CFGEdge::getCondition() const {
+  return isConditional() ? conditionName.value() : "";
+}
+void ftd::CFGEdge::print() const {
+  if (isConditional()) {
+    llvm::dbgs() << "{ " << getTrueSuccessor() << " " << getFalseSuccessor()
+                 << " " << conditionName.value() << " }\n";
+  } else {
+    llvm::dbgs() << "{ " << getSuccessor() << " }\n";
+  }
 }

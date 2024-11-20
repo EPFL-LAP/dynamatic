@@ -193,6 +193,14 @@ static void constructGroupsGraph(SmallVector<Operation *> &operations,
     producerGroup->succs.insert(consumerGroup);
     consumerGroup->preds.insert(producerGroup);
   }
+
+  // TODO
+  // for (Group *g : groups) {
+  //   if (!g->preds.size()) {
+  //     g->preds.insert(g);
+  //     g->succs.insert(g);
+  //   }
+  // }
 }
 
 /// Minimizes the connections between groups based on dominance info. Let's
@@ -582,7 +590,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
           Operation *producerLF = forksGraph[producerGroup->bb];
           SmallVector<Value> forkValuesToConnect = {startValue,
                                                     producerLF->getResult(0)};
-
           auto phiNetworkOrFailure = createPhiNetwork(
               funcOp.getRegion(), rewriter, forkValuesToConnect);
           if (failed(phiNetworkOrFailure))
@@ -890,7 +897,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
 
-  // Get the map of control dependencies for the blocks in the function to lower
+  // Get the map of control dependencies for the blocks in the function to
+  // lower
   auto cdaDeps = cdAnalaysis.getAllBlockDeps();
 
   // Map all memory accesses in the matched function to the index of their
@@ -1001,6 +1009,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
   // id basic block
   idBasicBlocks(funcOp, rewriter);
+
+  auto blockConnections = getCFGEdges(funcOp.getRegion(), namer);
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();

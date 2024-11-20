@@ -16,6 +16,7 @@
 #define DYNAMATIC_SUPPORT_FTD_SUPPORT_H
 
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
@@ -24,6 +25,53 @@
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+/// Class to store information related to an edge in a CFG. Each node is
+/// identified by its index as expressed in the MLIR format
+class CFGEdge {
+  /// Variant to store the successors of a node in the CFG. It's either one
+  /// single successor or two of them.
+  std::variant<unsigned, std::pair<unsigned, unsigned>> successors;
+
+  /// Optional string to store the name of the operation driving a conditional
+  /// branch from a node.
+  std::optional<std::string> conditionName;
+
+public:
+  /// Constructor of a CFG edge with one successor only.
+  CFGEdge(unsigned e) : successors(e), conditionName(std::nullopt) {}
+
+  // Constructor of a CFG edge with a true and a false successor.
+  CFGEdge(unsigned t, unsigned f, std::string c)
+      : successors(std::pair<unsigned, unsigned>(t, f)), conditionName(c) {}
+
+  /// Copy constructor.
+  CFGEdge(const CFGEdge &c) = default;
+
+  /// Default constructor.
+  CFGEdge() : successors(0u), conditionName(std::nullopt) {}
+
+  /// Returns true if the edge is unconditional.
+  bool isUnconditional() const;
+
+  /// Returns true if the edge is conditional.
+  bool isConditional() const;
+
+  /// Returns the successor if the edge is unconditional.
+  unsigned getSuccessor() const;
+
+  /// Returns the true successor if the edge is conditional.
+  unsigned getTrueSuccessor() const;
+
+  /// Returns the false successor if the edge is conditional.
+  unsigned getFalseSuccessor() const;
+
+  /// Returns the string condition if the edge is conditional.
+  std::string getCondition() const;
+
+  /// Print some information related to the edge.
+  void print() const;
+};
 
 /// Different types of loop suppression.
 enum BranchToLoopType {
@@ -177,6 +225,24 @@ addSuppToProducer(ConversionPatternRewriter &rewriter,
 /// Retrun true if the operation is either a `handshake::MergeOp` or
 /// `handshake::MuxOp`
 bool isMergeOrMux(Operation *op);
+
+/// Extract the CFG information from a region. Each basic block with an out edge
+/// is marked with the successor basic blocks, related to the structure
+/// `CFGEdge` for edges.
+DenseMap<unsigned, ftd::CFGEdge> getCFGEdges(Region &funcRegion,
+                                             NameAnalysis &namer);
+
+/// Use an handshake function ot build the cf structure again, thanks to the
+/// information in `edges`.
+LogicalResult restoreCfStructure(handshake::FuncOp &funcOp,
+                                 const DenseMap<unsigned, ftd::CFGEdge> &edges,
+                                 ConversionPatternRewriter &rewriter,
+                                 NameAnalysis &namer);
+
+/// Get rid of the cf structure by moving all the operations in the initial
+/// block and removing all the cf terminators.
+LogicalResult flattenFunction(handshake::FuncOp &funcOp,
+                              ConversionPatternRewriter &rewriter);
 
 }; // namespace ftd
 }; // namespace experimental
