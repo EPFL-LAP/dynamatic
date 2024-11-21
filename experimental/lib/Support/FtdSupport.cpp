@@ -1266,6 +1266,12 @@ bool ftd::isMergeOrMux(Operation *op) {
          llvm::isa_and_nonnull<handshake::MuxOp>(op);
 }
 
+bool ftd::CFGEdge::isConditional() const { return conditionName.has_value(); }
+
+bool ftd::CFGEdge::isUnconditional() const {
+  return !conditionName.has_value();
+}
+
 unsigned ftd::CFGEdge::getSuccessor() const {
   return isUnconditional() ? std::get<unsigned>(successors) : -1;
 }
@@ -1289,4 +1295,14 @@ void ftd::CFGEdge::print() const {
   } else {
     llvm::dbgs() << "{ " << getSuccessor() << " }\n";
   }
+}
+
+std::string
+ftd::CFGEdge::serializeEdges(const DenseMap<unsigned, ftd::CFGEdge> &edgeMap) {
+  return "";
+}
+
+DenseMap<unsigned, ftd::CFGEdge>
+ftd::CFGEdge::unserializeEdges(const std::string &edges) {
+  return DenseMap<unsigned, ftd::CFGEdge>();
 }

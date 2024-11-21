@@ -1015,6 +1015,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
+  funcOp->setAttr("CFGINFO", rewriter.getStringAttr("HELLO"));
+
   return success();
 }
 

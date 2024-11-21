@@ -71,6 +71,10 @@ public:
 
   /// Print some information related to the edge.
   void print() const;
+
+  static std::string serializeEdges(const DenseMap<unsigned, CFGEdge> &edgeMap);
+
+  static DenseMap<unsigned, CFGEdge> unserializeEdges(const std::string &edges);
 };
 
 /// Different types of loop suppression.
