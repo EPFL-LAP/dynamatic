@@ -475,8 +475,13 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
-  specOp = builder.create<handshake::SpeculatorOp>(dstOp->getLoc(), srcOpResult,
-                                                   enableSpecIn.value());
+  handshake::BufferOp bufferOp = builder.create<handshake::BufferOp>(
+      dstOp->getLoc(), enableSpecIn.value(), TimingInfo::tehb(), 16);
+  inheritBB(dstOp, bufferOp);
+
+  builder.setInsertionPoint(bufferOp);
+  specOp = builder.create<handshake::SpeculatorOp>(
+      bufferOp->getLoc(), srcOpResult, bufferOp.getResult());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
