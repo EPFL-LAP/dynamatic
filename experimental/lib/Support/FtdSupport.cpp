@@ -70,17 +70,24 @@ DenseMap<unsigned, ftd::CFGEdge> ftd::getCFGEdges(Region &funcRegion,
     }
   }
 
-  for (auto &[start, edge] : edgeMap) {
-    llvm::dbgs() << start << " -> ";
-    edge.print();
-  }
-
   return edgeMap;
 }
 
-LogicalResult ftd::restoreCfStructure(
-    handshake::FuncOp &funcOp, const DenseMap<unsigned, ftd::CFGEdge> &edges,
-    ConversionPatternRewriter &rewriter, NameAnalysis &namer) {
+LogicalResult
+ftd::restoreCfStructure(handshake::FuncOp &funcOp,
+                        const DenseMap<unsigned, ftd::CFGEdge> &edges,
+                        ConversionPatternRewriter &rewriter) {
+
+  auto getOpByName = [&](const std::string &name) -> Operation * {
+    for (Operation &op : funcOp.getOps()) {
+      auto opName = op.getAttrOfType<mlir::StringAttr>("handshake.name");
+      std::string opNameStr = opName.str();
+      if (name == opNameStr) {
+        return &op;
+      }
+    }
+    return nullptr;
+  };
 
   // Maintains the ID of the current block under analysis
   unsigned currentBlockID = 0;
@@ -140,17 +147,20 @@ LogicalResult ftd::restoreCfStructure(
     // Either create a conditional or unconditional branch depending on the type
     // of edge we have
     if (edge.isConditional()) {
-      rewriter.create<cf::CondBranchOp>(
-          bb.getTerminator()->getLoc(),
-          namer.getOp(edge.getCondition())->getResult(0),
-          indexToBlock[edge.getTrueSuccessor()],
-          indexToBlock[edge.getFalseSuccessor()]);
+      Operation *condOp = getOpByName(edge.getCondition());
+      if (!condOp)
+        return failure();
+      rewriter.create<cf::CondBranchOp>(bb.back().getLoc(),
+                                        condOp->getResult(0),
+                                        indexToBlock[edge.getTrueSuccessor()],
+                                        indexToBlock[edge.getFalseSuccessor()]);
     } else {
       unsigned successor = edge.getSuccessor();
-      rewriter.create<cf::BranchOp>(bb.getTerminator()->getLoc(),
+      rewriter.create<cf::BranchOp>(bb.back().getLoc(),
                                     indexToBlock[successor]);
     }
   }
+
   return success();
 }
 
@@ -1288,21 +1298,113 @@ unsigned ftd::CFGEdge::getFalseSuccessor() const {
 std::string ftd::CFGEdge::getCondition() const {
   return isConditional() ? conditionName.value() : "";
 }
-void ftd::CFGEdge::print() const {
-  if (isConditional()) {
-    llvm::dbgs() << "{ " << getTrueSuccessor() << " " << getFalseSuccessor()
-                 << " " << conditionName.value() << " }\n";
-  } else {
-    llvm::dbgs() << "{ " << getSuccessor() << " }\n";
-  }
-}
 
 std::string
 ftd::CFGEdge::serializeEdges(const DenseMap<unsigned, ftd::CFGEdge> &edgeMap) {
-  return "";
+  std::string result = "{";
+  for (auto &[sourceBB, edge] : edgeMap) {
+    result += "[";
+    result += std::to_string(sourceBB);
+    result += ",";
+    if (edge.isConditional()) {
+      result += std::to_string(edge.getTrueSuccessor()) + ",";
+      result += std::to_string(edge.getFalseSuccessor()) + ",";
+      result += edge.getCondition();
+    } else {
+      result += std::to_string(edge.getSuccessor());
+    }
+    result += "]";
+  }
+  result += "}";
+
+  return result;
 }
 
-DenseMap<unsigned, ftd::CFGEdge>
+FailureOr<DenseMap<unsigned, ftd::CFGEdge>>
 ftd::CFGEdge::unserializeEdges(const std::string &edges) {
-  return DenseMap<unsigned, ftd::CFGEdge>();
+  unsigned currentIndex = 0;
+  unsigned stringSize = edges.size();
+  DenseMap<unsigned, ftd::CFGEdge> result;
+
+  auto expectCharacter = [&](char c) -> bool {
+    return edges[currentIndex++] == c;
+  };
+
+  auto lookUp = [&]() -> char { return edges[currentIndex]; };
+
+  auto parseNumber = [&]() -> int {
+    unsigned sourceSize = 0;
+    unsigned sourceStart = currentIndex;
+    while (currentIndex < stringSize && std::isdigit(edges[currentIndex]))
+      sourceSize++, currentIndex++;
+    if (!sourceSize || currentIndex >= stringSize)
+      return -1;
+
+    return std::stoi(edges.substr(sourceStart, sourceSize));
+  };
+
+  auto parseString = [&]() -> std::string {
+    unsigned sourceSize = 0;
+    unsigned sourceStart = currentIndex;
+    while (currentIndex < stringSize && std::isalnum(edges[currentIndex]))
+      sourceSize++, currentIndex++;
+    if (!sourceSize || currentIndex >= stringSize)
+      return "";
+
+    return edges.substr(sourceStart, sourceSize);
+  };
+
+  if (!expectCharacter('{'))
+    return failure();
+
+  while (currentIndex < stringSize) {
+
+    if (!expectCharacter('['))
+      return failure();
+
+    int sourceEdge = parseNumber();
+    if (sourceEdge < 0)
+      return failure();
+
+    if (!expectCharacter(','))
+      return failure();
+
+    int destTrue = parseNumber();
+    if (destTrue < 0)
+      return failure();
+
+    if (lookUp() == ',') {
+      if (!expectCharacter(','))
+        return failure();
+
+      int destFalse = parseNumber();
+      if (destFalse < 0)
+        return failure();
+
+      if (!expectCharacter(','))
+        return failure();
+
+      std::string condition = parseString();
+      if (condition == "")
+        return failure();
+
+      result.insert({sourceEdge, CFGEdge(destTrue, destFalse, condition)});
+
+    } else if (lookUp() == ']') {
+      result.insert({sourceEdge, CFGEdge(destTrue)});
+    } else {
+      return failure();
+    }
+
+    if (!expectCharacter(']'))
+      return failure();
+
+    if (lookUp() == '}')
+      break;
+  }
+
+  if (!expectCharacter('}') || currentIndex != stringSize)
+    return failure();
+
+  return result;
 }

@@ -69,12 +69,10 @@ public:
   /// Returns the string condition if the edge is conditional.
   std::string getCondition() const;
 
-  /// Print some information related to the edge.
-  void print() const;
-
   static std::string serializeEdges(const DenseMap<unsigned, CFGEdge> &edgeMap);
 
-  static DenseMap<unsigned, CFGEdge> unserializeEdges(const std::string &edges);
+  static FailureOr<DenseMap<unsigned, CFGEdge>>
+  unserializeEdges(const std::string &edges);
 };
 
 /// Different types of loop suppression.
@@ -128,6 +126,7 @@ constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
 constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
+constexpr llvm::StringLiteral CFG_EDGES("cfg_edges");
 
 /// Recursively check weather 2 blocks belong to the same loop, starting
 /// from the inner-most loops
@@ -240,8 +239,7 @@ DenseMap<unsigned, ftd::CFGEdge> getCFGEdges(Region &funcRegion,
 /// information in `edges`.
 LogicalResult restoreCfStructure(handshake::FuncOp &funcOp,
                                  const DenseMap<unsigned, ftd::CFGEdge> &edges,
-                                 ConversionPatternRewriter &rewriter,
-                                 NameAnalysis &namer);
+                                 ConversionPatternRewriter &rewriter);
 
 /// Get rid of the cf structure by moving all the operations in the initial
 /// block and removing all the cf terminators.

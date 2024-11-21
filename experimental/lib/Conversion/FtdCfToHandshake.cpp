@@ -1011,11 +1011,11 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   idBasicBlocks(funcOp, rewriter);
 
   auto blockConnections = getCFGEdges(funcOp.getRegion(), namer);
+  auto resAttr = CFGEdge::serializeEdges(blockConnections);
+  funcOp->setAttr(CFG_EDGES, rewriter.getStringAttr(resAttr));
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
-
-  funcOp->setAttr("CFGINFO", rewriter.getStringAttr("HELLO"));
 
   return success();
 }
