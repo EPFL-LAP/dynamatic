@@ -39,15 +39,15 @@ public:
   FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit), cdAnalaysis(cda),
-        gsaAnalysis(gsa) {};
+      : LowerFuncToHandshake(namer, ctx, benefit), cdAnalysis(cda),
+        gsaAnalysis(gsa){};
 
   FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        cdAnalaysis(cda), gsaAnalysis(gsa) {};
+        cdAnalysis(cda), gsaAnalysis(gsa){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -55,7 +55,7 @@ public:
 
 protected:
   /// Store the control dependency analysis over the input function
-  ControlDependenceAnalysis cdAnalaysis;
+  ControlDependenceAnalysis cdAnalysis;
 
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
@@ -64,7 +64,7 @@ protected:
       handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
       MemInterfacesInfo &memInfo, const BlockIndexing &bi) const;
 
-  void analyzeLoop(handshake::FuncOp funcOp) const;
+  void exportGsaGatesInfo(handshake::FuncOp funcOp) const;
 
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
@@ -110,8 +110,8 @@ protected:
   /// Starting from the information collected by the gsa analysis pass,
   /// instantiate some merge operations at the beginning of each block which
   /// work as explicit phi functions.
-  LogicalResult addExplicitPhi(func::FuncOp funcOp,
-                               ConversionPatternRewriter &rewriter) const;
+  LogicalResult addGsaGates(func::FuncOp funcOp,
+                            ConversionPatternRewriter &rewriter) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

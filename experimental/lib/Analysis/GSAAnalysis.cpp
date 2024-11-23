@@ -36,6 +36,8 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
   // functions
   unsigned functionsCovered = 0;
 
+  // TODO: Extend to support multiple functions
+
   // The analysis can be instantiated either over a module containing one
   // function only or over a function
   if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
@@ -496,7 +498,8 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op : operands) {
+      for (GateInput *&op
+           : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());

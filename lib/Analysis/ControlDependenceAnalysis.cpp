@@ -32,6 +32,8 @@ ControlDependenceAnalysis::ControlDependenceAnalysis(Operation *operation) {
   // functions
   unsigned functionsCovered = 0;
 
+  // TODO: Extend to support multiple functions
+
   // The analysis can be instantiated either over a module containing one
   // function only or over a function
   if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
@@ -225,7 +227,8 @@ void dynamatic::ControlDependenceAnalysis::printAllBlocksDeps() const {
   DEBUG_WITH_TYPE(
       "CONTROL_DEPENDENCY_ANALYSIS",
       llvm::dbgs() << "\n*********************************\n\n";
-      for (auto &elem : blocksControlDeps) {
+      for (auto &elem
+           : blocksControlDeps) {
         Block *block = elem.first;
         block->printAsOperand(llvm::dbgs());
         llvm::dbgs() << " is control dependent on: ";

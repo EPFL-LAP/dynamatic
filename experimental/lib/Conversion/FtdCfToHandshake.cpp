@@ -106,28 +106,32 @@ struct FtdCfToHandshakePass
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
-void ftd::FtdLowerFuncToHandshake::analyzeLoop(handshake::FuncOp funcOp) const {
+void ftd::FtdLowerFuncToHandshake::exportGsaGatesInfo(
+    handshake::FuncOp funcOp) const {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
   std::ofstream ofs;
 
-  ofs.open("ftdscripting/loopinfo.txt", std::ofstream::out);
+  // We print to this file information about the GSA gates and the innermost
+  // loops, if any, containing each.
+  ofs.open("ftdscripting/gsaGatesInfo.txt", std::ofstream::out);
   std::string loopDescription;
   llvm::raw_string_ostream loopDescriptionStream(loopDescription);
 
   auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
   for (auto phi : muxes) {
-    if (!loopInfo.getLoopFor(phi->getBlock()))
-      continue;
     ofs << namer.getName(phi).str();
     if (llvm::isa<handshake::MergeOp>(phi->getOperand(0).getDefiningOp()))
       ofs << " (MU)\n";
     else
       ofs << " (GAMMA)\n";
-    loopInfo.getLoopFor(phi->getBlock())
-        ->print(loopDescriptionStream, false, false, 0);
+    if (!loopInfo.getLoopFor(phi->getBlock()))
+      ofs << "Not inside any loop\n";
+    else
+      loopInfo.getLoopFor(phi->getBlock())
+          ->print(loopDescriptionStream, false, false, 0);
     ofs << loopDescription << "\n";
     loopDescription = "";
   }
@@ -155,7 +159,7 @@ static void connectInitMerges(ConversionPatternRewriter &rewriter,
 }
 
 /// Given a set of operations related to one LSQ and the memory dependency
-/// information among them, crate a group graph.
+/// information among them, create a group graph.
 static void constructGroupsGraph(SmallVector<Operation *> &operations,
                                  SmallVector<ProdConsMemDep> &allMemDeps,
                                  DenseSet<Group *> &groups) {
@@ -194,7 +198,8 @@ static void constructGroupsGraph(SmallVector<Operation *> &operations,
     consumerGroup->preds.insert(producerGroup);
   }
 
-  // TODO
+  // TODO: Useful if we want to include self dependencies around individual
+  // groups
   // for (Group *g : groups) {
   //   if (!g->preds.size()) {
   //     g->preds.insert(g);
@@ -534,8 +539,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     // If the memory accesses require an LSQ, then the Fast Load-Store queue
     // allocation method from FPGA'23 is used. In particular, first the
     // groups allocation is performed together with the creation of the fork
-    // graph. Afterwards, the FTD methodology is used to interconnect the
-    // elements correctly.
+    // graph. Afterwards, the FTD methodology that comes later in the flow is
+    // used to interconnect the elements correctly.
     if (memAccesses.lsqPorts.size() > 0) {
 
       mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -547,8 +552,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // Get all the dependencies among the BBs of the related operations.
       // Two memory operations are dependant if:
       // 1. They are in different BBs;
-      // 2. One of them is a write operations;
-      // 3. They are not mutually exclusive.
+      // 2. One of them is a Store operation;
+      // 3. They are not mutually exclusive (according to the control flow).
       SmallVector<ProdConsMemDep> allMemDeps;
       identifyMemoryDependencies(allOperations, allMemDeps, loopInfo, bi);
 
@@ -573,9 +578,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       handshake::LSQOp lsqOp;
 
       // As we instantiate the interfaces for the LSQ for each memory
-      // operation, we need to add some forks in order for the control input
-      // to be propagated. In particular, we want to keep track of the control
-      // value associated to each basic block in the region
+      // operation, we need to add one fork to model each group and propagate
+      // control between dependent groups.
       DenseMap<Block *, Operation *> forksGraph;
 
       // Instantiate the interfaces and a lazy fork for each group
@@ -588,8 +592,15 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
         Operation *consumerLF = forksGraph[consumerGroup->bb];
         for (Group *producerGroup : consumerGroup->preds) {
           Operation *producerLF = forksGraph[producerGroup->bb];
+
+          // Every Fork takes Start as a predecessor along with any other
+          // predecessor it may have in the groups graph The below function
+          // running SSA will then either add a Merge or eliminate the Start
+          // predecessor depending on control flow
           SmallVector<Value> forkValuesToConnect = {startValue,
                                                     producerLF->getResult(0)};
+          // This function adds SSA Phis (Merges) by studying the deps between
+          // forks and the blocks containing them
           auto phiNetworkOrFailure = createPhiNetwork(
               funcOp.getRegion(), rewriter, forkValuesToConnect);
           if (failed(phiNetworkOrFailure))
@@ -649,7 +660,7 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
     // Loop over all the other operations in the LSQ. There is no dependency
     // in the following cases:
     // 1. One of them is not a memory operation;
-    // 2. The two operation are in the same group, thus they are in the same
+    // 2. The two operations are in the same group, thus they are in the same
     // BB;
     // 3. They are both load operations;
     // 4. The operations are mutually exclusive (i.e. there is no path which
@@ -694,7 +705,7 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
   }
 }
 
-LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
+LogicalResult ftd::FtdLowerFuncToHandshake::addGsaGates(
     func::FuncOp funcOp, ConversionPatternRewriter &rewriter) const {
 
   using namespace experimental::gsa;
@@ -708,9 +719,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
   // might be another GSA function, and it's possible that the function was
   // not instantiated yet. For this reason, we keep track of the missing
   // operands, and reconnect them later on.
-  //
-  // Also, a GAMMA function might have an empty data input: GAMMA(c, EMPTY,
-  // V). In this case, the function is translated into a branch.
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
@@ -744,7 +752,10 @@ LogicalResult ftd::FtdLowerFuncToHandshake::addExplicitPhi(
     ArrayRef<Gate *> phis = gsaAnalysis.getGates(&block);
     for (Gate *phi : phis) {
 
-      // Skip if it's a phi
+      // TODO: No point of this skipping if we have a guarantee that the
+      // phi->gsaGateFunction is exclusively either MuGate or GammaGate...
+      // Skip if it's an SSA phi that has more than 2 inputs (not yet broken
+      // down to multiple GSA gates)
       if (phi->gsaGateFunction == PhiGate)
         continue;
 
@@ -899,7 +910,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
   // Get the map of control dependencies for the blocks in the function to
   // lower
-  auto cdaDeps = cdAnalaysis.getAllBlockDeps();
+  auto cdaDeps = cdAnalysis.getAllBlockDeps();
 
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
@@ -910,7 +921,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   }
 
   // Add the muxes as obtained by the GSA analysis pass
-  if (failed(addExplicitPhi(lowerFuncOp, rewriter)))
+  if (failed(addGsaGates(lowerFuncOp, rewriter)))
     return failure();
 
   // Save pointers to old block
@@ -931,7 +942,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   for (auto &bb : funcOp.getBlocks())
     blocksHandshakeFunc.push_back(&bb);
 
-  // Remap control dependency analysis
+  // Remap control dependency analysis (in correspondence to the new block
+  // pointers)
   for (unsigned i = 0; i < blocksCfFunction.size(); i++) {
     auto deps = cdaDeps[blocksCfFunction[i]];
 
@@ -952,7 +964,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
   // function as one of its data inputs. However, the start value was not
-  // present yet when `addExplicitPhi` is called, thus we need to reconnect
+  // present yet when `addGsaGates` is called, thus we need to reconnect
   // it.
   connectInitMerges(rewriter, funcOp);
 
@@ -1000,7 +1012,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     if (failed(addRegen(rewriter, funcOp)))
       return failure();
 
-    analyzeLoop(funcOp);
+    // This function prints to a file information about all GSA gates and the
+    // loops containing them (if any)
+    exportGsaGatesInfo(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
     if (failed(addSupp(rewriter, funcOp, cdaDeps, bi)))
