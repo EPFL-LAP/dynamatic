@@ -26,8 +26,6 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -69,7 +67,7 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
   // Check that memory access ports are named
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   WalkResult res = modOp.walk([&](Operation *op) {
-    if (!isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(op))
+    if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
       return WalkResult::advance();
     if (!namer.hasName(op)) {
       op->emitError() << "Memory access port must be named.";
@@ -116,43 +114,6 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceInFunction(
   return success();
 }
 
-static constexpr llvm::StringLiteral
-    ERR_ATTR("memory operation must have attribute of type "
-             "'handshake::MemInterfaceAttr' to encode which memory interface "
-             "it should connect to.");
-
-/// Records a memory access port replacement.
-static void recordReplacement(Operation *oldOp, Operation *newOp,
-                              MemoryOpLowering &memLowering) {
-  inheritBB(oldOp, newOp);
-  memLowering.recordReplacement(oldOp, newOp, false);
-  oldOp->replaceAllUsesWith(newOp->getResults());
-  oldOp->erase();
-}
-
-/// Replaces a load port of the source type with a load port of a different
-/// type.
-template <typename DstLoadOp, typename SrcLoadOp>
-static DstLoadOp replaceLoad(SrcLoadOp loadOp, Value dataInput,
-                             OpBuilder &builder,
-                             MemoryOpLowering &memLowering) {
-  auto newLoadOp = builder.create<DstLoadOp>(
-      loadOp->getLoc(), loadOp.getAddressInput(), dataInput);
-  recordReplacement(loadOp, newLoadOp, memLowering);
-  return newLoadOp;
-}
-
-/// Replaces a store port of the source type with a store port of a different
-/// type.
-template <typename DstStpreOp, typename SrcStoreOp>
-static DstStpreOp replaceStore(SrcStoreOp storeOp, OpBuilder &builder,
-                               MemoryOpLowering &memLowering) {
-  auto newStoreOp = builder.create<DstStpreOp>(
-      storeOp->getLoc(), storeOp.getAddressInput(), storeOp.getDataInput());
-  recordReplacement(storeOp, newStoreOp, memLowering);
-  return newStoreOp;
-}
-
 LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
     handshake::FuncOp funcOp, TypedValue<mlir::MemRefType> memref,
     const DenseMap<unsigned, Value> &ctrlVals) {
@@ -185,111 +146,44 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   MemoryOpLowering memLowering(getAnalysis<NameAnalysis>());
   MemoryInterfaceBuilder memBuilder(funcOp, memref, masterIface.getMemStart(),
                                     masterIface.getCtrlEnd(), ctrlVals);
-  BackedgeBuilder backedgeBuilder(builder, funcOp->getLoc());
 
   // Collect all access ports related to the memory region under consideration
-  DenseSet<Operation *> regionPorts;
+  DenseSet<MemPortOpInterface> regionPorts;
   if (mcOp) {
     MCPorts mcPorts = mcOp.getPorts();
     for (MCBlock &block : mcPorts.getBlocks()) {
       for (MemoryPort &port : block->accessPorts)
-        regionPorts.insert(port.portOp);
+        regionPorts.insert(cast<MemPortOpInterface>(port.portOp));
     }
   }
   if (lsqOp) {
     LSQPorts lsqPorts = lsqOp.getPorts();
     for (LSQGroup &group : lsqPorts.getGroups()) {
       for (MemoryPort &port : group->accessPorts)
-        regionPorts.insert(port.portOp);
+        regionPorts.insert(cast<MemPortOpInterface>(port.portOp));
     }
   }
-
-  using FailOrGroup = FailureOr<std::optional<unsigned>>;
-  /// Common logic for replacing access ports currently connected to an MC.
-  auto replaceMCPort = [&](Operation *accessOp) -> FailOrGroup {
-    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(accessOp);
-    if (!memAttr)
-      return accessOp->emitError() << ERR_ATTR;
-    if (memAttr.connectsToMC()) {
-      memBuilder.addMCPort(accessOp);
-      removeDialectAttr<MemInterfaceAttr>(accessOp);
-      return {std::nullopt};
-    }
-    return memAttr.getLsqGroup();
-  };
-
-  /// Common logic for replacing access ports currently connected to an LSQ.
-  auto replaceLSQPort = [&](Operation *accessOp) -> FailureOr<bool> {
-    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(accessOp);
-    if (!memAttr)
-      return accessOp->emitError() << ERR_ATTR;
-    if (memAttr.connectsToLSQ()) {
-      memBuilder.addLSQPort(*memAttr.getLsqGroup(), accessOp);
-      removeDialectAttr<MemInterfaceAttr>(accessOp);
-      return false;
-    }
-    return true;
-  };
 
   // It is important to iterate in operation order here when adding ports to the
   // memory builder to maintain the original program order in each memory group
   for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-    // Ignore memory ports that are not related to the memory region under
-    // consideration
-    if (!regionPorts.contains(&op))
+    // Ignore ops that are not related to the memory region under consideration
+    auto portOp = dyn_cast<MemPortOpInterface>(op);
+    if (!portOp || !regionPorts.contains(portOp))
       continue;
 
-    builder.setInsertionPoint(&op);
-    llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-        .Case<handshake::MCLoadOp>([&](handshake::MCLoadOp loadOp) {
-          FailOrGroup connectRes = replaceMCPort(loadOp);
-          if (failed(connectRes))
-            return failure();
-          if (*connectRes) {
-            auto op = replaceLoad<LSQLoadOp>(
-                loadOp, backedgeBuilder.get(loadOp.getDataInput().getType()),
-                builder, memLowering);
-            memBuilder.addLSQPort(**connectRes, op);
-          }
-          return success();
-        })
-        .Case<handshake::MCStoreOp>([&](handshake::MCStoreOp storeOp) {
-          FailOrGroup connectRes = replaceMCPort(storeOp);
-          if (failed(connectRes))
-            return failure();
-          if (*connectRes) {
-            auto op = replaceStore<LSQStoreOp>(storeOp, builder, memLowering);
-            memBuilder.addLSQPort(**connectRes, op);
-          }
-          return success();
-        })
-        .Case<handshake::LSQLoadOp>([&](handshake::LSQLoadOp loadOp) {
-          FailureOr<bool> connectRes = replaceLSQPort(loadOp);
-          if (failed(connectRes))
-            return failure();
-          if (*connectRes) {
-            auto op = replaceLoad<MCLoadOp>(
-                loadOp, backedgeBuilder.get(loadOp.getDataInput().getType()),
-                builder, memLowering);
-            memBuilder.addMCPort(op);
-          }
-          return success();
-        })
-        .Case<handshake::LSQStoreOp>([&](handshake::LSQStoreOp storeOp) {
-          FailureOr<bool> connectRes = replaceLSQPort(storeOp);
-          if (failed(connectRes))
-            return failure();
-          if (*connectRes) {
-            auto op = replaceStore<MCStoreOp>(storeOp, builder, memLowering);
-            memBuilder.addMCPort(op);
-          }
-          return success();
-        });
+    auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(portOp);
+    if (!memAttr) {
+      return portOp->emitError()
+             << "memory operation must have attribute of type "
+                "'handshake::MemInterfaceAttr' to encode which memory "
+                "interface it should connect to.";
+    }
+    if (memAttr.connectsToMC())
+      memBuilder.addMCPort(portOp);
+    else
+      memBuilder.addLSQPort(*memAttr.getLsqGroup(), portOp);
   }
-
-  // Rename memory accesses referenced by memory dependencies attached to the
-  // old and new memory ports
-  memLowering.renameDependencies(funcOp);
 
   // Instantiate new memory interfaces
   handshake::MemoryControllerOp newMCOp;
@@ -302,12 +196,14 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   Value newMemEnd = newMCOp ? newMCOp.getMemEnd() : newLSQOp.getMemEnd();
   replaceMemCompletionSignal(masterIface, newMemEnd, builder);
 
+  BackedgeBuilder backedgeBuilder(builder, funcOp->getLoc());
   if (mcOp) {
     if (lsqOp) {
       // In case of a master MC and slave LSQ situation, the second to last
       // result of the MC is a load data signal going to the LSQ. It needs to be
       // temporarily replaced with a backedge to allow us to remove the MC
-      // before the LSQ
+      // before the LSQ. The backedge will lose its use automatically when the
+      // LSQ is deleted, so we do not need to replace it manually after
       builder.setInsertionPoint(mcOp);
       Value dataToLSQ = mcOp.getResult(mcOp.getNumResults() - 2);
       dataToLSQ.replaceAllUsesWith(backedgeBuilder.get(dataToLSQ.getType()));

@@ -255,13 +255,12 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
           }
         }
       })
-      .Case<handshake::MCLoadOp, handshake::LSQLoadOp, handshake::MCStoreOp,
-            handshake::LSQStoreOp, handshake::AddIOp, handshake::AddFOp,
-            handshake::SubIOp, handshake::SubFOp, handshake::AndIOp,
-            handshake::OrIOp, handshake::XOrIOp, handshake::MulIOp,
-            handshake::MulFOp, handshake::DivUIOp, handshake::DivSIOp,
-            handshake::DivFOp, handshake::ShRSIOp, handshake::ShLIOp,
-            handshake::CmpIOp, handshake::CmpFOp>(
+      .Case<handshake::LoadOp, handshake::StoreOp, handshake::AddIOp,
+            handshake::AddFOp, handshake::SubIOp, handshake::SubFOp,
+            handshake::AndIOp, handshake::OrIOp, handshake::XOrIOp,
+            handshake::MulIOp, handshake::MulFOp, handshake::DivUIOp,
+            handshake::DivSIOp, handshake::DivFOp, handshake::ShRSIOp,
+            handshake::ShLIOp, handshake::CmpIOp, handshake::CmpFOp>(
           [&](auto) { addJoinedOprdConstraints(); });
 
   StringRef unitName = getUniqueName(unit);

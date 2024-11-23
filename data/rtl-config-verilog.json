@@ -613,41 +613,23 @@
     "hdl": "verilog"
   },
   {
-    "name": "handshake.mc_load",
+    "name": "handshake.load",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/mc_load.v",
+    "generic": "$DYNAMATIC/data/verilog/handshake/load.v",
     "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
-    "name": "handshake.lsq_load",
+    "name": "handshake.store",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/lsq_load.v",
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.mc_store",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/mc_store.v",
+    "generic": "$DYNAMATIC/data/verilog/handshake/store.v",
     "dependencies": ["join_type"],
-    "hdl": "verilog"
-  },
-  {
-    "name": "handshake.lsq_store",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/verilog/handshake/lsq_store.v",
     "hdl": "verilog"
   },
   {
