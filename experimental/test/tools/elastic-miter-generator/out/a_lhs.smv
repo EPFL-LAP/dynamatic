@@ -1,0 +1,14 @@
+#include "handshake_cond_br_0.smv"
+
+
+MODULE a_lhs (D, D_valid, C, C_valid, T_ready, F_ready)
+
+VAR branch : handshake_cond_br_0(C, C_valid, D, D_valid, branch_trueOut_ready, branch_falseOut_ready);
+
+// output
+DEFINE T := branch.trueOut;
+DEFINE T_valid := branch.trueOut_valid;
+DEFINE branch_trueOut_ready := T_ready;
+DEFINE F := branch.falseOut;
+DEFINE F_valid := branch.falseOut_valid;
+DEFINE branch_falseOut_ready := F_ready;

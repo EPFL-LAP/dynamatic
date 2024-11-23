@@ -99,4 +99,11 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Three different cases for memory collsions: none/half/full">];
 }
 
+def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
+  let summary = "Make all channels rigid.";
+  let description = [{
+    Make all channels rigid. 
+  }];
+  let constructor = "dynamatic::experimental::rigidification::createHandshakeRigidification()";
+}
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

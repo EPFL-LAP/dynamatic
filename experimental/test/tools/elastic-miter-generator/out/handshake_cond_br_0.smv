@@ -1,0 +1,45 @@
+// handshake_cond_br_0 : cond_br(['port_types={"condition": "!handshake.channel<i1>", "data": "!handshake.channel<i32>", "trueOut": "!handshake.channel<i32>", "falseOut": "!handshake.channel<i32>"}'])
+
+
+MODULE handshake_cond_br_0(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
+  VAR
+  inner_br : handshake_cond_br_0__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+
+  // output
+  DEFINE
+  data_ready := inner_br.data_ready;
+  condition_ready := inner_br.condition_ready;
+  trueOut_valid := inner_br.trueOut_valid;
+  falseOut_valid := inner_br.falseOut_valid;
+  trueOut := data;
+  falseOut := data;
+
+
+MODULE handshake_cond_br_0__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
+  VAR
+  inner_join : handshake_cond_br_0__cond_br_dataless__join(data_valid, condition_valid, branch_ready);
+
+  DEFINE
+  branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
+
+  // output
+  DEFINE
+  data_ready := inner_join.ins_ready_0;
+  condition_ready := inner_join.ins_ready_1;
+  trueOut_valid := condition & inner_join.outs_valid;
+  falseOut_valid := !condition & inner_join.outs_valid;
+
+
+MODULE handshake_cond_br_0__cond_br_dataless__join(ins_valid_0, ins_valid_1, outs_ready)
+
+  DEFINE
+  all_valid := ins_valid_0 & ins_valid_1;
+
+  // output
+  DEFINE
+  ins_ready_0 := outs_ready & ins_valid_1;
+  ins_ready_1 := outs_ready & ins_valid_0;
+  outs_valid := all_valid;
+
+
+

@@ -16,6 +16,8 @@
 using namespace dynamatic;
 
 LogicalResult rigidifyChannel(Value *channel) {
-  // if (llvm::dyn_cast<handshake::ChannelType>(channel->getType()))
+  if (llvm::dyn_cast<handshake::ChannelType>(channel->getType()))
+    return LogicalResult::failure();
+
   return LogicalResult::success();
 }

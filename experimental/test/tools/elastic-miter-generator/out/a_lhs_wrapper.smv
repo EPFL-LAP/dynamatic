@@ -1,0 +1,14 @@
+#include "a_lhs.smv"
+
+
+MODULE a_lhs_wrapper (D, D_valid, C, C_valid, T_ready, F_ready)
+
+VAR a_lhs_wrapped : a_lhs(D, D_valid, C, C_valid, a_lhs_wrapped_T_ready, a_lhs_wrapped_F_ready);
+
+// output
+DEFINE T := a_lhs_wrapped.T;
+DEFINE T_valid := a_lhs_wrapped.T_valid;
+DEFINE a_lhs_wrapped_T_ready := T_ready;
+DEFINE F := a_lhs_wrapped.F;
+DEFINE F_valid := a_lhs_wrapped.F_valid;
+DEFINE a_lhs_wrapped_F_ready := F_ready;
