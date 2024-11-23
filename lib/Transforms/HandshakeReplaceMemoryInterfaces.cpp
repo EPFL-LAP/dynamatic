@@ -140,10 +140,6 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   }
 
   // Context and builder for creating new operation
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  MemoryOpLowering memLowering(getAnalysis<NameAnalysis>());
   MemoryInterfaceBuilder memBuilder(funcOp, memref, masterIface.getMemStart(),
                                     masterIface.getCtrlEnd(), ctrlVals);
 
@@ -186,6 +182,8 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   }
 
   // Instantiate new memory interfaces
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
   handshake::MemoryControllerOp newMCOp;
   handshake::LSQOp newLSQOp;
   if (failed(memBuilder.instantiateInterfaces(builder, newMCOp, newLSQOp)))
