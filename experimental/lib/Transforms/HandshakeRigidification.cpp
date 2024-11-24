@@ -14,6 +14,8 @@
 #include "experimental/Transforms/Passes.h.inc"
 // #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 
+#include <fstream>
+
 using namespace llvm;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
@@ -23,41 +25,51 @@ namespace {
 /// Rewrite pattern that will match on all muxes in the IR and replace each of
 /// them with a merge taking the same inputs (except the `select` input which
 /// merges do not have due to their undeterministic nature).
-struct HandshakeRigidification : public OpRewritePattern<Value> {
-  using OpRewritePattern<Value>::OpRewritePattern;
+// struct HandshakeRigidification : public OpRewritePattern<Operation> {
+//   using OpRewritePattern<Operation>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(Value muxOp,
-                                PatternRewriter &rewriter) const override {
-    return success();
-  }
-};
+//   LogicalResult matchAndRewrite(Operation muxOp,
+//                                 PatternRewriter &rewriter) const override {
+
+//     // rewriter.replaceOp(muxOp, muxOp);
+
+//     return success();
+//   }
+// };
 
 /// Simple driver for the pass that replaces all muxes with merges.
 struct HandshakeRigidificationPass
     : public impl::HandshakeRigidificationBase<HandshakeRigidificationPass> {
 
   void runDynamaticPass() override {
-    // This is the top-level operation in all MLIR files. All the IR is nested
-    // within it
-    mlir::ModuleOp mod = getOperation();
-    MLIRContext *ctx = &getContext();
+    // // This is the top-level operation in all MLIR files. All the IR is
+    // nested
+    // // within it
 
-    // Define the set of rewrite patterns we want to apply to the IR
+    mlir::ModuleOp mod = getOperation();
+
+    mod->walk([&](Operation *op) {
+      auto name = op->getName();
+      llvm::errs() << name.getIdentifier().str() << "\n";
+    });
+
+    // MLIRContext *ctx = &getContext();
+
+    // // Define the set of rewrite patterns we want to apply to the IR
     // RewritePatternSet patterns(ctx);
 
-    // patterns.add<HandshakeRigidification>(ctx);
+    // patterns.add<HandshakeRigidification<handshake::MuxOp>>(ctx);
 
     // // Run a greedy pattern rewriter on the entire IR under the top-level
-    // module
+    // // module
     // // operation
     // mlir::GreedyRewriteConfig config;
     // if (failed(
-    //         applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
-    //         {
+    //         applyPatternsAndFoldGreedily(mod, std::move(patterns),
+    //         config))) {
     //   // If the greedy pattern rewriter fails, the pass must also fail
     //   return signalPassFailure();
     // }
-    printf("My pass is running!\n");
   };
 };
 } // namespace

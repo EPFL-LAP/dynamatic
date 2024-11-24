@@ -9,6 +9,8 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/StringRef.h"
 
+using namespace dynamatic;
+
 namespace dynamatic {
 namespace experimental {
 namespace rigidification {
