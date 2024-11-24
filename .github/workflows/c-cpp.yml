@@ -18,4 +18,4 @@ jobs:
           submodules: recursive
 
       - name: build
-        run: ./build.sh
+        run: ./build.sh --threads 2
