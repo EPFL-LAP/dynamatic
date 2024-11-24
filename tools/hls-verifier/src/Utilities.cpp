@@ -27,12 +27,11 @@ IntegerCompare::IntegerCompare(bool isSigned) : isSigned(isSigned) {}
 bool IntegerCompare::compare(const string &token1, const string &token2) const {
   string t1 = token1.substr(2);
   string t2 = token2.substr(2);
-  while (t1.length() < t2.length()) {
+  while (t1.length() < t2.length())
     t1 = ((t2[0] >= '8' && isSigned) ? "f" : "0") + t1;
-  }
-  while (t2.length() < t1.length()) {
+
+  while (t2.length() < t1.length())
     t2 = ((t1[0] >= '8' && isSigned) ? "f" : "0") + t2;
-  }
 
   return (t1 == t2);
 }
@@ -47,12 +46,18 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
   is1 >> hex >> i1;
   is2 >> hex >> i2;
 
-  if (isnan(*((float *)&i1)) && isnan(*((float *)&i2))) {
-    return true;
-  }
+  float f1 = decodeToken(i1);
+  float f2 = decodeToken(i2);
 
-  float diff = abs(*((float *)&i1) - *((float *)&i2));
+  if (isnan(f1) && isnan(f2))
+    return true;
+
+  float diff = abs(f1 - f2);
   return (diff < threshold);
+}
+
+float FloatCompare::decodeToken(unsigned int token) const {
+  return *((float *) &token);
 }
 
 DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
@@ -65,20 +70,25 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
   is1 >> hex >> i1;
   is2 >> hex >> i2;
 
-  if (isnan(*((double *)&i1)) && isnan(*((double *)&i2))) {
-    return true;
-  }
+  double d1 = decodeToken(i1);
+  double d2 = decodeToken(i2);
 
-  double diff = abs(*((double *)&i1) - *((double *)&i2));
+  if (isnan(d1) && isnan(d2))
+    return true;
+
+  double diff = abs(d1 - d2);
   return (diff < threshold);
 }
 
+double DoubleCompare::decodeToken(unsigned int token) const {
+  return *((double *) &token);
+}
+
 string extractParentDirectoryPath(string filepath) {
-  for (int i = filepath.length() - 1; i >= 0; i--) {
-    if (filepath[i] == '/') {
+  for (int i = filepath.length() - 1; i >= 0; i--)
+    if (filepath[i] == '/')
       return filepath.substr(0, i);
-    }
-  }
+
   return ".";
 }
 
@@ -111,8 +121,9 @@ bool compareFiles(const string &refFile, const string &outFile,
                             "] are not equal.");
       return false;
     }
-    if (str1 == "[[[/runtime]]]")
+    if (str1 == "[[[/runtime]]]") {
       break;
+    }
     if (str1 == "[[transaction]]") {
       ref >> tn1;
       out >> tn2;
@@ -137,9 +148,9 @@ bool compareFiles(const string &refFile, const string &outFile,
 
 string trim(const string &str) {
   size_t first = str.find_first_not_of(" \t\n\r\f");
-  if (string::npos == first) {
+  if (string::npos == first)
     return str;
-  }
+
   size_t last = str.find_last_not_of(" \t\n\r\f");
   return str.substr(first, (last - first + 1));
 }
@@ -169,9 +180,8 @@ int getNumberOfTransactions(const string &inputPath) {
     iss >> dt;
     if (dt == "[[[/runtime]]]")
       break;
-    if (dt.substr(0, 15) == "[[transaction]]") {
+    if (dt.substr(0, 15) == "[[transaction]]")
       result = result + 1;
-    }
   }
   inf.close();
   return result;
@@ -179,9 +189,9 @@ int getNumberOfTransactions(const string &inputPath) {
 
 bool executeCommand(const string &command) {
   int status = system(command.c_str());
-  if (status != 0) {
+  if (status != 0)
     logErr(LOG_TAG, "Execution failed for command [" + command + "]");
-  }
+
   return (status == 0);
 }
 
