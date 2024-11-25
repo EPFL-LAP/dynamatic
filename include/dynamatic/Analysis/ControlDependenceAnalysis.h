@@ -58,6 +58,7 @@ public:
     return !pa.isPreserved<ControlDependenceAnalysis>();
   }
 
+  /// Print all the dependencies
   void printAllBlocksDeps() const;
 
 private:
