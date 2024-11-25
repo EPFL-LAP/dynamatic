@@ -13,6 +13,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -1024,9 +1025,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
-  auto blockConnections = getCFGEdges(funcOp.getRegion(), namer);
-  auto resAttr = CFGEdge::serializeEdges(blockConnections);
-  funcOp->setAttr(CFG_EDGES, rewriter.getStringAttr(resAttr));
+  cfg::annotateCFG(funcOp, rewriter);
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
