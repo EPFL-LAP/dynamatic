@@ -18,7 +18,6 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 

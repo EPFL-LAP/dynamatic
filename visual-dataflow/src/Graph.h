@@ -32,7 +32,6 @@ struct EdgeState {
   std::string data;
 };
 
-/// Implements the logic to create and update a Graph
 class GodotGraph {
 public:
   using Transitions = DenseMap<const DOTGraph::Edge *, EdgeState>;

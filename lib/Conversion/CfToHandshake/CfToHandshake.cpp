@@ -106,7 +106,7 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     return {};
 
   // Return values from multiple returns need to be merged together
-  SmallVector<Value, 4> results;
+  SmallVector<Value> results;
   Block *entryBlock = funcOp.getBodyBlock();
   Location loc = entryBlock->getOperations().back().getLoc();
   rewriter.setInsertionPointToEnd(entryBlock);
@@ -244,7 +244,7 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
 SmallVector<NamedAttribute>
 LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
-  SmallVector<NamedAttribute, 4> attributes;
+  SmallVector<NamedAttribute> attributes;
   MLIRContext *ctx = getContext();
   SmallVector<std::string> memRegionNames;
   bool hasArgNames = false;

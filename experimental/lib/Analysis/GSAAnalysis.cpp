@@ -356,7 +356,6 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
         // Remove the current operand from the list of blocks to avoid
         blocksToAvoid.erase(blocksToAvoid.begin());
 
-        // Find all the paths from `commonDominator` to `phiBlock` which pass
         // through operand's block but not through any of the `blocksToAvoid`
         auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
@@ -498,8 +497,7 @@ void experimental::gsa::Gate::print() {
       llvm::dbgs()
       << "\n";
 
-      for (GateInput *&op
-           : operands) {
+      for (GateInput *&op : operands) {
         if (op->isTypeValue()) {
           llvm::dbgs() << "[GSA]\t VALUE\t: ";
           op->getValue().print(llvm::dbgs());

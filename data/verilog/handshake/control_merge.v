@@ -7,7 +7,7 @@
     input  clk,
     input  rst,
     // Input Channels
-    input  [SIZE * (DATA_TYPE) - 1 : 0] ins,    // Input Channel
+    input  [SIZE * (DATA_TYPE) - 1 : 0] ins,
     input  [SIZE - 1 : 0] ins_valid,
     output [SIZE - 1 : 0] ins_ready,
     // Data Output Channel
@@ -19,11 +19,8 @@
     output index_valid,
     input  index_ready
   );
-    //! Specified the length of the vector compared with the original implementation.
-    //! Jiantao, 21/07/2024
     wire [INDEX_TYPE - 1 : 0] index_internal;
 
-    // Instantiate control_merge_dataless
     control_merge_dataless #(
       .SIZE(SIZE),
       .INDEX_TYPE(INDEX_TYPE)
@@ -41,8 +38,6 @@
 
     assign index = index_internal;
 
-    // Since no data output for outs, I directly assign 0 to it
-    // assign outs = ins[index_internal[0]];
     assign outs = 0;
 
   endmodule
