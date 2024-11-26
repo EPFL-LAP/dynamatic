@@ -42,15 +42,43 @@ struct HandshakeRigidificationPass
     : public impl::HandshakeRigidificationBase<HandshakeRigidificationPass> {
 
   void runDynamaticPass() override {
-    // // This is the top-level operation in all MLIR files. All the IR is
-    // nested
-    // // within it
+    // Get the MLIR context for the current operation being transformed
+    MLIRContext *ctx = &getContext();
+    // Get the operation being transformed (the top level module)
+    ModuleOp mod = getOperation();
 
-    mlir::ModuleOp mod = getOperation();
+    // for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
+    //   auto name = funcOp->getName();
+    //   llvm::errs() << name.getIdentifier().str() << "\n";
+    //   if (failed(rigidifyChannel(funcOp, ctx)))
+    //     return signalPassFailure();
+    // }
+    mod->walk([&](Operation *op) {
+      auto name = op->getName();
+      llvm::errs() << name.getIdentifier().str() << "\n";
+      for (auto ch : op->getResults()) {
+        Type opType = ch.getType();
+        // TODO: add support for control channels
+        if (llvm::dyn_cast<handshake::ChannelType>(opType)) {
+          llvm::errs() << "   " << opType << "\n";
+          rigidifyChannel(&ch, ctx);
+        }
+      }
+    });
+
+    llvm::errs() << "\n\n\n\n";
 
     mod->walk([&](Operation *op) {
       auto name = op->getName();
       llvm::errs() << name.getIdentifier().str() << "\n";
+      for (auto ch : op->getResults()) {
+        Type opType = ch.getType();
+        // TODO: add support for control channels
+        if (llvm::dyn_cast<handshake::ChannelType>(opType)) {
+          llvm::errs() << "   " << opType << "\n";
+          // rigidifyChannel(&ch, ctx);
+        }
+      }
     });
 
     // MLIRContext *ctx = &getContext();

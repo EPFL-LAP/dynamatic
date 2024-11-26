@@ -13,4 +13,5 @@
 
 #include "dynamatic/Support/LLVM.h"
 
-mlir::LogicalResult rigidifyChannel(mlir::Value *channel);
+mlir::LogicalResult rigidifyChannel(mlir::Value *channel,
+                                    mlir::MLIRContext *ctx);

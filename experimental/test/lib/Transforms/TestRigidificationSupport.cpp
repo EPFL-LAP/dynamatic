@@ -42,6 +42,7 @@ struct TestRigidificationSupport
 
   void runOnOperation() override {
     mlir::ModuleOp modOp = getOperation();
+    MLIRContext *ctx = &getContext();
 
     // Retrieve the single Handshake function
     auto allFunctions = modOp.getOps<handshake::FuncOp>();
@@ -56,7 +57,7 @@ struct TestRigidificationSupport
       for (auto ch : op->getResults()) {
         Type opType = ch.getType();
         if (llvm::dyn_cast<handshake::ChannelType>(opType))
-          rigidifyChannel(&ch);
+          rigidifyChannel(&ch, ctx);
       }
     });
   }
