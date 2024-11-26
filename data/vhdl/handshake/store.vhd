@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity mc_store is
+entity store is
   generic (
     DATA_TYPE : integer;
     ADDR_TYPE : integer
@@ -28,7 +28,7 @@ entity mc_store is
   );
 end entity;
 
-architecture arch of mc_store is
+architecture arch of store is
   signal single_ready : std_logic;
   signal join_valid   : std_logic;
 begin

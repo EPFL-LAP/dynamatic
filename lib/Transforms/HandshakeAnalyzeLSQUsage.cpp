@@ -57,7 +57,7 @@ void HandshakeAnalyzeLSQUsagePass::runDynamaticPass() {
   // Check that memory access ports are named
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   WalkResult res = modOp.walk([&](Operation *op) {
-    if (!isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(op))
+    if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
       return WalkResult::advance();
     if (!namer.hasName(op)) {
       op->emitError() << "Memory access port must be named.";
@@ -93,10 +93,10 @@ void HandshakeAnalyzeLSQUsagePass::analyzeFunction(handshake::FuncOp funcOp) {
 
 /// Determines whether there exists any RAW dependency between the load and the
 /// stores.
-static bool hasRAW(handshake::LSQLoadOp loadOp,
-                   DenseSet<handshake::LSQStoreOp> &storeOps) {
+static bool hasRAW(handshake::LoadOp loadOp,
+                   DenseSet<handshake::StoreOp> &storeOps) {
   StringRef loadName = getUniqueName(loadOp);
-  for (handshake::LSQStoreOp storeOp : storeOps) {
+  for (handshake::StoreOp storeOp : storeOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       for (MemDependenceAttr dependency : deps.getDependencies()) {
         if (dependency.getDstAccess() == loadName) {
@@ -115,9 +115,8 @@ static bool hasRAW(handshake::LSQLoadOp loadOp,
 
 /// Determines whether the load is globally in-order independent (GIID) on the
 /// store along all non-cyclic CFG paths between them.
-static bool isStoreGIIDOnLoad(handshake::LSQLoadOp loadOp,
-                              handshake::LSQStoreOp storeOp,
-                              HandshakeCFG &cfg) {
+static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
+                              handshake::StoreOp storeOp, HandshakeCFG &cfg) {
   // Identify all CFG paths from the block containing the load to the block
   // containing the store
   handshake::FuncOp funcOp = loadOp->getParentOfType<handshake::FuncOp>();
@@ -140,11 +139,11 @@ static bool isStoreGIIDOnLoad(handshake::LSQLoadOp loadOp,
 /// Determines whether the load is globally in-order independent (GIID) on all
 /// stores with which it has a WAR dependency along all non-cyclic CFG paths
 /// between them.
-static bool hasEnforcedWARs(handshake::LSQLoadOp loadOp,
-                            DenseSet<handshake::LSQStoreOp> &storeOps,
+static bool hasEnforcedWARs(handshake::LoadOp loadOp,
+                            DenseSet<handshake::StoreOp> &storeOps,
                             HandshakeCFG &cfg) {
-  DenseMap<StringRef, handshake::LSQStoreOp> storesByName;
-  for (handshake::LSQStoreOp storeOp : storeOps)
+  DenseMap<StringRef, handshake::StoreOp> storesByName;
+  for (handshake::StoreOp storeOp : storeOps)
     storesByName.insert({getUniqueName(storeOp), storeOp});
 
   // We only need to check stores that depend on the load (WAR dependencies) as
@@ -223,26 +222,26 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
   }
 
   // Identify load and store accesses to the LSQ
-  DenseSet<handshake::LSQLoadOp> lsqLoadOps;
-  DenseSet<handshake::LSQStoreOp> lsqStoreOps;
+  DenseSet<handshake::LoadOp> lsqLoadOps;
+  DenseSet<handshake::StoreOp> lsqStoreOps;
   DenseMap<Operation *, unsigned> groupMap;
   LSQPorts lsqPorts = lsqOp.getPorts();
   for (LSQGroup &group : lsqPorts.getGroups()) {
     for (MemoryPort &port : group->accessPorts) {
       groupMap.insert({port.portOp, group.groupID});
-      if (auto loadOp = dyn_cast<handshake::LSQLoadOp>(port.portOp))
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(port.portOp))
         lsqLoadOps.insert(loadOp);
       else
-        lsqStoreOps.insert(cast<handshake::LSQStoreOp>(port.portOp));
+        lsqStoreOps.insert(cast<handshake::StoreOp>(port.portOp));
     }
   }
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
   // Check whether we can prove independence of some loads w.r.t. other accesses
-  DenseSet<handshake::LSQLoadOp> dependentLoads;
-  DenseSet<handshake::LSQStoreOp> dependentStores;
-  for (handshake::LSQLoadOp loadOp : lsqLoadOps) {
+  DenseSet<handshake::LoadOp> dependentLoads;
+  DenseSet<handshake::StoreOp> dependentStores;
+  for (handshake::LoadOp loadOp : lsqLoadOps) {
     // Loads with no RAW dependencies and which satisfy the GIID property with
     // all stores they have a dependency with may be removed
     if (hasRAW(loadOp, lsqStoreOps) ||
@@ -253,7 +252,7 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
       if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
         for (MemDependenceAttr dependency : deps.getDependencies()) {
           Operation *dstOp = namer.getOp(dependency.getDstAccess());
-          if (auto storeOp = dyn_cast<LSQStoreOp>(dstOp))
+          if (auto storeOp = dyn_cast<StoreOp>(dstOp))
             dependentStores.insert(storeOp);
         }
       }
@@ -266,7 +265,7 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
 
   // Stores involed in a RAW ar WAW dependency with another operation are sill
   // dependent
-  for (handshake::LSQStoreOp storeOp : lsqStoreOps) {
+  for (handshake::StoreOp storeOp : lsqStoreOps) {
     auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp);
     if (!deps)
       continue;
@@ -285,13 +284,13 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
       // The dependency must still be honored
       Operation *dstOp = namer.getOp(dstName);
       dependentStores.insert(storeOp);
-      if (auto dstStoreOp = dyn_cast<handshake::LSQStoreOp>(dstOp))
+      if (auto dstStoreOp = dyn_cast<handshake::StoreOp>(dstOp))
         dependentStores.insert(dstStoreOp);
     }
   }
 
   LLVM_DEBUG({
-    for (handshake::LSQStoreOp storeOp : lsqStoreOps) {
+    for (handshake::StoreOp storeOp : lsqStoreOps) {
       if (dependentStores.contains(storeOp)) {
         llvm::dbgs() << "\tKeeping '" << getUniqueName(storeOp)
                      << "': WAW or RAW dependency with other access\n";

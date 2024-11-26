@@ -52,9 +52,11 @@ public:
   struct MemAccesses {
     /// Memory operations for a simple memory controller, grouped by
     /// originating basic block.
-    llvm::MapVector<Block *, SmallVector<Operation *>> mcPorts;
+    llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+        mcPorts;
     /// Memory operations for an LSQ, grouped by belonging LSQ group.
-    llvm::MapVector<unsigned, SmallVector<Operation *>> lsqPorts;
+    llvm::MapVector<unsigned, SmallVector<handshake::MemPortOpInterface>>
+        lsqPorts;
     /// Function argument corresponding to the memory start signal for that
     /// interface.
     BlockArgument memStart;

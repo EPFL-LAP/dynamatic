@@ -98,12 +98,12 @@ public:
   /// access to an MC. The operation must be tagged with the basic block it
   /// belongs to, which will be used to determine with which other MC ports this
   /// one belongs.
-  void addMCPort(Operation *memOp);
+  void addMCPort(handshake::MemPortOpInterface portOp);
 
   /// Adds an access port to a specific LSQ group. The operation must be a load
   /// or store access to an LSQ. The operation must be tagged with the basic
   /// block it belongs to.
-  void addLSQPort(unsigned group, Operation *memOp);
+  void addLSQPort(unsigned group, handshake::MemPortOpInterface portOp);
 
   /// Instantiates appropriate memory interfaces for all the ports that were
   /// added to the builder so far. This may insert no interface, a single MC, a
@@ -185,7 +185,7 @@ private:
   /// value exists for the block.
   Value getCtrl(unsigned block);
 
-  using FConnectLoad = std::function<void(handshake::LoadOpInterface, Value)>;
+  using FConnectLoad = std::function<void(handshake::LoadOp, Value)>;
 
   /// For a provided memory interface and its memory ports, invoke the load
   /// connection callback for all load-like operations with successive results
