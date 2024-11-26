@@ -339,10 +339,9 @@ void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
                                             const FConnectLoad &connect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
-    for (Operation *memOp : memGroupOps) {
+    for (Operation *memOp : memGroupOps)
       if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
         connect(loadOp, memIfaceOp->getResult(resIdx++));
-    }
   }
 }
 

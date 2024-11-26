@@ -852,10 +852,9 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
                                       ctrlEnd, ctrlVals);
 
     // Add MC ports to the interface builder
-    for (auto &[_, mcBlockOps] : memAccesses.mcPorts) {
+    for (auto &[_, mcBlockOps] : memAccesses.mcPorts)
       for (handshake::MemPortOpInterface portOp : mcBlockOps)
         memBuilder.addMCPort(portOp);
-    }
 
     // Determine LSQ group validity and add ports the the interface builder at
     // the same time
@@ -884,10 +883,9 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
       // block operations are naturally in program order since we always use
       // ordered maps and iterated over the operations in program order to begin
       // with
-      for (Block *block : order) {
+      for (Block *block : order)
         for (handshake::MemPortOpInterface portOp : opsPerBlock[block])
           memBuilder.addLSQPort(group, portOp);
-      }
     }
 
     // Build the memory interfaces
