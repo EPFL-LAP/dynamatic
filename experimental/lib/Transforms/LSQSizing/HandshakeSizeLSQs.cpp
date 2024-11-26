@@ -276,6 +276,12 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   // It would also easily be possible to add more cases, by just pushing the IIs
   // into the IIs vector in the order they are occuring
 
+  // Important side note: The II observed in simulation does not match the II
+  // received from buffer placement in some cases. This is also the case when
+  // there are no memory collisions. It is not clear why this is the case and
+  // would need further investigation by someone familiar with the buffer
+  // placement pass
+
   if (collisions == "full") {
     IIs.push_back(graph.getWorstCaseII());
   } else if (collisions == "half") {
