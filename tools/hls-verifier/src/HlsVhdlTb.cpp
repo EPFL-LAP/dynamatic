@@ -176,9 +176,9 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
 
   int transNum = getTransactionNumberFromInput();
   logInf(LOG_TAG, "Transaction number computed : " + to_string(transNum));
-  if (transNum <= 0) {
+  if (transNum <= 0)
     logErr(LOG_TAG, "Invalid number of transactions detected!");
-  }
+
   Constant tN("TRANSACTION_NUM", "INTEGER", to_string(transNum));
   constants.push_back(tN);
 
@@ -235,16 +235,16 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
 }
 
 string HlsVhdlTb::getInputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isInput) {
+  if (param.isInput)
     return ctx.getInputVectorPath(param);
-  }
+
   return "";
 }
 
 string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isOutput) {
+  if (param.isOutput)
     return ctx.getVhdlOutPath(param);
-  }
+
   return "";
 }
 

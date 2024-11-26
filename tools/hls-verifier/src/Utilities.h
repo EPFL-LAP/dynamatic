@@ -42,6 +42,7 @@ public:
 
 private:
   float threshold;
+  float decodeToken(unsigned int token) const;
 };
 
 class DoubleCompare : public TokenCompare {
@@ -52,6 +53,7 @@ public:
 
 private:
   double threshold;
+  double decodeToken(unsigned int token) const;
 };
 
 /**
