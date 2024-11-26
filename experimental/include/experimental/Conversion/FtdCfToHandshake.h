@@ -40,14 +40,14 @@ public:
                           NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, ctx, benefit), cdAnalysis(cda),
-        gsaAnalysis(gsa){};
+        gsaAnalysis(gsa) {};
 
   FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        cdAnalysis(cda), gsaAnalysis(gsa){};
+        cdAnalysis(cda), gsaAnalysis(gsa) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -106,12 +106,6 @@ protected:
                         handshake::FuncOp &funcOp,
                         ControlDependenceAnalysis::BlockControlDepsMap &cda,
                         const ftd::BlockIndexing &bi) const;
-
-  /// Starting from the information collected by the gsa analysis pass,
-  /// instantiate some merge operations at the beginning of each block which
-  /// work as explicit phi functions.
-  LogicalResult addGsaGates(func::FuncOp funcOp,
-                            ConversionPatternRewriter &rewriter) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

@@ -15,12 +15,11 @@
 #ifndef DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 #define DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/AnalysisManager.h"
-#include "llvm/Support/Debug.h"
 #include <queue>
 #include <utility>
 
@@ -91,8 +90,8 @@ using ListExpressionsPerGate =
 /// a set of inputs, a type, a condition, an index and it might be a root.
 struct Gate {
 
-  /// Reference to the value produced by the gate (block argument).
-  BlockArgument result;
+  /// Reference to the value produced by the gate
+  Value result;
 
   /// List of operands of the gate.
   SmallVector<GateInput *> operands;
@@ -111,7 +110,7 @@ struct Gate {
   bool isRoot = false;
 
   /// Initialize the values of the gate.
-  Gate(BlockArgument v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
+  Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
        Block *c = nullptr)
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
         index(i) {}
@@ -122,11 +121,18 @@ struct Gate {
   /// Get the block the gate refers to.
   inline Block *getBlock() { return result.getParentBlock(); }
 
-  /// Get the argument numebr the gate refers to.
-  inline unsigned getArgumentNumber() { return result.getArgNumber(); }
+  /// Get the argument numebr the gate refers to. If the value is not a block
+  /// argument, return 0
+  inline unsigned getArgumentNumber() {
+    if (auto ba = llvm::dyn_cast<BlockArgument>(result); ba)
+      return ba.getArgNumber();
+    return 0;
+  }
 
   ~Gate() = default;
 };
+
+using MapGatesPerBlock = DenseMap<Block *, SmallVector<Gate *>>;
 
 /// Class in charge of performing the GSA analysis prior to the cf to handshake
 /// conversion. For each block arguments, it provides the information necessary
@@ -138,11 +144,15 @@ public:
   /// functino to get the SSA information from.
   GSAAnalysis(Operation *operation);
 
+  /// This constructor runs the gsa anlaysis over a single merge and returns its
+  /// GSA conversion
+  GSAAnalysis(handshake::MergeOp &merge, Region &region);
+
   /// Copy constructor for the anlaysis pass, rerunning the anlaysis so that new
   /// pointers are created
   GSAAnalysis(GSAAnalysis &gsa) {
     this->inputOp = gsa.inputOp;
-    this->convertSSAToGSA(this->inputOp);
+    this->convertSSAToGSA(*this->inputOp);
   }
 
   /// Invalidation hook to keep the analysis cached across passes. Returns
@@ -153,38 +163,52 @@ public:
   }
 
   /// Get a pointer to the vector containing the gate functions of a block.
-  ArrayRef<Gate *> getGates(Block *bb) const;
+  ArrayRef<Gate *> getGatesPerBlock(Block *bb) const;
 
   /// Deallocates all the gates created.
   ~GSAAnalysis();
 
+  /// Starting from the information collected by the gsa analysis pass,
+  /// instantiate some merge operations at the beginning of each block which
+  /// work as explicit phi functions.
+  static LogicalResult addGsaGates(Region &region,
+                                   ConversionPatternRewriter &rewriter,
+                                   const GSAAnalysis &gsa, Backedge startValue,
+                                   bool removeTerminators = true);
+
 private:
   /// Keep track of the original operation the analysis was run on
-  mlir::func::FuncOp inputOp;
+  Region *inputOp;
 
   /// Associate an index to each gate.
   unsigned uniqueGateIndex;
 
   /// For each block in the function, keep a list of gate functions with all
   /// their information.
-  DenseMap<Block *, SmallVector<Gate *>> gatesPerBlock;
+  MapGatesPerBlock gatesPerBlock;
 
   /// List of all gate inputs which have been created (and must be thus
   /// deallocated).
   SmallVector<GateInput *> gateInputList;
 
   /// Identify the gates necessary in the function, referencing all of their
-  /// inputs.
-  void convertSSAToGSA(mlir::func::FuncOp &funcOp);
+  /// inputs. In this case, the starting point are the block arguments in the
+  /// blocks.
+  void convertSSAToGSA(Region &region);
+
+  /// Identify the gates necessary in the function, referencing all of their
+  /// inputs. In this case, the starting point of the anlaysis is an instance of
+  /// handshake::merge
+  void convertSSAToGSAMerges(handshake::MergeOp &merge, Region &region);
 
   /// Print the list of the gate functions.
   void printAllGates();
 
   /// Mark as mu all the phi gates which correspond to loop variables.
-  void convertPhiToMu(mlir::func::FuncOp &funcOp);
+  void convertPhiToMu(Region &region);
 
   /// Convert some phi gates to trees of gamma gates.
-  void convertPhiToGamma(mlir::func::FuncOp &funcOp,
+  void convertPhiToGamma(Region &region,
                          const experimental::ftd::BlockIndexing &bi);
 
   /// Given a boolean expression for each phi's inputs, expand it in a tree
@@ -193,7 +217,6 @@ private:
                         std::queue<unsigned> &conditions, Gate *originalPhi,
                         const ftd::BlockIndexing &bi);
 };
-
 } // namespace gsa
 } // namespace experimental
 } // namespace dynamatic
