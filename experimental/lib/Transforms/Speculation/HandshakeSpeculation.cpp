@@ -17,6 +17,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "experimental/Transforms/Speculation/NewPlacementFinder.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -546,7 +547,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // Run automatic finding of the unit placements
   if (this->automatic) {
-    PlacementFinder finder(this->placements);
+    NewPlacementFinder finder(this->placements);
     if (failed(finder.findPlacements()))
       return signalPassFailure();
   }
