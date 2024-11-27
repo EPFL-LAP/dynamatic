@@ -143,20 +143,19 @@ void ftd::FtdLowerFuncToHandshake::exportGsaGatesInfo(
 
 /// Given a set of operations related to one LSQ and the memory dependency
 /// information among them, create a group graph.
-static void constructGroupsGraph(SmallVector<Operation *> &operations,
-                                 SmallVector<ProdConsMemDep> &allMemDeps,
-                                 DenseSet<Group *> &groups) {
+static void
+constructGroupsGraph(SmallVector<handshake::MemPortOpInterface> &operations,
+                     SmallVector<ProdConsMemDep> &allMemDeps,
+                     DenseSet<Group *> &groups) {
 
   //  Given the operations related to the LSQ, create a group for each of the
   //  correspondent basic block
   for (Operation *op : operations) {
-    if (isHandhsakeLSQOperation(op)) {
-      Block *b = op->getBlock();
-      auto it = llvm::find_if(groups, [b](Group *g) { return g->bb == b; });
-      if (it == groups.end()) {
-        Group *g = new Group(b);
-        groups.insert(g);
-      }
+    Block *b = op->getBlock();
+    auto it = llvm::find_if(groups, [b](Group *g) { return g->bb == b; });
+    if (it == groups.end()) {
+      Group *g = new Group(b);
+      groups.insert(g);
     }
   }
 
@@ -398,17 +397,17 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
   /// Given an LSQ, extract the list of operations which require that same LSQ
   auto getLSQOperations =
-      [&](const llvm::MapVector<unsigned, SmallVector<Operation *>> &lsqPorts)
-      -> SmallVector<Operation *> {
+      [&](const llvm::MapVector<
+          unsigned, SmallVector<handshake::MemPortOpInterface>> &lsqPorts)
+      -> SmallVector<handshake::MemPortOpInterface> {
     // Result vector holding the result
-    SmallVector<Operation *> combinedOperations;
+    SmallVector<handshake::MemPortOpInterface> combinedOperations;
 
     // Iterate over the MapVector and add all Operation* to the
     // combinedOperations vector
     for (const auto &entry : lsqPorts) {
-      const SmallVector<Operation *> &operations = entry.second;
-      combinedOperations.insert(combinedOperations.end(), operations.begin(),
-                                operations.end());
+      combinedOperations.insert(combinedOperations.end(), entry.second.begin(),
+                                entry.second.end());
     }
     return combinedOperations;
   };
@@ -482,8 +481,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
     // Add MC ports to the interface builder
     for (auto &[_, mcBlockOps] : memAccesses.mcPorts) {
-      for (Operation *mcOp : mcBlockOps)
-        memBuilder.addMCPort(mcOp);
+      for (handshake::MemPortOpInterface portOp : mcBlockOps)
+        memBuilder.addMCPort(portOp);
     }
 
     // Determine LSQ group validity and add ports the interface builder
@@ -492,9 +491,10 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       assert(!groupOps.empty() && "group cannot be empty");
 
       // Group accesses by the basic block they belong to
-      llvm::MapVector<Block *, SmallVector<Operation *>> opsPerBlock;
-      for (Operation *op : groupOps)
-        opsPerBlock[op->getBlock()].push_back(op);
+      llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+          opsPerBlock;
+      for (handshake::MemPortOpInterface portOp : groupOps)
+        opsPerBlock[portOp->getBlock()].push_back(portOp);
 
       // Check whether there is a clear "linear dominance" relationship
       // between all blocks, and derive a port ordering for the group from
@@ -515,10 +515,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       // each block operations are naturally in program order since we
       // always use ordered maps and iterated over the operations in program
       // order to begin with
-      for (Block *block : order) {
-        for (Operation *lsqOp : opsPerBlock[block])
-          memBuilder.addLSQPort(group, lsqOp);
-      }
+      for (Block *block : order)
+        for (handshake::MemPortOpInterface portOp : opsPerBlock[block])
+          memBuilder.addLSQPort(group, portOp);
     }
 
     // Build the memory interfaces.
@@ -532,7 +531,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
       mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
 
       // Get all the operations associated to an LSQ
-      SmallVector<Operation *> allOperations =
+      SmallVector<handshake::MemPortOpInterface> allOperations =
           getLSQOperations(memAccesses.lsqPorts);
 
       // Get all the dependencies among the BBs of the related operations.
@@ -636,7 +635,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 }
 
 void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
-    const SmallVector<Operation *> &operations,
+    const SmallVector<handshake::MemPortOpInterface> &operations,
     SmallVector<ProdConsMemDep> &allMemDeps, const mlir::CFGLoopInfo &li,
     const BlockIndexing &bi) const {
 
@@ -647,7 +646,7 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
 
   // Returns true if two operations are both load
   auto areBothLoad = [](Operation *op1, Operation *op2) {
-    return (isa<handshake::LSQLoadOp>(op1) && isa<handshake::LSQLoadOp>(op2));
+    return (isa<handshake::LoadOp>(op1) && isa<handshake::LoadOp>(op2));
   };
 
   // Returns true if two operations belong to the same block
@@ -657,10 +656,7 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
 
   // Given all the operations which are assigned to an LSQ, loop over them
   // and skip those which are not memory operations
-  for (Operation *i : operations) {
-
-    if (!isHandhsakeLSQOperation(i))
-      continue;
+  for (handshake::MemPortOpInterface i : operations) {
 
     // Loop over all the other operations in the LSQ. There is no dependency
     // in the following cases:
@@ -670,15 +666,14 @@ void ftd::FtdLowerFuncToHandshake::identifyMemoryDependencies(
     // 3. They are both load operations;
     // 4. The operations are mutually exclusive (i.e. there is no path which
     // goes from i to j and vice-versa);
-    for (Operation *j : operations) {
+    for (handshake::MemPortOpInterface j : operations) {
 
-      if (!isHandhsakeLSQOperation(j) || isSameBlock(i, j) ||
-          areBothLoad(i, j) || (!isThereAPath(i, j) && !isThereAPath(j, i)))
+      if (isSameBlock(i, j) || areBothLoad(i, j) ||
+          (!isThereAPath(i, j) && !isThereAPath(j, i)))
         continue;
 
       // Get the two blocks
-      Block *bbI = i->getBlock();
-      Block *bbJ = j->getBlock();
+      Block *bbI = i->getBlock(), *bbJ = j->getBlock();
 
       // If the relationship was already present, then skip the pairs of
       // blocks

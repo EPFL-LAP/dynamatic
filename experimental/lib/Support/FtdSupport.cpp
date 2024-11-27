@@ -40,10 +40,6 @@ bool ftd::isSameLoopBlocks(Block *source, Block *dest,
   return isSameLoop(li.getLoopFor(source), li.getLoopFor(dest));
 }
 
-bool ftd::isHandhsakeLSQOperation(Operation *op) {
-  return isa<handshake::LSQStoreOp, handshake::LSQLoadOp>(op);
-}
-
 void ftd::eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2) {
 
   std::vector<Block *> intersection;
@@ -1012,13 +1008,9 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
           llvm::isa<cf::CondBranchOp>(consumerOp) ||
           llvm::isa<cf::BranchOp>(consumerOp) ||
           (llvm::isa<memref::LoadOp>(consumerOp) &&
-           !llvm::isa<handshake::LSQLoadOp>(consumerOp)) ||
+           !llvm::isa<handshake::LoadOp>(consumerOp)) ||
           (llvm::isa<memref::StoreOp>(consumerOp) &&
-           !llvm::isa<handshake::LSQStoreOp>(consumerOp)) ||
-          (llvm::isa<memref::LoadOp>(consumerOp) &&
-           !llvm::isa<handshake::MCLoadOp>(consumerOp)) ||
-          (llvm::isa<memref::StoreOp>(consumerOp) &&
-           !llvm::isa<handshake::MCStoreOp>(consumerOp)) ||
+           !llvm::isa<handshake::StoreOp>(consumerOp)) ||
           llvm::isa<mlir::MemRefType>(result.getType()))
         continue;
 

@@ -83,10 +83,6 @@ bool isSameLoop(const mlir::CFGLoop *loop1, const mlir::CFGLoop *loop2);
 /// checks if the source and destination are in a loop
 bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
 
-/// Returns true if the provided operation is either of they `LSQLoad` or
-/// `LSQStore`
-bool isHandhsakeLSQOperation(Operation *op);
-
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries
 void eliminateCommonBlocks(DenseSet<Block *> &s1, DenseSet<Block *> &s2);

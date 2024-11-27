@@ -123,7 +123,8 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
 
 LogicalResult LowerFuncToHandshake::computeLinearDominance(
     DenseMap<Block *, DenseSet<Block *>> &dominations,
-    llvm::MapVector<Block *, SmallVector<Operation *>> &opsPerBlock,
+    llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+        &opsPerBlock,
     SmallVector<Block *> &dominanceOrder) const {
   // Initialize the dominance order to the proper size, setting each element to
   // nullptr initially
@@ -726,11 +727,10 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
                                "'handshake::MemInterfaceAttr' to encode "
                                "which memory interface it should connect to.";
     }
-    bool connectToMC = memAttr.connectsToMC();
 
     // Replace memref operation with corresponding handshake operation
-    Operation *newOp =
-        llvm::TypeSwitch<Operation *, Operation *>(&op)
+    auto portOp =
+        llvm::TypeSwitch<Operation *, handshake::MemPortOpInterface>(&op)
             .Case<memref::LoadOp>([&](memref::LoadOp loadOp) {
               OperandRange indices = loadOp.getIndices();
               assert(indices.size() == 1 && "load must be unidimensional");
@@ -739,17 +739,11 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               assert(addr && "failed to remap address");
               Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
               Value data = edgeBuilder.get(channelifyType(dataTy));
-
-              Operation *newOp;
-              if (connectToMC)
-                newOp = rewriter.create<handshake::MCLoadOp>(loc, addr, data);
-              else
-                newOp = rewriter.create<handshake::LSQLoadOp>(loc, addr, data);
+              auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(loadOp, newOp, false);
-              Value dataOut =
-                  cast<handshake::LoadOpInterface>(newOp).getDataOutput();
+              Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
               loadOp.getResult().replaceAllUsesWith(dataOut);
               return newOp;
@@ -761,12 +755,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
               assert((addr && data) && "failed to remap address or data");
-
-              Operation *newOp;
-              if (connectToMC)
-                newOp = rewriter.create<handshake::MCStoreOp>(loc, addr, data);
-              else
-                newOp = rewriter.create<handshake::LSQStoreOp>(loc, addr, data);
+              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(storeOp, newOp, false);
@@ -774,7 +763,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               return newOp;
             })
             .Default([&](auto) { return nullptr; });
-    if (!newOp)
+    if (!portOp)
       return op.emitError() << "Memory operation type unsupported.";
 
     // Associate the new operation with the memory region it references and
@@ -782,9 +771,9 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
     assert(accessesIt != memInfo.end() && "unknown memref");
     if (memAttr.connectsToMC())
-      accessesIt->second.mcPorts[block].push_back(newOp);
+      accessesIt->second.mcPorts[block].push_back(portOp);
     else
-      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(newOp);
+      accessesIt->second.lsqPorts[*memAttr.getLsqGroup()].push_back(portOp);
   }
 
   memOpLowering.renameDependencies(funcOp);
@@ -855,10 +844,9 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
                                       ctrlEnd, ctrlVals);
 
     // Add MC ports to the interface builder
-    for (auto &[_, mcBlockOps] : memAccesses.mcPorts) {
-      for (Operation *mcOp : mcBlockOps)
-        memBuilder.addMCPort(mcOp);
-    }
+    for (auto &[_, mcBlockOps] : memAccesses.mcPorts)
+      for (handshake::MemPortOpInterface portOp : mcBlockOps)
+        memBuilder.addMCPort(portOp);
 
     // Determine LSQ group validity and add ports the the interface builder at
     // the same time
@@ -866,9 +854,10 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
       assert(!groupOps.empty() && "group cannot be empty");
 
       // Group accesses by the basic block they belong to
-      llvm::MapVector<Block *, SmallVector<Operation *>> opsPerBlock;
-      for (Operation *op : groupOps)
-        opsPerBlock[op->getBlock()].push_back(op);
+      llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+          opsPerBlock;
+      for (handshake::MemPortOpInterface portOp : groupOps)
+        opsPerBlock[portOp->getBlock()].push_back(portOp);
 
       // Check whether there is a clear "linear dominance" relationship between
       // all blocks, and derive a port ordering for the group from it
@@ -886,10 +875,9 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
       // block operations are naturally in program order since we always use
       // ordered maps and iterated over the operations in program order to begin
       // with
-      for (Block *block : order) {
-        for (Operation *lsqOp : opsPerBlock[block])
-          memBuilder.addLSQPort(group, lsqOp);
-      }
+      for (Block *block : order)
+        for (handshake::MemPortOpInterface portOp : opsPerBlock[block])
+          memBuilder.addLSQPort(group, portOp);
     }
 
     // Build the memory interfaces
@@ -1143,7 +1131,7 @@ static bool isCstSourcable(arith::ConstantOp cstOp) {
     if (isa<UnrealizedConversionCastOp>(user))
       return llvm::all_of(user->getUsers(), isValidUser);
     return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-                handshake::LoadOpInterface, handshake::StoreOpInterface>(user);
+                handshake::LoadOp, handshake::StoreOp>(user);
   };
 
   return llvm::all_of(cstOp->getUsers(), isValidUser);

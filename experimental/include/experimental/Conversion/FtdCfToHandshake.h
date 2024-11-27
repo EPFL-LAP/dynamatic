@@ -72,10 +72,10 @@ protected:
   // Two types of hazards between the predecessors of one LSQ node:
   // (1) WAW between 2 Store operations,
   // (2) RAW and WAR between Load and Store operations
-  void identifyMemoryDependencies(const SmallVector<Operation *> &operations,
-                                  SmallVector<ProdConsMemDep> &allMemDeps,
-                                  const mlir::CFGLoopInfo &li,
-                                  const BlockIndexing &bi) const;
+  void identifyMemoryDependencies(
+      const SmallVector<handshake::MemPortOpInterface> &operations,
+      SmallVector<ProdConsMemDep> &allMemDeps, const mlir::CFGLoopInfo &li,
+      const BlockIndexing &bi) const;
 
   /// Convers arith-level constants to handshake-level constants. Constants are
   /// triggered by the start value of the corresponding function. The FTD

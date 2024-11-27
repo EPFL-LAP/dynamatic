@@ -48,12 +48,12 @@ public:
   // the constructor of a non-base class.
   LowerFuncToHandshake(NameAnalysis &namer, MLIRContext *ctx,
                        mlir::PatternBenefit benefit = 1)
-      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit){};
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, ctx, benefit) {};
 
   LowerFuncToHandshake(NameAnalysis &namer, const TypeConverter &typeConverter,
                        MLIRContext *ctx, mlir::PatternBenefit benefit = 1)
       : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
-                                                   benefit){};
+                                                   benefit) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -63,9 +63,11 @@ public:
   struct MemAccesses {
     /// Memory operations for a simple memory controller, grouped by
     /// originating basic block.
-    llvm::MapVector<Block *, SmallVector<Operation *>> mcPorts;
+    llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+        mcPorts;
     /// Memory operations for an LSQ, grouped by belonging LSQ group.
-    llvm::MapVector<unsigned, SmallVector<Operation *>> lsqPorts;
+    llvm::MapVector<unsigned, SmallVector<handshake::MemPortOpInterface>>
+        lsqPorts;
     /// Function argument corresponding to the memory start signal for that
     /// interface.
     BlockArgument memStart;
@@ -145,7 +147,6 @@ public:
   /// Returns the value representing the block's control signal.
   virtual Value getBlockControl(Block *block) const;
 
-protected:
   /// Groups information to "rewire the IR" around a particular merge-like
   /// operation.
   struct MergeOpInfo {
@@ -184,7 +185,8 @@ protected:
   /// that property.
   LogicalResult computeLinearDominance(
       DenseMap<Block *, DenseSet<Block *>> &dominations,
-      llvm::MapVector<Block *, SmallVector<Operation *>> &opsPerBlock,
+      llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
+          &opsPerBlock,
       SmallVector<Block *> &dominanceOrder) const;
 };
 
