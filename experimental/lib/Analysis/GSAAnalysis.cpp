@@ -122,7 +122,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 };
 
 experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
-    ListExpressionsPerGate &expressions, std::queue<unsigned> &conditions,
+    ListExpressionsPerGate &expressions, std::queue<unsigned> conditions,
     Gate *originalPhi, const BlockIndexing &bi) {
 
   // At each iteration, we want to use a cofactor that is present in all the
@@ -429,11 +429,14 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
         expressionsList.emplace_back(phiInputCondition, operand);
       }
 
-      // Move the indexes of the blocks associated to the conditions into a
-      // queue. Since the set was ordered, the queue will contain the indexes
-      // ordered in ascending order as well
-      std::queue<unsigned> conditionsOrdered;
+      // Get a queue with all the necessary conditions, ordered according to
+      // their basic block index
+      std::vector<unsigned> conditionsToOrder;
       for (unsigned &index : blocksWithConditionInPath)
+        conditionsToOrder.push_back(index);
+      std::sort(conditionsToOrder.begin(), conditionsToOrder.end());
+      std::queue<unsigned> conditionsOrdered;
+      for (unsigned &index : conditionsToOrder)
         conditionsOrdered.push(index);
 
       // Expand the expressions to get the tree of gammas
@@ -786,6 +789,8 @@ LogicalResult experimental::gsa::GSAAnalysis::addGsaGates(
       }
     }
   }
+
+  region.getParentOp()->print(llvm::dbgs());
 
   return success();
 }

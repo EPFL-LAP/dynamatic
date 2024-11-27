@@ -214,7 +214,7 @@ private:
   /// Given a boolean expression for each phi's inputs, expand it in a tree
   /// of gamma functions.
   Gate *expandGammaTree(ListExpressionsPerGate &expressions,
-                        std::queue<unsigned> &conditions, Gate *originalPhi,
+                        std::queue<unsigned> conditions, Gate *originalPhi,
                         const ftd::BlockIndexing &bi);
 };
 } // namespace gsa
