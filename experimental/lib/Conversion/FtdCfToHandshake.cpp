@@ -309,11 +309,13 @@ ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
       return failure();
   }
 
-  // Once that all the multiplexers have been added, it is necessary to modify
-  // the type of the result, for it to be a channel type (that could not be
-  // done before)
-  for (Operation *mux : funcOp.getOps<handshake::MuxOp>())
+  // Considering each mux that was added, the inputs and output values must be
+  // channellified
+  for (Operation *mux : funcOp.getOps<handshake::MuxOp>()) {
+    mux->getOperand(1).setType(channelifyType(mux->getOperand(1).getType()));
+    mux->getOperand(2).setType(channelifyType(mux->getOperand(2).getType()));
     mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
+  }
 
   return success();
 }

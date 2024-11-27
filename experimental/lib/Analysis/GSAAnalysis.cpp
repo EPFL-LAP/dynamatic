@@ -660,7 +660,6 @@ LogicalResult experimental::gsa::GSAAnalysis::addGsaGates(
           operands.emplace_back(nullptr);
         } else {
           auto val = std::get<Value>(operand->input);
-          val.setType(channelifyType(val.getType()));
           operands.emplace_back(val);
         }
         operandIndex++;
@@ -718,14 +717,11 @@ LogicalResult experimental::gsa::GSAAnalysis::addGsaGates(
 
       // The one input gamma is marked at an operation to skip in the IR and
       // later removed
-      if (nullOperand >= 0) {
+      if (nullOperand >= 0)
         oneInputGammaList.insert(mux);
-        mux->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-      }
 
-      if (phi->isRoot) {
+      if (phi->isRoot)
         rewriter.replaceAllUsesWith(phi->result, mux.getResult());
-      }
 
       gsaList.insert({phi->index, mux});
       mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
@@ -768,29 +764,19 @@ LogicalResult experimental::gsa::GSAAnalysis::addGsaGates(
   // Each terminator must be replaced so that it does not provide any block
   // arguments (possibly only the final control argument)
   for (Block &block : region) {
-    Operation *terminator = block.getTerminator();
-    if (terminator) {
+    if (Operation *terminator = block.getTerminator(); terminator) {
       rewriter.setInsertionPointAfter(terminator);
-      if (isa<cf::CondBranchOp>(terminator)) {
-        auto condBranch = dyn_cast<cf::CondBranchOp>(terminator);
-        SmallVector<Value> trueOperands;
-        SmallVector<Value> falseOperands;
-        auto newCondBranch = rewriter.create<cf::CondBranchOp>(
-            condBranch->getLoc(), condBranch.getCondition(),
-            condBranch.getTrueDest(), trueOperands, condBranch.getFalseDest(),
-            falseOperands);
-        rewriter.replaceOp(condBranch, newCondBranch);
-      } else if (isa<cf::BranchOp>(terminator)) {
-        auto branch = dyn_cast<cf::BranchOp>(terminator);
-        SmallVector<Value> operands;
-        auto newBranch = rewriter.create<cf::BranchOp>(
-            branch->getLoc(), branch.getDest(), operands);
-        rewriter.replaceOp(branch, newBranch);
+      if (auto cbr = dyn_cast<cf::CondBranchOp>(terminator); cbr) {
+        while (!cbr.getTrueOperands().empty())
+          cbr.eraseTrueOperand(0);
+        while (!cbr.getFalseOperands().empty())
+          cbr.eraseFalseOperand(0);
+      } else if (auto br = dyn_cast<cf::BranchOp>(terminator); br) {
+        while (!br.getOperands().empty())
+          br.eraseOperand(0);
       }
     }
   }
-
-  region.getParentOp()->print(llvm::dbgs());
 
   return success();
 }
