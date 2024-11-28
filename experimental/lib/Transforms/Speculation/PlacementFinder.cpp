@@ -372,6 +372,7 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
-                 failed(findSaveCommitPositions()));
+  return failure(failed(findSavePositions()) || failed(findCommitPositions()));
+  // return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
+  //                failed(findSaveCommitPositions()));
 }
