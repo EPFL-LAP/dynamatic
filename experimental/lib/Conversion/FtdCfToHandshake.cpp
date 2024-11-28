@@ -266,51 +266,27 @@ static LogicalResult joinInsertion(OpBuilder &builder,
   return success();
 }
 
-LogicalResult ftd::FtdLowerFuncToHandshake::addSupp(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps) const {
+void ftd::FtdLowerFuncToHandshake::addSupp(ConversionPatternRewriter &rewriter,
+                                           handshake::FuncOp &funcOp) const {
 
-  // Get the block indexing
-  BlockIndexing bi(funcOp.getRegion());
+  // Set of original operations in the IR
+  std::vector<Operation *> consumersToCover;
+  for (Operation &consumerOp : funcOp.getOps())
+    consumersToCover.push_back(&consumerOp);
 
-  // A set of relationships between producer and consumer needs to be covered.
-  // To do that, we consider each possible operation in the circuit as
-  // producer. However, some operations are added throughout the execution of
-  // the function, and those are possibly to be analyzed as well. This vector
-  // maintains the list of operations to be analyzed.
-  // [TBD] We could consider slightly changing the analysis to avoid needing
-  // to rerun the analysis on the operations inserted throughout the
-  // execution, but this is future work...
-  std::vector<Operation *> producersToCover;
-
-  // Add all the operations in the IR to the above vector
-  for (Block &producerBlock : funcOp.getBlocks()) {
-    for (Operation &producerOp : producerBlock.getOperations())
-      producersToCover.push_back(&producerOp);
+  for (auto *consumerOp : consumersToCover) {
+    for (auto operand : consumerOp->getOperands())
+      addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
   }
-
-  // Loop through the vector until all the elements have been analyzed
-  unsigned producerIndex = 0;
-  while (producerIndex < producersToCover.size()) {
-    Operation *producerOp = producersToCover.at(producerIndex++);
-    if (failed(addSuppToProducer(rewriter, funcOp, producerOp, bi,
-                                 producersToCover, cdaDeps)))
-      return failure();
-  }
-
-  return success();
 }
 
-LogicalResult
-ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
-                                       handshake::FuncOp &funcOp) const {
+void ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
+                                            handshake::FuncOp &funcOp) const {
 
   // For each producer/consumer relationship
   for (Operation &consumerOp : funcOp.getOps()) {
     for (Value operand : consumerOp.getOperands()) {
-      if (failed(
-              addRegenOperandConsumer(rewriter, funcOp, &consumerOp, operand)))
-        return failure();
+      addRegenOperandConsumer(rewriter, funcOp, &consumerOp, operand);
     }
   }
 
@@ -321,8 +297,6 @@ ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
     mux->getOperand(2).setType(channelifyType(mux->getOperand(2).getType()));
     mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
   }
-
-  return success();
 }
 
 LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
@@ -624,8 +598,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
 
-  // For each merge that was signed with the `NEW_PHI` attribute, substitute it
-  // with its GSA equivalent
+  // For each merge that was signed with the `NEW_PHI` attribute, substitute
+  // it with its GSA equivalent
   for (handshake::MergeOp merge : funcOp.getOps<handshake::MergeOp>()) {
     if (!merge->hasAttr(NEW_PHI))
       continue;
@@ -636,11 +610,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
 
     // Get rid of the merge
     rewriter.eraseOp(merge);
-  }
-
-  for (handshake::MuxOp mux : funcOp.getOps<handshake::MuxOp>()) {
-    if (mux.getResult().getUses().empty())
-      rewriter.eraseOp(mux);
   }
 
   // Replace the backedge
@@ -748,10 +717,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (funcOp.isExternal())
     return success();
 
-  // Extract the control dependency analysis out of the new region
-  auto cdaDeps =
-      ControlDependenceAnalysis(funcOp.getRegion()).getAllBlockDeps();
-
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
   // function as one of its data inputs. However, the start value was not
@@ -788,7 +753,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
@@ -800,16 +765,14 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
   if (funcOp.getBlocks().size() != 1) {
     // Add muxes for regeneration of values in loop
-    if (failed(addRegen(rewriter, funcOp)))
-      return failure();
+    addRegen(rewriter, funcOp);
 
     // This function prints to a file information about all GSA gates and the
     // loops containing them (if any)
     exportGsaGatesInfo(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp, cdaDeps)))
-      return failure();
+    addSupp(rewriter, funcOp);
   }
 
   // id basic block

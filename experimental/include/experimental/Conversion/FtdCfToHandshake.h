@@ -95,17 +95,16 @@ protected:
   /// adding some merges to the network, to that this can be done. The new
   /// merge is moved inside of the loop, and it works like a reassignment
   /// (cfr. FPGA'22, Section V.C).
-  LogicalResult addRegen(ConversionPatternRewriter &rewriter,
-                         handshake::FuncOp &funcOp) const;
+  void addRegen(ConversionPatternRewriter &rewriter,
+                handshake::FuncOp &funcOp) const;
 
   /// Given each pairs of producers and consumers within the circuit, the
   /// producer might create a token which is never used by the corresponding
   /// consumer, because of the control decisions. In this scenario, the token
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
-  LogicalResult
-  addSupp(ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-          ControlDependenceAnalysis::BlockControlDepsMap &cda) const;
+  void addSupp(ConversionPatternRewriter &rewriter,
+               handshake::FuncOp &funcOp) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

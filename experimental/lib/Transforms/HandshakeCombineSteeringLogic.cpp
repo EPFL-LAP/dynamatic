@@ -182,6 +182,21 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+/// Remove muxes that have no successors
+struct RemoveSinkMuxes : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+
+    // The pattern fails if the branch has either true or false successors
+    if (!muxOp.getResult().getUsers().empty())
+      return failure();
+
+    rewriter.eraseOp(muxOp);
+    return success();
+  }
+};
+
 /// Remove conditional branches that have no successors
 struct RemoveDoubleSinkBranches
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
@@ -311,7 +326,8 @@ struct RemoveNotCondition
                                 newBranch.getFalseResult());
     rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(),
                                 newBranch.getTrueResult());
-    rewriter.eraseOp(condBranchOp);
+
+    newBranch->setAttr("handshake.bb", condBranchOp->getAttr("handshake.bb"));
 
     return success();
   }
@@ -379,9 +395,9 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<RemoveDoubleSinkBranches, CombineBranchesSameSign,
-                 CombineBranchesOppositeSign, CombineInits, CombineMuxes,
-                 RemoveNotCondition>(ctx);
+    patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
+                 CombineBranchesSameSign, CombineBranchesOppositeSign,
+                 CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };

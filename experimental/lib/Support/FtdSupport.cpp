@@ -14,7 +14,6 @@
 
 #include "experimental/Support/FtdSupport.h"
 #include "dynamatic/Support/Backedge.h"
-#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -545,10 +544,9 @@ SmallVector<CFGLoop *> ftd::getLoopsConsNotInProd(Block *cons, Block *prod,
   return result;
 };
 
-LogicalResult ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
-                                           handshake::FuncOp &funcOp,
-                                           Operation *consumerOp,
-                                           Value operand) {
+void ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+                                  handshake::FuncOp &funcOp,
+                                  Operation *consumerOp, Value operand) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -559,24 +557,24 @@ LogicalResult ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
   if (consumerOp->hasAttr(FTD_REGEN) || consumerOp->hasAttr(FTD_EXPLICIT_PHI) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
-    return success();
+    return;
 
   // Skip if the consumer has to do with memory operations or with che C-network
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp))
-    return success();
+    return;
 
   mlir::Operation *producerOp = operand.getDefiningOp();
 
   // Skip if the producer was added by this function or if it is an op to skip
   if (producerOp &&
       (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
-    return success();
+    return;
 
   // Skip if the producer has to do with memory operations
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
       llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-    return success();
+    return;
 
   // Last regenerated value
   Value regeneratedValue = operand;
@@ -642,8 +640,6 @@ LogicalResult ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
   }
 
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
-
-  return success();
 }
 
 std::string dynamatic::experimental::ftd::BlockIndexing::getBlockCondition(
@@ -779,12 +775,12 @@ static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
 
 /// Insert a branch to the correct position, taking into account whether it
 /// should work to suppress the over-production of tokens or self-regeneration
-static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
-                                  CFGLoop *loop, Operation *consumer,
-                                  Value connection, ftd::BranchToLoopType btlt,
-                                  CFGLoopInfo &li,
-                                  std::vector<Operation *> &producersToCover,
-                                  const ftd::BlockIndexing &bi) {
+static Value
+addSuppressionInLoop(ConversionPatternRewriter &rewriter, CFGLoop *loop,
+                     Operation *consumer, Value connection,
+                     ftd::BranchToLoopType btlt, CFGLoopInfo &li,
+                     std::vector<ftd::PairOperandConsumer> &toCover,
+                     const ftd::BlockIndexing &bi) {
 
   handshake::ConditionalBranchOp branchOp;
 
@@ -859,17 +855,17 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
         connection);
   }
 
+  Value newConnection = btlt == ftd::MoreProducerThanConsumers
+                            ? branchOp.getTrueResult()
+                            : branchOp.getFalseResult();
+
   // If we are handling a case with more producers than consumers, the new
   // branch must undergo the `addSupp` function so we add it to our structure
   // to be able to loop over it
   if (btlt == ftd::MoreProducerThanConsumers) {
     branchOp->setAttr(ftd::FTD_SUPP_BRANCH, rewriter.getUnitAttr());
-    producersToCover.push_back(branchOp);
+    toCover.emplace_back(newConnection, consumer);
   }
-
-  Value newConnection = btlt == ftd::MoreProducerThanConsumers
-                            ? branchOp.getTrueResult()
-                            : branchOp.getFalseResult();
 
   consumer->replaceUsesOfWith(connection, newConnection);
   return newConnection;
@@ -877,7 +873,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
-static LogicalResult insertDirectSuppression(
+static void insertDirectSuppression(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
     Operation *consumer, Value connection, const ftd::BlockIndexing &bi,
     ControlDependenceAnalysis::BlockControlDepsMap &cdAnalysis) {
@@ -907,7 +903,8 @@ static LogicalResult insertDirectSuppression(
   // added if the following conditions hold: The consumer is a mux; The
   // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
   // from the producer) is a data input.
-  if (ftd::isMux(consumer) && consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
+  if (llvm::isa<handshake::MuxOp>(consumer) &&
+      consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
       consumer->getOperand(0) != connection &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
       consumer->getBlock() != producerBlock) {
@@ -947,161 +944,129 @@ static LogicalResult insertDirectSuppression(
         branchCond, connection);
     consumer->replaceUsesOfWith(connection, branchOp.getFalseResult());
   }
-
-  return success();
 }
 
-LogicalResult
-ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
-                       handshake::FuncOp &funcOp, Operation *producerOp,
-                       const ftd::BlockIndexing &bi,
-                       std::vector<Operation *> &producersToCover,
-                       ControlDependenceAnalysis::BlockControlDepsMap &cda) {
+void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
+                                 handshake::FuncOp &funcOp,
+                                 Operation *consumerOp, Value operand) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-  Block *producerBlock = producerOp->getBlock();
+  BlockIndexing bi(region);
+  auto cda = ControlDependenceAnalysis(region).getAllBlockDeps();
 
   // Skip the prod-cons if the producer is part of the operations related to
   // the BDD expansion or INIT merges
-  if (producerOp->hasAttr(ftd::FTD_OP_TO_SKIP) ||
-      producerOp->hasAttr(ftd::FTD_INIT_MERGE))
-    return success();
+  if (consumerOp->hasAttr(ftd::FTD_OP_TO_SKIP) ||
+      consumerOp->hasAttr(ftd::FTD_INIT_MERGE))
+    return;
 
-  // Consider all the consumers of each value of the producer
-  for (Value result : producerOp->getResults()) {
+  // Do not take into account conditional branch
+  if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp))
+    return;
 
-    std::vector<Operation *> users(result.getUsers().begin(),
-                                   result.getUsers().end());
-    users.erase(unique(users.begin(), users.end()), users.end());
+  Block *consumerBlock = consumerOp->getBlock();
+  Block *producerBlock = operand.getParentBlock();
 
-    for (Operation *consumerOp : users) {
-      Block *consumerBlock = consumerOp->getBlock();
+  // If the consumer and the producer are in the same block without the
+  // consumer being a multiplxer skip because no delivery is needed
+  if (consumerBlock == producerBlock &&
+      !llvm::isa<handshake::MuxOp>(consumerOp))
+    return;
 
-      // If the consumer and the producer are in the same block without the
-      // consumer being a multiplxer skip because no delivery is needed
-      if (consumerBlock == producerBlock && !isMux(consumerOp))
-        continue;
+  if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
-      // Skip the prod-cons if the consumer is part of the operations
-      // related to the BDD expansion or INIT merges
-      if (consumerOp->hasAttr(ftd::FTD_OP_TO_SKIP) ||
-          consumerOp->hasAttr(ftd::FTD_INIT_MERGE))
-        continue;
+    // Skip the prod-cons if the consumer is part of the operations
+    // related to the BDD expansion or INIT merges
+    if (producerOp->hasAttr(ftd::FTD_OP_TO_SKIP) ||
+        producerOp->hasAttr(ftd::FTD_INIT_MERGE))
+      return;
 
-      // TODO: Group the conditions of memory and the conditions of Branches
-      // in 1 function?
-      // Skip if either the producer of the consumer are
-      // related to memory operations, or if the consumer is a conditional
-      // branch
-      if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumerOp) ||
-          llvm::isa_and_nonnull<handshake::MemoryControllerOp>(producerOp) ||
-          llvm::isa_and_nonnull<handshake::LSQOp>(producerOp) ||
-          llvm::isa_and_nonnull<handshake::LSQOp>(consumerOp) ||
-          llvm::isa_and_nonnull<handshake::ControlMergeOp>(producerOp) ||
-          llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-          llvm::isa<handshake::ConditionalBranchOp>(consumerOp) ||
-          llvm::isa<cf::CondBranchOp>(consumerOp) ||
-          llvm::isa<cf::BranchOp>(consumerOp) ||
-          (llvm::isa<memref::LoadOp>(consumerOp) &&
-           !llvm::isa<handshake::LoadOp>(consumerOp)) ||
-          (llvm::isa<memref::StoreOp>(consumerOp) &&
-           !llvm::isa<handshake::StoreOp>(consumerOp)) ||
-          llvm::isa<mlir::MemRefType>(result.getType()))
-        continue;
+    // TODO: Group the conditions of memory and the conditions of Branches
+    // in 1 function?
+    // Skip if either the producer of the consumer are
+    // related to memory operations, or if the consumer is a conditional
+    // branch
+    if (llvm::isa_and_nonnull<handshake::MemoryControllerOp>(consumerOp) ||
+        llvm::isa_and_nonnull<handshake::MemoryControllerOp>(producerOp) ||
+        llvm::isa_and_nonnull<handshake::LSQOp>(producerOp) ||
+        llvm::isa_and_nonnull<handshake::LSQOp>(consumerOp) ||
+        llvm::isa_and_nonnull<handshake::ControlMergeOp>(producerOp) ||
+        llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
+        llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) ||
+        llvm::isa_and_nonnull<cf::CondBranchOp>(consumerOp) ||
+        llvm::isa_and_nonnull<cf::BranchOp>(consumerOp) ||
+        (llvm::isa<memref::LoadOp>(consumerOp) &&
+         !llvm::isa<handshake::LoadOp>(consumerOp)) ||
+        (llvm::isa<memref::StoreOp>(consumerOp) &&
+         !llvm::isa<handshake::StoreOp>(consumerOp)) ||
+        llvm::isa<mlir::MemRefType>(operand.getType()))
+      return;
 
-      // The next step is to identify the relationship between the producer
-      // and consumer in hand: Are they in the same loop or at different
-      // loop levels? Are they connected through a bwd edge?
+    // The next step is to identify the relationship between the producer
+    // and consumer in hand: Are they in the same loop or at different
+    // loop levels? Are they connected through a bwd edge?
 
-      // Set true if the producer is in a loop which does not contains
-      // the consumer
-      bool producingGtUsing =
-          loopInfo.getLoopFor(producerBlock) &&
-          !loopInfo.getLoopFor(producerBlock)->contains(consumerBlock);
+    // Set true if the producer is in a loop which does not contains
+    // the consumer
+    bool producingGtUsing =
+        loopInfo.getLoopFor(producerBlock) &&
+        !loopInfo.getLoopFor(producerBlock)->contains(consumerBlock);
 
-      auto *consumerLoop = loopInfo.getLoopFor(consumerBlock);
+    auto *consumerLoop = loopInfo.getLoopFor(consumerBlock);
+    std::vector<PairOperandConsumer> newToCover;
 
-      // Set to true if the consumer uses its own result
-      bool selfRegeneration =
-          llvm::any_of(consumerOp->getResults(),
-                       [&result](const Value &v) { return v == result; });
+    // Set to true if the consumer uses its own result
+    bool selfRegeneration =
+        llvm::any_of(consumerOp->getResults(),
+                     [&operand](const Value &v) { return v == operand; });
 
-      // We need to suppress all the tokens produced within a loop and
-      // used outside each time the loop is not terminated. This should be
-      // done for as many loops there are
-      if (producingGtUsing && !ftd::isBranchLoopExit(producerOp, loopInfo)) {
-        Value con = result;
-        for (CFGLoop *loop = loopInfo.getLoopFor(producerBlock); loop;
-             loop = loop->getParentLoop()) {
+    // We need to suppress all the tokens produced within a loop and
+    // used outside each time the loop is not terminated. This should be
+    // done for as many loops there are
+    if (producingGtUsing && !ftd::isBranchLoopExit(producerOp, loopInfo)) {
+      Value con = operand;
+      for (CFGLoop *loop = loopInfo.getLoopFor(producerBlock); loop;
+           loop = loop->getParentLoop()) {
 
-          // For each loop containing the producer but not the consumer, add
-          // the branch
-          if (!loop->contains(consumerBlock))
-            con = addSuppressionInLoop(rewriter, loop, consumerOp, con,
-                                       ftd::MoreProducerThanConsumers, loopInfo,
-                                       producersToCover, bi);
-        }
+        // For each loop containing the producer but not the consumer, add
+        // the branch
+        if (!loop->contains(consumerBlock))
+          con = addSuppressionInLoop(rewriter, loop, consumerOp, con,
+                                     ftd::MoreProducerThanConsumers, loopInfo,
+                                     newToCover, bi);
       }
 
-      // We need to suppress a token if the consumer is the producer itself
-      // within a loop
-      else if (selfRegeneration && consumerLoop &&
-               !producerOp->hasAttr(ftd::FTD_SUPP_BRANCH)) {
-        addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
-                             ftd::SelfRegeneration, loopInfo, producersToCover,
-                             bi);
-      }
+      for (auto &pair : newToCover)
+        addSuppOperandConsumer(rewriter, funcOp, pair.second, pair.first);
 
-      // We need to suppress a token if the consumer comes before the
-      // producer (backward edge)
-      else if ((bi.greaterIndex(producerBlock, consumerBlock) ||
-                (isMux(consumerOp) && producerBlock == consumerBlock &&
-                 ftd::isaMergeLoop(consumerOp, loopInfo))) &&
-               consumerLoop) {
-        addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
-                             ftd::BackwardRelationship, loopInfo,
-                             producersToCover, bi);
-      }
+      return;
+    }
 
-      // If no loop is involved, then there is a direct relationship between
-      // consumer and producer
-      else if (failed(insertDirectSuppression(rewriter, funcOp, consumerOp,
-                                              result, bi, cda)))
-        return failure();
+    // We need to suppress a token if the consumer is the producer itself
+    // within a loop
+    if (selfRegeneration && consumerLoop &&
+        !producerOp->hasAttr(ftd::FTD_SUPP_BRANCH)) {
+      addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
+                           ftd::SelfRegeneration, loopInfo, newToCover, bi);
+      return;
+    }
+
+    // We need to suppress a token if the consumer comes before the
+    // producer (backward edge)
+    if ((bi.greaterIndex(producerBlock, consumerBlock) ||
+         (llvm::isa<handshake::MuxOp>(consumerOp) &&
+          producerBlock == consumerBlock &&
+          ftd::isaMergeLoop(consumerOp, loopInfo))) &&
+        consumerLoop) {
+      addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
+                           ftd::BackwardRelationship, loopInfo, newToCover, bi);
+      return;
     }
   }
 
-  // Once that we have considered all the consumers of the results of a
-  // producer, we consider the operands of the producer. Some of these
-  // operands might be the arguments of the functions, and these might need
-  // to be suppressed as well.
-
-  // Do not take into account conditional branch
-  if (llvm::isa<handshake::ConditionalBranchOp>(producerOp))
-    return success();
-
-  // For all the operands of the operation, take into account only the
-  // start value if exists
-  for (Value operand : producerOp->getOperands()) {
-    // The arguments of a function do not have a defining operation
-    if (operand.getDefiningOp())
-      continue;
-
-    // Skip if we are in block 0 and no multiplexer is involved
-    if (operand.getParentBlock() == producerBlock && !isMux(producerOp))
-      continue;
-
-    // Handle the suppression
-    if (failed(insertDirectSuppression(rewriter, funcOp, producerOp, operand,
-                                       bi, cda)))
-      return failure();
-  }
-
-  return success();
-}
-
-bool ftd::isMux(Operation *op) {
-  return llvm::isa_and_nonnull<handshake::MuxOp>(op);
+  // Handle the suppression in all the other cases (inlcuding the operand being
+  // a function arguement)
+  insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }

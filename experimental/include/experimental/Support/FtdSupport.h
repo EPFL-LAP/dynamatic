@@ -69,6 +69,8 @@ public:
   std::string getBlockCondition(Block *block) const;
 };
 
+using PairOperandConsumer = std::pair<Value, Operation *>;
+
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
 constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp");
 constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
@@ -155,21 +157,15 @@ SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
                                                    mlir::CFGLoopInfo &li);
 
 /// Add some regen multiplexers between an opearation and one of its operands
-LogicalResult addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
-                                      dynamatic::handshake::FuncOp &funcOp,
-                                      Operation *consumerOp, Value operand);
+void addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+                             dynamatic::handshake::FuncOp &funcOp,
+                             Operation *consumerOp, Value operand);
 
 /// Add suppression mechanism to all the inputs and outputs of a producer
-LogicalResult
-addSuppToProducer(ConversionPatternRewriter &rewriter,
-                  handshake::FuncOp &funcOp, Operation *producerOp,
-                  const ftd::BlockIndexing &bi,
-                  std::vector<Operation *> &producersToCover,
-                  ControlDependenceAnalysis::BlockControlDepsMap &cda);
+void addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
+                            handshake::FuncOp &funcOp, Operation *consumerOp,
+                            Value operand);
 
-/// Retrun true if the operation is either a `handshake::MergeOp` or
-/// `handshake::MuxOp`
-bool isMux(Operation *op);
 }; // namespace ftd
 }; // namespace experimental
 }; // namespace dynamatic
