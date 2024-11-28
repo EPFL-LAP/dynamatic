@@ -39,6 +39,10 @@
     {
       "operation-name": "cond_br5",
       "operand-idx": 0
+    },
+    {
+      "operation-name": "mux5",
+      "operand-idx": 2
     }
   ]
 }

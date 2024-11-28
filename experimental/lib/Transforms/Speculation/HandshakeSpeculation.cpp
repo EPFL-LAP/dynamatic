@@ -560,6 +560,25 @@ LogicalResult HandshakeSpeculationPass::placeBuffers() {
     operand->set(newOp.getResult());
   }
 
+  // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  // unsigned opIdx = 1;
+  // Operation *op = nameAnalysis.getOp("control_merge1");
+  // if (!op) {
+  //   std::cerr << "op not found\n";
+  //   return failure();
+  // }
+  // builder.setInsertionPoint(op);
+  // Operation *prevOp = op;
+  // Value prevValue = op->getOperand(opIdx);
+  // for (int i = 0; i < 15; i++) {
+  //   handshake::BufferOp bufOp = builder.create<handshake::BufferOp>(
+  //       prevOp->getLoc(), prevValue, TimingInfo::oehb(), 4);
+  //   inheritBB(op, bufOp);
+  //   prevOp = bufOp;
+  //   prevValue = bufOp.getResult();
+  // }
+  // op->setOperand(opIdx, prevValue);
+
   return success();
 }
 
