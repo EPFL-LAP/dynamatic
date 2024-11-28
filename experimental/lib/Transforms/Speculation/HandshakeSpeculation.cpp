@@ -591,7 +591,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // Run automatic finding of the unit placements
   if (this->automatic) {
-    NewPlacementFinder finder(this->placements);
+    PlacementFinder finder(this->placements);
     if (failed(finder.findPlacements()))
       return signalPassFailure();
   }
@@ -600,8 +600,8 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     return signalPassFailure();
 
   // Place Save operations
-  // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
-  //   return signalPassFailure();
+  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
+    return signalPassFailure();
 
   // Place Commit operations
   if (failed(placeCommits()))
