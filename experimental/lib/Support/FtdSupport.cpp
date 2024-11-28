@@ -545,9 +545,10 @@ SmallVector<CFGLoop *> ftd::getLoopsConsNotInProd(Block *cons, Block *prod,
   return result;
 };
 
-LogicalResult ftd::addRegenToConsumer(ConversionPatternRewriter &rewriter,
-                                      handshake::FuncOp &funcOp,
-                                      Operation *consumerOp) {
+LogicalResult ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+                                           handshake::FuncOp &funcOp,
+                                           Operation *consumerOp,
+                                           Value operand) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
@@ -565,86 +566,82 @@ LogicalResult ftd::addRegenToConsumer(ConversionPatternRewriter &rewriter,
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp))
     return success();
 
-  // Consider all the operands of the consumer
-  for (Value operand : consumerOp->getOperands()) {
+  mlir::Operation *producerOp = operand.getDefiningOp();
 
-    mlir::Operation *producerOp = operand.getDefiningOp();
+  // Skip if the producer was added by this function or if it is an op to skip
+  if (producerOp &&
+      (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
+    return success();
 
-    // Skip if the producer was added by this function or if it is an op to skip
-    if (producerOp &&
-        (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
-      continue;
+  // Skip if the producer has to do with memory operations
+  if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
+      llvm::isa_and_nonnull<MemRefType>(operand.getType()))
+    return success();
 
-    // Skip if the producer has to do with memory operations
-    if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
-        llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-      continue;
+  // Last regenerated value
+  Value regeneratedValue = operand;
 
-    // Last regenerated value
-    Value regeneratedValue = operand;
+  // Get all the loops for which we need to regenerate the
+  // corresponding value
+  SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
+      consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
 
-    // Get all the loops for which we need to regenerate the
-    // corresponding value
-    SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
-        consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
+  auto cstType = rewriter.getIntegerType(1);
+  auto cstAttr = IntegerAttr::get(cstType, 0);
+  unsigned numberOfLoops = loops.size();
 
-    auto cstType = rewriter.getIntegerType(1);
-    auto cstAttr = IntegerAttr::get(cstType, 0);
-    unsigned numberOfLoops = loops.size();
+  // For each of the loop, from the outermost to the innermost
+  for (unsigned i = 0; i < numberOfLoops; i++) {
 
-    // For each of the loop, from the outermost to the innermost
-    for (unsigned i = 0; i < numberOfLoops; i++) {
+    // If we are in the innermost loop (thus the iterator is at its end)
+    // and the consumer is a loop merge, stop
+    if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
+      break;
 
-      // If we are in the innermost loop (thus the iterator is at its end)
-      // and the consumer is a loop merge, stop
-      if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
-        break;
+    // Add the merge to the network, by substituting the operand with
+    // the output of the merge, and forwarding the output of the merge
+    // to its inputs.
+    //
+    rewriter.setInsertionPointToStart(loops[i]->getHeader());
 
-      // Add the merge to the network, by substituting the operand with
-      // the output of the merge, and forwarding the output of the merge
-      // to its inputs.
-      //
-      rewriter.setInsertionPointToStart(loops[i]->getHeader());
+    // The type of the input must be channelified
+    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
-      // The type of the input must be channelified
-      regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
+    // Create an INIT merge to provide the select of the multiplexer
+    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
+                                                          cstAttr, startValue);
+    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+    Value conditionValue =
+        loops[i]->getExitingBlock()->getTerminator()->getOperand(0);
 
-      // Create an INIT merge to provide the select of the multiplexer
-      auto constOp = rewriter.create<handshake::ConstantOp>(
-          consumerOp->getLoc(), cstAttr, startValue);
-      constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-      Value conditionValue =
-          loops[i]->getExitingBlock()->getTerminator()->getOperand(0);
+    SmallVector<Value> mergeOperands;
+    mergeOperands.push_back(constOp.getResult());
+    mergeOperands.push_back(conditionValue);
+    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+                                                           mergeOperands);
+    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
-      SmallVector<Value> mergeOperands;
-      mergeOperands.push_back(constOp.getResult());
-      mergeOperands.push_back(conditionValue);
-      auto initMergeOp = rewriter.create<handshake::MergeOp>(
-          consumerOp->getLoc(), mergeOperands);
-      initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+    // Create the multiplexer
+    auto selectSignal = initMergeOp->getResult(0);
+    selectSignal.setType(channelifyType(selectSignal.getType()));
 
-      // Create the multiplexer
-      auto selectSignal = initMergeOp->getResult(0);
-      selectSignal.setType(channelifyType(selectSignal.getType()));
+    SmallVector<Value> muxOperands;
+    muxOperands.push_back(regeneratedValue);
+    muxOperands.push_back(regeneratedValue);
 
-      SmallVector<Value> muxOperands;
-      muxOperands.push_back(regeneratedValue);
-      muxOperands.push_back(regeneratedValue);
+    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
+                                                   regeneratedValue.getType(),
+                                                   selectSignal, muxOperands);
 
-      auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                     regeneratedValue.getType(),
-                                                     selectSignal, muxOperands);
+    // The new producer operand is the output of the multiplxer
+    regeneratedValue = muxOp.getResult();
 
-      // The new producer operand is the output of the multiplxer
-      regeneratedValue = muxOp.getResult();
-
-      // Set the output of the mux as its input as well
-      muxOp->setOperand(2, muxOp->getResult(0));
-      muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
-    }
-
-    consumerOp->replaceUsesOfWith(operand, regeneratedValue);
+    // Set the output of the mux as its input as well
+    muxOp->setOperand(2, muxOp->getResult(0));
+    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
   }
+
+  consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 
   return success();
 }
@@ -910,7 +907,7 @@ static LogicalResult insertDirectSuppression(
   // added if the following conditions hold: The consumer is a mux; The
   // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
   // from the producer) is a data input.
-  if (ftd::isMergeOrMux(consumer) && consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
+  if (ftd::isMux(consumer) && consumer->hasAttr(ftd::FTD_EXPLICIT_PHI) &&
       consumer->getOperand(0) != connection &&
       consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
       consumer->getBlock() != producerBlock) {
@@ -984,7 +981,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
 
       // If the consumer and the producer are in the same block without the
       // consumer being a multiplxer skip because no delivery is needed
-      if (consumerBlock == producerBlock && !isMergeOrMux(consumerOp))
+      if (consumerBlock == producerBlock && !isMux(consumerOp))
         continue;
 
       // Skip the prod-cons if the consumer is part of the operations
@@ -1060,7 +1057,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       // We need to suppress a token if the consumer comes before the
       // producer (backward edge)
       else if ((bi.greaterIndex(producerBlock, consumerBlock) ||
-                (isMergeOrMux(consumerOp) && producerBlock == consumerBlock &&
+                (isMux(consumerOp) && producerBlock == consumerBlock &&
                  ftd::isaMergeLoop(consumerOp, loopInfo))) &&
                consumerLoop) {
         addSuppressionInLoop(rewriter, consumerLoop, consumerOp, result,
@@ -1093,7 +1090,7 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
       continue;
 
     // Skip if we are in block 0 and no multiplexer is involved
-    if (operand.getParentBlock() == producerBlock && !isMergeOrMux(producerOp))
+    if (operand.getParentBlock() == producerBlock && !isMux(producerOp))
       continue;
 
     // Handle the suppression
@@ -1105,7 +1102,6 @@ ftd::addSuppToProducer(ConversionPatternRewriter &rewriter,
   return success();
 }
 
-bool ftd::isMergeOrMux(Operation *op) {
-  return llvm::isa_and_nonnull<handshake::MergeOp>(op) ||
-         llvm::isa_and_nonnull<handshake::MuxOp>(op);
+bool ftd::isMux(Operation *op) {
+  return llvm::isa_and_nonnull<handshake::MuxOp>(op);
 }

@@ -28,6 +28,10 @@ using namespace mlir;
 using PathInDomTree = SmallVector<DominanceInfoNode *>;
 using PostDomTree = llvm::DominatorTreeBase<Block, true>;
 
+ControlDependenceAnalysis::ControlDependenceAnalysis(Region &region) {
+  identifyAllControlDeps(region);
+}
+
 ControlDependenceAnalysis::ControlDependenceAnalysis(Operation *operation) {
 
   // Only one function should be present in the module, excluding external
@@ -47,14 +51,14 @@ ControlDependenceAnalysis::ControlDependenceAnalysis(Operation *operation) {
 
       // Analyze the function
       if (!functionsCovered) {
-        identifyAllControlDeps(funcOp);
+        identifyAllControlDeps(funcOp.getRegion());
         functionsCovered++;
       } else {
         llvm::errs() << "[CDA] Too many functions to handle in the module";
       }
     }
   } else if (func::FuncOp fOp = dyn_cast<func::FuncOp>(operation); fOp) {
-    identifyAllControlDeps(fOp);
+    identifyAllControlDeps(fOp.getRegion());
     functionsCovered = 1;
   }
 
@@ -103,18 +107,17 @@ static void enumeratePathsInPostDomTree(Block *startBlock, Block *endBlock,
 }
 
 void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
-    mlir::func::FuncOp &funcOp) {
+    Region &region) {
 
-  if (funcOp.getBlocks().size() == 1)
+  if (region.getBlocks().size() == 1)
     return;
 
   // Get post-domination information
-  Region &funcReg = funcOp.getRegion();
   PostDominanceInfo postDomInfo;
-  PostDomTree &postDomTree = postDomInfo.getDomTree(&funcReg);
+  PostDomTree &postDomTree = postDomInfo.getDomTree(&region);
 
   // Consider each pair of successive block in the CFG
-  for (Block &bb : funcReg.getBlocks()) {
+  for (Block &bb : region.getBlocks()) {
     for (Block *successor : bb.getSuccessors()) {
 
       if (postDomInfo.properlyPostDominates(successor, &bb))
@@ -132,7 +135,7 @@ void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
       blocksControlDeps[successor].allControlDeps.insert(&bb);
 
       PathInDomTree pathFromLeastCommonAncToSuccessor;
-      enumeratePathsInPostDomTree(leastCommonAnc, successor, &funcReg,
+      enumeratePathsInPostDomTree(leastCommonAnc, successor, &region,
                                   &postDomTree,
                                   pathFromLeastCommonAncToSuccessor);
 
@@ -150,18 +153,17 @@ void dynamatic::ControlDependenceAnalysis::identifyAllControlDeps(
   }
 
   // Include nested dependencies to the analysis
-  addDepsOfDeps(funcOp);
+  addDepsOfDeps(region);
 
   // Extract the forward dependencies out of all the control dependencies
-  identifyForwardControlDeps(funcOp);
+  identifyForwardControlDeps(region);
 }
 
-void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(
-    mlir::func::FuncOp &funcOp) {
+void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(Region &region) {
 
   // For each block, consider each of its dependencies (`oneDep`) and move each
   // of its dependencies into block's
-  for (Block &block : funcOp.getBlocks()) {
+  for (Block &block : region.getBlocks()) {
     BlockControlDeps blockControlDeps = blocksControlDeps[&block];
     for (auto &oneDep : blockControlDeps.allControlDeps) {
       DenseSet<Block *> &oneDepDeps = blocksControlDeps[oneDep].allControlDeps;
@@ -172,16 +174,15 @@ void dynamatic::ControlDependenceAnalysis::addDepsOfDeps(
 }
 
 void dynamatic::ControlDependenceAnalysis::identifyForwardControlDeps(
-    mlir::func::FuncOp &funcOp) {
-  Region &funcReg = funcOp.getRegion();
+    Region &region) {
 
   // Get dominance, post-dominance and loop information
   DominanceInfo domInfo;
   PostDominanceInfo postDomInfo;
-  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&funcReg);
+  llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
   CFGLoopInfo li(domTree);
 
-  for (Block &block : funcReg.getBlocks()) {
+  for (Block &block : region.getBlocks()) {
 
     // Consider all block's dependencies
     for (Block *oneDep : blocksControlDeps[&block].allControlDeps) {

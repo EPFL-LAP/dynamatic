@@ -154,12 +154,10 @@ createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
 SmallVector<mlir::CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
                                                    mlir::CFGLoopInfo &li);
 
-/// Add some regen multiplexers to all the operands of a given consumer
-/// whenever it is necessary according to the CFG structure of the input
-/// function
-LogicalResult addRegenToConsumer(ConversionPatternRewriter &rewriter,
-                                 dynamatic::handshake::FuncOp &funcOp,
-                                 Operation *consumerOp);
+/// Add some regen multiplexers between an opearation and one of its operands
+LogicalResult addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+                                      dynamatic::handshake::FuncOp &funcOp,
+                                      Operation *consumerOp, Value operand);
 
 /// Add suppression mechanism to all the inputs and outputs of a producer
 LogicalResult
@@ -171,7 +169,7 @@ addSuppToProducer(ConversionPatternRewriter &rewriter,
 
 /// Retrun true if the operation is either a `handshake::MergeOp` or
 /// `handshake::MuxOp`
-bool isMergeOrMux(Operation *op);
+bool isMux(Operation *op);
 }; // namespace ftd
 }; // namespace experimental
 }; // namespace dynamatic

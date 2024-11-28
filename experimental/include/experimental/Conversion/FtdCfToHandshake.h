@@ -60,9 +60,10 @@ protected:
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
 
-  LogicalResult ftdVerifyAndCreateMemInterfaces(
-      handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-      MemInterfacesInfo &memInfo, const BlockIndexing &bi) const;
+  LogicalResult
+  ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
+                                  ConversionPatternRewriter &rewriter,
+                                  MemInterfacesInfo &memInfo) const;
 
   void exportGsaGatesInfo(handshake::FuncOp funcOp) const;
 
@@ -102,10 +103,9 @@ protected:
   /// consumer, because of the control decisions. In this scenario, the token
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
-  LogicalResult addSupp(ConversionPatternRewriter &rewriter,
-                        handshake::FuncOp &funcOp,
-                        ControlDependenceAnalysis::BlockControlDepsMap &cda,
-                        const ftd::BlockIndexing &bi) const;
+  LogicalResult
+  addSupp(ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+          ControlDependenceAnalysis::BlockControlDepsMap &cda) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

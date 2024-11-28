@@ -268,8 +268,10 @@ static LogicalResult joinInsertion(OpBuilder &builder,
 
 LogicalResult ftd::FtdLowerFuncToHandshake::addSupp(
     ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps,
-    const BlockIndexing &bi) const {
+    ControlDependenceAnalysis::BlockControlDepsMap &cdaDeps) const {
+
+  // Get the block indexing
+  BlockIndexing bi(funcOp.getRegion());
 
   // A set of relationships between producer and consumer needs to be covered.
   // To do that, we consider each possible operation in the circuit as
@@ -305,8 +307,11 @@ ftd::FtdLowerFuncToHandshake::addRegen(ConversionPatternRewriter &rewriter,
 
   // For each producer/consumer relationship
   for (Operation &consumerOp : funcOp.getOps()) {
-    if (failed(addRegenToConsumer(rewriter, funcOp, &consumerOp)))
-      return failure();
+    for (Value operand : consumerOp.getOperands()) {
+      if (failed(
+              addRegenOperandConsumer(rewriter, funcOp, &consumerOp, operand)))
+        return failure();
+    }
   }
 
   // Considering each mux that was added, the inputs and output values must be
@@ -395,7 +400,10 @@ LogicalResult ftd::FtdLowerFuncToHandshake::convertConstants(
 
 LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-    MemInterfacesInfo &memInfo, const BlockIndexing &bi) const {
+    MemInterfacesInfo &memInfo) const {
+
+  // Get the block indexing
+  BlockIndexing bi(funcOp.getRegion());
 
   /// Given an LSQ, extract the list of operations which require that same LSQ
   auto getLSQOperations =
@@ -630,6 +638,11 @@ LogicalResult ftd::FtdLowerFuncToHandshake::ftdVerifyAndCreateMemInterfaces(
     rewriter.eraseOp(merge);
   }
 
+  for (handshake::MuxOp mux : funcOp.getOps<handshake::MuxOp>()) {
+    if (mux.getResult().getUses().empty())
+      rewriter.eraseOp(mux);
+  }
+
   // Replace the backedge
   startValueBackedge.setValue(startValue);
 
@@ -711,10 +724,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
 
-  // Get the map of control dependencies for the blocks in the function to
-  // lower
-  auto cdaDeps = cdAnalysis.getAllBlockDeps();
-
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
   DenseMap<Value, unsigned> memrefToArgIdx;
@@ -731,11 +740,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
                                            gsaAnalysis, startValueBackedge)))
     return failure();
 
-  // Save pointers to old block
-  SmallVector<Block *> blocksCfFunction;
-  for (auto &bb : lowerFuncOp.getBlocks())
-    blocksCfFunction.push_back(&bb);
-
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
   if (failed(funcOrFailure))
@@ -744,29 +748,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (funcOp.isExternal())
     return success();
 
-  // Save pointers from new blocks
-  SmallVector<Block *> blocksHandshakeFunc;
-  for (auto &bb : funcOp.getBlocks())
-    blocksHandshakeFunc.push_back(&bb);
-
-  // Remap control dependency analysis (in correspondence to the new block
-  // pointers)
-  for (unsigned i = 0; i < blocksCfFunction.size(); i++) {
-    auto deps = cdaDeps[blocksCfFunction[i]];
-
-    for (unsigned i = 0; i < blocksCfFunction.size(); i++) {
-      if (deps.allControlDeps.contains(blocksCfFunction[i]))
-        deps.allControlDeps.insert(blocksHandshakeFunc[i]);
-      if (deps.forwardControlDeps.contains(blocksCfFunction[i]))
-        deps.forwardControlDeps.insert(blocksHandshakeFunc[i]);
-    }
-
-    cdaDeps.erase(blocksCfFunction[i]);
-    cdaDeps.insert({blocksHandshakeFunc[i], deps});
-  }
-
-  // Get the block indexing
-  BlockIndexing bi(funcOp.getRegion());
+  // Extract the control dependency analysis out of the new region
+  auto cdaDeps =
+      ControlDependenceAnalysis(funcOp.getRegion()).getAllBlockDeps();
 
   // When GSA-MU functions are translated into multiplexers, an `init merge`
   // is created to feed them. This merge requires the start value of the
@@ -804,7 +788,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo, bi)))
+  if (failed(ftdVerifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
@@ -824,7 +808,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     exportGsaGatesInfo(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
-    if (failed(addSupp(rewriter, funcOp, cdaDeps, bi)))
+    if (failed(addSupp(rewriter, funcOp, cdaDeps)))
       return failure();
   }
 
