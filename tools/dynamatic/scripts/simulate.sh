@@ -12,6 +12,11 @@ SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
 
+echo $1
+echo $2
+echo $3
+echo $4
+
 # Generated directories/files
 SIM_DIR="$OUTPUT_DIR/sim"
 C_SRC_DIR="$SIM_DIR/C_SRC"
@@ -24,7 +29,7 @@ IO_GEN_BIN="$SIM_DIR/C_SRC/$KERNEL_NAME-io-gen"
 
 # Shortcuts
 HDL_DIR="$OUTPUT_DIR/hdl"
-CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
+CLANGXX_BIN="clang++"
 HLS_VERIFIER_BIN="$DYNAMATIC_DIR/bin/hls-verifier"
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
 

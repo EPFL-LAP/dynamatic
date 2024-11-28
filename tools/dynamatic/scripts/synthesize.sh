@@ -81,6 +81,9 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 
 echo_info "Created synthesis scripts"
 echo_info "Launching Vivado synthesis"
+echo $SYNTH_DIR
+echo $F_SCRIPT
+echo $F_REPORT
 cd "$SYNTH_DIR"
-vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+vivado-2018.1-kgf vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
 exit_on_fail "Logic synthesis failed" "Logic synthesis succeeded"
