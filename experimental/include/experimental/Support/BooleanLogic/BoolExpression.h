@@ -175,25 +175,28 @@ struct Operator : public BoolExpression {
   Operator(ExpressionType t, BoolExpression *l, BoolExpression *r)
       : BoolExpression(t), left(l), right(r) {}
 
+  /// Delete operator
   ~Operator() override {
     delete left;
     delete right;
   }
 
+  /// Deep copy of a boolean expression
   BoolExpression *deepCopy() const override {
     return new Operator(type, left->deepCopy(), right->deepCopy());
   }
 };
 
-// This is specifically for signgle conditions: Variable, One, Zero
+/// This is specifically for single conditions: Variable, One, Zero
 struct SingleCond : public BoolExpression {
   std::string id;
   bool isNegated;
 
-  // Constructor for single condition nodes
+  /// Constructor for single condition nodes
   SingleCond(ExpressionType t, std::string i = "", bool negated = false)
       : BoolExpression(t), id(std::move(i)), isNegated(negated) {}
 
+  /// Deep copy of a single condition
   BoolExpression *deepCopy() const override {
     return new SingleCond(type, id, isNegated);
   }

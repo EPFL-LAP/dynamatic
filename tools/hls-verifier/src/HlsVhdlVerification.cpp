@@ -27,10 +27,9 @@ bool runVhdlVerification(vector<string> args) {
 
   vector<string> temp;
 
-  for (auto &arg : args) {
+  for (auto &arg : args)
     if (arg.empty() || arg[0] != '-')
       temp.push_back(arg);
-  }
 
   args = temp;
 
@@ -66,13 +65,12 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   sim << "vmap work work" << endl;
   sim << "project new . simulation work modelsim.ini 0" << endl;
   sim << "project open simulation" << endl;
-  for (auto &it : filelistVhdl) {
+  for (auto &it : filelistVhdl)
     sim << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << endl;
-  }
 
-  for (auto &it : filelistVerilog) {
+  for (auto &it : filelistVerilog)
     sim << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << endl;
-  }
+
   sim << "project calculateorder" << endl;
   sim << "project compileall" << endl;
   sim << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb" << endl;

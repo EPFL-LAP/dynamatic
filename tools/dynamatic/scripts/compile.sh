@@ -117,7 +117,9 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --ftd-lower-cf-to-handshake \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 
@@ -164,6 +166,7 @@ fi
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
   BUFFER_PLACEMENT_PASS="credit-based-sharing"
+  echo_info "Set to apply credit-based sharing after buffer placement."
 else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi

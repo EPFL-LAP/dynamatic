@@ -40,7 +40,7 @@ def set_paths(kernel_name: str):
     global PATH_TO_WLF2CSV
     KERNEL_NAME = kernel_name
 
-    LOOP_INFO_FILE_NAME = "ftdscripting/loopinfo.txt"
+    LOOP_INFO_FILE_NAME = "ftdscripting/gsaGatesInfo" #loopinfo.txt"
     PATH_TO_OUT = f"integration-test/{KERNEL_NAME}/out"
     PATH_TO_COMP = f"{PATH_TO_OUT}/comp"
     PATH_TO_SIM = f"{PATH_TO_OUT}/sim"

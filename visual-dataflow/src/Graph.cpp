@@ -39,9 +39,9 @@ static LogicalResult defCallback(StringRef val, T &field) {
 
 template <bool Optional = false, typename T>
 static LogicalResult
-expectAttr(const DOTGraph::Attributes &attrs, StringRef attrName, T &field,
-           LogicalResult (*callback)(StringRef, T &) = &defCallback) {
-  if (auto it = attrs.find(attrName); it != attrs.end())
+expectAttr(const DOTGraph::WithAttributes &withAttr, StringRef attrName,
+           T &field, LogicalResult (*callback)(StringRef, T &) = &defCallback) {
+  if (auto it = withAttr.attrs.find(attrName); it != withAttr.attrs.end())
     return callback(it->second, field);
   if constexpr (Optional) {
     return success();
@@ -116,45 +116,51 @@ LogicalResult GodotGraph::parseDOT(StringRef filepath) {
   if (failed(graph.getBuilder().parseFromFile(filepath)))
     return failure();
 
-  // Look at the attributes of each node to derive visual properties
-  for (const DOTGraph::Node *node : graph.getNodes()) {
-    const DOTGraph::Attributes &attr = node->attributes;
-    NodeProps &props = nodes.try_emplace(node).first->second;
-    if (failed(expectAttr(attr, "pos", props.position, toSinglePos)) ||
-        failed(expectAttr(attr, "width", props.width, toFloat)) ||
-        failed(expectAttr<true>(attr, "fillcolor", props.color)) ||
-        failed(expectAttr<true>(attr, "shape", props.shape)) ||
-        failed(expectAttr<true>(attr, "style", props.isDotted, toElemStyle)))
-      return failure();
-  }
+  std::function<LogicalResult(const DOTGraph::Subgraph &, bool)>
+      handleSubgraph =
+          [&](const DOTGraph::Subgraph &sub, bool isRoot) -> LogicalResult {
+    // Look at the attributes of each node to derive visual properties
+    for (const DOTGraph::Node *node : sub.nodes) {
+      NodeProps &props = nodes.try_emplace(node).first->second;
+      if (failed(expectAttr(*node, "pos", props.position, toSinglePos)) ||
+          failed(expectAttr(*node, "width", props.width, toFloat)) ||
+          failed(expectAttr<true>(*node, "fillcolor", props.color)) ||
+          failed(expectAttr<true>(*node, "shape", props.shape)) ||
+          failed(expectAttr<true>(*node, "style", props.isDotted, toElemStyle)))
+        return failure();
+    }
 
-  // Look at the attributes of each edge to derive visual properties
-  for (const DOTGraph::Edge *edge : graph.getEdges()) {
-    const DOTGraph::Attributes &attr = edge->attributes;
-    EdgeProps &props = edges.try_emplace(edge).first->second;
-    if (failed(expectAttr(attr, "pos", props.positions, toEdgePos)) ||
-        failed(expectAttr(attr, "arrowhead", props.arrowhead)) ||
-        failed(expectAttr(attr, "from_idx", props.fromIdx, toInteger)) ||
-        failed(expectAttr(attr, "to_idx", props.toIdx, toInteger)) ||
-        failed(expectAttr<true>(attr, "style", props.isDotted, toElemStyle)))
-      return failure();
-  }
+    // Look at the attributes of each edge to derive visual properties
+    for (const DOTGraph::Edge *edge : sub.edges) {
+      EdgeProps &props = edges.try_emplace(edge).first->second;
+      if (failed(expectAttr(*edge, "pos", props.positions, toEdgePos)) ||
+          failed(expectAttr(*edge, "arrowhead", props.arrowhead)) ||
+          failed(expectAttr(*edge, "from_idx", props.fromIdx, toInteger)) ||
+          failed(expectAttr(*edge, "to_idx", props.toIdx, toInteger)) ||
+          failed(expectAttr<true>(*edge, "style", props.isDotted, toElemStyle)))
+        return failure();
+    }
 
-  // Look at the attributes of each subgraph to derive visual properties, we
-  // assume that all subgraphs are directly under the top-level graph (no nested
-  // subgraphs)
-  for (const DOTGraph::Subgraph &subgraph : graph.getSubgraphs()) {
-    const DOTGraph::Attributes &attr = subgraph.attributes;
-    SubgraphProps &props = subgraphs.try_emplace(&subgraph).first->second;
-    if (failed(expectAttr(attr, "label", props.label)) ||
-        failed(expectAttr(attr, "bb", props.boundaries, toBoundaries)) ||
-        failed(expectAttr(attr, "lheight", props.labelSize.first, toFloat)) ||
-        failed(expectAttr(attr, "lwidth", props.labelSize.second, toFloat)) ||
-        failed(expectAttr(attr, "lp", props.labelPosition, toSinglePos)))
-      return failure();
-  }
+    if (!isRoot) { // Look at the attributes of the subgrap to derive visual
+                   // properties
+      SubgraphProps &props = subgraphs.try_emplace(&sub).first->second;
+      if (failed(expectAttr(sub, "label", props.label)) ||
+          failed(expectAttr(sub, "bb", props.boundaries, toBoundaries)) ||
+          failed(expectAttr(sub, "lheight", props.labelSize.first, toFloat)) ||
+          failed(expectAttr(sub, "lwidth", props.labelSize.second, toFloat)) ||
+          failed(expectAttr(sub, "lp", props.labelPosition, toSinglePos)))
+        return failure();
+    }
 
-  return success();
+    // Recurse on subgraphs
+    for (const DOTGraph::Subgraph *subsub : sub.subgraphs) {
+      if (failed(handleSubgraph(*subsub, false)))
+        return failure();
+    }
+    return success();
+  };
+
+  return handleSubgraph(graph.getRoot(), true);
 }
 
 static const DenseMap<StringRef, DataflowState> STATE_DECODER = {

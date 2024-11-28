@@ -49,9 +49,9 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
 // CHECK:           %[[VAL_16:.*]] = trunci %[[VAL_15]] : <i32> to <i10>
 // CHECK:           %[[VAL_17:.*]] = constant %[[VAL_2]] {value = 42 : i32} : <i32>
 // CHECK:           %[[VAL_5]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_18:.*]] = mc_load{{\[}}%[[VAL_12]]] %[[VAL_3]] {handshake.bb = 0 : ui32} : <i10>, <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = mc_store{{\[}}%[[VAL_14]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
-// CHECK:           %[[VAL_9]], %[[VAL_10]] = mc_store{{\[}}%[[VAL_16]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_18:.*]] = load{{\[}}%[[VAL_12]]] %[[VAL_3]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_7]], %[[VAL_8]] = store{{\[}}%[[VAL_14]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_9]], %[[VAL_10]] = store{{\[}}%[[VAL_16]]] %[[VAL_17]] {handshake.bb = 0 : ui32} : <i10>, <i32>
 // CHECK:           end %[[VAL_18]], %[[VAL_4]] : <i32>, <>
 // CHECK:         }
 handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.control<>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
@@ -63,9 +63,9 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.contro
   %ctrl1 = constant %start {value = 2 : i32, handshake.bb = 0 : ui32}: <i32>
   %addr1Ext = extui %addr1 : <i8> to <i32>
   %addr2Ext = extui %addr2 : <i16> to <i32>
-  %ldAddr1, %ldVal = mc_load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>
-  %stAddr1, %stData1 = mc_store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
-  %stAddr2, %stData2 = mc_store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %ldAddr1, %ldVal = load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %stAddr1, %stData1 = store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %stAddr2, %stData2 = store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
   end %ldVal, %done : <i32>, <>
 }
 
@@ -84,9 +84,9 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.contro
 // CHECK:           %[[VAL_17:.*]] = trunci %[[VAL_16]] : <i32> to <i10>
 // CHECK:           %[[VAL_18:.*]] = constant %[[VAL_2]] {value = 42 : i32} : <i32>
 // CHECK:           %[[VAL_5]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <i32>
-// CHECK:           %[[VAL_9]], %[[VAL_19:.*]] = lsq_load{{\[}}%[[VAL_13]]] %[[VAL_8]]#0 {handshake.bb = 0 : ui32} : <i10>, <i32>
-// CHECK:           %[[VAL_10]], %[[VAL_11]] = lsq_store{{\[}}%[[VAL_15]]] %[[VAL_18]] {handshake.bb = 0 : ui32} : <i10>, <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_7]] = mc_store{{\[}}%[[VAL_17]]] %[[VAL_18]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_9]], %[[VAL_19:.*]] = load{{\[}}%[[VAL_13]]] %[[VAL_8]]#0 {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_10]], %[[VAL_11]] = store{{\[}}%[[VAL_15]]] %[[VAL_18]] {handshake.bb = 0 : ui32} : <i10>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_7]] = store{{\[}}%[[VAL_17]]] %[[VAL_18]] {handshake.bb = 0 : ui32} : <i10>, <i32>
 // CHECK:           end %[[VAL_19]], %[[VAL_4]] : <i32>, <>
 // CHECK:         }
 
@@ -100,9 +100,9 @@ handshake.func @memAddrOptMasterSlave(%mem: memref<1000xi32>, %mem_start: !hands
   %ctrl1 = constant %start {value = 2 : i32, handshake.bb = 0 : ui32}: <i32>
   %addr1Ext = extui %addr1 : <i8> to <i32>
   %addr2Ext = extui %addr2 : <i16> to <i32>
-  %ldAddr1, %ldVal = lsq_load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>
-  %stAddr1, %stData1 = lsq_store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
-  %stAddr2, %stData2 = mc_store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %ldAddr1, %ldVal = load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %stAddr1, %stData1 = store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
+  %stAddr2, %stData2 = store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>
   end %ldVal, %done : <i32>, <>
 }
 

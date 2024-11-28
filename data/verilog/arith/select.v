@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module antitokens #()(
+module antitokens (
   // inputs
   input  clk,
   input  reset,
@@ -77,7 +77,7 @@ module selector #(
 
   assign result = condition ? trueValue : falseValue;
 
-  antitokens #() antitokens (
+  antitokens antitokens (
     .clk(clk),
     .reset(rst),
     .pvalid0(trueValue_valid),

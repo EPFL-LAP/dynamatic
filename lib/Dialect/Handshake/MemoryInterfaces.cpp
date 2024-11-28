@@ -24,7 +24,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
@@ -50,8 +49,8 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
   topLevelOp->walk([&](Operation *memOp) {
     // We only care about supported load/store memory accesses
     if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
-             affine::AffineStoreOp, handshake::LoadOpInterface,
-             handshake::StoreOpInterface>(memOp))
+             affine::AffineStoreOp, handshake::LoadOp, handshake::StoreOp>(
+            memOp))
       return;
 
     // Read potential memory dependencies stored on the memory operation
@@ -85,23 +84,25 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
 // MemoryInterfaceBuilder
 //===----------------------------------------------------------------------===//
 
-void MemoryInterfaceBuilder::addMCPort(Operation *memOp) {
-  std::optional<unsigned> bb = getLogicBB(memOp);
+void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
+  std::optional<unsigned> bb = getLogicBB(portOp);
   assert(bb && "MC port must belong to basic block");
-  if (isa<handshake::MCLoadOp>(memOp)) {
+  if (isa<handshake::LoadOp>(portOp)) {
     ++mcNumLoads;
   } else {
-    assert(isa<handshake::MCStoreOp>(memOp) && "invalid MC port");
+    assert(isa<handshake::StoreOp>(portOp) && "invalid MC port");
   }
-  mcPorts[*bb].push_back(memOp);
+  mcPorts[*bb].push_back(portOp);
 }
 
-void MemoryInterfaceBuilder::addLSQPort(unsigned group, Operation *memOp) {
-  if (isa<handshake::LSQLoadOp>(memOp))
+void MemoryInterfaceBuilder::addLSQPort(unsigned group,
+                                        handshake::MemPortOpInterface portOp) {
+  if (isa<handshake::LoadOp>(portOp)) {
     ++lsqNumLoads;
-  else
-    assert(isa<handshake::LSQStoreOp>(memOp) && "invalid LSQ port");
-  lsqPorts[group].push_back(memOp);
+  } else {
+    assert(isa<handshake::StoreOp>(portOp) && "invalid LSQ port");
+  }
+  lsqPorts[group].push_back(portOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
@@ -109,7 +110,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(builder, memref.getLoc());
 
-  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     loadOp->setOperand(1, dataIn);
   };
   return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
@@ -119,7 +120,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
-  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
   return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
@@ -205,11 +206,11 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 SmallVector<Value, 2>
 MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
   // For loads, address output goes to memory
-  if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
-    return SmallVector<Value, 2>{loadOp.getAddressOutput()};
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
+    return SmallVector<Value, 2>{loadOp.getAddressResult()};
 
   // For stores, all outputs (address and data) go to memory
-  auto storeOp = dyn_cast<handshake::StoreOpInterface>(memOp);
+  auto storeOp = dyn_cast<handshake::StoreOp>(memOp);
   assert(storeOp && "input operation must either be load or store");
   return SmallVector<Value, 2>{storeOp->getResults()};
 }
@@ -264,7 +265,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
   for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
-      if (isa<handshake::LSQStoreOp>(lsqOp)) {
+      if (isa<handshake::StoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
         if (!block)
           return lsqOp->emitError() << "LSQ port must belong to a BB.";
@@ -280,7 +281,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     // to the MC or going through an LSQ
     unsigned numStoresInBlock = lsqStoresPerBlock.lookup(block);
     for (Operation *memOp : mcBlockOps) {
-      if (isa<handshake::MCStoreOp>(memOp))
+      if (isa<handshake::StoreOp>(memOp))
         ++numStoresInBlock;
     }
 
@@ -338,10 +339,9 @@ void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
                                             const FConnectLoad &connect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
-    for (Operation *memOp : memGroupOps) {
-      if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
+    for (Operation *memOp : memGroupOps)
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
         connect(loadOp, memIfaceOp->getResult(resIdx++));
-    }
   }
 }
 

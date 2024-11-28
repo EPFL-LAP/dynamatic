@@ -13,26 +13,29 @@
 #ifndef DYNAMATIC_SUPPORT_DOT_H
 #define DYNAMATIC_SUPPORT_DOT_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LLVM.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 
 namespace dynamatic {
 
-/// A directed graph whose nodes and edges can optionally belong to a particular
-/// node in a tree of subgraphs. All nodes, edges, and subgraphs can optionally
-/// have a string-keyed dictionary of string attributes. This representation is
-/// identical to the Graphviz representation of hierarchical graphs expressed in
-/// the DOT format, hence the class name. Multiple edges between the same two
-/// nodes are allowed, even if they are going in the same direction.
+/// A directed graph whose nodes and edges are organizes in a tree of subgraph.
+/// All nodes, edges, and subgraphs can optionally have a string-keyed
+/// dictionary of string attributes. This representation is identical to the
+/// Graphviz representation of hierarchical graphs expressed in the DOT format,
+/// hence the class name. Multiple edges between the same two nodes are allowed,
+/// even if they are going in the same direction.
 ///
-/// Memory for nodes and edges is managed by the top-level graph; subgraphs
-/// maintain pointers to the subset of the nodes and edges that belong to them
-/// but do not free the corresponding memory.
+/// The memory for a node, edge, or subgraph is managed by the most nested
+/// subgraph in which it is contained.
 ///
-/// This class is immutable but a friend builder class is available to
+/// Instances of this class do not allow modifications of the underlying graph
+/// elements directly; a friend builder class is available for that purpose to
 /// programatically create graphs.
 ///
 /// ```cpp
@@ -44,59 +47,81 @@ namespace dynamatic {
 /// }
 /// ```
 class DOTGraph {
+public:
   class Builder;
   class Parser;
   friend Builder;
   friend Parser;
 
-public:
+  struct Subgraph;
+
   /// Type to store attributes on graph nodes/edges/subgraphs.
   using Attributes = llvm::StringMap<std::string>;
 
-  // A DOT node.
-  struct Node {
-    /// The node's unique identifier.
-    std::string id;
-    /// The node's attributes.
-    Attributes attributes;
+  struct WithAttributes {
+    /// A map of attributes for the DOT object.
+    Attributes attrs;
 
-    Node(StringRef id) : id(id) {
-      assert(!id.empty() && "node ID cannot be empty");
-    }
+    /// Adds an attribute (name-value pair) and returns whether this is the
+    /// first attribute with this name (if not the existing value is replaced
+    /// with the new one).
+    bool addAttr(const Twine &name, const Twine &value);
+
+    /// Prints the Graphviz-formatted attributes to the output stream.
+    void print(mlir::raw_indented_ostream &os) const;
   };
 
-  // A DOT edge.
-  struct Edge {
-    // The edge's source node.
-    const Node *srcNode;
-    // The edge's destination node.
-    const Node *dstNode;
-    /// The edge's attributes.
-    Attributes attributes;
+  /// A DOT node.
+  struct Node : public WithAttributes {
+    /// The node's unique identifier.
+    std::string id;
+    /// Most nested subgraph the node belongs to.
+    Subgraph *subgraph;
 
-    Edge(const Node *srcNode, const Node *dstNode)
-        : srcNode(srcNode), dstNode(dstNode) {
-      assert(srcNode && "source node cannot be nullptr");
-      assert(dstNode && "destination node cannot be nullptr");
+    Node(StringRef id, Subgraph &subgraph) : id(id), subgraph(&subgraph) {
+      assert(!id.empty() && "node ID cannot be empty");
     }
+
+    /// Prints the Graphviz-formatted node to the output stream.
+    void print(mlir::raw_indented_ostream &os) const;
+  };
+
+  /// A DOT edge, between two nodes.
+  struct Edge : public WithAttributes {
+    /// The edge's source node.
+    const Node *srcNode;
+    /// The edge's destination node.
+    const Node *dstNode;
+    /// Most nested subgraph the edge belongs to.
+    Subgraph *subgraph;
+
+    Edge(const Node &srcNode, const Node &dstNode, Subgraph &subgraph)
+        : srcNode(&srcNode), dstNode(&dstNode), subgraph(&subgraph) {}
+
+    /// Prints the Graphviz-formatted edge to the output stream.
+    void print(mlir::raw_indented_ostream &os) const;
   };
 
   /// A DOT subgraph, which may itself contain a tree of subgraphs.
-  struct Subgraph {
+  struct Subgraph : public WithAttributes {
     /// An optional ID for the subgraph (empty if not provided).
     std::string id;
-    /// The nodes that belong to the subgraph (but not to potential children
-    /// subgraphs).
-    mlir::SetVector<Node *> nodes;
-    /// The edges that belong to the subgraph (but not to potential children
-    /// subgraphs).
-    mlir::SetVector<Edge *> edges;
+    /// The nodes that belong immediately to the subgraph (heap-allocated).
+    std::vector<Node *> nodes;
+    /// The edges that belong immediately to the subgraph (heap-allocated).
+    std::vector<Edge *> edges;
     /// A potential list of subgraphs nested within this subgraph.
-    std::vector<Subgraph> subgraphs;
-    /// The subgraph's attributes.
-    Attributes attributes;
+    std::vector<Subgraph *> subgraphs;
+    /// Parent subgraph. `nullptr` for the top-level subgraph.
+    Subgraph *parent;
 
-    Subgraph(StringRef id) : id(id) {}
+    Subgraph(StringRef id = {}, Subgraph *parent = nullptr)
+        : id(id), parent(parent) {}
+
+    /// Prints the Graphviz-formatted subgraph to the output stream.
+    void print(mlir::raw_indented_ostream &os, bool isRoot) const;
+
+    ~Subgraph();
   };
 
   /// Returns a builder object for the current graph, allowing modification of
@@ -119,34 +144,27 @@ public:
     return it->second;
   };
 
-  /// Returns the list of all nodes in the graph.
-  ArrayRef<Node *> getNodes() const { return nodes; }
-
-  /// Returns the list of all edges in the graph.
-  ArrayRef<Edge *> getEdges() const { return edges; }
-
-  /// Returns the list of top-level subgraphs (children of the root graph).
-  ArrayRef<Subgraph> getSubgraphs() const { return subgraphs; }
+  /// Returns the root subgraph.
+  const Subgraph &getRoot() const { return root; }
 
   /// Returns the list of edges adjacent to a node (ingoing to it or outgoing
   /// from it).
   SmallVector<const Edge *> getAdjacentEdges(const Node &node) const;
 
-  /// Deletes all nodes and edges, which are heap-allocated.
-  ~DOTGraph();
+  /// Style in which to render edges in the printed DOTs.
+  enum class EdgeStyle {
+    /// Render edges as splines (default).
+    SPLINE,
+    /// Render edges as orthogonal lines.
+    ORTHO
+  };
+
+  void print(mlir::raw_ostream &os,
+             EdgeStyle edgeStyle = EdgeStyle::SPLINE) const;
 
 private:
-  /// An optional ID for the graph (empty if not provided).
-  std::string id;
-  /// The list of all nodes in the graph (heap-allocated).
-  std::vector<Node *> nodes;
-  /// The list of all edges in the graph (heap-allocated).
-  std::vector<Edge *> edges;
-  /// The list of all top-level subgraphs.
-  std::vector<Subgraph> subgraphs;
-  /// The top-level graph's attributes.
-  Attributes attributes;
-
+  /// The root subgraph.
+  Subgraph root;
   /// Maps all unique node identifiers to the node object they correspond to.
   llvm::DenseMap<StringRef, Node *> nodesByID;
   /// Maps nodes to their outgoing edges.
@@ -160,37 +178,38 @@ public:
   /// Creates the builder from an empty DOT graph.
   Builder(DOTGraph &graph) : graph(graph) {}
 
-  /// Adds a node with a specific unique identifier. If `subgraph` is not null,
-  /// the node is added to the specific subgraph. Fails when a node with this
-  /// identifier was already added explicitly; otherwise returns the added node.
-  FailureOr<Node *> addNode(StringRef id, Subgraph *subgraph = nullptr);
+  /// Adds a node with a specific unique identifier to a specific subgraph.
+  /// Fails and returns `nullptr` when a node with this identifier was already
+  /// added explicitly; otherwise returns a valid pointer to the added node.
+  Node *addNode(StringRef id, Subgraph &subgraph);
 
-  /// Adds an edge between two nodes identified by their string identifiers.  If
-  /// `subgraph` is not null, the edge is added to the specific subgraph. Note
-  /// that it is possible to add an edge whose endpoints do not currently exist.
-  /// In this case, nodes with corresponding identifers are added to the
-  /// top-level graph.
-  Edge *addEdge(StringRef srcID, StringRef dstID, Subgraph *subgraph = nullptr);
+  /// Adds an edge between two nodes identified by their string identifiers to a
+  /// specific subgraph, then returns a reference to it. Note that it is
+  /// possible to add an edge whose endpoints do not currently exist; in this
+  /// case, nodes with corresponding identifers are added to the same subgraph.
+  Edge &addEdge(StringRef srcID, StringRef dstID, Subgraph &subgraph);
 
-  /// Adds a subgraph with a specific unique identifier (which may be empty). If
-  /// `subgraph` is not null, the subgraph is added to the specific subgraph.
-  Subgraph *addSubgraph(StringRef id, Subgraph *subgraph = nullptr);
+  /// Adds a subgraph with a specific unique identifier (which may be empty) to
+  /// a specific subgraph, then returns a reference to it.
+  Subgraph &addSubgraph(StringRef id, Subgraph &subgraph);
 
   /// Parses the graph from DOT-formatted file. Fails when the graph could not
   /// be parsed successfully (note that we do not support the full DOT grammar).
   LogicalResult parseFromFile(StringRef filepath);
 
+  /// Returns the root subgraph.
+  Subgraph &getRoot() const { return graph.root; }
+
 protected:
   /// The graph being modified.
   DOTGraph &graph;
-  /// The set of node identifiers that were added indirectly through an earlier
-  /// edge. Explicitly adding an existing node whose identified is in this set
-  /// is not an error, though adding that same node explicitly again is.
-  DenseSet<StringRef> earlyNodes;
+  /// The set of node that were added indirectly through an earlier edge,
+  /// identified by their name.
+  llvm::StringMap<Node *> earlyNodes;
 
   /// Retrieves the node with the identifier if it exists. If it does not, add a
-  /// new node to the top-level graph and returns a pointer to it.
-  DOTGraph::Node *getOrAddNode(StringRef id);
+  /// new node to the subgraph and returns the added node.
+  DOTGraph::Node &getOrAddNode(StringRef id, Subgraph &subgraph);
 };
 
 /// Parses a DOT graph from a DOT-formatted file. Right now this only supports a
@@ -231,9 +250,8 @@ private:
   size_t tokenIdx = 0;
   /// An optional error message set during parsing failure.
   std::optional<StringRef> error;
-  /// The current (nested) subgraph being parsed. `nullptr` when parsing at the
-  /// top-level.
-  Subgraph *currentSubgraph = nullptr;
+  /// The current subgraph being parsed.
+  Subgraph *currentSubgraph;
   /// Whether parsing failed.
   bool parsingFailed = true;
 
@@ -274,21 +292,24 @@ private:
   /// Parses a list of DOT statements.
   ParseResult parseStatementList();
 
-  /// Parses a list of DOT attributes and inserts them in the attribute map.
-  ParseResult parseAttrList(Attributes *attr);
+  /// Parses a list of DOT attributes and inserts them in the DOT object wth
+  /// attributes.
+  ParseResult parseAttrList(WithAttributes &withAttr);
 
-  /// Parses an optional list of DOT attributes and inserts them in the
-  /// attribute map.
-  bool parseOptionalAttrList(Attributes *attr) {
-    return parseOptional(&Parser::parseAttrList, attr);
+  /// Parses an optional list of DOT attributes and inserts them in the DOT
+  /// object wth attributes.
+  bool parseOptionalAttrList(WithAttributes &withAttr) {
+    return parseOptional<WithAttributes &>(&Parser::parseAttrList, withAttr);
   }
 
-  /// Parses DOT attributes and inserts them in the attribute map.
-  ParseResult parseInnerAttrList(Attributes *attr);
+  /// Parses DOT attributes and inserts them in the DOT object wth attributes.
+  ParseResult parseInnerAttrList(WithAttributes &withAttr);
 
-  /// Parses optional DOT attributes and inserts them in the attribute map.
-  bool parseOptionalInnerAttrList(Attributes *attr) {
-    return parseOptional(&Parser::parseInnerAttrList, attr);
+  /// Parses optional DOT attributes and inserts them in the DOT object wth
+  /// attributes.
+  bool parseOptionalInnerAttrList(WithAttributes &withAttr) {
+    return parseOptional<WithAttributes &>(&Parser::parseInnerAttrList,
+                                           withAttr);
   }
 
   /// Parses the next token as an ID and stores it in the argument on success.
@@ -307,51 +328,6 @@ private:
   bool parseOptionalLiteral(StringRef literal) {
     return parseOptional(&Parser::parseLiteral, literal);
   }
-};
-
-/// Implements the logic to convert Handshake-level IR to a DOT. The only public
-/// method of this class, print, converts an MLIR module containing a single
-/// Handshake function into an equivalent DOT graph printed to a provided output
-/// stream. In any legacy mode, the resulting DOT can be used with legacy
-/// Dynamatic.
-class DOTPrinter {
-public:
-  /// Style in which to render edges in the printed DOTs.
-  enum class EdgeStyle {
-    /// Render edges as splines (default).
-    SPLINE,
-    /// Render edges as orthogonal lines.
-    ORTHO
-  };
-
-  DOTPrinter(EdgeStyle edgeStyle = EdgeStyle::SPLINE);
-
-  /// Writes the DOT representation of the module to the provided output stream.
-  LogicalResult write(mlir::ModuleOp mod, mlir::raw_indented_ostream &os);
-
-private:
-  /// Style of edges in the resulting DOTs.
-  EdgeStyle edgeStyle;
-
-  using PortNames = DenseMap<Operation *, handshake::PortNamer>;
-
-  /// Writes the node corresponding to an operation.
-  void writeNode(Operation *op, mlir::raw_indented_ostream &os);
-
-  /// Writes the edge corresponding to an operation operand. The edge links an
-  /// operation result's or block argument to an operation that uses the value.
-  void writeEdge(OpOperand &oprd, const PortNames &portNames,
-                 mlir::raw_indented_ostream &os);
-
-  /// Writes the graph corresponding to the Handshake function.
-  void writeFunc(handshake::FuncOp funcOp, mlir::raw_indented_ostream &os);
-
-  /// Opens a subgraph in the DOT file using the provided name and label.
-  void openSubgraph(StringRef name, StringRef label,
-                    mlir::raw_indented_ostream &os);
-
-  /// Closes a subgraph in the DOT file.
-  void closeSubgraph(mlir::raw_indented_ostream &os);
 };
 
 } // namespace dynamatic

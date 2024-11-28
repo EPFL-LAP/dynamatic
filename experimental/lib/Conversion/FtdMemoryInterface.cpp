@@ -45,7 +45,7 @@ LogicalResult FtdMemoryInterfaceBuilder::instantiateInterfacesWithForks(
   BackedgeBuilder edgeBuilder((PatternRewriter &)builder, memref.getLoc());
 
   // Connect function
-  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     ((PatternRewriter &)builder).updateRootInPlace(loadOp, [&] {
       loadOp->setOperand(1, dataIn);
     });
@@ -152,24 +152,6 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     forksGraph[bb] = forkOp;
   }
 
-  // For each group, its fork has as inputs the ouput of the forks of all its
-  // predecssors. Each lazy fork will be then updated so that its only input is
-  // the result of a `handshake::JoinOp` having the current values as inptus.
-  for (Group *group : groups) {
-    SmallVector<Value> predForkOuput;
-
-    // For each predecessor of the current group, get their fork output
-    for (Group *pred : group->preds)
-      predForkOuput.push_back(forksGraph[pred->bb]->getResult(0));
-
-    // If the node has more than one predecessor, set the collected values as
-    // inputs of the lazy fork. Otherwise, the input of the lazy fork remains
-    // the `start` control value
-    Operation *forkNode = forksGraph[group->bb];
-    if (predForkOuput.size() > 0)
-      forkNode->setOperands(predForkOuput);
-  }
-
   // The second output of each lazy fork must be connected to the LSQ, so that
   // they can activate the allocation for the operations of the corresponding
   // basic block
@@ -183,6 +165,7 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     // The output of the lazy fork associated to the group containing that
     // operation is now an input for the LSQ port
     Operation *forkNode = forksGraph[firstOpInGroup->getBlock()];
+    assert(forkNode && "Fork node is not present in the expected basic block!");
     inputs.lsqInputs.push_back(forkNode->getResult(1));
 
     // All memory ports resuts that go to the interface are added to the list of
@@ -206,7 +189,7 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
   for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
-      if (isa<handshake::LSQStoreOp>(lsqOp)) {
+      if (isa<handshake::StoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
         if (!block)
           return lsqOp->emitError() << "LSQ port must belong to a BB.";
@@ -222,7 +205,7 @@ LogicalResult FtdMemoryInterfaceBuilder::determineInterfaceInputsWithForks(
     // to the MC or going through an LSQ
     unsigned numStoresInBlock = lsqStoresPerBlock.lookup(block);
     for (Operation *memOp : mcBlockOps) {
-      if (isa<handshake::MCStoreOp>(memOp))
+      if (isa<handshake::StoreOp>(memOp))
         ++numStoresInBlock;
     }
 

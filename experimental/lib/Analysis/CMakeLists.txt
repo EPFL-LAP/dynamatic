@@ -1,5 +1,5 @@
 add_dynamatic_library(DynamaticExperimentalAnalysis
-  GsaAnalysis.cpp
+  GSAAnalysis.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

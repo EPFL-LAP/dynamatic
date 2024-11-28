@@ -374,7 +374,9 @@ struct CreditBasedSharingPass
     for (Operation &op : funcOp.getOps()) {
       // This is a list of sharable operations. To support more operation types,
       // simply add in the end of the list.
-      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp>(op)) {
+      if (isa<handshake::MulFOp, handshake::AddFOp, handshake::SubFOp,
+              handshake::MulIOp, handshake::DivUIOp, handshake::DivSIOp,
+              handshake::DivFOp>(op)) {
         assert(op.getNumOperands() > 1 && op.getNumResults() == 1 &&
                "Invalid sharing target is being added to the list of sharing "
                "targets! Currently operations with 1 input or more than 1 "
@@ -419,12 +421,19 @@ bool checkGroupMergable(const Group &g1, const Group &g2,
   if (gMerged.size() > MAX_GROUP_SIZE)
     return false;
 
+  // All operations in the group must have the same type as the first op in the
+  // group
   OperationName opName = (*(gMerged.begin()))->getName();
+  Type groupType = (*(gMerged.begin()))->getResultTypes().front();
 
-  // 1. The merged group must have operations of the same type.
-  for (Operation *op : gMerged)
+  // 1. The merged group must have operations of the same type (both op type and
+  // data type).
+  for (Operation *op : gMerged) {
     if (op->getName() != opName)
       return false;
+    if (op->getResultTypes().front() != groupType)
+      return false;
+  }
 
   // 2. For each CFC, the sum of occupancy must be smaller than the capacity
   // (i.e., units in CFC must no greater than the II).

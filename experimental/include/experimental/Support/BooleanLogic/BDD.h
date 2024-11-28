@@ -33,7 +33,6 @@ struct BDD {
   /// Build a BDD node with two descendents
   BDD(BDD *ni, BDD *pi, BoolExpression *bv)
       : inputs({ni, pi}), boolVariable(bv) {}
-
   /// Build a leaf
   BDD(BoolExpression *bv) : boolVariable(bv) {}
 };

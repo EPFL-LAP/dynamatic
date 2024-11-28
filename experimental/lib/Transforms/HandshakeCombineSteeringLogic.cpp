@@ -14,6 +14,7 @@
 #include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
@@ -283,6 +284,40 @@ struct CombineBranchesOppositeSign
 };
 
 /// Remove branches with same data operands and same conditional operand
+struct RemoveNotCondition
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto conditionValue = condBranchOp.getConditionOperand();
+    Operation *conditionOperation = conditionValue.getDefiningOp();
+
+    if (!llvm::isa_and_nonnull<handshake::NotOp>(conditionOperation))
+      return failure();
+
+    handshake::NotOp drivingNot =
+        llvm::dyn_cast<handshake::NotOp>(conditionOperation);
+
+    rewriter.setInsertionPointAfter(condBranchOp);
+
+    auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        conditionOperation->getLoc(),
+        experimental::ftd::getBranchResultTypes(
+            condBranchOp.getTrueResult().getType()),
+        drivingNot.getOperand(), condBranchOp.getDataOperand());
+
+    rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),
+                                newBranch.getFalseResult());
+    rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(),
+                                newBranch.getTrueResult());
+    rewriter.eraseOp(condBranchOp);
+
+    return success();
+  }
+};
+
+/// Remove branches with same data operands and same conditional operand
 struct CombineBranchesSameSign
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -344,8 +379,9 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<CombineBranchesSameSign, CombineBranchesOppositeSign,
-                 CombineInits, CombineMuxes, RemoveDoubleSinkBranches>(ctx);
+    patterns.add<RemoveDoubleSinkBranches, CombineBranchesSameSign,
+                 CombineBranchesOppositeSign, CombineInits, CombineMuxes,
+                 RemoveNotCondition>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };

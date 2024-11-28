@@ -15,53 +15,20 @@
 #ifndef DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 #define DYNAMATIC_CONVERSION_FTD_CF_TO_HANDSHAKE_H
 
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Analysis/GsaAnalysis.h"
+#include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Conversion/FtdMemoryInterface.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
-
-enum BranchToLoopType {
-  MoreProducerThanConsumers,
-  SelfRegeneration,
-  BackwardRelationship
-};
-
-/// Structure to store a set of data structures useful for the whole FTD
-/// algorithm.
-struct FtdStoredOperations {
-
-  /// contains all `handshake::BranchOp` created by `manageMoreProdThanCons`
-  /// or `manageDifferentRegeneration`
-  DenseSet<Operation *> suppBranches;
-
-  /// contains all `handshake::MergeOp` added in the straight LSQ
-  DenseSet<Operation *> memDepLoopMerges;
-
-  /// contains all `handshake::MergeOp` added by expliciting phi functions
-  DenseSet<Operation *> explicitPhiMerges;
-
-  /// For each condition of the block, represented in abstract as `cN` where `N`
-  /// is the index of the basic block, associate its corresponding control
-  /// value, Associates the condition of the block in string format to its
-  /// corresponding control value. This is given by the condition of the
-  /// terminator of the block, in case it's a conditional branch
-  std::map<std::string, Value> conditionToValue;
-
-  // Contains the operations related to init merges, thus both merges and
-  // constants
-  DenseSet<Operation *> initMergesOperations;
-
-  // Contains operations which are to be skipped by `addRegen` and `addSupp`
-  DenseSet<Operation *> opsToSkip;
-};
 
 /// Convert a func-level function into an handshake-level function. A custom
 /// behavior is defined so that the functionalities of the `fast delivery token`
@@ -69,32 +36,36 @@ struct FtdStoredOperations {
 class FtdLowerFuncToHandshake : public LowerFuncToHandshake {
 public:
   // Use the same constructors from the base class
-  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
+  FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
-      : LowerFuncToHandshake(namer, ctx, benefit), gsaAnalysis(gsa) {};
+      : LowerFuncToHandshake(namer, ctx, benefit), cdAnalysis(cda),
+        gsaAnalysis(gsa) {};
 
-  FtdLowerFuncToHandshake(gsa::GsaAnalysis<mlir::func::FuncOp> &gsa,
+  FtdLowerFuncToHandshake(ControlDependenceAnalysis &cda, gsa::GSAAnalysis &gsa,
                           NameAnalysis &namer,
                           const TypeConverter &typeConverter, MLIRContext *ctx,
                           mlir::PatternBenefit benefit = 1)
       : LowerFuncToHandshake(namer, typeConverter, ctx, benefit),
-        gsaAnalysis(gsa) {};
+        cdAnalysis(cda), gsaAnalysis(gsa) {};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
 
 protected:
-  /// Maintains the gsa analysis performed of the function before the conversion
-  /// to the handshake dialect
-  gsa::GsaAnalysis<mlir::func::FuncOp> &gsaAnalysis;
+  /// Store the control dependency analysis over the input function
+  ControlDependenceAnalysis cdAnalysis;
 
-  LogicalResult ftdVerifyAndCreateMemInterfaces(
-      handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter,
-      MemInterfacesInfo &memInfo, FtdStoredOperations &ftdOps) const;
+  /// Store the GSA analysis over the input function
+  gsa::GSAAnalysis gsaAnalysis;
 
-  void analyzeLoop(handshake::FuncOp funcOp, FtdStoredOperations &ftdOps) const;
+  LogicalResult
+  ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
+                                  ConversionPatternRewriter &rewriter,
+                                  MemInterfacesInfo &memInfo) const;
+
+  void exportGsaGatesInfo(handshake::FuncOp funcOp) const;
 
   /// Given a list of operations, return the list of memory dependencies for
   /// each block. This allows to build the group graph, which allows to
@@ -102,28 +73,10 @@ protected:
   // Two types of hazards between the predecessors of one LSQ node:
   // (1) WAW between 2 Store operations,
   // (2) RAW and WAR between Load and Store operations
-  void identifyMemoryDependencies(const SmallVector<Operation *> &operations,
-                                  SmallVector<ProdConsMemDep> &allMemDeps,
-                                  const mlir::CFGLoopInfo &li) const;
-
-  /// For each pair of producer and consumer which are not in loop (thus
-  /// considering, for each producer, only its forward dependenices) possibly
-  /// add a merge between the pair, so that the
-  LogicalResult addMergeNonLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
-                                SmallVector<ProdConsMemDep> &allMemDeps,
-                                DenseSet<Group *> &groups,
-                                DenseMap<Block *, Operation *> &forksGraph,
-                                FtdStoredOperations &ftdOps,
-                                Value startCtrl) const;
-
-  /// For each pair of producer and consumer which are in loop possibly
-  /// add a merge between the pair, so that the
-  LogicalResult addMergeLoop(handshake::FuncOp &funcOp, OpBuilder &builder,
-                             SmallVector<ProdConsMemDep> &allMemDeps,
-                             DenseSet<Group *> &groups,
-                             DenseMap<Block *, Operation *> &forksGraph,
-                             FtdStoredOperations &ftdOps,
-                             Value startCtrl) const;
+  void identifyMemoryDependencies(
+      const SmallVector<handshake::MemPortOpInterface> &operations,
+      SmallVector<ProdConsMemDep> &allMemDeps, const mlir::CFGLoopInfo &li,
+      const BlockIndexing &bi) const;
 
   /// Convers arith-level constants to handshake-level constants. Constants are
   /// triggered by the start value of the corresponding function. The FTD
@@ -143,33 +96,16 @@ protected:
   /// merge is moved inside of the loop, and it works like a reassignment
   /// (cfr. FPGA'22, Section V.C).
   LogicalResult addRegen(ConversionPatternRewriter &rewriter,
-                         handshake::FuncOp &funcOp,
-                         FtdStoredOperations &ftdOps) const;
+                         handshake::FuncOp &funcOp) const;
 
   /// Given each pairs of producers and consumers within the circuit, the
   /// producer might create a token which is never used by the corresponding
   /// consumer, because of the control decisions. In this scenario, the token
   /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
   /// is necessary, according to FPGA'22 (IV.C and V)
-  LogicalResult addSupp(ConversionPatternRewriter &rewriter,
-                        handshake::FuncOp &funcOp,
-                        FtdStoredOperations &ftdOps) const;
-
-  /// The suppression mechanism must be used for the start token as well.
-  /// However, in the handshake IR, the signal is considered as a value, so it
-  /// cannot be handled by the prevvious `addSupp` functions. This funciton is
-  /// in charge of handling this scenario, by adding appropriate suppressions
-  /// for the start token.
-  LogicalResult addSuppStart(ConversionPatternRewriter &rewriter,
-                             handshake::FuncOp &funcOp,
-                             FtdStoredOperations &ftdOps) const;
-
-  /// Starting from the information collected by the gsa analysis pass,
-  /// instantiate some merge operations at the beginning of each block which
-  /// work as explicit phi functions.
-  LogicalResult addExplicitPhi(mlir::func::FuncOp funcOp,
-                               ConversionPatternRewriter &rewriter,
-                               FtdStoredOperations &ftdOps) const;
+  LogicalResult
+  addSupp(ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
+          ControlDependenceAnalysis::BlockControlDepsMap &cda) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

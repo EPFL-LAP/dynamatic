@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity lsq_load is
+entity load is
   generic (
     DATA_TYPE : integer;
     ADDR_TYPE : integer
@@ -28,14 +28,39 @@ entity lsq_load is
   );
 end entity;
 
-architecture arch of lsq_load is
+architecture arch of load is
 begin
-  -- data
-  dataOut           <= dataFromMem;
-  dataOut_valid     <= dataFromMem_valid;
-  dataFromMem_ready <= dataOut_ready;
-  -- addr
-  addrOut       <= addrIn;
-  addrOut_valid <= addrIn_valid;
-  addrIn_ready  <= addrOut_ready;
+  addr_tehb : entity work.tehb(arch)
+    generic map(
+      DATA_TYPE => ADDR_TYPE
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      -- input channel
+      ins       => addrIn,
+      ins_valid => addrIn_valid,
+      ins_ready => addrIn_ready,
+      -- output channel
+      outs       => addrOut,
+      outs_valid => addrOut_valid,
+      outs_ready => addrOut_ready
+    );
+
+  data_tehb : entity work.tehb(arch)
+    generic map(
+      DATA_TYPE => DATA_TYPE
+    )
+    port map(
+      clk => clk,
+      rst => rst,
+      -- input channel
+      ins       => dataFromMem,
+      ins_valid => dataFromMem_valid,
+      ins_ready => dataFromMem_ready,
+      -- output channel
+      outs       => dataOut,
+      outs_valid => dataOut_valid,
+      outs_ready => dataOut_ready
+    );
 end architecture;

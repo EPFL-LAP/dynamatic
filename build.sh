@@ -15,17 +15,19 @@ print_help_and_exit () {
 "./build.sh [options]
 
 List of options:
-  --release | -r                    : build in \"Release\" mode (default is \"Debug\")
-  --skip-polygeist <polygeist-path> : skip building POLYGEIST
-  --visual-dataflow | -v            : build visual-dataflow's C++ library
-  --export-godot | -e <godot-path>  : export the Godot project (requires engine)
-  --force | -f                      : force cmake reconfiguration in each (sub)project
-  --threads | -t <num-threads>      : number of concurrent threads to build on (by
-                                      default, one thread per logical core on the host
-                                      machine)
-  --disable-build-opt | -o          : don't use clang/lld/ccache to speed up builds
-  --check | -c                      : run tests during build
-  --help | -h                       : display this help message
+  --release | -r                       : build in \"Release\" mode (default is \"Debug\")
+  --skip-polygeist <polygeist-path>    : skip building POLYGEIST
+  --visual-dataflow | -v               : build visual-dataflow's C++ library
+  --export-godot | -e <godot-path>     : export the Godot project (requires engine)
+  --force | -f                         : force cmake reconfiguration in each (sub)project
+  --threads | -t <num-threads>         : number of concurrent threads to build on (by
+                                         default, one thread per logical core on the host
+                                         machine)
+  --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when 
+                                         building llvm (defaults to 2)
+  --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
+  --check | -c                         : run tests during build
+  --help | -h                          : display this help message
 "
     exit
 }
@@ -119,6 +121,7 @@ CMAKE_EXTRA_POLYGEIST=""
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
+LLVM_PARALLEL_LINK_JOBS=2
 BUILD_TYPE="Debug"
 BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
@@ -143,6 +146,9 @@ do
     elif [[ $PARSE_ARG == "polygeist-path" ]]; then
       POLYGEIST_DIR="$arg"
       PARSE_ARG=""
+    elif [[ $PARSE_ARG == "llvm-parallel-link-jobs" ]]; then
+      LLVM_PARALLEL_LINK_JOBS="$arg"
+      PARSE_ARG=""
     else
       case "$arg" in
           "--disable-build-opt" | "-o")
@@ -164,6 +170,9 @@ do
               ;;
           "--threads" | "-t")
               PARSE_ARG="num-threads"
+              ;;
+          "--llvm-parallel-link-jobs")
+              PARSE_ARG="llvm-parallel-link-jobs"
               ;;
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
@@ -207,6 +216,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
         -DLLVM_ENABLE_PROJECTS="mlir;clang" \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
         $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
     exit_on_fail "Failed to cmake polygeist/llvm-project"
   fi
@@ -339,7 +349,6 @@ create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
-create_symlink ../build/bin/exp-sharing-wrapper-generator
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/wlf2csv
@@ -347,6 +356,7 @@ create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
 create_generator_symlink build/bin/rtl-constant-generator-verilog
+create_generator_symlink build/bin/exp-sharing-wrapper-generator
 create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
 if [[ $GODOT_PATH != "" ]]; then
   create_symlink ../visual-dataflow/bin/visual-dataflow
