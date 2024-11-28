@@ -631,7 +631,7 @@ begin
     readyArray(1) <= nReadyArray(0);
 
     -- Predictor output valid if enabled
-    dataOutArray(0) <= data_reg;
+    dataOutArray(0) <= data_reg; -- zeros & '1';
     validArray(0) <= enable(0);
 
 end arch;
