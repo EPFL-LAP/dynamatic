@@ -253,6 +253,7 @@ class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
+  static constexpr llvm::StringLiteral ADD_SEQ_MEM = "add-seq-mem";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
 
@@ -268,6 +269,7 @@ public:
                "'fpl22' (throughput- and timing-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
+    addFlag({ADD_SEQ_MEM, "Use sequentialize memory"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -572,6 +574,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string buffers = "on-merges";
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
+  std::string addSeqMem =
+      args.flags.contains(ADD_SEQ_MEM) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -594,7 +598,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 fastTokenDelivery);
+                 fastTokenDelivery, addSeqMem);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

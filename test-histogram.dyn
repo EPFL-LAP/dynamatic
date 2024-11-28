@@ -1,0 +1,14 @@
+# Set the source file to run
+set-src ./integration-test/histogram/histogram.c
+
+compile --fast-token-delivery --add-seq-mem   
+# compile  
+
+# Generate the VHDL design corresponding to the source code
+write-hdl
+
+# Simulate and verify using Modelsim
+simulate
+
+# Exit the frontend
+exit

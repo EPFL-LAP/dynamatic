@@ -16,6 +16,7 @@ TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
+ADD_SEQ_MEM=${10}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -120,15 +121,29 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-combine-steering-logic \
-    --handshake-analyze-lsq-usage \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake with FTD" \
-    "Applied transformations to handshake with FTD"
+  if [[ $ADD_SEQ_MEM -ne 0 ]]; then
+      # handshake transformations
+      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+        --handshake-add-seq-mem \
+        --handshake-combine-steering-logic \
+        --handshake-analyze-lsq-usage\
+        --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+        --handshake-materialize --handshake-infer-basic-blocks \
+        > "$F_HANDSHAKE_TRANSFORMED"
+      exit_on_fail "Failed to apply transformations to handshake with FTD and Seq mem" \
+        "Applied transformations to handshake with FTD and Seq mem"
+  else
+      # handshake transformations
+      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+        --handshake-combine-steering-logic \
+        --handshake-analyze-lsq-usage \
+        --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+        --handshake-materialize --handshake-infer-basic-blocks \
+        > "$F_HANDSHAKE_TRANSFORMED"
+      exit_on_fail "Failed to apply transformations to handshake with FTD without Seq mem" \
+        "Applied transformations to handshake with FTD without Seq mem"
+
+  fi
 
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
