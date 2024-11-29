@@ -30,59 +30,54 @@ namespace {
 struct ProdConsMemDep {
   Block *prodBb;
   Block *consBb;
-  bool isBackward;
 
-  ProdConsMemDep(Block *prod, Block *cons, bool backward)
-      : prodBb(prod), consBb(cons), isBackward(backward) {}
-
+  ProdConsMemDep(Block *prod, Block *cons) : prodBb(prod), consBb(cons) {}
   /// Print the dependency stored in the current relationship
-  void printDependency() {
-    llvm::dbgs() << "[PROD_CONS_MEM_DEP] Dependency from [";
-    prodBb->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << "] to [";
-    consBb->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << "]";
-    if (isBackward)
-      llvm::dbgs() << " (backward)";
-    llvm::dbgs() << "\n";
-  }
+  void print();
 };
 
 /// A group represents all the memory operations belonging to the same basic
 /// block which require the same LSQ. It contains a reference to the BB, a set
 /// of predecessor in the dependence graph and a set of successors.
-struct Group {
+struct MemoryGroup {
   // The BB the group defines
   Block *bb;
 
   // List of predecessors of the group
-  DenseSet<Group *> preds;
+  DenseSet<MemoryGroup *> preds;
   // List of successors of the group
-  DenseSet<Group *> succs;
+  DenseSet<MemoryGroup *> succs;
 
   // Constructor for the group
-  Group(Block *b) : bb(b) {}
-
-  // Relationship operator between groups
-  bool operator<(const Group &other) const { return bb < other.bb; }
+  MemoryGroup(Block *b) : bb(b) {}
 
   /// Print the dependenices of the curent group
-  void printDependenices() {
-    llvm::dbgs() << "[MEM_GROUP] Group for [";
-    bb->printAsOperand(llvm::dbgs());
-    llvm::dbgs() << "]; predecessors = {";
-    for (auto &gp : preds) {
-      gp->bb->printAsOperand(llvm::dbgs());
-      llvm::dbgs() << ", ";
-    }
-    llvm::dbgs() << "}; successors = {";
-    for (auto &gp : succs) {
-      gp->bb->printAsOperand(llvm::dbgs());
-      llvm::dbgs() << ", ";
-    }
-    llvm::dbgs() << "} \n";
-  }
+  void print();
 };
+
+void ProdConsMemDep::print() {
+  llvm::dbgs() << "[PROD_CONS_MEM_DEP] Dependency from [";
+  prodBb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "] to [";
+  consBb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "]\n";
+}
+
+void MemoryGroup::print() {
+  llvm::dbgs() << "[MEM_GROUP] Group for [";
+  bb->printAsOperand(llvm::dbgs());
+  llvm::dbgs() << "]; predecessors = {";
+  for (auto &gp : preds) {
+    gp->bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << ", ";
+  }
+  llvm::dbgs() << "}; successors = {";
+  for (auto &gp : succs) {
+    gp->bb->printAsOperand(llvm::dbgs());
+    llvm::dbgs() << ", ";
+  }
+  llvm::dbgs() << "} \n";
+}
 
 /// Given a list of operations, return the list of memory dependencies for
 /// each block. This allows to build the group graph, which allows to
@@ -148,17 +143,12 @@ static SmallVector<ProdConsMemDep> identifyMemoryDependencies(
       // hold, the dependency will be added when the two blocks are analyzed
       // in the opposite direction
       if (bi.lessIndex(bbJ, bbI)) {
-
-        // and add it to the list of dependencies
-        ProdConsMemDep oneMemDep(bbJ, bbI, false);
-        allMemDeps.push_back(oneMemDep);
+        allMemDeps.push_back(ProdConsMemDep(bbJ, bbI));
 
         // If the two blocks are in the same loop, then bbI is also a
         // consumer, while bbJ is a producer. This relationship is backward.
-        if (ftd::isSameLoopBlocks(bbI, bbJ, li)) {
-          ProdConsMemDep opp(bbI, bbJ, true);
-          allMemDeps.push_back(opp);
-        }
+        if (ftd::isSameLoopBlocks(bbI, bbJ, li))
+          allMemDeps.push_back(ProdConsMemDep(bbI, bbJ));
       }
     }
   }
@@ -168,19 +158,19 @@ static SmallVector<ProdConsMemDep> identifyMemoryDependencies(
 
 /// Given a set of operations related to one LSQ and the memory dependency
 /// information among them, create a group graph.
-static DenseSet<Group *>
+static DenseSet<MemoryGroup *>
 constructGroupsGraph(SmallVector<handshake::MemPortOpInterface> &lsqOps,
                      SmallVector<ProdConsMemDep> &lsqMemDeps) {
 
-  DenseSet<Group *> groups;
+  DenseSet<MemoryGroup *> groups;
 
   //  Given the operations related to the LSQ, create a group for each of the
   //  correspondent basic block
   for (Operation *op : lsqOps) {
     Block *b = op->getBlock();
-    auto it = llvm::find_if(groups, [b](Group *g) { return g->bb == b; });
+    auto it = llvm::find_if(groups, [b](MemoryGroup *g) { return g->bb == b; });
     if (it == groups.end()) {
-      Group *g = new Group(b);
+      MemoryGroup *g = new MemoryGroup(b);
       groups.insert(g);
     }
   }
@@ -190,14 +180,14 @@ constructGroupsGraph(SmallVector<handshake::MemPortOpInterface> &lsqOps,
   // predecessors of G_j, G_j to the successors of G_i
   for (ProdConsMemDep memDep : lsqMemDeps) {
     // Find the group related to the producer
-    Group *producerGroup =
-        *llvm::find_if(groups, [&memDep](const Group *group) {
+    MemoryGroup *producerGroup =
+        *llvm::find_if(groups, [&memDep](const MemoryGroup *group) {
           return group->bb == memDep.prodBb;
         });
 
     // Find the group related to the consumer
-    Group *consumerGroup =
-        *llvm::find_if(groups, [&memDep](const Group *group) {
+    MemoryGroup *consumerGroup =
+        *llvm::find_if(groups, [&memDep](const MemoryGroup *group) {
           return group->bb == memDep.consBb;
         });
 
@@ -207,7 +197,7 @@ constructGroupsGraph(SmallVector<handshake::MemPortOpInterface> &lsqOps,
   }
 
   // Add a self dependency each time you have a group with no dependency
-  for (Group *g : groups) {
+  for (MemoryGroup *g : groups) {
     if (!g->preds.size()) {
       g->preds.insert(g);
       g->succs.insert(g);
@@ -231,7 +221,7 @@ constructGroupsGraph(SmallVector<handshake::MemPortOpInterface> &lsqOps,
 ///
 /// B -> C -> D
 static void minimizeGroupsConnections(handshake::FuncOp funcOp,
-                                      DenseSet<Group *> &groupsGraph) {
+                                      DenseSet<MemoryGroup *> &groupsGraph) {
 
   // Get the dominance info for the region
   DominanceInfo domInfo;
@@ -242,7 +232,7 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
   // whole group
   for (auto &group : groupsGraph) {
     // List of predecessors to remove
-    DenseSet<Group *> predsToRemove;
+    DenseSet<MemoryGroup *> predsToRemove;
     for (auto &bp : group->preds) {
 
       for (auto &sp : group->preds) {
@@ -269,16 +259,18 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
   }
 }
 
+/// For each element in the group, build a lazy fork and use its output to feed
+/// the correspondent input of the LSQ.
 static DenseMap<Block *, handshake::LazyForkOp>
-connectLSQToForkGraph(handshake::FuncOp &funcOp, DenseSet<Group *> &groups,
-                      handshake::LSQOp lsqOp,
+connectLSQToForkGraph(handshake::FuncOp &funcOp,
+                      DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
                       ConversionPatternRewriter &rewriter) {
 
   DenseMap<Block *, handshake::LazyForkOp> forksGraph;
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Create the fork nodes: for each group among the set of groups
-  for (Group *group : groups) {
+  for (MemoryGroup *group : groups) {
     Block *bb = group->bb;
     rewriter.setInsertionPointToStart(bb);
 
@@ -296,9 +288,15 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp, DenseSet<Group *> &groups,
   // The second output of each lazy fork must be connected to the LSQ, so that
   // they can activate the allocation for the operations of the corresponding
   // basic block
+  //
+  // For each input of the LSQ
   for (auto [opIdx, op] : llvm::enumerate(lsqOp.getOperands())) {
+    // If it is not a cmerge, then continue
     if (!llvm::isa_and_nonnull<handshake::ControlMergeOp>(op.getDefiningOp()))
       continue;
+
+    // Replace the input if it comes from a cmerge in the same block of a lazy
+    // fork of the graph
     auto cmerge = llvm::dyn_cast<handshake::ControlMergeOp>(op.getDefiningOp());
     Block *bb = cmerge->getBlock();
     if (!forksGraph.contains(bb))
@@ -309,6 +307,8 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp, DenseSet<Group *> &groups,
   return forksGraph;
 }
 
+/// Use the GSA analysis to replace each non-init merge in the IR with a
+/// multiplexer
 static LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
                                        ConversionPatternRewriter &rewriter) {
   auto startValue = (Value)funcOp.getArguments().back();
@@ -343,13 +343,14 @@ static LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
 /// inputs for each of them is exactly one. The current inputs of the lazy
 /// forks become inputs for the joins.
 static void
-joinInsertion(ConversionPatternRewriter &rewriter, DenseSet<Group *> &groups,
-              DenseMap<Block *, handshake::LazyForkOp> &forksGraph) {
+joinInsertion(ConversionPatternRewriter &rewriter,
+              const DenseSet<MemoryGroup *> &groups,
+              const DenseMap<Block *, handshake::LazyForkOp> &forksGraph) {
 
   // For each group
-  for (Group *group : groups) {
+  for (MemoryGroup *group : groups) {
     // Get the corresponding fork and operands
-    Operation *forkNode = forksGraph[group->bb];
+    Operation *forkNode = forksGraph.at(group->bb);
     ValueRange operands = forkNode->getOperands();
     // If the number of inputs is higher than one
     if (operands.size() > 1) {
@@ -365,76 +366,131 @@ joinInsertion(ConversionPatternRewriter &rewriter, DenseSet<Group *> &groups,
   }
 }
 
-LogicalResult applyStraightToQueue(handshake::FuncOp funcOp, MLIRContext *ctx) {
+/// Get all the load and store operations related to a LSQ operation
+static SmallVector<handshake::MemPortOpInterface>
+getLsqOps(handshake::FuncOp &funcOp, handshake::LSQOp lsqOp) {
+  SmallVector<handshake::MemPortOpInterface> lsqOps;
 
-  ConversionPatternRewriter rewriter(ctx);
+  for (auto memOp : funcOp.getOps<handshake::MemPortOpInterface>()) {
+    if (llvm::any_of(memOp.getAddressOutput().getUsers(),
+                     [&](Operation *user) { return user == lsqOp; }))
+      lsqOps.push_back(memOp);
+  }
 
-  llvm::dbgs() << "[INFO] Runnin S2Q\n";
+  return lsqOps;
+}
 
-  if (funcOp.getOps<handshake::LSQOp>().empty())
-    return success();
+/// Given a graph of lazy forks, connect the elements together with some proper
+/// SSA phi
+static LogicalResult
+connectForkGraph(handshake::FuncOp &funcOp,
+                 const DenseSet<MemoryGroup *> &groupsGraph,
+                 const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
+                 ConversionPatternRewriter &rewriter) {
 
   auto startValue = (Value)funcOp.getArguments().back();
 
+  // For each consumer
+  for (MemoryGroup *consumerGroup : groupsGraph) {
+
+    // Store all the inputs of the lazy fork
+    SmallVector<Value> differentInputs;
+    Operation *consumerLF = forksGraph.at(consumerGroup->bb);
+
+    // For each of its producer
+    for (MemoryGroup *producerGroup : consumerGroup->preds) {
+
+      Operation *producerLF = forksGraph.at(producerGroup->bb);
+
+      // The values to connect are the start value and the output of the
+      // producer
+      SmallVector<Value> forkValuesToConnect = {startValue,
+                                                producerLF->getResult(0)};
+
+      // Build a phi network
+      auto phiNetworkOrFailure = ftd::createPhiNetwork(
+          funcOp.getRegion(), rewriter, forkValuesToConnect);
+      if (failed(phiNetworkOrFailure))
+        return failure();
+
+      auto &phiNetwork = *phiNetworkOrFailure;
+      differentInputs.push_back(phiNetwork[consumerGroup->bb]);
+    }
+
+    // If there are no inputs, start feeds the lazy fork directly
+    if (differentInputs.size() == 0)
+      differentInputs.push_back(startValue);
+
+    // Set the operands (if more than one, a join will be instantiated)
+    consumerLF->setOperands(differentInputs);
+  }
+
+  joinInsertion(rewriter, groupsGraph, forksGraph);
+
+  return success();
+}
+
+/// Run straight to the queue
+static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
+                                          MLIRContext *ctx) {
+
+  ConversionPatternRewriter rewriter(ctx);
+
+  llvm::dbgs() << "[INFO] Connecting LSQ with Straight To The Queue\n";
+
+  // Return if there are no LSQs in the function
+  if (funcOp.getOps<handshake::LSQOp>().empty())
+    return success();
+
+  // Restore the cf structure to work on a structured IR
   if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
     return failure();
 
-  for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
-    SmallVector<handshake::MemPortOpInterface> lsqOps;
+  // For each LSQ
+  for (const handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
 
-    for (auto memOp : funcOp.getOps<handshake::MemPortOpInterface>()) {
-      if (llvm::any_of(memOp.getAddressOutput().getUsers(),
-                       [&](Operation *user) { return user == lsqOp; }))
-        lsqOps.push_back(memOp);
-    }
+    // Collect all the operations related to that LSQ
+    auto lsqOps = getLsqOps(funcOp, lsqOp);
 
+    // Get all the memory depdencies among the operations connected to the same
+    // LSQ
     auto lsqMemDeps = identifyMemoryDependencies(funcOp, lsqOps);
     for (auto &dep : lsqMemDeps)
-      dep.printDependency();
+      dep.print();
 
+    // Build a group graph out of the dependencies
     auto groupsGraph = constructGroupsGraph(lsqOps, lsqMemDeps);
+
+    // Apply group minimization techniques
     minimizeGroupsConnections(funcOp, groupsGraph);
 
     for (auto &g : groupsGraph)
-      g->printDependenices();
+      g->print();
 
+    // Build a lazy fork for each group and connect it to the related activation
+    // input in the LSQ
     auto forksGraph =
         connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, rewriter);
 
-    for (Group *consumerGroup : groupsGraph) {
-      SmallVector<Value> differentInputs;
-      Operation *consumerLF = forksGraph[consumerGroup->bb];
-      for (Group *producerGroup : consumerGroup->preds) {
-        Operation *producerLF = forksGraph[producerGroup->bb];
+    // Connect the lazy forks together through a network of merges
+    if (failed(connectForkGraph(funcOp, groupsGraph, forksGraph, rewriter)))
+      return failure();
 
-        SmallVector<Value> forkValuesToConnect = {startValue,
-                                                  producerLF->getResult(0)};
-
-        auto phiNetworkOrFailure = ftd::createPhiNetwork(
-            funcOp.getRegion(), rewriter, forkValuesToConnect);
-        if (failed(phiNetworkOrFailure))
-          return failure();
-
-        auto &phiNetwork = *phiNetworkOrFailure;
-        differentInputs.push_back(phiNetwork[consumerGroup->bb]);
-      }
-
-      if (differentInputs.size() == 0)
-        differentInputs.push_back(startValue);
-
-      consumerLF->setOperands(differentInputs);
-    }
-
-    joinInsertion(rewriter, groupsGraph, forksGraph);
+    // Delete the groups
+    for (auto *g : groupsGraph)
+      delete g;
   }
 
+  // Replace each merge created by `createPhiNetwork` with a multiplxer
   if (failed(replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 
+  // Run fast token delivery on the newly inserted operations
   experimental::ftd::addRegen(funcOp, rewriter);
   experimental::ftd::addSupp(funcOp, rewriter);
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
+  // Remove the blocks and terminators
   if (failed(cfg::flattenFunction(funcOp)))
     return failure();
 
