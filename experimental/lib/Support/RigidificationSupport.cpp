@@ -24,20 +24,15 @@ LogicalResult rigidifyChannel(Value *channel, MLIRContext *ctx) {
   builder.setInsertionPointAfter(channel->getDefiningOp());
   auto loc = channel->getLoc();
 
-  auto newUnbundleOp = builder.create<handshake::UnbundleOp>(loc, *channel);
-  Value data = newUnbundleOp.getResult(0);
-  Value control = newUnbundleOp.getResult(1);
-  handshake::ChannelType channelType = llvm::dyn_cast<handshake::ChannelType>(channel->getType());
+  auto newRigidificationOp =
+      builder.create<handshake::RigidificationOp>(loc, *channel);
 
-  auto newBundleOp = builder.create<handshake::BundleOp>(
-      loc, data, control, ValueRange(channelType.getExtraSignals()), channelType);
-
-  Value bundleRes = newBundleOp.getResult(0);
+  Value rigidificationRes = newRigidificationOp.getResult();
 
   for (auto &use : llvm::make_early_inc_range(channel->getUses())) {
-      if (use.getOwner() != newUnbundleOp) {
-          use.set(bundleRes);
-      }
+    if (use.getOwner() != newRigidificationOp) {
+      use.set(rigidificationRes);
+    }
   }
   return LogicalResult::success();
 }

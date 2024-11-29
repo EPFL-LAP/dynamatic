@@ -1326,7 +1326,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1359,7 +1359,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1476,9 +1477,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1514,7 +1515,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1822,6 +1823,452 @@ LogicalResult UnbundleOp::inferReturnTypes(
 LogicalResult UnbundleOp::verify() {
   return verifyBundlingOp(getChannelLike().getType(), getUpstreams(),
                           getSignals(), false, [&]() { return emitError(); });
+}
+
+//===----------------------------------------------------------------------===//
+// RigidificationOp
+//===----------------------------------------------------------------------===//
+// OpBuilder &odsBuilder, OperationState &odsState,
+// //                      Value ctrl, Value data, ValueRange downstreams,
+// //                      ChannelType channelType
+// void RigidificationOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+//                      Value operand) {
+//   odsState.addOperands(operand);
+//   odsState.addTypes(operand.getType());
+
+//   // Create attribute dictionary
+//   SmallVector<NamedAttribute> attributes;
+//   MLIRContext *ctx = odsState.getContext();
+//   attributes.emplace_back(StringAttr::get(ctx, TIMING_ATTR_NAME),
+//                           TimingAttr::get(ctx, timing));
+//   if (false) {
+//     attributes.emplace_back(
+//         StringAttr::get(ctx, NUM_SLOTS_ATTR_NAME),
+//         IntegerAttr::get(IntegerType::get(ctx, 32, IntegerType::Unsigned),
+//                          *numSlots));
+//   }
+
+//   odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
+//                         DictionaryAttr::get(ctx, attributes));
+// }
+
+// ParseResult RigidificationOp::parse(OpAsmParser &parser, OperationState
+// &result) {
+//   SmallVector<OpAsmParser::UnresolvedOperand, 4> signals;
+//   Type dataflowType;
+//   MLIRContext *ctx = parser.getContext();
+//   llvm::SMLoc operandLoc = parser.getCurrentLocation();
+
+//   if (parser.parseOperandList(signals) ||
+//       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon()
+//       || parser.parseKeyword("_") || parser.parseKeyword("to") ||
+//       parseHandshakeType(parser, dataflowType))
+//     return failure();
+//   result.addTypes(dataflowType);
+
+//   // Determine the type of all input signals and of all upstream signals
+//   based
+//   // on the first result's type
+//   SmallVector<Type, 4> signalTypes;
+//   llvm::TypeSwitch<Type, void>(dataflowType)
+//       .Case<ChannelType>([&](ChannelType channelType) {
+//         signalTypes.push_back(ControlType::get(ctx));
+//         signalTypes.push_back(channelType.getDataType());
+//         for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//           if (extra.downstream)
+//             signalTypes.push_back(extra.type);
+//           else
+//             result.addTypes(extra.type);
+//         }
+//       })
+//       .Case<ControlType>([&](auto) {
+//         IntegerType i1Type = IntegerType::get(ctx, 1);
+//         signalTypes.push_back(i1Type);
+//         result.addTypes(i1Type);
+//       });
+
+//   return parser.resolveOperands(signals, signalTypes, operandLoc,
+//                                 result.operands);
+// }
+
+// void BundleOp::print(OpAsmPrinter &p) {
+//   p << " " << getOperands() << " ";
+//   p.printOptionalAttrDict((*this)->getAttrs());
+//   p << " : _ to ";
+//   printHandshakeType(p, getChannelLike().getType());
+// }
+
+// /// Common verifier for `handshake::BundleOp` and `handshake::UnbundleOp`
+// /// operations, which have the same semantics. Emits an error and fails if
+// the
+// /// operation under verification has inconsistent operands/results; succeeds
+// /// otherwise.
+// static LogicalResult
+// verifyBundlingOp(Type channelLikeType, ValueRange upstreams,
+//                  ValueRange downstreams, bool isBundleOp,
+//                  function_ref<InFlightDiagnostic()> emitError) {
+//   // Define some keyword for error reporting based on whether the operation
+//   is a
+//   // bundle or unbundle
+//   StringRef downStr, upStr, actionStr;
+//   if (isBundleOp) {
+//     downStr = "operand";
+//     upStr = "result";
+//     actionStr = "bundling";
+//   } else {
+//     downStr = "result";
+//     upStr = "operand";
+//     actionStr = "unbundling";
+//   }
+
+//   if (auto channelType = dyn_cast<handshake::ChannelType>(channelLikeType)) {
+//     // The first and second downstream values must be the channel's control
+//     and
+//     // the data type, respectively
+//     if (downstreams.size() < 2) {
+//       return emitError() << "not enough " << downStr << "s, " << actionStr
+//                          << " a !handshake.channel should "
+//                             "produce at least two "
+//                          << downStr << "s";
+//     }
+//     if (!isa<handshake::ControlType>(downstreams.front().getType())) {
+//       return emitError()
+//              << "type mistmatch between expected !handshake.control type and
+//              "
+//                 "operation's first "
+//              << downStr << " (" << downstreams.front().getType() << ")";
+//     }
+//     downstreams = downstreams.drop_front();
+//     if (channelType.getDataType() != downstreams.front().getType()) {
+//       return emitError() << "type mismatch between channel's data type ("
+//                          << channelType.getDataType()
+//                          << ") and operation's second " << downStr << " ("
+//                          << downstreams.front().getType() << ")";
+//     }
+//     downstreams = downstreams.drop_front();
+
+//     // The channel's extra signals must be reflected in number and types in
+//     the
+//     // operation's operands and results depending on their direction
+//     auto downstreamIt = downstreams.begin();
+//     auto upstreamIt = upstreams.begin();
+//     for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//       auto handleExtraSignal = [&](auto &it, ValueRange values,
+//                                    StringRef valueType,
+//                                    unsigned valOffset) -> LogicalResult {
+//         if (it == values.end()) {
+//           return emitError()
+//                  << "not enough " << valueType
+//                  << "s, no value for extra signal '" << extra.name << "'";
+//         }
+//         if (extra.type != (*it).getType()) {
+//           unsigned valIdx = std::distance(values.begin(), it) + valOffset;
+//           return emitError()
+//                  << "type mismatch between extra signal '" << extra.name
+//                  << "' (" << extra.type << ") and " << valIdx << "-th "
+//                  << valueType << " (" << (*it).getType() << ")";
+//         }
+//         ++it;
+//         return success();
+//       };
+
+//       if (extra.downstream) {
+//         if (failed(handleExtraSignal(downstreamIt, downstreams, downStr, 2)))
+//           return failure();
+//       } else {
+//         if (failed(handleExtraSignal(upstreamIt, upstreams, upStr, 1)))
+//           return failure();
+//       }
+//     }
+//     if (downstreamIt != downstreams.end()) {
+//       return emitError()
+//              << "too many extra downstream values provided, expected "
+//              << std::distance(downstreams.begin(), downstreamIt) << " but got
+//              "
+//              << downstreams.size();
+//     }
+//     if (upstreamIt != upstreams.end()) {
+//       return emitError() << "too many extra upstream values provided,
+//       expected "
+//                          << std::distance(upstreams.begin(), upstreamIt)
+//                          << " but got " << upstreams.size();
+//     }
+//   } else {
+//     assert(isa<handshake::ControlType>(channelLikeType) && "expected
+//     control"); OpBuilder builder(channelLikeType.getContext()); IntegerType
+//     i1Type = builder.getIntegerType(1); if (upstreams.size() != 1 ||
+//     upstreams.front().getType() != i1Type)
+//       return emitError() << "expected single i1 " << upStr << " for ready";
+//     if (downstreams.size() != 1 || downstreams.front().getType() != i1Type)
+//       return emitError() << "expected single i1 " << downStr << " for valid";
+//   }
+
+//   return success();
+// }
+
+// void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+//                      Value ctrl, Value data, ValueRange downstreams,
+//                      ChannelType channelType) {
+//   assert(isa<handshake::ControlType>(ctrl.getType()) &&
+//          "expected !handshake.control");
+//   assert(handshake::ChannelType::isSupportedSignalType(data.getType()) &&
+//          "unsupported data type");
+//   assert(downstreams.size() == channelType.getNumDownstreamExtraSignals() &&
+//          "incorrect number of extra downstream signals");
+
+//   odsState.addOperands({ctrl, data});
+//   odsState.addOperands(downstreams);
+
+//   // The operation produces the bundled channel type as well as any upstream
+//   // signal in the channel separately (in the order in which they are
+//   declared
+//   // by the channel)
+//   odsState.addTypes(channelType);
+//   for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//     if (!extra.downstream)
+//       odsState.addTypes(extra.type);
+//   }
+// }
+
+// LogicalResult BundleOp::verify() {
+//   return verifyBundlingOp(getChannelLike().getType(), getUpstreams(),
+//                           getSignals(), true, [&]() { return emitError(); });
+// }
+
+//===----------------------------------------------------------------------===//
+// ReshapeOp
+//===----------------------------------------------------------------------===//
+
+/// Returns the total number of bits needed to carry all extra downstream
+/// signals and all extra upstream signals.
+static std::pair<unsigned, unsigned> getTotalExtraWidths(ChannelType type) {
+  unsigned totalDownWidth = 0, totalUpWidth = 0;
+  for (const ExtraSignal &extra : type.getExtraSignals()) {
+    if (extra.downstream)
+      totalDownWidth += extra.getBitWidth();
+    else
+      totalUpWidth += extra.getBitWidth();
+  }
+  return {totalDownWidth, totalUpWidth};
+}
+
+void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                      TypedValue<ChannelType> channel,
+                      bool mergeDownstreamIntoData) {
+  // Set the operands/attributes
+  MLIRContext *ctx = odsBuilder.getContext();
+  ChannelReshapeType reshapeType = mergeDownstreamIntoData
+                                       ? ChannelReshapeType::MergeData
+                                       : ChannelReshapeType::MergeExtra;
+  odsState.addAttribute("reshapeType",
+                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
+  odsState.addOperands(channel);
+
+  // All extra signals will be combined into at most one downstream combined
+  // signal and one upstream combined signal, compute their bitwidth
+  auto [totalDownWidth, totalUpWidth] = getTotalExtraWidths(channel.getType());
+
+  // The result channel type can be determined from the input channel type and
+  // reshaping type
+  SmallVector<ExtraSignal> extraSignals;
+  Type dataType = channel.getType().getDataType();
+  if (mergeDownstreamIntoData) {
+    if (totalDownWidth) {
+      unsigned dataWidth = channel.getType().getDataBitWidth();
+      dataType = odsBuilder.getIntegerType(totalDownWidth + dataWidth);
+    }
+  } else {
+    // At most a single downstream extra signal should remain
+    if (totalDownWidth != 0) {
+      extraSignals.emplace_back(
+          MERGED_DOWN_NAME, odsBuilder.getIntegerType(totalDownWidth), true);
+    }
+  }
+  // At most a single upstream extra signal should remain
+  if (totalUpWidth != 0) {
+    extraSignals.emplace_back(MERGED_UP_NAME,
+                              odsBuilder.getIntegerType(totalUpWidth), false);
+  }
+
+  odsState.addTypes(ChannelType::get(ctx, dataType, extraSignals));
+}
+
+void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                      TypedValue<ChannelType> channel,
+                      bool splitDownstreamFromData, Type reshapedType) {
+  // Set the operands/attributes
+  MLIRContext *ctx = odsBuilder.getContext();
+  ChannelReshapeType reshapeType = splitDownstreamFromData
+                                       ? ChannelReshapeType::SplitData
+                                       : ChannelReshapeType::SplitExtra;
+  odsState.addAttribute("reshapeType",
+                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
+  odsState.addOperands(channel);
+
+  // The compatibility of this type with the input will be checked in the
+  // operation's verification function
+  odsState.addTypes(reshapedType);
+}
+
+LogicalResult ReshapeOp::verify() {
+  ChannelType srcType = getChannel().getType(),
+              dstType = getReshaped().getType();
+  std::pair<unsigned, unsigned> srcExtraWidths = getTotalExtraWidths(srcType),
+                                dstExtraWidths = getTotalExtraWidths(dstType);
+
+  // Fails if the merged type has at least one extra downstream signal.
+  auto checkNoExtraDownstreamSignal = [&](bool isMerge) -> LogicalResult {
+    ChannelType type = isMerge ? dstType : srcType;
+    unsigned numSignals = type.getNumDownstreamExtraSignals();
+    if (numSignals == 0)
+      return success();
+    return emitError() << "too many extra downstream signals in the "
+                       << (isMerge ? "destination" : "source")
+                       << " type, expected 0 but got " << numSignals;
+  };
+
+  // Fails if the merged type has more than one extra signal of the specified
+  // direction, or if the single extra signal of the direction is incompatible
+  // with the split type.
+  auto checkMergedExtraSignal = [&](bool isMerge,
+                                    bool isDownstream) -> LogicalResult {
+    ChannelType type = isMerge ? dstType : srcType;
+    unsigned expectedWidth, numExtra;
+    StringRef dirStr, combinedName;
+    if (isDownstream) {
+      expectedWidth = isMerge ? srcExtraWidths.first : dstExtraWidths.first;
+      numExtra = type.getNumDownstreamExtraSignals();
+      dirStr = "downstream";
+      combinedName = MERGED_DOWN_NAME;
+    } else {
+      expectedWidth = isMerge ? srcExtraWidths.second : dstExtraWidths.second;
+      numExtra = type.getNumUpstreamExtraSignals();
+      dirStr = "uptream";
+      combinedName = MERGED_UP_NAME;
+    }
+
+    // There must be either 0 or 1 extra signal of the specified direction
+    if (numExtra == 0)
+      return success();
+    if (numExtra > 1) {
+      return emitError() << "merged channel type should have at most one "
+                         << dirStr << " signal, but got " << numExtra;
+    }
+
+    // Retrieve the single extra signal of the correct direction, then check its
+    // name, bitwidth, and type
+    const ExtraSignal &extraSignal =
+        *llvm::find_if(type.getExtraSignals(), [&](const ExtraSignal &extra) {
+          return extra.downstream == isDownstream;
+        });
+
+    if (extraSignal.name != combinedName) {
+      return emitError() << "invalid name for merged extra " << dirStr
+                         << " signal, expected '" << combinedName
+                         << "' but got '" << extraSignal.name << "'";
+    }
+    if (extraSignal.getBitWidth() != expectedWidth) {
+      return emitError() << "invalid bitwidth for merged extra " << dirStr
+                         << " signal, expected " << expectedWidth << " but got "
+                         << extraSignal.getBitWidth();
+    }
+    if (!isa<IntegerType>(extraSignal.type)) {
+      return emitError() << "invalid type for merged extra " << dirStr
+                         << " signal, expected IntegerType but got "
+                         << extraSignal.type;
+    }
+    return success();
+  };
+
+  // Fails if the merged type's data type is incompatible with the split type.
+  auto checkCompatibleDataType = [&](bool isMerge) -> LogicalResult {
+    ChannelType splitType, mergeType;
+    unsigned extraWidth;
+    if (isMerge) {
+      splitType = srcType;
+      mergeType = dstType;
+      extraWidth = srcExtraWidths.first;
+    } else {
+      splitType = dstType;
+      mergeType = srcType;
+      extraWidth = dstExtraWidths.first;
+    }
+    Type mergedDataType = mergeType.getDataType();
+
+    unsigned expectedMergedDataWidth = extraWidth + splitType.getDataBitWidth();
+    if (expectedMergedDataWidth != mergeType.getDataBitWidth()) {
+      return emitError() << "invalid merged data type bitwidth, expected "
+                         << expectedMergedDataWidth << " but got "
+                         << mergeType.getDataBitWidth();
+    }
+    if (extraWidth) {
+      if (!isa<IntegerType>(mergedDataType)) {
+        return emitError() << "invalid merged data type, expected merged "
+                              "IntegerType but got "
+                           << mergedDataType;
+      }
+    } else {
+      if (splitType.getDataType() != mergedDataType) {
+        return emitError()
+               << "invalid destination data type, expected source data type "
+               << splitType.getDataType() << " but got " << mergedDataType;
+      }
+    }
+    return success();
+  };
+
+  // Fails if the merged type's and split type's data types are different.
+  auto checkSameDataType = [&]() -> LogicalResult {
+    if (srcType.getDataType() != dstType.getDataType()) {
+      return emitError() << "reshaping in this mode should not change "
+                            "the data type, expected "
+                         << srcType.getDataType() << " but got "
+                         << dstType.getDataType();
+    }
+    return success();
+  };
+
+  switch (getReshapeType()) {
+  case ChannelReshapeType::MergeData:
+    if (failed(checkNoExtraDownstreamSignal(true)) ||
+        failed(checkMergedExtraSignal(true, false)) ||
+        failed(checkCompatibleDataType(true)))
+      return failure();
+
+    break;
+  case ChannelReshapeType::MergeExtra:
+    if (failed(checkMergedExtraSignal(true, false)) ||
+        failed(checkMergedExtraSignal(true, true)) ||
+        failed(checkSameDataType()))
+      return failure();
+    break;
+  case ChannelReshapeType::SplitData:
+    if (failed(checkNoExtraDownstreamSignal(false)) ||
+        failed(checkMergedExtraSignal(false, false)) ||
+        failed(checkCompatibleDataType(false)))
+      return failure();
+    break;
+  case ChannelReshapeType::SplitExtra:
+    if (failed(checkMergedExtraSignal(false, false)) ||
+        failed(checkMergedExtraSignal(false, true)) ||
+        failed(checkSameDataType()))
+      return failure();
+    break;
+  }
+
+  return success();
+}
+
+OpFoldResult ReshapeOp::fold(FoldAdaptor adaptor) {
+  if (getChannel().getType() == getReshaped().getType())
+    return getChannel();
+
+  Operation *defOp = getChannel().getDefiningOp();
+  if (auto reshapeOp = dyn_cast_if_present<ReshapeOp>(defOp)) {
+    if (getReshaped().getType() == reshapeOp.getChannel().getType())
+      return reshapeOp.getChannel();
+  }
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
