@@ -1,9 +1,27 @@
+# This file contains all needed functions for the LSQ generation process (VHDL)
+
 import math
 import argparse
 from configs import *
 
-# Class for signals
+#===----------------------------------------------------------------------===#
+# Global Parameter Initialization
+#===----------------------------------------------------------------------===#
+
+tabLevel = 0
+tempCount = 0
+signalInitString = ''
+portInitString   = ''
+regInitString    = ''
+library          = 'library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n'
+
+#===----------------------------------------------------------------------===#
+# VHDL Signal Definition
+#===----------------------------------------------------------------------===#
+
+#
 # std_logic bit
+#
 class Logic:
     # Signal name
     name = ''
@@ -77,7 +95,9 @@ class Logic:
             regInitString += f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n'
         regInitString += '\t\tend if;\n'
 
+#
 # std_logic_vec
+#
 class LogicVec(Logic):
     # Signal name
     name = ''
@@ -145,7 +165,9 @@ class LogicVec(Logic):
             regInitString += f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n'
         regInitString += '\t\tend if;\n'
 
-# an array of std_logic
+#
+# An array of std_logic
+#
 class LogicArray(Logic):
     length = 1
     def __init__(self, name: str, type: str = 'w', length: int = 1):
@@ -186,7 +208,9 @@ class LogicArray(Logic):
                 regInitString += f'\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n'
         regInitString += '\t\tend if;\n'
 
-# an array of std_logic vector
+#
+# An array of std_logic vector
+#
 class LogicVecArray(LogicVec):
     length = 1
     def __init__(self, name: str, type: str = 'w', length: int = 1, size: int = 1):
@@ -227,17 +251,9 @@ class LogicVecArray(LogicVec):
                 regInitString += f'\t\t\t{self.getNameRead(i)} <= {self.getNameWrite(i)};\n'
         regInitString += '\t\tend if;\n'
 
-
-
-
-def getTemp(name) -> str:
-    global tempCount
-    return f'TEMP_{tempCount}_{name}'
-
-def useTemp() -> None:
-    global tempCount
-    tempCount += 1
-
+#===----------------------------------------------------------------------===#
+# Unit Operator
+#===----------------------------------------------------------------------===#
 
 def Op(out, *list_in) -> str:
     global tabLevel
@@ -269,14 +285,23 @@ def Op(out, *list_in) -> str:
     str_ret += ';\n'
     return str_ret
 
+#===----------------------------------------------------------------------===#
+# Helper Functions
+#===----------------------------------------------------------------------===#
+
+def getTemp(name) -> str:
+    global tempCount
+    return f'TEMP_{tempCount}_{name}'
+
+def useTemp() -> None:
+    global tempCount
+    tempCount += 1
 
 def isPow2(value: int) -> bool:
     return (value & (value-1) == 0) and value != 0
 
 def log2Ceil(value: int) -> int:
     return math.ceil(math.log2(value))
-
-
 
 def WrapAdd(out, in_a, in_b, max: int) -> str:
     global tabLevel
@@ -327,8 +352,6 @@ def WrapSub(out, in_a, in_b, max: int) -> str:
             f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));\n'
     str_ret += '\t'*tabLevel + '-- WrapAdd End\n\n'
     return str_ret
-
-
 
 def RotateLogicVec(dout, din, distance, layer) -> str:
     global tabLevel
@@ -396,8 +419,6 @@ def CyclicLeftShift(dout, din, distance) -> str:
         str_ret += RotateLogicVec(dout, din, distance, distance.size-1)
     str_ret += '\t'*tabLevel + '-- Shifter End\n\n'
     return str_ret
-
-
 
 def ReduceLogicVec(dout, din, operator, length) -> str:
     global tabLevel
@@ -475,8 +496,6 @@ def Reduce(dout, din, operator, comment: bool = True) -> str:
         str_ret += '\t'*tabLevel + '-- Reduction End\n\n'
     return str_ret
 
-
-
 def IntToBits(din, size = None) -> str:
     if(size == None):
         if (din):
@@ -512,8 +531,6 @@ def MaskLess(din, size) -> str:
     if (din > size):
         raise ValueError("Unknown value!")
     return '\"' + '0'*(size-din) + '1'*din + '\"'
-
-
 
 def Mux1H(dout, din, sel, j = None) -> str:
     global tabLevel
@@ -605,8 +622,6 @@ def MuxLookUp(dout, din, sel) -> str:
     str_ret += '\t'*tabLevel + '-- MuxLookUp End\n\n'
     return str_ret
 
-
-
 def VecToArray(dout, din) -> str:
     size = din.size
     assert dout.length == size
@@ -681,8 +696,6 @@ def CyclicPriorityMasking(dout, din, base, reverse = False) -> str:
     str_ret += '\t'*tabLevel + '-- Priority Masking End\n\n'
     return str_ret
 
-
-
 def BitsToOH(dout, din) -> str:
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Bits To One-Hot Begin\n'
@@ -723,17 +736,9 @@ def OHToBits(dout, din) -> str:
     str_ret += '\t'*tabLevel + '-- One-Hot To Bits End\n\n'
     return str_ret
 
-
-
-# global parameters
-tabLevel = 0
-tempCount = 0
-signalInitString = ''
-portInitString   = ''
-regInitString    = ''
-library          = 'library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n'
-
-
+#===----------------------------------------------------------------------===#
+# Module Generator Function Definitions
+#===----------------------------------------------------------------------===#
 
 def PortToQueueDispatcher(
     path_rtl:           str,
@@ -1070,8 +1075,6 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
         file.write(regInitString + 'end architecture;\n')
     return
 
-
-
 def PortToQueueDispatcherInit(
     name:               str,
     numPorts:           int,
@@ -1225,8 +1228,6 @@ def GroupAllocatorInit(
     arch += '\t' * tabLevel + f');\n'
     tabLevel -= 1
     return arch
-
-
 
 def LSQ(path_rtl: str, name: str, configs: Configs):
 
@@ -2387,6 +2388,9 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
         file.write('begin\n' + arch + '\n')
         file.write(regInitString + 'end architecture;\n')
 
+#===----------------------------------------------------------------------===#
+# Final Module Generation
+#===----------------------------------------------------------------------===#
 
 def codeGen(path_rtl, configs):
     name = configs.name
