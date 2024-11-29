@@ -105,7 +105,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -682,6 +682,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
         addUnsigned("FIFO_DEPTH", 16);
       })
+      .Case<handshake::RigidificationOp>([&](auto) {
+        // Input bitwidth and output bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -799,7 +803,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1800,6 +1804,7 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::RigidificationOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
                     // Arith operations

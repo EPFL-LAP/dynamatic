@@ -730,6 +730,13 @@
     "module-name": "logic_not"
   },
   {
+    "name": "handshake.rigidification",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/rigidification.vhd"
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
   },
   {
