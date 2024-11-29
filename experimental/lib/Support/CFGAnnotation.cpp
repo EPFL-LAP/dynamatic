@@ -392,8 +392,8 @@ LogicalResult dynamatic::experimental::cfg::restoreCfStructure(
   return success();
 }
 
-LogicalResult dynamatic::experimental::cfg::flattenFunction(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+LogicalResult
+dynamatic::experimental::cfg::flattenFunction(handshake::FuncOp &funcOp) {
 
   // For each block, remove the terminator, which is supposed to be either a
   // cf::condBranchOp, cf::BranchOp or func::ReturnOp
@@ -404,7 +404,7 @@ LogicalResult dynamatic::experimental::cfg::flattenFunction(
       return op->emitError("Last operation of the block must be "
                            "cf::CondBranchOp, cf::BranchOp or func::ReturnOp");
     }
-    rewriter.eraseOp(op);
+    op->erase();
   }
 
   // Move each operation in the entry block
@@ -425,4 +425,17 @@ LogicalResult dynamatic::experimental::cfg::flattenFunction(
   assert(funcOp.getBlocks().size() == 1);
 
   return success();
+}
+
+void dynamatic::experimental::cfg::markBasicBlocks(
+    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+  for (auto [blockID, block] : llvm::enumerate(funcOp)) {
+    for (Operation &op : block) {
+      if (!isa<handshake::MemoryOpInterface>(op)) {
+        // Memory interfaces do not naturally belong to any block, so they do
+        // not get an attribute
+        op.setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(blockID));
+      }
+    }
+  }
 }

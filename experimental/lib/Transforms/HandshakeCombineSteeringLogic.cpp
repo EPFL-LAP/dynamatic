@@ -351,6 +351,8 @@ struct CombineBranchesSameSign
         continue;
       if (isa_and_nonnull<handshake::ConditionalBranchOp>(condUser)) {
         auto branch = cast<handshake::ConditionalBranchOp>(condUser);
+        if (branch.getConditionOperand() == condOperand)
+          continue;
         conditionBranchUsers.insert(branch);
       }
     }
@@ -362,6 +364,8 @@ struct CombineBranchesSameSign
         continue;
       if (isa_and_nonnull<handshake::ConditionalBranchOp>(dataUser)) {
         auto branch = cast<handshake::ConditionalBranchOp>(dataUser);
+        if (branch.getDataOperand() == dataOperand)
+          continue;
         if (conditionBranchUsers.contains(branch))
           redundantBranches.insert(branch);
       }
@@ -396,7 +400,7 @@ struct HandshakeCombineSteeringLogicPass
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
     patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
-                 CombineBranchesSameSign, CombineBranchesOppositeSign,
+                 // CombineBranchesSameSign, CombineBranchesOppositeSign,
                  CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();

@@ -22,7 +22,6 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Analysis/GSAAnalysis.h"
-#include "experimental/Conversion/FtdMemoryInterface.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 
@@ -60,23 +59,7 @@ protected:
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
 
-  LogicalResult
-  ftdVerifyAndCreateMemInterfaces(handshake::FuncOp &funcOp,
-                                  ConversionPatternRewriter &rewriter,
-                                  MemInterfacesInfo &memInfo) const;
-
   void exportGsaGatesInfo(handshake::FuncOp funcOp) const;
-
-  /// Given a list of operations, return the list of memory dependencies for
-  /// each block. This allows to build the group graph, which allows to
-  /// determine the dependencies between memory access inside basic blocks.
-  // Two types of hazards between the predecessors of one LSQ node:
-  // (1) WAW between 2 Store operations,
-  // (2) RAW and WAR between Load and Store operations
-  void identifyMemoryDependencies(
-      const SmallVector<handshake::MemPortOpInterface> &operations,
-      SmallVector<ProdConsMemDep> &allMemDeps, const mlir::CFGLoopInfo &li,
-      const BlockIndexing &bi) const;
 
   /// Convers arith-level constants to handshake-level constants. Constants are
   /// triggered by the start value of the corresponding function. The FTD
@@ -89,22 +72,6 @@ protected:
   /// constant triggered by the start signal of the corresponding function.
   LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
                                        handshake::FuncOp &funcOp) const;
-
-  /// When the consumer is in a loop while the producer is not, the value must
-  /// be regenerated as many times as needed. This function is in charge of
-  /// adding some merges to the network, to that this can be done. The new
-  /// merge is moved inside of the loop, and it works like a reassignment
-  /// (cfr. FPGA'22, Section V.C).
-  void addRegen(ConversionPatternRewriter &rewriter,
-                handshake::FuncOp &funcOp) const;
-
-  /// Given each pairs of producers and consumers within the circuit, the
-  /// producer might create a token which is never used by the corresponding
-  /// consumer, because of the control decisions. In this scenario, the token
-  /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
-  /// is necessary, according to FPGA'22 (IV.C and V)
-  void addSupp(ConversionPatternRewriter &rewriter,
-               handshake::FuncOp &funcOp) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE

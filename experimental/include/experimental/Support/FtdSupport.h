@@ -77,6 +77,8 @@ constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
 constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
+constexpr llvm::StringLiteral FTD_REGEN_DONE("ftd.rd");
+constexpr llvm::StringLiteral FTD_SUPP_DONE("ftd.sd");
 
 /// Recursively check weather 2 blocks belong to the same loop, starting
 /// from the inner-most loops
@@ -165,6 +167,20 @@ void addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
 void addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
                             handshake::FuncOp &funcOp, Operation *consumerOp,
                             Value operand);
+
+/// When the consumer is in a loop while the producer is not, the value must
+/// be regenerated as many times as needed. This function is in charge of
+/// adding some merges to the network, to that this can be done. The new
+/// merge is moved inside of the loop, and it works like a reassignment
+/// (cfr. FPGA'22, Section V.C).
+void addRegen(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
+
+/// Given each pairs of producers and consumers within the circuit, the
+/// producer might create a token which is never used by the corresponding
+/// consumer, because of the control decisions. In this scenario, the token
+/// must be suprressed. This function inserts a `SUPPRESS` block whenever it
+/// is necessary, according to FPGA'22 (IV.C and V)
+void addSupp(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
 
 }; // namespace ftd
 }; // namespace experimental

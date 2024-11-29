@@ -1070,3 +1070,34 @@ void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
   // a function arguement)
   insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }
+
+void ftd::addSupp(handshake::FuncOp &funcOp,
+                  ConversionPatternRewriter &rewriter) {
+
+  // Set of original operations in the IR
+  std::vector<Operation *> consumersToCover;
+  for (Operation &consumerOp : funcOp.getOps())
+    consumersToCover.push_back(&consumerOp);
+
+  for (auto *consumerOp : consumersToCover) {
+    if (consumerOp->hasAttr(ftd::FTD_SUPP_DONE))
+      continue;
+    consumerOp->setAttr(ftd::FTD_SUPP_DONE, rewriter.getUnitAttr());
+    for (auto operand : consumerOp->getOperands())
+      addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
+  }
+}
+
+void ftd::addRegen(handshake::FuncOp &funcOp,
+                   ConversionPatternRewriter &rewriter) {
+
+  // For each producer/consumer relationship
+  for (Operation &consumerOp : funcOp.getOps()) {
+    if (consumerOp.hasAttr(ftd::FTD_REGEN_DONE))
+      continue;
+    consumerOp.setAttr(ftd::FTD_REGEN_DONE, rewriter.getUnitAttr());
+    for (Value operand : consumerOp.getOperands()) {
+      addRegenOperandConsumer(rewriter, funcOp, &consumerOp, operand);
+    }
+  }
+}
