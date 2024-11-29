@@ -1,0 +1,29 @@
+{
+    "specifications" :[
+      {
+      "name":          "handshake_lsq_lsq1",
+      "dataW":         32,
+      "addrW":         10,
+      "idW":           5,
+      "numLdqEntries": 16,
+      "numStqEntries": 16,
+      "numLdPorts":    1,
+      "numStPorts":    1,
+      "numGroups":     1,
+      "numLdMem":      1,
+      "numStMem":      1,
+      "stResp":        0,
+      "gaMulti":       0,
+      "gaNumLoads":    [1],
+      "gaNumStores":   [1],
+      "gaLdOrder":     [[0]],
+      "gaLdPortIdx":   [[0]],
+      "gaStPortIdx":   [[0]],
+      "pipe0":         0,
+      "pipe1":         0,
+      "pipeComp":      0,
+      "headLag":       0
+      }
+    ]
+  }
+    
