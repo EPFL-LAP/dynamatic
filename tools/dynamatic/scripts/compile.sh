@@ -124,6 +124,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-straight-to-queue \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"

@@ -26,6 +26,17 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
   let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
 }
 
+def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
+  let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
+  let description = [{
+    "Straight to the queue" allows to allocate the basic blocks in the LSQ 
+    according to an ASAP approach rather than by following the control flow
+    relationships coming from the network of cmerges.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createStraightToQueue()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
