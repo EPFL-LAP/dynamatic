@@ -1553,10 +1553,8 @@ LogicalResult SpeculatorOp::inferReturnTypes(
     ChannelType dataOutType = ChannelType::get(context, dataInType.cast<ChannelType>().getDataType(), extraSignals);
     inferredReturnTypes.push_back(dataOutType);
   } else if (dataInType.isa<ControlType>()) {
-    inferredReturnTypes.push_back(dataInType);
-    // todo
-    // ControlType dataOutType = ControlType::get(context, extraSignals);
-    // inferredReturnTypes.push_back(dataOutType);
+    ControlType dataOutType = ControlType::get(context, extraSignals);
+    inferredReturnTypes.push_back(dataOutType);
   } else {
     // Report error
     llvm::errs() << "expected $dataIn to have type !handshake.channel or !handshake.control but got "
