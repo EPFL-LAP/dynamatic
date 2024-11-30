@@ -1543,11 +1543,27 @@ LogicalResult SpeculatorOp::inferReturnTypes(
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
 
-  inferredReturnTypes.push_back(operands.front().getType());
-
   OpBuilder builder(context);
   ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
+
+  ArrayRef<ExtraSignal> extraSignals = {ExtraSignal("spec", builder.getIntegerType(1))};
+  Type dataInType = operands.front().getType();
+  if (dataInType.isa<ChannelType>()) {
+    ChannelType dataOutType = ChannelType::get(context, dataInType.cast<ChannelType>().getDataType(), extraSignals);
+    inferredReturnTypes.push_back(dataOutType);
+  } else if (dataInType.isa<ControlType>()) {
+    inferredReturnTypes.push_back(dataInType);
+    // todo
+    // ControlType dataOutType = ControlType::get(context, extraSignals);
+    // inferredReturnTypes.push_back(dataOutType);
+  } else {
+    // Report error
+    llvm::errs() << "expected $dataIn to have type !handshake.channel or !handshake.control but got "
+                 << dataInType << "\n";
+    return failure();
+  }
+
   inferredReturnTypes.push_back(ctrlType);
   inferredReturnTypes.push_back(ctrlType);
   inferredReturnTypes.push_back(wideControlType);
