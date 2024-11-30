@@ -47,6 +47,8 @@ def ControlType : Handshake_Type<"Control", "control"> {
       natural SSA def-use relation's direction) and
     - a 1-bit ready signal going upsteam (in the opposite direction as the
       natural SSA def-use relation's direction).
+    - an optional list of named extra signals of arbitrary width and type which
+      may go downstream or upstream.
   }];
 
   let parameters = (ins ExtraSignals:$extraSignals);

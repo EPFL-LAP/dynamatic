@@ -505,6 +505,8 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let results = (outs SimpleControl:$result);
 
   let builders = [
+    // We provide a builder that doesn't require the result type
+    // because it always has no extra bits.
     OpBuilder<(ins), [{
       $_state.addTypes(ControlType::get($_builder.getContext(), {}));
     }]>
@@ -613,6 +615,11 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ArrayRef<unsigned>":$blocks, 
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
+
+  // Since the ControlType now has an argument, we can no longer omit these types.
+  // However, it is uniquely determined not to have extra bits because we are using
+  // SimpleControl, which restricts the ControlType to no extra bits.
+  // If this seems redundant, we can consider designing a custom assembly printer.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
     attr-dict `:` type($memStart) type($memEnd) type($ctrlEnd) functional-type($inputs, $outputs)
