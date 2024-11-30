@@ -159,6 +159,11 @@ class ChannelHasDataWidth<int width> : CPred<
   "($_self).getDataBitWidth() == " # width
 >;
 
+class ControlHasNumExtras<int numExtras> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ControlType>" #
+  "($_self).getNumExtraSignals() == " # numExtras
+>;
+
 class ChannelHasNumExtras<int numExtras> : CPred<
   "::mlir::cast<::dynamatic::handshake::ChannelType>" #
   "($_self).getNumExtraSignals() == " # numExtras
@@ -202,6 +207,12 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 >;
 
 def BoolChannel : IntSizedChannel<1>;
+
+def SimpleControl : TypeConstraint<
+  ControlHasNumExtras<0>,
+  "must be a `handshake::ControlType` type with no extra signals",
+  "::dynamatic::handshake::ControlType"
+>;
 
 def SimpleChannel : TypeConstraint<
   ChannelHasNumExtras<0>,

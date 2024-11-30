@@ -502,7 +502,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
     ```
   }];
 
-  let results = (outs ControlType:$result);
+  let results = (outs SimpleControl:$result);
 
   let builders = [
     OpBuilder<(ins), [{
@@ -603,10 +603,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     ```
   }];
   
-  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
+  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
+                       Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<ChannelType>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
