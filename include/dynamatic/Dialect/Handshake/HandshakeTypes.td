@@ -22,22 +22,8 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ControlType : Handshake_Type<"Control", "control"> {
-  let summary = "a control-only dataflow channel";
-  let description = [{
-    Represents a control-only dataflow channel, which is made up of
-    - a 1-bit valid signal going downstream (in the same direction as the
-      natural SSA def-use relation's direction) and
-    - a 1-bit ready signal going upsteam (in the opposite direction as the
-      natural SSA def-use relation's direction).
-  }];
-
-  let parameters = (ins);
-  let assemblyFormat = "`<` `>`";
-}
-
 def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
+  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>",
   "An optional array of extra signals for a dataflow channel"> {
   let allocator = [{
     ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
@@ -51,6 +37,42 @@ def ExtraSignals : TypeParameter<
   let convertFromStorage = [{convertExtraSignalsFromStorage($_self)}];
   let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
   let defaultValue = cppType # "()";
+}
+
+def ControlType : Handshake_Type<"Control", "control"> {
+  let summary = "a control-only dataflow channel";
+  let description = [{
+    Represents a control-only dataflow channel, which is made up of
+    - a 1-bit valid signal going downstream (in the same direction as the
+      natural SSA def-use relation's direction) and
+    - a 1-bit ready signal going upsteam (in the opposite direction as the
+      natural SSA def-use relation's direction).
+  }];
+
+  let parameters = (ins ExtraSignals:$extraSignals);
+  let builders = [
+    TypeBuilder<(ins),
+      [{
+        return ControlType::get($_ctxt, {});
+      }]>
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    /// Returns the number of extra signals.
+    unsigned getNumExtraSignals() const {
+      return getExtraSignals().size();
+    }
+
+    /// Returns the number of downstream extra signals.
+    unsigned getNumDownstreamExtraSignals() const;
+
+    /// Returns the number of upstream extra signals.
+    unsigned getNumUpstreamExtraSignals() const {
+      return getNumExtraSignals() - getNumDownstreamExtraSignals();
+    }
+  }];
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel"> {

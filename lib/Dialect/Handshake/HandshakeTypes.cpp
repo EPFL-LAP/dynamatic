@@ -17,6 +17,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -27,39 +28,24 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-//===----------------------------------------------------------------------===//
-// ChannelType
-//===----------------------------------------------------------------------===//
-
-unsigned dynamatic::handshake::getHandshakeTypeBitWidth(Type type) {
-  return llvm::TypeSwitch<Type, unsigned>(type)
-      .Case<handshake::ControlType>([](auto) { return 0; })
-      .Case<handshake::ChannelType>(
-          [](ChannelType channelType) { return channelType.getDataBitWidth(); })
-      .Case<IntegerType, FloatType>(
-          [](Type type) { return type.getIntOrFloatBitWidth(); })
-      .Default([](Type type) {
-        llvm_unreachable("unsupported type");
-        return 0;
-      });
-}
-
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
-/// Checks the validity of a channel's data type.
-static LogicalResult
-checkChannelData(function_ref<InFlightDiagnostic()> emitError, Type dataType) {
-  if (!ChannelType::isSupportedSignalType(dataType)) {
-    return emitError()
-           << "expected data type to be IntegerType or FloatType, but got "
-           << dataType;
+static void printExtraSignals(AsmPrinter &odsPrinter,
+                              llvm::ArrayRef<ExtraSignal> extraSignals) {
+  auto printSignal = [&](const ExtraSignal &signal) {
+    odsPrinter << signal.name << ": " << signal.type;
+    if (!signal.downstream)
+      odsPrinter << " (" << UPSTREAM_SYMBOL << ")";
+  };
+
+  // Print all signals enclosed in square brackets
+  odsPrinter << ", [";
+  for (const ExtraSignal &signal : extraSignals.drop_back()) {
+    printSignal(signal);
+    odsPrinter << ", ";
   }
-  if (dataType.getIntOrFloatBitWidth() == 0) {
-    return emitError()
-           << "expected data type to have strictly positive bitwidth, but got "
-           << dataType;
-  }
-  return success();
+  printSignal(extraSignals.back());
+  odsPrinter << "]";
 }
 
 /// Checks the validity of a channel's extra signals.
@@ -99,24 +85,10 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
-static Type parseChannelAfterLess(AsmParser &odsParser) {
-  FailureOr<Type> dataType;
+static std::optional<SmallVector<ExtraSignal>>
+parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
+                  AsmParser &odsParser) {
   FailureOr<SmallVector<ExtraSignal::Storage>> extraSignalsStorage;
-
-  function_ref<InFlightDiagnostic()> emitError = [&]() {
-    return odsParser.emitError(odsParser.getCurrentLocation());
-  };
-
-  // Parse variable 'dataType'
-  dataType = FieldParser<Type>::parse(odsParser);
-  if (failed(dataType)) {
-    odsParser.emitError(odsParser.getCurrentLocation(),
-                        "failed to parse ChannelType parameter 'dataType' "
-                        "which is to be a Type");
-    return nullptr;
-  }
-  if (failed(checkChannelData(emitError, *dataType)))
-    return nullptr;
 
   // Parse variable 'extraSignals'
   extraSignalsStorage = [&]() -> FailureOr<SmallVector<ExtraSignal::Storage>> {
@@ -153,12 +125,8 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     odsParser.emitError(odsParser.getCurrentLocation(),
                         "failed to parse ChannelType parameter 'extraSignals' "
                         "which is to be a ArrayRef<ExtraSignal>");
-    return nullptr;
-  }
-
-  // Parse literal '>'
-  if (odsParser.parseGreater())
     return {};
+  }
 
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
@@ -166,9 +134,110 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage)
     extraSignals.emplace_back(signalStorage);
   if (failed(checkChannelExtra(emitError, extraSignals)))
+    return {};
+  return extraSignals;
+}
+
+//===----------------------------------------------------------------------===//
+// ControlType
+//===----------------------------------------------------------------------===//
+
+void ControlType::print(AsmPrinter &odsPrinter) const {
+  odsPrinter << "<";
+  if (!getExtraSignals().empty()) {
+    printExtraSignals(odsPrinter, getExtraSignals());
+  }
+  odsPrinter << ">";
+}
+
+Type ControlType::parse(AsmParser &odsParser) {
+  // Parse literal '<'
+  if (odsParser.parseLess())
+    return {};
+
+  function_ref<InFlightDiagnostic()> emitError = [&]() {
+    return odsParser.emitError(odsParser.getCurrentLocation());
+  };
+
+  std::optional<SmallVector<ExtraSignal>> extraSignals =
+      parseExtraSignals(emitError, odsParser);
+  if (!extraSignals.has_value())
+    return {};
+  // Parse literal '>'
+  if (odsParser.parseGreater())
+    return {};
+
+  return ControlType::get(odsParser.getContext(), extraSignals.value());
+}
+
+unsigned ControlType::getNumDownstreamExtraSignals() const {
+  return llvm::count_if(getExtraSignals(), [](const ExtraSignal &extra) {
+    return extra.downstream;
+  });
+}
+
+//===----------------------------------------------------------------------===//
+// ChannelType
+//===----------------------------------------------------------------------===//
+
+unsigned dynamatic::handshake::getHandshakeTypeBitWidth(Type type) {
+  return llvm::TypeSwitch<Type, unsigned>(type)
+      .Case<handshake::ControlType>([](auto) { return 0; })
+      .Case<handshake::ChannelType>(
+          [](ChannelType channelType) { return channelType.getDataBitWidth(); })
+      .Case<IntegerType, FloatType>(
+          [](Type type) { return type.getIntOrFloatBitWidth(); })
+      .Default([](Type type) {
+        llvm_unreachable("unsupported type");
+        return 0;
+      });
+}
+
+/// Checks the validity of a channel's data type.
+static LogicalResult
+checkChannelData(function_ref<InFlightDiagnostic()> emitError, Type dataType) {
+  if (!ChannelType::isSupportedSignalType(dataType)) {
+    return emitError()
+           << "expected data type to be IntegerType or FloatType, but got "
+           << dataType;
+  }
+  if (dataType.getIntOrFloatBitWidth() == 0) {
+    return emitError()
+           << "expected data type to have strictly positive bitwidth, but got "
+           << dataType;
+  }
+  return success();
+}
+
+static Type parseChannelAfterLess(AsmParser &odsParser) {
+  FailureOr<Type> dataType;
+
+  function_ref<InFlightDiagnostic()> emitError = [&]() {
+    return odsParser.emitError(odsParser.getCurrentLocation());
+  };
+
+  // Parse variable 'dataType'
+  dataType = FieldParser<Type>::parse(odsParser);
+  if (failed(dataType)) {
+    odsParser.emitError(odsParser.getCurrentLocation(),
+                        "failed to parse ChannelType parameter 'dataType' "
+                        "which is to be a Type");
+    return nullptr;
+  }
+  if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
-  return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
+  std::optional<SmallVector<ExtraSignal>> extraSignals =
+      parseExtraSignals(emitError, odsParser);
+  if (!extraSignals.has_value())
+    return nullptr;
+
+  // Parse literal '>'
+  if (odsParser.parseGreater())
+    return {};
+
+  return ChannelType::get(odsParser.getContext(), *dataType,
+                          extraSignals.value());
 }
 
 Type ChannelType::parse(AsmParser &odsParser) {
@@ -182,21 +251,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
   odsPrinter.printStrippedAttrOrType(getDataType());
   if (!getExtraSignals().empty()) {
-    auto printSignal = [&](const ExtraSignal &signal) {
-      odsPrinter << signal.name << ": " << signal.type;
-      if (!signal.downstream)
-        odsPrinter << " (" << UPSTREAM_SYMBOL << ")";
-    };
-
-    // Print all signals enclosed in square brackets
-    odsPrinter << ", [";
-    for (const ExtraSignal &signal : getExtraSignals().drop_back()) {
-      printSignal(signal);
-      odsPrinter << ", ";
-    }
-    printSignal(getExtraSignals().back());
-    odsPrinter << "]";
-    ;
+    printExtraSignals(odsPrinter, getExtraSignals());
   }
   odsPrinter << ">";
 }
