@@ -503,8 +503,14 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   }];
 
   let results = (outs ControlType:$result);
+
+  let builders = [
+    OpBuilder<(ins), [{
+      $_state.addTypes(ControlType::get($_builder.getContext(), {}));
+    }]>
+  ];
   
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -609,7 +615,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   let hasVerifier = 1;
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` functional-type($inputs, $outputs)
+    attr-dict `:` type($memStart) type($memEnd) type($ctrlEnd) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
