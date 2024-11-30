@@ -28,11 +28,11 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
-
 //===----------------------------------------------------------------------===//
 // Common implementations for ControlType and ChannelType
 //===----------------------------------------------------------------------===//
+
+static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
 /// Print the extra signals to generate an IR representation.
 /// For example: [spec: i1, tag: i32]
