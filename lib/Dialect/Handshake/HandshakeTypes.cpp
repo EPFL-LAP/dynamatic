@@ -30,6 +30,13 @@ using namespace dynamatic::handshake;
 
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
+//===----------------------------------------------------------------------===//
+// Common implementations for ControlType and ChannelType
+//===----------------------------------------------------------------------===//
+
+/// Print the extra signals to generate an IR representation.
+/// For example: [spec: i1, tag: i32]
+/// This function is common to both ControlType and ChannelType.
 static void printExtraSignals(AsmPrinter &odsPrinter,
                               llvm::ArrayRef<ExtraSignal> extraSignals) {
   auto printSignal = [&](const ExtraSignal &signal) {
@@ -85,6 +92,10 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+/// Parse the extra signals from the IR representation.
+/// For example: [spec: i1, tag: i32]
+/// This function is common to both ControlType and ChannelType.
+/// TODO: Is this proper to use std::optional for error handling?
 static std::optional<SmallVector<ExtraSignal>>
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser) {
