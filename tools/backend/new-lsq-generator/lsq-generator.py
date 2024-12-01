@@ -42,7 +42,6 @@ class LSQWrapper:
         self.signal_init_str = ''
         self.port_init_str = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
         self.reg_init_str = '\tprocess (clk, rst) is\n' + '\tbegin\n'
-        self.arch = ''
         
         # Define the final output string
         self.lsq_wrapper_str = "\n\n"
@@ -125,17 +124,98 @@ class LSQWrapper:
         io_ldData_bits = VHDLLogicVecTypeArray('io_ldData_bits', 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW)
         self.lsq_wrapper_str += io_ldData_bits.signalInit()
         
+        ### io_stAddr_ready: output
+        io_stAddr_ready = VHDLLogicTypeArray('io_stAddr_ready', 'o', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stAddr_ready.signalInit()
+        
+        ### io_stAddr_valid: input
+        io_stAddr_valid = VHDLLogicTypeArray('io_stAddr_valid', 'i', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stAddr_valid.signalInit()
+        
+        ### io_stAddr_bits: input
+        io_stAddr_bits = VHDLLogicVecTypeArray('io_stAddr_bits', 'i', self.lsq_config.numStPorts, self.lsq_config.addrW)
+        self.lsq_wrapper_str += io_stAddr_bits.signalInit()
+        
+        ### io_stData_ready: output
+        io_stData_ready = VHDLLogicTypeArray('io_stData_ready', 'o', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stData_ready.signalInit()
+        
+        ### io_stData_valid: input
+        io_stData_valid = VHDLLogicTypeArray('io_stData_valid', 'i', self.lsq_config.numStPorts)
+        self.lsq_wrapper_str += io_stData_valid.signalInit()
+        
+        ### io_stData_bits: input
+        io_stData_bits = VHDLLogicVecTypeArray('io_stData_bits', 'i', self.lsq_config.numStPorts, self.lsq_config.dataW)
+        self.lsq_wrapper_str += io_stData_bits.signalInit()
+        
+        ### io_memStart_ready: output
+        io_memStart_ready = VHDLLogicType('io_memStart_ready', 'o')
+        self.lsq_wrapper_str += io_memStart_ready.signalInit()
+        
+        ### io_memStart_valid: input
+        io_memStart_valid = VHDLLogicType('io_memStart_valid', 'i')
+        self.lsq_wrapper_str += io_memStart_valid.signalInit()
+        
+        ### io_ctrlEnd_ready: output
+        io_ctrlEnd_ready = VHDLLogicType('io_ctrlEnd_ready', 'o')
+        self.lsq_wrapper_str += io_ctrlEnd_ready.signalInit()
+        
+        ### io_ctrlEnd_valid: input
+        io_ctrlEnd_valid = VHDLLogicType('io_ctrlEnd_valid', 'i')
+        self.lsq_wrapper_str += io_ctrlEnd_valid.signalInit()
+        
+        ### io_memEnd_ready: input
+        io_memEnd_ready = VHDLLogicType('io_memEnd_ready', 'i')
+        self.lsq_wrapper_str += io_memEnd_ready.signalInit()
+        
+        ### io_memEnd_valid: output
+        io_memEnd_valid = VHDLLogicType('io_memEnd_valid', 'o')
+        self.lsq_wrapper_str += io_memEnd_valid.signalInit()
+        
+        ##
         ## IO Definition finished
+        ##
+        self.lsq_wrapper_str += '\n\t);'
         self.lsq_wrapper_str += '\nend entity;\n\n'
         
+        ##
+        ## Architecture definition start
+        ##
+        self.lsq_wrapper_str += f'architecture arch of {self.lsq_name} is\n'
+        
+        ### Define internal signals
+        rreq_ready = VHDLLogicTypeArray("rreq_ready", 'w', self.lsq_config.numLdMem)
+        self.lsq_wrapper_str += rreq_ready.signalInit()
+        
+        rresp_valid = VHDLLogicTypeArray("rresp_valid", 'w', self.lsq_config.numLdMem)
+        self.lsq_wrapper_str += rresp_valid.signalInit()
+        
+        rresp_id = VHDLLogicVecTypeArray("rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW)
+        self.lsq_wrapper_str += rresp_id.signalInit()
+        
+        wreq_ready = VHDLLogicTypeArray('wreq_ready', 'w', self.lsq_config.numStMem)
+        self.lsq_wrapper_str += wreq_ready.signalInit()
+        
+        wresp_valid = VHDLLogicTypeArray('wresp_valid', 'w', self.lsq_config.numStMem)
+        self.lsq_wrapper_str += wresp_valid.signalInit()
+        
+        wresp_id = VHDLLogicVecTypeArray("wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW)
+        self.lsq_wrapper_str += wresp_id.signalInit()
+        
+        rreq_id = VHDLLogicVecTypeArray("rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW)
+        self.lsq_wrapper_str += rreq_id.signalInit()
+        
+        wreq_id = VHDLLogicVecTypeArray("wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW)
+        self.lsq_wrapper_str += wreq_id.signalInit()
+        
+        ### Begin actual arch logic definition
+        self.lsq_wrapper_str += "begin\n"
+        
+        
+        # End module definition
+        self.lsq_wrapper_str += "end architecture;\n"
+        
         return self.lsq_wrapper_str
-        
-        
-        
-        
-        
-    
-    
 
 #===----------------------------------------------------------------------===#
 # Main Function
@@ -154,8 +234,8 @@ def main():
     lsqConfigsList = GetConfigs(args.config_files)
     
     # STEP 1: Generate the desired core lsq logic
-    for lsqConfigs in lsqConfigsList:
-        codeGen(args.output_path, lsqConfigs)
+    # for lsqConfigs in lsqConfigsList:
+        # codeGen(args.output_path, lsqConfigs)
         
     # STEP 2: Generate the wrapper to be connected with circuits generated by Dynamatic
     lsq_wrapper_module = LSQWrapper(args.output_path, '_wrapper', lsqConfigsList[0])
