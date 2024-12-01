@@ -215,11 +215,11 @@ class VHDLLogicTypeArray(VHDLLogicType):
     
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
-        return VHDLLogicType.getNameRead(self, f'{i}')
+        return VHDLLogicType.getNameRead(self)
     
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
-        return VHDLLogicType.getNameWrite(self, f'{i}')
+        return VHDLLogicType.getNameWrite(self)
         
     def signalInit(self):
         """We return all the definitions as a string
@@ -233,7 +233,7 @@ class VHDLLogicTypeArray(VHDLLogicType):
     
     def __getitem__(self, i) -> VHDLLogicType:
         assert i in range(0, self.length)
-        return VHDLLogicType(self.name + f'{i}', self.type)
+        return VHDLLogicType(self.name, self.type)
     
     def regInit(self, enable = None, init = None):
         assert(self.type == 'r')
@@ -281,15 +281,15 @@ class VHDLLogicVecTypeArray(VHDLLogicVecType):
     
     def getNameRead(self, i, j = None) -> str:
         assert i in range(0, self.length)
-        return VHDLLogicVecType.getNameRead(self, i, f'{i}')
+        return VHDLLogicVecType.getNameRead(self, i)
     
     def getNameWrite(self, i, j = None) -> str:
         assert i in range(0, self.length)
-        return VHDLLogicVecType.getNameWrite(self, j, f'{i}')
+        return VHDLLogicVecType.getNameWrite(self, j)
     
     def __getitem__(self, i) -> VHDLLogicVecType:
         assert i in range(0, self.length)
-        return VHDLLogicVecType(self.name + f'{i}', self.type, self.size)
+        return VHDLLogicVecType(self.name, self.type, self.size)
         
     def signalInit(self):
         sig_init_str = ''
@@ -325,6 +325,35 @@ class VHDLLogicVecTypeArray(VHDLLogicVecType):
         reg_init_str += '\t\tend if;\n'
         
         return reg_init_str
+
+def OpTab(out, tabLevel, *list_in) -> str:
+    if type(out) == tuple:
+        if len(out) == 2:
+            str_ret = '\t'*tabLevel + f'{out[0].getNameWrite(out[1])} <='
+        else:
+            str_ret = '\t'*tabLevel + f'{out[0].getNameWrite(out[1], out[2])} <='
+    else:
+        str_ret = '\t'*tabLevel + f'{out.getNameWrite()} <='
+        if (type(out) == VHDLLogicType):
+            size = 1
+        else:
+            size = out.size
+    for arg in list_in:
+        if type(arg) == str:
+            str_ret += ' ' + arg
+        elif type(arg) == int:
+            str_ret += ' ' + IntToBits(arg, size)
+        elif type(arg) == tuple:
+            if type(arg[0]) == int:
+                str_ret += ' ' + IntToBits(arg[0], arg[1])
+            elif len(arg) == 2:
+                str_ret += ' ' + arg[0].getNameRead(arg[1])
+            else:
+                str_ret += ' ' + arg[0].getNameRead(arg[1], arg[2])
+        else:
+            str_ret += ' ' + arg.getNameRead()
+    str_ret += ';\n'
+    return str_ret
 
 #===----------------------------------------------------------------------===#
 # Helper Function

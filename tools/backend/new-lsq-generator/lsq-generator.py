@@ -208,8 +208,76 @@ class LSQWrapper:
         wreq_id = VHDLLogicVecTypeArray("wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW)
         self.lsq_wrapper_str += wreq_id.signalInit()
         
-        ### Begin actual arch logic definition
+        ## Begin actual arch logic definition
         self.lsq_wrapper_str += "begin\n"
+        
+        ### Define the process to update
+        ### rreq_ready, rresp_valid
+        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        self.lsq_wrapper_str += "\t-- Process for rreq_ready, rresp_valid and rresp_id\n"
+        self.lsq_wrapper_str += self.reg_init_str
+        self.lsq_wrapper_str += "\t" * 2 + "if rst = '1' then\n"
+        
+        for i in range(self.lsq_config.numLdMem):
+            self.lsq_wrapper_str += OpTab(rreq_ready[i], 3, '\'0\'')    
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], 3, '\'0\'')
+            self.lsq_wrapper_str += OpTab(rresp_id[i], 3, 
+                                          '(', 'others', '>=', '\'0\'', ')')
+        
+        self.lsq_wrapper_str += "\t" * 2 + "elsif rising_edge(clk) then\n"
+        
+        for i in range(self.lsq_config.numLdMem):
+            self.lsq_wrapper_str += OpTab(rreq_ready[i], 3, '\'1\'')
+            
+        self.lsq_wrapper_str += "\n" + '\t' * 3 + "if " + io_loadEn.getNameWrite() + " = '1' then\n"
+        
+        for i in range(self.lsq_config.numLdMem):
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], 4, '\'1\'')
+            self.lsq_wrapper_str += OpTab(rresp_id[i], 4, rreq_id[i])
+        
+        self.lsq_wrapper_str += '\t' * 3 + "else\n"
+        
+        for i in range(self.lsq_config.numLdMem):
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], 4, '\'0\'')
+            
+        self.lsq_wrapper_str += '\t' * 3 + "end if\n" + '\t' * 2 + "end if\n" + '\tend process;\n'
+        
+        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        
+        ### Define the process to update
+        ### wreq_ready, wresp_valid, wresp_id
+        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        self.lsq_wrapper_str += "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
+        self.lsq_wrapper_str += self.reg_init_str
+        self.lsq_wrapper_str += "\t" * 2 + "if rst = '1' then\n"
+        
+        for i in range(self.lsq_config.numStMem):
+            self.lsq_wrapper_str += OpTab(wreq_ready[i], 3, '\'0\'')    
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], 3, '\'0\'')
+            self.lsq_wrapper_str += OpTab(wresp_id[i], 3, 
+                                          '(', 'others', '>=', '\'0\'', ')')
+        
+        self.lsq_wrapper_str += "\t" * 2 + "elsif rising_edge(clk) then\n"
+        
+        for i in range(self.lsq_config.numStMem):
+            self.lsq_wrapper_str += OpTab(wreq_ready[i], 3, '\'1\'')
+            
+        self.lsq_wrapper_str += "\n" + '\t' * 3 + "if " + io_storeEn.getNameWrite() + " = '1' then\n"
+        
+        for i in range(self.lsq_config.numStMem):
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], 4, '\'1\'')
+            self.lsq_wrapper_str += OpTab(wresp_id[i], 4, rreq_id[i])
+        
+        self.lsq_wrapper_str += '\t' * 3 + "else\n"
+        
+        for i in range(self.lsq_config.numStMem):
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], 4, '\'0\'')
+            
+        self.lsq_wrapper_str += '\t' * 3 + "end if\n" + '\t' * 2 + "end if\n" + '\tend process;\n'
+        
+        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        
+        ### Instantiate the LSQ module
         
         
         # End module definition
