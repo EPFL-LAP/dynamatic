@@ -3,6 +3,7 @@
 import math
 import argparse
 from configs import *
+from utils import *
 
 #===----------------------------------------------------------------------===#
 # Global Parameter Initialization
@@ -496,42 +497,6 @@ def Reduce(dout, din, operator, comment: bool = True) -> str:
         str_ret += '\t'*tabLevel + '-- Reduction End\n\n'
     return str_ret
 
-def IntToBits(din, size = None) -> str:
-    if(size == None):
-        if (din):
-            return '\'1\''
-        else:
-            return '\'0\''
-    else:
-        str_ret = '\"'
-        for i in range(0, size):
-            if (din % 2 == 0):
-                str_ret = '0' + str_ret
-            else:
-                str_ret = '1' + str_ret
-            din = din // 2
-        str_ret = '\"' + str_ret
-        if (din != 0):
-            raise ValueError("Unknown value!")
-        return str_ret
-
-def Zero(size) -> str:
-    if (size == None):
-        return '\'0\''
-    else:
-        return '\"' + '0' * size + '\"'
-
-def GetValue(row, i) -> int:
-    if (len(row) > i):
-        return row[i]
-    else:
-        return 0
-
-def MaskLess(din, size) -> str:
-    if (din > size):
-        raise ValueError("Unknown value!")
-    return '\"' + '0'*(size-din) + '1'*din + '\"'
-
 def Mux1H(dout, din, sel, j = None) -> str:
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Mux1H Begin\n'
@@ -821,7 +786,7 @@ def PortToQueueDispatcher(
     portInitString += '\n\t);'
 
     # Write to the file
-    with open(path_rtl + name + '.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -918,7 +883,7 @@ def QueueToPortDispatcher(
     portInitString += '\n\t);'
 
     # Write to the file
-    with open(path_rtl + name + '.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -1063,7 +1028,7 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
         regInitString = ''
 
     # Write to the file
-    with open(path_rtl + name + '.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -2377,7 +2342,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     regInitString  += '\tend process;\n'
 
     # Write to the file
-    with open(path_rtl + name + '.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
     # with open(name + '.vhd', 'w') as file:
         file.write(library)
         file.write(f'entity {name} is\n')
@@ -2395,7 +2360,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
 def codeGen(path_rtl, configs):
     name = configs.name
     # empty the file
-    file = open(path_rtl + name + '.vhd', 'w').close()
+    file = open(f'{path_rtl}/{name}.vhd', 'w').close()
     # Group Allocator
     GroupAllocator(path_rtl, name, '_ga', configs)
     # Load Address Port Dispatcher
@@ -2420,7 +2385,8 @@ def codeGen(path_rtl, configs):
             configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW
         )
 
-    LSQ(path_rtl, name, configs)
+    # Change the name of the following module to lsq_core
+    LSQ(path_rtl, name + '_core', configs)
 
 if __name__ == '__main__':
     # Parse the arguments
@@ -2430,7 +2396,7 @@ if __name__ == '__main__':
     parser.add_argument('--spec-file', '-s', required = True, dest='path_configs', default = '', type = str)
     args = parser.parse_args()
     path_configs = args.path_configs
-    path_rtl     = args.path_rtl + '/'
+    path_rtl     = args.path_rtl
 
     # Read the configuration file
     # path_configs = './configs/test_new.json'
