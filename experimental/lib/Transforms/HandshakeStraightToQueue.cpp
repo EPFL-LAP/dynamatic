@@ -436,8 +436,6 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
 
   ConversionPatternRewriter rewriter(ctx);
 
-  llvm::dbgs() << "[INFO] Connecting LSQ with Straight To The Queue\n";
-
   // Return if there are no LSQs in the function
   if (funcOp.getOps<handshake::LSQOp>().empty())
     return success();
