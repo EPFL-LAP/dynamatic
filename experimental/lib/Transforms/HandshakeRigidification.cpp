@@ -56,30 +56,18 @@ struct HandshakeRigidificationPass
     mod->walk([&](Operation *op) {
       auto name = op->getName();
       llvm::errs() << name.getIdentifier().str() << "\n";
-      for (auto ch : op->getResults()) {
-        Type opType = ch.getType();
-        // TODO: add support for control channels
-        if (llvm::dyn_cast<handshake::ChannelType>(opType)) {
-          llvm::errs() << "   " << opType << "\n";
-          rigidifyChannel(&ch, ctx);
-        }
+        for (auto ch : op->getResults()) {
+          bool is_mem = false;
+          for (auto &use : llvm::make_early_inc_range(ch.getUses()))
+            if (isa<handshake::LSQOp, handshake::MemoryControllerOp>(use.getOwner()))
+              is_mem = true;
+          Type resType = ch.getType();
+          if (llvm::dyn_cast<handshake::ChannelType>(resType) && !is_mem) {
+            rigidifyChannel(&ch, ctx);
+          }
       }
     });
 
-    llvm::errs() << "\n\n\n\n";
-
-    mod->walk([&](Operation *op) {
-      auto name = op->getName();
-      llvm::errs() << name.getIdentifier().str() << "\n";
-      for (auto ch : op->getResults()) {
-        Type opType = ch.getType();
-        // TODO: add support for control channels
-        if (llvm::dyn_cast<handshake::ChannelType>(opType)) {
-          llvm::errs() << "   " << opType << "\n";
-          // rigidifyChannel(&ch, ctx);
-        }
-      }
-    });
 
     // MLIRContext *ctx = &getContext();
 
