@@ -14,7 +14,7 @@
 #include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/HandshakeSupport.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"

@@ -12,7 +12,6 @@
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -20,8 +19,6 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -240,8 +237,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
-  if (failed(gsa::GSAAnalysis::addGsaGates(lowerFuncOp.getRegion(), rewriter,
-                                           gsaAnalysis, startValueBackedge)))
+  if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
+                         startValueBackedge)))
     return failure();
 
   // First lower the parent function itself, without modifying its body

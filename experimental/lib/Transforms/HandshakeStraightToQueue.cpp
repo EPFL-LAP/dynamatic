@@ -14,8 +14,6 @@
 
 #include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Backedge.h"
-#include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Support/LogicalResult.h"
@@ -307,38 +305,6 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp,
   return forksGraph;
 }
 
-/// Use the GSA analysis to replace each non-init merge in the IR with a
-/// multiplexer
-static LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
-                                       ConversionPatternRewriter &rewriter) {
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // Create a backedge for the start value, to be sued during the merges to
-  // muxes conversion
-  BackedgeBuilder edgeBuilderStart(rewriter, funcOp.getRegion().getLoc());
-  Backedge startValueBackedge =
-      edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
-
-  // For each merge that was signed with the `NEW_PHI` attribute, substitute
-  // it with its GSA equivalent
-  for (handshake::MergeOp merge : funcOp.getOps<handshake::MergeOp>()) {
-    if (!merge->hasAttr(ftd::NEW_PHI))
-      continue;
-    gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
-    if (failed(gsa::GSAAnalysis::addGsaGates(funcOp.getRegion(), rewriter, gsa,
-                                             startValueBackedge, false)))
-      return failure();
-
-    // Get rid of the merge
-    rewriter.eraseOp(merge);
-  }
-
-  // Replace the backedge
-  startValueBackedge.setValue(startValue);
-
-  return success();
-}
-
 /// Allocate some joins in front of each lazy fork, so that the number of
 /// inputs for each of them is exactly one. The current inputs of the lazy
 /// forks become inputs for the joins.
@@ -480,7 +446,7 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   }
 
   // Replace each merge created by `createPhiNetwork` with a multiplxer
-  if (failed(replaceMergeToGSA(funcOp, rewriter)))
+  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 
   // Run fast token delivery on the newly inserted operations

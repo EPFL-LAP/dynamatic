@@ -15,13 +15,14 @@
 #ifndef DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 #define DYNAMATIC_ANALYSIS_GSAANALYSIS_H
 
-#include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/HandshakeSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
 #include <utility>
+#include <variant>
 
 namespace dynamatic {
 namespace experimental {
@@ -167,14 +168,6 @@ public:
 
   /// Deallocates all the gates created.
   ~GSAAnalysis();
-
-  /// Starting from the information collected by the gsa analysis pass,
-  /// instantiate some merge operations at the beginning of each block which
-  /// work as explicit phi functions.
-  static LogicalResult addGsaGates(Region &region,
-                                   ConversionPatternRewriter &rewriter,
-                                   const GSAAnalysis &gsa, Backedge startValue,
-                                   bool removeTerminators = true);
 
 private:
   /// Keep track of the original operation the analysis was run on

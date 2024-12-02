@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   StdProfiler.cpp
+  HandshakeSupport.cpp
   HandshakeSimulator.cpp
   FtdSupport.cpp
   CFGAnnotation.cpp
