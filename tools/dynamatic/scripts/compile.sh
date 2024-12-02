@@ -118,7 +118,6 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
     --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"

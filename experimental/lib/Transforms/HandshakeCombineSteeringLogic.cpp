@@ -219,6 +219,36 @@ struct RemoveDoubleSinkBranches
   }
 };
 
+static DenseSet<handshake::ConditionalBranchOp>
+findRedundantBranches(Value condOperand, Value dataOperand,
+                      handshake::ConditionalBranchOp originalBranch) {
+  DenseSet<handshake::ConditionalBranchOp> condUsers;
+  DenseSet<handshake::ConditionalBranchOp> redundantBranches;
+
+  // Get all the users of the condition operand, and keep the branches only
+  for (auto *condUser : condOperand.getUsers()) {
+    if (condUser == originalBranch)
+      continue;
+    if (auto br = dyn_cast<handshake::ConditionalBranchOp>(condUser); br) {
+      if (br.getConditionOperand() == condOperand)
+        condUsers.insert(br);
+    }
+  }
+
+  // Check if one of the branch users of the data input was also a user of
+  // the condition input: in this case, the branch is redundant
+  for (auto *dataUser : dataOperand.getUsers()) {
+    if (dataUser == originalBranch)
+      continue;
+    if (auto br = dyn_cast<handshake::ConditionalBranchOp>(dataUser); br) {
+      if (br.getDataOperand() == dataOperand && condUsers.contains(br))
+        redundantBranches.insert(br);
+    }
+  }
+
+  return redundantBranches;
+}
+
 /// Remove branches which have the same data operands but opposite condition
 /// operand
 struct CombineBranchesOppositeSign
@@ -229,68 +259,25 @@ struct CombineBranchesOppositeSign
 
     Value dataOperand = condBranchOp.getDataOperand();
     Value condOperand = condBranchOp.getConditionOperand();
-    DenseSet<handshake::ConditionalBranchOp> conditionBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> dataBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> redundantBranches;
 
-    bool searchForANot = false;
-    Value actualCondOperand = condOperand;
-
-    if (isa_and_nonnull<handshake::NotOp>(condOperand.getDefiningOp()))
-      actualCondOperand = condOperand.getDefiningOp()->getOperand(0);
-    else
-      searchForANot = true;
-
-    if (!searchForANot) {
-      for (auto *condUser : actualCondOperand.getUsers()) {
-        if (isa_and_nonnull<handshake::ConditionalBranchOp>(condUser)) {
-          auto br = cast<handshake::ConditionalBranchOp>(condUser);
-          if (condUser == condBranchOp)
-            continue;
-          conditionBranchUsers.insert(br);
-        }
-      }
-    } else {
-      // Do not directly store all users of the condition; rather, store the
-      // Branch users of any NOT that is itself a user of the condition
-      for (auto *condUser : actualCondOperand.getUsers()) {
-        if (!isa_and_nonnull<handshake::NotOp>(condUser))
-          continue;
-        handshake::NotOp notOp = cast<handshake::NotOp>(condUser);
-        for (auto *notOpUser : notOp.getResult().getUsers()) {
-          if (!isa_and_nonnull<handshake::ConditionalBranchOp>(notOpUser))
-            continue;
-          auto br = cast<handshake::ConditionalBranchOp>(notOpUser);
-          conditionBranchUsers.insert(br);
-        }
-      }
-    }
-
-    for (auto *dataUser : dataOperand.getUsers()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(dataUser)) {
-        if (dataUser == condBranchOp)
-          continue;
-        dataBranchUsers.insert(cast<handshake::ConditionalBranchOp>(dataUser));
-      }
-    }
-
-    if (conditionBranchUsers.empty() || dataBranchUsers.empty())
+    if (!isa_and_nonnull<handshake::NotOp>(condOperand.getDefiningOp()))
       return failure();
 
-    // Find the redundant branches
-    for (auto br : dataBranchUsers)
-      if (conditionBranchUsers.find(br) != conditionBranchUsers.end())
-        redundantBranches.insert(br);
+    condOperand = condOperand.getDefiningOp()->getOperand(0);
 
+    auto redundantBranches =
+        findRedundantBranches(condOperand, dataOperand, condBranchOp);
+
+    // Nothing to erase
     if (redundantBranches.empty())
       return failure();
 
-    // Erase the redundant branches
+    // Erase the redundant branch
     for (auto br : redundantBranches) {
-      rewriter.replaceAllUsesWith(br.getTrueResult(),
-                                  condBranchOp.getFalseResult());
       rewriter.replaceAllUsesWith(br.getFalseResult(),
                                   condBranchOp.getTrueResult());
+      rewriter.replaceAllUsesWith(br.getTrueResult(),
+                                  condBranchOp.getFalseResult());
       rewriter.eraseOp(br);
     }
 
@@ -342,34 +329,9 @@ struct CombineBranchesSameSign
 
     Value dataOperand = condBranchOp.getDataOperand();
     Value condOperand = condBranchOp.getConditionOperand();
-    DenseSet<handshake::ConditionalBranchOp> conditionBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> redundantBranches;
 
-    // Get all the users of the condition operand, and keep the branches only
-    for (auto *condUser : condOperand.getUsers()) {
-      if (condUser == condBranchOp)
-        continue;
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(condUser)) {
-        auto branch = cast<handshake::ConditionalBranchOp>(condUser);
-        if (branch.getConditionOperand() == condOperand)
-          continue;
-        conditionBranchUsers.insert(branch);
-      }
-    }
-
-    // Check if one of the branch users of the data input was also a user of
-    // the condition input: in this case, the branch is redundant
-    for (auto *dataUser : dataOperand.getUsers()) {
-      if (dataUser == condBranchOp)
-        continue;
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(dataUser)) {
-        auto branch = cast<handshake::ConditionalBranchOp>(dataUser);
-        if (branch.getDataOperand() == dataOperand)
-          continue;
-        if (conditionBranchUsers.contains(branch))
-          redundantBranches.insert(branch);
-      }
-    }
+    auto redundantBranches =
+        findRedundantBranches(condOperand, dataOperand, condBranchOp);
 
     // Nothing to erase
     if (redundantBranches.empty())
@@ -400,7 +362,7 @@ struct HandshakeCombineSteeringLogicPass
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
     patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
-                 // CombineBranchesSameSign, CombineBranchesOppositeSign,
+                 CombineBranchesSameSign, CombineBranchesOppositeSign,
                  CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
