@@ -786,7 +786,7 @@ def PortToQueueDispatcher(
     portInitString += '\n\t);'
 
     # Write to the file
-    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}_core.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -883,7 +883,7 @@ def QueueToPortDispatcher(
     portInitString += '\n\t);'
 
     # Write to the file
-    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}_core.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -1028,7 +1028,7 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
         regInitString = ''
 
     # Write to the file
-    with open(f'{path_rtl}/{name}.vhd', 'a') as file:
+    with open(f'{path_rtl}/{name}_core.vhd', 'a') as file:
         file.write('\n\n')
         file.write(library)
         file.write(f'entity {name + suffix} is\n')
@@ -2396,28 +2396,28 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
 def codeGen(path_rtl, configs):
     name = configs.name
     # empty the file
-    file = open(f'{path_rtl}/{name}.vhd', 'w').close()
+    file = open(f'{path_rtl}/{name}_core.vhd', 'w').close()
     # Group Allocator
-    GroupAllocator(path_rtl, name, '_ga', configs)
+    GroupAllocator(path_rtl, name, '_core_ga', configs)
     # Load Address Port Dispatcher
-    PortToQueueDispatcher(path_rtl, name, '_lda',
+    PortToQueueDispatcher(path_rtl, name, '_core_lda',
         configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW
     )
     # Load Data Port Dispatcher
-    QueueToPortDispatcher(path_rtl, name, '_ldd',
+    QueueToPortDispatcher(path_rtl, name, '_core_ldd',
         configs.numLdPorts, configs.numLdqEntries, configs.dataW, configs.ldpAddrW
     )
     # Store Address Port Dispatcher
-    PortToQueueDispatcher(path_rtl, name, '_sta',
+    PortToQueueDispatcher(path_rtl, name, '_core_sta',
         configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW
     )
     # Store Data Port Dispatcher
-    PortToQueueDispatcher(path_rtl, name, '_std',
+    PortToQueueDispatcher(path_rtl, name, '_core_std',
         configs.numStPorts, configs.numStqEntries, configs.dataW, configs.stpAddrW
     )
     # Store Backward Port Dispatcher
     if configs.stResp:
-        QueueToPortDispatcher(path_rtl, name, '_stb',
+        QueueToPortDispatcher(path_rtl, name, '_core_stb',
             configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW
         )
 

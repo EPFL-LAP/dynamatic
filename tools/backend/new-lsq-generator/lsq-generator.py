@@ -216,31 +216,31 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         self.lsq_wrapper_str += "\t-- Process for rreq_ready, rresp_valid and rresp_id\n"
         self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * 2 + "if rst = '1' then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if rst = '1' then\n"
         
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], 3, '\'0\'')    
-            self.lsq_wrapper_str += OpTab(rresp_valid[i], 3, '\'0\'')
-            self.lsq_wrapper_str += OpTab(rresp_id[i], 3, 
+            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), '\'0\'')    
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], (self.tab_level + 2), '\'0\'')
+            self.lsq_wrapper_str += OpTab(rresp_id[i], (self.tab_level + 2), 
                                           '(', 'others', '>=', '\'0\'', ')')
         
-        self.lsq_wrapper_str += "\t" * 2 + "elsif rising_edge(clk) then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clk) then\n"
         
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], 3, '\'1\'')
+            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), '\'1\'')
             
-        self.lsq_wrapper_str += "\n" + '\t' * 3 + "if " + io_loadEn.getNameWrite() + " = '1' then\n"
+        self.lsq_wrapper_str += "\n" + '\t' * (self.tab_level + 2) + "if " + io_loadEn.getNameWrite() + " = '1' then\n"
         
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i], 4, '\'1\'')
-            self.lsq_wrapper_str += OpTab(rresp_id[i], 4, rreq_id[i])
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], (self.tab_level + 3), '\'1\'')
+            self.lsq_wrapper_str += OpTab(rresp_id[i], (self.tab_level + 3), rreq_id[i])
         
-        self.lsq_wrapper_str += '\t' * 3 + "else\n"
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + "else\n"
         
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i], 4, '\'0\'')
+            self.lsq_wrapper_str += OpTab(rresp_valid[i], (self.tab_level + 3), '\'0\'')
             
-        self.lsq_wrapper_str += '\t' * 3 + "end if\n" + '\t' * 2 + "end if\n" + '\tend process;\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + "end if;\n" + '\t' * 2 + "end if;\n" + '\tend process;\n'
         
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         
@@ -249,89 +249,93 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         self.lsq_wrapper_str += "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
         self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * 2 + "if rst = '1' then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if rst = '1' then\n"
         
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], 3, '\'0\'')    
-            self.lsq_wrapper_str += OpTab(wresp_valid[i], 3, '\'0\'')
-            self.lsq_wrapper_str += OpTab(wresp_id[i], 3, 
+            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), '\'0\'')    
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], (self.tab_level + 2), '\'0\'')
+            self.lsq_wrapper_str += OpTab(wresp_id[i], (self.tab_level + 2), 
                                           '(', 'others', '>=', '\'0\'', ')')
         
-        self.lsq_wrapper_str += "\t" * 2 + "elsif rising_edge(clk) then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clk) then\n"
         
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], 3, '\'1\'')
+            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), '\'1\'')
             
-        self.lsq_wrapper_str += "\n" + '\t' * 3 + "if " + io_storeEn.getNameWrite() + " = '1' then\n"
+        self.lsq_wrapper_str += "\n" + '\t' * (self.tab_level + 2) + "if " + io_storeEn.getNameWrite() + " = '1' then\n"
         
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i], 4, '\'1\'')
-            self.lsq_wrapper_str += OpTab(wresp_id[i], 4, rreq_id[i])
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], (self.tab_level + 3), '\'1\'')
+            self.lsq_wrapper_str += OpTab(wresp_id[i], (self.tab_level + 3), rreq_id[i])
         
-        self.lsq_wrapper_str += '\t' * 3 + "else\n"
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + "else\n"
         
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i], 4, '\'0\'')
+            self.lsq_wrapper_str += OpTab(wresp_valid[i], (self.tab_level + 3), '\'0\'')
             
-        self.lsq_wrapper_str += '\t' * 3 + "end if\n" + '\t' * 2 + "end if\n" + '\tend process;\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + "end if;\n" + '\t' * 2 + "end if;\n" + '\tend process;\n'
         
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         
         ###
         ### Instantiate the LSQ_core module
         ###
-        self.lsq_wrapper_str += '\t' * 1 + f'{self.lsq_name}_core : entity work.{self.lsq_name}_core\n'
-        self.lsq_wrapper_str += '\t' * 2 + f'port map(\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level) + f'{self.lsq_name}_core : entity work.{self.lsq_name}_core\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 1) + f'port map(\n'
         
-        self.lsq_wrapper_str += '\t' * 3 + f'rst => rst,\n'
-        self.lsq_wrapper_str += '\t' * 3 + f'clk => clk,\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rst => rst,\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'clk => clk,\n'
         
-        self.lsq_wrapper_str += '\t' * 3 + f'wreq_data_0_o => {io_storeData.getNameWrite()},\n'
-        self.lsq_wrapper_str += '\t' * 3 + f'wreq_addr_0_o => {io_storeAddr.getNameWrite()},\n'
-        self.lsq_wrapper_str += '\t' * 3 + f'wreq_valid_0_o => {io_storeEn.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_data_0_o => {io_storeData.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_addr_0_o => {io_storeAddr.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_valid_0_o => {io_storeEn.getNameWrite()},\n'
         
-        self.lsq_wrapper_str += '\t' * 3 + f'rresp_data_0_i => {io_loadData.getNameRead()},\n'
-        self.lsq_wrapper_str += '\t' * 3 + f'rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n'
-        self.lsq_wrapper_str += '\t' * 3 + f'rreq_valid_0_o => {io_loadEn.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rresp_data_0_i => {io_loadData.getNameRead()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_valid_0_o => {io_loadEn.getNameWrite()},\n'
         
         for i in range(self.lsq_config.numGroups):
-            self.lsq_wrapper_str += '\t' * 3 + f'group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'group_init_valid_{i}_i => {io_ctrl_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'group_init_valid_{i}_i => {io_ctrl_valid[i].getNameRead()},\n'
             
         for i in range(self.lsq_config.numLdPorts):   
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_addr_ready_{i}_o => {io_ldAddr_ready[i].getNameWrite()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_addr_valid_{i}_i => {io_ldAddr_valid[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_addr_{i}_i => {io_ldAddr_bits[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_addr_ready_{i}_o => {io_ldAddr_ready[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_addr_valid_{i}_i => {io_ldAddr_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_addr_{i}_i => {io_ldAddr_bits[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n'
             
         for i in range(self.lsq_config.numStPorts):
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_addr_valid_{i}_i => {io_stAddr_valid[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_addr_{i}_i => {io_stAddr_bits[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_addr_valid_{i}_i => {io_stAddr_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_addr_{i}_i => {io_stAddr_bits[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n'
             
         ### Define all AXI ports, we assume there is only 1 channel
         for i in range(self.lsq_config.numLdMem):  
-            self.lsq_wrapper_str += '\t' * 3 + f'rreq_ready_{i}_i => {rreq_ready[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'rresp_valid_{i}_i => {rresp_valid[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'rresp_id_{i}_i => {rresp_id[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'rreq_id_0_o => {rreq_id[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_ready_{i}_i => {rreq_ready[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rresp_valid_{i}_i => {rresp_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rresp_id_{i}_i => {rresp_id[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_id_0_o => {rreq_id[i].getNameWrite()},\n'
             
         for i in range(self.lsq_config.numStMem):  
-            self.lsq_wrapper_str += '\t' * 3 + f'wreq_ready_{i}_i => {wreq_ready[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'wresp_valid_{i}_i => {wresp_valid[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'wresp_id_{i}_i => {wresp_id[i].getNameRead()},\n'
-            self.lsq_wrapper_str += '\t' * 3 + f'wreq_id_{i}_o => {wreq_id[i].getNameWrite()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_ready_{i}_i => {wreq_ready[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wresp_valid_{i}_i => {wresp_valid[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wresp_id_{i}_i => {wresp_id[i].getNameRead()},\n'
+            self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_id_{i}_o => {wreq_id[i].getNameWrite()}\n'
             
-        self.lsq_wrapper_str += '\t' * 2 + ");\n"
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 1) + ");\n"
     
         # End module definition
         self.lsq_wrapper_str += "end architecture;\n" 
         
+        # Write to the file
+        with open(f'{self.output_folder}/{self.lsq_name}.vhd', 'w') as file:
+            file.write(self.lsq_wrapper_str)
+            
         return self.lsq_wrapper_str
 
 #===----------------------------------------------------------------------===#
@@ -351,8 +355,8 @@ def main():
     lsqConfigsList = GetConfigs(args.config_files)
     
     # STEP 1: Generate the desired core lsq logic
-    # for lsqConfigs in lsqConfigsList:
-    #     codeGen(args.output_path, lsqConfigs)
+    for lsqConfigs in lsqConfigsList:
+        codeGen(args.output_path, lsqConfigs)
         
     # STEP 2: Generate the wrapper to be connected with circuits generated by Dynamatic
     lsq_wrapper_module = LSQWrapper(args.output_path, '_wrapper', lsqConfigsList[0])
