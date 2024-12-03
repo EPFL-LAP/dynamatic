@@ -730,32 +730,6 @@ static void insertDirectSuppression(
   BoolExpression *fCons =
       enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
 
-  // The condition related to the select signal of the consumer mux must be
-  // added if the following conditions hold: The consumer is a mux; The
-  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
-  // from the producer) is a data input.
-  if (llvm::isa<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
-      consumer->getOperand(0) != connection &&
-      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock) {
-
-    auto selectOperand = consumer->getOperand(0);
-    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        bi.getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
-
-    // The condition must be taken into account for `fCons` only if the
-    // producer is not control dependent from the block which produces the
-    // condition of the mux
-    if (!prodControlDeps.contains(selectOperand.getParentBlock())) {
-      if (consumer->getOperand(1) == connection)
-        fCons = BoolExpression::boolAnd(fCons,
-                                        selectOperandCondition->boolNegate());
-      else
-        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
-    }
-  }
-
   /// f_supp = f_prod and not f_cons
   BoolExpression *fSup = BoolExpression::boolAnd(fProd, fCons->boolNegate());
   fSup = fSup->boolMinimize();
@@ -773,7 +747,62 @@ static void insertDirectSuppression(
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), ftd::getBranchResultTypes(connection.getType()),
         branchCond, connection);
-    consumer->replaceUsesOfWith(connection, branchOp.getFalseResult());
+
+    // Take into account the possiblity of a mux to get the condition input also
+    // as data input. In this case, a branch needs to be created, but only the
+    // corresponding data input is affected. The conditions below take into
+    // account this possibility.
+    for (auto &use : connection.getUses()) {
+      if (use.getOwner() != consumer)
+        continue;
+      if (llvm::isa<handshake::MuxOp>(consumer) && use.getOperandNumber() == 0)
+        continue;
+      use.set(branchOp.getFalseResult());
+    }
+    connection = branchOp.getFalseResult();
+  }
+
+  // The condition related to the select signal of the consumer mux must be
+  // added if the following conditions hold: The consumer is a mux; The
+  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
+  // from the producer) is a data input.
+  if (llvm::isa<handshake::MuxOp>(consumer) &&
+      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
+      (consumer->getOperand(1) == connection ||
+       consumer->getOperand(2) == connection) &&
+      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
+      consumer->getBlock() != producerBlock) {
+
+    auto selectOperand = consumer->getOperand(0);
+    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
+        bi.getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
+
+    // The condition must be taken into account for `fCons` only if the
+    // producer is not control dependent from the block which produces the
+    // condition of the mux
+    if (!prodControlDeps.contains(selectOperand.getParentBlock())) {
+      if (consumer->getOperand(1) == connection)
+        selectOperandCondition = selectOperandCondition->boolNegate();
+
+      std::set<std::string> blocks = selectOperandCondition->getVariables();
+      std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
+      BDD *bdd = buildBDD(selectOperandCondition, cofactorList);
+      Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
+
+      rewriter.setInsertionPointToStart(consumer->getBlock());
+      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getBranchResultTypes(connection.getType()),
+          branchCond, connection);
+
+      for (auto &use : connection.getUses()) {
+        if (use.getOwner() != consumer)
+          continue;
+        if (llvm::isa<handshake::MuxOp>(consumer) &&
+            use.getOperandNumber() == 0)
+          continue;
+        use.set(branchOp.getTrueResult());
+      }
+    }
   }
 }
 
