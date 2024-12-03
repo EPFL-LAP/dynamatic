@@ -65,7 +65,7 @@ void NewPlacementFinder::findCommitsTraversal(
       //   placements.addSaveCommit(dstOpOperand);
       //   placements.eraseSave(dstOpOperand);
       // } else if (isa<handshake::StoreOpInterface>(succOp)) {
-      if (isa<handshake::StoreOpInterface>(succOp)) {
+      if (isa<handshake::StoreOp>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {
@@ -73,7 +73,7 @@ void NewPlacementFinder::findCommitsTraversal(
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::MemoryControllerOp>(succOp)) {
         if (dstOpOperand.getOperandNumber() == 2 &&
-            !isa<handshake::MCLoadOp>(currOp)) {
+            !isa<handshake::LoadOp>(currOp)) {
           // A commit is needed in front of the memory controller
           // On the operand indicating the number of stores
           placements.addCommit(dstOpOperand);
@@ -316,7 +316,9 @@ void NewPlacementFinder::addUndirectedEdge(
 }
 
 void NewPlacementFinder::markDontPlaces() {
-  std::cerr << "number of commits: " << placements.getPlacements<handshake::SpecCommitOp>().size() << "\n";
+  std::cerr << "number of commits: "
+            << placements.getPlacements<handshake::SpecCommitOp>().size()
+            << "\n";
   for (auto *commitOperand :
        placements.getPlacements<handshake::SpecCommitOp>()) {
     if (directlyReachableCommits.contains(commitOperand)) {

@@ -104,7 +104,7 @@ LogicalResult PlacementFinder::findSavePositions() {
             continue;
 
           // tmp
-          if (isa<handshake::MCStoreOp>(operand.getOwner()))
+          if (isa<handshake::StoreOp>(operand.getOwner()))
             continue;
 
           placements.addSave(operand);
@@ -138,7 +138,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // consecutive Commit-Save units.
         placements.addSaveCommit(dstOpOperand);
         placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::StoreOpInterface>(succOp)) {
+      } else if (isa<handshake::StoreOp>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {
@@ -146,7 +146,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::MemoryControllerOp>(succOp)) {
         if (dstOpOperand.getOperandNumber() == 2 &&
-            !isa<handshake::MCLoadOp>(currOp)) {
+            !isa<handshake::LoadOp>(currOp)) {
           // A commit is needed in front of the memory controller
           // On the operand indicating the number of stores
           placements.addCommit(dstOpOperand);
