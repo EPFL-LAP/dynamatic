@@ -25,8 +25,8 @@ func.func @retunMultipleValues(%arg0 : i32, %arg1 : i1, %arg2 : index) -> (i32, 
 // CHECK-LABEL:   handshake.func @multipleReturns(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: !handshake.channel<i1>,
 // CHECK-SAME:                                    %[[VAL_1:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["in0", "start"], resNames = ["out0", "end"]} {
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 0 : i32} : <i32>
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 1 : i32} : <i32>
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = cond_br %[[VAL_0]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_0]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_0]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <i32>
@@ -51,8 +51,8 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 
 // CHECK-LABEL:   handshake.func @memoryConnect(
 // CHECK-SAME:                                  %[[VAL_0:.*]]: !handshake.channel<i1>, %[[VAL_1:.*]]: memref<4xi32>, %[[VAL_2:.*]]: memref<4xi32>, %[[VAL_3:.*]]: !handshake.control<>, %[[VAL_4:.*]]: !handshake.control<>, %[[VAL_5:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["in0", "mem0", "mem1", "mem0_start", "mem1_start", "start"], resNames = ["out0", "mem0_end", "mem1_end", "end"]} {
-// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_5]] {handshake.bb = 0 : ui32, value = 0 : i32} : <i32>
-// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_5]] {handshake.bb = 0 : ui32, value = 1 : i32} : <i32>
+// CHECK:           %[[VAL_6:.*]] = constant %[[VAL_5]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_7:.*]] = constant %[[VAL_5]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_0]], %[[VAL_6]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_0]], %[[VAL_5]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_0]], %[[VAL_7]] {handshake.bb = 0 : ui32} : <i1>, <i32>
