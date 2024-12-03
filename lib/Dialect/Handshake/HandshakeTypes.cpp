@@ -187,6 +187,14 @@ unsigned ControlType::getNumDownstreamExtraSignals() const {
   });
 }
 
+FailureOr<ExtraSignal> ControlType::getExtraSignalByName(std::string name) {
+  for (const ExtraSignal &extra : getExtraSignals()) {
+    if (extra.name == name)
+      return extra;
+  }
+  return failure();
+}
+
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//
@@ -287,6 +295,14 @@ unsigned ChannelType::getNumDownstreamExtraSignals() const {
 
 unsigned ChannelType::getDataBitWidth() const {
   return getDataType().getIntOrFloatBitWidth();
+}
+
+FailureOr<ExtraSignal> ChannelType::getExtraSignalByName(std::string name) {
+  for (const ExtraSignal &extra : getExtraSignals()) {
+    if (extra.name == name)
+      return extra;
+  }
+  return failure();
 }
 
 Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
