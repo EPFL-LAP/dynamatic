@@ -138,8 +138,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // consecutive Commit-Save units.
         placements.addSaveCommit(dstOpOperand);
         placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOp,
-                     handshake::StoreOp>(succOp)) {
+      } else if (isa<handshake::StoreOpInterface>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {
@@ -374,6 +373,7 @@ LogicalResult PlacementFinder::findPlacements() {
   clearPlacements();
 
   return failure(failed(findSavePositions()) || failed(findCommitPositions()));
-  // return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
+  // return failure(failed(findSavePositions()) || failed(findCommitPositions())
+  // ||
   //                failed(findSaveCommitPositions()));
 }
