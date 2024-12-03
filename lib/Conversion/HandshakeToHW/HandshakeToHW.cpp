@@ -36,6 +36,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -55,6 +56,19 @@ using namespace dynamatic::handshake;
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
+// Makes all extra signals signless IntegerType's of the same width as the
+// original type.
+static SmallVector<ExtraSignal>
+lowerExtraSignals(llvm::ArrayRef<ExtraSignal> extraSignals) {
+  SmallVector<ExtraSignal> newExtraSignals;
+  for (const ExtraSignal &extra : extraSignals) {
+    unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+    Type newType = IntegerType::get(extra.type.getContext(), extraWidth);
+    newExtraSignals.emplace_back(extra.name, newType, extra.downstream);
+  }
+  return newExtraSignals;
+}
+
 /// Makes all (nested) types signless IntegerType's of the same width as the
 /// original type. At the HW/RTL level we treat everything as opaque bitvectors,
 /// so we no longer want to differentiate types of the same width w.r.t. their
@@ -67,19 +81,20 @@ static Type lowerType(Type type) {
         Type dataType = IntegerType::get(type.getContext(), width);
 
         // Make sure all extra signals are signless IntegerType's as well
-        SmallVector<ExtraSignal> extraSignals;
-        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
-          Type newType = IntegerType::get(type.getContext(), extraWidth);
-          extraSignals.emplace_back(extra.name, newType, extra.downstream);
-        }
+        SmallVector<ExtraSignal> extraSignals =
+            lowerExtraSignals(channelType.getExtraSignals());
         return handshake::ChannelType::get(dataType, extraSignals);
       })
       .Case<FloatType, IntegerType>([](auto type) {
         unsigned width = type.getIntOrFloatBitWidth();
         return IntegerType::get(type.getContext(), width);
       })
-      .Case<handshake::ControlType>([](auto type) { return type; })
+      .Case<handshake::ControlType>([](handshake::ControlType type) {
+        // Make sure all extra signals are signless IntegerType's
+        SmallVector<ExtraSignal> extraSignals =
+            lowerExtraSignals(type.getExtraSignals());
+        return handshake::ControlType::get(type.getContext(), extraSignals);
+      })
       .Default([](auto type) { return nullptr; });
 }
 
