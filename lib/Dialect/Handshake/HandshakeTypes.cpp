@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -19,10 +20,14 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/JSON.h"
 #include <cctype>
+#include <iostream>
+#include <ostream>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -59,8 +64,10 @@ static void printExtraSignals(AsmPrinter &odsPrinter,
 static LogicalResult
 checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
                   const ArrayRef<ExtraSignal> &extraSignals) {
+  std::cerr << "checkChannelExtra" << std::endl;
   DenseSet<StringRef> names;
   for (const ExtraSignal &extra : extraSignals) {
+    std::cerr << "extra.name: " << extra.name.data() << std::endl;
     if (auto [_, newName] = names.insert(extra.name); !newName) {
       return emitError() << "expected all signal names to be unique but '"
                          << extra.name << "' appears more than once";
@@ -95,40 +102,36 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 /// Parse the extra signals from the IR representation.
 /// For example: [spec: i1, tag: i32]
 /// This function is common to both ControlType and ChannelType.
-/// TODO: Is this proper to use std::optional for error handling?
-static std::optional<SmallVector<ExtraSignal>>
+static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
-                  AsmParser &odsParser) {
+                  AsmParser &odsParser,
+                  SmallVector<ExtraSignal> &extraSignals) {
   FailureOr<SmallVector<ExtraSignal::Storage>> extraSignalsStorage;
 
   // Parse variable 'extraSignals'
   extraSignalsStorage = [&]() -> FailureOr<SmallVector<ExtraSignal::Storage>> {
     SmallVector<ExtraSignal::Storage> storage;
 
-    if (!odsParser.parseOptionalComma()) {
-      auto parseSignal = [&]() -> ParseResult {
-        auto &signal = storage.emplace_back();
+    auto parseSignal = [&]() -> ParseResult {
+      auto &signal = storage.emplace_back();
 
-        if (odsParser.parseKeywordOrString(&signal.name) ||
-            odsParser.parseColon() || odsParser.parseType(signal.type))
-          return failure();
-
-        // Attempt to parse the optional upstream symbol
-        if (!odsParser.parseOptionalLParen()) {
-          std::string upstreamSymbol;
-          if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
-              upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
-            return failure();
-          signal.downstream = false;
-        }
-        return success();
-      };
-
-      if (odsParser.parseLSquare() ||
-          odsParser.parseCommaSeparatedList(parseSignal) ||
-          odsParser.parseRSquare())
+      if (odsParser.parseKeywordOrString(&signal.name) ||
+          odsParser.parseColon() || odsParser.parseType(signal.type))
         return failure();
-    }
+
+      // Attempt to parse the optional upstream symbol
+      if (!odsParser.parseOptionalLParen()) {
+        std::string upstreamSymbol;
+        if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
+            upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
+          return failure();
+        signal.downstream = false;
+      }
+      return success();
+    };
+
+    if (odsParser.parseCommaSeparatedList(parseSignal))
+      return failure();
 
     return storage;
   }();
@@ -136,17 +139,20 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
     odsParser.emitError(odsParser.getCurrentLocation(),
                         "failed to parse ChannelType parameter 'extraSignals' "
                         "which is to be a ArrayRef<ExtraSignal>");
-    return {};
+    return failure();
   }
 
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  SmallVector<ExtraSignal> extraSignals;
-  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
+  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage) {
+    auto &signal = extraSignals.emplace_back(signalStorage);
+    signal.name = signalStorage.name;
+  }
+  std::cerr << "call from parseExtraSignals" << std::endl;
   if (failed(checkChannelExtra(emitError, extraSignals)))
-    return {};
-  return extraSignals;
+    return failure();
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -161,24 +167,41 @@ void ControlType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << ">";
 }
 
-Type ControlType::parse(AsmParser &odsParser) {
-  // Parse literal '<'
-  if (odsParser.parseLess())
-    return {};
-
+static Type parseControlAfterLSquare(AsmParser &odsParser) {
   function_ref<InFlightDiagnostic()> emitError = [&]() {
     return odsParser.emitError(odsParser.getCurrentLocation());
   };
 
-  std::optional<SmallVector<ExtraSignal>> extraSignals =
-      parseExtraSignals(emitError, odsParser);
-  if (!extraSignals.has_value())
+  SmallVector<ExtraSignal> extraSignals;
+  if (failed(parseExtraSignals(emitError, odsParser, extraSignals)))
+    return {};
+
+  // Parse ']'
+  if (odsParser.parseRSquare())
     return {};
   // Parse literal '>'
   if (odsParser.parseGreater())
     return {};
 
-  return ControlType::get(odsParser.getContext(), extraSignals.value());
+  return ControlType::get(odsParser.getContext(), extraSignals);
+}
+
+Type ControlType::parse(AsmParser &odsParser) {
+  // Parse literal '<'
+  if (odsParser.parseLess())
+    return {};
+
+  if (!odsParser.parseOptionalLSquare()) {
+    // Parsed '['.
+    // The control has extra bits
+    return parseControlAfterLSquare(odsParser);
+  }
+
+  // Parse literal '>'
+  if (odsParser.parseGreater())
+    return {};
+
+  return ControlType::get(odsParser.getContext(), {});
 }
 
 unsigned ControlType::getNumDownstreamExtraSignals() const {
@@ -251,17 +274,28 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
-  std::optional<SmallVector<ExtraSignal>> extraSignals =
-      parseExtraSignals(emitError, odsParser);
-  if (!extraSignals.has_value())
-    return nullptr;
+  SmallVector<ExtraSignal> extraSignals;
+  if (!odsParser.parseOptionalComma()) {
+    // Parsed literal ','
+    // The channel has extra bits
+
+    // Parse '['
+    if (odsParser.parseLSquare())
+      return nullptr;
+
+    if (failed(parseExtraSignals(emitError, odsParser, extraSignals)))
+      return nullptr;
+
+    // Parse ']'
+    if (odsParser.parseRSquare())
+      return nullptr;
+  }
 
   // Parse literal '>'
   if (odsParser.parseGreater())
     return {};
 
-  return ChannelType::get(odsParser.getContext(), *dataType,
-                          extraSignals.value());
+  return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
 }
 
 Type ChannelType::parse(AsmParser &odsParser) {
@@ -289,6 +323,10 @@ ChannelType ChannelType::getAddrChannel(MLIRContext *ctx) {
 LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                                   Type dataType,
                                   ArrayRef<ExtraSignal> extraSignals) {
+  std::cerr << "ChannelType::verify" << std::endl;
+  for (const auto &extra : extraSignals) {
+    std::cerr << extra.name.data() << std::endl;
+  }
   return failure(failed(checkChannelData(emitError, dataType)) ||
                  failed(checkChannelExtra(emitError, extraSignals)));
 }
@@ -319,8 +357,14 @@ bool ChannelType::hasExtraSignal(const std::string &name) {
 Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
   if (parser.parseOptionalLess())
     return nullptr;
-  if (!parser.parseOptionalGreater())
+  if (!parser.parseOptionalGreater()) {
+    // Parsed <>: ControlType without extra bits
     return handshake::ControlType::get(parser.getContext());
+  }
+  if (!parser.parseOptionalLSquare()) {
+    // Parsed <[: ControlType with extra bits
+    return parseControlAfterLSquare(parser);
+  }
   return parseChannelAfterLess(parser);
 }
 
