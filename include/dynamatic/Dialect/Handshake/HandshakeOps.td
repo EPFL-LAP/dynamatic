@@ -622,7 +622,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   // If this seems redundant, we can consider designing a custom assembly printer.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` type($memStart) type($memEnd) type($ctrlEnd) functional-type($inputs, $outputs)
+    attr-dict `:` type($memStart) `,` type($memEnd) `,` type($ctrlEnd) `,` functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
