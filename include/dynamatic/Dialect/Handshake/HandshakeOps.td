@@ -876,7 +876,7 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataIn", "dataOut"]>,
+  AddingSpecTag<"dataIn", "dataOut">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
