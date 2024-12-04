@@ -118,10 +118,11 @@ struct BranchTracingItem {
 // This function traverses the IR and creates a control path by replicating the
 // branches it finds in the way. It stops at commits and connects them to the
 // newly created path with value ctrlSignal
-static void routeCommitControlRecursive(
-    MLIRContext *ctx, SpeculatorOp &specOp,
-    llvm::DenseSet<Operation *> &arrived, OpOperand &currOpOperand,
-    const std::list<BranchTracingItem> &branchTracingList) {
+static void
+routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
+                            llvm::DenseSet<Operation *> &arrived,
+                            OpOperand &currOpOperand,
+                            std::vector<BranchTracingItem> &branchTrace) {
   Operation *currOp = currOpOperand.getOwner();
 
   // End traversal if currOpOperand is already arrived
@@ -142,8 +143,7 @@ static void routeCommitControlRecursive(
     // We replicate branches only if the traversal reaches a commit.
     // Because sometimes a path of branches does not reach a commit unit.
     Value ctrlSignal = specOp.getCommitCtrl();
-    for (auto [valueForSpecTag, branchOp, branchDirection] :
-         branchTracingList) {
+    for (auto [valueForSpecTag, branchOp, branchDirection] : branchTrace) {
       // Replicate a branch in the control path and use new control signal.
       // To do so, a structure of two connected branches is created.
       // A speculating branch first discards the condition in case that
@@ -180,21 +180,18 @@ static void routeCommitControlRecursive(
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
       for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
-        // Copy the current branchTracingList and add the current branch info to
-        // the new list.
+        // Push the current branch info to the stack.
         // The items are referenced when the traversal hits a commit unit to
         // build the commit control network.
-        // We avoid modifying the original list as it's referenced elsewhere.
-        // However, copying may impact performance for larger circuits. To
-        // optimize, we could use a structure that references the original list,
-        // adding only the new item, like a "Cons" structure in functional
-        // programming
-        std::list<BranchTracingItem> newList(branchTracingList);
-        newList.push_back({currOpOperand.get(), branchOp, i});
+        auto branchTracingItem = branchTrace.emplace_back();
+        branchTracingItem.valueForSpecTag = currOpOperand.get();
+        branchTracingItem.branchOp = branchOp;
+        branchTracingItem.branchDirection = i;
 
         // Continue traversal with new branchTracingList
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
-                                    newList);
+                                    branchTrace);
+        branchTrace.pop_back();
       }
     }
   } else {
@@ -202,7 +199,7 @@ static void routeCommitControlRecursive(
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
-                                    branchTracingList);
+                                    branchTrace);
       }
     }
   }
@@ -229,9 +226,10 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   }
 
   llvm::DenseSet<Operation *> arrived;
+  std::vector<BranchTracingItem> branchTracingStack;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
-                                {});
+                                branchTracingStack);
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControlForCommits.value()));
