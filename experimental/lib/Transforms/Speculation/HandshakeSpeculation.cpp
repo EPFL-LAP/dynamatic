@@ -183,21 +183,21 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     commitOp.setOperand(1, ctrlSignal);
   } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(currOp)) {
     // Follow the two branch results with a different control signal
-    for (unsigned i = 0; i <= 1; ++i) {
-      for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
-        // Push the current branch information to the vector
-        // The items are referenced when the traversal hits a commit unit to
-        // build the commit control network.
-        branchTrace.emplace_back(currOpOperand.get(), branchOp, i);
+    for (auto [i, result] : llvm::enumerate(branchOp->getResults())) {
+      // Push the current branch info to the vector
+      // The items are referenced when the traversal hits a commit unit to
+      // build the commit control network.
+      branchTrace.emplace_back(currOpOperand.get(), branchOp, (unsigned)i);
 
+      for (OpOperand &dstOpOperand : result.getUses()) {
         // Continue traversal with new branchTracingList
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
                                     branchTrace);
-
-        // Pop the current branch information from the vector
-        // as it is no longer needed
-        branchTrace.pop_back();
       }
+
+      // Pop the current branch info from the vector
+      // This info is no longer used
+      branchTrace.pop_back();
     }
   } else {
     // Continue Traversal
@@ -214,9 +214,9 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
 static bool areAllCommitsRouted(Value fakeControl) {
   if (not fakeControl.use_empty()) {
     // fakeControl is still in use, so at least one commit is not routed
-    for (Operation *user : fakeControl.getUsers()) {
+    for (Operation *user : fakeControl.getUsers())
       user->emitError() << "This Commit could not be routed\n";
-    }
+
     llvm::errs() << "Error: commit routing failed.\n";
     return false;
   }
@@ -232,9 +232,10 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
 
   llvm::DenseSet<Operation *> arrived;
   std::vector<BranchTracingItem> branchTrace;
-  for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
+  for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
                                 branchTrace);
+  }
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControlForCommits.value()));
