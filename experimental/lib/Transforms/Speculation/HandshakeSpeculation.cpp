@@ -151,6 +151,12 @@ struct BranchTracingItem {
   handshake::ConditionalBranchOp branchOp;
   // The index of the result of the branchOp
   unsigned branchDirection;
+
+  BranchTracingItem(Value valueForSpecTag,
+                    handshake::ConditionalBranchOp branchOp,
+                    unsigned branchDirection)
+      : valueForSpecTag(valueForSpecTag), branchOp(branchOp),
+        branchDirection(branchDirection) {}
 };
 
 // This function traverses the IR and creates a control path by replicating the
@@ -218,17 +224,17 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
       for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
-        // Push the current branch info to the stack.
+        // Push the current branch info to the vector
         // The items are referenced when the traversal hits a commit unit to
         // build the commit control network.
-        auto branchTracingItem = branchTrace.emplace_back();
-        branchTracingItem.valueForSpecTag = currOpOperand.get();
-        branchTracingItem.branchOp = branchOp;
-        branchTracingItem.branchDirection = i;
+        branchTrace.emplace_back(currOpOperand.get(), branchOp, i);
 
         // Continue traversal with new branchTracingList
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
                                     branchTrace);
+
+        // Pop the current branch info from the vector
+        // This info is no longer used
         branchTrace.pop_back();
       }
     }
@@ -264,10 +270,10 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   }
 
   llvm::DenseSet<Operation *> arrived;
-  std::vector<BranchTracingItem> branchTracingStack;
+  std::vector<BranchTracingItem> branchTrace = {};
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
-                                branchTracingStack);
+                                branchTrace);
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControlForCommits.value()));
