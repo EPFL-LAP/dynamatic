@@ -1269,7 +1269,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1302,8 +1302,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort) {};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1420,9 +1419,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group) {};
+    : blockID(blockID), group(group){};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1458,7 +1457,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1547,17 +1546,20 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
 
-  ArrayRef<ExtraSignal> extraSignals = {ExtraSignal("spec", builder.getIntegerType(1))};
+  ArrayRef<ExtraSignal> extraSignals = {
+      ExtraSignal("spec", builder.getIntegerType(1))};
   Type dataInType = operands.front().getType();
   if (dataInType.isa<ChannelType>()) {
-    ChannelType dataOutType = ChannelType::get(context, dataInType.cast<ChannelType>().getDataType(), extraSignals);
+    ChannelType dataOutType = ChannelType::get(
+        context, dataInType.cast<ChannelType>().getDataType(), extraSignals);
     inferredReturnTypes.push_back(dataOutType);
   } else if (dataInType.isa<ControlType>()) {
     ControlType dataOutType = ControlType::get(context, extraSignals);
     inferredReturnTypes.push_back(dataOutType);
   } else {
     // Report error
-    llvm::errs() << "expected $dataIn to have type !handshake.channel or !handshake.control but got "
+    llvm::errs() << "expected $dataIn to have type !handshake.channel or "
+                    "!handshake.control but got "
                  << dataInType << "\n";
     return failure();
   }
