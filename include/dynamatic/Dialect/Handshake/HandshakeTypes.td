@@ -266,14 +266,17 @@ class HasSpecTag<string type> : CPred<
 >;
 
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
-// Whether `a` has a spec tag or not is irrelevant.
 class AddingSpecTag<string a, string b> : PredOpTrait<
   b # " should be the type of " # a # " with spec tag",
   And<[
     AllDataTypesMatch<[a, b]>.predicate,
+    Neg<HasSpecTag<"$" # a # ".getType()">>,
     HasSpecTag<"$" # b # ".getType()">
     // TODO: Add a constraint to ensure that no other extra bits are added to `b`.
   ]>
 >;
+
+// Multi-entity constraint ensuring that the type of `b` matches the type of `a` without a spec tag.
+class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
