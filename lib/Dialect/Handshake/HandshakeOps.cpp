@@ -1592,6 +1592,37 @@ LogicalResult SpeculatorOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// SpecCommitOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SpecCommitOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+
+  OpBuilder builder(context);
+
+  Type dataInType = operands.front().getType();
+  if (dataInType.isa<ChannelType>()) {
+    ChannelType dataOutType = ChannelType::get(
+        context, dataInType.cast<ChannelType>().getDataType(), {});
+    inferredReturnTypes.push_back(dataOutType);
+  } else if (dataInType.isa<ControlType>()) {
+    ControlType dataOutType = ControlType::get(context, {});
+    inferredReturnTypes.push_back(dataOutType);
+  } else {
+    // Report error
+    llvm::errs() << "expected $dataIn to have type !handshake.channel or "
+                    "!handshake.control but got "
+                 << dataInType << "\n";
+    return failure();
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 
