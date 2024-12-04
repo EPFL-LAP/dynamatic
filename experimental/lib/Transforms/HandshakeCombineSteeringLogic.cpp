@@ -305,8 +305,7 @@ struct RemoveNotCondition
 
     auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
         conditionOperation->getLoc(),
-        experimental::ftd::getBranchResultTypes(
-            condBranchOp.getTrueResult().getType()),
+        experimental::ftd::getListTypes(condBranchOp.getTrueResult().getType()),
         drivingNot.getOperand(), condBranchOp.getDataOperand());
 
     rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),

@@ -7,14 +7,12 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::boolean;
 
-std::string dynamatic::experimental::ftd::BlockIndexing::getBlockCondition(
-    Block *block) const {
+std::string ftd::BlockIndexing::getBlockCondition(Block *block) const {
   return "c" + std::to_string(getIndexFromBlock(block));
 }
 
-dynamatic::experimental::ftd::BlockIndexing::BlockIndexing(Region &region) {
+ftd::BlockIndexing::BlockIndexing(Region &region) {
   mlir::DominanceInfo domInfo;
 
   // Create a vector with all the blocks
@@ -22,36 +20,33 @@ dynamatic::experimental::ftd::BlockIndexing::BlockIndexing(Region &region) {
   for (Block &bb : region.getBlocks())
     allBlocks.push_back(&bb);
 
-  // Sort the vector according to the dominance information
+  // Sort the vector according to the dominance information, so that a block
+  // comes before each dominators.
   std::sort(allBlocks.begin(), allBlocks.end(),
             [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
 
   // Associate a smalled index in the map to the blocks at higer levels of the
   // dominance tree
-  unsigned bbIndex = 0;
-  for (Block *bb : allBlocks) {
-    indexToBlock.insert({bbIndex, bb});
-    blockToIndex.insert({bb, bbIndex});
-    bbIndex++;
+  for (auto [blockID, bb] : llvm::enumerate(allBlocks)) {
+    indexToBlock.insert({blockID, bb});
+    blockToIndex.insert({bb, blockID});
   }
 }
 
-Block *dynamatic::experimental::ftd::BlockIndexing::getBlockFromIndex(
-    unsigned index) const {
+Block *ftd::BlockIndexing::getBlockFromIndex(unsigned index) const {
   auto it = indexToBlock.find(index);
   return (it == indexToBlock.end()) ? nullptr : it->getSecond();
 }
 
-Block *dynamatic::experimental::ftd::BlockIndexing::getBlockFromCondition(
-    const std::string &condition) const {
+Block *
+ftd::BlockIndexing::getBlockFromCondition(const std::string &condition) const {
   std::string conditionNumber = condition;
   conditionNumber.erase(0, 1);
   unsigned index = std::stoi(conditionNumber);
   return this->getBlockFromIndex(index);
 }
 
-unsigned dynamatic::experimental::ftd::BlockIndexing::getIndexFromBlock(
-    Block *bb) const {
+unsigned ftd::BlockIndexing::getIndexFromBlock(Block *bb) const {
   auto it = blockToIndex.find(bb);
   return (it == blockToIndex.end()) ? -1 : it->getSecond();
 }
@@ -61,13 +56,12 @@ bool dynamatic::experimental::ftd::BlockIndexing::greaterIndex(
   return getIndexFromBlock(bb1) > getIndexFromBlock(bb2);
 }
 
-bool dynamatic::experimental::ftd::BlockIndexing::lessIndex(Block *bb1,
-                                                            Block *bb2) const {
+bool ftd::BlockIndexing::lessIndex(Block *bb1, Block *bb2) const {
   return getIndexFromBlock(bb1) < getIndexFromBlock(bb2);
 }
 
 /// Recursively check weather 2 blocks belong to the same loop, starting
-/// from the inner-most loops
+/// from the inner-most loops.
 static bool isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
   if (!loop1 || !loop2)
     return false;
@@ -82,7 +76,7 @@ bool ftd::isSameLoopBlocks(Block *source, Block *dest,
 }
 
 /// Recursive function which allows to obtain all the paths from block `start`
-/// to block `end` using a DFS
+/// to block `end` using a DFS.
 static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
                         std::unordered_set<Block *> &visited,
                         std::vector<std::vector<Block *>> &allPaths,
@@ -175,8 +169,7 @@ ftd::getPathExpression(ArrayRef<Block *> path,
             boolean::BoolExpression::parseSop(blockCondition);
 
         // Possibly add the condition to the list of cofactors
-        if (!blockIndexSet.contains(blockIndex))
-          blockIndexSet.insert(blockIndex);
+        blockIndexSet.insert(blockIndex);
 
         // Negate the condition if `secondBlock` is reached when the condition
         // is false
@@ -211,9 +204,6 @@ Type ftd::channelifyType(Type type) {
       .Default([](auto type) { return nullptr; });
 }
 
-SmallVector<Type> ftd::getBranchResultTypes(Type inputType) {
-  SmallVector<Type> handshakeResultTypes;
-  handshakeResultTypes.push_back(channelifyType(inputType));
-  handshakeResultTypes.push_back(channelifyType(inputType));
-  return handshakeResultTypes;
+SmallVector<Type> ftd::getListTypes(Type inputType, unsigned size) {
+  return SmallVector<Type>(size, channelifyType(inputType));
 }

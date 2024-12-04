@@ -641,8 +641,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
     // in the materialization pass, as we expect from a suppress branch
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().back().getLoc(),
-        ftd::getBranchResultTypes(connection.getType()), conditionValue,
-        connection);
+        ftd::getListTypes(connection.getType()), conditionValue, connection);
 
   } else {
 
@@ -680,8 +679,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 
     branchOp = rewriter.create<handshake::ConditionalBranchOp>(
         loopExit->getOperations().front().getLoc(),
-        ftd::getBranchResultTypes(connection.getType()), branchCond,
-        connection);
+        ftd::getListTypes(connection.getType()), branchCond, connection);
   }
 
   Value newConnection = btlt == MoreProducerThanConsumers
@@ -779,8 +777,8 @@ static void insertDirectSuppression(
 
     rewriter.setInsertionPointToStart(consumer->getBlock());
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        consumer->getLoc(), ftd::getBranchResultTypes(connection.getType()),
-        branchCond, connection);
+        consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
+        connection);
 
     // Take into account the possiblity of a mux to get the condition input also
     // as data input. In this case, a branch needs to be created, but only the

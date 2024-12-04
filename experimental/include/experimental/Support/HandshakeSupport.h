@@ -9,10 +9,10 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Class to associate an index to each block, that if block Bi dominates block
-/// Bj then i < j. While this is guaranteed by the MLIR CFG construction, it
-/// cannot really be given for granted, thus it is more convenient to make a
-/// custom one.
+/// Class to associate an index to each block, so that if block Bi dominates
+/// block Bj then i < j. While this is guaranteed by the MLIR CFG construction,
+/// it cannot really be given for granted, thus it is more convenient to have a
+/// custom indexing.
 class BlockIndexing {
 
   /// Map to store the connection between indexes and blocks.
@@ -22,7 +22,7 @@ class BlockIndexing {
   DenseMap<Block *, unsigned> blockToIndex;
 
 public:
-  /// Build the map.
+  /// Build the map out of a region.
   BlockIndexing(mlir::Region &region);
 
   /// Get a block out of an index.
@@ -43,37 +43,39 @@ public:
 
   /// Given a block whose name is `^BBN` (where N is an integer) return a string
   /// in the format `cN`, used to identify the condition which allows the block
-  /// to be executed.
+  /// to be executed. The adopted index is retrived from the BlockIndexing.
   std::string getBlockCondition(Block *block) const;
 };
 
-/// checks if the source and destination are in a loop
+/// Checks if the source and destination are in a loop
 bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
 
 /// Gets all the paths from block `start` to block `end` using a dfs search.
-/// If `blockToTraverse` is non null, then we want the paths having that block
-/// in the path; if `blocksToAvoid` is non empty, then we want the paths which
-/// do not cross those paths.
+/// If `blockToTraverse` is non null, then we want the paths having
+/// `blockToTraverse` in the path; if `blocksToAvoid` is non empty, then we want
+/// the paths which do not cross those blocks.
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
              Block *blockToTraverse = nullptr,
              ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
 
-/// Get the boolean condition determining when a path is executed. While
-/// covering each block in the path, add the cofactor of each block to the
-/// list of cofactors if not already covered
+/// Given a sequence of block, find a boolean expression defining the conditions
+/// for which the path is traversed. If one edge is unconditional, then no
+/// condition is added; otherwise, the condition for the conditional branch is
+/// added (either direct or negated). The list of blocks whose condition is
+/// considered is saved in `blockIndexSet`. If `ignoreDeps` is false, then a
+/// condition is added only if the source block was in the set `deps`.
 boolean::BoolExpression *
 getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
                   const BlockIndexing &bi,
                   const DenseSet<Block *> &deps = DenseSet<Block *>(),
                   bool ignoreDeps = true);
 
-/// Return the channelified version of the input type
+/// Return the channelified version of the input type.
 Type channelifyType(Type type);
 
-/// Get an array of two types containing the result type of a branch
-/// operation, channelifying the input type
-SmallVector<Type> getBranchResultTypes(Type inputType);
+/// Get an array of `size` elements all identical to the
+SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);
 
 } // namespace ftd
 } // namespace experimental
