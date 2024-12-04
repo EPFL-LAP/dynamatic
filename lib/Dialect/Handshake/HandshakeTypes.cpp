@@ -51,7 +51,7 @@ static void printExtraSignals(AsmPrinter &odsPrinter,
   };
 
   // Print all signals enclosed in square brackets
-  odsPrinter << ", [";
+  odsPrinter << "[";
   for (const ExtraSignal &signal : extraSignals.drop_back()) {
     printSignal(signal);
     odsPrinter << ", ";
@@ -296,6 +296,7 @@ void ChannelType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
   odsPrinter.printStrippedAttrOrType(getDataType());
   if (!getExtraSignals().empty()) {
+    odsPrinter << ", ";
     printExtraSignals(odsPrinter, getExtraSignals());
   }
   odsPrinter << ">";
