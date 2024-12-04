@@ -24,7 +24,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
-#include <list>
 #include <string>
 
 using namespace llvm::sys;
@@ -186,7 +185,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     // Follow the two branch results with a different control signal
     for (unsigned i = 0; i <= 1; ++i) {
       for (OpOperand &dstOpOperand : branchOp->getResult(i).getUses()) {
-        // Push the current branch info to the vector
+        // Push the current branch information to the vector
         // The items are referenced when the traversal hits a commit unit to
         // build the commit control network.
         branchTrace.emplace_back(currOpOperand.get(), branchOp, i);
@@ -195,8 +194,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
         routeCommitControlRecursive(ctx, specOp, arrived, dstOpOperand,
                                     branchTrace);
 
-        // Pop the current branch info from the vector
-        // This info is no longer used
+        // Pop the current branch information from the vector
+        // as it is no longer needed
         branchTrace.pop_back();
       }
     }
@@ -232,7 +231,7 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   }
 
   llvm::DenseSet<Operation *> arrived;
-  std::vector<BranchTracingItem> branchTrace = {};
+  std::vector<BranchTracingItem> branchTrace;
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses())
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
                                 branchTrace);
