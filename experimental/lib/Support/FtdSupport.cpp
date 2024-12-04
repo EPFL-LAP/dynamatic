@@ -36,13 +36,11 @@ enum BranchToLoopType {
 };
 
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
-constexpr llvm::StringLiteral FTD_SUPP_BRANCH("ftd.supp");
+constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
 constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
 constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
-constexpr llvm::StringLiteral FTD_REGEN_DONE("ftd.rd");
-constexpr llvm::StringLiteral FTD_SUPP_DONE("ftd.sd");
 
 /// Given a block, get its immediate dominator if exists
 static Block *getImmediateDominator(Region &region, Block *bb) {
@@ -694,7 +692,7 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
   // branch must undergo the `addSupp` function so we add it to our structure
   // to be able to loop over it
   if (btlt == MoreProducerThanConsumers) {
-    branchOp->setAttr(FTD_SUPP_BRANCH, rewriter.getUnitAttr());
+    branchOp->setAttr(FTD_NEW_SUPP, rewriter.getUnitAttr());
     toCover.emplace_back(newConnection, consumer);
   }
 
@@ -712,6 +710,15 @@ static void insertDirectSuppression(
   Block *entryBlock = &funcOp.getBody().front();
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
+  Value muxCondition = nullptr;
+
+  bool accountMuxCondition =
+      llvm::isa<handshake::MuxOp>(consumer) &&
+      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
+      (consumer->getOperand(1) == connection ||
+       consumer->getOperand(2) == connection) &&
+      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
+      consumer->getBlock() != producerBlock;
 
   // Get the control dependencies from the producer
   DenseSet<Block *> prodControlDeps =
@@ -721,6 +728,17 @@ static void insertDirectSuppression(
   DenseSet<Block *> consControlDeps =
       cdAnalysis[consumer->getBlock()].forwardControlDeps;
 
+  // If the mux condition is to be taken into account, then the control
+  // dependencies of the mux conditions are to be added to the consumer control
+  // dependencies
+  if (accountMuxCondition) {
+    muxCondition = consumer->getOperand(0);
+    DenseSet<Block *> condControlDeps =
+        cdAnalysis[muxCondition.getDefiningOp()->getBlock()].forwardControlDeps;
+    for (auto &x : condControlDeps)
+      consControlDeps.insert(x);
+  }
+
   // Get rid of common entries in the two sets
   eliminateCommonBlocks(prodControlDeps, consControlDeps);
 
@@ -729,6 +747,22 @@ static void insertDirectSuppression(
       enumeratePaths(entryBlock, producerBlock, bi, prodControlDeps);
   BoolExpression *fCons =
       enumeratePaths(entryBlock, consumerBlock, bi, consControlDeps);
+
+  if (accountMuxCondition) {
+    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
+        bi.getBlockCondition(muxCondition.getDefiningOp()->getBlock()));
+
+    // The condition must be taken into account for `fCons` only if the
+    // producer is not control dependent from the block which produces the
+    // condition of the mux
+    if (!prodControlDeps.contains(muxCondition.getParentBlock())) {
+      if (consumer->getOperand(1) == connection)
+        fCons = BoolExpression::boolAnd(fCons,
+                                        selectOperandCondition->boolNegate());
+      else
+        fCons = BoolExpression::boolAnd(fCons, selectOperandCondition);
+    }
+  }
 
   /// f_supp = f_prod and not f_cons
   BoolExpression *fSup = BoolExpression::boolAnd(fProd, fCons->boolNegate());
@@ -758,50 +792,6 @@ static void insertDirectSuppression(
       if (llvm::isa<handshake::MuxOp>(consumer) && use.getOperandNumber() == 0)
         continue;
       use.set(branchOp.getFalseResult());
-    }
-    connection = branchOp.getFalseResult();
-  }
-
-  // The condition related to the select signal of the consumer mux must be
-  // added if the following conditions hold: The consumer is a mux; The
-  // mux was a GAMMA from GSA analysis; The input of the mux (i.e., coming
-  // from the producer) is a data input.
-  if (llvm::isa<handshake::MuxOp>(consumer) &&
-      consumer->hasAttr(FTD_EXPLICIT_PHI) &&
-      (consumer->getOperand(1) == connection ||
-       consumer->getOperand(2) == connection) &&
-      consumer->getOperand(0).getParentBlock() != consumer->getBlock() &&
-      consumer->getBlock() != producerBlock) {
-
-    auto selectOperand = consumer->getOperand(0);
-    BoolExpression *selectOperandCondition = BoolExpression::parseSop(
-        bi.getBlockCondition(selectOperand.getDefiningOp()->getBlock()));
-
-    // The condition must be taken into account for `fCons` only if the
-    // producer is not control dependent from the block which produces the
-    // condition of the mux
-    if (!prodControlDeps.contains(selectOperand.getParentBlock())) {
-      if (consumer->getOperand(1) == connection)
-        selectOperandCondition = selectOperandCondition->boolNegate();
-
-      std::set<std::string> blocks = selectOperandCondition->getVariables();
-      std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-      BDD *bdd = buildBDD(selectOperandCondition, cofactorList);
-      Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), bi);
-
-      rewriter.setInsertionPointToStart(consumer->getBlock());
-      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getBranchResultTypes(connection.getType()),
-          branchCond, connection);
-
-      for (auto &use : connection.getUses()) {
-        if (use.getOwner() != consumer)
-          continue;
-        if (llvm::isa<handshake::MuxOp>(consumer) &&
-            use.getOperandNumber() == 0)
-          continue;
-        use.set(branchOp.getTrueResult());
-      }
     }
   }
 }
@@ -836,6 +826,10 @@ void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
     return;
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
+
+    if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
+        !producerOp->hasAttr(FTD_NEW_SUPP))
+      return;
 
     // Skip the prod-cons if the consumer is part of the operations
     // related to the BDD expansion or INIT merges
@@ -907,7 +901,7 @@ void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
     // We need to suppress a token if the consumer is the producer itself
     // within a loop
     if (selfRegeneration && consumerLoop &&
-        !producerOp->hasAttr(FTD_SUPP_BRANCH)) {
+        !producerOp->hasAttr(FTD_NEW_SUPP)) {
       addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
                            SelfRegeneration, loopInfo, newToCover, bi);
       return;
@@ -940,10 +934,6 @@ void ftd::addSupp(handshake::FuncOp &funcOp,
     consumersToCover.push_back(&consumerOp);
 
   for (auto *consumerOp : consumersToCover) {
-    if (consumerOp->hasAttr(FTD_SUPP_DONE))
-      continue;
-    consumerOp->setAttr(FTD_SUPP_DONE, rewriter.getUnitAttr());
-
     for (auto operand : consumerOp->getOperands())
       addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
   }
@@ -959,10 +949,6 @@ void ftd::addRegen(handshake::FuncOp &funcOp,
 
   // For each producer/consumer relationship
   for (Operation *consumerOp : consumersToCover) {
-    if (consumerOp->hasAttr(FTD_REGEN_DONE))
-      continue;
-    consumerOp->setAttr(FTD_REGEN_DONE, rewriter.getUnitAttr());
-
     for (Value operand : consumerOp->getOperands())
       addRegenOperandConsumer(rewriter, funcOp, consumerOp, operand);
   }
