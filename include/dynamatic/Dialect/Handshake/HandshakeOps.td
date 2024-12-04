@@ -876,7 +876,10 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  AddingSpecTag<"dataIn", "dataOut">,
+  PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
+    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside a loop
+    AddingSpecTag<"dataIn", "dataOut">.predicate // Not inside a loop
+  ]>>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -941,7 +944,11 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   }];
 }
 
-def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
+def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface, RemovingSpecTag<"dataIn", "dataOut">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
     Commit units are used to mark the end of the speculation region. 
@@ -961,6 +968,25 @@ def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
     ```
   }];
 
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  // While type($dataOut) can be inferred due to this operation's implementation of inferReturnTypes,  
+  // we chose to explicitly specify it in the IR for better clarity and understandability.
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
