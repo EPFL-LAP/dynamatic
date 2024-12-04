@@ -11,9 +11,11 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdSupport.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -113,8 +115,8 @@ static void channelifyMuxes(handshake::FuncOp &funcOp) {
   }
 }
 
-void ftd::FtdLowerFuncToHandshake::exportGsaGatesInfo(
-    handshake::FuncOp funcOp) const {
+/// Export GSA information
+static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -146,10 +148,11 @@ void ftd::FtdLowerFuncToHandshake::exportGsaGatesInfo(
   ofs.close();
 }
 
-// --- Helper functions ---
-
-LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
+/// Converts undefined operations (LLVM::UndefOp) with a default "0"
+/// constant triggered by the start signal of the corresponding function.
+static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
+                                            handshake::FuncOp &funcOp,
+                                            NameAnalysis &namer) {
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -186,8 +189,13 @@ LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
   return success();
 }
 
-LogicalResult ftd::FtdLowerFuncToHandshake::convertConstants(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
+/// Convers arith-level constants to handshake-level constants. Constants are
+/// triggered by the start value of the corresponding function. The FTD
+/// algorithm is then in charge of connecting the constants to the rest of the
+/// network, in order for them to be re-generated
+static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp,
+                                      NameAnalysis &namer) {
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -291,8 +299,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
   // control value
-  if (failed(convertConstants(rewriter, funcOp)) ||
-      failed(convertUndefinedValues(rewriter, funcOp)))
+  if (failed(::convertConstants(rewriter, funcOp, namer)) ||
+      failed(::convertUndefinedValues(rewriter, funcOp, namer)))
     return failure();
 
   if (funcOp.getBlocks().size() != 1) {
@@ -304,7 +312,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
     // This function prints to a file information about all GSA gates and the
     // loops containing them (if any)
-    exportGsaGatesInfo(funcOp);
+    ::exportGsaGatesInfo(funcOp, namer);
 
     // Add suppression blocks between each pair of producer and consumer
     addSupp(funcOp, rewriter);
@@ -313,6 +321,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
+  // Annotate the IR with the CFG information
   cfg::annotateCFG(funcOp, rewriter);
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))

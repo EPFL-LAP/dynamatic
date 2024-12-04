@@ -17,13 +17,9 @@
 
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Analysis/GSAAnalysis.h"
-#include "experimental/Support/FtdSupport.h"
-#include "mlir/Analysis/CFGLoopInfo.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -58,20 +54,6 @@ protected:
 
   /// Store the GSA analysis over the input function
   gsa::GSAAnalysis gsaAnalysis;
-
-  void exportGsaGatesInfo(handshake::FuncOp funcOp) const;
-
-  /// Convers arith-level constants to handshake-level constants. Constants are
-  /// triggered by the start value of the corresponding function. The FTD
-  /// algorithm is then in charge of connecting the constants to the rest of the
-  /// network, in order for them to be re-generated
-  LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
-                                 handshake::FuncOp &funcOp) const;
-
-  /// Converts undefined operations (LLVM::UndefOp) with a default "0"
-  /// constant triggered by the start signal of the corresponding function.
-  LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
-                                       handshake::FuncOp &funcOp) const;
 };
 #define GEN_PASS_DECL_FTDCFTOHANDSHAKE
 #define GEN_PASS_DEF_FTDCFTOHANDSHAKE
