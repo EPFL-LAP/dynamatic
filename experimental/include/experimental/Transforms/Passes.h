@@ -18,6 +18,7 @@
 #include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "experimental/Transforms/HandshakeAddSeqMem.h"
+#include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "experimental/Transforms/Speculation/SpecAnnotatePaths.h"

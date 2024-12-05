@@ -147,6 +147,7 @@ public:
   /// Returns the value representing the block's control signal.
   virtual Value getBlockControl(Block *block) const;
 
+protected:
   /// Groups information to "rewire the IR" around a particular merge-like
   /// operation.
   struct MergeOpInfo {

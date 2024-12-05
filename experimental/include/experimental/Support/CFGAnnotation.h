@@ -109,8 +109,12 @@ LogicalResult restoreCfStructure(handshake::FuncOp &funcOp,
 
 /// Get rid of the cf structure by moving all the operations in the initial
 /// block and removing all the cf terminators.
-LogicalResult flattenFunction(handshake::FuncOp &funcOp,
-                              ConversionPatternRewriter &rewriter);
+LogicalResult flattenFunction(handshake::FuncOp &funcOp);
+
+/// Sets an integer "bb" attribute on each operation to identify the basic
+/// block from which the operation originates in the std-level IR.
+void markBasicBlocks(handshake::FuncOp &funcOp,
+                     ConversionPatternRewriter &rewriter);
 
 }; // namespace cfg
 }; // namespace experimental

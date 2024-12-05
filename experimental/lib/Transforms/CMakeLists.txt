@@ -2,6 +2,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
   HandshakeAddSeqMem.cpp
   HandshakeCombineSteeringLogic.cpp
+  HandshakeStraightToQueue.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -10,6 +11,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRControlFlowDialect
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport

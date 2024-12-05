@@ -16,7 +16,9 @@ TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
-ADD_SEQ_MEM=${10}
+STRAIGHT_TO_QUEUE=${10}
+ADD_SEQ_MEM=${11}
+
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -117,11 +119,25 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+  echo_info "Running FTD algorithm for handshake conversion"
+
+  if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
+
+    echo_info "Using FPGA'23 for LSQ connection"
+
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+      --ftd-lower-cf-to-handshake \
+      --handshake-straight-to-queue \
+      --handshake-combine-steering-logic \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
+  else
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+      --ftd-lower-cf-to-handshake \
+      --handshake-combine-steering-logic \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+  fi
 
   if [[ $ADD_SEQ_MEM -ne 0 ]]; then
       # handshake transformations
