@@ -105,7 +105,7 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
 void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, OpBuilder builder, NameAnalysis& namer){
 
     llvm::errs() << "heyyyy\n";
-    if (LSQLoadOp memOp = dyn_cast<LSQLoadOp>(op); memOp){
+    if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
 
     builder.setInsertionPointToStart(memOp->getBlock());
 
@@ -142,7 +142,7 @@ void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict
 
     SmallVector<Value> joinValues;
 
-    if (LSQLoadOp memOp = dyn_cast<LSQLoadOp>(op); memOp){
+    if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
       llvm::errs() << "[insert join] reached the load operation: " << getUniqueName(memOp) << "\n";
 
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
@@ -169,7 +169,7 @@ void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict
         }
         
       } 
-    }else if (LSQStoreOp memOp = dyn_cast<LSQStoreOp>(op); memOp){
+    }else if (StoreOp memOp = dyn_cast<StoreOp>(op); memOp){
       llvm::errs() << "[insert join] reached the store operation: " << getUniqueName(memOp) << "\n";
 
       if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
@@ -242,7 +242,7 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
   // Check that memory access ports are named
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   WalkResult res = modOp.walk([&](Operation *op) {
-    if (!isa<handshake::LoadOpInterface, handshake::StoreOpInterface>(op))
+    if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
       return WalkResult::advance();
     if (!namer.hasName(op)) {
       op->emitError() << "Memory access port must be named.";
