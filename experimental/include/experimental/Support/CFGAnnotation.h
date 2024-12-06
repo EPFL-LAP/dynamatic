@@ -34,8 +34,6 @@ namespace cfg {
 /// Name used to store the edge annotation on the handshake function
 constexpr llvm::StringLiteral CFG_EDGES("cfg.edges");
 
-constexpr char OPEN_LIST = '{';
-constexpr char CLOSE_LIST = '{';
 constexpr char OPEN_EDGE = '[';
 constexpr char CLOSE_EDGE = ']';
 constexpr char DELIMITER = ',';
