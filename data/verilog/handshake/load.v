@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module mc_load #(
+module load #(
   parameter DATA_TYPE = 32,
   parameter ADDR_TYPE = 32
 )(

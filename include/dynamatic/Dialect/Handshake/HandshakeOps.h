@@ -35,10 +35,8 @@ IntegerType getOptimizedIndexValType(OpBuilder &builder, unsigned numToIndex);
 struct TimingInfo;
 
 // Forward declaration needed by memory ports data structures.
-class MCLoadOp;
-class LSQLoadOp;
-class MCStoreOp;
-class LSQStoreOp;
+class LoadOp;
+class StoreOp;
 class MemoryControllerOp;
 class LSQOp;
 
@@ -70,22 +68,10 @@ public:
   enum class Kind {
     /// Control port.
     CONTROL,
-    /// Load port (from load-like operation).
+    /// Load port (from dynamatic::handshake::LoadOp).
     LOAD,
-    /// Load port (from dynamatic::handshake::MCLoadOp).
-    MC_LOAD,
-    /// Load port (from dynamatic::handshake::LSQLoadOp).
-    LSQ_LOAD,
-    /// Marker for last load-type port.
-    LOAD_END,
-    /// Store port (from store-like operation).
+    /// Store port (from dynamatic::handshake::StoreOp).
     STORE,
-    /// Store port (from dynamatic::handshake::MCLStoreOp).
-    MC_STORE,
-    /// Store port (from dynamatic::handshake::LSQStoreOp).
-    LSQ_STORE,
-    /// Marker for last store-type port.
-    STORE_END,
     /// MC load/store port (from dynamatic::handshake::MemoryControllerOp).
     MC_LOAD_STORE,
     /// LSQ load/store port (from dynamatic::handshake::LSQOp),
@@ -155,7 +141,7 @@ public:
   }
 };
 
-/// Memory load port associated with a load-like Handshake operation. It
+/// Memory load port associated with a `dynamatic::LoadOp` operation. It
 /// represents two values in the memory interface's inputs/outputs.
 /// 1. the address value produced by the port operation and consumed by the
 /// memory interface, and
@@ -163,6 +149,13 @@ public:
 /// operation.
 class LoadPort : public MemoryPort {
 public:
+  /// Constructs the load port from a load operation, the index of the load's
+  /// address output in the memory interface's inputs, the index of the
+  /// load's data input in the memory interface's outputs, and the specific load
+  /// kind.
+  LoadPort(dynamatic::handshake::LoadOp loadOp, unsigned addrInputIdx,
+           unsigned dataOutputIdx);
+
   /// Default copy constructor.
   LoadPort(const LoadPort &other) = default;
 
@@ -170,7 +163,7 @@ public:
   LoadPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the load operation the port is associated to.
-  dynamatic::handshake::LoadOpInterface getLoadOp() const;
+  dynamatic::handshake::LoadOp getLoadOp() const;
 
   /// Returns the index of the load address value in the memory interface's
   /// inputs.
@@ -182,61 +175,11 @@ public:
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
-    Kind kind = port->getKind();
-    return Kind::LOAD <= kind && kind < Kind::LOAD_END;
-  }
-
-protected:
-  /// Constructs the load port from a load operation, the index of the load's
-  /// address output in the memory interface's inputs, the index of the
-  /// load's data input in the memory interface's outputs, and the specific load
-  /// kind.
-  LoadPort(dynamatic::handshake::LoadOpInterface loadOp, unsigned addrInputIdx,
-           unsigned dataOutputIdx, Kind kind);
-};
-
-// Memory load port for memory controllers.
-class MCLoadPort : public LoadPort {
-public:
-  /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
-
-  /// Constructs the load port from an MC load operation, the index of the
-  /// load's address output in the memory interface's inputs, and the index of
-  /// the load's data input in the memory interface's outputs.
-  MCLoadPort(dynamatic::handshake::MCLoadOp loadOp, unsigned addrInputIdx,
-             unsigned dataOutputIdx);
-
-  /// Returns the MC load operation the port is associated to.
-  dynamatic::handshake::MCLoadOp getMCLoadOp() const;
-
-  /// Used by LLVM-style RTTI to establish `isa` relationships.
-  static inline bool classof(const MemoryPort *port) {
-    return port->getKind() == Kind::MC_LOAD;
+    return port->getKind() == Kind::LOAD;
   }
 };
 
-// Memory load port for LSQs.
-class LSQLoadPort : public LoadPort {
-public:
-  /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadPort(const MemoryPort &memPort) : LoadPort(memPort) {};
-
-  /// Same semantics as the `LoadPort` constructor but works specifically with a
-  /// load operation that connects to an LSQ.
-  LSQLoadPort(dynamatic::handshake::LSQLoadOp loadOp, unsigned addrInputIdx,
-              unsigned dataOutputIdx);
-
-  /// Returns the LSQ load operation the port is associated to.
-  dynamatic::handshake::LSQLoadOp getLSQLoadOp() const;
-
-  /// Used by LLVM-style RTTI to establish `isa` relationships.
-  static inline bool classof(const MemoryPort *port) {
-    return port->getKind() == Kind::LSQ_LOAD;
-  }
-};
-
-/// Memory store port associated with a store-like handshake operation. It
+/// Memory store port associated with a `dynamatic::StoreOp` operation. It
 /// represents two values in the memory interface's inputs.
 /// 1. the address value produced by the port operation and consumed by the
 /// memory interface, and
@@ -244,6 +187,11 @@ public:
 /// memory interface.
 class StorePort : public MemoryPort {
 public:
+  /// Constructs the store port from a store operation, the index of the
+  /// store's address output in the memory interface's inputs (the store's data
+  /// output is assumed to be at the next index), and the specific store kind.
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
+
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
 
@@ -251,7 +199,7 @@ public:
   StorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
 
   /// Returns the store operation the port is associated to.
-  dynamatic::handshake::StoreOpInterface getStoreOp() const;
+  dynamatic::handshake::StoreOp getStoreOp() const;
 
   /// Returns the index of the store address value in the memory interface's
   /// inputs.
@@ -263,54 +211,7 @@ public:
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
-    Kind kind = port->getKind();
-    return Kind::STORE <= kind && kind < Kind::STORE_END;
-  }
-
-protected:
-  /// Constructs the store port from a store operation, the index of the
-  /// store's address output in the memory interface's inputs (the store's data
-  /// output is assumed to be at the next index), and the specific store kind.
-  StorePort(dynamatic::handshake::StoreOpInterface storeOp,
-            unsigned addrInputIdx, Kind kind);
-};
-
-// Memory store port for memory controllers.
-class MCStorePort : public StorePort {
-public:
-  /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
-
-  /// Same semantics as the `LoadPort` constructor but works specifically with a
-  /// load operation that connects to an MC.
-  MCStorePort(dynamatic::handshake::MCStoreOp mcStoreOp, unsigned addrInputIdx);
-
-  /// Returns the MC store operation the port is associated to.
-  dynamatic::handshake::MCStoreOp getMCStoreOp() const;
-
-  /// Used by LLVM-style RTTI to establish `isa` relationships.
-  static inline bool classof(const MemoryPort *port) {
-    return port->getKind() == Kind::MC_STORE;
-  }
-};
-
-// Memory store port for LSQs.
-class LSQStorePort : public StorePort {
-public:
-  /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQStorePort(const MemoryPort &memPort) : StorePort(memPort) {};
-
-  /// Same semantics as the `LoadPort` constructor but works specifically with a
-  /// load operation that connects to an LSQ.
-  LSQStorePort(dynamatic::handshake::LSQStoreOp lsqStoreOp,
-               unsigned addrInputIdx);
-
-  /// Returns the LSQ store operation the port is associated to.
-  dynamatic::handshake::LSQStoreOp getLSQStoreOp() const;
-
-  /// Used by LLVM-style RTTI to establish `isa` relationships.
-  static inline bool classof(const MemoryPort *port) {
-    return port->getKind() == Kind::LSQ_STORE;
+    return port->getKind() == Kind::STORE;
   }
 };
 
@@ -667,6 +568,12 @@ public:
 /// Identifies the type of all ports in a memory interface's memory inputs by
 /// backtracking their def-use chain till reaching specific operation types.
 FuncMemoryPorts getMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp);
+
+/// Attempts to find a memory interface by following the value's uses in a BFS
+/// fashion. This works even on dematerialized IR but will only follow through
+/// simple "forwarding operations" like extensions/truncations and forks before
+/// giving up. Returns `nullptr` if no memory interface could be found.
+handshake::MemoryOpInterface findMemInterface(Value val);
 
 } // namespace dynamatic
 

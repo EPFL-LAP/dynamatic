@@ -4,7 +4,7 @@
 // CHECK-LABEL:   handshake.func @simpleLoad(
 // CHECK-SAME:                               %[[VAL_0:.*]]: memref<4xi32>, %[[VAL_1:.*]]: !handshake.channel<i32>, %[[VAL_2:.*]]: !handshake.control<>, %[[VAL_3:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "in0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<4xi32>] %[[VAL_2]] (%[[VAL_6:.*]]) %[[VAL_3]] {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>) -> !handshake.channel<i32>
-// CHECK:           %[[VAL_6]], %[[VAL_7:.*]] = mc_load{{\[}}%[[VAL_1]]] %[[VAL_4]] {handshake.bb = 0 : ui32} : <i32>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_7:.*]] = load{{\[}}%[[VAL_1]]] %[[VAL_4]] {handshake.bb = 0 : ui32} : <i32>, <i32>
 // CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_7]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
 func.func @simpleLoad(%arg0: memref<4xi32>, %arg1: index) -> i32 {

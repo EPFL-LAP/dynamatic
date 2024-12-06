@@ -380,8 +380,11 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
-    // No throughput constraints on channels going to LSQ stores
-    if (isa<handshake::LSQStoreOp>(dstOp))
+    // No throughput constraints on channels going to stores
+    /// TODO: this is from legacy implementation, we should understand why we
+    /// really do this and figure out if it makes sense (@lucas-rami: I don't
+    /// think it does)
+    if (isa<handshake::StoreOp>(dstOp))
       continue;
 
     /// TODO: The legacy implementation does not add any constraints here for
