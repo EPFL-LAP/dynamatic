@@ -164,7 +164,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       // level.
       auto branchDiscardNonSpec =
           builder.create<handshake::SpeculatingBranchOp>(
-              branchOp.getLoc(), valueForSpecTag /* specTag */,
+              branchOp.getLoc(), /*specTag=*/valueForSpecTag,
               branchOp.getConditionOperand());
       inheritBB(specOp, branchDiscardNonSpec);
 
@@ -172,8 +172,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       // speculative token took
       auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
           branchDiscardNonSpec->getLoc(),
-          branchDiscardNonSpec.getTrueResult() /* condition */,
-          ctrlSignal /* data */);
+          /*condition=*/branchDiscardNonSpec.getTrueResult(),
+          /*data=*/ctrlSignal);
       inheritBB(specOp, branchReplicated);
 
       // Update ctrlSignal
@@ -313,7 +313,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // First, discard if speculation didn't happen
   auto branchDiscardCondNonSpec =
       builder.create<handshake::SpeculatingBranchOp>(
-          controlBranch.getLoc(), specOp.getDataOut() /* spec tag */,
+          controlBranch.getLoc(), /*specTag=*/specOp.getDataOut(),
           controlBranch.getConditionOperand());
   inheritBB(specOp, branchDiscardCondNonSpec);
 
