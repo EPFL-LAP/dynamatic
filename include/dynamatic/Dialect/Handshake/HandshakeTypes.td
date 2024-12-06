@@ -266,6 +266,14 @@ class HasSpecTag<string type> : CPred<
   "  )"
 >;
 
+// Two approaches to ensuring operand types satisfy a constraint:
+// 1. Define a multi-entity constraint:
+//    - Lightweight implementation but less expressive.
+// 2. Create an OpInterface and implement a verifier to it:
+//    - Commonly used in Dynamatic but lacks immediate clarity that a constraint exists in the Op.
+//    - Deviates from the original intent of an "Interface."
+// TODO: Standardize these approaches or establish guidelines for when to use each.
+
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
 class AddingSpecTag<string a, string b> : PredOpTrait<
   b # " should be the type of " # a # " with spec tag",
@@ -279,5 +287,38 @@ class AddingSpecTag<string a, string b> : PredOpTrait<
 
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` without a spec tag.
 class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
+
+// Multi-entity constraint ensuring that if at least one of the `input` has a spec tag,
+// then all of the `output` should have a spec tag.
+// This verification is done in the verifier of MergeLikeOpInterface
+class PropagatingSpecTag<list<string> inputs, list<string> outputs> : PredOpTrait<
+  "if at least one of the inputs has a spec tag, then all of the outputs should have a spec tag",
+  Or<[
+    And<[
+      Or<!foreach(
+        input, // variable name
+        inputs,
+        HasSpecTag<"$" # input # ".getType()">
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        HasSpecTag<"$" # output # ".getType()">
+      )>
+    ]>,
+    And<[
+      And<!foreach(
+        input, // variable name
+        inputs,
+        Neg<HasSpecTag<"$" # input # ".getType()">>
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        Neg<HasSpecTag<"$" # output # ".getType()">>
+      )>
+    ]>
+  ]>
+>;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
