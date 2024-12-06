@@ -227,7 +227,7 @@ std::string RTLDataflowType::serialize(Attribute attr) {
     std::stringstream ss;
     ss << ty.getDataBitWidth();
     for (const handshake::ExtraSignal &extra : ty.getExtraSignals()) {
-      ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
+      ss << "-" << extra.name << "-" << extra.getBitWidth()
          << (extra.downstream ? "-D" : "-U");
     }
     return ss.str();
@@ -236,7 +236,7 @@ std::string RTLDataflowType::serialize(Attribute attr) {
     std::stringstream ss;
     ss << "0";
     for (const handshake::ExtraSignal &extra : ty.getExtraSignals()) {
-      ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
+      ss << "-" << extra.name << "-" << extra.getBitWidth()
          << (extra.downstream ? "-D" : "-U");
     }
     return ss.str();
