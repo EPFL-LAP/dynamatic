@@ -333,7 +333,7 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
 /// Returns the internal signal name for an extra channel signal.
 static std::string getExtraSignalName(StringRef baseName,
                                       const ExtraSignal &extra) {
-  return baseName.str() + "_" + extra.name.str();
+  return baseName.str() + "_" + extra.name;
 }
 
 void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,

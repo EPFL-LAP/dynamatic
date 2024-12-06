@@ -44,7 +44,7 @@ struct ExtraSignal {
   };
 
   /// The signal's name.
-  llvm::StringRef name;
+  std::string name;
   /// The signal's MLIR type.
   mlir::Type type;
   /// Whether the signal is going downstream or upstream.
