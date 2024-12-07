@@ -227,7 +227,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   }];
 
   let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
-  let results = (outs SimpleChannel:$result);
+  let results = (outs ChannelType:$result);
   let assemblyFormat = "$ctrl attr-dict `:` type($ctrl) `,` type($result)";
   let hasVerifier = 1;
 }
