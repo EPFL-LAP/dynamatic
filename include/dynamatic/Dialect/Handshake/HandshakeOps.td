@@ -502,7 +502,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
     ```
   }];
 
-  let results = (outs SimpleControl:$result);
+  let results = (outs ControlType:$result);
 
   let builders = [
     // We provide a builder that doesn't require the result type
