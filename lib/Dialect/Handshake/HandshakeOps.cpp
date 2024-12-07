@@ -286,6 +286,7 @@ ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseCustomTypeWithFallback(selectType))
     return failure();
+
   int size = allOperands.size();
 
   // Parse the data operands types
@@ -341,17 +342,27 @@ OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
 
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
-  Type dataType;
-  handshake::ChannelType indexType;
+  Type resultDataType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
   if (parser.parseOperandList(operands) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, dataType) || parser.parseComma() ||
-      parser.parseCustomTypeWithFallback(indexType))
+      parseHandshakeType(parser, resultDataType))
     return failure();
 
-  SmallVector<Type> operandTypes(operands.size(), dataType);
-  result.addTypes({dataType, indexType});
+  int size = operands.size();
+
+  SmallVector<Type> operandTypes(operands.size());
+  for (int i = 0; i < size; i++) {
+    if (parser.parseComma() || parseHandshakeType(parser, operandTypes[i]))
+      return failure();
+  }
+
+  handshake::ChannelType indexType;
+
+  if (parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
+    return failure();
+
+  result.addTypes({resultDataType, indexType});
   return parser.resolveOperands(operands, operandTypes, allOperandLoc,
                                 result.operands);
 }
@@ -361,6 +372,10 @@ void ControlMergeOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : ";
   printHandshakeType(p, getResult().getType());
+  for (auto op : getOperands()) {
+    p << ", ";
+    printHandshakeType(p, op.getType());
+  }
   p << ", ";
   p.printStrippedAttrOrType(getIndex().getType());
 }
