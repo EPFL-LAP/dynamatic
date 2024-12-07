@@ -29,6 +29,7 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -102,7 +103,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath) {};
+      : modOp(modOp), config(config), outputPath(outputPath){};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -251,7 +252,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, HDL hdl)
-      : exportInfo(exportInfo), hdl(hdl) {};
+      : exportInfo(exportInfo), hdl(hdl){};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -366,6 +367,13 @@ void WriteModData::writeSignalDeclarations(
     writeDeclaration(getInternalSignalName(name, SignalType::READY),
                      std::nullopt, os);
   };
+  auto addExtraSignals = [&](StringRef name,
+                             ArrayRef<ExtraSignal> extraSignals) -> void {
+    for (const ExtraSignal &extra : extraSignals) {
+      writeDeclaration(getExtraSignalName(name, extra),
+                       getRawType(cast<IntegerType>(extra.type)), os);
+    }
+  };
 
   for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
     llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
@@ -374,13 +382,12 @@ void WriteModData::writeSignalDeclarations(
               getInternalSignalName(valueAndName.second, SignalType::DATA),
               channelType.getDataBitWidth() - 1, os);
           addValidReady(valueAndName.second);
-          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-            writeDeclaration(getExtraSignalName(valueAndName.second, extra),
-                             getRawType(cast<IntegerType>(extra.type)), os);
-          }
+          addExtraSignals(valueAndName.second, channelType.getExtraSignals());
         })
-        .Case<ControlType>(
-            [&](auto type) { addValidReady(valueAndName.second); })
+        .Case<ControlType>([&](auto type) {
+          addValidReady(valueAndName.second);
+          addExtraSignals(valueAndName.second, type.getExtraSignals());
+        })
         .Case<IntegerType>([&](IntegerType intType) {
           writeDeclaration(valueAndName.second, getRawType(intType), os);
         });
@@ -395,6 +402,16 @@ void WriteModData::writeSignalAssignments(
     writeAssignment(name + RTLWriter::READY_SUFFIX,
                     signal + RTLWriter::READY_SUFFIX, os);
   };
+  auto addExtraSignals = [&](StringRef name, StringRef signal,
+                             ArrayRef<ExtraSignal> extraSignals) -> void {
+    for (const ExtraSignal &extra : extraSignals) {
+      std::string srcName = getExtraSignalName(signal, extra);
+      std::string dstName = getExtraSignalName(name, extra);
+      if (!extra.downstream)
+        std::swap(srcName, dstName);
+      writeAssignment(srcName, dstName, os);
+    }
+  };
 
   for (auto valAndName : llvm::zip(outputs, modOp.getOutputNamesStr())) {
     Value val = std::get<0>(valAndName);
@@ -404,15 +421,12 @@ void WriteModData::writeSignalAssignments(
         .Case<ChannelType>([&](ChannelType channelType) {
           writeAssignment(signal, name, os);
           addValidReady(name, signal);
-          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-            std::string srcName = getExtraSignalName(signal, extra);
-            std::string dstName = getExtraSignalName(name, extra);
-            if (!extra.downstream)
-              std::swap(srcName, dstName);
-            writeAssignment(srcName, dstName, os);
-          }
+          addExtraSignals(name, signal, channelType.getExtraSignals());
         })
-        .Case<ControlType>([&](auto type) { addValidReady(name, signal); })
+        .Case<ControlType>([&](auto type) {
+          addValidReady(name, signal);
+          addExtraSignals(name, signal, type.getExtraSignals());
+        })
         .Case<IntegerType>([&](IntegerType intType) {
           writeAssignment(signals[val], name, os);
         });
@@ -427,6 +441,16 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     up.emplace_back(getInternalSignalName(portName, SignalType::READY),
                     std::nullopt);
   };
+  auto addExtraSignals = [&](StringRef portName, std::vector<IOPort> &down,
+                             std::vector<IOPort> &up,
+                             ArrayRef<ExtraSignal> extraSignals) -> void {
+    for (const ExtraSignal &extra : extraSignals) {
+      std::vector<IOPort> &portsDir = extra.downstream ? down : up;
+      IntegerType ty = cast<IntegerType>(extra.type);
+      portsDir.emplace_back(getExtraSignalName(portName, extra),
+                            getRawType(ty));
+    }
+  };
 
   auto addPortType = [&](Type portType, StringRef portName,
                          std::vector<IOPort> &down, std::vector<IOPort> &up) {
@@ -435,15 +459,12 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
           down.emplace_back(getInternalSignalName(portName, SignalType::DATA),
                             channelType.getDataBitWidth() - 1);
           addValidAndReady(portName, down, up);
-          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-            std::vector<IOPort> &portsDir = extra.downstream ? down : up;
-            IntegerType ty = cast<IntegerType>(extra.type);
-            portsDir.emplace_back(getExtraSignalName(portName, extra),
-                                  getRawType(ty));
-          }
+          addExtraSignals(portName, down, up, channelType.getExtraSignals());
         })
-        .Case<ControlType>(
-            [&](auto type) { addValidAndReady(portName, down, up); })
+        .Case<ControlType>([&](auto type) {
+          addValidAndReady(portName, down, up);
+          addExtraSignals(portName, down, up, type.getExtraSignals());
+        })
         .Case<IntegerType>([&](IntegerType intType) {
           down.emplace_back(portName, getRawType(intType));
         });
@@ -506,6 +527,13 @@ void RTLWriter::constructIOMappings(
     mappings[getTypedSignalName(port, SignalType::READY)].push_back(
         getInternalSignalName(signal, SignalType::READY));
   };
+  auto addExtraSignals = [&](StringRef port, StringRef signal,
+                             ArrayRef<ExtraSignal> extraSignals) -> void {
+    for (const ExtraSignal &extra : extraSignals) {
+      mappings[{getExtraSignalName(port, extra), false}].push_back(
+          getExtraSignalName(signal, extra));
+    }
+  };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
     llvm::TypeSwitch<Type, void>(portType)
@@ -513,12 +541,12 @@ void RTLWriter::constructIOMappings(
           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(
               getInternalSignalName(signal, SignalType::DATA));
           addValidAndReady(port, signal);
-          for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-            mappings[{getExtraSignalName(port, extra), false}].push_back(
-                getExtraSignalName(signal, extra));
-          }
+          addExtraSignals(port, signal, channelType.getExtraSignals());
         })
-        .Case<ControlType>([&](auto type) { addValidAndReady(port, signal); })
+        .Case<ControlType>([&](auto type) {
+          addValidAndReady(port, signal);
+          addExtraSignals(port, signal, type.getExtraSignals());
+        })
         .Case<IntegerType>([&](IntegerType intType) {
           mappings[getSignalName(port)].push_back(signal.str());
         });

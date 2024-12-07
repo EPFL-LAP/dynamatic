@@ -49,7 +49,7 @@ handshake.func @eraseSingleInputMuxes(%arg0: !handshake.channel<i32>, %arg1: !ha
 // CHECK-SAME:                                             %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                                             %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_3:.*]] = source {handshake.bb = 0 : ui32}
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 0 : i32} : <i32>
+// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
 // CHECK:           %[[VAL_5:.*]], %[[VAL_6:.*]] = control_merge %[[VAL_0]], %[[VAL_1]]  {handshake.bb = 0 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_7:.*]] = addi %[[VAL_0]], %[[VAL_1]] : <i32>
 // CHECK:           %[[VAL_8:.*]] = addi %[[VAL_7]], %[[VAL_5]] : <i32>
