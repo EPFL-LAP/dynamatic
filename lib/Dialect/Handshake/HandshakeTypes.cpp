@@ -64,10 +64,8 @@ static void printExtraSignals(AsmPrinter &odsPrinter,
 static LogicalResult
 checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
                   const ArrayRef<ExtraSignal> &extraSignals) {
-  std::cerr << "checkChannelExtra" << std::endl;
   DenseSet<StringRef> names;
   for (const ExtraSignal &extra : extraSignals) {
-    std::cerr << "extra.name: " << extra.name.data() << std::endl;
     if (auto [_, newName] = names.insert(extra.name); !newName) {
       return emitError() << "expected all signal names to be unique but '"
                          << extra.name << "' appears more than once";
@@ -148,7 +146,6 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
     auto &signal = extraSignals.emplace_back(signalStorage);
     signal.name = signalStorage.name;
   }
-  std::cerr << "call from parseExtraSignals" << std::endl;
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return failure();
 
@@ -310,10 +307,6 @@ ChannelType ChannelType::getAddrChannel(MLIRContext *ctx) {
 LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                                   Type dataType,
                                   ArrayRef<ExtraSignal> extraSignals) {
-  std::cerr << "ChannelType::verify" << std::endl;
-  for (const auto &extra : extraSignals) {
-    std::cerr << extra.name.data() << std::endl;
-  }
   return failure(failed(checkChannelData(emitError, dataType)) ||
                  failed(checkChannelExtra(emitError, extraSignals)));
 }
