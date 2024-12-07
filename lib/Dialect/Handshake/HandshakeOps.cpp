@@ -278,19 +278,29 @@ ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
   SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
   handshake::ChannelType selectType;
-  Type dataType;
-  SmallVector<Type, 2> dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
+  // Parse until the type of the select operand
   if (parser.parseOperand(selectOperand) || parser.parseLSquare() ||
       parser.parseOperandList(allOperands) || parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseCustomTypeWithFallback(selectType) || parser.parseComma() ||
-      parseHandshakeType(parser, dataType))
+      parser.parseCustomTypeWithFallback(selectType))
     return failure();
-
   int size = allOperands.size();
-  dataOperandsTypes.assign(size, dataType);
-  result.addTypes(dataType);
+
+  // Parse the data operands types
+  SmallVector<Type> dataOperandsTypes(size);
+  for (int i = 0; i < size; i++) {
+    if (parser.parseComma() || parseHandshakeType(parser, dataOperandsTypes[i]))
+      return failure();
+  }
+
+  // Parse the result type
+  Type resultType;
+  if (parser.parseComma() || parseHandshakeType(parser, resultType))
+    return failure();
+  result.addTypes(resultType);
+
   allOperands.insert(allOperands.begin(), selectOperand);
   if (parser.resolveOperands(
           allOperands,
@@ -310,6 +320,10 @@ void MuxOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : ";
   p.printStrippedAttrOrType(getSelectOperand().getType());
+  for (auto op : getDataOperands()) {
+    p << ", ";
+    printHandshakeType(p, op.getType());
+  }
   p << ", ";
   printHandshakeType(p, getResult().getType());
 }
