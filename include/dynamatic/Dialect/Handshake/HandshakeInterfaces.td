@@ -47,6 +47,31 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
+    InterfaceMethod<[{
+        Returns whether the operation has an operand with the "spec" tag.
+      }],
+      "mlir::FailureOr<bool>", "hasSpecInput", (ins),
+      /*methodBody=*/"", /*defaultImplementation=*/[{
+        auto operands = $_op->getOperands();
+
+        if (!operands.size()) {
+          $_op->emitOpError("must have at least one operand");
+          return failure();
+        }
+
+        for (auto operand : operands) {
+          if (auto controlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(operand.getType())) {
+            if (controlType.hasExtraSignal("spec"))
+              return true;
+          } else if (auto channelType = mlir::dyn_cast<::dynamatic::handshake::ChannelType>(operand.getType())) {
+            if (channelType.hasExtraSignal("spec"))
+              return true;
+          }
+        }
+
+        return false;
+      }]
+    >,
   ];
 
   let verify = [{
@@ -59,6 +84,34 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
 
     mlir::Type resultType = $_op->getResult(0).getType();
 
+    FailureOr<bool> hasInputWithSpecTag = concreteOp.hasSpecInput();
+    if (mlir::failed(hasInputWithSpecTag))
+      return mlir::failure();
+
+    if (auto resultControlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(resultType)) {
+      bool resultHasSpecTag = !mlir::failed(resultControlType.getExtraSignalByName("spec"));
+      if (*hasInputWithSpecTag) {
+        if (!resultHasSpecTag)
+          return concreteOp.emitOpError("result must have a spec tag");
+      } else {
+        if (resultHasSpecTag)
+          return concreteOp.emitOpError("result must not have a spec tag");
+      }
+
+      return mlir::success();
+    }
+    if (auto resultChannelType = mlir::dyn_cast<::dynamatic::handshake::ChannelType>(resultType)) {
+      bool resultHasSpecTag = !mlir::failed(resultChannelType.getExtraSignalByName("spec"));
+      if (*hasInputWithSpecTag) {
+        if (!resultHasSpecTag)
+          return concreteOp.emitOpError("result must have a spec tag");
+      } else {
+        if (resultHasSpecTag)
+          return concreteOp.emitOpError("result must not have a spec tag");
+      }
+
+      return mlir::success();
+    }
     for (auto operand : operands)
       if (operand.getType() != resultType)
         return concreteOp.emitOpError("operand has type ") << operand.getType()

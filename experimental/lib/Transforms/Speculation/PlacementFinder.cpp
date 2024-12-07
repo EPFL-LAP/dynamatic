@@ -13,6 +13,7 @@
 
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
@@ -35,7 +36,8 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
 
 void PlacementFinder::clearPlacements() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
-  this->placements = SpeculationPlacements(specPos);
+  auto buffers = this->placements.getPlacements<handshake::BufferOp>();
+  this->placements = SpeculationPlacements(specPos, buffers);
 }
 
 //===----------------------------------------------------------------------===//
@@ -101,6 +103,10 @@ LogicalResult PlacementFinder::findSavePositions() {
           if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
             continue;
 
+          // tmp
+          if (isa<handshake::StoreOp>(operand.getOwner()))
+            continue;
+
           placements.addSave(operand);
         }
       }
@@ -132,13 +138,24 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // consecutive Commit-Save units.
         placements.addSaveCommit(dstOpOperand);
         placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOp,
-                     handshake::StoreOp>(succOp)) {
+      } else if (isa<handshake::StoreOp>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {
         // A commit is needed in front of the end/exit operation
         placements.addCommit(dstOpOperand);
+      } else if (isa<handshake::MemoryControllerOp>(succOp)) {
+        if (dstOpOperand.getOperandNumber() == 2 &&
+            !isa<handshake::LoadOp>(currOp)) {
+          // A commit is needed in front of the memory controller
+          // On the operand indicating the number of stores
+          placements.addCommit(dstOpOperand);
+        } else if (dstOpOperand.get().getType().isa<handshake::ControlType>()) {
+          // End signal
+          placements.addCommit(dstOpOperand);
+        }
+        // Exceptionally stop the traversal
+        continue;
       } else {
         findCommitsTraversal(visited, succOp);
       }
@@ -201,14 +218,19 @@ void PlacementFinder::findCommitsBetweenBBs() {
     }
 
     if (countSpecInputs > 1) {
+      int placeIndex = 0;
+      int i = 0;
       // Potential ordering issue, add commits
       for (const BBArc &pred : predecessorArcs) {
-        for (CFGEdge *edge : pred.edges) {
-          // Add a Commit only in front of speculative inputs
-          if (speculativeEdges.count(edge))
-            placements.addCommit(*edge);
-          // Here, synchronizer operations will be needed in the future
+        if (i == placeIndex) {
+          for (CFGEdge *edge : pred.edges) {
+            // Add a Commit only in front of speculative inputs
+            if (speculativeEdges.count(edge))
+              placements.addCommit(*edge);
+            // Here, synchronizer operations will be needed in the future
+          }
         }
+        i++;
       }
     }
   }
@@ -350,6 +372,8 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
-                 failed(findSaveCommitPositions()));
+  return failure(failed(findSavePositions()) || failed(findCommitPositions()));
+  // return failure(failed(findSavePositions()) || failed(findCommitPositions())
+  // ||
+  //                failed(findSaveCommitPositions()));
 }

@@ -336,7 +336,7 @@ def MuxOp : Handshake_Op<"mux", [
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  // DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "mux operation";
@@ -371,7 +371,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
-  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  // DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "control merge operation";
@@ -503,8 +503,17 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   }];
 
   let results = (outs ControlType:$result);
-  
-  let assemblyFormat = "attr-dict";
+
+  let builders = [
+    // We provide a builder that doesn't require the result type
+    // because it always has no extra bits.
+    OpBuilder<(ins), [{
+      $_state.addTypes(ControlType::get($_builder.getContext(), {}));
+    }]>
+  ];
+
+  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -556,8 +565,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -570,7 +579,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -587,7 +596,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -596,20 +605,22 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
     ```
   }];
-  
-  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
+
+  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
+                       Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<ChannelType>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
+
+  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` functional-type($inputs, $outputs)
+    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
@@ -726,22 +737,43 @@ def LSQOp : Handshake_Op<"lsq", [
 // Memory ports
 //===----------------------------------------------------------------------===//
 
-class Handshake_MemPortOp<string mnemonic> :
+class Handshake_MemPortOp<string mnemonic, list<OpBuilder> customBuilders> :
   Handshake_Op<mnemonic, [
     MemPortOpInterface,
-    AllTypesMatch<["address", "addressResult"]>,
-    AllTypesMatch<["data", "dataResult"]>,
+    AllDataTypesMatch<["address", "addressResult"]>,
+    AllDataTypesMatch<["data", "dataResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+
+  let builders = customBuilders # [
+    // We provide a builder that doesn't require the result type
+    OpBuilder<(ins "::mlir::Value":$address, "::mlir::Value":$data), [{
+      $_state.addOperands({address, data});
+      // The type of addressResult is the same as the type of address
+      // The type of dataResult is the same as the type of data
+      $_state.addTypes({address.getType(), data.getType()});
+    }]>,
+  ];
+
   let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    `[` $address `]` $data attr-dict `:` type($address) `,` type($data) `,` type($addressResult) `,` type($dataResult)
   }];
 }
 
-def LoadOp : Handshake_MemPortOp<"load"> {
+def LoadOp : Handshake_MemPortOp<"load", [
+  OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
+    // Address (data operand needs to be added later)
+    $_state.addOperands(address);
+
+    // Data and address results
+    $_state.types.push_back(address.getType());
+    $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+      memrefType.getElementType()));
+  }]>
+]> {
   let summary = "load port for memory interface";
   let description = [{
     Represents a load memory port which sends load requests to a memory
@@ -765,18 +797,6 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     ```
   }];
 
-  let builders = [
-    OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
-      // Address (data operand needs to be added later)
-      $_state.addOperands(address);
-
-      // Data and address results
-      $_state.types.push_back(address.getType());
-      $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
-        memrefType.getElementType()));
-    }]>
-  ];
-
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
@@ -790,7 +810,7 @@ def LoadOp : Handshake_MemPortOp<"load"> {
   }];
 }
 
-def StoreOp : Handshake_MemPortOp<"store"> {
+def StoreOp : Handshake_MemPortOp<"store", []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
     Represents a store memory port which sends store requests to a memory
@@ -859,7 +879,11 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataIn", "dataOut"]>,
+  PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
+    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside a loop
+    AddingSpecTag<"dataIn", "dataOut">.predicate // Not inside a loop
+  ]>>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -895,12 +919,24 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
   }];
 }
 
@@ -924,7 +960,11 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   }];
 }
 
-def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
+def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface, RemovingSpecTag<"dataIn", "dataOut">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
     Commit units are used to mark the end of the speculation region. 
@@ -944,6 +984,25 @@ def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
     ```
   }];
 
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  // While type($dataOut) can be inferred due to this operation's implementation of inferReturnTypes,  
+  // we chose to explicitly specify it in the IR for better clarity and understandability.
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
@@ -965,7 +1024,8 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -989,6 +1049,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand)
+  }];
+  let extraClassDeclaration = [{
+    // These are the indices into the dests list.
+    enum { trueIndex = 0, falseIndex = 1 };
   }];
 }
 

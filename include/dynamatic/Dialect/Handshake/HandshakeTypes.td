@@ -22,22 +22,8 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ControlType : Handshake_Type<"Control", "control"> {
-  let summary = "a control-only dataflow channel";
-  let description = [{
-    Represents a control-only dataflow channel, which is made up of
-    - a 1-bit valid signal going downstream (in the same direction as the
-      natural SSA def-use relation's direction) and
-    - a 1-bit ready signal going upsteam (in the opposite direction as the
-      natural SSA def-use relation's direction).
-  }];
-
-  let parameters = (ins);
-  let assemblyFormat = "`<` `>`";
-}
-
 def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
+  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>",
   "An optional array of extra signals for a dataflow channel"> {
   let allocator = [{
     ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
@@ -51,6 +37,54 @@ def ExtraSignals : TypeParameter<
   let convertFromStorage = [{convertExtraSignalsFromStorage($_self)}];
   let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
   let defaultValue = cppType # "()";
+}
+
+def ControlType : Handshake_Type<"Control", "control"> {
+  let summary = "a control-only dataflow channel";
+  let description = [{
+    Represents a control-only dataflow channel, which is made up of
+    - a 1-bit valid signal going downstream (in the same direction as the
+      natural SSA def-use relation's direction) and
+    - a 1-bit ready signal going upsteam (in the opposite direction as the
+      natural SSA def-use relation's direction).
+    - an optional list of named extra signals of arbitrary width and type which
+      may go downstream or upstream.
+  }];
+
+  let parameters = (ins ExtraSignals:$extraSignals);
+  let builders = [
+    TypeBuilder<(ins),
+      [{
+        return ControlType::get($_ctxt, {});
+      }]>
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    /// Returns the number of extra signals.
+    unsigned getNumExtraSignals() const {
+      return getExtraSignals().size();
+    }
+
+    /// Returns the number of downstream extra signals.
+    unsigned getNumDownstreamExtraSignals() const;
+
+    /// Returns the number of upstream extra signals.
+    unsigned getNumUpstreamExtraSignals() const {
+      return getNumExtraSignals() - getNumDownstreamExtraSignals();
+    }
+
+    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
+    bool hasExtraSignal(const std::string &name);
+
+    ControlType addExtraSignal(const ExtraSignal &signal) {
+      ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
+      newExtraSignals.emplace_back(signal);
+      return ControlType::get(getContext(), newExtraSignals);
+    }
+
+  }];
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel"> {
@@ -71,8 +105,8 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
-      "::mlir::Type":$dataType, 
-      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
+      "::mlir::Type":$dataType,
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras),
       [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
@@ -108,7 +142,19 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     ChannelType withDataType(Type newDataType) {
       return ChannelType::get(newDataType, getExtraSignals());
     }
-    
+
+    /// Returns a channel type with identical data type but a potentially
+    /// different extra signals.
+    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
+      return ChannelType::get(getDataType(), newExtraSignals);
+    }
+
+    ChannelType addExtraSignal(const ExtraSignal &signal) {
+      ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
+      newExtraSignals.emplace_back(signal);
+      return ChannelType::get(getDataType(), newExtraSignals);
+    }
+
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
@@ -118,6 +164,9 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     /// Returns a channel whose data type is the default one used to represent
     /// an address in an external memory.
     static ChannelType getAddrChannel(::mlir::MLIRContext* ctx);
+
+    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
+    bool hasExtraSignal(const std::string &name);
   }];
 }
 
@@ -135,6 +184,11 @@ class ChannelHasDataType<string type> : CPred<
 class ChannelHasDataWidth<int width> : CPred<
   "::mlir::cast<::dynamatic::handshake::ChannelType>" #
   "($_self).getDataBitWidth() == " # width
+>;
+
+class ControlHasNumExtras<int numExtras> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ControlType>" #
+  "($_self).getNumExtraSignals() == " # numExtras
 >;
 
 class ChannelHasNumExtras<int numExtras> : CPred<
@@ -181,10 +235,111 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 
 def BoolChannel : IntSizedChannel<1>;
 
+def SimpleControl : TypeConstraint<
+  ControlHasNumExtras<0>,
+  "must be a `handshake::ControlType` type with no extra signals",
+  "::dynamatic::handshake::ControlType"
+>;
+
 def SimpleChannel : TypeConstraint<
   ChannelHasNumExtras<0>,
   "must be a `handshake::ChannelType` type with no extra signals",
   "::dynamatic::handshake::ChannelType"
+>;
+
+// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
+// Also applies to ControlTypes, as some operations treat them interchangeably 
+// using HandshakeType.
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
+>;
+
+// Multi-entity constraints for spec tags
+
+// Predicate to verify if the given type has a valid spec tag as an additional signal.
+class HasSpecTag<string type> : CPred<
+  [{
+    ([&](FailureOr<ExtraSignal> signal) {
+      if (failed(signal)) {
+        // There is no extra signal called "spec"
+        return false;
+      }
+      if (!(*signal).downstream) {
+        // The signal is not a downstream signal
+        return false;
+      }
+      if (!(*signal).type.isInteger(1)) {
+        // The signal is not a 1-bit integer
+        return false;
+      }
+      return true;
+    })(
+  }] #
+  "    ::mlir::isa<::dynamatic::handshake::ChannelType>(" # type # ") ?\n" #
+  "    ::mlir::cast<::dynamatic::handshake::ChannelType>(" # type # ").getExtraSignalByName(\"spec\") :\n" #
+  "    ::mlir::cast<::dynamatic::handshake::ControlType>(" # type # ").getExtraSignalByName(\"spec\")\n" #
+  "  )"
+>;
+
+// Two approaches to ensuring operand types satisfy a constraint:
+// 1. Define a multi-entity constraint:
+//    - Lightweight implementation but less expressive.
+// 2. Create an OpInterface and implement a verifier to it:
+//    - Commonly used in Dynamatic but lacks immediate clarity that a constraint exists in the Op.
+//    - Deviates from the original intent of an "Interface."
+// TODO: Standardize these approaches or establish guidelines for when to use each.
+
+// Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
+class AddingSpecTag<string a, string b> : PredOpTrait<
+  b # " should be the type of " # a # " with spec tag",
+  And<[
+    AllDataTypesMatch<[a, b]>.predicate,
+    Neg<HasSpecTag<"$" # a # ".getType()">>,
+    HasSpecTag<"$" # b # ".getType()">
+    // TODO: Add a constraint to ensure that no other extra bits are added to `b`.
+  ]>
+>;
+
+// Multi-entity constraint ensuring that the type of `b` matches the type of `a` without a spec tag.
+class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
+
+// Multi-entity constraint ensuring that if at least one of the `input` has a spec tag,
+// then all of the `output` should have a spec tag.
+// This verification is done in the verifier of MergeLikeOpInterface
+class PropagatingSpecTag<list<string> inputs, list<string> outputs> : PredOpTrait<
+  "if at least one of the inputs has a spec tag, then all of the outputs should have a spec tag",
+  Or<[
+    And<[
+      Or<!foreach(
+        input, // variable name
+        inputs,
+        HasSpecTag<"$" # input # ".getType()">
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        HasSpecTag<"$" # output # ".getType()">
+      )>
+    ]>,
+    And<[
+      And<!foreach(
+        input, // variable name
+        inputs,
+        Neg<HasSpecTag<"$" # input # ".getType()">>
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        Neg<HasSpecTag<"$" # output # ".getType()">>
+      )>
+    ]>
+  ]>
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
