@@ -78,9 +78,9 @@ def ControlType : Handshake_Type<"Control", "control"> {
     mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
     bool hasExtraSignal(const std::string &name);
 
-    ControlType addExtraSignal(ExtraSignal signal) {
+    ControlType addExtraSignal(const ExtraSignal &signal) {
       ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-      newExtraSignals.push_back(signal);
+      newExtraSignals.emplace_back(signal);
       return ControlType::get(getContext(), newExtraSignals);
     }
 
@@ -149,9 +149,9 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
       return ChannelType::get(getDataType(), newExtraSignals);
     }
 
-    ChannelType addExtraSignal(ExtraSignal signal) {
+    ChannelType addExtraSignal(const ExtraSignal &signal) {
       ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-      newExtraSignals.push_back(signal);
+      newExtraSignals.emplace_back(signal);
       return ChannelType::get(getDataType(), newExtraSignals);
     }
 
