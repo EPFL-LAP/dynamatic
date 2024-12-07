@@ -2220,7 +2220,13 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
@@ -2235,7 +2241,13 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
