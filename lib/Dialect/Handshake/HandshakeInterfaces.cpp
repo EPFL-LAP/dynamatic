@@ -447,25 +447,23 @@ LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
   return success();
 }
 
-SmallVector<ChannelVal> MuxOp::getChannelsWithSameExtraSignals() {
-  if (getResult().getType())
-    return {};
+// SmallVector<ChannelVal> MuxOp::getChannelsWithSameExtraSignals() {
+//   if (getResult().getType())
+//     return {};
 
-  SmallVector<ChannelVal> channels;
-  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
-  channels.push_back(toChannel(getResult()));
-  return channels;
-}
+//   SmallVector<ChannelVal> channels;
+//   llvm::transform(getDataOperands(), std::back_inserter(channels),
+//   toChannel); channels.push_back(toChannel(getResult())); return channels;
+// }
 
-SmallVector<ChannelVal> ControlMergeOp::getChannelsWithSameExtraSignals() {
-  if (getResult().getType())
-    return {};
+// SmallVector<ChannelVal> ControlMergeOp::getChannelsWithSameExtraSignals() {
+//   if (getResult().getType())
+//     return {};
 
-  SmallVector<ChannelVal> channels;
-  llvm::transform(getDataOperands(), std::back_inserter(channels), toChannel);
-  channels.push_back(toChannel(getResult()));
-  return channels;
-}
+//   SmallVector<ChannelVal> channels;
+//   llvm::transform(getDataOperands(), std::back_inserter(channels),
+//   toChannel); channels.push_back(toChannel(getResult())); return channels;
+// }
 
 SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
   return {getTrueValue(), getFalseValue(), getResult()};
