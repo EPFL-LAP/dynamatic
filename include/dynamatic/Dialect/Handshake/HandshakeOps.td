@@ -513,7 +513,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   ];
 
   // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
-  let assemblyFormat = "attr-dict type($result)";
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
