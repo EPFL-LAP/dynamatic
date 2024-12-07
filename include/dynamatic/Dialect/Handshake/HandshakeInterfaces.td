@@ -47,6 +47,31 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
+    InterfaceMethod<[{
+        Returns whether the operation has an operand with the "spec" tag.
+      }],
+      "mlir::FailureOr<bool>", "hasSpecInput", (ins),
+      /*methodBody=*/"", /*defaultImplementation=*/[{
+        auto operands = $_op->getOperands();
+
+        if (!operands.size()) {
+          $_op->emitOpError("must have at least one operand");
+          return failure();
+        }
+
+        for (auto operand : operands) {
+          if (auto controlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(operand.getType())) {
+            if (!mlir::failed(controlType.getExtraSignalByName("spec")))
+              return true;
+          } else if (auto channelType = mlir::dyn_cast<::dynamatic::handshake::ChannelType>(operand.getType())) {
+            if (!mlir::failed(channelType.getExtraSignalByName("spec")))
+              return true;
+          }
+        }
+
+        return false;
+      }]
+    >,
   ];
 
   let verify = [{
@@ -59,18 +84,13 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
 
     mlir::Type resultType = $_op->getResult(0).getType();
 
-    if (auto resultControlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(resultType)) {
-      bool hasInputWithSpecTag = false;
-      for (auto operand : operands) {
-        auto operandType = cast<::dynamatic::handshake::ControlType>(operand.getType());
-        if (!mlir::failed(operandType.getExtraSignalByName("spec"))) {
-          hasInputWithSpecTag = true;
-          break;
-        }
-      }
+    FailureOr<bool> hasInputWithSpecTag = concreteOp.hasSpecInput();
+    if (mlir::failed(hasInputWithSpecTag))
+      return mlir::failure();
 
+    if (auto resultControlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(resultType)) {
       bool resultHasSpecTag = !mlir::failed(resultControlType.getExtraSignalByName("spec"));
-      if (hasInputWithSpecTag) {
+      if (*hasInputWithSpecTag) {
         if (!resultHasSpecTag)
           return concreteOp.emitOpError("result must have a spec tag");
       } else {
@@ -81,17 +101,8 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       return mlir::success();
     }
     if (auto resultChannelType = mlir::dyn_cast<::dynamatic::handshake::ChannelType>(resultType)) {
-      bool hasInputWithSpecTag = false;
-      for (auto operand : operands) {
-        auto operandType = cast<::dynamatic::handshake::ChannelType>(operand.getType());
-        if (!mlir::failed(operandType.getExtraSignalByName("spec"))) {
-          hasInputWithSpecTag = true;
-          break;
-        }
-      }
-
       bool resultHasSpecTag = !mlir::failed(resultChannelType.getExtraSignalByName("spec"));
-      if (hasInputWithSpecTag) {
+      if (*hasInputWithSpecTag) {
         if (!resultHasSpecTag)
           return concreteOp.emitOpError("result must have a spec tag");
       } else {
