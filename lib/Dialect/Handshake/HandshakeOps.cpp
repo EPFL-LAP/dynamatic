@@ -45,6 +45,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+const std::string EXTRA_BIT_SPEC = "spec";
+
 static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
   return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
     if ((ty = handshake::detail::jointHandshakeTypeParser(parser)))
@@ -224,8 +226,47 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   // operand)
   if (operands.size() < 2)
     return failure();
-  // Result type is type of any data operand
-  inferredReturnTypes.push_back(operands[1].getType());
+
+  OpBuilder builder(context);
+  auto dataInTypeCandidate = operands[1].getType();
+  bool hasSpecInput = false;
+  for (auto operand : operands) {
+    auto operandType = operand.getType();
+    if (auto channelType = dyn_cast<ChannelType>(operandType)) {
+      if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+        hasSpecInput = true;
+        break;
+      }
+    } else if (auto controlType = dyn_cast<ControlType>(operandType)) {
+      if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+        hasSpecInput = true;
+        break;
+      }
+    }
+  }
+  if (!hasSpecInput) {
+    inferredReturnTypes.push_back(dataInTypeCandidate);
+    return success();
+  }
+  if (auto channelType = dyn_cast<ChannelType>(dataInTypeCandidate)) {
+    if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      inferredReturnTypes.push_back(channelType);
+    } else {
+      inferredReturnTypes.push_back(channelType.addExtraSignal(
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    }
+  } else if (auto controlType = dyn_cast<ControlType>(dataInTypeCandidate)) {
+    if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      inferredReturnTypes.push_back(controlType);
+    } else {
+      inferredReturnTypes.push_back(controlType.addExtraSignal(
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    }
+  } else {
+    // TODO: emit error
+    return failure();
+  }
+
   return success();
 }
 
@@ -314,13 +355,13 @@ LogicalResult ControlMergeOp::verify() {
   TypeRange operandTypes = getOperandTypes();
   if (operandTypes.empty())
     return emitOpError("operation must have at least one operand");
-  Type refType = operandTypes.front();
-  for (Type type : operandTypes.drop_front()) {
-    if (refType != type)
-      return emitOpError("all operands should have the same type");
-  }
-  if (refType != getResult().getType())
-    return emitOpError("type of data result should match type of operands");
+  // Type refType = operandTypes.front();
+  // for (Type type : operandTypes.drop_front()) {
+  //   if (refType != type)
+  //     return emitOpError("all operands should have the same type");
+  // }
+  // if (refType != getResult().getType())
+  //   return emitOpError("type of data result should match type of operands");
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
 
@@ -1548,18 +1589,18 @@ LogicalResult SpeculatorOp::inferReturnTypes(
 
   Type dataInType = operands.front().getType();
   if (auto channelType = dyn_cast<ChannelType>(dataInType)) {
-    if (channelType.hasExtraSignal("spec")) {
+    if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
       inferredReturnTypes.push_back(channelType);
     } else {
       inferredReturnTypes.push_back(channelType.addExtraSignal(
-          ExtraSignal("spec", builder.getIntegerType(1))));
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
   } else if (auto controlType = dyn_cast<ControlType>(dataInType)) {
-    if (controlType.hasExtraSignal("spec")) {
+    if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
       inferredReturnTypes.push_back(controlType);
     } else {
       inferredReturnTypes.push_back(controlType.addExtraSignal(
-          ExtraSignal("spec", builder.getIntegerType(1))));
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
   } else {
     // Report error
