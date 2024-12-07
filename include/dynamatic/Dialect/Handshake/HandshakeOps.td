@@ -739,22 +739,43 @@ def LSQOp : Handshake_Op<"lsq", [
 // Memory ports
 //===----------------------------------------------------------------------===//
 
-class Handshake_MemPortOp<string mnemonic> :
+class Handshake_MemPortOp<string mnemonic, list<OpBuilder> customBuilders> :
   Handshake_Op<mnemonic, [
     MemPortOpInterface,
-    AllTypesMatch<["address", "addressResult"]>,
-    AllTypesMatch<["data", "dataResult"]>,
+    AllDataTypesMatch<["address", "addressResult"]>,
+    AllDataTypesMatch<["data", "dataResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+
+  let builders = customBuilders # [
+    // We provide a builder that doesn't require the result type
+    OpBuilder<(ins "::mlir::Value":$address, "::mlir::Value":$data), [{
+      $_state.addOperands({address, data});
+      // The type of addressResult is the same as the type of address
+      // The type of dataResult is the same as the type of data
+      $_state.addTypes({address.getType(), data.getType()});
+    }]>,
+  ];
+
   let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    `[` $address `]` $data attr-dict `:` type($address) `,` type($data) `,` type($addressResult) `,` type($dataResult)
   }];
 }
 
-def LoadOp : Handshake_MemPortOp<"load"> {
+def LoadOp : Handshake_MemPortOp<"load", [
+  OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
+    // Address (data operand needs to be added later)
+    $_state.addOperands(address);
+
+    // Data and address results
+    $_state.types.push_back(address.getType());
+    $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+      memrefType.getElementType()));
+  }]>
+]> {
   let summary = "load port for memory interface";
   let description = [{
     Represents a load memory port which sends load requests to a memory
@@ -778,18 +799,6 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     ```
   }];
 
-  let builders = [
-    OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
-      // Address (data operand needs to be added later)
-      $_state.addOperands(address);
-
-      // Data and address results
-      $_state.types.push_back(address.getType());
-      $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
-        memrefType.getElementType()));
-    }]>
-  ];
-
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
@@ -803,7 +812,7 @@ def LoadOp : Handshake_MemPortOp<"load"> {
   }];
 }
 
-def StoreOp : Handshake_MemPortOp<"store"> {
+def StoreOp : Handshake_MemPortOp<"store", []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
     Represents a store memory port which sends store requests to a memory
