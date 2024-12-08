@@ -200,23 +200,10 @@ Type ControlType::parse(AsmParser &odsParser) {
   return ControlType::get(odsParser.getContext(), {});
 }
 
-unsigned ControlType::getNumDownstreamExtraSignals() const {
-  return llvm::count_if(getExtraSignals(), [](const ExtraSignal &extra) {
-    return extra.downstream;
-  });
-}
-
-FailureOr<ExtraSignal>
-ControlType::getExtraSignalByName(const std::string &name) {
-  for (const ExtraSignal &extra : getExtraSignals()) {
-    if (extra.name == name)
-      return extra;
-  }
-  return failure();
-}
-
-bool ControlType::hasExtraSignal(const std::string &name) {
-  return !failed(getExtraSignalByName(name));
+Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
+  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
+  newExtraSignals.emplace_back(signal);
+  return ControlType::get(getContext(), newExtraSignals);
 }
 
 //===----------------------------------------------------------------------===//
@@ -323,27 +310,8 @@ LogicalResult ChannelType::verify(function_ref<InFlightDiagnostic()> emitError,
                  failed(checkChannelExtra(emitError, extraSignals)));
 }
 
-unsigned ChannelType::getNumDownstreamExtraSignals() const {
-  return llvm::count_if(getExtraSignals(), [](const ExtraSignal &extra) {
-    return extra.downstream;
-  });
-}
-
 unsigned ChannelType::getDataBitWidth() const {
   return getDataType().getIntOrFloatBitWidth();
-}
-
-FailureOr<ExtraSignal>
-ChannelType::getExtraSignalByName(const std::string &name) {
-  for (const ExtraSignal &extra : getExtraSignals()) {
-    if (extra.name == name)
-      return extra;
-  }
-  return failure();
-}
-
-bool ChannelType::hasExtraSignal(const std::string &name) {
-  return !failed(getExtraSignalByName(name));
 }
 
 Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
@@ -358,6 +326,12 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
     return parseControlAfterLSquare(parser);
   }
   return parseChannelAfterLess(parser);
+}
+
+Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
+  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
+  newExtraSignals.emplace_back(signal);
+  return ChannelType::get(getDataType(), newExtraSignals);
 }
 
 //===----------------------------------------------------------------------===//

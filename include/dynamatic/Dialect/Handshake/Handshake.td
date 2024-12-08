@@ -44,6 +44,7 @@ def Handshake_Dialect : Dialect {
 }
 
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.td"
 include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 include "dynamatic/Dialect/Handshake/HandshakeInterfaces.td"
 include "dynamatic/Dialect/Handshake/HandshakeOps.td"
