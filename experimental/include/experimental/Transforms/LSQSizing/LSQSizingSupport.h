@@ -135,6 +135,8 @@ public:
   /// returns the earliest start time of an operation
   int getEarliestStartTime(mlir::Operation *op);
 
+  static bool isConnectedToLSQ(mlir::Operation *op);
+
 private:
   static constexpr const char *backedgePrefix =
       "backedge_"; // Prefix for backedges

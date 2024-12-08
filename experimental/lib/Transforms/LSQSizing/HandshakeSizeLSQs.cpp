@@ -233,8 +233,22 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     TimingDatabase timingDB, unsigned initialII, std::string collisions) {
 
   CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII);
-  auto loadOps = graph.getOperationsWithOpType<handshake::LSQLoadOp>();
-  auto storeOps = graph.getOperationsWithOpType<handshake::LSQStoreOp>();
+
+  // We only want LSQ loads, therefore we need to check if they are connected to
+  // an LSQ
+  auto allLoadOps = graph.getOperationsWithOpType<handshake::LoadOp>();
+  auto allStoreOps = graph.getOperationsWithOpType<handshake::StoreOp>();
+  std::vector<mlir::Operation *> loadOps;
+  std::vector<mlir::Operation *> storeOps;
+  for (auto op : allLoadOps) {
+    if (graph.isConnectedToLSQ(op))
+      loadOps.push_back(op);
+  }
+
+  for (auto op : allStoreOps) {
+    if (graph.isConnectedToLSQ(op))
+      storeOps.push_back(op);
+  }
 
   if (loadOps.size() == 0 && storeOps.size() == 0)
     return std::nullopt;

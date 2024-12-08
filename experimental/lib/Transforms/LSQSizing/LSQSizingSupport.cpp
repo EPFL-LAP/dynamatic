@@ -41,8 +41,20 @@ using namespace dynamatic::experimental::lsqsizing;
 static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
-  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency)))
+  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency))) {
+
+    // TODO This is a temporary hack to fix the latency of the LoadOp when its
+    // connected to an LSQ (Necessary since there is now the same loadop for MC
+    // and LSQ loads). When the TimingDB gets reworked, this can be removed
+    if (isa<handshake::LoadOp>(op)) {
+      for (mlir::Operation *destOp : op->getUsers()) {
+        if (isa<handshake::LSQOp>(destOp)) {
+          return latency + 3;
+        }
+      }
+    }
     return latency;
+  }
 
   if (isa<handshake::BufferOp>(op)) {
     auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
@@ -448,12 +460,13 @@ unsigned CFDFCGraph::getWorstCaseII() {
       unsigned tempMaxLatency = 0;
 
       // Check if the node operation is a load or store and compute latencies
-      if (isa<handshake::LSQLoadOp>(node.second.op)) {
+      if (isa<handshake::LoadOp>(node.second.op)) {
         // Iterate through nodes again to find corresponding stores for this
         // LSQOp
         for (auto &otherNode : nodes) {
           if (otherNode.second.op &&
-              isa<handshake::LSQStoreOp>(otherNode.second.op)) {
+              isa<handshake::StoreOp>(otherNode.second.op) &&
+              isConnectedToLSQ(otherNode.second.op)) {
             // Calculate path latency between the load and store
             unsigned latency = findMaxPathLatency(
                 node.second.op, otherNode.second.op, true, true);
@@ -523,7 +536,6 @@ bool CFDFCGraph::updateStartTimeForNode(std::string node,
   // Therefore the latency for mux, merge and cmerge is the minimum of all
   // incoming edges
   if (op && isa<handshake::MergeLikeOpInterface>(op)) {
-
     int minLatency = INT_MAX;
     for (auto &incomgingEdge : edgeMinLatencies[node])
       if (minLatency > incomgingEdge.second)
@@ -558,4 +570,13 @@ int CFDFCGraph::getEarliestStartTime(mlir::Operation *op) {
   return nodes.at(opName).earliestStartTime == -1
              ? 0
              : nodes.at(opName).earliestStartTime;
+}
+
+bool CFDFCGraph::isConnectedToLSQ(mlir::Operation *op) {
+  for (mlir::Operation *destOp : op->getUsers()) {
+    if (isa<handshake::LSQOp>(destOp)) {
+      return true;
+    }
+  }
+  return false;
 }
