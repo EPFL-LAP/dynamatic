@@ -83,6 +83,9 @@ class IntegerType;
 class FloatType;
 } // namespace mlir
 
+// Dependency of HandshakeTypes.h.inc
+#include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.h.inc"
+
 #define GET_TYPEDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 

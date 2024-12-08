@@ -15,6 +15,7 @@
 
 include "mlir/IR/AttrTypeBase.td"
 include "dynamatic/Dialect/Handshake/Handshake.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.td"
 
 /// Base class for types in the Handshake dialect.
 class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
@@ -39,7 +40,9 @@ def ExtraSignals : TypeParameter<
   let defaultValue = cppType # "()";
 }
 
-def ControlType : Handshake_Type<"Control", "control"> {
+def ControlType : Handshake_Type<"Control", "control", [
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+]> {
   let summary = "a control-only dataflow channel";
   let description = [{
     Represents a control-only dataflow channel, which is made up of
@@ -60,34 +63,11 @@ def ControlType : Handshake_Type<"Control", "control"> {
   ];
 
   let hasCustomAssemblyFormat = 1;
-
-  let extraClassDeclaration = [{
-    /// Returns the number of extra signals.
-    unsigned getNumExtraSignals() const {
-      return getExtraSignals().size();
-    }
-
-    /// Returns the number of downstream extra signals.
-    unsigned getNumDownstreamExtraSignals() const;
-
-    /// Returns the number of upstream extra signals.
-    unsigned getNumUpstreamExtraSignals() const {
-      return getNumExtraSignals() - getNumDownstreamExtraSignals();
-    }
-
-    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
-    bool hasExtraSignal(const std::string &name);
-
-    ControlType addExtraSignal(const ExtraSignal &signal) {
-      ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-      newExtraSignals.emplace_back(signal);
-      return ControlType::get(getContext(), newExtraSignals);
-    }
-
-  }];
 }
 
-def ChannelType : Handshake_Type<"Channel", "channel"> {
+def ChannelType : Handshake_Type<"Channel", "channel", [
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+]> {
   let summary = "a dataflow channel with optional extra signals";
   let description = [{
     Represents a dataflow channel, which is made up of
@@ -121,19 +101,6 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
   let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
-    /// Returns the number of extra signals.
-    unsigned getNumExtraSignals() const {
-      return getExtraSignals().size();
-    }
-
-    /// Returns the number of downstream extra signals.
-    unsigned getNumDownstreamExtraSignals() const;
-
-    /// Returns the number of upstream extra signals.
-    unsigned getNumUpstreamExtraSignals() const {
-      return getNumExtraSignals() - getNumDownstreamExtraSignals();
-    }
-
     /// Returns the data type's bitwidth.
     unsigned getDataBitWidth() const;
 
@@ -149,12 +116,6 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
       return ChannelType::get(getDataType(), newExtraSignals);
     }
 
-    ChannelType addExtraSignal(const ExtraSignal &signal) {
-      ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-      newExtraSignals.emplace_back(signal);
-      return ChannelType::get(getDataType(), newExtraSignals);
-    }
-
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
@@ -164,9 +125,6 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     /// Returns a channel whose data type is the default one used to represent
     /// an address in an external memory.
     static ChannelType getAddrChannel(::mlir::MLIRContext* ctx);
-
-    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
-    bool hasExtraSignal(const std::string &name);
   }];
 }
 
