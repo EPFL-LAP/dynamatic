@@ -236,16 +236,14 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
 
   // We only want LSQ loads and stores (not MC loads and stores), therefore we
   // need to check if they are connected to an LSQ
-  auto allLoadOps = graph.getOperationsWithOpType<handshake::LoadOp>();
-  auto allStoreOps = graph.getOperationsWithOpType<handshake::StoreOp>();
   std::vector<mlir::Operation *> loadOps;
   std::vector<mlir::Operation *> storeOps;
-  for (auto op : allLoadOps) {
+  for (auto op : graph.getOperationsWithOpType<handshake::LoadOp>()) {
     if (graph.isConnectedToLSQ(op))
       loadOps.push_back(op);
   }
 
-  for (auto op : allStoreOps) {
+  for (auto op : graph.getOperationsWithOpType<handshake::StoreOp>()) {
     if (graph.isConnectedToLSQ(op))
       storeOps.push_back(op);
   }

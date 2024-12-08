@@ -42,17 +42,6 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
   double latency = 0;
 
   if (!failed(timingDB.getLatency(op, SignalType::DATA, latency))) {
-
-    // TODO This is a temporary hack to fix the latency of the LoadOp when its
-    // connected to an LSQ (Necessary since there is now the same loadop for MC
-    // and LSQ loads). When the TimingDB gets reworked, this can be removed
-    if (isa<handshake::LoadOp>(op)) {
-      for (mlir::Operation *destOp : op->getUsers()) {
-        if (isa<handshake::LSQOp>(destOp)) {
-          return latency + 3;
-        }
-      }
-    }
     return latency;
   }
 
@@ -573,10 +562,10 @@ int CFDFCGraph::getEarliestStartTime(mlir::Operation *op) {
 }
 
 bool CFDFCGraph::isConnectedToLSQ(mlir::Operation *op) {
-  for (mlir::Operation *destOp : op->getUsers()) {
-    if (isa<handshake::LSQOp>(destOp)) {
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+    auto memOp = findMemInterface(loadOp.getAddressResult());
+    if (isa_and_present<handshake::LSQOp>(memOp))
       return true;
-    }
   }
   return false;
 }
