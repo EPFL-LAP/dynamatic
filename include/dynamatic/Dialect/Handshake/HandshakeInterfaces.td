@@ -161,20 +161,6 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
-def LoadOpInterface : OpInterface<"LoadOpInterface", [MemPortOpInterface]> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Handshake operations which act as a load port to a memory interface.
-  }];
-}
-
-def StoreOpInterface : OpInterface<"StoreOpInterface", [MemPortOpInterface]> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Handshake operations which act as a store port to a memory interface.
-  }];
-}
-
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =

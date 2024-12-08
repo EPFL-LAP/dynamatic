@@ -110,31 +110,6 @@ static StringRef getMemName(Value memref) {
   return StringRef();
 }
 
-/// Returns the name of the function argument that corresponds to the memory
-/// interface that the memory port operation connects to.
-template <typename Op>
-static StringRef getMemNameForPort(Op memPortOp) {
-  Value addrRes = memPortOp.getAddressOutput();
-  auto addrUsers = addrRes.getUsers();
-  if (addrUsers.empty())
-    return "";
-  Operation *userOp = *addrUsers.begin();
-  while (isa_and_present<handshake::ExtSIOp, handshake::ExtUIOp,
-                         handshake::TruncIOp, handshake::ForkOp>(userOp)) {
-    auto users = userOp->getResult(0).getUsers();
-    if (users.empty())
-      return "";
-    userOp = *users.begin();
-  }
-  // We should have reached a memory interface
-  if (handshake::LSQOp lsqOp = dyn_cast<handshake::LSQOp>(userOp))
-    return getMemName(lsqOp.getMemRef());
-  if (handshake::MemoryControllerOp mcOp =
-          dyn_cast<handshake::MemoryControllerOp>(userOp))
-    return getMemName(mcOp.getMemRef());
-  llvm_unreachable("cannot reach memory interface");
-}
-
 /// Returns the pretty-field version of a label fro a memory-related operation.
 static inline std::string getMemLabel(StringRef baseName, StringRef memName) {
   return (baseName + (memName.empty() ? "" : " (" + memName.str() + ")")).str();
@@ -200,12 +175,14 @@ static std::string getPrettyNodeLabel(Operation *op) {
       .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
         return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
       })
-      .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
-        StringRef memName = getMemNameForPort(dyn_cast<LoadOpInterface>(op));
+      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+        auto memOp = findMemInterface(loadOp.getAddressResult());
+        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
         return getMemLabel("LD", memName);
       })
-      .Case<handshake::MCStoreOp, handshake::LSQStoreOp>([&](auto) {
-        StringRef memName = getMemNameForPort(dyn_cast<StoreOpInterface>(op));
+      .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
+        auto memOp = findMemInterface(storeOp.getAddressResult());
+        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
         return getMemLabel("ST", memName);
       })
       .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
@@ -297,8 +274,8 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
       .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
-      .Case<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-            handshake::StoreOpInterface>([&](auto) { return "coral"; })
+      .Case<handshake::MemoryOpInterface, handshake::LoadOp,
+            handshake::StoreOp>([&](auto) { return "coral"; })
       .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
           [&](auto) { return "lightblue"; })
       .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
