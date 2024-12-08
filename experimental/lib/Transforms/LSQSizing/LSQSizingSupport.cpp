@@ -567,5 +567,10 @@ bool CFDFCGraph::isConnectedToLSQ(mlir::Operation *op) {
     if (isa_and_present<handshake::LSQOp>(memOp))
       return true;
   }
+  if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+    auto memOp = findMemInterface(storeOp.getAddressResult());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      return true;
+  }
   return false;
 }
