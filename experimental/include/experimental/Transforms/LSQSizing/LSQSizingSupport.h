@@ -135,6 +135,8 @@ public:
   /// returns the earliest start time of an operation
   int getEarliestStartTime(mlir::Operation *op);
 
+  /// checks if an operation is connected to the LSQ (for checking if a
+  /// load/store is for a LSQ or for a MC)
   static bool isConnectedToLSQ(mlir::Operation *op);
 
 private:
