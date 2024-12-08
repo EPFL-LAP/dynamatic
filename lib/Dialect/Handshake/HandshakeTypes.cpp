@@ -361,4 +361,5 @@ llvm::hash_code dynamatic::handshake::hash_value(const ExtraSignal &signal) {
   return llvm::hash_combine(signal.name, signal.type, signal.downstream);
 }
 
+#include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.cpp.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.cpp.inc"
