@@ -11,22 +11,21 @@ module merge_dataless #(
   output outs_valid,
   input  outs_ready
 );
+
   // Internal signal declaration
-  reg tehb_pvalid;
+  wire tehb_pvalid;
   wire tehb_ready;
-  integer i;
 
-  always @(*) begin
-    tehb_pvalid = 0;
-    for (i = SIZE - 1; i >= 0; i = i - 1) begin
-      if (ins_valid[i]) begin
-        tehb_pvalid = 1;
-      end
-    end
-  end
-
-  // Handling input readiness
-  assign ins_ready = {SIZE{tehb_ready}};
+  merge_notehb_dataless #(
+    .INPUTS(SIZE)
+  ) merge_ins (
+    .clk        (clk          ),
+    .rst        (rst          ),
+    .ins_valid  (ins_valid    ),
+    .ins_ready  (ins_ready    ),
+    .outs_valid (tehb_pvalid),
+    .outs_ready (tehb_ready)
+  );
 
   tehb_dataless tehb (
     .clk        (clk         ),
