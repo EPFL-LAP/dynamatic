@@ -347,17 +347,6 @@ std::tuple<mlir::Operation *, StartTimes>
 HandshakeSizeLSQsPass::findStartTimes(CFDFCGraph graph) {
   StartTimes startTimes;
 
-  // Find all mux and control_merge ops as candidates for start node
-  /*std::vector<mlir::Operation *> muxOps =
-      graph.getOperationsWithOpType<handshake::MuxOp>();
-  std::vector<mlir::Operation *> cmergeOps =
-      graph.getOperationsWithOpType<handshake::ControlMergeOp>();
-  std::vector<mlir::Operation *> startNodeCandidates =
-      std::vector<mlir::Operation *>(muxOps.size() + cmergeOps.size());
-  std::merge(muxOps.begin(), muxOps.end(), cmergeOps.begin(), cmergeOps.end(),
-             startNodeCandidates.begin());
-  */
-
   std::vector<mlir::Operation *> startNodeCandidates =
       graph.getOperationsWithOpType<handshake::MergeLikeOpInterface>();
 
