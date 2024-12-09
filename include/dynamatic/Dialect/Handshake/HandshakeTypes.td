@@ -206,12 +206,14 @@ def SimpleChannel : TypeConstraint<
 >;
 
 // Multi-entity constraint ensuring that all ChannelTypes have matching data types.
-// Also applies to ControlTypes, as some operations treat them interchangeably 
+// Also applies to ControlTypes, as some operations treat them interchangeably
 // using HandshakeType.
+// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
     ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    // ControlType without extra signals
     ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
     ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
   }],
@@ -220,26 +222,26 @@ class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
 
 // Multi-entity constraints for spec tags
 
-// Predicate to verify if the given type has a valid spec tag as an additional signal.
+// Predicate to verify if the given type has a valid spec tag as an extra signal.
 class HasSpecTag<string type> : CPred<
   [{
-    ([&](FailureOr<ExtraSignal> signal) {
-      if (failed(signal)) {
+    ([&](FailureOr<ExtraSignal> getExtraSignalByNameResult) {
+      if (failed(getExtraSignalByNameResult)) {
         // There is no extra signal called "spec"
         return false;
       }
-      if (!(*signal).downstream) {
-        // The signal is not a downstream signal
+
+      ExtraSignal signal = getExtraSignalByNameResult.value();
+
+      // The signal should be a 1-bit integer downstream signal.
+      if (!signal.downstream)
         return false;
-      }
-      if (!(*signal).type.isInteger(1)) {
-        // The signal is not a 1-bit integer
+      if (!signal.type.isInteger(1))
         return false;
-      }
+
       return true;
-    })(
-  }] #
-  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(" # type # ").getExtraSignalByName(\"spec\"))"
+    })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
+  }] # type # ").getExtraSignalByName(\"spec\"))"
 >;
 
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
@@ -258,7 +260,7 @@ class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
 
 // Multi-entity constraint ensuring that if at least one of the `input` has a spec tag,
 // then all of the `output` should have a spec tag.
-// This verification is done in the verifier of MergeLikeOpInterface
+// This verification is also done in the verifier of MergeLikeOpInterface
 class PropagatingSpecTag<list<string> inputs, list<string> outputs> : PredOpTrait<
   "if at least one of the inputs has a spec tag, then all of the outputs should have a spec tag",
   Or<[

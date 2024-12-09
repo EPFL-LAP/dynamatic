@@ -45,7 +45,7 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-const std::string EXTRA_BIT_SPEC = "spec";
+const std::string EXTRA_SIGNAL_SPEC = "spec";
 
 static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
   return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
@@ -247,34 +247,41 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   if (operands.size() < 2)
     return failure();
 
-  OpBuilder builder(context);
-  auto dataInTypeCandidate = operands[1].getType();
+  // We infer the return type only considering the spec tag.
+  // If someone wants to support another extra signal, they should update the
+  // implementation here.
+
+  // We cannot use MergeLikeOpInterface::inferReturnTypes here because this
+  // method is static.
   bool hasSpecInput = false;
   for (auto operand : operands) {
     auto operandType = operand.getType();
     if (auto extraSignalsType =
             dyn_cast<ExtraSignalsTypeInterface>(operandType)) {
-      if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      if (extraSignalsType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
         hasSpecInput = true;
         break;
       }
     }
   }
+
+  // The type of the first data operand is the candidate for the return type
+  auto dataInTypeCandidate = operands[1].getType();
   if (!hasSpecInput) {
+    // If none of the data operands has the spec tag, we can use the candidate
     inferredReturnTypes.push_back(dataInTypeCandidate);
     return success();
   }
-  if (auto extraSignalsType =
-          dyn_cast<ExtraSignalsTypeInterface>(dataInTypeCandidate)) {
-    if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      inferredReturnTypes.push_back(extraSignalsType);
-    } else {
-      inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
-    }
+
+  auto extraSignalsType = cast<ExtraSignalsTypeInterface>(dataInTypeCandidate);
+  if (extraSignalsType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
+    // If the candidate already has the spec tag, we can use it as is
+    inferredReturnTypes.push_back(extraSignalsType);
   } else {
-    // TODO: emit error
-    return failure();
+    // Otherwise, we need to add the spec tag
+    OpBuilder builder(context);
+    inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
+        ExtraSignal(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1))));
   }
 
   return success();
@@ -599,17 +606,13 @@ LogicalResult ConstantOp::inferReturnTypes(
   auto attr = cast<TypedAttr>(attributes.get(attrName));
 
   Type inputType = operands[0].getType();
-  if (auto controlType = dyn_cast<ControlType>(inputType)) {
-    // The return type is a ChannelType with:
-    // - dataType as specified by the attribute
-    // - extra signals matching the input control type
-    inferredReturnTypes.push_back(handshake::ChannelType::get(
-        attr.getType(), controlType.getExtraSignals()));
-    return success();
-  }
-  // The inputType should be a ControlType.
-  // Therefore, it fails here.
-  return failure();
+  auto controlType = cast<ControlType>(inputType);
+  // The return type is a ChannelType with:
+  // - dataType as specified by the attribute
+  // - extra signals matching the input control type
+  inferredReturnTypes.push_back(handshake::ChannelType::get(
+      attr.getType(), controlType.getExtraSignals()));
+  return success();
 }
 
 LogicalResult ConstantOp::verify() {
@@ -1642,11 +1645,11 @@ LogicalResult SpeculatorOp::inferReturnTypes(
 
   Type dataInType = operands.front().getType();
   if (auto extraSignalsType = dyn_cast<ExtraSignalsTypeInterface>(dataInType)) {
-    if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+    if (extraSignalsType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
       inferredReturnTypes.push_back(extraSignalsType);
     } else {
       inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+          ExtraSignal(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1))));
     }
   } else {
     // Report error
