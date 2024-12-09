@@ -62,6 +62,7 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
   return success();
 }
 
+// A parsing function for the custom directive `custom<SimpleControl>(...)`.
 static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
   // No parsing needed.
   // SimpleControl is ControlType without extra bits.
@@ -96,6 +97,7 @@ static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
   printHandshakeType(printer, nullptr, types.back());
 }
 
+// A printing functino for the custom directive `custom<SimpleControl>(...)`.
 static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
   // No printing needed.
   // SimpleControl is ControlType without extra bits.

@@ -18,9 +18,12 @@ include "mlir/IR/OpBase.td"
 def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
   let cppNamespace = "dynamatic::handshake";
   let description = [{
-    An interface for types with ExtraSignals
+    An interface for types with ExtraSignals to define and provide a
+    default implementation of methods related to extra signals
+    (getNumExtraSignals, getNumDownstreamExtraSignals, hasExtraSignal, etc)
   }];
 
+  // define the methods the interface provides
   // methodBody: the method body of the interface itself
   // defaultImplementation: the default body of the method of the type implementing this interface
   // ConcreteType: the type (template) implementing this interface

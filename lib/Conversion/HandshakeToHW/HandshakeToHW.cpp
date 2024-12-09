@@ -56,14 +56,17 @@ using namespace dynamatic::handshake;
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
-// Makes all extra signals signless IntegerType's of the same width as the
-// original type.
+/// Makes all extra signals signless IntegerType's of the same width as the
+/// original type.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(llvm::ArrayRef<ExtraSignal> extraSignals) {
   SmallVector<ExtraSignal> newExtraSignals;
   for (const ExtraSignal &extra : extraSignals) {
     unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+
+    // Create a new signless IntegerType with the same bit width as the original
     Type newType = IntegerType::get(extra.type.getContext(), extraWidth);
+
     newExtraSignals.emplace_back(extra.name, newType, extra.downstream);
   }
   return newExtraSignals;

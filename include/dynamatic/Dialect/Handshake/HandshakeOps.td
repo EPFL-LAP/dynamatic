@@ -505,14 +505,13 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let results = (outs ControlType:$result);
 
   let builders = [
-    // We provide a builder that doesn't require the result type
-    // because it always has no extra bits.
+    // We provide a builder that doesn't require the result type.
+    // The result type will be a ControlType without extra signals.
     OpBuilder<(ins), [{
-      $_state.addTypes(ControlType::get($_builder.getContext(), {}));
+      $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
     }]>
   ];
 
-  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
@@ -606,6 +605,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     ```
   }];
 
+  // The memory controller does not accept ControlTypes with extra signals.
+  // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
+  // (at least in speculative execution scenarios)
+  // TODO: Change ChannelType to SimpleChannel as well
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
                        Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
@@ -617,7 +620,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
 
-  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
+  // The SimpleControl type can be uniquely inferred (as it has no parameters),
+  // but MLIR lacks support for this.
+  // Therefore, we use a custom directive for SimpleControl to
+  // omit writing it explicitly in the IR.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
     attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
