@@ -762,11 +762,15 @@ class Handshake_MemPortOp<string mnemonic, list<OpBuilder> customBuilders> :
 }
 
 def LoadOp : Handshake_MemPortOp<"load", [
+  // A builder that requires the memref type instead of the data
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
     // Address (data operand needs to be added later)
+    // TODO: Please describe to us when and where the data operand is added
     $_state.addOperands(address);
 
-    // Data and address results
+    // Register the types of addressResult and dataResults
+    // The type of addressResult is the same as the type of address
+    // The type of dataResult can be inferred from the memrefType
     $_state.types.push_back(address.getType());
     $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
       memrefType.getElementType()));
