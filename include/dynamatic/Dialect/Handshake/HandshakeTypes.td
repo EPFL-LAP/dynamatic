@@ -239,10 +239,7 @@ class HasSpecTag<string type> : CPred<
       return true;
     })(
   }] #
-  "    ::mlir::isa<::dynamatic::handshake::ChannelType>(" # type # ") ?\n" #
-  "    ::mlir::cast<::dynamatic::handshake::ChannelType>(" # type # ").getExtraSignalByName(\"spec\") :\n" #
-  "    ::mlir::cast<::dynamatic::handshake::ControlType>(" # type # ").getExtraSignalByName(\"spec\")\n" #
-  "  )"
+  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(" # type # ").getExtraSignalByName(\"spec\"))"
 >;
 
 // Two approaches to ensuring operand types satisfy a constraint:
