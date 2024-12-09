@@ -1546,16 +1546,21 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
 
-  ArrayRef<ExtraSignal> extraSignals = {
-      ExtraSignal("spec", builder.getIntegerType(1))};
   Type dataInType = operands.front().getType();
-  if (dataInType.isa<ChannelType>()) {
-    ChannelType dataOutType = ChannelType::get(
-        context, dataInType.cast<ChannelType>().getDataType(), extraSignals);
-    inferredReturnTypes.push_back(dataOutType);
-  } else if (dataInType.isa<ControlType>()) {
-    ControlType dataOutType = ControlType::get(context, extraSignals);
-    inferredReturnTypes.push_back(dataOutType);
+  if (auto channelType = dyn_cast<ChannelType>(dataInType)) {
+    if (channelType.hasExtraSignal("spec")) {
+      inferredReturnTypes.push_back(channelType);
+    } else {
+      inferredReturnTypes.push_back(channelType.addExtraSignal(
+          ExtraSignal("spec", builder.getIntegerType(1))));
+    }
+  } else if (auto controlType = dyn_cast<ControlType>(dataInType)) {
+    if (controlType.hasExtraSignal("spec")) {
+      inferredReturnTypes.push_back(controlType);
+    } else {
+      inferredReturnTypes.push_back(controlType.addExtraSignal(
+          ExtraSignal("spec", builder.getIntegerType(1))));
+    }
   } else {
     // Report error
     llvm::errs() << "expected $dataIn to have type !handshake.channel or "
