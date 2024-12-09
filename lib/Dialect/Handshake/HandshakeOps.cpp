@@ -62,6 +62,19 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
   return success();
 }
 
+// A parsing function for the custom directive `custom<SimpleControl>(...)`.
+static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
+  // No parsing needed.
+  // SimpleControl is ControlType without extra bits.
+  // Since the type is uniquely determined, we don’t need to write it explicitly
+  // in the IR. But MLIR doesn’t support this with TypeConstraint. So, we added
+  // a custom directive for ControlType.
+
+  // Specify the control type without extra bits
+  type = ControlType::get(parser.getContext());
+  return success();
+}
+
 static void printHandshakeType(OpAsmPrinter &printer, Operation * /*op*/,
                                Type type) {
   if (auto controlType = dyn_cast<handshake::ControlType>(type)) {
@@ -82,6 +95,15 @@ static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
     printer << ", ";
   }
   printHandshakeType(printer, nullptr, types.back());
+}
+
+// A printing functino for the custom directive `custom<SimpleControl>(...)`.
+static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
+  // No printing needed.
+  // SimpleControl is ControlType without extra bits.
+  // Since the type is uniquely determined, we don’t need to write it explicitly
+  // in the IR. But MLIR doesn’t support this with TypeConstraint. So, we added
+  // a custom directive for ControlType.
 }
 
 static void printHandshakeType(OpAsmPrinter &printer, Type type) {
@@ -1269,7 +1291,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1302,8 +1324,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort) {};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1420,9 +1441,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group) {};
+    : blockID(blockID), group(group){};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1458,7 +1479,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1729,6 +1750,9 @@ void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                      ChannelType channelType) {
   assert(isa<handshake::ControlType>(ctrl.getType()) &&
          "expected !handshake.control");
+  assert(cast<handshake::ControlType>(ctrl.getType()).getNumExtraSignals() ==
+             0 &&
+         "expected ctrl to have no extra signals");
   assert(handshake::ChannelType::isSupportedSignalType(data.getType()) &&
          "unsupported data type");
   assert(downstreams.size() == channelType.getNumDownstreamExtraSignals() &&

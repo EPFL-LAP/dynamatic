@@ -503,8 +503,16 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   }];
 
   let results = (outs ControlType:$result);
-  
-  let assemblyFormat = "attr-dict";
+
+  let builders = [
+    // We provide a builder that doesn't require the result type.
+    // The result type will be a ControlType without extra signals.
+    OpBuilder<(ins), [{
+      $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
+    }]>
+  ];
+
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -556,8 +564,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -570,7 +578,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -587,7 +595,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -596,20 +604,29 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
     ```
   }];
-  
-  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
+
+  // The memory controller does not accept ControlTypes with extra signals.
+  // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
+  // (at least in speculative execution scenarios)
+  // TODO: Change ChannelType to SimpleChannel as well
+  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
+                       Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<ChannelType>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
+
+  // The SimpleControl type can be uniquely inferred (as it has no parameters),
+  // but MLIR lacks support for this.
+  // Therefore, we use a custom directive for SimpleControl to
+  // omit writing it explicitly in the IR.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` functional-type($inputs, $outputs)
+    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
@@ -1093,6 +1110,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
+    // A builder for bundling ControlType
     OpBuilder<(ins "::mlir::Value":$valid), [{
       mlir::Type validReadyType = $_builder.getIntegerType(1);
       assert(valid.getType() == validReadyType && "incorrect valid signal");
@@ -1103,6 +1121,8 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
         validReadyType
       });
     }]>,
+    // A builder for bundling ChannelType
+    // Implemented in C++
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)
@@ -1150,7 +1170,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$channelLike,
+  let arguments = (ins ChannelOrSimpleControl:$channelLike,
                        Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 
