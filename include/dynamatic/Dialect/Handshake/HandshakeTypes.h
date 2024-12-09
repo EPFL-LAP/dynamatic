@@ -44,7 +44,7 @@ struct ExtraSignal {
   };
 
   /// The signal's name.
-  llvm::StringRef name;
+  std::string name;
   /// The signal's MLIR type.
   mlir::Type type;
   /// Whether the signal is going downstream or upstream.
@@ -82,6 +82,9 @@ class IndexType;
 class IntegerType;
 class FloatType;
 } // namespace mlir
+
+// Dependency of HandshakeTypes.h.inc
+#include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.h.inc"
 
 #define GET_TYPEDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
