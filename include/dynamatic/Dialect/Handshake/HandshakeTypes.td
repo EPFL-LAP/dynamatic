@@ -220,6 +220,60 @@ class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   "data type"
 >;
 
+class AllTypesMatchWithinVariadic<string name> : PredOpTrait<
+  "The operands inside the variadic " # name # " should have the same type",
+  CPred<[{
+    ([&](mlir::OperandRange operands) {
+      // Operands are those specified as the variadic input.
+      ValueTypeRange<OperandRange> types = operands.getTypes();
+      size_t numTypes = types.size();
+
+      // If there are less than 2 types, always return true
+      if (numTypes < 2)
+        return true;
+
+      Type firstType = types.front();
+      for (size_t i = 1; i < numTypes; i++) {
+        if (types[i] != firstType)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ")">
+>;
+
+class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
+  "The operands inside the variadic " # name # " should have the same type",
+  CPred<[{
+    ([&](mlir::OperandRange operands) {
+      // Operands are those specified as the variadic input.
+      ValueTypeRange<OperandRange> types = operands.getTypes();
+      size_t numTypes = types.size();
+
+      // If there are no items, always return true
+      if (numTypes < 1)
+        return true;
+
+      if (mlir::isa<ControlType>(types.front())) {
+        // Just confirm that all types are ControlType
+        for (size_t i = 1; i < numTypes; i++) {
+          if (!mlir::isa<ControlType>(types[i]))
+            return false;
+        }
+        return true;
+      }
+
+      // Confirm that dataTypes of all types are the same
+      Type firstType = mlir::cast<ChannelType>(types.front()).getDataType();
+      for (size_t i = 1; i < numTypes; i++) {
+        if (mlir::cast<ChannelType>(types[i]).getDataType() != firstType)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ")">
+>;
+
 // Multi-entity constraints for spec tags
 
 // Predicate to verify if the given type has a valid spec tag as an extra signal.
