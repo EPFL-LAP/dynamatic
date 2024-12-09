@@ -1,73 +1,84 @@
-//===- FtdSupport.h --- FTD conversion support -----------------*- C++ -*-===//
-//
-// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// Declares some utility functions which are useful for both the fast token
-// delivery algorithm and for the GSA anlaysis pass. All the functions are about
-// anlayzing relationships between blocks and handshake operations.
-//
-//===----------------------------------------------------------------------===//
-
-#ifndef DYNAMATIC_SUPPORT_FTD_SUPPORT_H
-#define DYNAMATIC_SUPPORT_FTD_SUPPORT_H
+#ifndef DYNAMATIC_HANDSHAKE_SUPPORT_SUPPORT_H
+#define DYNAMATIC_HANDSHAKE_SUPPORT_SUPPORT_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Backedge.h"
-#include "experimental/Analysis/GSAAnalysis.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Given a set of values defining the same value in different blocks of a
-/// CFG, modify the SSA representation to connect the values through some
-/// merges.
-FailureOr<DenseMap<Block *, Value>>
-createPhiNetwork(Region &funcRegion, ConversionPatternRewriter &rewriter,
-                 SmallVector<Value> &vals);
+/// Class to associate an index to each block, so that if block Bi dominates
+/// block Bj then i < j. While this is guaranteed by the MLIR CFG construction,
+/// it cannot really be given for granted, thus it is more convenient to have a
+/// custom indexing.
+class BlockIndexing {
 
-/// Add some regen multiplexers between an opearation and one of its operands
-void addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
-                             dynamatic::handshake::FuncOp &funcOp,
-                             Operation *consumerOp, Value operand);
+  /// Map to store the connection between indexes and blocks.
+  DenseMap<unsigned, Block *> indexToBlock;
 
-/// Add suppression mechanism to all the inputs and outputs of a producer
-void addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
-                            handshake::FuncOp &funcOp, Operation *consumerOp,
-                            Value operand);
+  /// Map to store the connection between blocks and indexes.
+  DenseMap<Block *, unsigned> blockToIndex;
 
-/// When the consumer is in a loop while the producer is not, the value must
-/// be regenerated as many times as needed. This function is in charge of
-/// adding some merges to the network, to that this can be done. The new
-/// merge is moved inside of the loop, and it works like a reassignment
-/// (cfr. FPGA'22, Section V.C).
-void addRegen(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
+public:
+  /// Build the map out of a region.
+  BlockIndexing(mlir::Region &region);
 
-/// Given each pairs of producers and consumers within the circuit, the
-/// producer might create a token which is never used by the corresponding
-/// consumer, because of the control decisions. In this scenario, the token
-/// must be suprressed. This function inserts a `SUPPRESS` block whenever it
-/// is necessary, according to FPGA'22 (IV.C and V)
-void addSupp(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
+  /// Get a block out of an index.
+  Block *getBlockFromIndex(unsigned index) const;
 
-/// Starting from the information collected by the gsa analysis pass,
-/// instantiate some merge operations at the beginning of each block which
-/// work as explicit phi functions.
-LogicalResult addGsaGates(Region &region, ConversionPatternRewriter &rewriter,
-                          const gsa::GSAAnalysis &gsa, Backedge startValue,
-                          bool removeTerminators = true);
+  /// Get a block out of a string condition in the format `cX` where X is a
+  /// number.
+  Block *getBlockFromCondition(const std::string &condition) const;
 
-/// Use the GSA analysis to replace each non-init merge in the IR with a
-/// multiplexer.
-LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
-                                ConversionPatternRewriter &rewriter);
+  /// Get the index of a block.
+  unsigned getIndexFromBlock(Block *bb) const;
 
-}; // namespace ftd
-}; // namespace experimental
-}; // namespace dynamatic
+  /// Return true if the index of bb1 is greater than then index of bb2.
+  bool greaterIndex(Block *bb1, Block *bb2) const;
 
-#endif // DYNAMATIC_SUPPORT_FTD_SUPPORT_H
+  /// Return true if the index of bb1 is smaller than then index of bb2.
+  bool lessIndex(Block *bb1, Block *bb2) const;
+
+  /// Given a block whose name is `^BBN` (where N is an integer) return a string
+  /// in the format `cN`, used to identify the condition which allows the block
+  /// to be executed. The adopted index is retrived from the BlockIndexing.
+  std::string getBlockCondition(Block *block) const;
+};
+
+/// Checks if the source and destination are in a loop
+bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
+
+/// Gets all the paths from block `start` to block `end` using a dfs search.
+/// If `blockToTraverse` is non null, then we want the paths having
+/// `blockToTraverse` in the path; if `blocksToAvoid` is non empty, then we want
+/// the paths which do not cross those blocks.
+std::vector<std::vector<Block *>>
+findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
+             Block *blockToTraverse = nullptr,
+             ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
+
+/// Given a sequence of block, find a boolean expression defining the conditions
+/// for which the path is traversed. If one edge is unconditional, then no
+/// condition is added; otherwise, the condition for the conditional branch is
+/// added (either direct or negated). The list of blocks whose condition is
+/// considered is saved in `blockIndexSet`. If `ignoreDeps` is false, then a
+/// condition is added only if the source block was in the set `deps`.
+boolean::BoolExpression *
+getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+                  const BlockIndexing &bi,
+                  const DenseSet<Block *> &deps = DenseSet<Block *>(),
+                  bool ignoreDeps = true);
+
+/// Return the channelified version of the input type.
+Type channelifyType(Type type);
+
+/// Get an array of `size` elements all identical to the
+SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);
+
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic
+
+#endif

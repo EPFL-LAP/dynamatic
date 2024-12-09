@@ -14,7 +14,7 @@
 
 #include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
-#include "experimental/Support/HandshakeSupport.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dominance.h"

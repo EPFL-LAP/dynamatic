@@ -15,7 +15,7 @@
 #include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/CFGAnnotation.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 

@@ -14,7 +14,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/CFGAnnotation.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdImplementation.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"

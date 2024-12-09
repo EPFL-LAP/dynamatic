@@ -18,7 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/HandshakeSupport.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Pass/AnalysisManager.h"
 #include <queue>
 #include <utility>

@@ -1,8 +1,8 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   StdProfiler.cpp
-  HandshakeSupport.cpp
-  HandshakeSimulator.cpp
   FtdSupport.cpp
+  HandshakeSimulator.cpp
+  FtdImplementation.cpp
   CFGAnnotation.cpp
 
   LINK_LIBS PUBLIC
