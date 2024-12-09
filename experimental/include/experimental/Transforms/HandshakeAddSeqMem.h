@@ -14,6 +14,8 @@
 #define DYNAMATIC_TRANSFORMS_HANDSHAKEADDSEQMEM_H
 
 #include "dynamatic/Support/DynamaticPass.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
 namespace experimental {

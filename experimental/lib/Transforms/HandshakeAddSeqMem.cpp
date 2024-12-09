@@ -22,6 +22,8 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/CFGAnnotation.h"
+
 
 #define DEBUG_TYPE "handshake-add-seq-mem"
 
@@ -44,12 +46,9 @@ struct HandshakeAddSeqMemPass
 
   void runDynamaticPass() override;
 
-  void traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, OpBuilder, NameAnalysis&));
+  void traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, ConversionPatternRewriter&, NameAnalysis&), ConversionPatternRewriter &rewriter);
 
 };
-} // namespace
-
-
 
 int getBBNumberFromOp(Operation * op){
       std::string BB_STRING = "handshake.bb = ";
@@ -68,13 +67,13 @@ int getBBNumberFromOp(Operation * op){
 }
 
 
-void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, OpBuilder, NameAnalysis&)){
+void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, ConversionPatternRewriter&, NameAnalysis&),ConversionPatternRewriter &rewriter){
    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()){
       for (BlockArgument arg : funcOp.getArguments()) {
         llvm::errs() << "[traversing arguments]" << arg << "\n";
         if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg)){
-            MLIRContext *ctx = &getContext();
-            OpBuilder builder(ctx);
+            // MLIRContext *ctx = &getContext();
+            // OpBuilder builder(ctx);
             NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
             auto memrefUsers = memref.getUsers();
@@ -89,7 +88,7 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
                   llvm::errs() << "group" << "--\n";
                   for (MemoryPort &port : group->accessPorts) {
                       llvm::errs() << "oomad \n";
-                      func (port.portOp, forkOpDict, builder, namer);
+                      func (port.portOp, forkOpDict, rewriter, namer);
                     }
                 }
             }
@@ -102,31 +101,31 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
     
 
 
-void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, OpBuilder builder, NameAnalysis& namer){
+void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter& rewriter, NameAnalysis& namer){
 
     llvm::errs() << "heyyyy\n";
     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
 
-    builder.setInsertionPointToStart(memOp->getBlock());
+    rewriter.setInsertionPointToStart(memOp->getBlock());
 
 
 
-    handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
-    unbundleOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+    handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
+    unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
 
 
-    handshake::ForkOp forkOp = builder.create<handshake::ForkOp>(memOp.getLoc(), unbundleOp->getResult(0), 13);
-    forkOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+    handshake::ForkOp forkOp = rewriter.create<handshake::ForkOp>(memOp.getLoc(), unbundleOp->getResult(0), 13);
+    forkOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
 
 
 
     ValueRange *ab = new ValueRange();
     handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-    handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(memOp.getLoc(), forkOp->getResult(0), unbundleOp->getResult(1), *ab, ch);
-    bundleOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+    handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), forkOp->getResult(0), unbundleOp->getResult(1), *ab, ch);
+    bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
 
     
-    builder.create<handshake::SinkOp>(memOp.getLoc(), bundleOp->getResult(0));
+    rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp->getResult(0));
 
 
     forkOpDict[getUniqueName(memOp)] = forkOp;
@@ -138,7 +137,7 @@ void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict
 
 
 
-void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, OpBuilder builder, NameAnalysis& namer){
+void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter &rewriter, NameAnalysis& namer){
 
     SmallVector<Value> joinValues;
 
@@ -203,24 +202,24 @@ void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict
 
 
 
-      builder.setInsertionPointToStart(memOp->getBlock());
+      rewriter.setInsertionPointToStart(memOp->getBlock());
 
       int bb_num = getBBNumberFromOp(memOp);
 
-      handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getOperand(0));
-      unbundleOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(bb_num));
+      handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getOperand(0));
+      unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
       joinValues.push_back(unbundleOp.getResult(0));
 
-      handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(memOp.getLoc(), joinValues);
-      joinOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(bb_num));
+      handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(memOp.getLoc(), joinValues);
+      joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
 
       ValueRange *ab = new ValueRange();
       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
 
-      handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(memOp.getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
-      bundleOp->setAttr(BB_ATTR_NAME, builder.getUI32IntegerAttr(bb_num));
+      handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+      bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
       llvm::errs() << "fetne2" << bundleOp <<  "\n";
       llvm::errs() << joinOp.getResult() << unbundleOp.getResult(1) <<  "\n";
@@ -264,13 +263,44 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
     }
   }
 
+      MLIRContext *ctx = &getContext();
+  
+  ConversionPatternRewriter rewriter(ctx);
+
+
+
+
+  
+  llvm::errs() << "Finished Traversing \n";
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
+      // Restore the cf structure to work on a structured IR
+      if (failed(experimental::cfg::restoreCfStructure(funcOp, rewriter)))
+        signalPassFailure();
+  }
+
   DenseMap<StringRef, Operation *> forkOpDict;
 
-  traverseMemRef(modOp, forkOpDict, &insertForkForOp);
-  traverseMemRef(modOp, forkOpDict, &insertJoinForOp);
+  traverseMemRef(modOp, forkOpDict, &insertForkForOp, rewriter);
+  traverseMemRef(modOp, forkOpDict, &insertJoinForOp, rewriter);
+
+for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
+      funcOp.print(llvm::dbgs());
+      llvm::errs() << "funcOp";
+
+      experimental::ftd::addRegen(funcOp, rewriter);
+      experimental::ftd::addSupp(funcOp, rewriter);
+      experimental::cfg::markBasicBlocks(funcOp, rewriter);
+
+      // Remove the blocks and terminators
+      if (failed(cfg::flattenFunction(funcOp)))
+        signalPassFailure();
+  }
+  
+
 
   
 }
+} // namespace
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::createHandshakeAddSeqMem() {

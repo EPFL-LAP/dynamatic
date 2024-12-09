@@ -96,6 +96,7 @@ def HandshakeAddSeqMem : DynamaticPass<"handshake-add-seq-mem"> {
     so it can sequentialize the accesses which it needs.
   }];
   let constructor = "dynamatic::experimental::createHandshakeAddSeqMem()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
 def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {

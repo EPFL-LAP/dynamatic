@@ -602,8 +602,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 fastTokenDelivery, addSeqMem);
-                 fastTokenDelivery, straightToQueue);
+                 fastTokenDelivery, straightToQueue, addSeqMem);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
