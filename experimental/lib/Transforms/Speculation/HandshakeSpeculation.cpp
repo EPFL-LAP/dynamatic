@@ -90,6 +90,8 @@ private:
 };
 } // namespace
 
+const std::string EXTRA_BIT_SPEC = "spec";
+
 template <>
 LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
     Value ctrlSignal) {
@@ -564,16 +566,18 @@ LogicalResult HandshakeSpeculationPass::placeBuffers() {
 static LogicalResult markTypeOfValueWithSpecTag(Value value) {
   OpBuilder builder(value.getContext());
 
-  ArrayRef<ExtraSignal> extraSignals = {
-      ExtraSignal("spec", builder.getIntegerType(1))};
   if (auto channelType = value.getType().dyn_cast<handshake::ChannelType>()) {
-    value.setType(handshake::ChannelType::get(
-        channelType.getContext(), channelType.getDataType(), extraSignals));
+    if (!channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      value.setType(channelType.addExtraSignal(
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    }
     return success();
   }
   if (auto controlType = value.getType().dyn_cast<handshake::ControlType>()) {
-    value.setType(
-        handshake::ControlType::get(controlType.getContext(), extraSignals));
+    if (!controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      value.setType(controlType.addExtraSignal(
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    }
     return success();
   }
   value.dump();
