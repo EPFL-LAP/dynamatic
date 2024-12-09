@@ -242,14 +242,6 @@ class HasSpecTag<string type> : CPred<
   "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(" # type # ").getExtraSignalByName(\"spec\"))"
 >;
 
-// Two approaches to ensuring operand types satisfy a constraint:
-// 1. Define a multi-entity constraint:
-//    - Lightweight implementation but less expressive.
-// 2. Create an OpInterface and implement a verifier to it:
-//    - Commonly used in Dynamatic but lacks immediate clarity that a constraint exists in the Op.
-//    - Deviates from the original intent of an "Interface."
-// TODO: Standardize these approaches or establish guidelines for when to use each.
-
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
 class AddingSpecTag<string a, string b> : PredOpTrait<
   b # " should be the type of " # a # " with spec tag",
