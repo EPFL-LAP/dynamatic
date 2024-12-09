@@ -67,6 +67,7 @@ def ControlType : Handshake_Type<"Control", "control", [
   ];
 
   let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
