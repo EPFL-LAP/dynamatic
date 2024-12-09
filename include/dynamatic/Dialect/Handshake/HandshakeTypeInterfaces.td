@@ -28,6 +28,10 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
   // defaultImplementation: the default body of the method of the type implementing this interface
   // ConcreteType: the type (template) implementing this interface
   let methods = [
+    // This method is auto-implemented if the type includes an `extraSignals` argument 
+    // of type `ExtraSignals` (defined in HandshakeTypes.td).
+    InterfaceMethod<"Returns extra signals",
+      "llvm::ArrayRef<ExtraSignal>", "getExtraSignals", (ins)>,
     InterfaceMethod<"Returns the number of extra signals",
       "unsigned", "getNumExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
