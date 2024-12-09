@@ -7,9 +7,7 @@
 void loop_load(in_int_t array[1000], in_int_t n) {
   int i, m;
   for (i = 0; i < n; ++i) {
-    m = array[i];
-    if (m > 60)
-      break;
+    array[i] += 1;
   }
   array[i-1] = 10;
 }

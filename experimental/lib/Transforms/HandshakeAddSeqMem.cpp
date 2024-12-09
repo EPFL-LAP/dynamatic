@@ -46,7 +46,7 @@ struct HandshakeAddSeqMemPass
 
   void runDynamaticPass() override;
 
-  void traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, ConversionPatternRewriter&, NameAnalysis&), ConversionPatternRewriter &rewriter);
+  void traverseMemRef(ModuleOp modOp, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter));
 
 };
 
@@ -67,14 +67,14 @@ int getBBNumberFromOp(Operation * op){
 }
 
 
-void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, Operation *> &forkOpDict, void (*func)(Operation*, DenseMap<StringRef, Operation *>&, ConversionPatternRewriter&, NameAnalysis&),ConversionPatternRewriter &rewriter){
+void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter)){
    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()){
       for (BlockArgument arg : funcOp.getArguments()) {
         llvm::errs() << "[traversing arguments]" << arg << "\n";
         if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg)){
             // MLIRContext *ctx = &getContext();
             // OpBuilder builder(ctx);
-            NameAnalysis &namer = getAnalysis<NameAnalysis>();
+            // NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
             auto memrefUsers = memref.getUsers();
             Operation *memOp = *memrefUsers.begin();
@@ -88,7 +88,8 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
                   llvm::errs() << "group" << "--\n";
                   for (MemoryPort &port : group->accessPorts) {
                       llvm::errs() << "oomad \n";
-                      func (port.portOp, forkOpDict, rewriter, namer);
+                      func (port.portOp, joinInputValues, rewriter);
+                      nameToOp[getUniqueName(port.portOp)] = port.portOp;
                     }
                 }
             }
@@ -100,139 +101,201 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
 }
     
 
+void determineJoinInputValues(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter){
 
-void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter& rewriter, NameAnalysis& namer){
-
-    llvm::errs() << "heyyyy\n";
     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
+        
+        if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
+          
+          rewriter.setInsertionPointToStart(memOp->getBlock());
 
-    rewriter.setInsertionPointToStart(memOp->getBlock());
+          handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
+          unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
 
+          ValueRange *ab = new ValueRange();
+          handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+          handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
+          bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
 
+          rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp.getResult(0));
 
-    handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
-    unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+          for (MemDependenceAttr dependency : deps.getDependencies()) {
+              auto dstAccess = dependency.getDstAccess();
 
+              // if (joinInputValues.at(dstAccess))
+              //     joinInputValues[dstAccess] = *new SmallVector<Value>();
+               joinInputValues[dstAccess].push_back(unbundleOp.getResult(0));
 
-    handshake::ForkOp forkOp = rewriter.create<handshake::ForkOp>(memOp.getLoc(), unbundleOp->getResult(0), 13);
-    forkOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
-
-
-
-    ValueRange *ab = new ValueRange();
-    handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-    handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), forkOp->getResult(0), unbundleOp->getResult(1), *ab, ch);
-    bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
-
-    
-    rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp->getResult(0));
-
-
-    forkOpDict[getUniqueName(memOp)] = forkOp;
-    llvm::errs() << "[insert fork] for " << getUniqueName(memOp) << "\n inserted fork " << forkOp << "\n now the size of dictionary is " << forkOpDict.size() <<  "\n";
-
+          }
+        }
+      
     }
-    
 }
 
+void connectJoins(DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter){
 
+    for (auto it = joinInputValues.begin(); it != joinInputValues.end(); ++it){
 
-void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter &rewriter, NameAnalysis& namer){
+      StringRef opName = it->first;
+      llvm::errs() << "[connect joins]" << opName << "\n";
+      Operation* op = nameToOp[opName];
+      llvm::errs() << "[connect joins]" << op << "\n";
+      rewriter.setInsertionPointToStart(op->getBlock());
 
-    SmallVector<Value> joinValues;
+      int bb_num = getBBNumberFromOp(op);
 
-    if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
-      llvm::errs() << "[insert join] reached the load operation: " << getUniqueName(memOp) << "\n";
-
-    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
-      
-      for (MemDependenceAttr dependency : deps.getDependencies()) {
-          auto dstAccess = dependency.getDstAccess();
-
-          llvm::errs() << "the name of dest access is " << dstAccess << "\n";
-          // Operation *dstOp = namer.getOp(dstAccess);
-
-
-          if (Operation* op = forkOpDict[dstAccess]; op){
-            llvm::errs() << "[fork Op dict] found" <<  op << "\n";
-            llvm::errs() << "[fork Op dict] found" <<  *op << "\n";
-
-          llvm::errs() << "fork Op " << op->getResult(0) << "\n";
-          joinValues.push_back(op->getResult(0));
-
-
-          } else {
-            llvm::errs() << "[fork Op dict] didn't found anything \n";
-          }
-
-        }
-        
-      } 
-    }else if (StoreOp memOp = dyn_cast<StoreOp>(op); memOp){
-      llvm::errs() << "[insert join] reached the store operation: " << getUniqueName(memOp) << "\n";
-
-      if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
-        for (MemDependenceAttr dependency : deps.getDependencies()) {
-            auto dstAccess = dependency.getDstAccess();
-            
-            llvm::errs() << "[insert join] the name of dest access is " << dstAccess << "\n";
-
-
-            if (Operation* op = forkOpDict[dstAccess]; op){
-              llvm::errs() << "[fork Op dict] found" <<  op << "\n";
-              llvm::errs() << "[fork Op dict] found" <<  *op << "\n";
-
-            llvm::errs() << "fork Op " << op->getResult(0) << "\n";
-            joinValues.push_back(op->getResult(0));
-
-
-            } else {
-              llvm::errs() << "[fork Op dict] didn't found anything \n";
-            }
-          }
-          
-      }
-
-      
-      llvm::errs() << "The join values are: ";
-      for (auto & joinValue : joinValues){
-          llvm::errs() << joinValue << "-----\n";
-      }
-      llvm::errs() << "-------------------------------\n";
-
-
-
-      rewriter.setInsertionPointToStart(memOp->getBlock());
-
-      int bb_num = getBBNumberFromOp(memOp);
-
-      handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getOperand(0));
+      handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
+      auto joinValues = it->second;
       joinValues.push_back(unbundleOp.getResult(0));
 
-      handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(memOp.getLoc(), joinValues);
+      handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
 
       ValueRange *ab = new ValueRange();
       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-
-      handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+      handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
-      llvm::errs() << "fetne2" << bundleOp <<  "\n";
-      llvm::errs() << joinOp.getResult() << unbundleOp.getResult(1) <<  "\n";
+      op->setOperand(0, bundleOp.getResult(0));
+    }
+}
+
+
+// void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter& rewriter, NameAnalysis& namer){
+
+//     llvm::errs() << "heyyyy\n";
+//     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
+
+//     rewriter.setInsertionPointToStart(memOp->getBlock());
+
+
+
+//     handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
+//     unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+
+
+//     handshake::ForkOp forkOp = rewriter.create<handshake::ForkOp>(memOp.getLoc(), unbundleOp->getResult(0), 13);
+//     forkOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+
+
+
+//     ValueRange *ab = new ValueRange();
+//     handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+//     handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), forkOp->getResult(0), unbundleOp->getResult(1), *ab, ch);
+//     bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+
+    
+//     rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp->getResult(0));
+
+
+//     forkOpDict[getUniqueName(memOp)] = forkOp;
+//     llvm::errs() << "[insert fork] for " << getUniqueName(memOp) << "\n inserted fork " << forkOp << "\n now the size of dictionary is " << forkOpDict.size() <<  "\n";
+
+//     }
+    
+// }
+
+
+
+// void insertJoinForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter &rewriter, NameAnalysis& namer){
+
+//     SmallVector<Value> joinValues;
+
+//     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
+//       llvm::errs() << "[insert join] reached the load operation: " << getUniqueName(memOp) << "\n";
+
+//     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
+      
+//       for (MemDependenceAttr dependency : deps.getDependencies()) {
+//           auto dstAccess = dependency.getDstAccess();
+
+//           llvm::errs() << "the name of dest access is " << dstAccess << "\n";
+//           // Operation *dstOp = namer.getOp(dstAccess);
+
+
+//           if (Operation* op = forkOpDict[dstAccess]; op){
+//             llvm::errs() << "[fork Op dict] found" <<  op << "\n";
+//             llvm::errs() << "[fork Op dict] found" <<  *op << "\n";
+
+//           llvm::errs() << "fork Op " << op->getResult(0) << "\n";
+//           joinValues.push_back(op->getResult(0));
+
+
+//           } else {
+//             llvm::errs() << "[fork Op dict] didn't found anything \n";
+//           }
+
+//         }
+        
+//       } 
+//     }else if (StoreOp memOp = dyn_cast<StoreOp>(op); memOp){
+//       llvm::errs() << "[insert join] reached the store operation: " << getUniqueName(memOp) << "\n";
+
+//       if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
+//         for (MemDependenceAttr dependency : deps.getDependencies()) {
+//             auto dstAccess = dependency.getDstAccess();
+            
+//             llvm::errs() << "[insert join] the name of dest access is " << dstAccess << "\n";
+
+
+//             if (Operation* op = forkOpDict[dstAccess]; op){
+//               llvm::errs() << "[fork Op dict] found" <<  op << "\n";
+//               llvm::errs() << "[fork Op dict] found" <<  *op << "\n";
+
+//             llvm::errs() << "fork Op " << op->getResult(0) << "\n";
+//             joinValues.push_back(op->getResult(0));
+
+
+//             } else {
+//               llvm::errs() << "[fork Op dict] didn't found anything \n";
+//             }
+//           }
+          
+//       }
+
+      
+//       llvm::errs() << "The join values are: ";
+//       for (auto & joinValue : joinValues){
+//           llvm::errs() << joinValue << "-----\n";
+//       }
+//       llvm::errs() << "-------------------------------\n";
+
+
+
+//       rewriter.setInsertionPointToStart(memOp->getBlock());
+
+//       int bb_num = getBBNumberFromOp(memOp);
+
+//       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getOperand(0));
+//       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+//       joinValues.push_back(unbundleOp.getResult(0));
+
+//       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(memOp.getLoc(), joinValues);
+//       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+
+//       ValueRange *ab = new ValueRange();
+//       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+
+//       handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+//       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+//       llvm::errs() << "fetne2" << bundleOp <<  "\n";
+//       llvm::errs() << joinOp.getResult() << unbundleOp.getResult(1) <<  "\n";
        
 
-      memOp.setOperand(0, bundleOp.getResult(0));
+//       memOp.setOperand(0, bundleOp.getResult(0));
 
-      llvm::errs() << "[insert join] created the join operation\n" ;
+//       llvm::errs() << "[insert join] created the join operation\n" ;
 
-    }
+//     }
 
 
-}
+// }
 
 
 void HandshakeAddSeqMemPass::runDynamaticPass() {
@@ -263,42 +326,47 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
     }
   }
 
-      MLIRContext *ctx = &getContext();
+  
+  MLIRContext *ctx = &getContext();
   
   ConversionPatternRewriter rewriter(ctx);
 
 
-
-
-  
-  llvm::errs() << "Finished Traversing \n";
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
       // Restore the cf structure to work on a structured IR
       if (failed(experimental::cfg::restoreCfStructure(funcOp, rewriter)))
         signalPassFailure();
   }
 
-  DenseMap<StringRef, Operation *> forkOpDict;
+  DenseMap<StringRef, SmallVector<Value>> joinInputValues;
+  DenseMap<StringRef, Operation*> nameToOp;
 
-  traverseMemRef(modOp, forkOpDict, &insertForkForOp, rewriter);
-  traverseMemRef(modOp, forkOpDict, &insertJoinForOp, rewriter);
+  traverseMemRef(modOp, joinInputValues, nameToOp, rewriter, &determineJoinInputValues);
+
+  connectJoins(joinInputValues, nameToOp, rewriter);
+
+
+  llvm::errs() << "finished \n";
 
 for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
       funcOp.print(llvm::dbgs());
       llvm::errs() << "funcOp";
 
       experimental::ftd::addRegen(funcOp, rewriter);
+      llvm::errs() << "add regen \n";
       experimental::ftd::addSupp(funcOp, rewriter);
+      llvm::errs() << "add supp \n";
       experimental::cfg::markBasicBlocks(funcOp, rewriter);
+      llvm::errs() << "mark \n";
 
       // Remove the blocks and terminators
       if (failed(cfg::flattenFunction(funcOp)))
         signalPassFailure();
+
+      llvm::errs() << "flatten \n";
   }
   
 
-
-  
 }
 } // namespace
 
