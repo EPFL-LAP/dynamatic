@@ -7,6 +7,9 @@ target_link_libraries(exp-export-smv
   PRIVATE
   DynamaticSupport
   DynamaticTransforms
+  MLIRIR
+  DynamaticSupportRTL
+  DynamaticHW
 
   DynamaticHandshake
   MLIRParser

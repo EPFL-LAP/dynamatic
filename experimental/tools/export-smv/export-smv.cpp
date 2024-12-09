@@ -1,4 +1,4 @@
-//===- export-vhdl.cpp - Export VHDL from netlist-level IR ------*- C++ -*-===//
+//===- export-rtl.cpp - Export RTL from HW-level IR -------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,517 +6,977 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Experimental tool that exports nuXmv-compatible format from a netlist-level
-// IR expressed in the handshake dialect
+// Exports RTL from HW-level IR. Files corresponding to internal and external
+// modules are written inside a provided output directory (which is created if
+// necessary).
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/TimingModels.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/BuiltinAttributes.h"
+#include "dynamatic/Dialect/HW/HWDialect.h"
+#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/RTL/RTL.h"
+#include "dynamatic/Support/System.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
-#include <cstddef>
+#include "llvm/Support/raw_ostream.h"
+#include <iterator>
+#include <optional>
 #include <set>
 #include <string>
-#include <tuple>
+#include <system_error>
 #include <utility>
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
 
-static cl::OptionCategory mainCategory("Application options");
+static cl::OptionCategory mainCategory("Tool options");
 
-static cl::opt<std::string> inputFileName(cl::Positional,
+static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
 
-static cl::opt<std::string> timingDBFilepath(
-    "timing-models", cl::Optional,
-    cl::desc(
-        "Relative path to JSON-formatted file containing timing models for "
-        "dataflow components. The tool will fetch the latency information from "
-        "this file"),
-    cl::init("data/components.json"), cl::cat(mainCategory));
+static cl::opt<std::string> outputDir(cl::Positional, cl::Required,
+                                      cl::desc("<output directory>"),
+                                      cl::cat(mainCategory));
 
-static StringRef getMemName(Value memref) {
-  Operation *parentOp = memref.getParentBlock()->getParentOp();
-  handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
-  for (auto [name, funArg] :
-       llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
-    if (funArg == memref)
-      return cast<StringAttr>(name).getValue();
+static cl::opt<std::string> dynamaticPath("dynamatic-path", cl::Optional,
+                                          cl::desc("<path to Dynamatic>"),
+                                          cl::init("."), cl::cat(mainCategory));
+
+static cl::opt<HDL>
+    hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
+        cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
+                   clEnumValN(HDL::VERILOG, "verilog", "Verilog")),
+        cl::cat(mainCategory));
+
+static cl::list<std::string>
+    rtlConfigs(cl::Positional, cl::OneOrMore,
+               cl::desc("<RTL configuration files...>"), cl::cat(mainCategory));
+
+namespace {
+
+using FGenComp =
+    std::function<LogicalResult(const RTLRequest &, hw::HWModuleExternOp)>;
+
+/// Aggregates information useful during RTL export. This is to avoid passing
+/// many arguments to a bunch of functions.
+struct ExportInfo {
+  /// The top-level MLIR module.
+  mlir::ModuleOp modOp;
+  /// The RTL configuration parsed from JSON-formatted files.
+  RTLConfiguration &config;
+  /// Output directory (without trailing separators).
+  StringRef outputPath;
+
+  /// Maps every external hardware module in the IR to its corresponding
+  /// heap-allocated match according to the RTL configuration.
+  mlir::DenseMap<hw::HWModuleExternOp, RTLMatch *> externals;
+
+  /// Creates export information for the given module and RTL configuration.
+  ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
+             StringRef outputPath)
+      : modOp(modOp), config(config), outputPath(outputPath){};
+
+  /// Associates every external hardware module to its match according to the
+  /// RTL configuration and concretizes each of them inside the output
+  /// directory. Fails if any external module does not have a match in the RTL
+  /// configuration; succeeds otherwise.
+  LogicalResult concretizeExternalModules();
+
+  /// Deallocates all of our RTL matches.
+  ~ExportInfo() {
+    for (auto [_, match] : externals)
+      delete match;
   }
-  return StringRef();
-}
+};
+} // namespace
 
-static size_t findIndexInRange(ValueRange range, Value val) {
-  for (auto [idx, res] : llvm::enumerate(range))
-    if (res == val)
-      return idx;
-  llvm_unreachable("value should exist in range");
-}
+LogicalResult ExportInfo::concretizeExternalModules() {
+  std::set<std::string> modules;
 
-std::string getNodeLatencyAttr(Operation *op, TimingDatabase &timingDB) {
-  double latency;
-  if (failed(timingDB.getLatency(op, SignalType::DATA, latency)))
-    return "0";
-  return std::to_string(static_cast<unsigned>(latency));
-}
-
-LogicalResult getBufferImpl(bool transp, unsigned slots,
-                            mlir::raw_indented_ostream &os) {
-
-  os << "\n";
-  os << "MODULE buffer" << slots << (transp ? "t" : "o")
-     << "_1_1(dataIn0, pValid0, nReady0)\n";
-  os << "VAR\n";
-
-  // Currently, when mapping the (transp, slot) to the buffer implementation, we
-  // consider the following convention:
-  // not transparent && slot == 1 or 2: OEHB
-  //     transparent && slot == 1     : TEHB
-  // not transparent && slot >  2     : OEHB + tslots * (slot - 1) + TEHB
-  //     transparent && slot >  1     : tslots * (slot)
-
-  // This will be revised in the future when we consider the buffer parameter as
-  // a tuple, i.e., (fwdLatency, bwdLatency, slots)
-
-  if (!transp && (slots == 1 || slots == 2)) {
-    os << "b0     : tehb_1_1(dataIn0, pValid0, b1.ready0);\n";
-    os << "b1     : oehb_1_1(b0.dataOut0, b0.valid0, nReady0);\n";
-    os << "DEFINE\n";
-    os << "dataOut0 := b1.dataOut0;\n";
-    os << "valid0 := b1.valid0;\n";
-    os << "ready0 := b0.ready0;\n";
-    return success();
-  }
-
-  if (transp && slots == 1) {
-    os << "b0 : tehb_1_1(dataIn0, pValid0, nReady0);\n";
-    os << "DEFINE\n";
-    os << "dataOut0 := b0.dataOut0;\n";
-    os << "valid0   := b0.valid0;\n";
-    os << "ready0   := b0.ready0;\n";
-    return success();
-  }
-
-  // The data/valid/ready port signals of the individual slots
-  std::vector<std::string> data;
-  std::vector<std::string> valid;
-  std::vector<std::string> ready;
-
-  // Transparent buffer with more than 1 slot: equivalent to a N-slot elastic
-  // FIFO with bypass, i.e, has no sequential delay on both directions.
-  data.emplace_back("dataIn0");
-  valid.emplace_back("pValid0");
-  for (unsigned i = 0; i < slots - 1 + (!transp); i++) {
-    data.emplace_back("b" + itostr(i) + ".dataOut0");
-    valid.emplace_back("b" + itostr(i) + ".valid0");
-    ready.emplace_back("b" + itostr(i) + ".ready0");
-  }
-  ready.emplace_back("nReady");
-  os << "DEFINE dataOut0 := b" << slots - (transp) << ".dataOut0; \n";
-  os << "DEFINE valid0   := b" << slots - (transp) << ".valid0; \n";
-  os << "DEFINE ready0   := b0.ready0; \n";
-  if (transp) {
-    assert(std::size(data) == slots);
-    for (unsigned i = 0; i < slots; i++) {
-      os << "VAR b" << i << " : tslot_1_1(" << data[i] << ", " << valid[i]
-         << ", " << ready[i] << ");\n";
+  FGenComp concretizeComponent =
+      [&](const RTLRequest &request,
+          hw::HWModuleExternOp extOp) -> LogicalResult {
+    // Try to find a matching component
+    RTLMatch *match = config.getMatchingComponent(request);
+    if (!match) {
+      return emitError(request.loc)
+             << "Failed to find matching RTL component for external module";
     }
-    return success();
-  }
-  // Non-transparent buffer (N slots) with more than 2 slots: equivalent to a
-  // N-slot elastic FIFO + TEHB, i.e., it has sequential latency on both
-  // directions
-  if (!transp) {
-    assert(std::size(data) == slots + 1);
-    os << "VAR b0 : oehb_1_1(" << data[0] << ", " << valid[0] << ", "
-       << ready[0] << ");\n";
-    for (unsigned i = 1; i < slots; i++) {
-      os << "VAR b" << i << " : tslot_1_1(" << data[i] << ", " << valid[i]
-         << ", " << ready[i] << ");\n";
+    if (extOp)
+      externals[extOp] = match;
+
+    // No need to do anything if a module with the same name already exists
+    StringRef concreteModName = match->getConcreteModuleName();
+    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew)
+      return success();
+
+    // First generate dependencies recursively...
+    for (StringRef dep : match->component->getDependencies()) {
+      RTLDependencyRequest dependencyRequest(dep, request.loc);
+      if (failed(concretizeComponent(dependencyRequest, nullptr)))
+        return failure();
     }
-    os << "VAR b" << slots << " : tehb_1_1" << data[slots] << ", "
-       << valid[slots] << ", " << ready[slots] << ");\n";
-    return success();
-  }
 
-  // encountered unknown buffer configuration!
-  return failure();
-}
+    // ...then generate the component itself
+    return match->concretize(request, dynamaticPath, outputPath);
+  };
 
-LogicalResult getForkImpl(unsigned nOutputs, mlir::raw_indented_ostream &os) {
-  assert(nOutputs >= 2 && "received a fork with 0 or 1 output ports!");
-  // interface
-  os << "\nMODULE fork_1_" << nOutputs << "(dataIn0, pValid0, ";
-  for (unsigned i = 0; i < nOutputs - 1; i++) {
-    os << "nReady" << i << ", ";
-  }
-  os << "nReady" << nOutputs - 1 << ")\n";
-  os << "forkStop := ";
-  for (unsigned i = 0; i < nOutputs - 1; i++) {
-    os << "regBlock" << i << ".blockStop | ";
-  }
-  os << "regBlock" << nOutputs - 1 << "blockStop;\n";
-  os << "pValidAndForkStop := pValid0 & forkStop;\n";
-  os << "ready0 := !forkStop;\n";
-  for (unsigned i = 0; i < nOutputs; i++) {
-    os << "-- output" << i << "\n";
-    os << "VAR regBlock" << i << " : eagerFork_RegisterBlock(pValid0, !nReady"
-       << i << ", pValidAndForkStop);\n";
-    os << "DEFINE valid" << i << " := regBlock" << i << ".valid;\n";
-    os << "DEFINE dataOut" << i << " := dataIn0;\n";
-    os << "sent" << i << " := !regBlock" << i << ".reg_value;\n";
-    os << "sent_plus" << i << " := !regBlock" << i << ".reg_value & dataIn0;\n";
-    os << "sent_minus" << i << " := !regBlock" << i
-       << ".reg_value & !dataIn0;\n";
-  }
-
-  return success();
-}
-
-LogicalResult getOperatorImpl(unsigned numInputs, unsigned lat,
-                              raw_indented_ostream &os) {
-  os << "\nMODULE operator" << lat << "c_" << numInputs << "_1 (";
-  for (unsigned i = 0; i < numInputs; i++) {
-    os << "dataIn" << i << ", pValid" << i << ", ";
-  }
-  os << "nReady0)\nVAR\n";
-  os << "d0 : delay" << lat << "c_1_1(FALSE, j0.valid0, nReady0);\n";
-  os << "j0 : join_" << numInputs << "_1(";
-  for (unsigned i = 0; i < numInputs; i++) {
-    os << "pValid" << i << ", ";
-  }
-  os << "d0.ready0);\n";
-  os << "DEFINE\n";
-  os << "valid0   := d0.valid0;\n";
-  os << "dataOut0 := d0.dataOut0;\n";
-  os << "num      := d0.num;\n";
-  for (unsigned i = 0; i < numInputs; i++) {
-    os << "ready" << i << " := j0.ready" << i << ";\n";
-  }
-  return success();
-}
-
-// this implements model of the pipeline stage inside the pipelined units
-LogicalResult getDelayImpl(unsigned lat, raw_indented_ostream &os) {
-  os << "\nMODULE delay" << lat << "c_1_1 (dataIn0, pValid0, nReady0)\n";
-  if (lat == 0) {
-    os << "DEFINE dataOut0 := dataIn0;\n";
-    os << "DEFINE valid0   := pValid0;\n";
-    os << "DEFINE ready0   := nReady0;\n";
-    return success();
-  }
-
-  if (lat == 1) {
-    os << "VAR b0          := oehb_1_1(dataIn0, pValid0, nReady0);\n";
-    os << "DEFINE dataOut0 := b0.dataIn0;\n";
-    os << "DEFINE valid0   := b0.pValid0;\n";
-    os << "DEFINE ready0   := b0.ready0;\n";
-    os << "DEFINE num      := toint(b0.valid0);\n";
-    os << "DEFINE v1.full  := b0.valid0;\n";
-    os << "DEFINE v1.num   := num;\n";
-    return success();
-  }
-
-  if (lat > 1) {
-    os << "VAR b0 := oehb_1_1(dataIn0, v" << lat - 1 << ", nReady0);\n";
-    os << "DEFINE v0       := pValid0;\n";
-    for (unsigned i = 1; i < lat; i++) {
-      os << "VAR b" << i << " : boolean;\n";
-      os << "ASSIGN init(v" << i << ") := FALSE;\n";
-      os << "ASSIGN next(v" << i << ") := b0.ready0 ? v" << i - 1 << " : v" << i
-         << ";\n";
-    }
-    os << "DEFINE dataOut0 := FALSE;\n";
-    os << "DEFINE valid0   := b0.pValid0;\n";
-    os << "DEFINE ready0   := b0.ready0;\n";
-    os << "DEFINE v" << lat << " := b0.valid0;\n";
-
-    os << "num : count(";
-    for (unsigned i = 1; i < lat; i++) {
-      os << "v" << itostr(i) << ", ";
-    }
-    os << "v" << lat << ");\n";
-    for (unsigned i = 1; i < lat; i++) {
-      os << "DEFINE v" << i << ".full := v" << i << ";\n";
-      os << "DEFINE v" << i << ".num  := toint(v" << i << ");\n";
-    }
-    return success();
-  }
-
-  return failure();
-}
-
-LogicalResult writeMCImpl(handshake::MemoryControllerOp mcOp,
-                          raw_indented_ostream &os) {
-  StringRef memName = getMemName(mcOp.getMemRef());
-  os << "mc_" << std::string(memName) << "_" << mcOp->getNumOperands() << "_"
-     << mcOp.getNumResults() << "(";
-  MCPorts ports = mcOp.getPorts();
-  int numCtrl = 0, numIn = 0, numOut = 0;
-  if (ports.hasAnyPort<ControlPort>()) {
-    numCtrl += 1;
-  }
-
-  return success();
-}
-
-// for parametrized units, we encode the parameter in the type of the unit and
-// later generate a unit for each parametrization used by the model
-LogicalResult getUnitType(Operation *op, mlir::raw_indented_ostream &os,
-                          TimingDatabase timingDB) {
-
-  int numInputs = op->getNumOperands();
-  int numOutputs = op->getNumResults();
-
-  std::string type =
-      llvm::TypeSwitch<Operation *, std::string>(op)
-          .Case<handshake::ConstantOp>(
-              [&](handshake::ConstantOp cstOp) -> std::string {
-                return "constant";
-              })
-          .Case<handshake::OEHBOp>([&](handshake::OEHBOp oehbOp) {
-            return "buffer" + std::to_string(oehbOp.getSlots()) + "o";
-          })
-          .Case<handshake::TEHBOp>([&](handshake::TEHBOp tehbOp) {
-            return "buffer" + std::to_string(tehbOp.getSlots()) + "t";
-          })
-          .Case<handshake::ReturnOp>([&](auto) { return "buffer1t"; })
-          .Case<arith::CmpIOp, arith::CmpFOp, arith::AndIOp, arith::OrIOp,
-                arith::XOrIOp>([&](auto) {
-            return "decider" + getNodeLatencyAttr(op, timingDB) + "c";
-          })
-          .Case<handshake::ForkOp>([&](auto) { return "fork"; })
-          .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-          .Case<handshake::SourceOp>([&](auto) { return "source"; })
-          .Case<handshake::SinkOp>([&](auto) { return "sink"; })
-          .Case<handshake::MuxOp>([&](auto) { return "mux"; })
-          .Case<handshake::MergeOp>([&](auto) { return "merge"; })
-          .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-            StringRef memName = getMemName(lsqOp.getMemRef());
-            return "lsq_" + std::string(memName);
-          })
-          .Case<handshake::MemoryControllerOp>(
-              [&](handshake::MemoryControllerOp mcOp) {
-                StringRef memName = getMemName(mcOp.getMemRef());
-                return "mc_" + std::string(memName);
-              })
-          .Case<handshake::ConditionalBranchOp, handshake::BranchOp>(
-              [&](auto) { return "branch"; })
-          .Case<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
-                arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
-                arith::DivFOp, arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp,
-                arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
-                arith::TruncFOp>([&](auto) {
-            return "operator" + getNodeLatencyAttr(op, timingDB) + "c";
-          })
-          .Default(
-              [&](auto) { return "unknownop" + std::to_string(numInputs); });
-
-  os << type << "_" << std::to_string(numInputs) << "_"
-     << std::to_string(numOutputs);
-  ;
-  return success();
-}
-
-// prints the declaration for the unit
-LogicalResult printUnit(Operation *op, mlir::raw_indented_ostream &os,
-                        TimingDatabase &timingDB) {
-  StringRef unitName = getUniqueName(op);
-
-  os << "VAR " << unitName << " : ";
-  if (failed(getUnitType(op, os, timingDB))) {
-    return failure();
-  }
-  os << " (";
-
-  for (auto [idx, arg] : llvm::enumerate(op->getOperands())) {
-    os << unitName << "_dataIn" << idx << ", " << unitName << "_pValid" << idx;
-    if (idx < op->getNumOperands() - 1) {
-      os << ", ";
-    }
-  }
-
-  if (op->getNumOperands() > 0 && op->getNumResults() > 0)
-    os << ", ";
-
-  for (auto [idx, arg] : llvm::enumerate(op->getResults())) {
-    os << unitName << "_nReady" << idx;
-    if (idx < op->getNumResults() - 1) {
-      os << ", ";
-    }
-  }
-  os << ");\n";
-  return success();
-}
-
-// prints the declaration for the channels, one line per each data, ready and
-// valid signal
-LogicalResult printChannel(OpOperand &oprd, mlir::raw_indented_ostream &os) {
-  Value val = oprd.get();
-  Operation *src = val.getDefiningOp();
-  Operation *dst = oprd.getOwner();
-
-  // Locate value in source results and destination operands
-  const size_t resIdx = findIndexInRange(src->getResults(), val);
-  const size_t argIdx = findIndexInRange(dst->getOperands(), val);
-
-  std::string cstValue =
-      llvm::TypeSwitch<Operation *, std::string>(src)
-          .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
-            Type cstType = cstOp.getResult().getType();
-            TypedAttr valueAttr = cstOp.getValueAttr();
-            if (isa<IntegerType>(cstType)) {
-              if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
-                return boolAttr.getValue() ? "TRUE" : "FALSE";
-            }
-            // if not a Boolean value: the abstract model doesn't care constant
-            // values like this
-            return "FALSE";
-          })
-          .Default([&](auto) { return "false"; });
-
-  os << "DEFINE " << getUniqueName(src) << "_nReady" << resIdx
-     << " := " << getUniqueName(dst) << ".ready" << argIdx << ";\n";
-
-  os << "DEFINE " << getUniqueName(dst) << "_pValid" << argIdx
-     << " := " << getUniqueName(src) << ".valid" << resIdx << ";\n";
-
-  if (!isa<handshake::ConstantOp>(src))
-    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx
-       << " := " << getUniqueName(src) << ".dataOut" << resIdx << ";\n";
-  else
-    os << "DEFINE " << getUniqueName(dst) << "_dataIn" << argIdx
-       << " := " << cstValue << ";\n";
-
-  return success();
-}
-
-LogicalResult writeUnitImpl(handshake::FuncOp &funcOp,
-                            mlir::raw_indented_ostream &os,
-                            const TimingDatabase &timingDB) {
-  // make sure the each configuration is generated no more than once
-  std::set<std::tuple<bool, signed>> bufAttrs;
-  std::set<unsigned> forkAttrs, delayAttrs;
-  std::set<std::tuple<unsigned, unsigned>> operatorAttrs;
-  for (auto &op : funcOp.getOps()) {
-    if (handshake::OEHBOp oehb = llvm::dyn_cast<handshake::OEHBOp>(op); oehb) {
-      unsigned slots = oehb.getSlots();
-      if (bufAttrs.count({false, slots}) == 0) {
-        if (failed(getBufferImpl(false, slots, os)))
-          return failure();
-      }
-      bufAttrs.emplace(false, slots);
-    }
-    if (handshake::TEHBOp tehb = llvm::dyn_cast<handshake::TEHBOp>(op); tehb) {
-      unsigned slots = tehb.getSlots();
-      if (bufAttrs.count({true, slots}) == 0) {
-        if (failed(getBufferImpl(true, slots, os)))
-          return failure();
-        bufAttrs.emplace(true, slots);
-      }
-    }
-    if (handshake::ForkOp forkOp = llvm::dyn_cast<handshake::ForkOp>(op);
-        forkOp) {
-      unsigned numOutputs = forkOp.getNumResults();
-      // only generate implementation for forks that have more than 3 outputs
-      // the 2-output and 3-output forks are provided in the smv component
-      // library
-      if (forkAttrs.count(numOutputs) == 0 && numOutputs > 3) {
-        if (failed(getForkImpl(numOutputs, os)))
-          return failure();
-        forkAttrs.emplace(numOutputs);
-      }
-    }
-    if (isa<arith::AddIOp, arith::AddFOp, arith::SubIOp, arith::SubFOp,
-            arith::MulIOp, arith::MulFOp, arith::DivUIOp, arith::DivSIOp,
-            arith::DivFOp, arith::ShRSIOp, arith::ShRUIOp, arith::ShLIOp,
-            arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp, arith::TruncIOp,
-            arith::TruncFOp>(op)) {
-      double floatLat = 0.0;
-      unsigned lat = 0;
-      if (!failed(timingDB.getLatency(&op, SignalType::DATA, floatLat))) {
-        lat = (int)round(floatLat);
-      }
-      if (delayAttrs.count(lat) == 0) {
-        if (failed(getDelayImpl(lat, os)))
-          return failure();
-        delayAttrs.emplace((int)round(lat));
-      }
-      int numInputs = op.getNumOperands();
-      if (operatorAttrs.count({numInputs, lat}) == 0) {
-        if (failed(getOperatorImpl(numInputs, lat, os)))
-          return failure();
-        operatorAttrs.emplace(numInputs, lat);
-      }
-    }
-  }
-  return success();
-}
-
-LogicalResult writeSmv(mlir::ModuleOp mod, TimingDatabase &timingDB) {
-  mlir::raw_indented_ostream stdOs(llvm::outs());
-  auto funcs = mod.getOps<handshake::FuncOp>();
-  if (++funcs.begin() != funcs.end()) {
-    mod->emitOpError()
-        << "we currently only support one handshake function per module";
-    return failure();
-  }
-  NameAnalysis nameAnalysis = NameAnalysis(mod);
-  if (!nameAnalysis.isAnalysisValid())
-    return failure();
-  nameAnalysis.nameAllUnnamedOps();
-
-  handshake::FuncOp funcOp = *funcs.begin();
-
-  stdOs << "MODULE main\n";
-  stdOs << "\n-- units\n";
-
-  for (auto &op : funcOp.getOps()) {
-    if (failed(printUnit(&op, stdOs, timingDB)))
+  for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
+    RTLRequestFromHWModule request(extOp);
+    if (failed(concretizeComponent(request, extOp)))
       return failure();
   }
+  return success();
+}
 
-  stdOs << "\n\n-- channels\n";
+namespace {
 
-  for (auto &op : funcOp.getOps()) {
-    for (OpResult res : op.getResults()) {
-      for (OpOperand &val : res.getUses()) {
-        if (failed(printChannel(val, stdOs)))
-          return failure();
+using FGetValueName = std::function<StringRef(Value)>;
+
+/// Aggregates all data one is likely to need when writing a module's RTL
+/// implementation to a file on disk.
+struct WriteModData {
+  /// Module being exported to RTL.
+  hw::HWModuleOp modOp;
+  /// Stream on which to write the RTL implementation.
+  raw_indented_ostream &os;
+  /// Maps SSA values to the name of a corresponding RTL signal.
+  llvm::MapVector<Value, std::string> signals;
+  /// List of SSA values feeding the module's output ports.
+  SmallVector<Value> outputs;
+
+  /// Constructs from the module being exported and from the stream to write the
+  /// RTL implementation to.
+  WriteModData(hw::HWModuleOp modOp, raw_indented_ostream &os)
+      : modOp(modOp), os(os) {}
+
+  using PortDeclarationWriter = void (*)(const llvm::Twine &name, PortType dir,
+                                         std::optional<unsigned> type,
+                                         raw_indented_ostream &os);
+
+  /// Writes the module's port declarations.
+  void writeIO(PortDeclarationWriter writeDeclaration, StringRef sep);
+
+  using SignalDeclarationWriter = void (*)(const llvm::Twine &name,
+                                           std::optional<unsigned> type,
+                                           raw_indented_ostream &os);
+
+  /// Writes the module's internal signal declarations.
+  void writeSignalDeclarations(SignalDeclarationWriter writeDeclaration);
+
+  using SignalAssignmentWriter = void (*)(const llvm::Twine &dst,
+                                          const llvm::Twine &src,
+                                          raw_indented_ostream &os);
+
+  /// Writes signal assignments between the top-level module's outputs and
+  /// the implementation's internal signals.
+  void writeSignalAssignments(SignalAssignmentWriter writeAssignment);
+
+  /// Returns a function that maps SSA values to the name of the internal RTl
+  /// signal that corresponds to it. The returned function asserts if the value
+  /// is unknown.
+  FGetValueName getSignalNameFunc() const {
+    return [&](Value val) -> StringRef {
+      const auto *name = signals.find(val);
+      assert(name != signals.end() && "unknown SSA value");
+      return name->second;
+    };
+  }
+};
+
+/// SMV module writer
+class SMVWriter {
+public:
+  // /// The name of a port along with its type (`std::nullopt` for a 1-bit
+  // signal,
+  // /// an unsigned number `n` for a vector of size `n + 1`)
+  // using IOPort = std::pair<std::string, std::optional<unsigned>>;
+
+  // /// Groups all of the top-level entity's IO as pairs of signal name and
+  // signal
+  // /// type. Inputs and outputs are also separated.
+  // struct EntityIO {
+  //   /// The entity's inputs.
+  //   std::vector<IOPort> inputs;
+  //   /// The entity's outputs.
+  //   std::vector<IOPort> outputs;
+
+  //   /// Constructs entity IO for the hardware module.
+  //   EntityIO(hw::HWModuleOp modOp);
+  // };
+
+  // /// Represents a component's port; its name and a boolean indicating
+  // whether
+  // /// the port is part of a vector in RTL.
+  // using Port = std::pair<std::string, bool>;
+
+  // /// Associates every port of a component to internal signal names that
+  // should
+  // /// connect to it.
+  // using IOMap = std::map<Port, SmallVector<std::string>>;
+
+  /// Suffixes for specfic signal types.
+  static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
+                                 READY_SUFFIX = StringLiteral("_ready");
+
+  /// Export information (external modules must have already been concretized).
+  ExportInfo &exportInfo;
+  // // The HDL in which to write the module.
+  // HDL hdl;
+
+  /// Creates the RTL writer.
+  SMVWriter(ExportInfo &exportInfo) : exportInfo(exportInfo){};
+
+  /// Writes the RTL implementation of the module to the output stream. On
+  /// failure, the RTL implementation should be considered invalid and/or
+  /// incomplete.
+  LogicalResult write(hw::HWModuleOp modOp, raw_indented_ostream &os) const;
+
+  // /// Associates each SSA value inside the module to internal module signals.
+  // /// Fails when encoutering an unsupported operation inside the module;
+  // /// succeeds otherwise.
+  // LogicalResult createInternalSignals(WriteModData &data) const;
+
+  // void fillIOMappings(hw::InstanceOp instOp, const FGetValueName
+  // &getValueName,
+  //                     IOMap &mappings) const;
+
+  /// Default destructor.
+  ~SMVWriter() = default;
+
+private:
+  //   using FGetTypedSignalName = std::function<Port(StringRef, SignalType)>;
+  //   using FGetSignalName = std::function<Port(StringRef)>;
+
+  //   void constructIOMappings(hw::InstanceOp instOp, hw::HWModuleLike modOp,
+  //                            const FGetValueName &getValueName,
+  //                            const FGetTypedSignalName &getTypedSignalName,
+  //                            const FGetSignalName &getSignalName,
+  //                            IOMap &mappings) const;
+  void writeModuleInstantiations(WriteModData &data) const;
+};
+} // namespace
+
+// using PortMapWriter = void (*)(const RTLWriter::Port &port,
+//                                ArrayRef<std::string> signalNames,
+//                                raw_indented_ostream &os);
+
+// /// Writes IO mappings to the output stream. Provided with a correct
+// /// port-mapping function, this works for both VHDL and Verilog.
+// static void writeIOMap(const RTLWriter::IOMap &mappings,
+//                        PortMapWriter writePortMap, raw_indented_ostream &os)
+//                        {
+//   size_t numIOLeft = mappings.size();
+//   for (auto &[port, signalNames] : mappings) {
+//     writePortMap(port, signalNames, os);
+//     if (--numIOLeft != 0)
+//       os << ",";
+//     os << "\n";
+//   }
+// }
+
+// /// Returns the type's "raw" RTL type.
+// static std::optional<unsigned> getRawType(IntegerType intType) {
+//   unsigned dataWidth = intType.getIntOrFloatBitWidth();
+//   assert(dataWidth != 0 && "0-width signals are not allowed");
+//   if (dataWidth == 1)
+//     return std::nullopt;
+//   return dataWidth - 1;
+// }
+
+/// Returns the hardare module the hardware instance is of.
+static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
+  mlir::ModuleOp modOp = instOp->getParentOfType<mlir::ModuleOp>();
+  assert(modOp && "cannot find top-level MLIR module");
+  Operation *lookup = modOp.lookupSymbol(instOp.getModuleName());
+  assert(lookup && "symbol does not reference an operation");
+  return cast<hw::HWModuleLike>(lookup);
+}
+
+/// Returns the internal signal name for a specific signal type.
+static std::string getInternalSignalName(StringRef baseName, SignalType type) {
+  switch (type) {
+  case (SignalType::DATA):
+    return baseName.str();
+  case (SignalType::VALID):
+    return baseName.str() + "_valid";
+  case (SignalType::READY):
+    return baseName.str() + "_ready";
+  }
+}
+
+/// Returns the internal signal name for an extra channel signal.
+static std::string getExtraSignalName(StringRef baseName,
+                                      const ExtraSignal &extra) {
+  return baseName.str() + "_" + extra.name.str();
+}
+
+// void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
+//                            StringRef sep) {
+//   const RTLWriter::EntityIO entityIO(modOp);
+//   size_t numIOLeft = entityIO.inputs.size() + entityIO.outputs.size();
+
+//   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
+//                            PortType dir) -> void {
+//     for (auto &[portName, portType] : io) {
+//       writeDeclaration(portName, dir, portType, os);
+//       if (--numIOLeft != 0)
+//         os << sep;
+//       os << "\n";
+//     }
+//   };
+
+// writePortsDir(entityIO.inputs, PortType::IN);
+// writePortsDir(entityIO.outputs, PortType::OUT);
+// }
+
+// void WriteModData::writeSignalDeclarations(
+//     SignalDeclarationWriter writeDeclaration) {
+//   auto isNotBlockArg = [](auto valAndName) -> bool {
+//     return !isa<BlockArgument>(valAndName.first);
+//   };
+
+//   auto addValidReady = [&](StringRef name) -> void {
+//     writeDeclaration(getInternalSignalName(name, SignalType::VALID),
+//                      std::nullopt, os);
+//     writeDeclaration(getInternalSignalName(name, SignalType::READY),
+//                      std::nullopt, os);
+//   };
+
+//   for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
+//     llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+//         .Case<ChannelType>([&](ChannelType channelType) {
+//           writeDeclaration(
+//               getInternalSignalName(valueAndName.second, SignalType::DATA),
+//               channelType.getDataBitWidth() - 1, os);
+//           addValidReady(valueAndName.second);
+//           for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//             writeDeclaration(getExtraSignalName(valueAndName.second, extra),
+//                              getRawType(cast<IntegerType>(extra.type)), os);
+//           }
+//         })
+//         .Case<ControlType>(
+//             [&](auto type) { addValidReady(valueAndName.second); })
+//         .Case<IntegerType>([&](IntegerType intType) {
+//           writeDeclaration(valueAndName.second, getRawType(intType), os);
+//         });
+//   }
+// }
+
+// void WriteModData::writeSignalAssignments(
+//     SignalAssignmentWriter writeAssignment) {
+//   auto addValidReady = [&](StringRef name, StringRef signal) -> void {
+//     writeAssignment(signal + RTLWriter::VALID_SUFFIX,
+//                     name + RTLWriter::VALID_SUFFIX, os);
+//     writeAssignment(name + RTLWriter::READY_SUFFIX,
+//                     signal + RTLWriter::READY_SUFFIX, os);
+//   };
+
+//   for (auto valAndName : llvm::zip(outputs, modOp.getOutputNamesStr())) {
+//     Value val = std::get<0>(valAndName);
+//     StringRef name = std::get<1>(valAndName).strref();
+//     StringRef signal = signals[val];
+//     llvm::TypeSwitch<Type, void>(val.getType())
+//         .Case<ChannelType>([&](ChannelType channelType) {
+//           writeAssignment(signal, name, os);
+//           addValidReady(name, signal);
+//           for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//             std::string srcName = getExtraSignalName(signal, extra);
+//             std::string dstName = getExtraSignalName(name, extra);
+//             if (!extra.downstream)
+//               std::swap(srcName, dstName);
+//             writeAssignment(srcName, dstName, os);
+//           }
+//         })
+//         .Case<ControlType>([&](auto type) { addValidReady(name, signal); })
+//         .Case<IntegerType>([&](IntegerType intType) {
+//           writeAssignment(signals[val], name, os);
+//         });
+//   }
+// }
+
+// RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
+//   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
+//                               std::vector<IOPort> &up) -> void {
+//     down.emplace_back(getInternalSignalName(portName, SignalType::VALID),
+//                       std::nullopt);
+//     up.emplace_back(getInternalSignalName(portName, SignalType::READY),
+//                     std::nullopt);
+//   };
+
+//   auto addPortType = [&](Type portType, StringRef portName,
+//                          std::vector<IOPort> &down, std::vector<IOPort> &up)
+//                          {
+//     llvm::TypeSwitch<Type, void>(portType)
+//         .Case<ChannelType>([&](ChannelType channelType) {
+//           down.emplace_back(getInternalSignalName(portName,
+//           SignalType::DATA),
+//                             channelType.getDataBitWidth() - 1);
+//           addValidAndReady(portName, down, up);
+//           for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//             std::vector<IOPort> &portsDir = extra.downstream ? down : up;
+//             IntegerType ty = cast<IntegerType>(extra.type);
+//             portsDir.emplace_back(getExtraSignalName(portName, extra),
+//                                   getRawType(ty));
+//           }
+//         })
+//         .Case<ControlType>(
+//             [&](auto type) { addValidAndReady(portName, down, up); })
+//         .Case<IntegerType>([&](IntegerType intType) {
+//           down.emplace_back(portName, getRawType(intType));
+//         });
+//   };
+
+//   for (auto [arg, portAttr] : llvm::zip_equal(
+//            modOp.getBodyBlock()->getArguments(), modOp.getInputNamesStr()))
+//     addPortType(arg.getType(), portAttr.str(), inputs, outputs);
+
+//   for (auto [resType, portAttr] :
+//        llvm::zip_equal(modOp.getOutputTypes(), modOp.getOutputNamesStr()))
+//     addPortType(resType, portAttr.str(), outputs, inputs);
+// }
+
+// LogicalResult RTLWriter::createInternalSignals(WriteModData &data) const {
+//   // Create signal names for all block arguments
+//   for (auto [arg, name] :
+//        llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
+//                        data.modOp.getInputNamesStr()))
+//     data.signals[arg] = name.strref();
+
+//   // Create signal names for all operation results
+//   for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
+//     LogicalResult res =
+//         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
+//             .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) {
+//               // Retrieve the module referenced by the instance
+//               hw::HWModuleLike refModOp = getHWModule(instOp);
+//               std::string prefix = instOp.getInstanceName().str() + "_";
+
+//               // Associate each instance result with a signal name
+//               for (auto [res, name] : llvm::zip_equal(
+//                        instOp->getResults(), refModOp.getOutputNamesStr()))
+//                 data.signals[res] = prefix + name.str();
+//               return success();
+//             })
+//             .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
+//               llvm::copy(outputOp->getOperands(),
+//                          std::back_inserter(data.outputs));
+//               return success();
+//             })
+//             .Default([&](auto) {
+//               return op.emitOpError()
+//                      << "Unsupported operation type within module";
+//             });
+//     if (failed(res))
+//       return failure();
+//   }
+//   return success();
+// }
+
+// void RTLWriter::constructIOMappings(
+//     hw::InstanceOp instOp, hw::HWModuleLike modOp,
+//     const FGetValueName &getValueName,
+//     const FGetTypedSignalName &getTypedSignalName,
+//     const FGetSignalName &getSignalName, IOMap &mappings) const {
+//   auto addValidAndReady = [&](StringRef port, StringRef signal) -> void {
+//     mappings[getTypedSignalName(port, SignalType::VALID)].push_back(
+//         getInternalSignalName(signal, SignalType::VALID));
+//     mappings[getTypedSignalName(port, SignalType::READY)].push_back(
+//         getInternalSignalName(signal, SignalType::READY));
+//   };
+
+//   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
+//     llvm::TypeSwitch<Type, void>(portType)
+//         .Case<ChannelType>([&](ChannelType channelType) {
+//           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(
+//               getInternalSignalName(signal, SignalType::DATA));
+//           addValidAndReady(port, signal);
+//           for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+//             mappings[{getExtraSignalName(port, extra), false}].push_back(
+//                 getExtraSignalName(signal, extra));
+//           }
+//         })
+//         .Case<ControlType>([&](auto type) { addValidAndReady(port, signal);
+//         }) .Case<IntegerType>([&](IntegerType intType) {
+//           mappings[getSignalName(port)].push_back(signal.str());
+//         });
+//   };
+
+//   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
+//   for (auto [oprd, portAttr] : ins)
+//     addPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
+
+//   auto outs = llvm::zip_equal(instOp.getResults(),
+//   modOp.getOutputNamesStr()); for (auto [oprd, portAttr] : outs)
+//     addPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
+// }
+
+// void RTLWriter::fillIOMappings(hw::InstanceOp instOp,
+//                                const FGetValueName &getValueName,
+//                                IOMap &mappings) const {
+//   hw::HWModuleLike modOp = getHWModule(instOp);
+//   if (auto extModOp = dyn_cast<hw::HWModuleExternOp>(modOp.getOperation())) {
+//     const RTLMatch &match = *exportInfo.externals.at(extModOp);
+//     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) ->
+//     Port {
+//       return match.component->getRTLPortName(port, type, ::hdl);
+//     };
+//     FGetSignalName getSignalName = [&](auto port) -> Port {
+//       return match.component->getRTLPortName(port, ::hdl);
+//     };
+//     constructIOMappings(instOp, modOp, getValueName, getTypedSignalName,
+//                         getSignalName, mappings);
+//   } else {
+//     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) ->
+//     Port {
+//       return {getInternalSignalName(port, type), false};
+//     };
+//     FGetSignalName getSignalName = [&](auto port) -> Port {
+//       return {port.str(), false};
+//     };
+//     constructIOMappings(instOp, modOp, getValueName, getTypedSignalName,
+//                         getSignalName, mappings);
+//   }
+// }
+
+//===----------------------------------------------------------------------===//
+// VHDLWriter
+//===----------------------------------------------------------------------===//
+
+// namespace {
+
+// struct VHDLWriter : public RTLWriter {
+//   using RTLWriter::RTLWriter;
+
+//   /// Architecture name for VHDL modules we create directly.
+//   static constexpr StringLiteral ARCH_NAME = "behavioral";
+
+//   /// Writes the VHDL implementation of the module to the output stream.
+//   LogicalResult write(hw::HWModuleOp modOp,
+//                       raw_indented_ostream &os) const override;
+
+// private:
+//   static std::string getVHDLType(std::optional<unsigned> width) {
+//     if (width)
+//       return "std_logic_vector(" + std::to_string(*width) + " downto 0)";
+//     return "std_logic";
+//   }
+
+//   /// Writes all module instantiations inside the entity's architecture.
+//   void writeModuleInstantiations(WriteModData &data) const;
+// };
+
+// } // namespace
+
+LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
+                               raw_indented_ostream &os) const {
+
+  WriteModData data(modOp, os);
+  // if (failed(createInternalSignals(data)))
+  //   return failure();
+
+  llvm::errs() << "\nMODULE " << modOp.getSymName() << "\n\n";
+
+  // // Generic imports
+  // os << "library ieee;\n";
+  // os << "use ieee.std_logic_1164.all;\n";
+  // os << "use ieee.numeric_std.all;\n\n";
+
+  // // Declare the entity
+  // os << "entity " << modOp.getSymName() << " is\n";
+  // os.indent();
+  // os << "port (\n";
+  // os.indent();
+
+  // data.writeIO(
+  //     [](const llvm::Twine &name, PortType dir, std::optional<unsigned> type,
+  //        raw_indented_ostream &os) {
+  //       os << name << " : ";
+  //       switch (dir) {
+  //       case PortType::IN:
+  //         os << "in ";
+  //         break;
+  //       case PortType::OUT:
+  //         os << "out ";
+  //         break;
+  //       }
+  //       os << getVHDLType(type);
+  //     },
+  //     ";");
+
+  // // Close the entity declaration
+  // os.unindent();
+  // os << ");\n";
+  // os.unindent();
+  // os << "end entity;\n\n";
+
+  // // Open the entity's architecture
+  // os << "architecture " << ARCH_NAME << " of " << modOp.getSymName()
+  //    << " is\n\n";
+  // os.indent();
+
+  // data.writeSignalDeclarations([](const llvm::Twine &name,
+  //                                 std::optional<unsigned> type,
+  //                                 raw_indented_ostream &os) {
+  //   os << "signal " << name << " : " << getVHDLType(type) << ";\n";
+  // });
+  // os.unindent();
+  // os << "\nbegin\n\n";
+  // os.indent();
+
+  // // Architecture implementation
+  // data.writeSignalAssignments(
+  //     [](const llvm::Twine &src, const llvm::Twine &dst,
+  //        raw_indented_ostream &os) { os << dst << " <= " << src << ";\n"; });
+  // os << "\n";
+  writeModuleInstantiations(data);
+
+  // // Close the entity's architecture
+  // os.unindent();
+  // os << "end architecture;\n";
+  return success();
+}
+
+void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
+  using KeyValuePair = std::pair<StringRef, StringRef>;
+
+  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+    // HDL hdl(HDL::VHDL);
+    std::string moduleName;
+    // std::string archName;
+    SmallVector<KeyValuePair> genericParams;
+
+    llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
+        .Case<hw::HWModuleOp>([&](hw::HWModuleOp hwModOp) {
+          moduleName = hwModOp.getSymName();
+          // archName = ARCH_NAME;
+        })
+        .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
+          const RTLMatch &match = *exportInfo.externals.at(extModOp);
+          // hdl = match.component->getHDL();
+          moduleName = match.getConcreteModuleName();
+          // archName = match.getConcreteArchName();
+          genericParams = match.getGenericParameterValues().takeVector();
+        })
+        .Default([&](auto) { llvm_unreachable("unknown module type"); });
+
+    raw_indented_ostream &os = data.os;
+    // Declare the instance
+    os << "VAR " << instOp.getInstanceName() << " : " << moduleName;
+    // os << instOp.getInstanceName() << " : entity work." << moduleName;
+    // if (hdl == HDL::VHDL)
+    //   os << "(" << archName << ")";
+
+    // // Write generic parameters if there are any
+    if (!genericParams.empty()) {
+      // os << " generic map(";
+      // for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams}.drop_back())
+      //   os << val << ", ";
+      // os << genericParams.back().second << ")";
+      for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams})
+        os << "_" << val;
+    }
+    // os << "\n";
+
+    // PortMapWriter writePortMap = [](const Port &port,
+    //                                 ArrayRef<std::string> signalNames,
+    //                                 raw_indented_ostream &os) {
+    //   assert(!signalNames.empty() && "no signal name associated to port");
+    //   if (!port.second) {
+    //     assert(signalNames.size() == 1 &&
+    //            "more than one signal for non-array port");
+    //     os << port.first << " => " << signalNames.front();
+    //     return;
+    //   }
+
+    //   ArrayRef<std::string> signals(signalNames);
+    //   for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
+    //     os << port.first << "(" << idx << ") => " << sig << ",\n";
+    //   os << port.first << "(" << std::to_string(signals.size() - 1) << ") =>
+    //   "
+    //      << signals.back();
+    // };
+    os << "(";
+
+    mlir::AsmState asmState(instOp->getParentOp());
+
+    bool first = true;
+    for (mlir::Value operand : instOp->getOperands()) {
+      std::string buffer;
+      llvm::raw_string_ostream nameOs(buffer);
+      operand.printAsOperand(nameOs, asmState);
+
+      std::string operandName = nameOs.str();
+      if (!operandName.empty() && operandName[0] == '%') {
+        operandName = operandName.substr(1);
+      }
+
+      if (dyn_cast<ChannelType>(operand.getType())) {
+        if (!first)
+          os << ", ";
+        first = false;
+        os << operandName << ", " << operandName << VALID_SUFFIX;
+      }
+      if (dyn_cast<ControlType>(operand.getType())) {
+        if (!first)
+          os << ", ";
+        first = false;
+        os << operandName << VALID_SUFFIX;
       }
     }
+
+    for (mlir::Value result : instOp->getResults()) {
+      assert(result.hasOneUse() && "result should be used only once");
+      std::string buffer;
+      llvm::raw_string_ostream nameOs(buffer);
+
+      auto *userOp = *result.getUsers().begin();
+      unsigned operandIndex = 0;
+      for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
+        auto operand = userOp->getOperand(i);
+        if (operand == result) {
+          operandIndex = i;
+          // result.printAsOperand(nameOs, asmState);
+          break;
+        }
+      }
+
+      std::string argName;
+      bool argFound = false;
+      if (auto argNamesAttr =
+              userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
+        if (operandIndex < argNamesAttr.size()) {
+          if (auto strAttr =
+                  argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+            argName = strAttr.getValue().str();
+            argFound = true;
+          }
+        }
+      }
+      if (!argFound)
+        continue;
+
+      nameOs << *userOp;
+
+      std::string opStr = nameOs.str();
+
+      // extract name
+      size_t start = opStr.find('"');
+      size_t end = opStr.find('"', start + 1);
+
+      std::string opName = opStr.substr(start + 1, end - start - 1);
+      std::string resultName = opName + "." + argName;
+
+      if (!first)
+        os << ", ";
+      first = false;
+      os << resultName << READY_SUFFIX;
+    }
+    os << ");\n";
+
+    // // Write IO mappings
+    // os.indent();
+    // os << "port map(\n";
+    // os.indent();
+    // IOMap mappings;
+    // fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
+    // writeIOMap(mappings, writePortMap, os);
+    // os.unindent();
+    // os << ");\n";
+    // os.unindent();
+    // os << "\n";
   }
+}
 
-  stdOs << "\n\n-- formal properties\n";
+// //===----------------------------------------------------------------------===//
+// // VerilogWriter
+// //===----------------------------------------------------------------------===//
 
-  stdOs << "\n\n-- parametrized units\n";
-  if (failed(writeUnitImpl(funcOp, stdOs, timingDB)))
-    return failure();
+// namespace {
 
-  return success();
+// struct VerilogWriter : public RTLWriter {
+//   using RTLWriter::RTLWriter;
+
+//   /// Writes the Verilog implementation of the module to the output stream.
+//   LogicalResult write(hw::HWModuleOp modOp,
+//                       raw_indented_ostream &os) const override;
+
+// private:
+//   static std::string getVerilogType(std::optional<unsigned> width) {
+//     if (width)
+//       return "[" + std::to_string(*width) + ":0]";
+//     return "";
+//   }
+
+//   /// Writes all module instantiations inside the entity's architecture.
+//   void writeModuleInstantiations(WriteModData &data) const;
+// };
+
+// } // namespace
+
+// LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
+//                                    raw_indented_ostream &os) const {
+//   WriteModData data(modOp, os);
+//   if (failed(createInternalSignals(data)))
+//     return failure();
+
+//   os << "module " << modOp.getSymName() << "(\n";
+
+//   os.indent();
+//   data.writeIO(
+//       [](const llvm::Twine &name, PortType dir, std::optional<unsigned> type,
+//          raw_indented_ostream &os) {
+//         switch (dir) {
+//         case PortType::IN:
+//           os << "input ";
+//           break;
+//         case PortType::OUT:
+//           os << "output ";
+//           break;
+//         }
+//         os << getVerilogType(type) << " " << name;
+//       },
+//       ",");
+//   os.unindent();
+
+//   os << ");\n";
+//   os.indent();
+
+//   data.writeSignalDeclarations([](const llvm::Twine &name,
+//                                   std::optional<unsigned> type,
+//                                   raw_indented_ostream &os) {
+//     os << "wire " << getVerilogType(type) << " " << name << ";\n";
+//   });
+
+//   os << "\n";
+//   data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine
+//   &dst,
+//                                  raw_indented_ostream &os) {
+//     os << "assign " << dst << " = " << src << ";\n";
+//   });
+//   os << "\n";
+//   writeModuleInstantiations(data);
+
+//   os.unindent();
+//   os << "endmodule\n";
+//   return success();
+// }
+
+// void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
+//   using KeyValuePair = std::pair<StringRef, StringRef>;
+
+//   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+//     HDL hdl(dynamatic::HDL::VERILOG);
+//     std::string moduleName;
+//     SmallVector<KeyValuePair> genericParams;
+
+//     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
+//         .Case<hw::HWModuleOp>(
+//             [&](hw::HWModuleOp hwModOp) { moduleName = hwModOp.getSymName();
+//             })
+//         .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
+//           const RTLMatch &match = *exportInfo.externals.at(extModOp);
+//           hdl = match.component->getHDL();
+//           moduleName = match.getConcreteModuleName();
+//           genericParams = match.getGenericParameterValues().takeVector();
+//         })
+//         .Default([&](auto) { llvm_unreachable("unknown module type"); });
+
+//     raw_indented_ostream &os = data.os;
+//     os << moduleName << " ";
+
+//     // Write generic parameters if there are any
+//     if (!genericParams.empty()) {
+//       os << "#(";
+//       for (auto [name, val] :
+//       ArrayRef<KeyValuePair>{genericParams}.drop_back())
+//         os << "." << name << "(" << val << "), ";
+//       auto [name, val] = genericParams.back();
+//       os << "." << name << "(" << val << ")) ";
+//     }
+//     os << instOp.getInstanceName() << "(\n";
+
+//     PortMapWriter writePortMap = [](const Port &port,
+//                                     ArrayRef<std::string> signalNames,
+//                                     raw_indented_ostream &os) {
+//       assert(!signalNames.empty() && "no signal name associated to port");
+
+//       os << "." << port.first << " (";
+//       if (!port.second) {
+//         assert(signalNames.size() == 1 &&
+//                "more than one signal for non-array port");
+//         os << signalNames.front() << ")";
+//         return;
+//       }
+
+//       // Signals are stored in increasing port index order but the port
+//       mapping
+//       // expects them in the opposite order, so we reverse the list
+//       os << "{";
+//       ArrayRef<std::string> signals(signalNames);
+//       for (StringRef sig : llvm::reverse(signals.drop_front()))
+//         os << sig << ", ";
+//       os << signals.front();
+//       os << "})";
+//     };
+
+//     // Write IO mappings
+//     os.indent();
+//     IOMap mappings;
+//     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
+//     writeIOMap(mappings, writePortMap, os);
+//     os.unindent();
+//     os << ");\n\n";
+//   }
+// }
+
+/// Writes the SMV implementation corresponding to the hardware module in a
+/// file named like the module inside the output directory. Fails if the
+/// output file cannot be created or if the module cannot be converted to SMV;
+/// succeeds otherwise.
+static LogicalResult writeModule(SMVWriter &writer, hw::HWModuleOp modOp) {
+  // Open the file in which we will create the module, it is named like the
+  // module itself
+  std::string filepath = writer.exportInfo.outputPath.str() +
+                         sys::path::get_separator().str() +
+                         modOp.getSymName().str() + ".smv";
+
+  std::error_code ec;
+  llvm::raw_fd_ostream fileStream(filepath, ec);
+  if (ec.value() != 0) {
+    return modOp->emitOpError() << "Failed to create file for export @ \""
+                                << filepath << "\": " << ec.message();
+  }
+  raw_indented_ostream os(fileStream);
+  return writer.write(modOp, os);
 }
 
 int main(int argc, char **argv) {
@@ -524,39 +984,59 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Exports a SMV model corresponding to the module"
-      "The tool only supports exporting the graph of a single Handshake "
-      "function at the moment, and will fail"
-      "if there is more than one Handhsake function in the module.");
+      "Exports a SMV design corresponding to an input HW-level IR. "
+      "JSON-formatted SMV configuration files encode the procedure to "
+      "instantiate/generate external HW modules present in the input IR.");
 
-  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
+  // Make sure the output path does not end in a file separator
+  StringRef outputPath = sys::path::removeTrailingSeparators(outputDir);
+
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
   if (std::error_code error = fileOrErr.getError()) {
-    llvm::errs() << argv[0] << ": could not open input file '" << inputFileName
+    llvm::errs() << argv[0] << ": could not open input file '" << inputFilename
                  << "': " << error.message() << "\n";
     return 1;
   }
 
-  // Functions feeding into HLS tools might have attributes from high(er)
-  // level dialects or parsers. Allow unregistered dialects to not fail in
-  // these cases
+  // We only need the Handshake and HW dialects
   MLIRContext context;
-  context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
-                      handshake::HandshakeDialect, math::MathDialect>();
-  context.allowUnregisteredDialects();
-
-  TimingDatabase timingDB(&context);
-  if (failed(TimingDatabase::readFromJSON(timingDBFilepath, timingDB))) {
-    llvm::errs() << "Failed to read timing database at \"" << timingDBFilepath
-                 << "\"\n";
-    return 1;
-  }
+  context.loadDialect<handshake::HandshakeDialect, hw::HWDialect>();
 
   // Load the MLIR module
   SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
-  mlir::OwningOpRef<mlir::ModuleOp> mod(
+  mlir::OwningOpRef<mlir::ModuleOp> modOp(
       mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
-  if (!mod)
+  if (!modOp)
     return 1;
-  return failed(writeSmv(*mod, timingDB));
+
+  // // Parse the RTL configuration files
+  RTLConfiguration config;
+  // for (StringRef filepath : rtlConfigs) {
+  //   if (failed(config.addComponentsFromJSON(filepath)))
+  //     return 1;
+  // }
+
+  // Create the (potentially nested) output directory
+  if (auto ec = sys::fs::create_directories(outputPath); ec.value() != 0) {
+    llvm::errs() << "Failed to create output directory\n" << ec.message();
+    return 1;
+  }
+
+  // // Generate/Pull all external modules into the output directory
+  ExportInfo info(*modOp, config, outputPath);
+  // if (failed(info.concretizeExternalModules()))
+  //   return 1;
+
+  // Create an SMV writer
+  SMVWriter writer(info);
+
+  // Write each module's RTL implementation to a separate file
+  for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
+    if (failed(writeModule(writer, hwModOp))) {
+      return 1;
+    }
+  }
+
+  return 0;
 }
