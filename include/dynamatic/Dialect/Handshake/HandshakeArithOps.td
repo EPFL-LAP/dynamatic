@@ -228,6 +228,9 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 
   let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
   let results = (outs ChannelType:$result);
+
+  // The type of the control also needs to be specified in the IR.
+  // It may have extra bits, which could affect the result's type and token.
   let assemblyFormat = "$ctrl attr-dict `:` type($ctrl) `,` type($result)";
   let hasVerifier = 1;
 }
