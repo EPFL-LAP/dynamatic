@@ -206,4 +206,14 @@ def SimpleChannel : TypeConstraint<
   "::dynamatic::handshake::ChannelType"
 >;
 
+// Temporary constraint for UnbundleOp.
+def ChannelOrSimpleControl : TypeConstraint<
+  CPred<[{
+    ::mlir::isa<::dynamatic::handshake::ChannelType>($_self) ||
+    (::mlir::isa<::dynamatic::handshake::ControlType>($_self) &&
+     ::mlir::cast<::dynamatic::handshake::ControlType>($_self).getNumExtraSignals() == 0)
+  }]>,
+  "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
