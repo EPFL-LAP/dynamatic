@@ -180,6 +180,11 @@ void ControlType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << ">";
 }
 
+LogicalResult ControlType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                  ArrayRef<ExtraSignal> extraSignals) {
+  return checkChannelExtra(emitError, extraSignals);
+}
+
 /// Parse the control type after "<[" is parsed.
 static Type parseControlAfterLSquare(AsmParser &odsParser) {
   function_ref<InFlightDiagnostic()> emitError = [&]() {
