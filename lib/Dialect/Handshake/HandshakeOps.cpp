@@ -407,13 +407,7 @@ LogicalResult ControlMergeOp::verify() {
   TypeRange operandTypes = getOperandTypes();
   if (operandTypes.empty())
     return emitOpError("operation must have at least one operand");
-  // Type refType = operandTypes.front();
-  // for (Type type : operandTypes.drop_front()) {
-  //   if (refType != type)
-  //     return emitOpError("all operands should have the same type");
-  // }
-  // if (refType != getResult().getType())
-  //   return emitOpError("type of data result should match type of operands");
+
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
 
