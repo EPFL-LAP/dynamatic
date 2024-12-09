@@ -205,25 +205,11 @@ def SimpleChannel : TypeConstraint<
   "::dynamatic::handshake::ChannelType"
 >;
 
-// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
-// Also applies to ControlTypes, as some operations treat them interchangeably
-// using HandshakeType.
-// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
-class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
-  names,
-  [{
-    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
-    // ControlType without extra signals
-    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
-    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
-  }],
-  "data type"
->;
-
+// A constraint ensuring that all types of a variadic operand are the same.
 class AllTypesMatchWithinVariadic<string name> : PredOpTrait<
   "The operands inside the variadic " # name # " should have the same type",
   CPred<[{
-    ([&](mlir::OperandRange operands) {
+    ([&](const mlir::OperandRange &operands) {
       // Operands are those specified as the variadic input.
       ValueTypeRange<OperandRange> types = operands.getTypes();
       size_t numTypes = types.size();
@@ -242,10 +228,49 @@ class AllTypesMatchWithinVariadic<string name> : PredOpTrait<
   }] # "($" # name # ")">
 >;
 
+// Multi-entity constraint ensuring that all variadic/non-variadic operands have the same types.
+// We assume that there is at least one element in nonvariadics.
+// Otherwise, please use AllTypesMatchWithinVariadic.
+class AllTypesMatchWithVariadics<list<string> variadics, list<string> nonvariadics> : PredOpTrait<
+  "All variadic/non-variadic operands should have the same type",
+  And<[
+    // Non-variadic operands
+    AllTypesMatch<nonvariadics>.predicate] #
+    // Intra variadic operands
+    !foreach(variadic, variadics, AllTypesMatchWithinVariadic<variadic>.predicate) #
+    // Inter variadic operands (compare the head of each variadics and the head of non-variadics)
+    // We assumed there is at least one element in nonvariadic
+    !foreach(variadic, variadics, CPred<[{
+      ([&](const mlir::OperandRange &operands, const mlir::OpResult &op) {
+        auto types = operands.getTypes();
+        if (types.empty())
+          return true;
+        return types.front() == op.getType();
+      })
+    }] # "($" # variadic # ", $" # !head(nonvariadics) # ")">)>
+>;
+
+// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
+// Also applies to ControlTypes, as some operations treat them interchangeably
+// using HandshakeType.
+// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    // ControlType without extra signals
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
+>;
+
+// A constraint ensuring that all types of a variadic operand have the same data type.
+// Also applies to ControlTypes, as some operations treat them interchangeably.
 class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
   "The operands inside the variadic " # name # " should have the same type",
   CPred<[{
-    ([&](mlir::OperandRange operands) {
+    ([&](const mlir::OperandRange &operands) {
       // Operands are those specified as the variadic input.
       ValueTypeRange<OperandRange> types = operands.getTypes();
       size_t numTypes = types.size();
@@ -274,12 +299,39 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
   }] # "($" # name # ")">
 >;
 
+// Multi-entity constraint ensuring that all variadic/non-variadic operands have the same data types.
+// Also applies to ControlTypes, as some operations treat them interchangeably.
+// We assume that there is at least one element in nonvariadics.
+// Otherwise, please use AllTypesMatchWithinVariadic.
+class AllDataTypesMatchWithVariadics<list<string> variadics, list<string> nonvariadics> : PredOpTrait<
+  "All variadic/non-variadic operands should have the same data types",
+  And<[
+    // Non-variadic operands
+    AllDataTypesMatch<nonvariadics>.predicate] #
+    // Intra variadic operands
+    !foreach(variadic, variadics, AllDataTypesMatchWithinVariadic<variadic>.predicate) #
+    // Inter variadic operands (compare the head of each variadics and the head of non-variadics)
+    // We assumed there is at least one element in nonvariadic
+    !foreach(variadic, variadics, CPred<[{
+      ([&](const mlir::OperandRange &operands, const mlir::OpResult &op) {
+        auto types = operands.getTypes();
+        if (types.empty())
+          return true;
+        if (mlir::isa<ControlType>(types.front())) {
+          // Just confirm that non-variadic type is also ControlType
+          return mlir::isa<ControlType>(op.getType());
+        }
+        return mlir::cast<ChannelType>(types.front()).getDataType() == mlir::cast<ChannelType>(op.getType()).getDataType();
+      })
+    }] # "($" # variadic # ", $" # !head(nonvariadics) # ")">)>
+>;
+
 // Multi-entity constraints for spec tags
 
 // Predicate to verify if the given type has a valid spec tag as an extra signal.
 class HasSpecTag<string type> : CPred<
   [{
-    ([&](FailureOr<ExtraSignal> getExtraSignalByNameResult) {
+    ([&](const FailureOr<ExtraSignal> &getExtraSignalByNameResult) {
       if (failed(getExtraSignalByNameResult)) {
         // There is no extra signal called "spec"
         return false;

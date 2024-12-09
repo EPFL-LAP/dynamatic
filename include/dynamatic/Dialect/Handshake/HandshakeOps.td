@@ -306,7 +306,7 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure, SameOperandsAndResultType,
-  AllTypesMatchWithinVariadic<"dataOperands">,
+  AllTypesMatchWithVariadics<["dataOperands"], ["result"]>,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
@@ -333,7 +333,7 @@ def MergeOp : Handshake_Op<"merge", [
 
 def MuxOp : Handshake_Op<"mux", [
   Pure,
-  AllDataTypesMatchWithinVariadic<"dataOperands">,
+  AllDataTypesMatchWithVariadics<["dataOperands"], ["result"]>,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -370,7 +370,7 @@ def MuxOp : Handshake_Op<"mux", [
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
-  AllDataTypesMatchWithinVariadic<"dataOperands">,
+  AllDataTypesMatchWithVariadics<["dataOperands"], ["result"]>,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
