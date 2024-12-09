@@ -10,6 +10,7 @@
 
 #include "experimental/Transforms/FtdProfiling.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/TimingModels.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Support/LogicalResult.h"
@@ -22,27 +23,37 @@ using namespace dynamatic::experimental;
 
 namespace {
 
-/// Recursive function which allows to obtain all the paths from block `start`
-/// to block `end` using a DFS.
+using path_t = std::vector<Operation *>;
+using v_path_t = std::vector<path_t>;
+using pathPerMux_t =
+    std::map<Operation *, std::tuple<v_path_t, v_path_t, v_path_t>>;
+
+/// Recursive function which allows to obtain all the paths from block
+/// `start` to block `end` using a DFS.
 static void dfsAllPaths(Operation *start, DenseSet<Operation *> &end,
-                        std::vector<Operation *> &path,
-                        DenseSet<Operation *> &visited,
-                        std::vector<std::vector<Operation *>> &allPaths,
-                        bool firstStep = false) {
+                        path_t &path, DenseSet<Operation *> &visited,
+                        pathPerMux_t &allPaths, bool firstStep = false,
+                        unsigned operand = 0) {
 
   path.push_back(start);
   visited.insert(start);
 
   // If we are at the end of the path, then add it to the list of paths
   if (end.contains(start) && !firstStep) {
-    allPaths.push_back(path);
+    if (operand == 0)
+      std::get<0>(allPaths[start]).push_back(path);
+    if (operand == 1)
+      std::get<1>(allPaths[start]).push_back(path);
+    if (operand == 2)
+      std::get<2>(allPaths[start]).push_back(path);
   } else {
     // Else, for each successor which was not visited, run DFS again
     for (auto result : start->getResults()) {
       for (auto &use : result.getUses()) {
         Operation *user = use.getOwner();
         if (end.contains(user) || !visited.contains(user)) {
-          dfsAllPaths(user, end, path, visited, allPaths);
+          dfsAllPaths(user, end, path, visited, allPaths, false,
+                      use.getOperandNumber());
         }
       }
     }
@@ -52,20 +63,18 @@ static void dfsAllPaths(Operation *start, DenseSet<Operation *> &end,
   visited.erase(start);
 }
 
-static std::vector<std::vector<Operation *>>
-findAllPaths(Operation *start, DenseSet<Operation *> &end) {
-  std::vector<std::vector<Operation *>> allPaths;
-  std::vector<Operation *> path;
+static void findAllPaths(Operation *start, DenseSet<Operation *> &end,
+                         pathPerMux_t &allPaths) {
+  path_t path;
   DenseSet<Operation *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, true);
-  return allPaths;
 }
 
 using MuxesInLoop = std::map<std::string, DenseSet<Operation *>>;
 
 /// Export GSA information
-static MuxesInLoop exportGsaGatesInfo(handshake::FuncOp funcOp,
-                                      NameAnalysis &namer) {
+static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer,
+                               TimingDatabase &timingDB) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -102,25 +111,64 @@ static MuxesInLoop exportGsaGatesInfo(handshake::FuncOp funcOp,
   }
 
   ofs.close();
+  double delay;
 
+  /// For each multiplexer, store all the paths which start start from any mux
+  /// at the same loop level and end in one of their operands. The paths are
+  /// collected according to the related operand.
+  pathPerMux_t pathsPerMux;
   for (auto &[nameLoop, listMuxes] : mil) {
-    for (auto *mux : listMuxes) {
-      llvm::dbgs() << "\n\nStarting point: ";
-      mux->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      auto result = findAllPaths(mux, listMuxes);
-      for (auto &path : result) {
-        llvm::dbgs() << "=================\n";
-        for (auto *op : path) {
-          op->print(llvm::dbgs());
-          llvm::dbgs() << "\n";
-        }
-        llvm::dbgs() << "=================\n";
-      }
-    }
+    for (auto *mux : listMuxes)
+      findAllPaths(mux, listMuxes, pathsPerMux);
   }
 
-  return mil;
+  for (auto &[source, pathsOperands] : pathsPerMux) {
+
+    llvm::dbgs() << "===========================\n";
+
+    double maxDelay0 = 0, maxDelay1 = 0, maxDelay2 = 0, minDelay0 = 99999,
+           minDelay1 = 99999, minDelay2 = 99999;
+
+    for (auto &path : std::get<0>(pathsOperands)) {
+      double delaySum = 0;
+      for (auto *op : path) {
+        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
+          delay = 0;
+        delaySum += delay;
+      }
+      maxDelay0 = maxDelay0 < delaySum ? delaySum : maxDelay0,
+      minDelay0 = minDelay0 > delaySum ? delaySum : minDelay0;
+    }
+
+    for (auto &path : std::get<1>(pathsOperands)) {
+      double delaySum = 0;
+      for (auto *op : path) {
+        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
+          delay = 0;
+        delaySum += delay;
+      }
+      maxDelay1 = maxDelay1 < delaySum ? delaySum : maxDelay1,
+      minDelay1 = minDelay1 > delaySum ? delaySum : minDelay1;
+    }
+
+    for (auto &path : std::get<2>(pathsOperands)) {
+      double delaySum = 0;
+      for (auto *op : path) {
+        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
+          delay = 0;
+        delaySum += delay;
+      }
+      maxDelay2 = maxDelay2 < delaySum ? delaySum : maxDelay2,
+      minDelay2 = minDelay2 > delaySum ? delaySum : minDelay2;
+    }
+
+    llvm::dbgs() << "Max delay input 0: " << maxDelay0 << "\n";
+    llvm::dbgs() << "Max delay input 1: " << maxDelay1 << "\n";
+    llvm::dbgs() << "Max delay input 2: " << maxDelay2 << "\n";
+    llvm::dbgs() << "Min delay input 0: " << minDelay0 << "\n";
+    llvm::dbgs() << "Min delay input 1: " << minDelay1 << "\n";
+    llvm::dbgs() << "Min delay input 2: " << minDelay2 << "\n";
+  }
 }
 
 struct FtdProfilingPass
@@ -133,11 +181,16 @@ struct FtdProfilingPass
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
     ConversionPatternRewriter rewriter(ctx);
 
+    std::string timingModels = "./data/components.json";
+    TimingDatabase timingDB(&getContext());
+    if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+      signalPassFailure();
+
     for (handshake::FuncOp funcOp : module.getOps<handshake::FuncOp>()) {
       if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
         signalPassFailure();
 
-      exportGsaGatesInfo(funcOp, namer);
+      exportGsaGatesInfo(funcOp, namer, timingDB);
 
       if (failed(cfg::flattenFunction(funcOp)))
         signalPassFailure();
