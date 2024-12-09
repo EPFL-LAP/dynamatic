@@ -75,7 +75,8 @@ def ControlType : Handshake_Type<"Control", "control"> {
       return getNumExtraSignals() - getNumDownstreamExtraSignals();
     }
 
-    mlir::FailureOr<ExtraSignal> getExtraSignalByName(std::string name);
+    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
+    bool hasExtraSignal(const std::string &name);
 
     ControlType addExtraSignal(ExtraSignal signal) {
       ::llvm::SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
@@ -164,7 +165,8 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     /// an address in an external memory.
     static ChannelType getAddrChannel(::mlir::MLIRContext* ctx);
 
-    mlir::FailureOr<ExtraSignal> getExtraSignalByName(std::string name);
+    mlir::FailureOr<ExtraSignal> getExtraSignalByName(const std::string &name);
+    bool hasExtraSignal(const std::string &name);
   }];
 }
 
