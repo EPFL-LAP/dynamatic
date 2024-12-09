@@ -61,10 +61,10 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
 
         for (auto operand : operands) {
           if (auto controlType = mlir::dyn_cast<::dynamatic::handshake::ControlType>(operand.getType())) {
-            if (!mlir::failed(controlType.getExtraSignalByName("spec")))
+            if (controlType.hasExtraSignal("spec"))
               return true;
           } else if (auto channelType = mlir::dyn_cast<::dynamatic::handshake::ChannelType>(operand.getType())) {
-            if (!mlir::failed(channelType.getExtraSignalByName("spec")))
+            if (channelType.hasExtraSignal("spec"))
               return true;
           }
         }
