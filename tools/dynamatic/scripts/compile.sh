@@ -127,6 +127,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
       --ftd-lower-cf-to-handshake \
       --handshake-straight-to-queue \
       --handshake-combine-steering-logic \
+      --ftd-profiling \
       > "$F_HANDSHAKE"
     exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
   else

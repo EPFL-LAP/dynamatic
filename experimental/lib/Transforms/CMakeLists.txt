@@ -2,6 +2,7 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
   HandshakeCombineSteeringLogic.cpp
   HandshakeStraightToQueue.cpp
+  FtdProfiling.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

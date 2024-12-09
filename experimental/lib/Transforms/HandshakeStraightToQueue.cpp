@@ -363,8 +363,17 @@ connectForkGraph(handshake::FuncOp &funcOp,
     SmallVector<Value> differentInputs;
     Operation *consumerLF = forksGraph.at(consumerGroup->bb);
 
+    // If there are no inputs, start feeds the lazy fork directly
+    if (!consumerGroup->preds.size()) {
+      consumerLF->setOperands({startValue});
+    } else {
+      consumerLF->setOperands(
+          SmallVector<Value>(consumerGroup->preds.size(), startValue));
+    }
+
     // For each of its producer
-    for (MemoryGroup *producerGroup : consumerGroup->preds) {
+    int idx = 0;
+    for (auto &producerGroup : consumerGroup->preds) {
 
       Operation *producerLF = forksGraph.at(producerGroup->bb);
 
@@ -373,22 +382,15 @@ connectForkGraph(handshake::FuncOp &funcOp,
       SmallVector<Value> forkValuesToConnect = {startValue,
                                                 producerLF->getResult(0)};
 
+      SmallVector<mlir::OpOperand *> operandsToChange;
+      operandsToChange.push_back(&consumerLF->getOpOperand(idx++));
+
       // Build a phi network
       auto phiNetworkOrFailure = ftd::createPhiNetwork(
-          funcOp.getRegion(), rewriter, forkValuesToConnect);
+          funcOp.getRegion(), rewriter, forkValuesToConnect, operandsToChange);
       if (failed(phiNetworkOrFailure))
         return failure();
-
-      auto &phiNetwork = *phiNetworkOrFailure;
-      differentInputs.push_back(phiNetwork[consumerGroup->bb]);
     }
-
-    // If there are no inputs, start feeds the lazy fork directly
-    if (differentInputs.size() == 0)
-      differentInputs.push_back(startValue);
-
-    // Set the operands (if more than one, a join will be instantiated)
-    consumerLF->setOperands(differentInputs);
   }
 
   joinInsertion(rewriter, groupsGraph, forksGraph);

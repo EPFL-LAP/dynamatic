@@ -288,7 +288,6 @@ LogicalResult dynamatic::experimental::cfg::restoreCfStructure(
     originalOps.push_back(&op);
 
   for (auto blockIndex : blocksList) {
-    llvm::dbgs() << "Running on " << blockIndex << "\n";
 
     // For each operation
     for (auto *op : originalOps) {

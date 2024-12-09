@@ -26,6 +26,16 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
   let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
 }
 
+def FtdProfiling : DynamaticPass< "ftd-profiling">  {
+  let summary = "Profiling pass to extract relevant IR information";
+  let description = [{
+    The pass is in charge of extracting static information from the IR, 
+    related to the relationship between loops and multiplexers in the circuit.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createFtdProfiling()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
   let description = [{

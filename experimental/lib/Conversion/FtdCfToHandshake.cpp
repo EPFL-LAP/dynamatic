@@ -15,7 +15,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdSupport.h"
-#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -28,7 +27,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include <fstream>
 #include <utility>
 
 using namespace mlir;
@@ -113,39 +111,6 @@ static void channelifyMuxes(handshake::FuncOp &funcOp) {
     mux->getOperand(2).setType(channelifyType(mux->getOperand(2).getType()));
     mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
   }
-}
-
-/// Export GSA information
-static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer) {
-
-  Region &region = funcOp.getBody();
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-  std::ofstream ofs;
-
-  // We print to this file information about the GSA gates and the innermost
-  // loops, if any, containing each.
-  ofs.open("ftdscripting/gsaGatesInfo.txt", std::ofstream::out);
-  std::string loopDescription;
-  llvm::raw_string_ostream loopDescriptionStream(loopDescription);
-
-  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
-  for (auto phi : muxes) {
-    ofs << namer.getName(phi).str();
-    if (llvm::isa<handshake::MergeOp>(phi->getOperand(0).getDefiningOp()))
-      ofs << " (MU)\n";
-    else
-      ofs << " (GAMMA)\n";
-    if (!loopInfo.getLoopFor(phi->getBlock()))
-      ofs << "Not inside any loop\n";
-    else
-      loopInfo.getLoopFor(phi->getBlock())
-          ->print(loopDescriptionStream, false, false, 0);
-    ofs << loopDescription << "\n";
-    loopDescription = "";
-  }
-
-  ofs.close();
 }
 
 /// Converts undefined operations (LLVM::UndefOp) with a default "0"
@@ -307,12 +272,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
     // Add muxes for regeneration of values in loop
     addRegen(funcOp, rewriter);
-
     channelifyMuxes(funcOp);
-
-    // This function prints to a file information about all GSA gates and the
-    // loops containing them (if any)
-    ::exportGsaGatesInfo(funcOp, namer);
 
     // Add suppression blocks between each pair of producer and consumer
     addSupp(funcOp, rewriter);

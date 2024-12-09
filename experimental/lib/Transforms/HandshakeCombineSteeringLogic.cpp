@@ -14,7 +14,6 @@
 #include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Support/HandshakeSupport.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
@@ -292,21 +291,19 @@ struct RemoveNotCondition
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
 
-    auto conditionValue = condBranchOp.getConditionOperand();
-    Operation *conditionOperation = conditionValue.getDefiningOp();
+    Value condValue = condBranchOp.getConditionOperand();
+    Operation *condOp = condValue.getDefiningOp();
 
-    if (!llvm::isa_and_nonnull<handshake::NotOp>(conditionOperation))
+    if (!llvm::isa_and_nonnull<handshake::NotOp>(condOp))
       return failure();
 
-    handshake::NotOp drivingNot =
-        llvm::dyn_cast<handshake::NotOp>(conditionOperation);
+    auto drivingNot = llvm::dyn_cast<handshake::NotOp>(condOp);
 
     rewriter.setInsertionPointAfter(condBranchOp);
 
     auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
-        conditionOperation->getLoc(),
-        experimental::ftd::getListTypes(condBranchOp.getTrueResult().getType()),
-        drivingNot.getOperand(), condBranchOp.getDataOperand());
+        condOp->getLoc(), drivingNot.getOperand(),
+        condBranchOp.getDataOperand());
 
     rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),
                                 newBranch.getFalseResult());
