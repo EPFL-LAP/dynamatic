@@ -566,16 +566,10 @@ LogicalResult HandshakeSpeculationPass::placeBuffers() {
 static LogicalResult markTypeOfValueWithSpecTag(Value value) {
   OpBuilder builder(value.getContext());
 
-  if (auto channelType = value.getType().dyn_cast<handshake::ChannelType>()) {
-    if (!channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      value.setType(channelType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
-    }
-    return success();
-  }
-  if (auto controlType = value.getType().dyn_cast<handshake::ControlType>()) {
-    if (!controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      value.setType(controlType.addExtraSignal(
+  if (auto extraSignalsType =
+          value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
+    if (!extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      value.setType(extraSignalsType.addExtraSignal(
           ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
     return success();
