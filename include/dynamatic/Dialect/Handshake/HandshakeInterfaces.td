@@ -84,24 +84,17 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     if (mlir::failed(hasInputWithSpecTag))
       return mlir::failure();
 
-    if (auto resultExtraSignalsType = mlir::dyn_cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType)) {
-      bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
-      if (hasInputWithSpecTag.value()) {
-        // If any input has a spec tag, the result must have a spec tag
-        if (!resultHasSpecTag)
-          return concreteOp.emitOpError("result must have a spec tag");
-      } else {
-        // If no input has a spec tag, the result must not have a spec tag
-        if (resultHasSpecTag)
-          return concreteOp.emitOpError("result must not have a spec tag");
-      }
-
-      return mlir::success();
+    auto resultExtraSignalsType = cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType);
+    bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
+    if (hasInputWithSpecTag.value()) {
+      // If any input has a spec tag, the result must have a spec tag
+      if (!resultHasSpecTag)
+        return concreteOp.emitOpError("result must have a spec tag");
+    } else {
+      // If no input has a spec tag, the result must not have a spec tag
+      if (resultHasSpecTag)
+        return concreteOp.emitOpError("result must not have a spec tag");
     }
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
 
     return mlir::success();
   }];
