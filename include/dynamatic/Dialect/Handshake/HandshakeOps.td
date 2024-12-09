@@ -994,7 +994,6 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 
   // While type($dataOut) can be inferred due to the inferReturnTypes,
   // we chose to explicitly specify it in the IR for better clarity and understandability.
-  // NOTE: inferReturnTypes still makes it easy to build this operation (without specifying the return type).
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];

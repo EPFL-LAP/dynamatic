@@ -293,22 +293,22 @@ bool MuxOp::isControl() {
 
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> dataOperands;
   handshake::ChannelType selectType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
 
   // Parse until the type of the select operand
   if (parser.parseOperand(selectOperand) || parser.parseLSquare() ||
-      parser.parseOperandList(allOperands) || parser.parseRSquare() ||
+      parser.parseOperandList(dataOperands) || parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseCustomTypeWithFallback(selectType))
     return failure();
 
-  int size = allOperands.size();
+  int numDataOperands = dataOperands.size();
 
   // Parse the data operands types
-  SmallVector<Type> dataOperandsTypes(size);
-  for (int i = 0; i < size; i++) {
+  SmallVector<Type> dataOperandsTypes(numDataOperands);
+  for (int i = 0; i < numDataOperands; i++) {
     if (parser.parseComma() || parseHandshakeType(parser, dataOperandsTypes[i]))
       return failure();
   }
@@ -319,14 +319,13 @@ ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   result.addTypes(resultType);
 
-  allOperands.insert(allOperands.begin(), selectOperand);
-  if (parser.resolveOperands(
-          allOperands,
-          llvm::concat<const Type>(ArrayRef<Type>(selectType),
-                                   ArrayRef<Type>(dataOperandsTypes)),
-          allOperandLoc, result.operands))
-    return failure();
-  return success();
+  // Fill the result.operands
+  return parser.resolveOperands(
+      llvm::concat<const OpAsmParser::UnresolvedOperand>(
+          ArrayRef<OpAsmParser::UnresolvedOperand>(selectOperand),
+          dataOperands),
+      llvm::concat<const Type>(ArrayRef<Type>(selectType), dataOperandsTypes),
+      allOperandLoc, result.operands);
 }
 
 void MuxOp::print(OpAsmPrinter &p) {
@@ -361,25 +360,32 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
   Type resultDataType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
+  // Parse until the type of the result data
   if (parser.parseOperandList(operands) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parseHandshakeType(parser, resultDataType))
     return failure();
 
-  int size = operands.size();
+  int numOperands = operands.size();
 
-  SmallVector<Type> operandTypes(operands.size());
-  for (int i = 0; i < size; i++) {
+  // Parse the operand types
+  SmallVector<Type> operandTypes(numOperands);
+  for (int i = 0; i < numOperands; i++) {
     if (parser.parseComma() || parseHandshakeType(parser, operandTypes[i]))
       return failure();
   }
 
   handshake::ChannelType indexType;
 
+  // Parse the index type
   if (parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
     return failure();
 
+  // Register the result types
   result.addTypes({resultDataType, indexType});
+
+  // Fill the result.operands
   return parser.resolveOperands(operands, operandTypes, allOperandLoc,
                                 result.operands);
 }

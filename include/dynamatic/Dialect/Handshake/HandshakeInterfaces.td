@@ -50,15 +50,9 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     InterfaceMethod<[{
         Returns whether the operation has at least one operand with the "spec" tag.
       }],
-      "mlir::FailureOr<bool>", "hasSpecInput", (ins),
+      "bool", "hasSpecInput", (ins),
       /*methodBody=*/"", /*defaultImplementation=*/[{
         auto operands = $_op->getOperands();
-
-        if (operands.size() < 1) {
-          $_op->emitOpError("must have at least one operand");
-          return failure();
-        }
-
         for (auto operand : operands) {
           auto extraSignalsType = mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(operand.getType());
           if (extraSignalsType.hasExtraSignal("spec"))
@@ -75,7 +69,7 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
 
     auto operands = concreteOp.getDataOperands();
 
-    if (!operands.size())
+    if (operands.size() < 1)
       return concreteOp.emitOpError("must have at least one data operand");
 
     // Verification of the spec tag
@@ -88,14 +82,10 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     // If someone wants to verify other extra signals, they should implement a new verification here,
     // or impose new constraints to the operations.
 
-    FailureOr<bool> hasInputWithSpecTag = concreteOp.hasSpecInput();
-    if (mlir::failed(hasInputWithSpecTag))
-      return mlir::failure();
-
     mlir::Type resultType = $_op->getResult(0).getType();
     auto resultExtraSignalsType = cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType);
     bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
-    if (hasInputWithSpecTag.value()) {
+    if (concreteOp.hasSpecInput()) {
       // If any input has a spec tag, the result must have a spec tag
       if (!resultHasSpecTag)
         return concreteOp.emitOpError("result must have a spec tag");
