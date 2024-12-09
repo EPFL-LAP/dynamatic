@@ -78,12 +78,21 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     if (!operands.size())
       return concreteOp.emitOpError("must have at least one data operand");
 
-    mlir::Type resultType = $_op->getResult(0).getType();
+    // Verification of the spec tag
+    // If any input has a spec tag, the result must have a spec tag
+    // If no input has a spec tag, the result must not have a spec tag
+
+    // We don't care any other extra signals than spec tag here.
+    // That means, the verification succeeds even if the result suddenly has an unknown extra signal none of the inputs have.
+    // Also, the verify succeeds even if the result drops an unknown extra signal that all of the inputs have.
+    // If someone wants to verify other extra signals, they should implement a new verification here,
+    // or impose new constraints to the operations.
 
     FailureOr<bool> hasInputWithSpecTag = concreteOp.hasSpecInput();
     if (mlir::failed(hasInputWithSpecTag))
       return mlir::failure();
 
+    mlir::Type resultType = $_op->getResult(0).getType();
     auto resultExtraSignalsType = cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType);
     bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
     if (hasInputWithSpecTag.value()) {

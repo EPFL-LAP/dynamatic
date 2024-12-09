@@ -881,9 +881,10 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
+  // Constraint on the dataIn/dataOut relationship
   PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
     AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside a loop
-    AddingSpecTag<"dataIn", "dataOut">.predicate // Not inside a loop
+    AddingSpecTag<"dataIn", "dataOut">.predicate // Outside a loop
   ]>>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
@@ -964,19 +965,21 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface, RemovingSpecTag<"dataIn", "dataOut">,
+  // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
+  // The builder is used in the HandshakeSpeculation pass.
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
-    Commit units are used to mark the end of the speculation region. 
-    Commit units are used to stall speculative tokens until they receive 
-    the decision from the speculator. In case the speculation is correct, 
-    the speculative tokens are converted into non-speculative tokens and 
-    passed on to the rest of the circuit. 
-    Otherwise, the speculative tokens are discarded. 
+    Commit units are used to mark the end of the speculation region.
+    Commit units are used to stall speculative tokens until they receive
+    the decision from the speculator. In case the speculation is correct,
+    the speculative tokens are converted into non-speculative tokens and
+    passed on to the rest of the circuit.
+    Otherwise, the speculative tokens are discarded.
 
-    Any non-speculative token can pass through the commit units 
+    Any non-speculative token can pass through the commit units
     without any stall.
 
     Example:
@@ -989,8 +992,9 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
 
-  // While type($dataOut) can be inferred due to this operation's implementation of inferReturnTypes,  
+  // While type($dataOut) can be inferred due to the inferReturnTypes,
   // we chose to explicitly specify it in the IR for better clarity and understandability.
+  // NOTE: inferReturnTypes still makes it easy to build this operation (without specifying the return type).
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
