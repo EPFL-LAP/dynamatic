@@ -142,10 +142,9 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
 
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage) {
-    auto &signal = extraSignals.emplace_back(signalStorage);
-    signal.name = signalStorage.name;
-  }
+  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage)
+    extraSignals.emplace_back(signalStorage);
+
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return failure();
 
