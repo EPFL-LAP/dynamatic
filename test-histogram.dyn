@@ -1,8 +1,10 @@
 # Set the source file to run
-set-src ./integration-test/histogram/histogram.c
+#set-src ./integration-test/histogram/histogram.c
+#set-src ./integration-test/loop_load/loop_load.c
+set-src ./integration-test/min_lsq_example/min_lsq_example.c
 
-compile --fast-token-delivery --add-seq-mem   
-# compile  
+#compile   
+compile --fast-token-delivery
 
 # Generate the VHDL design corresponding to the source code
 write-hdl
