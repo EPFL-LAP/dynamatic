@@ -883,8 +883,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
   // Constraint on the dataIn/dataOut relationship
   PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
-    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside a loop
-    AddingSpecTag<"dataIn", "dataOut">.predicate // Outside a loop
+    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside loops
+    AddingSpecTag<"dataIn", "dataOut">.predicate // Outside loops
   ]>>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
@@ -892,12 +892,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
     The speculator produces speculative tokens when real data has
-    not yet arrived. The speculator is also responsible for deciding 
+    not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
     It needs to send control tokens to save units and commit units
     ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while 
+    signals are needed. $SCSaveCtrl is connected directly, while
     $SCCommitCtrl replicates the branches that $dataOut
     follows and might not reach a save-commit. $SCBranchCtrl is needed
     in the replicated branches to discard the latter signal.
@@ -912,9 +912,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
   let results = (outs HandshakeType:$dataOut,
-                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
+                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl,
                       IntSizedChannel<3>:$SCSaveCtrl,
-                      IntSizedChannel<3>:$SCCommitCtrl, 
+                      IntSizedChannel<3>:$SCCommitCtrl,
                       BoolChannel:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;

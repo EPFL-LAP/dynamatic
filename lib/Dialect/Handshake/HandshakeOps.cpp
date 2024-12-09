@@ -605,6 +605,9 @@ LogicalResult ConstantOp::inferReturnTypes(
   StringAttr attrName = getValueAttrName(opName);
   auto attr = cast<TypedAttr>(attributes.get(attrName));
 
+  if (operands.size() != 1)
+    return failure();
+
   Type inputType = operands[0].getType();
   auto controlType = cast<ControlType>(inputType);
   // The return type is a ChannelType with:
@@ -1603,24 +1606,26 @@ ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
   Type enableType;
   SmallVector<Type> uniqueResTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
   if (parser.parseLSquare() || parser.parseOperand(enable) ||
       parser.parseRSquare() || parser.parseOperand(dataIn) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseType(dataType) || parser.parseComma() ||
       parser.parseType(enableType) || parser.parseArrowTypeList(uniqueResTypes))
     return failure();
+
   if (uniqueResTypes.size() != 3)
     return failure();
 
   Type ctrlType = uniqueResTypes[1];
   Type wideCtrlType = uniqueResTypes[2];
+
+  // dataOut, saveCtrl, commitCtrl, SCSaveCtrl, SCCommitCtrl, SCBranchCtrl
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  if (parser.resolveOperands({dataIn, enable}, {dataType, enableType},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
+  return parser.resolveOperands({dataIn, enable}, {dataType, enableType},
+                                allOperandLoc, result.operands);
 }
 
 void SpeculatorOp::print(OpAsmPrinter &p) {
@@ -1643,20 +1648,15 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
 
-  Type dataInType = operands.front().getType();
-  if (auto extraSignalsType = dyn_cast<ExtraSignalsTypeInterface>(dataInType)) {
-    if (extraSignalsType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
-      inferredReturnTypes.push_back(extraSignalsType);
-    } else {
-      inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
-          ExtraSignal(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1))));
-    }
+  auto dataInType =
+      dyn_cast<ExtraSignalsTypeInterface>(operands.front().getType());
+  if (dataInType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
+    // If dataIn already has the spec bit, just push it through (inside loops)
+    inferredReturnTypes.push_back(dataInType);
   } else {
-    // Report error
-    llvm::errs() << "expected $dataIn to have type !handshake.channel or "
-                    "!handshake.control but got "
-                 << dataInType << "\n";
-    return failure();
+    // Otherwise, add the spec bit to the dataIn type (outside loops)
+    inferredReturnTypes.push_back(dataInType.addExtraSignal(
+        ExtraSignal(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1))));
   }
 
   inferredReturnTypes.push_back(ctrlType);
