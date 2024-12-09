@@ -232,8 +232,9 @@ def SimpleChannel : TypeConstraint<
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
-    ::mlir::isa<::dynamatic::handshake::ChannelType>($_self.getType()) ?
-    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType() : $_self.getType()
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
   }],
   "data type"
 >;
