@@ -1171,6 +1171,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
+    // A builder for bundling ControlType
     OpBuilder<(ins "::mlir::Value":$valid), [{
       mlir::Type validReadyType = $_builder.getIntegerType(1);
       assert(valid.getType() == validReadyType && "incorrect valid signal");
@@ -1181,6 +1182,8 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
         validReadyType
       });
     }]>,
+    // A builder for bundling ChannelType
+    // Implemented in C++
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)
@@ -1228,7 +1231,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$channelLike,
+  let arguments = (ins ChannelOrSimpleControl:$channelLike,
                        Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 

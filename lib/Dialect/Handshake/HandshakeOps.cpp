@@ -1861,6 +1861,9 @@ void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                      ChannelType channelType) {
   assert(isa<handshake::ControlType>(ctrl.getType()) &&
          "expected !handshake.control");
+  assert(cast<handshake::ControlType>(ctrl.getType()).getNumExtraSignals() ==
+             0 &&
+         "expected ctrl to have no extra signals");
   assert(handshake::ChannelType::isSupportedSignalType(data.getType()) &&
          "unsupported data type");
   assert(downstreams.size() == channelType.getNumDownstreamExtraSignals() &&

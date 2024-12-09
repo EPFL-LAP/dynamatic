@@ -206,6 +206,16 @@ def SimpleChannel : TypeConstraint<
   "::dynamatic::handshake::ChannelType"
 >;
 
+// Temporary constraint for UnbundleOp.
+def ChannelOrSimpleControl : TypeConstraint<
+  CPred<[{
+    ::mlir::isa<::dynamatic::handshake::ChannelType>($_self) ||
+    (::mlir::isa<::dynamatic::handshake::ControlType>($_self) &&
+     ::mlir::cast<::dynamatic::handshake::ControlType>($_self).getNumExtraSignals() == 0)
+  }]>,
+  "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
+>;
+
 // A constraint ensuring that all types of a variadic operand are the same.
 class AllTypesMatchWithinVariadic<string name> : PredOpTrait<
   "The operands inside the variadic " # name # " should have the same type",
