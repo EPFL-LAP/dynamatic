@@ -252,13 +252,9 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   bool hasSpecInput = false;
   for (auto operand : operands) {
     auto operandType = operand.getType();
-    if (auto channelType = dyn_cast<ChannelType>(operandType)) {
-      if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-        hasSpecInput = true;
-        break;
-      }
-    } else if (auto controlType = dyn_cast<ControlType>(operandType)) {
-      if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+    if (auto extraSignalsType =
+            dyn_cast<ExtraSignalsTypeInterface>(operandType)) {
+      if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
         hasSpecInput = true;
         break;
       }
@@ -268,18 +264,12 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
     inferredReturnTypes.push_back(dataInTypeCandidate);
     return success();
   }
-  if (auto channelType = dyn_cast<ChannelType>(dataInTypeCandidate)) {
-    if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      inferredReturnTypes.push_back(channelType);
+  if (auto extraSignalsType =
+          dyn_cast<ExtraSignalsTypeInterface>(dataInTypeCandidate)) {
+    if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      inferredReturnTypes.push_back(extraSignalsType);
     } else {
-      inferredReturnTypes.push_back(channelType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
-    }
-  } else if (auto controlType = dyn_cast<ControlType>(dataInTypeCandidate)) {
-    if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      inferredReturnTypes.push_back(controlType);
-    } else {
-      inferredReturnTypes.push_back(controlType.addExtraSignal(
+      inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
           ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
   } else {
@@ -1651,18 +1641,11 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
 
   Type dataInType = operands.front().getType();
-  if (auto channelType = dyn_cast<ChannelType>(dataInType)) {
-    if (channelType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      inferredReturnTypes.push_back(channelType);
+  if (auto extraSignalsType = dyn_cast<ExtraSignalsTypeInterface>(dataInType)) {
+    if (extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      inferredReturnTypes.push_back(extraSignalsType);
     } else {
-      inferredReturnTypes.push_back(channelType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
-    }
-  } else if (auto controlType = dyn_cast<ControlType>(dataInType)) {
-    if (controlType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      inferredReturnTypes.push_back(controlType);
-    } else {
-      inferredReturnTypes.push_back(controlType.addExtraSignal(
+      inferredReturnTypes.push_back(extraSignalsType.addExtraSignal(
           ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
   } else {
