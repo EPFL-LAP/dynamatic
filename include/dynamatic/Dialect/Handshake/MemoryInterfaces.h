@@ -225,6 +225,31 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
+  /// Below are params needed by the new LSQ config file
+  /// Number of channels at memory interface
+  unsigned numLdChannels = 1, numStChannels = 1;
+  /// Number of bits for ID in the memory interface
+  unsigned indexWidth = 6;
+  /// Indicate whether the store response channel 
+  /// in store access port is enabled
+  unsigned stResp = 0;
+  /// Indicate whether the multiple groups are allowed
+  /// to request an allocation at the same cycle
+  unsigned groupMulti = 0;
+  /// Indicate whether pipeline registers are inserted
+  unsigned pipe0En = 0, pipe1En = 0, pipeCompEn = 0;
+  /// Indicate whether the head pointer of the load queue is
+  /// updated one cycle later than the valid bits of entries
+  unsigned headLagEn = 0; 
+
+  // Configurations needed for the new lsq design
+  // LdOrder contains the same information as the previous loadOffset entry
+  // just in a different format.
+  SmallVector<SmallVector<unsigned>> ldOrder;
+  // Ports indices for store and load ports
+  // which contain the same information as the previous two 2d vectors, just no
+  // padding included.
+  SmallVector<SmallVector<unsigned>> ldPortIdx, stPortIdx;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");

@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -374,19 +375,37 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     loadsPerGroup.push_back(groupPorts.getNumPorts<LoadPort>());
     storesPerGroup.push_back(groupPorts.getNumPorts<StorePort>());
 
-    // Compute the ffset of first load/store in the group and indices of each
-    // load/store port
+    // Track the numebr of stores within a group
+    unsigned numStores = 0;
+
+    // Compute the ffset of first load/store in the group and indices of
+    // each load/store port
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
+    unsigned numEntries = groupPorts.getNumPorts<StorePort>()
+                              ? groupPorts.getNumPorts<StorePort>()
+                              : 1;
+    SmallVector<unsigned> singleLdOrder(numEntries, 0);
+
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
       if (isa<LoadPort>(accessPort)) {
         if (!firstLoadOffset)
           firstLoadOffset = portIdx;
+
+        // Update the ldOrder list
+        if (numStores > 0) {
+          for (size_t stIdx = 0; stIdx < numStores; stIdx++) {
+            singleLdOrder[stIdx] = 1;
+          }
+        }
+
         groupLoadPorts.push_back(loadIdx++);
       } else {
         assert(isa<StorePort>(accessPort) && "port must be load or store");
         if (!firstStoreOffset)
           firstStoreOffset = portIdx;
+
+        numStores++;
         groupStorePorts.push_back(storeIdx++);
       }
     }
@@ -398,6 +417,11 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
 
     loadPorts.push_back(groupLoadPorts);
     storePorts.push_back(groupStorePorts);
+    ldPortIdx.push_back(groupLoadPorts);
+    stPortIdx.push_back(groupStorePorts);
+
+    // Push back the new ldOrder Info
+    ldOrder.push_back(singleLdOrder);
   }
 
   /// Adds as many 0s as necessary to the array so that its size equals the
@@ -416,9 +440,62 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
       capArray(array, depth);
   };
 
+  // Add only 1 0 if the size of the array is 0
+  auto extendArray = [&](SmallVector<SmallVector<unsigned>> &inArray) -> void {
+    for (size_t i = 0; i < inArray.size(); i++) {
+      if (inArray[i].size() == 0) {
+        inArray[i].push_back(0);
+      }
+    }
+  };
+
   // Port offsets and index arrays must have length equal to the depth
   capBiArray(loadOffsets, depth);
   capBiArray(storeOffsets, depth);
   capBiArray(loadPorts, depth);
   capBiArray(storePorts, depth);
+
+  // Expand arrays defined for the new lsq config file
+  extendArray(ldPortIdx);
+  extendArray(stPortIdx);
+
+  // Update the index width
+  indexWidth = llvm::Log2_64_Ceil(depthLoad);
+
+  //! Testing
+  // llvm::dbgs() << "[LSQ Info] \n";
+  // llvm::dbgs() << "Module Name: " << name << "\n";
+  // llvm::dbgs() << "\tNum Groups: " << numGroups << "\n";
+  // llvm::dbgs() << "\tTotal Num Loads: " << numLoads << "\n";
+  // llvm::dbgs() << "\tTotal Num Stores: " << numStores << "\n";
+  // llvm::dbgs() << "\tidW: " << idW << "\n";
+
+  // int16_t groupCounter = 0;
+
+  // // Print the numebr of loads and the corresponding index
+  // for (int counter = 0; counter < loadsPerGroup.size(); counter++) {
+  //   llvm::dbgs() << "\t[Group " << counter << "]\n";
+  //   llvm::dbgs() << "\t\tNum Loads: " << loadsPerGroup[counter] << "\n";
+  //   llvm::dbgs() << "\t\tNum Stores: " << storesPerGroup[counter] << "\n";
+
+  //   // Print the original indices
+  //   llvm::dbgs() << "\t\tgaLdPortIdx: [";
+  //   for (auto &loadindice : ldPortIdx[counter]) {
+  //     llvm::dbgs() << loadindice << ", ";
+  //   }
+  //   llvm::dbgs() << "]\n";
+
+  //   llvm::dbgs() << "\t\tgaStPortIdx: [";
+  //   for (auto &storeindice : stPortIdx[counter]) {
+  //     llvm::dbgs() << storeindice << ", ";
+  //   }
+  //   llvm::dbgs() << "]\n";
+
+  //   // Print the new configurations
+  //   llvm::dbgs() << "\t\tldOrder: [";
+  //   for (auto &ldOrder : ldOrder[groupCounter]) {
+  //     llvm::dbgs() << ldOrder << ", ";
+  //   }
+  //   llvm::dbgs() << "]\n";
+  // }
 }
