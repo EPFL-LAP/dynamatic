@@ -23,12 +23,15 @@ module control_merge_dataless #(
 
   reg [INDEX_TYPE - 1 : 0] index_tehb;
   integer i;
+  reg found;
   always @(ins_valid) begin
     index_tehb = {INDEX_TYPE{1'b0}};
+    found = 1'b0;
+
     for (i = 0; i < SIZE; i = i + 1) begin
       if (ins_valid[i]) begin
         index_tehb = i[INDEX_TYPE - 1 : 0];
-        i = SIZE;      // Exit the loop on the first valid
+        found = 1'b1; // Set flag to indicate the value has been found
       end
     end
   end
