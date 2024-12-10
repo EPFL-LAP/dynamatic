@@ -20,7 +20,11 @@ module store #(
   // Address to Interface Channel
   output [ADDR_TYPE - 1 : 0] addrOut,
   output addrOut_valid,
-  input  addrOut_ready 
+  input  addrOut_ready
+  // Mem done signal
+  //input memDoneFromMem,
+  //output memDoneToSuccessor
+
 );
 
   wire join_valid;
@@ -41,5 +45,8 @@ module store #(
   // Data assignment
   assign dataToMem = dataIn;
   assign dataToMem_valid = join_valid;
+  // Mem done assignment
+  //assign memDoneToSuccessor = memDoneFromMem;
+
 
 endmodule

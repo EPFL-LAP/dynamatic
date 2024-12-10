@@ -734,11 +734,16 @@ class Handshake_MemPortOp<string mnemonic> :
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
+    let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
   let assemblyFormat = [{
     `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
   }];
+  // let arguments = (ins IntChannelType:$address, ChannelType:$data, ControlType:$memDone);
+  // let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult, ControlType:$memDoneResult);
+  // let assemblyFormat = [{
+  //   `[` $address `]` $data $memDone attr-dict `:` type($address) `,` type($data)
+  // }];
 }
 
 def LoadOp : Handshake_MemPortOp<"load"> {
