@@ -43,10 +43,8 @@ struct HandshakeAddSeqMemPass
     : public dynamatic::experimental::impl::HandshakeAddSeqMemBase<
           HandshakeAddSeqMemPass> {
 
-
   void runDynamaticPass() override;
 
-  void traverseMemRef(ModuleOp modOp, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter));
 
 };
 
@@ -67,8 +65,8 @@ int getBBNumberFromOp(Operation * op){
 }
 
 
-void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter)){
-   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()){
+void traverseMemRef(FuncOp funcOp, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter)){
+
       for (BlockArgument arg : funcOp.getArguments()) {
         llvm::errs() << "[traversing arguments]" << arg << "\n";
         if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg)){
@@ -88,7 +86,7 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
                   llvm::errs() << "group" << "--\n";
                   for (MemoryPort &port : group->accessPorts) {
                       llvm::errs() << "oomad \n";
-                      func (port.portOp, joinInputValues, rewriter);
+                      func (port.portOp, predNamesAndDoneSignalsForOp, rewriter);
                       nameToOp[getUniqueName(port.portOp)] = port.portOp;
                     }
                 }
@@ -96,12 +94,10 @@ void HandshakeAddSeqMemPass::traverseMemRef(ModuleOp modOp, DenseMap<StringRef, 
             llvm::errs() << "not lsq op \n";
         }
     }
-
-  }
 }
     
 
-void determineJoinInputValues(Operation* op, DenseMap<StringRef, SmallVector<Value>> &joinInputValues, ConversionPatternRewriter& rewriter){
+void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter){
 
     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
         
@@ -122,13 +118,62 @@ void determineJoinInputValues(Operation* op, DenseMap<StringRef, SmallVector<Val
           for (MemDependenceAttr dependency : deps.getDependencies()) {
               auto dstAccess = dependency.getDstAccess();
 
-              // if (joinInputValues.at(dstAccess))
-              //     joinInputValues[dstAccess] = *new SmallVector<Value>();
-               joinInputValues[dstAccess].push_back(unbundleOp.getResult(0));
+               predNamesAndDoneSignalsForOp[dstAccess].push_back(std::make_tuple(getUniqueName(op), unbundleOp.getResult(0)));
 
           }
         }
       
+    }
+}
+
+void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter, Value startSignal){
+
+    for (auto it = predNamesAndDoneSignalsForOp.begin(); it != predNamesAndDoneSignalsForOp.end(); ++it){
+
+      StringRef opName = it->first;
+      llvm::errs() << "[connect joins]" << opName << "\n";
+      Operation* op = nameToOp[opName];
+      llvm::errs() << "[connect joins]" << op << "\n";
+      rewriter.setInsertionPointToStart(op->getBlock());
+
+      int bb_num = getBBNumberFromOp(op);
+      Value sourceOpAddr = op->getOperand(0);
+      
+      SmallVector<std::tuple<StringRef, Value>> predNamesAndDoneSignals = it->second;
+      SmallVector<Value> joinValues;
+
+      for (auto doneAndAddr: predNamesAndDoneSignals){
+          StringRef dstName = std::get<0>(doneAndAddr);
+          Operation* dstOp = nameToOp[dstName];
+          Value done = std::get<1>(doneAndAddr);
+
+          handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, sourceOpAddr, dstOp->getOperand(0));
+
+          SmallVector<Value> muxValues;
+          muxValues.push_back(done);
+          muxValues.push_back(startSignal);
+          
+          handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
+          joinValues.push_back(muxOp.getResult());
+
+      }
+
+      handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
+      unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+      
+      joinValues.push_back(unbundleOp.getResult(0));
+
+      handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
+      joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+
+      ValueRange *ab = new ValueRange();
+      handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+      handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+      bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+      op->setOperand(0, bundleOp.getResult(0));
     }
 }
 
@@ -336,20 +381,20 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
       // Restore the cf structure to work on a structured IR
       if (failed(experimental::cfg::restoreCfStructure(funcOp, rewriter)))
         signalPassFailure();
-  }
-
-  DenseMap<StringRef, SmallVector<Value>> joinInputValues;
-  DenseMap<StringRef, Operation*> nameToOp;
-
-  traverseMemRef(modOp, joinInputValues, nameToOp, rewriter, &determineJoinInputValues);
-
-  connectJoins(joinInputValues, nameToOp, rewriter);
 
 
-  llvm::errs() << "finished \n";
+      DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> predNamesAndDoneSignalsForOp;
+      DenseMap<StringRef, Operation*> nameToOp;
 
-for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
-      funcOp.print(llvm::dbgs());
+      traverseMemRef(funcOp, predNamesAndDoneSignalsForOp, nameToOp, rewriter, &determinePredDoneSignals);
+
+      Value startSignal = (Value)funcOp.getArguments().back();
+      connectMuxsAndJoins (predNamesAndDoneSignalsForOp, nameToOp, rewriter, startSignal);
+
+
+      llvm::errs() << "finished \n";
+
+      // funcOp.print(llvm::dbgs());
       llvm::errs() << "funcOp";
 
       experimental::ftd::addRegen(funcOp, rewriter);
