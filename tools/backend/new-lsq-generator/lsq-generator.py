@@ -298,10 +298,9 @@ class LSQWrapper:
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_ready_o => {io_memStart_ready.getNameWrite()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_valid_i => {io_memStart_valid.getNameRead()},\n'
         
-        # TODO: Check the correctness of the following instantiation
-        for i in range(self.lsq_config.numGroups):
-          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_ready_o => {io_ctrl_ready[i].getNameWrite()},\n'
-          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_valid_i => {io_ctrl_valid[i].getNameRead()},\n'
+        
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_ready_o => {io_ctrlEnd_ready.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_valid_i => {io_ctrlEnd_valid.getNameRead()},\n'
           
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_ready_i => {io_memEnd_ready.getNameRead()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n'

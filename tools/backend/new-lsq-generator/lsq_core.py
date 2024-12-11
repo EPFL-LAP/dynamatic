@@ -1262,7 +1262,9 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     wresp_ready_o      = LogicArray('wresp_ready', 'o', configs.numStMem)
     wresp_id_i         = LogicVecArray('wresp_id', 'i', configs.numStMem, configs.idW)
     
+    #! If this is the lsq master, then we need the following logic
     #! Define new interfaces needed by dynamatic
+    
     memStart_ready = Logic('memStart_ready', 'o')
     memStart_valid = Logic('memStart_valid', 'i')
     ctrlEnd_ready = Logic('ctrlEnd_ready', 'o')
@@ -1277,6 +1279,9 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     temp_gen_mem = Logic('TEMP_GEN_MEM', 'w') 
     
     #! Define the needed logic
+    arch += "\t-- Define the intermediate logic\n"
+    arch += f"\tTEMP_GEN_MEM <= {ctrlEnd_valid.getNameRead()} and stq_empty and ldq_empty;\n"
+    
     arch += "\t-- Define logic for the new interfaces needed by dynamatic\n"
     arch += "\tprocess (clk) is\n\tbegin\n"
     arch += '\t' * 2 + "if rising_edge(clk) then\n"
