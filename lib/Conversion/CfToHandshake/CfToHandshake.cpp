@@ -739,6 +739,9 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               assert(addr && "failed to remap address");
               Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
               Value data = edgeBuilder.get(channelifyType(dataTy));
+              //change for done signal
+              // Value memDone;
+              // auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data, memDone);
               auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
 
               // Record the memory access replacement
@@ -754,7 +757,10 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
+              //change for done signal
+              // Value memDone; 
               assert((addr && data) && "failed to remap address or data");
+              // auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data, memDone);
               auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
 
               // Record the memory access replacement
@@ -770,6 +776,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     // the memory interface it should connect to
     auto *accessesIt = memInfo.find(funcArgs[memrefIndices.at(memref)]);
     assert(accessesIt != memInfo.end() && "unknown memref");
+    // Rouzbeh
     if (memAttr.connectsToMC())
       accessesIt->second.mcPorts[block].push_back(portOp);
     else

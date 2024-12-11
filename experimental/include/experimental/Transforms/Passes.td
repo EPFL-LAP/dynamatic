@@ -98,6 +98,17 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   ];
 }
 
+
+def HandshakeAddSeqMem : DynamaticPass<"handshake-add-seq-mem"> {
+  let summary = "Adds Sequentialization between memory operations";
+  let description = [{
+    This path addes forks after and joins before every memory operation, 
+    so it can sequentialize the accesses which it needs.
+  }];
+  let constructor = "dynamatic::experimental::createHandshakeAddSeqMem()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
   let summary = "Credit-Based Sharing of Functional Units";
   let description = [{ Sharing functional units for better resource utilization.

@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
+  HandshakeAddSeqMem.cpp
   HandshakeCombineSteeringLogic.cpp
   HandshakeStraightToQueue.cpp
   FtdProfiling.cpp
