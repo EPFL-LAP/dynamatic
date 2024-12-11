@@ -61,7 +61,12 @@ class VHDLLogicType:
         # in Dynamatic
         if (suffix != ''):
             name_list = self.name.split("_")
-            new_name_list = name_list[:-1] + [suffix, name_list[-1]]
+            
+            if (suffix == '0'):
+              new_name_list = name_list[:-1] + [suffix, name_list[-1]]
+            else:
+              new_name_list = name_list[:-2] + [suffix, name_list[-1]]
+            
             self.name = '_'.join(new_name_list)
         
         # Check the signal type
@@ -158,7 +163,11 @@ class VHDLLogicVecType(VHDLLogicType):
         # in Dynamatic
         if (suffix != ''):
             name_list = self.name.split("_")
-            new_name_list = name_list[:-1] + [suffix, name_list[-1]]
+            if (suffix == '0'):
+              new_name_list = name_list[:-1] + [suffix, name_list[-1]]
+            else:
+              new_name_list = name_list[:-2] + [suffix, name_list[-1]]
+              
             self.name = '_'.join(new_name_list)
 
         if (self.type == 'w'):
