@@ -95,4 +95,4 @@ SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif
+#endif // DYNAMATIC_HANDSHAKE_SUPPORT_SUPPORT_H
