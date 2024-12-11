@@ -430,6 +430,79 @@ LogicalResult experimental::ftd::createPhiNetwork(
   return success();
 }
 
+LogicalResult ftd::createPhiNetworkDeps(
+    Region &funcRegion, ConversionPatternRewriter &rewriter,
+    const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap) {
+
+  mlir::DominanceInfo domInfo;
+
+  // For each pair of operand and its dependencies
+  for (auto &[operand, dependencies] : dependenciesMap) {
+
+    Operation *operandOwner = operand->getOwner();
+    auto startValue = (Value)funcRegion.getArguments().back();
+
+    /// Lambda to run the SSA analysis over the pair of values {dep, startValue}
+    /// and properly connect the operand `op` to the correct value in the
+    /// network.
+    auto connect = [&](OpOperand *op, Value dep) -> LogicalResult {
+      Operation *depOwner = dep.getDefiningOp();
+
+      // If the producer and the consumer are in the same basic block, and the
+      // producer properly dominates the consumer (i.e. comes before in a linear
+      // sense) then the consumer is directly connected to the producer without
+      // further mechansim.
+      if (dep.getParentBlock() == operandOwner->getBlock() &&
+          domInfo.properlyDominates(depOwner, operandOwner)) {
+        op->set(dep);
+        return success();
+      }
+
+      // Otherwise, we run the SSA insertion
+      SmallVector<mlir::OpOperand *> operandsToChange = {op};
+      SmallVector<Value> inputValues = {startValue, dep};
+
+      if (failed(ftd::createPhiNetwork(funcRegion, rewriter, inputValues,
+                                       operandsToChange))) {
+        return failure();
+      }
+
+      return success();
+    };
+
+    // If the operand has not dependencies, then it can be connected to start
+    // directly.
+    if (dependencies.size() == 0) {
+      operand->set(startValue);
+      continue;
+    }
+
+    // If the operand has one dependency only, there is no need for a join.
+    if (dependencies.size() == 1) {
+      if (failed(connect(operand, dependencies[0])))
+        return failure();
+      continue;
+    }
+
+    // If the operand has many dependencies, then each of them is singularly
+    // connected with an SSA network, and then everything is joined.
+    ValueRange operands = dependencies;
+    rewriter.setInsertionPointToStart(operand->getOwner()->getBlock());
+    auto joinOp = rewriter.create<handshake::JoinOp>(
+        operand->getOwner()->getLoc(), operands);
+    joinOp->moveBefore(operandOwner);
+
+    for (unsigned i = 0; i < dependencies.size(); i++) {
+      if (failed(connect(&joinOp->getOpOperand(i), dependencies[i])))
+        return failure();
+    }
+
+    operand->set(joinOp.getResult());
+  }
+
+  return success();
+}
+
 void ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumerOp, Value operand) {

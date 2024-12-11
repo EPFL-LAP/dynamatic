@@ -23,15 +23,6 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Given a set of values defining the same value in different blocks of a
-/// CFG, modify the SSA representation to connect the values through some
-/// merges. Replace the input uses with the correct value coming from the
-/// network.
-LogicalResult createPhiNetwork(Region &funcRegion,
-                               ConversionPatternRewriter &rewriter,
-                               SmallVector<Value> &vals,
-                               SmallVector<OpOperand *> &toSubstitue);
-
 /// Add some regen multiplexers between an opearation and one of its operands
 void addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
                              dynamatic::handshake::FuncOp &funcOp,
@@ -67,6 +58,25 @@ LogicalResult addGsaGates(Region &region, ConversionPatternRewriter &rewriter,
 /// multiplexer.
 LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
                                 ConversionPatternRewriter &rewriter);
+
+/// Connect the values in `vals` by inserting some appropriate new SSA-nodes
+/// (merges) across the control flow graph of the function. The new
+/// `phi-network` is in charge of connecting them in accordance to their
+/// position and their dominance. Given the set of operands `toSubstitue`, each
+/// of them is modified with the correct input from the network.
+LogicalResult createPhiNetwork(Region &funcRegion,
+                               ConversionPatternRewriter &rewriter,
+                               SmallVector<Value> &vals,
+                               SmallVector<OpOperand *> &toSubstitue);
+
+/// `deps` contains a map between an operand of an operation and a set of values
+/// that operand is `dependent` on, meaning it is produced once that each of the
+/// other operands are ready as well. This function generates a set of SSA-nodes
+/// and appropriate joins to combine them together so that such a dependency is
+/// fullfilled.
+LogicalResult createPhiNetworkDeps(
+    Region &funcRegion, ConversionPatternRewriter &rewriter,
+    const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
 
 }; // namespace ftd
 }; // namespace experimental

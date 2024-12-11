@@ -354,47 +354,21 @@ connectForkGraph(handshake::FuncOp &funcOp,
                  const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
                  ConversionPatternRewriter &rewriter) {
 
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // For each consumer
   for (MemoryGroup *consumerGroup : groupsGraph) {
 
-    // Store all the inputs of the lazy fork
-    SmallVector<Value> differentInputs;
-    Operation *consumerLF = forksGraph.at(consumerGroup->bb);
+    DenseMap<OpOperand *, SmallVector<Value>> deps;
+    SmallVector<Value> forkDeps;
 
-    // If there are no inputs, start feeds the lazy fork directly
-    if (!consumerGroup->preds.size()) {
-      consumerLF->setOperands({startValue});
-    } else {
-      consumerLF->setOperands(
-          SmallVector<Value>(consumerGroup->preds.size(), startValue));
-    }
-
-    // For each of its producer
-    int idx = 0;
     for (auto &producerGroup : consumerGroup->preds) {
-
       Operation *producerLF = forksGraph.at(producerGroup->bb);
-
-      // The values to connect are the start value and the output of the
-      // producer
-      SmallVector<Value> forkValuesToConnect = {startValue,
-                                                producerLF->getResult(0)};
-
-      SmallVector<mlir::OpOperand *> operandsToChange;
-      operandsToChange.push_back(&consumerLF->getOpOperand(idx++));
-
-      // Build a phi network
-      auto phiNetworkOrFailure = ftd::createPhiNetwork(
-          funcOp.getRegion(), rewriter, forkValuesToConnect, operandsToChange);
-      if (failed(phiNetworkOrFailure))
-        return failure();
+      forkDeps.push_back(producerLF->getResult(0));
     }
+
+    deps[&forksGraph.at(consumerGroup->bb)->getOpOperand(0)] = forkDeps;
+
+    if (failed(ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps)))
+      return failure();
   }
-
-  joinInsertion(rewriter, groupsGraph, forksGraph);
-
   return success();
 }
 
@@ -418,8 +392,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     // Collect all the operations related to that LSQ
     auto lsqOps = getLsqOps(funcOp, lsqOp);
 
-    // Get all the memory depdencies among the operations connected to the same
-    // LSQ
+    // Get all the memory depdencies among the operations connected to the
+    // same LSQ
     auto lsqMemDeps = identifyMemoryDependencies(funcOp, lsqOps);
     for (auto &dep : lsqMemDeps)
       dep.print();
@@ -433,8 +407,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     for (auto &g : groupsGraph)
       g->print();
 
-    // Build a lazy fork for each group and connect it to the related activation
-    // input in the LSQ
+    // Build a lazy fork for each group and connect it to the related
+    // activation input in the LSQ
     auto forksGraph =
         connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, rewriter);
 
