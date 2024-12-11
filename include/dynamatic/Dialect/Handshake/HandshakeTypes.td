@@ -15,6 +15,7 @@
 
 include "mlir/IR/AttrTypeBase.td"
 include "dynamatic/Dialect/Handshake/Handshake.td"
+include "dynamatic/Dialect/Handshake/HandshakeTypeInterfaces.td"
 
 /// Base class for types in the Handshake dialect.
 class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
@@ -22,22 +23,8 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ControlType : Handshake_Type<"Control", "control"> {
-  let summary = "a control-only dataflow channel";
-  let description = [{
-    Represents a control-only dataflow channel, which is made up of
-    - a 1-bit valid signal going downstream (in the same direction as the
-      natural SSA def-use relation's direction) and
-    - a 1-bit ready signal going upsteam (in the opposite direction as the
-      natural SSA def-use relation's direction).
-  }];
-
-  let parameters = (ins);
-  let assemblyFormat = "`<` `>`";
-}
-
 def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
+  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>",
   "An optional array of extra signals for a dataflow channel"> {
   let allocator = [{
     ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
@@ -53,7 +40,40 @@ def ExtraSignals : TypeParameter<
   let defaultValue = cppType # "()";
 }
 
-def ChannelType : Handshake_Type<"Channel", "channel"> {
+def ControlType : Handshake_Type<"Control", "control", [
+  // These methods are implemented in the cpp file.
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+]> {
+  let summary = "a control-only dataflow channel";
+  let description = [{
+    Represents a control-only dataflow channel, which is made up of
+    - a 1-bit valid signal going downstream (in the same direction as the
+      natural SSA def-use relation's direction) and
+    - a 1-bit ready signal going upsteam (in the opposite direction as the
+      natural SSA def-use relation's direction).
+    - an optional list of named extra signals of arbitrary width and type which
+      may go downstream or upstream.
+  }];
+
+  let parameters = (ins ExtraSignals:$extraSignals);
+
+  let builders = [
+    // We provide a builder that doesn't require extra signals.
+    // The type will be without extra signals (SimpleControl).
+    TypeBuilder<(ins),
+      [{
+        return ControlType::get($_ctxt, {});
+      }]>
+  ];
+
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
+}
+
+def ChannelType : Handshake_Type<"Channel", "channel", [
+  // These methods are implemented in the cpp file.
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+]> {
   let summary = "a dataflow channel with optional extra signals";
   let description = [{
     Represents a dataflow channel, which is made up of
@@ -71,8 +91,8 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
-      "::mlir::Type":$dataType, 
-      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
+      "::mlir::Type":$dataType,
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras),
       [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
@@ -87,19 +107,6 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
   let genVerifyDecl = 1;
 
   let extraClassDeclaration = [{
-    /// Returns the number of extra signals.
-    unsigned getNumExtraSignals() const {
-      return getExtraSignals().size();
-    }
-
-    /// Returns the number of downstream extra signals.
-    unsigned getNumDownstreamExtraSignals() const;
-
-    /// Returns the number of upstream extra signals.
-    unsigned getNumUpstreamExtraSignals() const {
-      return getNumExtraSignals() - getNumDownstreamExtraSignals();
-    }
-
     /// Returns the data type's bitwidth.
     unsigned getDataBitWidth() const;
 
@@ -108,7 +115,13 @@ def ChannelType : Handshake_Type<"Channel", "channel"> {
     ChannelType withDataType(Type newDataType) {
       return ChannelType::get(newDataType, getExtraSignals());
     }
-    
+
+    /// Returns a channel type with identical data type but a potentially
+    /// different extra signals.
+    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
+      return ChannelType::get(getDataType(), newExtraSignals);
+    }
+
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
@@ -137,8 +150,8 @@ class ChannelHasDataWidth<int width> : CPred<
   "($_self).getDataBitWidth() == " # width
 >;
 
-class ChannelHasNumExtras<int numExtras> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
+class HasNumExtras<int numExtras> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>" #
   "($_self).getNumExtraSignals() == " # numExtras
 >;
 
@@ -181,10 +194,26 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 
 def BoolChannel : IntSizedChannel<1>;
 
+def SimpleControl : TypeConstraint<
+  HasNumExtras<0>,
+  "must be a `handshake::ControlType` type with no extra signals",
+  "::dynamatic::handshake::ControlType"
+>;
+
 def SimpleChannel : TypeConstraint<
-  ChannelHasNumExtras<0>,
+  HasNumExtras<0>,
   "must be a `handshake::ChannelType` type with no extra signals",
   "::dynamatic::handshake::ChannelType"
+>;
+
+// Temporary constraint for UnbundleOp.
+def ChannelOrSimpleControl : TypeConstraint<
+  CPred<[{
+    ::mlir::isa<::dynamatic::handshake::ChannelType>($_self) ||
+    (::mlir::isa<::dynamatic::handshake::ControlType>($_self) &&
+     ::mlir::cast<::dynamatic::handshake::ControlType>($_self).getNumExtraSignals() == 0)
+  }]>,
+  "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
