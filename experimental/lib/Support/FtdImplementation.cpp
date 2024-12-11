@@ -288,13 +288,16 @@ runCrytonAlgorithm(Region &funcRegion, DenseMap<Block *, Value> &inputBlocks) {
 }
 
 LogicalResult experimental::ftd::createPhiNetwork(
-    Region &funcRegion, ConversionPatternRewriter &rewriter,
-    SmallVector<Value> &vals, SmallVector<OpOperand *> &toSubstitue) {
+    Region &funcRegion, PatternRewriter &rewriter, SmallVector<Value> &vals,
+    SmallVector<OpOperand *> &toSubstitue) {
 
   if (vals.empty()) {
     llvm::errs() << "Input of \"createPhiNetwork\" is empty";
     return failure();
   }
+
+  auto *ctx = funcRegion.getContext();
+  OpBuilder builder(ctx);
 
   mlir::DominanceInfo domInfo;
   // Type of the inputs
@@ -305,7 +308,7 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // the same block
   DenseMap<Block *, Value> inputBlocks;
   // Backedge builder to insert new merges
-  BackedgeBuilder edgeBuilder(rewriter, funcRegion.getLoc());
+  BackedgeBuilder edgeBuilder(builder, funcRegion.getLoc());
   // Backedge corresponding to each phi
   DenseMap<Block *, Backedge> resultPerPhi;
   // Operands of each merge
@@ -431,7 +434,7 @@ LogicalResult experimental::ftd::createPhiNetwork(
 }
 
 LogicalResult ftd::createPhiNetworkDeps(
-    Region &funcRegion, ConversionPatternRewriter &rewriter,
+    Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap) {
 
   mlir::DominanceInfo domInfo;
@@ -503,7 +506,7 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
-void ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumerOp, Value operand) {
 
@@ -604,7 +607,7 @@ void ftd::addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
 }
 
 /// Get a value out of the input boolean expression
-static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
+static Value boolVariableToCircuit(PatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
                                    Block *block, const ftd::BlockIndexing &bi) {
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
@@ -624,7 +627,7 @@ static Value boolVariableToCircuit(ConversionPatternRewriter &rewriter,
 
 /// Get a circuit out a boolean expression, depending on the different kinds
 /// of expressions you might have
-static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
+static Value boolExpressionToCircuit(PatternRewriter &rewriter,
                                      BoolExpression *expr, Block *block,
                                      const ftd::BlockIndexing &bi) {
 
@@ -652,8 +655,8 @@ static Value boolExpressionToCircuit(ConversionPatternRewriter &rewriter,
 
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-static Value bddToCircuit(ConversionPatternRewriter &rewriter, BDD *bdd,
-                          Block *block, const ftd::BlockIndexing &bi) {
+static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+                          const ftd::BlockIndexing &bi) {
   if (!bdd->inputs.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
@@ -681,10 +684,9 @@ using PairOperandConsumer = std::pair<Value, Operation *>;
 
 /// Insert a branch to the correct position, taking into account whether it
 /// should work to suppress the over-production of tokens or self-regeneration
-static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
-                                  CFGLoop *loop, Operation *consumer,
-                                  Value connection, BranchToLoopType btlt,
-                                  CFGLoopInfo &li,
+static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
+                                  Operation *consumer, Value connection,
+                                  BranchToLoopType btlt, CFGLoopInfo &li,
                                   std::vector<PairOperandConsumer> &toCover,
                                   const ftd::BlockIndexing &bi) {
 
@@ -777,8 +779,8 @@ static Value addSuppressionInLoop(ConversionPatternRewriter &rewriter,
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static void insertDirectSuppression(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp,
-    Operation *consumer, Value connection, const ftd::BlockIndexing &bi,
+    PatternRewriter &rewriter, handshake::FuncOp &funcOp, Operation *consumer,
+    Value connection, const ftd::BlockIndexing &bi,
     ControlDependenceAnalysis::BlockControlDepsMap &cdAnalysis) {
 
   Block *entryBlock = &funcOp.getBody().front();
@@ -870,7 +872,7 @@ static void insertDirectSuppression(
   }
 }
 
-void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
+void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
                                  handshake::FuncOp &funcOp,
                                  Operation *consumerOp, Value operand) {
 
@@ -999,8 +1001,7 @@ void ftd::addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
   insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }
 
-void ftd::addSupp(handshake::FuncOp &funcOp,
-                  ConversionPatternRewriter &rewriter) {
+void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 
   // Set of original operations in the IR
   std::vector<Operation *> consumersToCover;
@@ -1013,8 +1014,7 @@ void ftd::addSupp(handshake::FuncOp &funcOp,
   }
 }
 
-void ftd::addRegen(handshake::FuncOp &funcOp,
-                   ConversionPatternRewriter &rewriter) {
+void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 
   // Set of original operations in the IR
   std::vector<Operation *> consumersToCover;
@@ -1028,9 +1028,11 @@ void ftd::addRegen(handshake::FuncOp &funcOp,
   }
 }
 
-LogicalResult experimental::ftd::addGsaGates(
-    Region &region, ConversionPatternRewriter &rewriter,
-    const gsa::GSAAnalysis &gsa, Backedge startValue, bool removeTerminators) {
+LogicalResult experimental::ftd::addGsaGates(Region &region,
+                                             PatternRewriter &rewriter,
+                                             const gsa::GSAAnalysis &gsa,
+                                             Backedge startValue,
+                                             bool removeTerminators) {
 
   using namespace experimental::gsa;
 
@@ -1230,14 +1232,15 @@ LogicalResult experimental::ftd::addGsaGates(
 }
 
 LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                     ConversionPatternRewriter &rewriter) {
+                                     PatternRewriter &rewriter) {
   auto startValue = (Value)funcOp.getArguments().back();
+  auto *ctx = funcOp->getContext();
+  OpBuilder builder(ctx);
 
   // Create a backedge for the start value, to be sued during the merges to
   // muxes conversion
-  BackedgeBuilder edgeBuilderStart(rewriter, funcOp.getRegion().getLoc());
-  Backedge startValueBackedge =
-      edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
+  BackedgeBuilder edgeBuilderStart(builder, funcOp.getRegion().getLoc());
+  Backedge startValueBackedge = edgeBuilderStart.get(startValue.getType());
 
   // For each merge that was signed with the `NEW_PHI` attribute, substitute
   // it with its GSA equivalent
@@ -1251,7 +1254,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
       return failure();
 
     // Get rid of the merge
-    merge->erase();
+    merge.erase();
   }
 
   // Replace the backedge

@@ -97,13 +97,12 @@ using CFGAnnotation = llvm::DenseMap<unsigned, CFGNode>;
 /// UnconditionalEdge = [source,dest]
 ///
 /// Add the string as annotation of the handshake function.
-void annotateCFG(handshake::FuncOp &funcOp,
-                 ConversionPatternRewriter &rewriter);
+void annotateCFG(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 /// Use an handshake function ot build the cf structure again, thanks to the
 /// information in `edges`.
 LogicalResult restoreCfStructure(handshake::FuncOp &funcOp,
-                                 ConversionPatternRewriter &rewriter);
+                                 PatternRewriter &rewriter);
 
 /// Get rid of the cf structure by moving all the operations in the initial
 /// block and removing all the cf terminators.
@@ -111,8 +110,7 @@ LogicalResult flattenFunction(handshake::FuncOp &funcOp);
 
 /// Sets an integer "bb" attribute on each operation to identify the basic
 /// block from which the operation originates in the std-level IR.
-void markBasicBlocks(handshake::FuncOp &funcOp,
-                     ConversionPatternRewriter &rewriter);
+void markBasicBlocks(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 }; // namespace cfg
 }; // namespace experimental

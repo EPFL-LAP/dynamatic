@@ -187,8 +187,8 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
   return edgeMap;
 }
 
-void dynamatic::experimental::cfg::annotateCFG(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+void dynamatic::experimental::cfg::annotateCFG(handshake::FuncOp &funcOp,
+                                               PatternRewriter &rewriter) {
 
   // Get the CFG information
   const auto edgeMap = getCFGEdges(funcOp.getRegion());
@@ -217,8 +217,9 @@ void dynamatic::experimental::cfg::annotateCFG(
   funcOp->setAttr(CFG_EDGES, rewriter.getStringAttr(result));
 }
 
-LogicalResult dynamatic::experimental::cfg::restoreCfStructure(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+LogicalResult
+dynamatic::experimental::cfg::restoreCfStructure(handshake::FuncOp &funcOp,
+                                                 PatternRewriter &rewriter) {
 
   // Get an operation according to its name. If not present, return a compare
   // operation in the block provided as input
@@ -382,8 +383,8 @@ dynamatic::experimental::cfg::flattenFunction(handshake::FuncOp &funcOp) {
   return success();
 }
 
-void dynamatic::experimental::cfg::markBasicBlocks(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+void dynamatic::experimental::cfg::markBasicBlocks(handshake::FuncOp &funcOp,
+                                                   PatternRewriter &rewriter) {
   for (auto [blockID, block] : llvm::enumerate(funcOp)) {
     for (Operation &op : block) {
       if (!isa<handshake::MemoryOpInterface>(op)) {

@@ -262,7 +262,7 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
 static DenseMap<Block *, handshake::LazyForkOp>
 connectLSQToForkGraph(handshake::FuncOp &funcOp,
                       DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
-                      ConversionPatternRewriter &rewriter) {
+                      PatternRewriter &rewriter) {
 
   DenseMap<Block *, handshake::LazyForkOp> forksGraph;
   auto startValue = (Value)funcOp.getArguments().back();
@@ -325,7 +325,7 @@ static LogicalResult
 connectForkGraph(handshake::FuncOp &funcOp,
                  const DenseSet<MemoryGroup *> &groupsGraph,
                  const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
-                 ConversionPatternRewriter &rewriter) {
+                 PatternRewriter &rewriter) {
 
   for (MemoryGroup *consumerGroup : groupsGraph) {
 
