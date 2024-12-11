@@ -305,33 +305,6 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp,
   return forksGraph;
 }
 
-/// Allocate some joins in front of each lazy fork, so that the number of
-/// inputs for each of them is exactly one. The current inputs of the lazy
-/// forks become inputs for the joins.
-static void
-joinInsertion(ConversionPatternRewriter &rewriter,
-              const DenseSet<MemoryGroup *> &groups,
-              const DenseMap<Block *, handshake::LazyForkOp> &forksGraph) {
-
-  // For each group
-  for (MemoryGroup *group : groups) {
-    // Get the corresponding fork and operands
-    Operation *forkNode = forksGraph.at(group->bb);
-    ValueRange operands = forkNode->getOperands();
-    // If the number of inputs is higher than one
-    if (operands.size() > 1) {
-
-      // Join all the inputs, and set the output of this new element as input
-      // of the lazy fork
-      rewriter.setInsertionPointToStart(forkNode->getBlock());
-      auto joinOp =
-          rewriter.create<handshake::JoinOp>(forkNode->getLoc(), operands);
-      /// The result of the JoinOp becomes the input to the LazyFork
-      forkNode->setOperands(joinOp.getResult());
-    }
-  }
-}
-
 /// Get all the load and store operations related to a LSQ operation
 static SmallVector<handshake::MemPortOpInterface>
 getLsqOps(handshake::FuncOp &funcOp, handshake::LSQOp lsqOp) {

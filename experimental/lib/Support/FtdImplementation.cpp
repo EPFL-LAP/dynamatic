@@ -1229,7 +1229,7 @@ LogicalResult experimental::ftd::addGsaGates(
   return success();
 }
 
-LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp funcOp,
+LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
                                      ConversionPatternRewriter &rewriter) {
   auto startValue = (Value)funcOp.getArguments().back();
 
@@ -1241,7 +1241,8 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp funcOp,
 
   // For each merge that was signed with the `NEW_PHI` attribute, substitute
   // it with its GSA equivalent
-  for (handshake::MergeOp merge : funcOp.getOps<handshake::MergeOp>()) {
+  for (handshake::MergeOp merge :
+       llvm::make_early_inc_range(funcOp.getOps<handshake::MergeOp>())) {
     if (!merge->hasAttr(NEW_PHI))
       continue;
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
@@ -1250,7 +1251,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp funcOp,
       return failure();
 
     // Get rid of the merge
-    rewriter.eraseOp(merge);
+    merge->erase();
   }
 
   // Replace the backedge

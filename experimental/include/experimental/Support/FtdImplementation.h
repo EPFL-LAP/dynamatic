@@ -56,7 +56,7 @@ LogicalResult addGsaGates(Region &region, ConversionPatternRewriter &rewriter,
 
 /// Use the GSA analysis to replace each non-init merge in the IR with a
 /// multiplexer.
-LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
+LogicalResult replaceMergeToGSA(handshake::FuncOp &funcOp,
                                 ConversionPatternRewriter &rewriter);
 
 /// Connect the values in `vals` by inserting some appropriate new SSA-nodes

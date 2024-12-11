@@ -35,6 +35,7 @@ F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
+F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
@@ -119,22 +120,23 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
   echo_info "Running FTD algorithm for handshake conversion"
 
-  if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
-
-    echo_info "Using FPGA'23 for LSQ connection"
-
     "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
       --ftd-lower-cf-to-handshake \
-      --handshake-straight-to-queue \
       --handshake-combine-steering-logic \
       > "$F_HANDSHAKE"
     exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
-  else
-    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
-      --ftd-lower-cf-to-handshake \
+
+
+  if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
+    echo_info "Using FPGA'23 for LSQ connection"
+
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-straight-to-queue \
       --handshake-combine-steering-logic \
-      > "$F_HANDSHAKE"
-    exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+      > "$F_HANDSHAKE_SQ"
+    exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
+
+    F_HANDSHAKE=$F_HANDSHAKE_SQ
   fi
 
   # handshake transformations
