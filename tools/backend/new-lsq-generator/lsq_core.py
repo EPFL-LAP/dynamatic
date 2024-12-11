@@ -1264,44 +1264,44 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     
     #! If this is the lsq master, then we need the following logic
     #! Define new interfaces needed by dynamatic
-    
-    memStart_ready = Logic('memStart_ready', 'o')
-    memStart_valid = Logic('memStart_valid', 'i')
-    ctrlEnd_ready = Logic('ctrlEnd_ready', 'o')
-    ctrlEnd_valid = Logic('ctrlEnd_valid', 'i')
-    memEnd_ready = Logic('memEnd_ready', 'i')
-    memEnd_valid = Logic('memEnd_valid', 'o')
-    
-    #! Add extra signals required
-    memStartReady = Logic('memStartReady', 'w')
-    memEndValid = Logic('memEndValid', 'w')
-    ctrlEndReady = Logic('ctrlEndReady', 'w')
-    temp_gen_mem = Logic('TEMP_GEN_MEM', 'w') 
-    
-    #! Define the needed logic
-    arch += "\t-- Define the intermediate logic\n"
-    arch += f"\tTEMP_GEN_MEM <= {ctrlEnd_valid.getNameRead()} and stq_empty and ldq_empty;\n"
-    
-    arch += "\t-- Define logic for the new interfaces needed by dynamatic\n"
-    arch += "\tprocess (clk) is\n\tbegin\n"
-    arch += '\t' * 2 + "if rising_edge(clk) then\n"
-    arch += '\t' * 3 + "if rst = '1' then\n"
-    arch += '\t' * 4 + "memStartReady <= '1';\n"
-    arch += '\t' * 4 + "memEndValid <= '0';\n"
-    arch += '\t' * 4 + "ctrlEndReady <= '0';\n"
-    arch += '\t' * 3 + "else\n"
-    arch += '\t' * 4 + "memStartReady <= (memEndValid and memEnd_ready_i) or ((not (memStart_valid_i and memStartReady)) and memStartReady);\n"
-    arch += '\t' * 4 + "memEndValid <= TEMP_GEN_MEM or memEndValid;\n"
-    arch += '\t' * 4 + "ctrlEndReady <= (not (ctrlEnd_valid_i and ctrlEndReady)) and (TEMP_GEN_MEM or ctrlEndReady);\n"
-    arch += '\t' * 3 + "end if;\n"
-    arch += '\t' * 2 + "end if;\n"
-    arch += "\tend process;\n\n"
-    
-    #! Assign signals for the newly added ports
-    arch += "\t-- Update new memory interfaces\n"
-    arch += Op(memStart_ready, memStartReady)
-    arch += Op(ctrlEnd_ready, ctrlEndReady)
-    arch += Op(memEnd_valid, memEndValid)
+    if (configs.master):
+      memStart_ready = Logic('memStart_ready', 'o')
+      memStart_valid = Logic('memStart_valid', 'i')
+      ctrlEnd_ready = Logic('ctrlEnd_ready', 'o')
+      ctrlEnd_valid = Logic('ctrlEnd_valid', 'i')
+      memEnd_ready = Logic('memEnd_ready', 'i')
+      memEnd_valid = Logic('memEnd_valid', 'o')
+      
+      #! Add extra signals required
+      memStartReady = Logic('memStartReady', 'w')
+      memEndValid = Logic('memEndValid', 'w')
+      ctrlEndReady = Logic('ctrlEndReady', 'w')
+      temp_gen_mem = Logic('TEMP_GEN_MEM', 'w') 
+      
+      #! Define the needed logic
+      arch += "\t-- Define the intermediate logic\n"
+      arch += f"\tTEMP_GEN_MEM <= {ctrlEnd_valid.getNameRead()} and stq_empty and ldq_empty;\n"
+      
+      arch += "\t-- Define logic for the new interfaces needed by dynamatic\n"
+      arch += "\tprocess (clk) is\n\tbegin\n"
+      arch += '\t' * 2 + "if rising_edge(clk) then\n"
+      arch += '\t' * 3 + "if rst = '1' then\n"
+      arch += '\t' * 4 + "memStartReady <= '1';\n"
+      arch += '\t' * 4 + "memEndValid <= '0';\n"
+      arch += '\t' * 4 + "ctrlEndReady <= '0';\n"
+      arch += '\t' * 3 + "else\n"
+      arch += '\t' * 4 + "memStartReady <= (memEndValid and memEnd_ready_i) or ((not (memStart_valid_i and memStartReady)) and memStartReady);\n"
+      arch += '\t' * 4 + "memEndValid <= TEMP_GEN_MEM or memEndValid;\n"
+      arch += '\t' * 4 + "ctrlEndReady <= (not (ctrlEnd_valid_i and ctrlEndReady)) and (TEMP_GEN_MEM or ctrlEndReady);\n"
+      arch += '\t' * 3 + "end if;\n"
+      arch += '\t' * 2 + "end if;\n"
+      arch += "\tend process;\n\n"
+      
+      #! Assign signals for the newly added ports
+      arch += "\t-- Update new memory interfaces\n"
+      arch += Op(memStart_ready, memStartReady)
+      arch += Op(ctrlEnd_ready, ctrlEndReady)
+      arch += Op(memEnd_valid, memEndValid)
 
     ######  Queue Registers ######
     # Load Queue Entries
