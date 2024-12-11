@@ -14,4 +14,5 @@ add_dynamatic_library(DynamaticLSQSizing
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+  DynamaticBufferPlacement
   )
