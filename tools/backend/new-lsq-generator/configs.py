@@ -5,12 +5,15 @@ import sys
 # read and parse the json file
 def GetConfigs(path: str):
     with open(path, 'r') as file:
-        configsString = file.read()
+        configString = file.read()
         # configs_list_raw = json.loads(configsString)["specifications"]
-        configs_list = []
-        for configs in json.loads(configsString)["specifications"]:
-           configs_list.append(Configs(configs))
-        return configs_list
+        # configs_list = []
+        # configs_list.append(Configs(json.loads(configsString)))
+        # for configs in json.loads(configsString)["specifications"]:
+        #    configs_list.append(Configs(configs))
+        
+        configs = json.loads(configString)
+        return Configs(configs)
 
 class Configs:
   name:          str = 'test'
@@ -46,25 +49,26 @@ class Configs:
 
   def __init__(self, config: dict) -> None:
     self.name          = config["name"]
-    self.dataW         = config["dataW"]
-    self.addrW         = config["addrW"]
-    self.idW           = config["idW"]
-    self.numLdqEntries = config["numLdqEntries"]
-    self.numStqEntries = config["numStqEntries"]
-    self.numLdPorts    = config["numLdPorts"]
-    self.numStPorts    = config["numStPorts"]
-    self.numGroups     = config["numGroups"]
-    self.numLdMem      = config["numLdMem"]
-    self.numStMem      = config["numStMem"]
+    self.dataW         = config["dataWidth"]
+    self.addrW         = config["addrWidth"]
+    self.idW           = config["indexWidth"]
+    self.numLdqEntries = config["fifoDepth_L"]
+    self.numStqEntries = config["fifoDepth_S"]
+    self.numLdPorts    = config["numLoadPorts"]
+    self.numStPorts    = config["numStorePorts"]
+    self.numGroups     = config["numBBs"]
+    self.numLdMem      = config["numLdChannels"]
+    self.numStMem      = config["numStChannels"]
+    self.master        = bool(config["master"])
 
     self.stResp        = bool(config["stResp"])
-    self.gaMulti       = bool(config["gaMulti"])
+    self.gaMulti       = bool(config["groupMulti"])
 
-    self.gaNumLoads    = config["gaNumLoads"]
-    self.gaNumStores   = config["gaNumStores"]
-    self.gaLdOrder     = config["gaLdOrder"]
-    self.gaLdPortIdx   = config["gaLdPortIdx"]
-    self.gaStPortIdx   = config["gaStPortIdx"]
+    self.gaNumLoads    = config["numLoads"]
+    self.gaNumStores   = config["numStores"]
+    self.gaLdOrder     = config["ldOrder"]
+    self.gaLdPortIdx   = config["ldPortIdx"]
+    self.gaStPortIdx   = config["stPortIdx"]
 
     self.ldqAddrW      = math.ceil(math.log2(self.numLdqEntries))
     self.stqAddrW      = math.ceil(math.log2(self.numStqEntries))
@@ -73,10 +77,10 @@ class Configs:
     self.ldpAddrW      = math.ceil(math.log2(self.numLdPorts))
     self.stpAddrW      = math.ceil(math.log2(self.numStPorts))
 
-    self.pipe0         = bool(config["pipe0"])
-    self.pipe1         = bool(config["pipe1"])
-    self.pipeComp      = bool(config["pipeComp"])
-    self.headLag       = bool(config["headLag"])
+    self.pipe0         = bool(config["pipe0En"])
+    self.pipe1         = bool(config["pipe1En"])
+    self.pipeComp      = bool(config["pipeCompEn"])
+    self.headLag       = bool(config["headLagEn"])
 
     assert(self.idW >= self.ldqAddrW)
 
@@ -93,7 +97,7 @@ class Configs:
     #     assert(len(self.gaStPortIdx[idx]) == self.gaNumStores[idx])
 
 if __name__ == '__main__':
-    path_configs = './configs/test_new.json'
-    configs_list = GetConfigs(path_configs)
-    for configs in configs_list:
-      print(configs.__dict__)
+    path_configs = '/home/jianliu/new_lsq/dynamatic-mlir/integration-test/histogram/out/hdl/handshake_lsq_lsq1.json'
+    config = GetConfigs(path_configs)
+    # for configs in configs_list:
+    print(config.__dict__)

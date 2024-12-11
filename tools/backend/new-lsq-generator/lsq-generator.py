@@ -40,8 +40,8 @@ class LSQWrapper:
         self.tab_level = 1
         self.temp_count = 0
         self.signal_init_str = ''
-        self.port_init_str = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
-        self.reg_init_str = '\tprocess (clk, rst) is\n' + '\tbegin\n'
+        self.port_init_str = '\tport(\n\t\treset : in std_logic;\n\t\tclock : in std_logic'
+        self.reg_init_str = '\tprocess (clock, reset) is\n' + '\tbegin\n'
         
         # Define the final output string
         self.lsq_wrapper_str = "\n\n"
@@ -216,15 +216,15 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         self.lsq_wrapper_str += "\t-- Process for rreq_ready, rresp_valid and rresp_id\n"
         self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if rst = '1' then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if reset = '1' then\n"
         
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), '\'0\'')    
             self.lsq_wrapper_str += OpTab(rresp_valid[i], (self.tab_level + 2), '\'0\'')
             self.lsq_wrapper_str += OpTab(rresp_id[i], (self.tab_level + 2), 
-                                          '(', 'others', '>=', '\'0\'', ')')
+                                          '(', 'others', '=>', '\'0\'', ')')
         
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clk) then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), '\'1\'')
@@ -249,15 +249,15 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         self.lsq_wrapper_str += "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
         self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if rst = '1' then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "if reset = '1' then\n"
         
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), '\'0\'')    
             self.lsq_wrapper_str += OpTab(wresp_valid[i], (self.tab_level + 2), '\'0\'')
             self.lsq_wrapper_str += OpTab(wresp_id[i], (self.tab_level + 2), 
-                                          '(', 'others', '>=', '\'0\'', ')')
+                                          '(', 'others', '=>', '\'0\'', ')')
         
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clk) then\n"
+        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), '\'1\'')
@@ -280,11 +280,12 @@ class LSQWrapper:
         ###
         ### Instantiate the LSQ_core module
         ###
+        self.lsq_wrapper_str += "\t-- Instantiate the core LSQ logic\n"
         self.lsq_wrapper_str += '\t' * (self.tab_level) + f'{self.lsq_name}_core : entity work.{self.lsq_name}_core\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 1) + f'port map(\n'
         
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rst => rst,\n'
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'clk => clk,\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rst => reset,\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'clk => clock,\n'
         
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_data_0_o => {io_storeData.getNameWrite()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'wreq_addr_0_o => {io_storeAddr.getNameWrite()},\n'
@@ -293,6 +294,17 @@ class LSQWrapper:
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rresp_data_0_i => {io_loadData.getNameRead()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_valid_0_o => {io_loadEn.getNameWrite()},\n'
+        
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_ready_o => {io_memStart_ready.getNameWrite()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_valid_i => {io_memStart_valid.getNameRead()},\n'
+        
+        # TODO: Check the correctness of the following instantiation
+        for i in range(self.lsq_config.numGroups):
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_ready_o => {io_ctrl_ready[i].getNameWrite()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_valid_i => {io_ctrl_valid[i].getNameRead()},\n'
+          
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_ready_i => {io_memEnd_ready.getNameRead()},\n'
+        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n'
         
         for i in range(self.lsq_config.numGroups):
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n'
@@ -352,14 +364,13 @@ def main():
         os.makedirs(args.output_path)
     
     # Parse the config file
-    lsqConfigsList = GetConfigs(args.config_files)
+    lsqConfig = GetConfigs(args.config_files)
     
     # STEP 1: Generate the desired core lsq logic
-    for lsqConfigs in lsqConfigsList:
-        codeGen(args.output_path, lsqConfigs)
+    codeGen(args.output_path, lsqConfig)
         
     # STEP 2: Generate the wrapper to be connected with circuits generated by Dynamatic
-    lsq_wrapper_module = LSQWrapper(args.output_path, '_wrapper', lsqConfigsList[0])
+    lsq_wrapper_module = LSQWrapper(args.output_path, '_wrapper', lsqConfig)
     
     print(lsq_wrapper_module.genWrapper())
     
