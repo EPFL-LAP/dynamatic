@@ -148,29 +148,31 @@ class LSQWrapper:
         io_stData_bits = VHDLLogicVecTypeArray('io_stData_bits', 'i', self.lsq_config.numStPorts, self.lsq_config.dataW)
         self.lsq_wrapper_str += io_stData_bits.signalInit()
         
-        ### io_memStart_ready: output
-        io_memStart_ready = VHDLLogicType('io_memStart_ready', 'o')
-        self.lsq_wrapper_str += io_memStart_ready.signalInit()
-        
-        ### io_memStart_valid: input
-        io_memStart_valid = VHDLLogicType('io_memStart_valid', 'i')
-        self.lsq_wrapper_str += io_memStart_valid.signalInit()
-        
-        ### io_ctrlEnd_ready: output
-        io_ctrlEnd_ready = VHDLLogicType('io_ctrlEnd_ready', 'o')
-        self.lsq_wrapper_str += io_ctrlEnd_ready.signalInit()
-        
-        ### io_ctrlEnd_valid: input
-        io_ctrlEnd_valid = VHDLLogicType('io_ctrlEnd_valid', 'i')
-        self.lsq_wrapper_str += io_ctrlEnd_valid.signalInit()
-        
-        ### io_memEnd_ready: input
-        io_memEnd_ready = VHDLLogicType('io_memEnd_ready', 'i')
-        self.lsq_wrapper_str += io_memEnd_ready.signalInit()
-        
-        ### io_memEnd_valid: output
-        io_memEnd_valid = VHDLLogicType('io_memEnd_valid', 'o')
-        self.lsq_wrapper_str += io_memEnd_valid.signalInit()
+        # The following ios are needed, when lsqConfg.master == True
+        if (config.master):
+          ### io_memStart_ready: output
+          io_memStart_ready = VHDLLogicType('io_memStart_ready', 'o')
+          self.lsq_wrapper_str += io_memStart_ready.signalInit()
+          
+          ### io_memStart_valid: input
+          io_memStart_valid = VHDLLogicType('io_memStart_valid', 'i')
+          self.lsq_wrapper_str += io_memStart_valid.signalInit()
+          
+          ### io_ctrlEnd_ready: output
+          io_ctrlEnd_ready = VHDLLogicType('io_ctrlEnd_ready', 'o')
+          self.lsq_wrapper_str += io_ctrlEnd_ready.signalInit()
+          
+          ### io_ctrlEnd_valid: input
+          io_ctrlEnd_valid = VHDLLogicType('io_ctrlEnd_valid', 'i')
+          self.lsq_wrapper_str += io_ctrlEnd_valid.signalInit()
+          
+          ### io_memEnd_ready: input
+          io_memEnd_ready = VHDLLogicType('io_memEnd_ready', 'i')
+          self.lsq_wrapper_str += io_memEnd_ready.signalInit()
+          
+          ### io_memEnd_valid: output
+          io_memEnd_valid = VHDLLogicType('io_memEnd_valid', 'o')
+          self.lsq_wrapper_str += io_memEnd_valid.signalInit()
         
         ##
         ## IO Definition finished
@@ -295,15 +297,16 @@ class LSQWrapper:
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n'
         self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'rreq_valid_0_o => {io_loadEn.getNameWrite()},\n'
         
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_ready_o => {io_memStart_ready.getNameWrite()},\n'
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_valid_i => {io_memStart_valid.getNameRead()},\n'
-        
-        
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_ready_o => {io_ctrlEnd_ready.getNameWrite()},\n'
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_valid_i => {io_ctrlEnd_valid.getNameRead()},\n'
+        if (config.master):
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_ready_o => {io_memStart_ready.getNameWrite()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memStart_valid_i => {io_memStart_valid.getNameRead()},\n'
           
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_ready_i => {io_memEnd_ready.getNameRead()},\n'
-        self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n'
+          
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_ready_o => {io_ctrlEnd_ready.getNameWrite()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'ctrlEnd_valid_i => {io_ctrlEnd_valid.getNameRead()},\n'
+            
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_ready_i => {io_memEnd_ready.getNameRead()},\n'
+          self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n'
         
         for i in range(self.lsq_config.numGroups):
             self.lsq_wrapper_str += '\t' * (self.tab_level + 2) + f'group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n'
