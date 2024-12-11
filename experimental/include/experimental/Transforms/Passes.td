@@ -128,4 +128,20 @@ def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
       "'buffer-placement' at the binary's location.">];
 }
 
+def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
+  let summary = "Size the LSQs based on the buffer placement information.";
+  let description = [{
+    Calculates the necessary Load-Store-Queue depths, based on the buffer placement information, 
+    to ensure that the memory accesses are not restricting the circuits troughput, while 
+    trying to keep the area as low as possible.  
+  }];
+  let constructor = "dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs()";
+  
+  let options = [Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">,
+      Option<"collisions", "collisions", "std::string", "",
+      "Three different cases for memory collsions: none/half/full">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
