@@ -282,7 +282,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   idBasicBlocks(funcOp, rewriter);
 
   // Annotate the IR with the CFG information
-  cfg::annotateCFG(funcOp, rewriter);
+  cfg::annotateCFG(funcOp, rewriter, namer);
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();

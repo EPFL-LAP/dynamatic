@@ -25,6 +25,7 @@
 #ifndef DYNAMATIC_SUPPORT_CFG_ANNOTATION_H
 #define DYNAMATIC_SUPPORT_CFG_ANNOTATION_H
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 
 namespace dynamatic {
@@ -97,7 +98,8 @@ using CFGAnnotation = llvm::DenseMap<unsigned, CFGNode>;
 /// UnconditionalEdge = [source,dest]
 ///
 /// Add the string as annotation of the handshake function.
-void annotateCFG(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
+void annotateCFG(handshake::FuncOp &funcOp, PatternRewriter &rewriter,
+                 NameAnalysis &namer);
 
 /// Use an handshake function ot build the cf structure again, thanks to the
 /// information in `edges`.

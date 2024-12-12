@@ -139,7 +139,7 @@ unserializeEdges(handshake::FuncOp &funcOp) {
 /// Extract the CFG information from a region. Each basic block with an out
 /// edge is marked with the successor basic blocks, related to the structure
 /// `CFGEdge` for edges.
-static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
+static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
 
   cfg::CFGAnnotation edgeMap;
 
@@ -169,9 +169,7 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
       // branch
       Operation *conditionOperation =
           condBranchOp.getOperand(0).getDefiningOp();
-      std::string conditionName =
-          conditionOperation->getAttrOfType<mlir::StringAttr>("handshake.name")
-              .str();
+      std::string conditionName = namer.getName(conditionOperation).str();
 
       // Get IDs of both true and false destinations
       unsigned trueDestID = getIDBlock(condBranchOp.getTrueDest());
@@ -188,10 +186,11 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
 }
 
 void dynamatic::experimental::cfg::annotateCFG(handshake::FuncOp &funcOp,
-                                               PatternRewriter &rewriter) {
+                                               PatternRewriter &rewriter,
+                                               NameAnalysis &namer) {
 
   // Get the CFG information
-  const auto edgeMap = getCFGEdges(funcOp.getRegion());
+  const auto edgeMap = getCFGEdges(funcOp.getRegion(), namer);
 
   std::string result = "";
 
