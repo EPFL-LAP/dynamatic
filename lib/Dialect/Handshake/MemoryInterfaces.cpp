@@ -461,41 +461,4 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
 
   // Update the index width
   indexWidth = llvm::Log2_64_Ceil(depthLoad);
-
-  //! Testing
-  // llvm::dbgs() << "[LSQ Info] \n";
-  // llvm::dbgs() << "Module Name: " << name << "\n";
-  // llvm::dbgs() << "\tNum Groups: " << numGroups << "\n";
-  // llvm::dbgs() << "\tTotal Num Loads: " << numLoads << "\n";
-  // llvm::dbgs() << "\tTotal Num Stores: " << numStores << "\n";
-  // llvm::dbgs() << "\tidW: " << idW << "\n";
-
-  // int16_t groupCounter = 0;
-
-  // // Print the numebr of loads and the corresponding index
-  // for (int counter = 0; counter < loadsPerGroup.size(); counter++) {
-  //   llvm::dbgs() << "\t[Group " << counter << "]\n";
-  //   llvm::dbgs() << "\t\tNum Loads: " << loadsPerGroup[counter] << "\n";
-  //   llvm::dbgs() << "\t\tNum Stores: " << storesPerGroup[counter] << "\n";
-
-  //   // Print the original indices
-  //   llvm::dbgs() << "\t\tgaLdPortIdx: [";
-  //   for (auto &loadindice : ldPortIdx[counter]) {
-  //     llvm::dbgs() << loadindice << ", ";
-  //   }
-  //   llvm::dbgs() << "]\n";
-
-  //   llvm::dbgs() << "\t\tgaStPortIdx: [";
-  //   for (auto &storeindice : stPortIdx[counter]) {
-  //     llvm::dbgs() << storeindice << ", ";
-  //   }
-  //   llvm::dbgs() << "]\n";
-
-  //   // Print the new configurations
-  //   llvm::dbgs() << "\t\tldOrder: [";
-  //   for (auto &ldOrder : ldOrder[groupCounter]) {
-  //     llvm::dbgs() << ldOrder << ", ";
-  //   }
-  //   llvm::dbgs() << "]\n";
-  // }
 }
