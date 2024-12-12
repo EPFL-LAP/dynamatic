@@ -656,7 +656,7 @@ def main():
     if (lsqConfig.master):
       lsq_wrapper_module.genWrapper()
     else:
-      print(lsq_wrapper_module.genWrapperSlave())
+      lsq_wrapper_module.genWrapperSlave()
     
 if __name__ == '__main__':
     main()
