@@ -1,4 +1,5 @@
 # This file redesigned the classes to represent the signals in the VHDL file
+import re
 
 #===----------------------------------------------------------------------===#
 # VHDL Signal Type Definition 
@@ -242,7 +243,8 @@ class VHDLLogicTypeArray(VHDLLogicType):
     
     def __getitem__(self, i) -> VHDLLogicType:
         assert i in range(0, self.length)
-        return VHDLLogicType(self.name, self.type)
+        name = re.sub(r'(\D+)\d+(\D+)', lambda m: f"{m.group(1)}{i}{m.group(2)}", self.name)
+        return VHDLLogicType(name, self.type)
     
     def regInit(self, enable = None, init = None):
         assert(self.type == 'r')
@@ -298,7 +300,8 @@ class VHDLLogicVecTypeArray(VHDLLogicVecType):
     
     def __getitem__(self, i) -> VHDLLogicVecType:
         assert i in range(0, self.length)
-        return VHDLLogicVecType(self.name, self.type, self.size)
+        name = re.sub(r'(\D+)\d+(\D+)', lambda m: f"{m.group(1)}{i}{m.group(2)}", self.name)
+        return VHDLLogicVecType(name, self.type, self.size)
         
     def signalInit(self):
         sig_init_str = ''
