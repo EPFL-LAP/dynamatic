@@ -365,6 +365,19 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
+  handshake::LSQDepthAttr lsqDepthAttr =
+      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
+  if (lsqDepthAttr) {
+    depthLoad = lsqDepthAttr.getLoadQueueDepth();
+    depthStore = lsqDepthAttr.getStoreQueueDepth();
+    // "depth" Parameter is theoretically unused, but still needed by the
+    // current LSQGenerator
+    depth = std::max(depthLoad, depthStore);
+  } else {
+    depthLoad = 16;
+    depthStore = 16;
+  }
+
   numGroups = ports.getNumGroups();
   numLoads = ports.getNumPorts<LoadPort>();
   numStores = ports.getNumPorts<StorePort>();
@@ -450,10 +463,10 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   };
 
   // Port offsets and index arrays must have length equal to the depth
-  capBiArray(loadOffsets, depth);
-  capBiArray(storeOffsets, depth);
-  capBiArray(loadPorts, depth);
-  capBiArray(storePorts, depth);
+  capBiArray(loadOffsets, depthLoad);
+  capBiArray(storeOffsets, depthStore);
+  capBiArray(loadPorts, depthLoad);
+  capBiArray(storePorts, depthStore);
 
   // Expand arrays defined for the new lsq config file
   extendArray(ldPortIdx);
