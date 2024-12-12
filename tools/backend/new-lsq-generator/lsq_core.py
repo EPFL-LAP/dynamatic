@@ -2440,12 +2440,6 @@ if __name__ == '__main__':
     path_rtl     = args.path_rtl
 
     # Read the configuration file
-    # path_configs = './configs/test_new.json'
-    # path_configs   = sys.argv[1]
     lsqConfig = GetConfigs(path_configs)
-    # path_rtl     = './synthesis/hdl/'
-    # path_rtl     = '../../Dynamatic/etc/dynamatic/histogram/hdl/'
-    # path_rtl       = sys.argv[2] + '/'
-    # for lsqConfigs in lsqConfigsList:
     codeGen(path_rtl, lsqConfig)
     

@@ -5,13 +5,7 @@ import sys
 # read and parse the json file
 def GetConfigs(path: str):
     with open(path, 'r') as file:
-        configString = file.read()
-        # configs_list_raw = json.loads(configsString)["specifications"]
-        # configs_list = []
-        # configs_list.append(Configs(json.loads(configsString)))
-        # for configs in json.loads(configsString)["specifications"]:
-        #    configs_list.append(Configs(configs))
-        
+        configString = file.read()      
         configs = json.loads(configString)
         return Configs(configs)
 
@@ -74,8 +68,9 @@ class Configs:
     self.stqAddrW      = math.ceil(math.log2(self.numStqEntries))
     self.emptyLdAddrW  = math.ceil(math.log2(self.numLdqEntries+1))
     self.emptyStAddrW  = math.ceil(math.log2(self.numStqEntries+1))
-    self.ldpAddrW      = math.ceil(math.log2(self.numLdPorts))
-    self.stpAddrW      = math.ceil(math.log2(self.numStPorts))
+    # Check the number of ports, if num*Ports == 0, set it to 1
+    self.ldpAddrW      = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
+    self.stpAddrW      = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
     self.pipe0         = bool(config["pipe0En"])
     self.pipe1         = bool(config["pipe1En"])
@@ -90,11 +85,6 @@ class Configs:
     assert(len(self.gaLdOrder)   == self.numGroups)
     assert(len(self.gaLdPortIdx) == self.numGroups)
     assert(len(self.gaStPortIdx) == self.numGroups)
-
-    # for idx in range(0, self.numGroups):
-    #     assert(len(self.gaLdOrder[idx])   == self.gaNumLoads[idx])
-    #     assert(len(self.gaLdPortIdx[idx]) == self.gaNumLoads[idx])
-    #     assert(len(self.gaStPortIdx[idx]) == self.gaNumStores[idx])
 
 if __name__ == '__main__':
     path_configs = '/home/jianliu/new_lsq/dynamatic-mlir/integration-test/histogram/out/hdl/handshake_lsq_lsq1.json'
