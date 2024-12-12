@@ -29,7 +29,7 @@ module control_merge_dataless #(
     found = 1'b0;
 
     for (i = 0; i < SIZE; i = i + 1) begin
-      if (ins_valid[i]) begin
+      if (!found && ins_valid[i]) begin
         index_tehb = i[INDEX_TYPE - 1 : 0];
         found = 1'b1; // Set flag to indicate the value has been found
       end
