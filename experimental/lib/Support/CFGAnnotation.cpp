@@ -139,7 +139,7 @@ unserializeEdges(handshake::FuncOp &funcOp) {
 /// Extract the CFG information from a region. Each basic block with an out
 /// edge is marked with the successor basic blocks, related to the structure
 /// `CFGEdge` for edges.
-static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
+static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
 
   cfg::CFGAnnotation edgeMap;
 
@@ -169,9 +169,7 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
       // branch
       Operation *conditionOperation =
           condBranchOp.getOperand(0).getDefiningOp();
-      std::string conditionName =
-          conditionOperation->getAttrOfType<mlir::StringAttr>("handshake.name")
-              .str();
+      std::string conditionName = namer.getName(conditionOperation).str();
 
       // Get IDs of both true and false destinations
       unsigned trueDestID = getIDBlock(condBranchOp.getTrueDest());
@@ -187,11 +185,12 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion) {
   return edgeMap;
 }
 
-void dynamatic::experimental::cfg::annotateCFG(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+void dynamatic::experimental::cfg::annotateCFG(handshake::FuncOp &funcOp,
+                                               PatternRewriter &rewriter,
+                                               NameAnalysis &namer) {
 
   // Get the CFG information
-  const auto edgeMap = getCFGEdges(funcOp.getRegion());
+  const auto edgeMap = getCFGEdges(funcOp.getRegion(), namer);
 
   std::string result = "";
 
@@ -217,8 +216,9 @@ void dynamatic::experimental::cfg::annotateCFG(
   funcOp->setAttr(CFG_EDGES, rewriter.getStringAttr(result));
 }
 
-LogicalResult dynamatic::experimental::cfg::restoreCfStructure(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+LogicalResult
+dynamatic::experimental::cfg::restoreCfStructure(handshake::FuncOp &funcOp,
+                                                 PatternRewriter &rewriter) {
 
   // Get an operation according to its name. If not present, return a compare
   // operation in the block provided as input
@@ -382,8 +382,8 @@ dynamatic::experimental::cfg::flattenFunction(handshake::FuncOp &funcOp) {
   return success();
 }
 
-void dynamatic::experimental::cfg::markBasicBlocks(
-    handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter) {
+void dynamatic::experimental::cfg::markBasicBlocks(handshake::FuncOp &funcOp,
+                                                   PatternRewriter &rewriter) {
   for (auto [blockID, block] : llvm::enumerate(funcOp)) {
     for (Operation &op : block) {
       if (!isa<handshake::MemoryOpInterface>(op)) {

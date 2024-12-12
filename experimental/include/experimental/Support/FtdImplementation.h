@@ -24,12 +24,12 @@ namespace experimental {
 namespace ftd {
 
 /// Add some regen multiplexers between an opearation and one of its operands
-void addRegenOperandConsumer(ConversionPatternRewriter &rewriter,
+void addRegenOperandConsumer(PatternRewriter &rewriter,
                              dynamatic::handshake::FuncOp &funcOp,
                              Operation *consumerOp, Value operand);
 
 /// Add suppression mechanism to all the inputs and outputs of a producer
-void addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
+void addSuppOperandConsumer(PatternRewriter &rewriter,
                             handshake::FuncOp &funcOp, Operation *consumerOp,
                             Value operand);
 
@@ -38,34 +38,33 @@ void addSuppOperandConsumer(ConversionPatternRewriter &rewriter,
 /// adding some merges to the network, to that this can be done. The new
 /// merge is moved inside of the loop, and it works like a reassignment
 /// (cfr. FPGA'22, Section V.C).
-void addRegen(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
+void addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 /// Given each pairs of producers and consumers within the circuit, the
 /// producer might create a token which is never used by the corresponding
 /// consumer, because of the control decisions. In this scenario, the token
 /// must be suprressed. This function inserts a `SUPPRESS` block whenever it
 /// is necessary, according to FPGA'22 (IV.C and V)
-void addSupp(handshake::FuncOp &funcOp, ConversionPatternRewriter &rewriter);
+void addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 /// Starting from the information collected by the gsa analysis pass,
 /// instantiate some merge operations at the beginning of each block which
 /// work as explicit phi functions.
-LogicalResult addGsaGates(Region &region, ConversionPatternRewriter &rewriter,
+LogicalResult addGsaGates(Region &region, PatternRewriter &rewriter,
                           const gsa::GSAAnalysis &gsa, Backedge startValue,
                           bool removeTerminators = true);
 
 /// Use the GSA analysis to replace each non-init merge in the IR with a
 /// multiplexer.
 LogicalResult replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                ConversionPatternRewriter &rewriter);
+                                PatternRewriter &rewriter);
 
 /// Connect the values in `vals` by inserting some appropriate new SSA-nodes
 /// (merges) across the control flow graph of the function. The new
 /// `phi-network` is in charge of connecting them in accordance to their
 /// position and their dominance. Given the set of operands `toSubstitue`, each
 /// of them is modified with the correct input from the network.
-LogicalResult createPhiNetwork(Region &funcRegion,
-                               ConversionPatternRewriter &rewriter,
+LogicalResult createPhiNetwork(Region &funcRegion, PatternRewriter &rewriter,
                                SmallVector<Value> &vals,
                                SmallVector<OpOperand *> &toSubstitue);
 
@@ -75,7 +74,7 @@ LogicalResult createPhiNetwork(Region &funcRegion,
 /// and appropriate joins to combine them together so that such a dependency is
 /// fullfilled.
 LogicalResult createPhiNetworkDeps(
-    Region &funcRegion, ConversionPatternRewriter &rewriter,
+    Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
 
 }; // namespace ftd

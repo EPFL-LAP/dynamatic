@@ -128,7 +128,6 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
       > "$F_HANDSHAKE"
     exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
 
-
   if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
     echo_info "Using FPGA'23 for LSQ connection"
 
@@ -141,44 +140,20 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     F_HANDSHAKE=$F_HANDSHAKE_SQ
   fi
 
-  if [[ $ADD_SEQ_MEM -ne 0 ]]; then
-      # handshake transformations
-      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-        --handshake-add-seq-mem \
-        --handshake-combine-steering-logic \
-        --handshake-analyze-lsq-usage\
-        --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-        --handshake-materialize --handshake-infer-basic-blocks \
-        > "$F_HANDSHAKE_TRANSFORMED"
-      exit_on_fail "Failed to apply transformations to handshake with FTD and Seq mem" \
-        "Applied transformations to handshake with FTD and Seq mem"
-  else
-      # handshake transformations
-      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-        --handshake-combine-steering-logic \
-        --handshake-analyze-lsq-usage \
-        --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-        --handshake-materialize --handshake-infer-basic-blocks \
-        > "$F_HANDSHAKE_TRANSFORMED"
-      exit_on_fail "Failed to apply transformations to handshake with FTD without Seq mem" \
-        "Applied transformations to handshake with FTD without Seq mem"
-
-  fi
-
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
-
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
 fi
+
+# handshake transformations
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+  --handshake-materialize --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED"
+exit_on_fail "Failed to apply transformations to handshake" \
+  "Applied transformations to handshake"
 
 
 # Credit-based sharing
