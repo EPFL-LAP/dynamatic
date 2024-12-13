@@ -243,12 +243,26 @@ struct LSQGenerationInfo {
   unsigned headLagEn = 0; 
 
   // Configurations needed for the new lsq design
-  // LdOrder contains the same information as the previous loadOffset entry
-  // just in a different format.
+  // LdOrder indicates for each load entry in each group, 
+  // which store entries need to be completed before this 
+  // load is issued. Foe example:
+  // Group 0: {st0, ld0, st1, ld1}
+  // Group 1: {st2, ld2, st3}
+  // Then we have the following configuration for the ldOrder
+  // ldOrder = [
+  //    [1, 2], (in group1: there is a store before ld0 and two stores before ld1)
+  //    [1]     (in group 1: there is a store before ld2)
+  // ]
   SmallVector<SmallVector<unsigned>> ldOrder;
   // Ports indices for store and load ports
   // which contain the same information as the previous two 2d vectors, just no
   // padding included.
+  // Following the example above, we have the following configuration for stPortIdx
+  // stPortIdx = [
+  //    [0, 1], (Two st in group 1)
+  //    [2, 3]  (Two st in group 2)
+  // ]
+  // ldPortIdx follows the same pattern
   SmallVector<SmallVector<unsigned>> ldPortIdx, stPortIdx;
 
   /// Derives generation information for the provided LSQ.

@@ -388,29 +388,26 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     loadsPerGroup.push_back(groupPorts.getNumPorts<LoadPort>());
     storesPerGroup.push_back(groupPorts.getNumPorts<StorePort>());
 
-    // Track the numebr of stores within a group
-    unsigned numStores = 0;
+    // Track the numebr of stores and ld idx within a group
+    unsigned numStoresCount = 0, ldIdx = 0;
 
-    // Compute the ffset of first load/store in the group and indices of
+    // Compute the offset of first load/store in the group and indices of
     // each load/store port
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
-    unsigned numEntries = groupPorts.getNumPorts<StorePort>()
-                              ? groupPorts.getNumPorts<StorePort>()
+    unsigned numLoadEntries = groupPorts.getNumPorts<LoadPort>()
+                              ? groupPorts.getNumPorts<LoadPort>()
                               : 1;
-    SmallVector<unsigned> singleLdOrder(numEntries, 0);
+
+    SmallVector<unsigned> singleLdOrder(numLoadEntries, 0);
 
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
       if (isa<LoadPort>(accessPort)) {
         if (!firstLoadOffset)
           firstLoadOffset = portIdx;
 
-        // Update the ldOrder list
-        if (numStores > 0) {
-          for (size_t stIdx = 0; stIdx < numStores; stIdx++) {
-            singleLdOrder[stIdx] = 1;
-          }
-        }
+        // Update ldOrder 
+        singleLdOrder[ldIdx++] = numStoresCount;
 
         groupLoadPorts.push_back(loadIdx++);
       } else {
@@ -418,7 +415,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
         if (!firstStoreOffset)
           firstStoreOffset = portIdx;
 
-        numStores++;
+        numStoresCount++;
         groupStorePorts.push_back(storeIdx++);
       }
     }

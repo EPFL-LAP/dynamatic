@@ -85,9 +85,3 @@ class Configs:
     assert(len(self.gaLdOrder)   == self.numGroups)
     assert(len(self.gaLdPortIdx) == self.numGroups)
     assert(len(self.gaStPortIdx) == self.numGroups)
-
-if __name__ == '__main__':
-    path_configs = '/home/jianliu/new_lsq/dynamatic-mlir/integration-test/histogram/out/hdl/handshake_lsq_lsq1.json'
-    config = GetConfigs(path_configs)
-    # for configs in configs_list:
-    print(config.__dict__)
