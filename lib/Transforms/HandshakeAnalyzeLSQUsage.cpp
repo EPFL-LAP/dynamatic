@@ -97,9 +97,12 @@ static bool hasRAW(handshake::LoadOp loadOp,
                    DenseSet<handshake::StoreOp> &storeOps) {
   StringRef loadName = getUniqueName(loadOp);
   for (handshake::StoreOp storeOp : storeOps) {
-    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
-      for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (dependency.getDstAccess() == loadName) {
+    if (auto deps = getDialectAttr<MemDependenceDictAttr>(storeOp)) {
+      DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
+      for (auto &[memDep, isActive] : dependenciesStatus) {
+        if (!isActive)
+          continue;
+        if (memDep.getDstAccess() == loadName) {
           LLVM_DEBUG({
             llvm::dbgs() << "\tKeeping '" << loadName
                          << "': RAW dependency with '" << getUniqueName(storeOp)
@@ -149,9 +152,12 @@ static bool hasEnforcedWARs(handshake::LoadOp loadOp,
   // We only need to check stores that depend on the load (WAR dependencies) as
   // others are already provably independent. We may check a single store
   // multiple times if it depends on the load at multiple loop depths
-  if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
-    for (MemDependenceAttr dependency : deps.getDependencies()) {
-      auto storeOp = storesByName.at(dependency.getDstAccess());
+  if (auto deps = getDialectAttr<MemDependenceDictAttr>(loadOp)) {
+    DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
+    for (auto &[memDep, isActive] : dependenciesStatus) {
+      if (!isActive)
+        continue;
+      auto storeOp = storesByName.at(memDep.getDstAccess());
       if (!isStoreGIIDOnLoad(loadOp, storeOp, cfg)) {
         LLVM_DEBUG({
           llvm::dbgs() << "\tKeeping '" << getUniqueName(loadOp)
@@ -249,9 +255,12 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
       dependentLoads.insert(loadOp);
 
       // All stores involved in a WAR with the load are still dependent
-      if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
-        for (MemDependenceAttr dependency : deps.getDependencies()) {
-          Operation *dstOp = namer.getOp(dependency.getDstAccess());
+      if (auto deps = getDialectAttr<MemDependenceDictAttr>(loadOp)) {
+        DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
+        for (auto &[memDep, isActive] : dependenciesStatus) {
+          if (!isActive)
+            continue;
+          Operation *dstOp = namer.getOp(memDep.getDstAccess());
           if (auto storeOp = dyn_cast<StoreOp>(dstOp))
             dependentStores.insert(storeOp);
         }
@@ -266,15 +275,20 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
   // Stores involed in a RAW ar WAW dependency with another operation are sill
   // dependent
   for (handshake::StoreOp storeOp : lsqStoreOps) {
-    auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp);
+    auto deps = getDialectAttr<MemDependenceDictAttr>(storeOp);
     if (!deps)
       continue;
 
     // Iterate over all RAW and WAW dependencies to determine those which must
     // still be honored by an LSQ
     StringRef storeName = getUniqueName(storeOp);
-    for (MemDependenceAttr dependency : deps.getDependencies()) {
-      StringRef dstName = dependency.getDstAccess();
+    
+    DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
+    for (auto &[memDep, isActive] : dependenciesStatus) {
+      StringRef dstName = memDep.getDstAccess();
+
+      if(!isActive)
+        continue;
 
       // WAW dependencies on the same operation can be ignored, they are
       // enforced automatically by the dataflow circuit's construction

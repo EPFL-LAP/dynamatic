@@ -37,7 +37,7 @@ using namespace dynamatic::handshake;
 
 void MemoryOpLowering::recordReplacement(Operation *oldOp, Operation *newOp,
                                          bool forwardInterface) {
-  copyDialectAttr<MemDependenceArrayAttr>(oldOp, newOp);
+  copyDialectAttr<MemDependenceDictAttr>(oldOp, newOp);
   if (forwardInterface)
     copyDialectAttr<MemInterfaceAttr>(oldOp, newOp);
   nameChanges[namer.getName(oldOp)] = namer.getName(newOp);
@@ -54,27 +54,31 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
       return;
 
     // Read potential memory dependencies stored on the memory operation
-    auto oldMemDeps = getDialectAttr<MemDependenceArrayAttr>(memOp);
+    auto oldMemDeps = getDialectAttr<MemDependenceDictAttr>(memOp);
     if (!oldMemDeps)
       return;
 
     // Copy memory dependence attributes one-by-one, replacing the name of
     // replaced destination memory operations along the way if necessary
-    SmallVector<MemDependenceAttr> newMemDeps;
-    for (MemDependenceAttr oldDep : oldMemDeps.getDependencies()) {
+    DenseMap<MemDependenceAttr, bool> newMemDeps;
+    
+    DenseMap<MemDependenceAttr, bool> dependenciesStatus = oldMemDeps.getDependeciesStatus();
+    for (auto it = dependenciesStatus.begin(); it != dependenciesStatus.end() ; it++) {
+      auto oldDep = it->first;
+      bool isActive = it -> second;
       StringRef oldName = oldDep.getDstAccess();
       auto replacedName = nameChanges.find(oldName);
       bool opWasReplaced = replacedName != nameChanges.end();
       anyChange |= opWasReplaced;
       if (opWasReplaced) {
         StringAttr newName = StringAttr::get(ctx, replacedName->second);
-        newMemDeps.push_back(MemDependenceAttr::get(
-            ctx, newName, oldDep.getLoopDepth(), oldDep.getComponents()));
+        newMemDeps[MemDependenceAttr::get(
+            ctx, newName, oldDep.getLoopDepth(), oldDep.getComponents())] = isActive;
       } else {
-        newMemDeps.push_back(oldDep);
+        newMemDeps[oldDep] = isActive;
       }
     }
-    setDialectAttr<MemDependenceArrayAttr>(memOp, ctx, newMemDeps);
+    setDialectAttr<MemDependenceDictAttr>(memOp, ctx, newMemDeps);
   });
 
   return anyChange;
