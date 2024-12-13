@@ -174,9 +174,6 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   if (odsParser.parseGreater())
     return {};
 
-  // We convert the storage type to the non-storage type at the end of parsing.
-  // Be careful that the non-storage type just holds a raw string pointer inside
-  // (via StringRef), so passing it around may lead to dangling pointers.
   SmallVector<ExtraSignal> extraSignals;
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
@@ -290,9 +287,6 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (odsParser.parseGreater())
     return {};
 
-  // We convert the storage type to the non-storage type at the end of parsing.
-  // Be careful that the non-storage type just holds a raw string pointer inside
-  // (via StringRef), so passing it around may lead to dangling pointers.
   SmallVector<ExtraSignal> extraSignals;
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
