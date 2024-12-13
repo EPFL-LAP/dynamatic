@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines Handshake TypeInterfaces in Tablegen.
+// This file defines the type interfaces of the Handshake dialect.
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,14 +37,14 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getExtraSignals().size();
       }]>,
-    InterfaceMethod<"Returns the number of extra signals",
+    InterfaceMethod<"Returns the number of downstream extra signals",
       "unsigned", "getNumDownstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return llvm::count_if(concreteType.getExtraSignals(), [](const ExtraSignal &extra) {
           return extra.downstream;
         });
       }]>,
-    InterfaceMethod<"Returns the number of extra signals",
+    InterfaceMethod<"Returns the number of upstream extra signals",
       "unsigned", "getNumUpstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getNumExtraSignals() - concreteType.getNumDownstreamExtraSignals();
@@ -68,7 +68,7 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
         return !mlir::failed(concreteType.getExtraSignalByName(name));
       }]>,
     // The implementation of this method largely depends on the type
-    // Thus we don't provide the defaultImplementation on this
+    // Therefore, we don't provide the defaultImplementation on this
     InterfaceMethod<"Returns a new type with the extraSignal added",
       "mlir::Type", "addExtraSignal", (ins "const ExtraSignal &":$extraSignal)>,
   ];
