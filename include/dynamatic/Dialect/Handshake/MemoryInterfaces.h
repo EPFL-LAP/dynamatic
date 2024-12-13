@@ -250,7 +250,7 @@ struct LSQGenerationInfo {
   // Group 1: {st2, ld2, st3}
   // Then we have the following configuration for the ldOrder
   // ldOrder = [
-  //    [1, 2], (in group1: there is a store before ld0 and two stores before ld1)
+  //    [1, 2], (in group 0: there is a store before ld0 and two stores before ld1)
   //    [1]     (in group 1: there is a store before ld2)
   // ]
   SmallVector<SmallVector<unsigned>> ldOrder;
@@ -259,8 +259,8 @@ struct LSQGenerationInfo {
   // padding included.
   // Following the example above, we have the following configuration for stPortIdx
   // stPortIdx = [
-  //    [0, 1], (Two st in group 1)
-  //    [2, 3]  (Two st in group 2)
+  //    [0, 1], (two st in group 0)
+  //    [2, 3]  (two st in group 1)
   // ]
   // ldPortIdx follows the same pattern
   SmallVector<SmallVector<unsigned>> ldPortIdx, stPortIdx;
