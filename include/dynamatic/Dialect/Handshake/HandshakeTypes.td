@@ -113,12 +113,6 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
       return ChannelType::get(newDataType, getExtraSignals());
     }
     
-    /// Returns a channel type with identical data type but a potentially
-    /// different extra signals.
-    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
-      return ChannelType::get(getDataType(), newExtraSignals);
-    }
-
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
