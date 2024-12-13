@@ -75,11 +75,28 @@ void traverseMemRef(FuncOp funcOp, DenseMap<StringRef,  SmallVector<std::tuple<S
             // NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
             auto memrefUsers = memref.getUsers();
+
+            assert(std::distance(memrefUsers.begin(), memrefUsers.end()) <= 1 && "expected at most one memref user");
+
             Operation *memOp = *memrefUsers.begin();
-            handshake::LSQOp lsqOp = dyn_cast<handshake::LSQOp>(memOp);
             
-            llvm::errs() << "lsq op \n";
-            if (lsqOp) {
+            llvm::errs() << *memOp << "\n";
+
+              handshake::LSQOp lsqOp;
+            if (lsqOp = dyn_cast<handshake::LSQOp>(memOp); !lsqOp) {
+              // The master memory interface must be an MC
+              auto mcOp = cast<handshake::MemoryControllerOp>(memOp);
+              // Ports to memory controllers will always remain connected to a memory
+              // controller, mark them as such with the memory interface attribute
+              MCPorts mcPorts = mcOp.getPorts();
+
+              if (!mcPorts.connectsToLSQ()) {
+                llvm::errs() << "no LSQ so continue";
+                continue;
+              }
+              lsqOp = mcPorts.getLSQPort().getLSQOp();
+            }
+
                 LSQPorts lsqPorts = lsqOp.getPorts();
                 llvm::errs() << "lsqPorts" << "--\n";
                 for (LSQGroup &group : lsqPorts.getGroups()) {
@@ -90,12 +107,12 @@ void traverseMemRef(FuncOp funcOp, DenseMap<StringRef,  SmallVector<std::tuple<S
                       nameToOp[getUniqueName(port.portOp)] = port.portOp;
                     }
                 }
-            }
-            llvm::errs() << "not lsq op \n";
+
         }
     }
 }
     
+
 
 void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter){
 
@@ -127,7 +144,7 @@ void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<st
     }
 }
 
-void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter, Value startSignal){
+void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter, Value startSignal){
 
     for (auto it = predNamesAndDoneSignalsForOp.begin(); it != predNamesAndDoneSignalsForOp.end(); ++it){
 
@@ -138,34 +155,37 @@ void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, V
       rewriter.setInsertionPointToStart(op->getBlock());
 
       int bb_num = getBBNumberFromOp(op);
-      Value sourceOpAddr = op->getOperand(0);
+      Value dstOpAddr = op->getOperand(0);
       
       SmallVector<std::tuple<StringRef, Value>> predNamesAndDoneSignals = it->second;
-      SmallVector<Value> joinValues;
+      SmallVector<Value> dependencyValues;
 
       for (auto doneAndAddr: predNamesAndDoneSignals){
-          StringRef dstName = std::get<0>(doneAndAddr);
-          Operation* dstOp = nameToOp[dstName];
+          StringRef predName = std::get<0>(doneAndAddr);
+          Operation* predOp = nameToOp[predName];
           Value done = std::get<1>(doneAndAddr);
 
-          handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, sourceOpAddr, dstOp->getOperand(0));
+          handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, dstOpAddr, predOp->getOperand(0));
 
           SmallVector<Value> muxValues;
           muxValues.push_back(done);
           muxValues.push_back(startSignal);
           
           handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
-          joinValues.push_back(muxOp.getResult());
-
+          dependencyValues.push_back(muxOp.getResult());
       }
 
       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
-      
+      SmallVector<Value> joinValues;
+      joinValues.push_back(unbundleOp.getResult(0));
       joinValues.push_back(unbundleOp.getResult(0));
 
+
+      llvm::errs() << "salam \n";
       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
+
       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
 
@@ -175,8 +195,63 @@ void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, V
       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
       op->setOperand(0, bundleOp.getResult(0));
+      llvm::errs() << "salam \n";
+      dependenciesMap[&joinOp->getOpOperand(0)] = dependencyValues;
+            llvm::errs() << "salam \n";
     }
+
 }
+
+// void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter, Value startSignal){
+
+//     for (auto it = predNamesAndDoneSignalsForOp.begin(); it != predNamesAndDoneSignalsForOp.end(); ++it){
+
+//       StringRef opName = it->first;
+//       llvm::errs() << "[connect joins]" << opName << "\n";
+//       Operation* op = nameToOp[opName];
+//       llvm::errs() << "[connect joins]" << op << "\n";
+//       rewriter.setInsertionPointToStart(op->getBlock());
+
+//       int bb_num = getBBNumberFromOp(op);
+//       Value sourceOpAddr = op->getOperand(0);
+      
+//       SmallVector<std::tuple<StringRef, Value>> predNamesAndDoneSignals = it->second;
+//       SmallVector<Value> joinValues;
+
+//       for (auto doneAndAddr: predNamesAndDoneSignals){
+//           StringRef dstName = std::get<0>(doneAndAddr);
+//           Operation* dstOp = nameToOp[dstName];
+//           Value done = std::get<1>(doneAndAddr);
+
+//           handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, sourceOpAddr, dstOp->getOperand(0));
+
+//           SmallVector<Value> muxValues;
+//           muxValues.push_back(done);
+//           muxValues.push_back(startSignal);
+          
+//           handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
+//           joinValues.push_back(muxOp.getResult());
+
+//       }
+
+//       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
+//       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+      
+//       joinValues.push_back(unbundleOp.getResult(0));
+
+//       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
+//       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+
+//       ValueRange *ab = new ValueRange();
+//       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+//       handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+//       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+//       op->setOperand(0, bundleOp.getResult(0));
+//     }
+// }
 
 void connectJoins(DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter){
 
@@ -386,12 +461,14 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
 
       DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> predNamesAndDoneSignalsForOp;
       DenseMap<StringRef, Operation*> nameToOp;
+      DenseMap<OpOperand *, SmallVector<Value>> dependenciesMap;
 
       traverseMemRef(funcOp, predNamesAndDoneSignalsForOp, nameToOp, rewriter, &determinePredDoneSignals);
 
       Value startSignal = (Value)funcOp.getArguments().back();
-      connectMuxsAndJoins (predNamesAndDoneSignalsForOp, nameToOp, rewriter, startSignal);
+      connectMuxsAndJoins (predNamesAndDoneSignalsForOp, nameToOp, dependenciesMap, rewriter, startSignal);
 
+      experimental::ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, dependenciesMap);
 
       llvm::errs() << "finished \n";
 
