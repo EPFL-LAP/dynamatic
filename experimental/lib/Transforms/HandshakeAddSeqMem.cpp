@@ -21,7 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdImplementation.h"
 #include "experimental/Support/CFGAnnotation.h"
 
 
@@ -101,7 +101,7 @@ void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<st
 
     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
         
-        if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
+        if (auto deps = getDialectAttr<MemDependenceDictAttr>(memOp)) {
           
           rewriter.setInsertionPointToStart(memOp->getBlock());
 
@@ -115,11 +115,12 @@ void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<st
 
           rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp.getResult(0));
 
-          for (MemDependenceAttr dependency : deps.getDependencies()) {
-              auto dstAccess = dependency.getDstAccess();
-
-               predNamesAndDoneSignalsForOp[dstAccess].push_back(std::make_tuple(getUniqueName(op), unbundleOp.getResult(0)));
-
+          DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
+          for (auto &[memDep, isActive] : dependenciesStatus) {
+              StringRef dstAccess = memDep.getDstAccess();
+              if (!isActive)
+                continue;
+              predNamesAndDoneSignalsForOp[dstAccess].push_back(std::make_tuple(getUniqueName(op), unbundleOp.getResult(0)));
           }
         }
       
