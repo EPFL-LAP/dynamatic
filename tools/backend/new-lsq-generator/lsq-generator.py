@@ -64,32 +64,32 @@ class LSQWrapper:
         ##! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         ### io_storeData: output
         io_storeData = VHDLLogicVecType('io_storeData', 'o', self.lsq_config.dataW)
-        # io_storeData = VHDLLogicVecTypeArray('io_storeData', 'o', self.lsq_config.numStMem, self.lsq_config.dataW)
+        
         self.lsq_wrapper_str += io_storeData.signalInit()
         
         ### io_storeAddr: output
         io_storeAddr = VHDLLogicVecType('io_storeAddr', 'o', self.lsq_config.addrW)
-        # io_storeAddr = VHDLLogicVecTypeArray('io_storeAddr', 'o', self.lsq_config.numStMem, self.lsq_config.addrW)
+        
         self.lsq_wrapper_str += io_storeAddr.signalInit()
         
         ### io_storeEn: output
         io_storeEn = VHDLLogicType('io_storeEn', 'o')
-        # io_storeEn = VHDLLogicTypeArray('io_storeEn', 'o', self.lsq_config.numStMem)
+        
         self.lsq_wrapper_str += io_storeEn.signalInit()
         
         ### io_loadData: input
         io_loadData = VHDLLogicVecType('io_loadData', 'i', self.lsq_config.dataW)
-        # io_loadData = VHDLLogicVecTypeArray('io_loadData', 'i', self.lsq_config.numLdMem, self.lsq_config.dataW)
+        
         self.lsq_wrapper_str += io_loadData.signalInit()
         
         ### io_loadAddr: output
         io_loadAddr = VHDLLogicVecType('io_loadAddr', 'o', self.lsq_config.addrW)
-        # io_loadAddr = VHDLLogicVecTypeArray('io_loadAddr', 'o', self.lsq_config.numLdMem, self.lsq_config.addrW)
+        
         self.lsq_wrapper_str += io_loadAddr.signalInit()
         
         ### io_loadEn: output
         io_loadEn = VHDLLogicType('io_loadEn', 'o')
-        # io_loadEn = VHDLLogicTypeArray('io_loadEn', 'o', self.lsq_config.numLdMem)
+        
         self.lsq_wrapper_str += io_loadEn.signalInit()
         
         ### io_ctrl_*_ready: output
