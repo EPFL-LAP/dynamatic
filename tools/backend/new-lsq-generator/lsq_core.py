@@ -1217,19 +1217,23 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     group_init_valid_i = LogicArray('group_init_valid', 'i', configs.numGroups)
     group_init_ready_o = LogicArray('group_init_ready', 'o', configs.numGroups)
 
-    # port to/from BBs
+    # Memory access ports, i.e., the connection "kernel -> LSQ"
+    # Load address channel (addr, valid, ready) from kernel, contains signals:
     ldp_addr_i         = LogicVecArray('ldp_addr', 'i', configs.numLdPorts, configs.addrW)
     ldp_addr_valid_i   = LogicArray('ldp_addr_valid', 'i', configs.numLdPorts)
     ldp_addr_ready_o   = LogicArray('ldp_addr_ready', 'o', configs.numLdPorts)
 
+    # Load data channel (data, valid, ready) to kernel
     ldp_data_o         = LogicVecArray('ldp_data', 'o', configs.numLdPorts, configs.dataW)
     ldp_data_valid_o   = LogicArray('ldp_data_valid', 'o', configs.numLdPorts)
     ldp_data_ready_i   = LogicArray('ldp_data_ready', 'i', configs.numLdPorts)
 
+    # Store address channel (addr, valid, ready) from kernel
     stp_addr_i         = LogicVecArray('stp_addr', 'i', configs.numStPorts, configs.addrW)
     stp_addr_valid_i   = LogicArray('stp_addr_valid', 'i', configs.numStPorts)
     stp_addr_ready_o   = LogicArray('stp_addr_ready', 'o', configs.numStPorts)
 
+    # Store data channel (data, valid, ready) from kernel
     stp_data_i         = LogicVecArray('stp_data', 'i', configs.numStPorts, configs.dataW)
     stp_data_valid_i   = LogicArray('stp_data_valid', 'i', configs.numStPorts)
     stp_data_ready_o   = LogicArray('stp_data_ready', 'o', configs.numStPorts)
@@ -1241,7 +1245,10 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     # queue empty signal
     empty_o            = Logic('empty', 'o')
 
-    # memory interface
+    # Memory interface: i.e., the connection LSQ -> AXI
+    # We assume that the memory interface has
+    # 1. A read request channel (rreq) and a read response channel (rresp).
+    # 2. A write request channel (wreq) and a write response channel (wresp).
     rreq_valid_o       = LogicArray('rreq_valid', 'o', configs.numLdMem)
     rreq_ready_i       = LogicArray('rreq_ready', 'i', configs.numLdMem)
     rreq_id_o          = LogicVecArray('rreq_id', 'o', configs.numLdMem, configs.idW)
