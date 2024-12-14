@@ -417,7 +417,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
         if (!firstLoadOffset)
           firstLoadOffset = portIdx;
 
-        // Update ldOrder 
+        // Sets "the number of stores before load[ldIdx]" = numStoresCount
         ldOrderOfOneGroup[ldIdx++] = numStoresCount;
 
         groupLoadPorts.push_back(loadIdx++);
