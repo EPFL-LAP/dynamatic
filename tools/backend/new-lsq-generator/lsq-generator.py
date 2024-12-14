@@ -24,7 +24,89 @@ args = parser.parse_args()
 #===----------------------------------------------------------------------===#
 
 class LSQWrapper:
-    """Class used to generate the top level wrapper for the LSQ
+    """This class adapts the LSQ core module to handle the following:
+        - The naming difference between the IOs of the core module and in dataflow circuits.
+        - All needed logic to handle the AXI memory interfaces assumed by the core lsq logic
+      
+      Terminologies:
+      We call the LSQ module a "master module" for the following case:
+        kernel -> LSQ -> AXI (now assuming it always connects to a BRAM),
+      The wrapper for this case is generated using `genWrapperMaster` method.
+      
+      We call the LSQ module a "slave module" for the following case:
+        kernel -> LSQ -> MC -> AXI,
+      The wrapper for this case is generated in `genWrapperSlave` method.
+      
+      Signal name mappings documentation:
+      1. Mapping of the master module:
+        | "names in the wrapper"             | "names in LSQ core"                     |  
+        | ---------------------------------- | --------------------------------------- | 
+        | io_ldAddr_<id>_(bits|valid|ready)  | ldp_addr_(|valid|ready)_<id>_(i|i|o)    | 
+        | io_ldData_<id>_(bits|valid|ready)  | ldp_data_(|valid|ready)_<id>_(o|o|i)    | 
+        | io_stAddr_<id>_(bits|valid|ready)  | stp_addr_(|valid|ready)_<id>_(i|i|o)    | 
+        | io_stData_<id>_(bits|valid|ready)  | stp_data_(|valid|ready)_<id>_(i|i|o)    |            
+        | io_storeData                       | wreq_data_0_o                           |
+        | io_storeAddr                       | wreq_addr_0_o                           |
+        | N/A                                | wreq_id_0_o                             |
+        | io_storeEn                         | wreq_valid_0_o                          |
+        | N/A                                | wreq_ready_0_i                          |       
+        | io_loadData                        | rresp_data_0_i                          |
+        | N/A                                | rresp_id_0_i                            |
+        | N/A                                | rresp_valid_0_i                         |
+        | N/A                                | rresp_ready_0_o                         |
+        | io_loadAddr                        | rreq_addr_0_o                           |
+        | N/A                                | rreq_id_0_o                             |         
+        | io_loadEn                          | rreq_valid_0_o                          |
+        | N/A                                | rreq_ready_0_i                          |
+        | N/A                                | wresp_id_0_i                            |
+        | N/A                                | wresp_valid_0_i                         |
+        | N/A                                | wresp_ready_0_o                         |
+        | io_ctrl_<id>_ready                 | group_init_ready_<id>_o                 |
+        | io_ctrl_<id>_valid                 | group_init_valid_<id>_i                 |
+        | io_memStart_valid                  | memStart_valid_i                        |
+        | io_memStart_ready                  | memStart_ready_o                        |
+        | io_ctrlEnd_valid                   | ctrlEnd_valid_i                         |
+        | io_ctrlEnd_ready                   | ctrlEnd_ready_o                         |
+        | io_memEnd_valid                    | memEnd_valid_o                          |
+        | io_memEnd_ready                    | memEnd_ready_i                          |
+        | ---------------------------------- | --------------------------------------- | 
+      
+        (*Most the N/A ports are handled by separate signals defined in the wrapper)
+      
+      2. Mapping of the slave module:
+        | "names in the wrapper"             | "names in LSQ core"                     |  
+        | ---------------------------------- | --------------------------------------- | 
+        | io_ldAddr_<id>_(bits|valid|ready)  | ldp_addr_(|valid|ready)_<id>_(i|i|o)    | 
+        | io_ldData_<id>_(bits|valid|ready)  | ldp_data_(|valid|ready)_<id>_(o|o|i)    | 
+        | io_stAddr_<id>_(bits|valid|ready)  | stp_addr_(|valid|ready)_<id>_(i|i|o)    | 
+        | io_stData_<id>_(bits|valid|ready)  | stp_data_(|valid|ready)_<id>_(i|i|o)    |
+        | io_stDataToMC_bits                 | wreq_data_0_o                           |
+        | io_stDataToMC_valid                | N/A                                     |
+        | io_stDataToMC_ready                | N/A                                     |
+        | io_stAddrToMC_bits                 | wreq_addr_0_o                           |
+        | io_stAddrToMC_valid                | N/A                                     |
+        | io_stAddrToMC_ready                | N/A                                     |
+        | io_ldDataFromMC_bits               | rresp_data_0_i                          | 
+        | io_ldDataFromMC_valid              | rresp_valid_0_i                         |
+        | io_ldDataFromMC_ready              | rresp_ready_0_o                         | 
+        | io_ldAddrToMC_bits                 | rreq_addr_0_o                           |
+        | io_ldAddrToMC_valid                | N/A                                     |
+        | io_ldAddrToMC_ready                | rreq_ready_0_i                          |
+        | io_ctrl_<id>_ready                 | group_init_ready_<id>_o                 |
+        | io_ctrl_<id>_valid                 | group_init_valid_<id>_i                 |     
+        | N/A                                | rreq_valid_0_o                          |       
+        | N/A                                | wreq_id_0_o                             |
+        | N/A                                | wreq_valid_0_o                          |
+        | N/A                                | wreq_ready_0_i                          |       
+        | N/A                                | rresp_id_0_i                            |
+        | N/A                                | rreq_id_0_o                             |         
+        | N/A                                | wresp_id_0_i                            |
+        | N/A                                | wresp_valid_0_i                         |
+        | N/A                                | wresp_ready_0_o                         |
+        | ---------------------------------- | --------------------------------------- | 
+      
+        (*Most of the N/A ports are handled by separate signals defined in the wrapper)
+      
     """
     
     def __init__(self, path_rtl: str, suffix: str, configs: Configs):
@@ -60,7 +142,7 @@ class LSQWrapper:
         self.lsq_wrapper_str += self.port_init_str
         
         ##
-        ## Define all the IOs
+        ## Define all the IOs, details can be found in the table above
         ##! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         ### io_storeData: output
         io_storeData = VHDLLogicVecType('io_storeData', 'o', self.lsq_config.dataW)
