@@ -399,7 +399,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
                               ? groupPorts.getNumPorts<LoadPort>()
                               : 1;
 
-    SmallVector<unsigned> singleLdOrder(numLoadEntries, 0);
+    SmallVector<unsigned> ldOrderOfOneGroup(numLoadEntries, 0);
 
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
       if (isa<LoadPort>(accessPort)) {
@@ -407,7 +407,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
           firstLoadOffset = portIdx;
 
         // Update ldOrder 
-        singleLdOrder[ldIdx++] = numStoresCount;
+        ldOrderOfOneGroup[ldIdx++] = numStoresCount;
 
         groupLoadPorts.push_back(loadIdx++);
       } else {
@@ -431,7 +431,7 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     stPortIdx.push_back(groupStorePorts);
 
     // Push back the new ldOrder Info
-    ldOrder.push_back(singleLdOrder);
+    ldOrder.push_back(ldOrderOfOneGroup);
   }
 
   /// Adds as many 0s as necessary to the array so that its size equals the
