@@ -63,7 +63,7 @@ lowerExtraSignals(llvm::ArrayRef<ExtraSignal> extraSignals) {
   for (const ExtraSignal &extra : extraSignals) {
     unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
 
-    // Create a new signless IntegerType with the same bit width as the original
+    // Convert to integer with the same bit width
     Type newType = IntegerType::get(extra.type.getContext(), extraWidth);
 
     newExtraSignals.emplace_back(extra.name, newType, extra.downstream);
@@ -82,7 +82,7 @@ static Type lowerType(Type type) {
         unsigned width = channelType.getDataBitWidth();
         Type dataType = IntegerType::get(type.getContext(), width);
 
-        // Make sure all extra signals are signless IntegerType's as well
+        // Convert all ExtraSignals to unsigned integer
         SmallVector<ExtraSignal> extraSignals =
             lowerExtraSignals(channelType.getExtraSignals());
         return handshake::ChannelType::get(dataType, extraSignals);
@@ -92,7 +92,7 @@ static Type lowerType(Type type) {
         return IntegerType::get(type.getContext(), width);
       })
       .Case<handshake::ControlType>([](handshake::ControlType type) {
-        // Make sure all extra signals are signless IntegerType's
+        // Convert all ExtraSignals to unsigned integer
         SmallVector<ExtraSignal> extraSignals =
             lowerExtraSignals(type.getExtraSignals());
         return handshake::ControlType::get(type.getContext(), extraSignals);

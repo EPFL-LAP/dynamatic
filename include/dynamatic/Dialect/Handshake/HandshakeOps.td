@@ -505,8 +505,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let results = (outs ControlType:$result);
 
   let builders = [
-    // We provide a builder that doesn't require the result type.
-    // The result type will be a ControlType without extra signals.
+    // Unless otherwise specified, output type is SimpleControl
     OpBuilder<(ins), [{
       $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
     }]>
@@ -608,7 +607,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   // The memory controller does not accept ControlTypes with extra signals.
   // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
   // (at least in speculative execution scenarios)
-  // TODO: Change ChannelType to SimpleChannel as well
+  // TODO: Discuss the change of ChannelTypes to SimpleChannels
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
                        Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
@@ -620,10 +619,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
 
-  // The SimpleControl type can be uniquely inferred (as it has no parameters),
-  // but MLIR lacks support for this.
-  // Therefore, we use a custom directive for SimpleControl to
-  // omit writing it explicitly in the IR.
+  // Dispatch SimpleControl signals to custom print and parse
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
     attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
@@ -1110,7 +1106,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    // A builder for bundling ControlType
+    // Builder for bundling ControlType
     OpBuilder<(ins "::mlir::Value":$valid), [{
       mlir::Type validReadyType = $_builder.getIntegerType(1);
       assert(valid.getType() == validReadyType && "incorrect valid signal");
@@ -1121,8 +1117,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
         validReadyType
       });
     }]>,
-    // A builder for bundling ChannelType
-    // Implemented in C++
+    // Builder for bundling ChannelType
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)

@@ -23,10 +23,6 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
     (getNumExtraSignals, getNumDownstreamExtraSignals, hasExtraSignal, etc)
   }];
 
-  // define the methods the interface provides
-  // methodBody: the method body of the interface itself
-  // defaultImplementation: the default body of the method of the type implementing this interface
-  // ConcreteType: the type (template) implementing this interface
   let methods = [
     // This method is auto-implemented if the type includes an `extraSignals` argument 
     // of type `ExtraSignals` (defined in HandshakeTypes.td).

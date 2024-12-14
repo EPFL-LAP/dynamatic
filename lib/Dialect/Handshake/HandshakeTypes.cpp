@@ -163,6 +163,7 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
     return odsParser.emitError(odsParser.getCurrentLocation());
   };
 
+  // Declare vector of structs for storing parse results
   SmallVector<ExtraSignal::Storage> extraSignalsStorage;
   if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
     return {};
@@ -175,14 +176,15 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
     return {};
 
   SmallVector<ExtraSignal> extraSignals;
-  // Convert the element type of the extra signal storage list to its
-  // non-storage version (these will be uniqued/allocated by ChannelType::get)
+  // Convert parse results to ExtraSignal instances
   for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
     extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return {};
 
+  // Build ControlType
+  // Uniquify and Allocate the ExtraSignal instances inside MLIR context
   return ControlType::get(odsParser.getContext(), extraSignals);
 }
 

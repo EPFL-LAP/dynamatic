@@ -62,15 +62,11 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
   return success();
 }
 
-// A parsing function for the custom directive `custom<SimpleControl>(...)`.
+/// Parser for custom<SimpleControl>
 static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
   // No parsing needed.
-  // SimpleControl is ControlType without extra bits.
-  // Since the type is uniquely determined, we don’t need to write it explicitly
-  // in the IR. But MLIR doesn’t support this with TypeConstraint. So, we added
-  // a custom directive for ControlType.
 
-  // Specify the control type without extra bits
+  // Make SimpleControl type
   type = ControlType::get(parser.getContext());
   return success();
 }
@@ -97,13 +93,9 @@ static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
   printHandshakeType(printer, nullptr, types.back());
 }
 
-// A printing functino for the custom directive `custom<SimpleControl>(...)`.
+/// Printer for custom<SimpleControl>
 static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
   // No printing needed.
-  // SimpleControl is ControlType without extra bits.
-  // Since the type is uniquely determined, we don’t need to write it explicitly
-  // in the IR. But MLIR doesn’t support this with TypeConstraint. So, we added
-  // a custom directive for ControlType.
 }
 
 static void printHandshakeType(OpAsmPrinter &printer, Type type) {
