@@ -289,7 +289,7 @@ fi
 
 echo_subsection "Building LSQ generator"
 
-LSQ_GEN_PATH="tools/backend/lsq-generator"
+LSQ_GEN_PATH="tools/backend/lsq-generator-chisel"
 LSQ_GEN_JAR="target/scala-2.13/lsq-generator.jar"
 cd "$SCRIPT_CWD/$LSQ_GEN_PATH"
 sbt assembly
