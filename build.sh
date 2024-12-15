@@ -116,8 +116,8 @@ run_ninja() {
 #### Parse arguments ####
 
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
-CMAKE_EXTRA_LLVM=""
-CMAKE_EXTRA_POLYGEIST=""
+CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
@@ -153,8 +153,8 @@ do
       case "$arg" in
           "--disable-build-opt" | "-o")
               CMAKE_COMPILERS=""
-              CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
-              CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
+              CMAKE_EXTRA_LLVM=""
+              CMAKE_EXTRA_POLYGEIST=""
               ;;
           "--force" | "-f")
               FORCE_CMAKE=1
