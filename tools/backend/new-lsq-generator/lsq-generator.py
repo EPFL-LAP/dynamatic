@@ -71,7 +71,7 @@ class LSQWrapper:
         | io_memEnd_ready                    | memEnd_ready_i                          |
         | ---------------------------------- | --------------------------------------- | 
       
-        (*Most the N/A ports are handled by separate signals defined in the wrapper)
+        (*Most of the N/A ports are handled by separate signals defined in the wrapper)
       
       2. Mapping of the slave module:
         | "names in the wrapper"             | "names in LSQ core"                     |  
