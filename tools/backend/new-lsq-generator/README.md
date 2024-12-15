@@ -1,5 +1,21 @@
-### LSQ Generator
+### LSQ generator
 This Python-based LSQ generator generates the LSQ design outlined in Hailin Wang's master thesis.
+
+### Configuration parameters
+
+- `ldOrder`: Defines the order matrix for each group, the same as the previous `loadOffsets` parameter with a new format.
+- `ldPortIdx`: Specifies the access port index for each load operation within a group.
+- `stPortIdx`: Specifies the access port index for each store operation within a group.
+- `indexWidth`: Number of bits for the ID in the memory interfaces.
+- `numLdChannels`: Indicates the number of load channels at the memory interface (fixed to 1 in this design).
+- `numStChannels`: Indicates the number of store channels at the memory interface (fixed to 1 in this design).
+- `stResp`: Enables or disables the store response channel in the store access port.
+- `groupMulti`: Whether multiple groups are allowed to request an allocation at the same cycle.
+- `pipe0En`: Enables or disables the insertion of pipeline register 0 in the LSQ.
+- `pipe1En`: Enables or disables the insertion of pipeline register 1 in the LSQ.
+- `pipeCompEn`: Enables or disables the insertion of the `pipeComp` pipeline register in the LSQ.
+- `headLagEn`: Determines whether the head pointer of the load queue updates one cycle later than the valid bits of its entries.
+
 
 ### Sampele usage
 
