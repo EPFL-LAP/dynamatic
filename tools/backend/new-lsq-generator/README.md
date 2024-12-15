@@ -50,7 +50,7 @@ usage: lsq-generator.py [-h] [--output-dir OUTPUT_PATH] --config-file CONFIG_FIL
 
 ---
 ### Revert to chisel LSQ generator
-If you want to use the chisel based LSQ generator, please change the corresponding location in `$DYNAMATIC/data/rtl-config-vhdl.json` to:
+Both the old and new configuration parameters coexist in the JSON file. If you want to use the chisel based LSQ generator, please change the corresponding location in `$DYNAMATIC/data/rtl-config-vhdl.json` to:
 
 ```
 {
