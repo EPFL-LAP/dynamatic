@@ -47,8 +47,6 @@ struct TestHandshakeSimulator
       llvm::errs() << "Expected single Handshake function\n";
       return signalPassFailure();
     }
-
-    handshake::FuncOp funcOp = *allFunctions.begin();
   }
 
   TestHandshakeSimulator(const TestHandshakeSimulatorOptions &options)

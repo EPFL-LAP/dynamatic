@@ -685,6 +685,19 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
+        /// Add the attributes needed by the new lsq config file
+        addBiArrayIntAttr("ldOrder", genInfo.ldOrder);
+        addBiArrayIntAttr("ldPortIdx", genInfo.ldPortIdx);
+        addBiArrayIntAttr("stPortIdx", genInfo.stPortIdx);
+        addUnsigned("indexWidth", genInfo.indexWidth);
+        addUnsigned("numLdChannels", genInfo.numLdChannels);
+        addUnsigned("numStChannels", genInfo.numStChannels);
+        addUnsigned("stResp", genInfo.stResp);
+        addUnsigned("groupMulti", genInfo.groupMulti);
+        addUnsigned("pipe0En", genInfo.pipe0En);
+        addUnsigned("pipe1En", genInfo.pipe1En);
+        addUnsigned("pipeCompEn", genInfo.pipeCompEn);
+        addUnsigned("headLagEn", genInfo.headLagEn);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
