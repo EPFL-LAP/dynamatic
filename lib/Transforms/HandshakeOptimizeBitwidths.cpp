@@ -675,7 +675,6 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
     auto newMuxOp = rewriter.create<handshake::MuxOp>(
         muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
         muxOp->getAttrs());
-    inheritBB(muxOp, newMuxOp);
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
     return success();
@@ -719,7 +718,6 @@ struct HandshakeCMergeIndex
         cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
         cmergeOp->getAttrs());
     namer.replaceOp(cmergeOp, newCmergeOp);
-    inheritBB(cmergeOp, newCmergeOp);
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::LOGICAL},
                                  indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
