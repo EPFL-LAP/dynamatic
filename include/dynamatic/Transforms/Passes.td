@@ -348,7 +348,7 @@ def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
   let description = [{
     Analyzes memory accesses in each function in a module and identifies all
     dependencies between them. Stores information about these dependencies in a
-    `dynamatic::handshake::MemDependenceDictAttr` attribute attached to each
+    `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
     operation that is the source of at least one dependency.
 
     The pass attempts to find dependencies between all `affine::AffineLoadOp`,
@@ -379,7 +379,7 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     `--mark-memory-dependencies` pass, strictly below the scf IR level, and
     before memory interface instantiation.
 
-    Internally, it uses `dynamatic::handshake::MemDependenceDictAttr`
+    Internally, it uses `dynamatic::handshake::MemDependenceArrayAttr`
     attributes attached to memory operations to determine whether any memory
     access depends on any other. If no such attributes are present it is assumed
     that there are no memory dependencies.  

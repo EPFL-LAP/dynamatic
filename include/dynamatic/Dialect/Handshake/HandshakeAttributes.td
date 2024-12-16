@@ -238,7 +238,7 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   }];
 }
 
-def MemDependenceDictAttr : Handshake_Attr<"MemDependenceDict", "deps"> {
+def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
   let summary = "A list of memory dependencies with respect to other memory operations";
   let description = [{
     Represents a list of memory dependencies between the operation this
@@ -246,8 +246,8 @@ def MemDependenceDictAttr : Handshake_Attr<"MemDependenceDict", "deps"> {
     function.
   }];
 
-  let parameters = (ins MapParameter<"::dynamatic::handshake::MemDependenceAttr", "bool">: $dependeciesStatus);
-  let assemblyFormat = "`[` $dependeciesStatus `]`";
+  let parameters = (ins ArrayRefParameter<"::dynamatic::handshake::MemDependenceAttr">:$dependencies);
+  let assemblyFormat = "`[` $dependencies `]`";
 }
 
 //===----------------------------------------------------------------------===//
