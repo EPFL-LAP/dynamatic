@@ -225,6 +225,45 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
+  /// Below are params needed by the new LSQ config file
+  /// Number of channels at memory interface
+  unsigned numLdChannels = 1, numStChannels = 1;
+  /// Number of bits for ID in the memory interface
+  unsigned indexWidth = 6;
+  /// Indicate whether the store response channel 
+  /// in store access port is enabled
+  unsigned stResp = 0;
+  /// Indicate whether the multiple groups are allowed
+  /// to request an allocation at the same cycle
+  unsigned groupMulti = 0;
+  /// Indicate whether pipeline registers are inserted
+  unsigned pipe0En = 0, pipe1En = 0, pipeCompEn = 0;
+  /// Indicate whether the head pointer of the load queue is
+  /// updated one cycle later than the valid bits of entries
+  unsigned headLagEn = 0; 
+
+  // Configurations needed for the new lsq design
+  // LdOrder indicates for each load entry in each group, 
+  // which store entries need to be completed before this 
+  // load is issued. Foe example:
+  // Group 0: {st0, ld0, st1, ld1}
+  // Group 1: {st2, ld2, st3}
+  // Then we have the following configuration for the ldOrder
+  // ldOrder = [
+  //    [1, 2], (in group 0: there is a store before ld0 and two stores before ld1)
+  //    [1]     (in group 1: there is a store before ld2)
+  // ]
+  SmallVector<SmallVector<unsigned>> ldOrder;
+  // Ports indices for store and load ports
+  // which contain the same information as the previous two 2d vectors, just no
+  // padding included.
+  // Following the example above, we have the following configuration for stPortIdx
+  // stPortIdx = [
+  //    [0, 1], (two st in group 0)
+  //    [2, 3]  (two st in group 1)
+  // ]
+  // ldPortIdx follows the same pattern
+  SmallVector<SmallVector<unsigned>> ldPortIdx, stPortIdx;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");
