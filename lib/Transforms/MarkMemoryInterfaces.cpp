@@ -88,7 +88,7 @@ private:
   /// `dynamatic::handshake::MemInterfaceAttr` attribute, denoting the kind of
   /// memory interface it should eventually connect to. The decision is based on
   /// identified memory dependencies between the memory accesses, represented
-  /// using potential `dynamatic::handshake::MemDependenceDictAttr` attributes
+  /// using potential `dynamatic::handshake::MemDependenceArrayAttr` attributes
   /// attached to memory operations.
   void markMemoryInterfaces(func::FuncOp funcOp);
 };
@@ -130,11 +130,8 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
 
     StringRef srcOpName = nameAnalysis.getName(op);
     bool connectToMC = true;
-    if (auto allDeps = getDialectAttr<MemDependenceDictAttr>(op)) {
-      DenseMap<MemDependenceAttr, bool> dependenciesStatus = allDeps.getDependeciesStatus();
-      for (auto & [memDep, isActive] : dependenciesStatus) {
-        if (isActive)
-          continue;
+    if (auto allDeps = getDialectAttr<MemDependenceArrayAttr>(op)) {
+      for (MemDependenceAttr memDep : allDeps.getDependencies()) {
         // Both the source and destination operation need to connect to an LSQ
         StringRef dstOpName = memDep.getDstAccess();
         if (srcOpName == dstOpName) {

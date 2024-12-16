@@ -9,7 +9,7 @@
 // Implements the --mark-memory-dependencies pass, which identifies all
 // dependences between all pairs of memory accesses in each function. All
 // information regarding the dependencies is stored in a
-// `dynamatic::handshake::MemDependenceDictAttr` attribute attached to each
+// `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
 // memory operation that is the source of at least one dependency.
 //
 //===----------------------------------------------------------------------===//
@@ -37,7 +37,7 @@ using MemAccesses = llvm::MapVector<Value, SmallVector<Operation *>>;
 
 /// Maps memory operations their identified memory dependencies with other
 /// memory operations.
-using MemDependencies = DenseMap<Operation *, DenseMap<MemDependenceAttr, bool>>;
+using MemDependencies = DenseMap<Operation *, SmallVector<MemDependenceAttr>>;
 
 /// Determines whether an operation is akin to a load.
 static inline bool isLoadLike(Operation *op) {
@@ -67,7 +67,7 @@ struct MarkMemoryDependenciesPass
 
 private:
   /// Analyzes memory accesses in a function and identify all dependencies
-  /// between them. Sets a MemDependenceDictAttr attribute on each operation
+  /// between them. Sets a MemDependenceArrayAttr attribute on each operation
   /// that is the source of at least one dependence. Fails if a dependence check
   /// fails; succeeds otherwise.
   LogicalResult analyzeMemAccesses(func::FuncOp funcOp);
@@ -142,10 +142,10 @@ MarkMemoryDependenciesPass::analyzeMemAccesses(func::FuncOp funcOp) {
   }
 
   // For each memory operation with dependencies to other memory operations, set
-  // the MemDependenceDictAttr attribute on the operation
+  // the MemDependenceArrayAttr attribute on the operation
   MLIRContext *ctx = &getContext();
   for (auto &[op, deps] : opDeps)
-    setDialectAttr<MemDependenceDictAttr>(op, ctx, deps);
+    setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
   return success();
 }
 
@@ -163,7 +163,8 @@ LogicalResult MarkMemoryDependenciesPass::checkAffineAccessPair(
     StringRef dstName = namer.getName(dstOp);
     if (result.value == DependenceResult::HasDependence) {
       // Add the dependence to the source operation
-      opDeps[srcOp][MemDependenceAttr::get(ctx, dstName, loopDepth, components)]= true;
+      opDeps[srcOp].push_back(
+          MemDependenceAttr::get(ctx, dstName, loopDepth, components));
     } else if (result.value == DependenceResult::Failure) {
       return srcOp->emitError()
              << "Dependence check failed with memory access '" << dstName
@@ -184,8 +185,8 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   StringRef dstName = namer.getName(dstOp);
-  opDeps[srcOp][MemDependenceAttr::get(
-      &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{})] = true;
+  opDeps[srcOp].push_back(MemDependenceAttr::get(
+      &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{}));
 
   return success();
 }
