@@ -1,0 +1,753 @@
+[
+  {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/addf.smv",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.addi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/addi.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.andi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/andi.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.cmpf",
+    "parameters": [
+      { "name": "PREDICATE", "type": "string" },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0,
+        "generic": true
+      }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/smv/arith/cmpf.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME $PREDICATE",
+    "dependencies": ["join", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.cmpi",
+    "parameters": [
+      { "name": "PREDICATE", "type": "string" },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0,
+        "generic": true
+      }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/data/smv/arith/cmpi.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME $PREDICATE smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.divf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/divf.smv",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.divsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/divsi.smv",
+    "dependencies": ["join", "delay_buffer"]
+  },
+  {
+    "name": "handshake.divui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/divui.smv",
+    "dependencies": ["join", "delay_buffer"]
+  },
+  {
+    "name": "handshake.extsi",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/extsi.smv"
+  },
+  {
+    "name": "handshake.extui",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/extui.smv"
+  },
+  {
+    "name": "handshake.maximumf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/maximumf.smv",
+    "dependencies": ["join", "delay_buffer"]
+  },
+  {
+    "name": "handshake.minimumf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/minimumf.smv",
+    "dependencies": ["join", "delay_buffer"]
+  },
+  {
+    "name": "handshake.mulf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/mulf.smv",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.muli",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/muli.smv",
+    "dependencies": ["join", "delay_buffer", "oehb"]
+  },
+  {
+    "name": "handshake.negf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/negf.smv"
+  },
+  {
+    "name": "handshake.ori",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/ori.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.select",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/select.smv",
+    "module-name": "selector"
+  },
+  {
+    "name": "handshake.shli",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/shli.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.shrsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/shrsi.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.shrui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/shrui.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.subf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/subf.smv",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.subi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/subi.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.trunci",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/trunci.smv"
+  },
+  {
+    "name": "handshake.truncf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/truncf.smv"
+  },
+  {
+    "name": "handshake.xori",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/xori.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.sitofp",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/sitofp.smv"
+  },
+  {
+    "name": "handshake.fptosi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/fptosi.smv"
+  },
+  {
+    "name": "handshake.absf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/absf.smv"
+  },
+  {
+    "name": "handshake.extf",
+    "parameters": [
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/arith/extf.smv"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/oehb.smv",
+    "module-name": "oehb_dataless"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/oehb.smv",
+    "dependencies": ["oehb_dataless"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/ofifo.smv",
+    "module-name": "ofifo_dataless",
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/ofifo.smv",
+    "dependencies": ["tehb", "elastic_fifo_inner"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tehb.smv",
+    "module-name": "tehb_dataless"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/tehb.smv",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tfifo.smv",
+    "module-name": "tfifo_dataless",
+    "dependencies": ["elastic_fifo_inner_dataless"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/tfifo.smv",
+    "dependencies": ["elastic_fifo_inner"]
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/fork.smv",
+    "module-name": "fork_dataless",
+    "dependencies": ["logic", "eager_fork_register_block"]
+  },
+  {
+    "name": "handshake.fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/fork.smv",
+    "module-name": "handshake_fork",
+    "dependencies": ["types", "fork_dataless"]
+  },
+  {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/lazy_fork.smv",
+    "module-name": "lazy_fork_dataless",
+    "dependencies": ["logic"]
+  },
+  {
+    "name": "handshake.lazy_fork",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/lazy_fork.smv",
+    "dependencies": ["types", "lazy_fork_dataless"]
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/sink.smv",
+    "module-name": "sink_dataless"
+  },
+  {
+    "name": "handshake.sink",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/sink.smv"
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/mux.smv",
+    "module-name": "mux_dataless",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.mux",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/mux.smv",
+    "dependencies": ["types", "tehb"]
+  },
+  {
+    "name": "handshake.control_merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/control_merge.smv",
+    "module-name": "control_merge_dataless",
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
+  },
+  {
+    "name": "handshake.control_merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/control_merge.smv",
+    "dependencies": ["types", "control_merge_dataless"]
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/merge.smv",
+    "module-name": "merge_dataless",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
+    "name": "handshake.merge",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/merge.smv",
+    "dependencies": ["types", "tehb"]
+  },
+  {
+    "name": "handshake.br",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/br.smv",
+    "module-name": "br_dataless"
+  },
+  {
+    "name": "handshake.br",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/br.smv"
+  },
+  {
+    "name": "handshake.cond_br",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/cond_br.smv",
+    "module-name": "cond_br_dataless",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.cond_br",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/cond_br.smv",
+    "dependencies": ["cond_br_dataless"]
+  },
+  {
+    "name": "handshake.source",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/smv/handshake/source.smv"
+  },
+  {
+    "name": "handshake.constant",
+    "parameters": [
+      { "name": "VALUE", "type": "string" },
+      {
+        "name": "DATA_WIDTH",
+        "type": "unsigned",
+        "generic": true
+      }
+    ],
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-text-generator\" \"$DYNAMATIC/data/smv/handshake/constant.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
+  },
+  {
+    "name": "handshake.load",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/load.smv",
+    "dependencies": ["tehb"]
+  },
+  {
+    "name": "handshake.store",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/store.smv",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller_storeless.smv",
+    "dependencies": ["mc_support"]
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller_loadless.smv",
+    "dependencies": ["mc_support"]
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller.smv",
+    "dependencies": ["mem_controller_loadless"]
+  },
+  {
+    "name": "handshake.lsq",
+    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
+    "hdl": "verilog",
+    "io-kind": "flat",
+    "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
+    "io-signals": {
+      "data": "_bits"
+    }
+  },
+  {
+    "name": "handshake.sharing_wrapper",
+    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"",
+    "parameters": [
+      { "name": "CREDITS", "type": "string" },
+      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY", "type": "unsigned", "lb": 1 }
+    ],
+    "dependencies": [
+      "logic",
+      "types",
+      "sharing_support",
+      "ofifo",
+      "tfifo",
+      "lazy_fork"
+    ]
+  },
+  {
+    "name": "handshake.join",
+    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
+    "generic": "$DYNAMATIC/data/smv/handshake/join.smv",
+    "module-name": "join_handshake",
+    "dependencies": ["join"]
+  },
+  {
+    "name": "handshake.not",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/handshake/not.smv",
+    "module-name": "logic_not"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/delay_buffer.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/eager_fork_register_block.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/elastic_fifo_inner.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/dataless/elastic_fifo_inner.smv",
+    "module-name": "elastic_fifo_inner_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/logic.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/flopoco_ip_cores.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/join.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/mc_support.smv",
+    "dependencies": ["types"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/merge_notehb.smv",
+    "dependencies": ["types"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/dataless/merge_notehb.smv",
+    "module-name": "merge_notehb_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/types.smv"
+  },
+  {
+    "name": "mem_to_bram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/smv/support/mem_to_bram.smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/sharing_support.smv",
+    "dependencies": ["types"]
+  }
+]

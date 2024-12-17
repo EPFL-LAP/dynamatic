@@ -23,6 +23,7 @@
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Parser/Parser.h"
@@ -632,6 +633,7 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os.indent();
   os << "port (\n";
   os.indent();
+  llvm::errs() << "\nMODULE " << modOp.getSymName() << "\n\n";
 
   data.writeIO(
       [](const llvm::Twine &name, PortType dir, std::optional<unsigned> type,
@@ -708,6 +710,7 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     raw_indented_ostream &os = data.os;
     // Declare the instance
     os << instOp.getInstanceName() << " : entity work." << moduleName;
+    llvm::errs() << "VAR " << instOp.getInstanceName() << " : " << moduleName;
     if (hdl == HDL::VHDL)
       os << "(" << archName << ")";
 
@@ -717,6 +720,10 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
 
       for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams}.drop_back())
         os << val << ", ";
+
+      for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams})
+        llvm::errs() << "_" << val;
+
       os << genericParams.back().second << ")";
     }
     os << "\n";
@@ -738,6 +745,84 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
       os << port.first << "(" << std::to_string(signals.size() - 1) << ") => "
          << signals.back();
     };
+
+    llvm::errs() << "(";
+    mlir::AsmState asmState(instOp->getParentOp());
+
+    bool first = true;
+    for (mlir::Value operand : instOp->getOperands()) {
+      std::string buffer;
+      llvm::raw_string_ostream nameOs(buffer);
+      operand.printAsOperand(nameOs, asmState);
+
+      std::string operandName = nameOs.str();
+      if (!operandName.empty() && operandName[0] == '%') {
+        operandName = operandName.substr(1);
+      }
+
+      if (dyn_cast<ChannelType>(operand.getType())) {
+        if (!first)
+          llvm::errs() << ", ";
+        first = false;
+        llvm::errs() << operandName << ", " << operandName << VALID_SUFFIX;
+      }
+      if (dyn_cast<ControlType>(operand.getType())) {
+        if (!first)
+          llvm::errs() << ", ";
+        first = false;
+        llvm::errs() << operandName << VALID_SUFFIX;
+      }
+    }
+
+    for (mlir::Value result : instOp->getResults()) {
+      assert(result.hasOneUse() && "result should be used only once");
+      std::string buffer;
+      llvm::raw_string_ostream nameOs(buffer);
+
+      auto *userOp = *result.getUsers().begin();
+      unsigned operandIndex = 0;
+      for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
+        auto operand = userOp->getOperand(i);
+        if (operand == result) {
+          operandIndex = i;
+          // result.printAsOperand(nameOs, asmState);
+          break;
+        }
+      }
+
+      std::string argName;
+      bool argFound = false;
+      if (auto argNamesAttr =
+              userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
+        if (operandIndex < argNamesAttr.size()) {
+          if (auto strAttr =
+                  argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+            argName = strAttr.getValue().str();
+            argFound = true;
+          }
+        }
+      }
+      if (!argFound)
+        continue;
+
+      nameOs << *userOp;
+
+      std::string opStr = nameOs.str();
+
+      // extract name
+      size_t start = opStr.find('"');
+      size_t end = opStr.find('"', start + 1);
+
+      std::string opName = opStr.substr(start + 1, end - start - 1);
+      std::string resultName = opName + "." + argName;
+
+      if (!first)
+        llvm::errs() << ", ";
+      first = false;
+      llvm::errs() << resultName << READY_SUFFIX;
+    }
+
+    llvm::errs() << ");\n";
 
     // Write IO mappings
     os.indent();
@@ -871,8 +956,8 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
         return;
       }
 
-      // Signals are stored in increasing port index order but the port mapping
-      // expects them in the opposite order, so we reverse the list
+      // Signals are stored in increasing port index order but the port
+      // mapping expects them in the opposite order, so we reverse the list
       os << "{";
       ArrayRef<std::string> signals(signalNames);
       for (StringRef sig : llvm::reverse(signals.drop_front()))
