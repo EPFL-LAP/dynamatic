@@ -49,19 +49,19 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
         Returns an extra signal specified by the name
         Returns a failure if it is not found
       }],
-      "mlir::FailureOr<ExtraSignal>", "getExtraSignalByName",
+      "std::optional<ExtraSignal>", "getExtraSignal",
       (ins "llvm::StringRef":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         for (const ExtraSignal &extra : concreteType.getExtraSignals()) {
           if (extra.name == name)
             return extra;
         }
-        return mlir::failure();
+        return {};
       }]>,
     InterfaceMethod<"Returns whether the type has an extra signal specified by the name",
       "bool", "hasExtraSignal", (ins "llvm::StringRef":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return !mlir::failed(concreteType.getExtraSignalByName(name));
+        return concreteType.getExtraSignal(name).has_value();
       }]>,
     // The implementation of this method largely depends on the type
     // Therefore, we don't provide the defaultImplementation on this
