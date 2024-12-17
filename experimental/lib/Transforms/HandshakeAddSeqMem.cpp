@@ -65,29 +65,22 @@ int getBBNumberFromOp(Operation * op){
 }
 
 
-void traverseMemRef(FuncOp funcOp, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter &rewriter, void (*func)(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter)){
+void findMemAccessesInFunc(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAccesses){
 
       for (BlockArgument arg : funcOp.getArguments()) {
         llvm::errs() << "[traversing arguments]" << arg << "\n";
         if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg)){
-            // MLIRContext *ctx = &getContext();
-            // OpBuilder builder(ctx);
-            // NameAnalysis &namer = getAnalysis<NameAnalysis>();
-
             auto memrefUsers = memref.getUsers();
 
             assert(std::distance(memrefUsers.begin(), memrefUsers.end()) <= 1 && "expected at most one memref user");
 
             Operation *memOp = *memrefUsers.begin();
-            
-            llvm::errs() << *memOp << "\n";
 
-              handshake::LSQOp lsqOp;
+
+            handshake::LSQOp lsqOp;
             if (lsqOp = dyn_cast<handshake::LSQOp>(memOp); !lsqOp) {
-              // The master memory interface must be an MC
               auto mcOp = cast<handshake::MemoryControllerOp>(memOp);
-              // Ports to memory controllers will always remain connected to a memory
-              // controller, mark them as such with the memory interface attribute
+
               MCPorts mcPorts = mcOp.getPorts();
 
               if (!mcPorts.connectsToLSQ()) {
@@ -97,83 +90,119 @@ void traverseMemRef(FuncOp funcOp, DenseMap<StringRef,  SmallVector<std::tuple<S
               lsqOp = mcPorts.getLSQPort().getLSQOp();
             }
 
-                LSQPorts lsqPorts = lsqOp.getPorts();
-                llvm::errs() << "lsqPorts" << "--\n";
-                for (LSQGroup &group : lsqPorts.getGroups()) {
-                  llvm::errs() << "group" << "--\n";
-                  for (MemoryPort &port : group->accessPorts) {
-                      llvm::errs() << "oomad \n";
-                      func (port.portOp, predNamesAndDoneSignalsForOp, rewriter);
-                      nameToOp[getUniqueName(port.portOp)] = port.portOp;
-                    }
+            LSQPorts lsqPorts = lsqOp.getPorts();
+            llvm::errs() << "lsqPorts" << "--\n";
+            for (LSQGroup &group : lsqPorts.getGroups()) {
+              llvm::errs() << "group" << "--\n";
+              for (MemoryPort &port : group->accessPorts) {
+                  llvm::errs() << "oomad \n";
+                  memAccesses[getUniqueName(port.portOp)] = port.portOp;
                 }
+            }
 
         }
     }
 }
     
+void createSyncSignalForPedecessor(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &predSyncSignalsForEachOp, ConversionPatternRewriter& rewriter){
+    Value startSignal = (Value)funcOp.getArguments().back();
 
+    for (auto [memOpName, memOpPointer] : memAccesses){
 
-void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter){
+        if (LoadOp loadOp = dyn_cast<LoadOp>(*memOpPointer); loadOp){
+            if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOpPointer)) {
 
-    if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
-        
-        if (auto deps = getDialectAttr<MemDependenceDictAttr>(memOp)) {
-          
-          rewriter.setInsertionPointToStart(memOp->getBlock());
+              rewriter.setInsertionPointToStart(memOpPointer->getBlock());
 
-          handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
-          unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+              handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOpPointer->getLoc(), memOpPointer->getResult(1));
+              unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOpPointer)));
 
-          ValueRange *ab = new ValueRange();
-          handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-          handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
-          bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+              ValueRange *ab = new ValueRange();
+              handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+              handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOpPointer->getLoc(), unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
+              bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOpPointer)));
 
-          rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp.getResult(0));
+              rewriter.create<handshake::SinkOp>(memOpPointer->getLoc(), bundleOp.getResult(0));
 
-          DenseMap<MemDependenceAttr, bool> dependenciesStatus = deps.getDependeciesStatus();
-          for (auto &[memDep, isActive] : dependenciesStatus) {
-              StringRef dstAccess = memDep.getDstAccess();
-              if (!isActive)
-                continue;
-              predNamesAndDoneSignalsForOp[dstAccess].push_back(std::make_tuple(getUniqueName(op), unbundleOp.getResult(0)));
-          }
+              for (MemDependenceAttr dependency : deps.getDependencies()) {
+                rewriter.setInsertionPointToStart(memOpPointer->getBlock());
+
+                  StringRef dstAccess = dependency.getDstAccess();
+                  llvm::errs() << dstAccess << "}}}\n";
+
+                  Operation* dstAccessPointer = memAccesses[dstAccess];
+                  Value dstOpAddr = dstAccessPointer->getOperand(0);
+
+                  handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(memOpPointer->getLoc(), CmpIPredicate::ne, dstOpAddr, memOpPointer->getOperand(0));
+                   cmpIOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOpPointer)));
+
+                  SmallVector<Value> muxValues;
+                  muxValues.push_back(unbundleOp.getResult(0));
+                  muxValues.push_back(startSignal);
+
+                  handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(memOpPointer->getLoc(), startSignal.getType(), cmpIOp.getResult(), muxValues);
+                   muxOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOpPointer)));
+
+                  predSyncSignalsForEachOp[dstAccess].push_back(muxOp.getResult());
+                  llvm::errs() << muxOp.getResult() << "!!!!!!!!!!\n";
+              }
+            }
         }
-      
+
+
     }
 }
 
-void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter, Value startSignal){
 
-    for (auto it = predNamesAndDoneSignalsForOp.begin(); it != predNamesAndDoneSignalsForOp.end(); ++it){
+// void determinePredDoneSignals(Operation* op, DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, ConversionPatternRewriter& rewriter){
 
-      StringRef opName = it->first;
-      llvm::errs() << "[connect joins]" << opName << "\n";
-      Operation* op = nameToOp[opName];
-      llvm::errs() << "[connect joins]" << op << "\n";
-      rewriter.setInsertionPointToStart(op->getBlock());
-
-      int bb_num = getBBNumberFromOp(op);
-      Value dstOpAddr = op->getOperand(0);
-      
-      SmallVector<std::tuple<StringRef, Value>> predNamesAndDoneSignals = it->second;
-      SmallVector<Value> dependencyValues;
-
-      for (auto doneAndAddr: predNamesAndDoneSignals){
-          StringRef predName = std::get<0>(doneAndAddr);
-          Operation* predOp = nameToOp[predName];
-          Value done = std::get<1>(doneAndAddr);
-
-          handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, dstOpAddr, predOp->getOperand(0));
-
-          SmallVector<Value> muxValues;
-          muxValues.push_back(done);
-          muxValues.push_back(startSignal);
+//     if (LoadOp memOp = dyn_cast<LoadOp>(op); memOp){
+        
+//         if (auto deps = getDialectAttr<MemDependenceArrayAttr>(memOp)) {
           
-          handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
-          dependencyValues.push_back(muxOp.getResult());
-      }
+//           rewriter.setInsertionPointToStart(memOp->getBlock());
+
+//           handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(memOp.getLoc(), memOp.getResult(1));
+//           unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+
+//           ValueRange *ab = new ValueRange();
+//           handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+//           handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(memOp.getLoc(), unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
+//           bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(getBBNumberFromOp(memOp)));
+
+//           rewriter.create<handshake::SinkOp>(memOp.getLoc(), bundleOp.getResult(0));
+
+
+//           for (MemDependenceAttr dependency : deps.getDependencies()) {
+//               StringRef dstAccess = dependency.getDstAccess();
+//               llvm::errs() << dstAccess << "}}}\n";
+
+
+//                         handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, dstOpAddr, predOp->getOperand(0));
+
+//           SmallVector<Value> muxValues;
+//           muxValues.push_back(done);
+//           muxValues.push_back(startSignal);
+
+
+          
+//           handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
+//           dependencyValues.push_back(muxOp.getResult());
+
+
+//               predNamesAndDoneSignalsForOp[dstAccess].push_back(std::make_tuple(getUniqueName(op), unbundleOp.getResult(0)));
+//           }
+//         }
+      
+//     }
+// }
+
+void SyncSuccessorWithPredecessors (DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &predSyncSignalsForEachOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter){
+
+    for (auto [opName, predSyncSignals]: predSyncSignalsForEachOp){
+
+      Operation * op = memAccesses[opName];
+      int bb_num = getBBNumberFromOp(op);
 
       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
@@ -181,13 +210,10 @@ void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, V
       SmallVector<Value> joinValues;
       joinValues.push_back(unbundleOp.getResult(0));
       joinValues.push_back(unbundleOp.getResult(0));
+      // joinValues.append(predSyncSignals);
 
-
-      llvm::errs() << "salam \n";
       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
-
       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
-
 
       ValueRange *ab = new ValueRange();
       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
@@ -195,12 +221,76 @@ void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, V
       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
       op->setOperand(0, bundleOp.getResult(0));
-      llvm::errs() << "salam \n";
-      dependenciesMap[&joinOp->getOpOperand(0)] = dependencyValues;
-            llvm::errs() << "salam \n";
+
+      dependenciesMap[&joinOp->getOpOperand(0)] = predSyncSignals;
     }
 
+
+
 }
+
+
+// void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter, Value startSignal){
+
+//     for (auto &[opName, predNamesAndDoneSignals] : predNamesAndDoneSignalsForOp){
+
+//       llvm::errs() << "[connect joins]" << opName << "\n";
+//       Operation* op = nameToOp[opName];
+//       llvm::errs() << "[connect joins]" << op << "\n";
+//       rewriter.setInsertionPointToStart(op->getBlock());
+
+//       int bb_num = getBBNumberFromOp(op);
+//       Value dstOpAddr = op->getOperand(0);
+      
+//       SmallVector<Value> dependencyValues;
+
+//       for (auto doneAndAddr: predNamesAndDoneSignals){
+//           StringRef predName = std::get<0>(doneAndAddr);
+//           Operation* predOp = nameToOp[predName];
+//           Value done = std::get<1>(doneAndAddr);
+
+//           llvm::errs() << predName << done << "((((((((((((((()))))))))))))))\n";
+
+//           // handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(op->getLoc(), CmpIPredicate::ne, dstOpAddr, predOp->getOperand(0));
+
+//           // SmallVector<Value> muxValues;
+//           // muxValues.push_back(done);
+//           // muxValues.push_back(startSignal);
+
+
+          
+//           // handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(op->getLoc(), done.getType(), cmpIOp.getResult(), muxValues);
+//           // dependencyValues.push_back(muxOp.getResult());
+//       }
+
+//       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
+//       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+//       SmallVector<Value> joinValues;
+//       joinValues.push_back(unbundleOp.getResult(0));
+//       joinValues.push_back(unbundleOp.getResult(0));
+//       // joinValues.append(dependencyValues);
+
+
+
+//       llvm::errs() << "salam \n";
+//       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
+
+//       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+
+//       ValueRange *ab = new ValueRange();
+//       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+//       handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+//       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+
+//       op->setOperand(0, bundleOp.getResult(0));
+//       llvm::errs() << "salam \n";
+//       dependenciesMap[&joinOp->getOpOperand(0)] = dependencyValues;
+//             llvm::errs() << "salam \n";
+//     }
+
+// }
 
 // void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, Value>>> &predNamesAndDoneSignalsForOp, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter, Value startSignal){
 
@@ -253,36 +343,33 @@ void connectMuxsAndJoins(DenseMap<StringRef, SmallVector<std::tuple<StringRef, V
 //     }
 // }
 
-void connectJoins(DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter){
+// void connectJoins(DenseMap<StringRef, SmallVector<Value>> &joinInputValues, DenseMap<StringRef, Operation*> &nameToOp, ConversionPatternRewriter& rewriter){
 
-    for (auto it = joinInputValues.begin(); it != joinInputValues.end(); ++it){
+//     for (auto &[opName, joinValues] : joinInputValues){
+//       llvm::errs() << "[connect joins]" << opName << "\n";
+//       Operation* op = nameToOp[opName];
+//       llvm::errs() << "[connect joins]" << op << "\n";
+//       rewriter.setInsertionPointToStart(op->getBlock());
 
-      StringRef opName = it->first;
-      llvm::errs() << "[connect joins]" << opName << "\n";
-      Operation* op = nameToOp[opName];
-      llvm::errs() << "[connect joins]" << op << "\n";
-      rewriter.setInsertionPointToStart(op->getBlock());
+//       int bb_num = getBBNumberFromOp(op);
 
-      int bb_num = getBBNumberFromOp(op);
+//       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
+//       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
-      handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
-      unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+//       joinValues.push_back(unbundleOp.getResult(0));
 
-      auto joinValues = it->second;
-      joinValues.push_back(unbundleOp.getResult(0));
-
-      handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
-      joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+//       handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(op->getLoc(), joinValues);
+//       joinOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
 
-      ValueRange *ab = new ValueRange();
-      handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-      handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
-      bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
+//       ValueRange *ab = new ValueRange();
+//       handshake::ChannelType ch = handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+//       handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(op->getLoc(), joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+//       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
-      op->setOperand(0, bundleOp.getResult(0));
-    }
-}
+//       op->setOperand(0, bundleOp.getResult(0));
+//     }
+// }
 
 
 // void insertForkForOp(Operation* op, DenseMap<StringRef, Operation *> &forkOpDict, ConversionPatternRewriter& rewriter, NameAnalysis& namer){
@@ -459,34 +546,40 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
         signalPassFailure();
 
 
-      DenseMap<StringRef,  SmallVector<std::tuple<StringRef, Value>>> predNamesAndDoneSignalsForOp;
-      DenseMap<StringRef, Operation*> nameToOp;
+      DenseMap<StringRef, Operation*> memAccesses;
+      DenseMap<StringRef, SmallVector<Value>> predSyncSignalsForEachOp;
       DenseMap<OpOperand *, SmallVector<Value>> dependenciesMap;
 
-      traverseMemRef(funcOp, predNamesAndDoneSignalsForOp, nameToOp, rewriter, &determinePredDoneSignals);
+      findMemAccessesInFunc(funcOp, memAccesses);
 
-      Value startSignal = (Value)funcOp.getArguments().back();
-      connectMuxsAndJoins (predNamesAndDoneSignalsForOp, nameToOp, dependenciesMap, rewriter, startSignal);
+      createSyncSignalForPedecessor(funcOp, memAccesses, predSyncSignalsForEachOp, rewriter);
 
+      SyncSuccessorWithPredecessors(memAccesses, predSyncSignalsForEachOp, dependenciesMap, rewriter);
+
+      // for (auto [a, b]: dependenciesMap){
+      //   llvm::errs() << "&&&";
+      //   for (auto c : b )
+      //     llvm::errs() << c << "***\n";
+      // }
       experimental::ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, dependenciesMap);
 
-      llvm::errs() << "finished \n";
+      llvm::errs() << " ------------- finished -------------------\n";
+      funcOp.print(llvm::dbgs());
+      
 
-      // funcOp.print(llvm::dbgs());
-      llvm::errs() << "funcOp";
-
-      experimental::ftd::addRegen(funcOp, rewriter);
-      llvm::errs() << "add regen \n";
-      experimental::ftd::addSupp(funcOp, rewriter);
-      llvm::errs() << "add supp \n";
-      experimental::cfg::markBasicBlocks(funcOp, rewriter);
-      llvm::errs() << "mark \n";
+      // experimental::ftd::addRegen(funcOp, rewriter);
+      // llvm::errs() << "add regen \n";
+      // experimental::ftd::addSupp(funcOp, rewriter);
+      // llvm::errs() << "add supp \n";
+      // experimental::cfg::markBasicBlocks(funcOp, rewriter);
+      // llvm::errs() << "mark \n";
 
       // Remove the blocks and terminators
       if (failed(cfg::flattenFunction(funcOp)))
         signalPassFailure();
 
-      llvm::errs() << "flatten \n";
+      // llvm::errs() << " ------------- flatten ---------------- \n";
+      // funcOp.print(llvm::dbgs());
   }
   
 

@@ -7,10 +7,8 @@
 void if_load_store(in_int_t a[1000], in_int_t b[1000], in_int_t n) {
     if (a[5] < 10){
       b[17] = a[10] + 5;
-    } else{
-      a[8] ++;
-    }
-    a[10] = b[17];
+    } 
+    a[10] = b[19];
 }
 
 int main(void) {

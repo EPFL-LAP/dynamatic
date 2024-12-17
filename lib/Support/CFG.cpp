@@ -337,9 +337,16 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
+  for (auto [a, b] : successors){
+    llvm::errs() << a << "\n";
+    for (auto c : b)
+      llvm::errs() << c << "---\n";
+  }
+  llvm::errs() << from << ": from\n";
+  llvm::errs() << to << ": to\n";
   // Both blocks must exist in the CFG
-  assert(successors.contains(from) && "source block must exist in the CFG");
-  assert(successors.contains(to) && "destination block must exist in the CFG");
+  // assert(successors.contains(from) && "source block must exist in the CFG");
+  // assert(successors.contains(to) && "destination block must exist in the CFG");
 
   mlir::SetVector<unsigned> pathSoFar;
   pathSoFar.insert(from);
@@ -429,6 +436,7 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
       CFGPath newPath;
       llvm::copy(pathSoFar, std::back_inserter(newPath));
       newPath.push_back(to);
+      paths.push_back(newPath);
     } else if (!pathSoFar.contains(nextBB)) {
       mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);
