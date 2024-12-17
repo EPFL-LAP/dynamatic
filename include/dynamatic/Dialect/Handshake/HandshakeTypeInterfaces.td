@@ -24,33 +24,38 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
   }];
 
   let methods = [
-    // This method is auto-implemented if the type includes an `extraSignals` argument 
-    // of type `ExtraSignals` (defined in HandshakeTypes.td).
+    // This method is auto-implemented if the type includes an `extraSignals`
+    // argument of type `ExtraSignals` (defined in HandshakeTypes.td)
     InterfaceMethod<"Returns extra signals",
       "llvm::ArrayRef<ExtraSignal>", "getExtraSignals", (ins)>,
     InterfaceMethod<"Returns the number of extra signals",
-      "unsigned", "getNumExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+      "unsigned", "getNumExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getExtraSignals().size();
       }]>,
     InterfaceMethod<"Returns the number of downstream extra signals",
-      "unsigned", "getNumDownstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+      "unsigned", "getNumDownstreamExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return llvm::count_if(concreteType.getExtraSignals(), [](const ExtraSignal &extra) {
-          return extra.downstream;
-        });
+        return llvm::count_if(
+            concreteType.getExtraSignals(),
+            [](const ExtraSignal &extra) { return extra.downstream; });
       }]>,
     InterfaceMethod<"Returns the number of upstream extra signals",
-      "unsigned", "getNumUpstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+      "unsigned", "getNumUpstreamExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return concreteType.getNumExtraSignals() - concreteType.getNumDownstreamExtraSignals();
+        return concreteType.getNumExtraSignals() -
+               concreteType.getNumDownstreamExtraSignals();
       }]>,
     InterfaceMethod<[{
         Returns an extra signal specified by the name
         Returns a failure if it is not found
       }],
       "std::optional<ExtraSignal>", "getExtraSignal",
-      (ins "llvm::StringRef":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
+      (ins "llvm::StringRef":$name), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         for (const ExtraSignal &extra : concreteType.getExtraSignals()) {
           if (extra.name == name)
@@ -58,8 +63,10 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
         }
         return {};
       }]>,
-    InterfaceMethod<"Returns whether the type has an extra signal specified by the name",
-      "bool", "hasExtraSignal", (ins "llvm::StringRef":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
+    InterfaceMethod<"Returns whether the type has an extra signal",
+      "bool", "hasExtraSignal", (ins "llvm::StringRef":$name),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getExtraSignal(name).has_value();
       }]>,
