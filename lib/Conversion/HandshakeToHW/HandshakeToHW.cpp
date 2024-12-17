@@ -58,7 +58,7 @@ static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
 /// Converts all ExtraSignal types to unsigned integer.
 static SmallVector<ExtraSignal>
-lowerExtraSignals(llvm::ArrayRef<ExtraSignal> extraSignals) {
+lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
   SmallVector<ExtraSignal> newExtraSignals;
   for (const ExtraSignal &extra : extraSignals) {
     unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
@@ -82,7 +82,7 @@ static Type lowerType(Type type) {
         unsigned width = channelType.getDataBitWidth();
         Type dataType = IntegerType::get(type.getContext(), width);
 
-        // Convert all ExtraSignals to unsigned integer
+        // Convert all ExtraSignals to signless integer
         SmallVector<ExtraSignal> extraSignals =
             lowerExtraSignals(channelType.getExtraSignals());
         return handshake::ChannelType::get(dataType, extraSignals);
@@ -92,7 +92,7 @@ static Type lowerType(Type type) {
         return IntegerType::get(type.getContext(), width);
       })
       .Case<handshake::ControlType>([](handshake::ControlType type) {
-        // Convert all ExtraSignals to unsigned integer
+        // Convert all ExtraSignals to signless integer
         SmallVector<ExtraSignal> extraSignals =
             lowerExtraSignals(type.getExtraSignals());
         return handshake::ControlType::get(type.getContext(), extraSignals);
