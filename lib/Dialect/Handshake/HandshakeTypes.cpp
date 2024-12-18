@@ -115,7 +115,7 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser,
-                  SmallVector<ExtraSignal::Storage> &extraSignalsStorage) {
+                  SmallVectorImpl<ExtraSignal::Storage> &extraSignalsStorage) {
 
   auto parseSignal = [&]() -> ParseResult {
     auto &signal = extraSignalsStorage.emplace_back();
