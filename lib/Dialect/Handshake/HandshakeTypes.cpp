@@ -42,8 +42,12 @@ static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 /// Print the extra signals to generate an IR representation.
 /// For example: `[spec: i1, tag: i32 (U)]`.
 /// This function is common to both ControlType and ChannelType.
+/// Note: this function assumes that `extraSignals` is non-empty.
 static void printExtraSignals(AsmPrinter &odsPrinter,
                               llvm::ArrayRef<ExtraSignal> extraSignals) {
+
+  assert(!extraSignals.empty() &&
+         "expected at least one extra signal to print");
 
   // Print a single signal.
   // eg. spec: i1
