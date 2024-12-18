@@ -9,7 +9,7 @@ This document contains advanced build instructions targeted at users who would l
 ## Gurobi
 
 ##### Why do we need Gurobi?
-Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable perfomance. 
+Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. 
 
 ##### Download Gurobi
 Gurobi is available for Linux [here](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The resulting downloaded file will be `gurobiXX.X.X_linux64.tar.gz`.
