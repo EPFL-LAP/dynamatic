@@ -30,7 +30,7 @@ to pass your obtained license to Gurobi, which it stores in `~/gurobi.lic`.
 
 ##### Configuring your environment
 
-In addition to adding Gurobi to your path, Dynamatic's CMake requires the GUROBI_HOME environment variable to find headers and libraries.
+In addition to adding Gurobi to your path, Dynamatic's CMake requires the `GUROBI_HOME` environment variable to find headers and libraries.
 
 ```sh
 # Replace "gurobiXXXX" with the correct version
