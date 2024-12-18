@@ -70,10 +70,12 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getExtraSignal(name).has_value();
       }]>,
-    // The implementation of this method largely depends on the type
-    // Therefore, we don't provide the defaultImplementation on this
+    // The implementation of these methods largely depend on the type
+    // Thus we don't provide the defaultImplementation on them
     InterfaceMethod<"Returns a new type with the extraSignal added",
       "mlir::Type", "addExtraSignal", (ins "const ExtraSignal &":$extraSignal)>,
+    InterfaceMethod<"Returns a new type without the extraSignal",
+      "mlir::Type", "removeExtraSignal", (ins "const std::string &":$name)>,
   ];
 }
 
