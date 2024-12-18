@@ -5,31 +5,41 @@ This document contains advanced build instructions targeted at users who would l
 > [!NOTE]
 > In the instructions below, we assume that you have already cloned Dynamatic and its submodules and that the project is rooted in a folder called `dynamatic`. Whenever provided shell commands contain `cd dynamatic`, it refers to this directory created during cloning. Adjust paths as needed depending on your current working directory.  
 
-## Getting Gurobi
 
-**Why do we need Gurobi?** Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve the performance optimization problem. If Gurobi is unavailable, Dynamatic can only generate circuits with suboptimal performance. 
+## Gurobi
 
-**Getting the Gurobi solver.** Download [Gurobi optimizer for
-Linux](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The downloaded file should look like `gurobiXX.X.X_linux64.tar.gz`.
+##### Why do we need Gurobi?
+Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable perfomance. 
 
-**Generating the license file.** Gurobi offers free [academic license](https://www.gurobi.com/academia/academic-program-and-licenses/). 
-After getting the license key, `untar` the Gurobi solver tarball. It is recommended to place it in `/opt/`, for instance, there would be a directory called `/opt/gurobiXXXX/linux64/` (the value of XXXX depends on the downloaded version).
+##### Download Gurobi
+Gurobi is available for Linux [here](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The resulting downloaded file will be `gurobiXX.X.X_linux64.tar.gz`.
 
+##### Obtain a license
+Free academic licenses for Gurobi are available [here](https://www.gurobi.com/academia/academic-program-and-licenses/). 
+
+##### Installation
+To install Gurobi, first extract your downloaded file to your desired installation directory.
+We recommend to place this in`/opt/`, e.g. `/opt/gurobiXXXX/linux64/` (with XXXX as the downloaded version).
+
+Using the following command:
 ```sh
-# Replace the x's with your key
+# Replace x's with obtained license
 /opt/gurobiXXXX/linux64/bin/grbgetkey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
 ```
-Which stores the license file at `~/gurobi.lic` (this is one of the default
-location for Gurobi to check if you have a valid license).
+to pass your obtained license to Gurobi, which it stores in `~/gurobi.lic`.
 
-**Configuring the environment.** Put the following lines in your `~/.bashrc` or `~/.zshrc`. Dynamatic's CMake settings uses these environment variables for including headers and linking libraries.
+##### Configuring your environment
+
+The following environment variables are used by Dynamatic's CMake to find headers and libraries.
 
 ```sh
-# Replace "gurobiXXXX" with the one on your machine
+# Replace "gurobiXXXX" with the correct version
 export GUROBI_HOME="/opt/gurobiXXXX/linux64"
-export PATH="${PATH}:${GUROBI_HOME}/bin"
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
+export PATH="${GUROBI_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="$GUROBI_HOME/lib:$LD_LIBRARY_PATH"
 ```
+
+These lines can be added to your shell initiation script, e.g. `~/.bashrc` or `~/.zshrc`, or used with any other environment setup method.
 
 ## Cloning
 
