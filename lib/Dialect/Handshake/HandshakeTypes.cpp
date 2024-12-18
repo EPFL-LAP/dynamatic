@@ -290,7 +290,7 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
-    return {};
+    return nullptr;
 
   return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
 }
