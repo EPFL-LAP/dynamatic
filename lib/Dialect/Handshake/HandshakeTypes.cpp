@@ -130,9 +130,6 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
       if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
           upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
         return failure();
-      // The default value of `signal.downstream` is true.
-      // I think this is a bit confusing.
-      // TODO: signal.upstream?
       signal.downstream = false;
     }
     return success();
