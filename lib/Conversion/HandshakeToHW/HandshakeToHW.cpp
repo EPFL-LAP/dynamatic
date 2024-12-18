@@ -56,7 +56,7 @@ using namespace dynamatic::handshake;
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
 
-/// Converts all ExtraSignal types to unsigned integer.
+/// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
   SmallVector<ExtraSignal> newExtraSignals;
