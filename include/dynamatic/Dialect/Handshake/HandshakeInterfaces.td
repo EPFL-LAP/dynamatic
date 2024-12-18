@@ -47,6 +47,21 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
+    InterfaceMethod<[{
+        Returns whether the operation has at least one operand with the "spec" tag.
+      }],
+      "bool", "hasSpecInput", (ins),
+      /*methodBody=*/"", /*defaultImplementation=*/[{
+        auto operands = $_op->getOperands();
+        for (auto operand : operands) {
+          auto extraSignalsType = mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(operand.getType());
+          if (extraSignalsType.hasExtraSignal("spec"))
+            return true;
+        }
+
+        return false;
+      }]
+    >,
   ];
 
   let verify = [{
@@ -54,15 +69,31 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
 
     auto operands = concreteOp.getDataOperands();
 
-    if (!operands.size())
+    if (operands.size() < 1)
       return concreteOp.emitOpError("must have at least one data operand");
 
-    mlir::Type resultType = $_op->getResult(0).getType();
+    // Verification of the spec tag
+    // If any input has a spec tag, the result must have a spec tag
+    // If no input has a spec tag, the result must not have a spec tag
 
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
+    // We don't care any other extra signals than spec tag here.
+    // That means, the verification succeeds even if the result suddenly has an unknown extra signal none of the inputs have.
+    // Also, the verify succeeds even if the result drops an unknown extra signal that all of the inputs have.
+    // If someone wants to verify other extra signals, they should implement a new verification here,
+    // or impose new constraints to the operations.
+
+    mlir::Type resultType = $_op->getResult(0).getType();
+    auto resultExtraSignalsType = cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType);
+    bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
+    if (concreteOp.hasSpecInput()) {
+      // If any input has a spec tag, the result must have a spec tag
+      if (!resultHasSpecTag)
+        return concreteOp.emitOpError("result must have a spec tag");
+    } else {
+      // If no input has a spec tag, the result must not have a spec tag
+      if (resultHasSpecTag)
+        return concreteOp.emitOpError("result must not have a spec tag");
+    }
 
     return mlir::success();
   }];
