@@ -34,16 +34,19 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
-// Common implementations for ControlType and ChannelType
+// Common implementation for ControlType and ChannelType
 //===----------------------------------------------------------------------===//
 
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
 /// Print the extra signals to generate an IR representation.
-/// For example: [spec: i1, tag: i32]
+/// For example: [spec: i1, tag: i32 (U)]
 /// This function is common to both ControlType and ChannelType.
 static void printExtraSignals(AsmPrinter &odsPrinter,
                               llvm::ArrayRef<ExtraSignal> extraSignals) {
+
+  // Print a single signal.
+  // eg. spec: i1
   auto printSignal = [&](const ExtraSignal &signal) {
     odsPrinter << signal.name << ": " << signal.type;
     if (!signal.downstream)
@@ -56,7 +59,10 @@ static void printExtraSignals(AsmPrinter &odsPrinter,
     printSignal(signal);
     odsPrinter << ", ";
   }
+
+  // Print the last signal without a comma
   printSignal(extraSignals.back());
+
   odsPrinter << "]";
 }
 
@@ -98,7 +104,9 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 }
 
 /// Parse the extra signals from the IR representation.
-/// For example: [spec: i1, tag: i32]
+/// Due to the restriction on the joint parser of ControlType and ChannelType,
+/// we don't parse square brackets here.
+/// For example: spec: i1, tag: i32
 /// This function is common to both ControlType and ChannelType.
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
@@ -106,7 +114,8 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   SmallVector<ExtraSignal> &extraSignals) {
   FailureOr<SmallVector<ExtraSignal::Storage>> extraSignalsStorage;
 
-  // Parse variable 'extraSignals'
+  // TODO: This code can be simplified. I'll do this after finishing the
+  // discussion on the dangling pointer.
   extraSignalsStorage = [&]() -> FailureOr<SmallVector<ExtraSignal::Storage>> {
     SmallVector<ExtraSignal::Storage> storage;
 
@@ -123,6 +132,9 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
         if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
             upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
           return failure();
+        // The default value of `signal.downstream` is true.
+        // I think this is a bit confusing.
+        // TODO: signal.upstream?
         signal.downstream = false;
       }
       return success();
@@ -142,9 +154,14 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
 
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage)
+  for (const ExtraSignal::Storage &signalStorage : *extraSignalsStorage) {
+    // TODO: Not pointer safe!! (as discussed in the PR)
+    // The signal.name is allocated in this function and is not copied here.
     extraSignals.emplace_back(signalStorage);
+  }
 
+  // TODO: This check is also called in verify. We should consider refactoring
+  // this.
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return failure();
 
@@ -163,6 +180,7 @@ void ControlType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << ">";
 }
 
+/// Parse the control type after "<[" is parsed.
 static Type parseControlAfterLSquare(AsmParser &odsParser) {
   function_ref<InFlightDiagnostic()> emitError = [&]() {
     return odsParser.emitError(odsParser.getCurrentLocation());
@@ -197,6 +215,7 @@ Type ControlType::parse(AsmParser &odsParser) {
   if (odsParser.parseGreater())
     return {};
 
+  // Parsed "<>" here.
   return ControlType::get(odsParser.getContext(), {});
 }
 
@@ -239,6 +258,7 @@ checkChannelData(function_ref<InFlightDiagnostic()> emitError, Type dataType) {
   return success();
 }
 
+/// Parse the channel type after "<" is parsed.
 static Type parseChannelAfterLess(AsmParser &odsParser) {
   FailureOr<Type> dataType;
 
@@ -254,6 +274,9 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
                         "which is to be a Type");
     return nullptr;
   }
+
+  // TODO: This check is also called in verify. We should consider refactoring
+  // this.
   if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
@@ -318,11 +341,11 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
   if (parser.parseOptionalLess())
     return nullptr;
   if (!parser.parseOptionalGreater()) {
-    // Parsed <>: ControlType without extra bits
+    // Parsed "<>": ControlType without extra bits
     return handshake::ControlType::get(parser.getContext());
   }
   if (!parser.parseOptionalLSquare()) {
-    // Parsed <[: ControlType with extra bits
+    // Parsed "<[": ControlType with extra bits
     return parseControlAfterLSquare(parser);
   }
   return parseChannelAfterLess(parser);

@@ -41,6 +41,7 @@ def ExtraSignals : TypeParameter<
 }
 
 def ControlType : Handshake_Type<"Control", "control", [
+  // These methods are implemented in the cpp file.
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
 ]> {
   let summary = "a control-only dataflow channel";
@@ -55,7 +56,10 @@ def ControlType : Handshake_Type<"Control", "control", [
   }];
 
   let parameters = (ins ExtraSignals:$extraSignals);
+
   let builders = [
+    // We provide a builder that doesn't require extra signals.
+    // The type will be without extra signals (SimpleControl).
     TypeBuilder<(ins),
       [{
         return ControlType::get($_ctxt, {});
@@ -66,6 +70,7 @@ def ControlType : Handshake_Type<"Control", "control", [
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
+  // These methods are implemented in the cpp file.
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
 ]> {
   let summary = "a dataflow channel with optional extra signals";
