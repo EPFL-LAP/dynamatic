@@ -62,7 +62,7 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
   return success();
 }
 
-/// Parser for custom<SimpleControl>
+/// Parser for the `custom<SimpleControl>` Tablegen directive.
 static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
   // No parsing needed.
 
@@ -93,7 +93,7 @@ static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
   printHandshakeType(printer, nullptr, types.back());
 }
 
-/// Printer for custom<SimpleControl>
+/// Printer for the `custom<SimpleControl>` Tablegen directive.
 static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
   // No printing needed.
 }
