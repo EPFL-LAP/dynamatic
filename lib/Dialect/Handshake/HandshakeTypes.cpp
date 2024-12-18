@@ -40,7 +40,7 @@ using namespace dynamatic::handshake;
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
 /// Print the extra signals to generate an IR representation.
-/// For example: [spec: i1, tag: i32 (U)]
+/// For example: `[spec: i1, tag: i32 (U)]`.
 /// This function is common to both ControlType and ChannelType.
 static void printExtraSignals(AsmPrinter &odsPrinter,
                               llvm::ArrayRef<ExtraSignal> extraSignals) {
@@ -106,7 +106,7 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 /// Parse the extra signals from the IR representation.
 /// Due to the restriction on the joint parser of ControlType and ChannelType,
 /// we don't parse square brackets here.
-/// For example: spec: i1, tag: i32
+/// For example: `spec: i1, tag: i32`.
 /// This function is common to both ControlType and ChannelType.
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
