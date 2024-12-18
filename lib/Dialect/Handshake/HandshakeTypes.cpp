@@ -147,9 +147,10 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
 
 void ControlType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
-  if (!getExtraSignals().empty()) {
+
+  if (!getExtraSignals().empty())
     printExtraSignals(odsPrinter, getExtraSignals());
-  }
+
   odsPrinter << ">";
 }
 
@@ -169,11 +170,8 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
     return {};
 
-  // Parse ']'
-  if (odsParser.parseRSquare())
-    return {};
-  // Parse literal '>'
-  if (odsParser.parseGreater())
+  // Parse ']' and '>'
+  if (odsParser.parseRSquare() || odsParser.parseGreater())
     return {};
 
   SmallVector<ExtraSignal> extraSignals;
@@ -274,15 +272,10 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     // Parsed literal ','
     // The channel has extra bits
 
-    // Parse '['
-    if (odsParser.parseLSquare())
-      return nullptr;
-
-    if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
-      return nullptr;
-
-    // Parse ']'
-    if (odsParser.parseRSquare())
+    // Parse '[', extra signals and ']'
+    if (odsParser.parseLSquare() ||
+        failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)) ||
+        odsParser.parseRSquare())
       return nullptr;
   }
 
@@ -339,11 +332,11 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
   if (parser.parseOptionalLess())
     return nullptr;
   if (!parser.parseOptionalGreater()) {
-    // Parsed "<>": ControlType without extra bits
+    // Parsed "<>": ControlType without extra signals
     return handshake::ControlType::get(parser.getContext());
   }
   if (!parser.parseOptionalLSquare()) {
-    // Parsed "<[": ControlType with extra bits
+    // Parsed "<[": ControlType with extra signals
     return parseControlAfterLSquare(parser);
   }
   return parseChannelAfterLess(parser);
