@@ -511,8 +511,9 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
       $_state.addTypes(ControlType::get($_builder.getContext(), {}));
     }]>
   ];
-  
-  let assemblyFormat = "attr-dict `:` type($result)";
+
+  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
+  let assemblyFormat = "attr-dict custom<SimpleControl>(type($result))";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -604,7 +605,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
     ```
   }];
-  
+
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
                        Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
@@ -616,13 +617,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
 
-  // Since the ControlType now has an argument, we can no longer omit these types.
-  // However, it is uniquely determined not to have extra bits because we are using
-  // SimpleControl, which restricts the ControlType to no extra bits.
-  // If this seems redundant, we can consider designing a custom assembly printer.
+  // We use a custom directive for SimpleControl to omit writing it explicitly in the IR.
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` type($memStart) `,` type($memEnd) `,` type($ctrlEnd) `,` functional-type($inputs, $outputs)
+    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
