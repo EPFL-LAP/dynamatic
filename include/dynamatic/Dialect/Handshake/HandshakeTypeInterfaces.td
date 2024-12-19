@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines Handshake TypeInterfaces in Tablegen.
+// This file defines the type interfaces of the Handshake dialect.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,49 +23,52 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
     (getNumExtraSignals, getNumDownstreamExtraSignals, hasExtraSignal, etc)
   }];
 
-  // define the methods the interface provides
-  // methodBody: the method body of the interface itself
-  // defaultImplementation: the default body of the method of the type implementing this interface
-  // ConcreteType: the type (template) implementing this interface
   let methods = [
-    // This method is auto-implemented if the type includes an `extraSignals` argument 
-    // of type `ExtraSignals` (defined in HandshakeTypes.td).
+    // This method is auto-implemented if the type includes an `extraSignals`
+    // argument of type `ExtraSignals` (defined in HandshakeTypes.td)
     InterfaceMethod<"Returns extra signals",
       "llvm::ArrayRef<ExtraSignal>", "getExtraSignals", (ins)>,
     InterfaceMethod<"Returns the number of extra signals",
-      "unsigned", "getNumExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+      "unsigned", "getNumExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         return concreteType.getExtraSignals().size();
       }]>,
-    InterfaceMethod<"Returns the number of extra signals",
-      "unsigned", "getNumDownstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+    InterfaceMethod<"Returns the number of downstream extra signals",
+      "unsigned", "getNumDownstreamExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return llvm::count_if(concreteType.getExtraSignals(), [](const ExtraSignal &extra) {
-          return extra.downstream;
-        });
+        return llvm::count_if(
+            concreteType.getExtraSignals(),
+            [](const ExtraSignal &extra) { return extra.downstream; });
       }]>,
-    InterfaceMethod<"Returns the number of extra signals",
-      "unsigned", "getNumUpstreamExtraSignals", (ins), /*methodBody=*/"", /*defaultImplementation=*/[{
+    InterfaceMethod<"Returns the number of upstream extra signals",
+      "unsigned", "getNumUpstreamExtraSignals", (ins), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return concreteType.getNumExtraSignals() - concreteType.getNumDownstreamExtraSignals();
+        return concreteType.getNumExtraSignals() -
+               concreteType.getNumDownstreamExtraSignals();
       }]>,
     InterfaceMethod<[{
         Returns an extra signal specified by the name
         Returns a failure if it is not found
       }],
-      "mlir::FailureOr<ExtraSignal>", "getExtraSignalByName",
-      (ins "const std::string &":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
+      "std::optional<ExtraSignal>", "getExtraSignal",
+      (ins "llvm::StringRef":$name), /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
         for (const ExtraSignal &extra : concreteType.getExtraSignals()) {
           if (extra.name == name)
             return extra;
         }
-        return mlir::failure();
+        return {};
       }]>,
-    InterfaceMethod<"Returns whether the type has an extra signal specified by the name",
-      "bool", "hasExtraSignal", (ins "const std::string &":$name), /*methodBody=*/"", /*defaultImplementation=*/[{
+    InterfaceMethod<"Returns whether the type has an extra signal",
+      "bool", "hasExtraSignal", (ins "llvm::StringRef":$name),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         ConcreteType concreteType = mlir::cast<ConcreteType>($_type);
-        return !mlir::failed(concreteType.getExtraSignalByName(name));
+        return concreteType.getExtraSignal(name).has_value();
       }]>,
     // The implementation of these methods largely depend on the type
     // Thus we don't provide the defaultImplementation on them

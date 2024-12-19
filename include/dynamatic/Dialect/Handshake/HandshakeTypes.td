@@ -35,13 +35,11 @@ def ExtraSignals : TypeParameter<
     }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
   }];
   let cppStorageType = "::llvm::SmallVector<::dynamatic::handshake::ExtraSignal::Storage>";
-  let convertFromStorage = [{convertExtraSignalsFromStorage($_self)}];
   let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
   let defaultValue = cppType # "()";
 }
 
 def ControlType : Handshake_Type<"Control", "control", [
-  // These methods are implemented in the cpp file.
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
 ]> {
   let summary = "a control-only dataflow channel";
@@ -58,8 +56,7 @@ def ControlType : Handshake_Type<"Control", "control", [
   let parameters = (ins ExtraSignals:$extraSignals);
 
   let builders = [
-    // We provide a builder that doesn't require extra signals.
-    // The type will be without extra signals (SimpleControl).
+    // If no parameters provided, build SimpleControl
     TypeBuilder<(ins),
       [{
         return ControlType::get($_ctxt, {});
@@ -71,7 +68,6 @@ def ControlType : Handshake_Type<"Control", "control", [
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
-  // These methods are implemented in the cpp file.
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
 ]> {
   let summary = "a dataflow channel with optional extra signals";
@@ -216,6 +212,21 @@ def ChannelOrSimpleControl : TypeConstraint<
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
 >;
 
+// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
+// Also applies to ControlTypes, as some operations treat them interchangeably
+// using HandshakeType.
+// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    // ControlType without extra signals
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
+>;
+
 // A constraint ensuring that all types of a variadic operand are the same.
 class AllTypesMatchWithinVariadic<string name> : PredOpTrait<
   "The operands inside the variadic " # name # " should have the same type",
@@ -259,21 +270,6 @@ class AllTypesMatchWithVariadics<list<string> variadics, list<string> nonvariadi
         return types.front() == op.getType();
       })
     }] # "($" # variadic # ", $" # !head(nonvariadics) # ")">)>
->;
-
-// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
-// Also applies to ControlTypes, as some operations treat them interchangeably
-// using HandshakeType.
-// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
-class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
-  names,
-  [{
-    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
-    // ControlType without extra signals
-    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
-    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
-  }],
-  "data type"
 >;
 
 // A constraint ensuring that all types of a variadic operand have the same data type.
@@ -342,13 +338,13 @@ class AllDataTypesMatchWithVariadics<list<string> variadics, list<string> nonvar
 // Predicate to verify if the given type has a valid spec tag as an extra signal.
 class HasSpecTag<string type> : CPred<
   [{
-    ([&](const FailureOr<ExtraSignal> &getExtraSignalByNameResult) {
-      if (failed(getExtraSignalByNameResult)) {
+    ([&](std::optional<ExtraSignal> getExtraSignalResult) {
+      if (getExtraSignalResult.has_value()) {
         // There is no extra signal called "spec"
         return false;
       }
 
-      ExtraSignal signal = getExtraSignalByNameResult.value();
+      ExtraSignal signal = getExtraSignalResult.value();
 
       // The signal should be a 1-bit integer downstream signal.
       if (!signal.downstream)
@@ -358,7 +354,7 @@ class HasSpecTag<string type> : CPred<
 
       return true;
     })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
-  }] # type # ").getExtraSignalByName(\"spec\"))"
+  }] # type # ").getExtraSignal(\"spec\"))"
 >;
 
 // Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.

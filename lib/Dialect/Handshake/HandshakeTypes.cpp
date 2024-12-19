@@ -40,10 +40,14 @@ using namespace dynamatic::handshake;
 static constexpr llvm::StringLiteral UPSTREAM_SYMBOL("U");
 
 /// Print the extra signals to generate an IR representation.
-/// For example: [spec: i1, tag: i32 (U)]
+/// For example: `[spec: i1, tag: i32 (U)]`.
 /// This function is common to both ControlType and ChannelType.
+/// Note: this function assumes that `extraSignals` is non-empty.
 static void printExtraSignals(AsmPrinter &odsPrinter,
                               llvm::ArrayRef<ExtraSignal> extraSignals) {
+
+  assert(!extraSignals.empty() &&
+         "expected at least one extra signal to print");
 
   // Print a single signal.
   // eg. spec: i1
@@ -106,12 +110,12 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 /// Parse the extra signals from the IR representation.
 /// Due to the restriction on the joint parser of ControlType and ChannelType,
 /// we don't parse square brackets here.
-/// For example: spec: i1, tag: i32
+/// For example: `spec: i1, tag: i32`.
 /// This function is common to both ControlType and ChannelType.
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser,
-                  SmallVector<ExtraSignal::Storage> &extraSignalsStorage) {
+                  SmallVectorImpl<ExtraSignal::Storage> &extraSignalsStorage) {
 
   auto parseSignal = [&]() -> ParseResult {
     auto &signal = extraSignalsStorage.emplace_back();
@@ -126,9 +130,6 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
       if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
           upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
         return failure();
-      // The default value of `signal.downstream` is true.
-      // I think this is a bit confusing.
-      // TODO: signal.upstream?
       signal.downstream = false;
     }
     return success();
@@ -146,9 +147,10 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
 
 void ControlType::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "<";
-  if (!getExtraSignals().empty()) {
+
+  if (!getExtraSignals().empty())
     printExtraSignals(odsPrinter, getExtraSignals());
-  }
+
   odsPrinter << ">";
 }
 
@@ -163,29 +165,25 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
     return odsParser.emitError(odsParser.getCurrentLocation());
   };
 
+  // Declare vector of structs for storing parse results
   SmallVector<ExtraSignal::Storage> extraSignalsStorage;
   if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
     return {};
 
-  // Parse ']'
-  if (odsParser.parseRSquare())
-    return {};
-  // Parse literal '>'
-  if (odsParser.parseGreater())
+  // Parse ']' and '>'
+  if (odsParser.parseRSquare() || odsParser.parseGreater())
     return {};
 
-  // We convert the storage type to the non-storage type at the end of parsing.
-  // Be careful that the non-storage type just holds a raw string pointer inside
-  // (via StringRef), so passing it around may lead to dangling pointers.
   SmallVector<ExtraSignal> extraSignals;
-  // Convert the element type of the extra signal storage list to its
-  // non-storage version (these will be uniqued/allocated by ChannelType::get)
+  // Convert parse results to ExtraSignal instances
   for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
     extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return {};
 
+  // Build ControlType
+  // Uniquify and Allocate the ExtraSignal instances inside MLIR context
   return ControlType::get(odsParser.getContext(), extraSignals);
 }
 
@@ -283,15 +281,10 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     // Parsed literal ','
     // The channel has extra bits
 
-    // Parse '['
-    if (odsParser.parseLSquare())
-      return nullptr;
-
-    if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
-      return nullptr;
-
-    // Parse ']'
-    if (odsParser.parseRSquare())
+    // Parse '[', extra signals and ']'
+    if (odsParser.parseLSquare() ||
+        failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)) ||
+        odsParser.parseRSquare())
       return nullptr;
   }
 
@@ -299,9 +292,6 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (odsParser.parseGreater())
     return {};
 
-  // We convert the storage type to the non-storage type at the end of parsing.
-  // Be careful that the non-storage type just holds a raw string pointer inside
-  // (via StringRef), so passing it around may lead to dangling pointers.
   SmallVector<ExtraSignal> extraSignals;
   // Convert the element type of the extra signal storage list to its
   // non-storage version (these will be uniqued/allocated by ChannelType::get)
@@ -351,11 +341,11 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
   if (parser.parseOptionalLess())
     return nullptr;
   if (!parser.parseOptionalGreater()) {
-    // Parsed "<>": ControlType without extra bits
+    // Parsed "<>": ControlType without extra signals
     return handshake::ControlType::get(parser.getContext());
   }
   if (!parser.parseOptionalLSquare()) {
-    // Parsed "<[": ControlType with extra bits
+    // Parsed "<[": ControlType with extra signals
     return parseControlAfterLSquare(parser);
   }
   return parseChannelAfterLess(parser);
