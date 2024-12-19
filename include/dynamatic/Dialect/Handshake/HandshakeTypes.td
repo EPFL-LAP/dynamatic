@@ -339,7 +339,7 @@ class AllDataTypesMatchWithVariadics<list<string> variadics, list<string> nonvar
 class HasSpecTag<string type> : CPred<
   [{
     ([&](std::optional<ExtraSignal> getExtraSignalResult) {
-      if (getExtraSignalResult.has_value()) {
+      if (!getExtraSignalResult.has_value()) {
         // There is no extra signal called "spec"
         return false;
       }
