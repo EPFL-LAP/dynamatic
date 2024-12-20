@@ -429,6 +429,7 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
       CFGPath newPath;
       llvm::copy(pathSoFar, std::back_inserter(newPath));
       newPath.push_back(to);
+      paths.push_back(newPath);
     } else if (!pathSoFar.contains(nextBB)) {
       mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);
