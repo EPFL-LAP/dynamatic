@@ -15,6 +15,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
 
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
@@ -46,6 +47,8 @@ struct ExtraSignal {
 
   /// Returns the signal type's bitwidth.
   unsigned getBitWidth() const;
+
+  ExtraSignal allocateInto(mlir::TypeStorageAllocator &alloc) const;
 };
 
 bool operator==(const ExtraSignal &lhs, const ExtraSignal &rhs);
