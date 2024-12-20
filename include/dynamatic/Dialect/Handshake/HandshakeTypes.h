@@ -32,29 +32,15 @@ unsigned getHandshakeTypeBitWidth(mlir::Type type);
 /// upstream).
 struct ExtraSignal {
 
-  /// Used when creating `handshake::ChannelType` instances. Owns its name
-  /// instead of referencing it.
-  struct Storage {
-    std::string name;
-    mlir::Type type = nullptr;
-    bool downstream = true;
-
-    Storage() = default;
-    Storage(llvm::StringRef name, mlir::Type type, bool downstream = true);
-  };
-
   /// The signal's name.
   llvm::StringRef name;
   /// The signal's MLIR type.
-  mlir::Type type;
+  mlir::Type type = nullptr;
   /// Whether the signal is going downstream or upstream.
-  bool downstream;
+  bool downstream = true;
 
   /// Simple member-by-member constructor.
   ExtraSignal(llvm::StringRef name, mlir::Type type, bool downstream = true);
-
-  /// Constructs from the storage type (should not be used by client code).
-  ExtraSignal(const Storage &storage);
 
   ExtraSignal() = default;
 
