@@ -163,8 +163,9 @@ LogicalResult MarkMemoryDependenciesPass::checkAffineAccessPair(
     StringRef dstName = namer.getName(dstOp);
     if (result.value == DependenceResult::HasDependence) {
       // Add the dependence to the source operation
+      // At this point the dependency should be initialized as active
       opDeps[srcOp].push_back(
-          MemDependenceAttr::get(ctx, dstName, loopDepth, components));
+          MemDependenceAttr::get(ctx, dstName, loopDepth, components, true));
     } else if (result.value == DependenceResult::Failure) {
       return srcOp->emitError()
              << "Dependence check failed with memory access '" << dstName
@@ -186,7 +187,7 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   StringRef dstName = namer.getName(dstOp);
   opDeps[srcOp].push_back(MemDependenceAttr::get(
-      &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{}));
+      &getContext(), dstName, 0, ArrayRef<affine::DependenceComponent>{}, true));
 
   return success();
 }
