@@ -99,6 +99,8 @@ static bool hasRAW(handshake::LoadOp loadOp,
   for (handshake::StoreOp storeOp : storeOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       for (MemDependenceAttr dependency : deps.getDependencies()) {
+        if (!dependency.getIsActive())
+          continue;
         if (dependency.getDstAccess() == loadName) {
           LLVM_DEBUG({
             llvm::dbgs() << "\tKeeping '" << loadName
@@ -151,6 +153,8 @@ static bool hasEnforcedWARs(handshake::LoadOp loadOp,
   // multiple times if it depends on the load at multiple loop depths
   if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
     for (MemDependenceAttr dependency : deps.getDependencies()) {
+      if (!dependency.getIsActive())
+        continue;
       auto storeOp = storesByName.at(dependency.getDstAccess());
       if (!isStoreGIIDOnLoad(loadOp, storeOp, cfg)) {
         LLVM_DEBUG({
@@ -251,6 +255,8 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
       // All stores involved in a WAR with the load are still dependent
       if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
         for (MemDependenceAttr dependency : deps.getDependencies()) {
+          if (!dependency.getIsActive())
+            continue;
           Operation *dstOp = namer.getOp(dependency.getDstAccess());
           if (auto storeOp = dyn_cast<StoreOp>(dstOp))
             dependentStores.insert(storeOp);
@@ -274,6 +280,8 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     // still be honored by an LSQ
     StringRef storeName = getUniqueName(storeOp);
     for (MemDependenceAttr dependency : deps.getDependencies()) {
+      if (!dependency.getIsActive())
+        continue;
       StringRef dstName = dependency.getDstAccess();
 
       // WAW dependencies on the same operation can be ignored, they are
