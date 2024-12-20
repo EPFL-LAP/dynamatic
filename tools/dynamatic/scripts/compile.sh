@@ -143,9 +143,8 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   if [[ $ADD_SEQ_MEM -ne 0 ]]; then
       # handshake transformations
       "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-        --handshake-analyze-lsq-usage \
+        --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces\
         --handshake-add-seq-mem \
-        --handshake-combine-steering-logic \
         --handshake-minimize-cst-width --handshake-optimize-bitwidths \
         --handshake-materialize --handshake-infer-basic-blocks \
         > "$F_HANDSHAKE_TRANSFORMED"

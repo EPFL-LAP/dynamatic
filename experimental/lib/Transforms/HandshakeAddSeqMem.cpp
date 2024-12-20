@@ -125,6 +125,8 @@ void createSyncSignalForPedecessor(FuncOp funcOp, DenseMap<StringRef, Operation*
               rewriter.create<handshake::SinkOp>(memOpPointer->getLoc(), bundleOp.getResult(0));
 
               for (MemDependenceAttr dependency : deps.getDependencies()) {
+                if (!dependency.getIsActive())
+                  continue;
                 rewriter.setInsertionPointToStart(memOpPointer->getBlock());
 
                   StringRef dstAccess = dependency.getDstAccess();
@@ -197,12 +199,14 @@ void createSyncSignalForPedecessor(FuncOp funcOp, DenseMap<StringRef, Operation*
 //     }
 // }
 
-void SyncSuccessorWithPredecessors (DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &predSyncSignalsForEachOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter){
+void SyncSuccessorWithPredecessors (DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &predSyncSignalsForEachOp, DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap, ConversionPatternRewriter& rewriter, FuncOp funcOp){
 
     for (auto [opName, predSyncSignals]: predSyncSignalsForEachOp){
 
       Operation * op = memAccesses[opName];
       int bb_num = getBBNumberFromOp(op);
+
+      rewriter.setInsertionPointToStart(op->getBlock());
 
       handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op->getLoc(), op->getOperand(0));
       unbundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
@@ -221,6 +225,11 @@ void SyncSuccessorWithPredecessors (DenseMap<StringRef, Operation*> &memAccesses
       bundleOp->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(bb_num));
 
       op->setOperand(0, bundleOp.getResult(0));
+
+      llvm::dbgs() << "~~~~~~~~~~~~~~\n";
+      funcOp.print(llvm::dbgs());
+            llvm::dbgs() << "~~~~~~~~~~~~~~\n";
+
 
       dependenciesMap[&joinOp->getOpOperand(0)] = predSyncSignals;
     }
@@ -554,7 +563,7 @@ void HandshakeAddSeqMemPass::runDynamaticPass() {
 
       createSyncSignalForPedecessor(funcOp, memAccesses, predSyncSignalsForEachOp, rewriter);
 
-      SyncSuccessorWithPredecessors(memAccesses, predSyncSignalsForEachOp, dependenciesMap, rewriter);
+      SyncSuccessorWithPredecessors(memAccesses, predSyncSignalsForEachOp, dependenciesMap, rewriter, funcOp);
 
       // for (auto [a, b]: dependenciesMap){
       //   llvm::errs() << "&&&";
