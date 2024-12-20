@@ -34,7 +34,6 @@ def ExtraSignals : TypeParameter<
     }
     }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
   }];
-  let cppStorageType = "::llvm::SmallVector<::dynamatic::handshake::ExtraSignal::Storage>";
   let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
   let defaultValue = cppType # "()";
 }

@@ -360,14 +360,8 @@ Type ChannelType::removeExtraSignal(const std::string &name) const {
 // ExtraSignal
 //===----------------------------------------------------------------------===//
 
-ExtraSignal::Storage::Storage(StringRef name, mlir::Type type, bool downstream)
-    : name(name), type(type), downstream(downstream) {}
-
 ExtraSignal::ExtraSignal(StringRef name, mlir::Type type, bool downstream)
     : name(name), type(type), downstream(downstream) {}
-
-ExtraSignal::ExtraSignal(const ExtraSignal::Storage &storage)
-    : name(storage.name), type(storage.type), downstream(storage.downstream) {}
 
 unsigned ExtraSignal::getBitWidth() const {
   return type.getIntOrFloatBitWidth();
