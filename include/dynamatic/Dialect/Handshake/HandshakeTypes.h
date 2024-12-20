@@ -31,6 +31,8 @@ unsigned getHandshakeTypeBitWidth(mlir::Type type);
 /// A dataflow channel's extra signal. The signal has a unique (within a
 /// channel's context) name, specific MLIR type, and a direction (downstream or
 /// upstream).
+/// This struct is used as an MLIR type parameter in the tablegen file
+/// (e.g. ChannelType or ControlType)
 struct ExtraSignal {
 
   /// The signal's name.
@@ -48,6 +50,9 @@ struct ExtraSignal {
   /// Returns the signal type's bitwidth.
   unsigned getBitWidth() const;
 
+  /// Called inside the type builder to allocate data inside the context
+  /// if SelfAllocationParameter or ArrayRefOfSelfAllocationParameter is
+  /// specified to this type parameter
   ExtraSignal allocateInto(mlir::TypeStorageAllocator &alloc) const;
 };
 
