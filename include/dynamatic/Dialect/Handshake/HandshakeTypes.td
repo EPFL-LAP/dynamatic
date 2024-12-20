@@ -23,21 +23,6 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>",
-  "An optional array of extra signals for a dataflow channel"> {
-  let allocator = [{
-    ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
-    for (const ::dynamatic::handshake::ExtraSignal &signal : $_self) {
-      ::dynamatic::handshake::ExtraSignal& tmp = tmpSignals.emplace_back(signal);
-      tmp.name = $_allocator.copyInto(tmp.name);
-    }
-    }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
-  }];
-  let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
-  let defaultValue = cppType # "()";
-}
-
 def ControlType : Handshake_Type<"Control", "control", [
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
 ]> {
@@ -52,7 +37,7 @@ def ControlType : Handshake_Type<"Control", "control", [
       may go downstream or upstream.
   }];
 
-  let parameters = (ins ExtraSignals:$extraSignals);
+  let parameters = (ins ArrayRefOfSelfAllocationParameter<"ExtraSignal", "Array of ExtraSignal">:$extraSignals);
 
   let builders = [
     // If no parameters provided, build SimpleControl
@@ -82,7 +67,7 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
       may go downstream or upstream.
   }];
 
-  let parameters = (ins "::mlir::Type":$dataType, ExtraSignals:$extraSignals);
+  let parameters = (ins "::mlir::Type":$dataType, ArrayRefOfSelfAllocationParameter<"ExtraSignal", "Array of ExtraSignal">:$extraSignals);
 
   let builders = [
     TypeBuilderWithInferredContext<(ins

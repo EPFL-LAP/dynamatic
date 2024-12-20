@@ -16,6 +16,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeSupport.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -371,6 +372,10 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {
   return lhs.name == rhs.name && lhs.type == rhs.type &&
          lhs.downstream == rhs.downstream;
+}
+
+ExtraSignal ExtraSignal::allocateInto(mlir::TypeStorageAllocator &alloc) const {
+  return ExtraSignal(alloc.copyInto(name), type, downstream);
 }
 
 llvm::hash_code dynamatic::handshake::hash_value(const ExtraSignal &signal) {
