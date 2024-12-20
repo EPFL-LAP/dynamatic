@@ -115,13 +115,14 @@ checkChannelExtra(function_ref<InFlightDiagnostic()> emitError,
 static LogicalResult
 parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   AsmParser &odsParser,
-                  SmallVectorImpl<ExtraSignal::Storage> &extraSignalsStorage) {
+                  SmallVectorImpl<ExtraSignal> &extraSignals) {
 
   auto parseSignal = [&]() -> ParseResult {
-    auto &signal = extraSignalsStorage.emplace_back();
+    auto &signal = extraSignals.emplace_back();
+    signal.downstream = true;
 
-    if (odsParser.parseKeywordOrString(&signal.name) ||
-        odsParser.parseColon() || odsParser.parseType(signal.type))
+    if (odsParser.parseKeyword(&signal.name) || odsParser.parseColon() ||
+        odsParser.parseType(signal.type))
       return failure();
 
     // Attempt to parse the optional upstream symbol
@@ -166,18 +167,13 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   };
 
   // Declare vector of structs for storing parse results
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
-  if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
+  SmallVector<ExtraSignal> extraSignals;
+  if (failed(parseExtraSignals(emitError, odsParser, extraSignals)))
     return nullptr;
 
   // Parse ']' and '>'
   if (odsParser.parseRSquare() || odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert parse results to ExtraSignal instances
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
@@ -267,14 +263,14 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   if (failed(checkChannelData(emitError, *dataType)))
     return nullptr;
 
-  SmallVector<ExtraSignal::Storage> extraSignalsStorage;
+  SmallVector<ExtraSignal> extraSignals;
   if (!odsParser.parseOptionalComma()) {
     // Parsed literal ','
     // The channel has extra bits
 
     // Parse '[', extra signals and ']'
     if (odsParser.parseLSquare() ||
-        failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)) ||
+        failed(parseExtraSignals(emitError, odsParser, extraSignals)) ||
         odsParser.parseRSquare())
       return nullptr;
   }
@@ -282,12 +278,6 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
   // Parse literal '>'
   if (odsParser.parseGreater())
     return nullptr;
-
-  SmallVector<ExtraSignal> extraSignals;
-  // Convert the element type of the extra signal storage list to its
-  // non-storage version (these will be uniqued/allocated by ChannelType::get)
-  for (const ExtraSignal::Storage &signalStorage : extraSignalsStorage)
-    extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
     return nullptr;
