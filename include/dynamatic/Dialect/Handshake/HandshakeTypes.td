@@ -174,13 +174,13 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 
 def BoolChannel : IntSizedChannel<1>;
 
-def SimpleControl : TypeConstraint<
+def SimpleControl : Type<
   HasNumExtras<0>,
   "must be a `handshake::ControlType` type with no extra signals",
   "::dynamatic::handshake::ControlType"
 >;
 
-def SimpleChannel : TypeConstraint<
+def SimpleChannel : Type<
   HasNumExtras<0>,
   "must be a `handshake::ChannelType` type with no extra signals",
   "::dynamatic::handshake::ChannelType"
