@@ -609,9 +609,9 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   // (at least in speculative execution scenarios)
   // TODO: Discuss the change of ChannelTypes to SimpleChannels
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
-                       Variadic<ChannelType>:$inputs, SimpleControl:$ctrlEnd,
+                       Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, SimpleControl:$memEnd);
+  let results = (outs Variadic<SimpleChannel>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
