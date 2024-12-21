@@ -168,11 +168,11 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
   // Declare vector of structs for storing parse results
   SmallVector<ExtraSignal::Storage> extraSignalsStorage;
   if (failed(parseExtraSignals(emitError, odsParser, extraSignalsStorage)))
-    return {};
+    return nullptr;
 
   // Parse ']' and '>'
   if (odsParser.parseRSquare() || odsParser.parseGreater())
-    return {};
+    return nullptr;
 
   SmallVector<ExtraSignal> extraSignals;
   // Convert parse results to ExtraSignal instances
@@ -180,7 +180,7 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
     extraSignals.emplace_back(signalStorage);
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
-    return {};
+    return nullptr;
 
   // Build ControlType
   // Uniquify and Allocate the ExtraSignal instances inside MLIR context
@@ -190,7 +190,7 @@ static Type parseControlAfterLSquare(AsmParser &odsParser) {
 Type ControlType::parse(AsmParser &odsParser) {
   // Parse literal '<'
   if (odsParser.parseLess())
-    return {};
+    return nullptr;
 
   if (!odsParser.parseOptionalLSquare()) {
     // Parsed '['.
@@ -200,7 +200,7 @@ Type ControlType::parse(AsmParser &odsParser) {
 
   // Parse literal '>'
   if (odsParser.parseGreater())
-    return {};
+    return nullptr;
 
   // Parsed "<>" here.
   return ControlType::get(odsParser.getContext(), {});
@@ -281,7 +281,7 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
 
   // Parse literal '>'
   if (odsParser.parseGreater())
-    return {};
+    return nullptr;
 
   SmallVector<ExtraSignal> extraSignals;
   // Convert the element type of the extra signal storage list to its
@@ -298,7 +298,7 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
 Type ChannelType::parse(AsmParser &odsParser) {
   // Parse literal '<'
   if (odsParser.parseLess())
-    return {};
+    return nullptr;
   return parseChannelAfterLess(odsParser);
 }
 
