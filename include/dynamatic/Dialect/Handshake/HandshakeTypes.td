@@ -206,4 +206,28 @@ def ChannelOrSimpleControl : TypeConstraint<
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
 >;
 
+// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
+// Also applies to ControlTypes, as some operations treat them interchangeably
+// using HandshakeType.
+// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    // ControlType without extra signals
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
+>;
+
+// Multi-entity constraint ensuring that all HandshakeTypes have matching extra signals.
+class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($_self.getType()).getExtraSignals()
+  }],
+  "extra signals"
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
