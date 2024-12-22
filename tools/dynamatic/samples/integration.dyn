@@ -1,0 +1,25 @@
+set-dynamatic-path  .
+
+set-src           integration-test/binary_search/binary_search.c
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/fir/fir.c
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/gcd/gcd.c
+compile
+write-hdl
+simulate
+synthesize
+
+set-src           integration-test/matrix/matrix.c
+compile
+write-hdl
+simulate
+synthesize
