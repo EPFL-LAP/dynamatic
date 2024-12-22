@@ -3,8 +3,8 @@
 
 // CHECK-LABEL:   handshake.func @multiplePathsAfterSpeculator(
 // CHECK-SAME:                                                 %[[VAL_0:.*]]: i1, ...) attributes {argNames = ["start"], resNames = []} {
-// CHECK:           %[[VAL_1:.*]] = source {name = #[[?]]<"source0">}
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {name = #[[?]]<"constant0">, value = true} : i1
+// CHECK:           %[[VAL_1:.*]] = source {name = #[[?]]<"source0">} : <>
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {name = #[[?]]<"constant0">, value = true} : <>, i1
 // CHECK:           %[[VAL_3:.*]] = spec_save{{\[}}%[[VAL_4:.*]]] %[[VAL_2]] {name = #[[?]]<"spec_save0">, speculative = true} : i1
 // CHECK:           %[[VAL_5:.*]], %[[VAL_4]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]] = speculator %[[VAL_0]] {name = #[[?]]<"speculator0", speculative = true>} : i1
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_5]], %[[VAL_3]] {name = #[[?]]<"cond_br0">, speculative = true} : i1
@@ -13,8 +13,8 @@
 // CHECK:           end {name = #[[?]]<"end0">} %[[VAL_12]], %[[VAL_13]] : i1, i1
 // CHECK:         }
 handshake.func @multiplePathsAfterSpeculator(%start: !handshake.control<>) -> (!handshake.channel<i1>, !handshake.channel<i1>) {
-    %0 = source
-    %1 = constant %0 {value = 1 : i1} : <i1>
+    %0 = source : <>
+    %1 = constant %0 {value = 1 : i1} : <>, <i1>
     %dataOutSave = spec_save[%saveCtrl] %1 : !handshake.channel<i1>, <i1>
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl = speculator [%start] %dataOutSave : !handshake.channel<i1> -> (!handshake.channel<i1>, !handshake.channel<i1>, !handshake.channel<i3>)
     %trueResult, %falseResult = cond_br %dataOut, %dataOutSave: <i1>, <i1>

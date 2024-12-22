@@ -4,12 +4,12 @@
 // CHECK-LABEL:   handshake.func @placeSaveCommitsOnAllPaths(
 // CHECK-SAME:                                               %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]]:2 = fork [2] %[[VAL_0]] {handshake.bb = 0 : ui32, handshake.name = "fork1"} : none
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = false} : i1
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = false} : <>, i1
 // CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = control_merge %[[VAL_5:.*]], %[[VAL_2]] {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : i1, i1
 // CHECK:           %[[VAL_6:.*]] = spec_save_commit{{\[}}%[[VAL_7:.*]]] %[[VAL_3]] {handshake.bb = 1 : ui32, handshake.name = "spec_save_commit0"} : i1
 // CHECK:           %[[VAL_8:.*]] = spec_save_commit{{\[}}%[[VAL_7]]] %[[VAL_9:.*]]#2 {handshake.bb = 1 : ui32, handshake.name = "spec_save_commit1"} : i1
 // CHECK:           %[[VAL_5]], %[[VAL_10:.*]] = cond_br %[[VAL_8]], %[[VAL_6]] {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : i1
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_1]]#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = true} : i1
+// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_1]]#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = true} : <>, i1
 // CHECK:           %[[VAL_12:.*]] = mux %[[VAL_4]] {{\[}}%[[VAL_13:.*]], %[[VAL_11]]] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : i1, i1
 // CHECK:           %[[VAL_9]]:3 = fork [3] %[[VAL_12]] {handshake.bb = 1 : ui32, handshake.name = "fork0"} : i1
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_16:.*]], %[[VAL_17:.*]], %[[VAL_18:.*]], %[[VAL_19:.*]] = speculator{{\[}}%[[VAL_1]]#1] %[[VAL_9]]#1 {handshake.bb = 1 : ui32, handshake.name = "speculator0"} : i1
@@ -28,10 +28,10 @@
 // CHECK:         }
 handshake.func @placeSaveCommitsOnAllPaths(%start: !handshake.control<>) -> !handshake.channel<i1> {
   %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
-  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <i1>
+  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <>, <i1>
   %result, %index = control_merge %trueResult, %4 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <i1>, <i1>
   %trueResult, %falseResult = cond_br %3#2, %result {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : <i1>, <i1>
-  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <i1>
+  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <>, <i1>
   %2 = mux %index [%trueResult1, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <i1>
   %3:3 = fork [3] %2  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : <i1>
   %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <i1>
