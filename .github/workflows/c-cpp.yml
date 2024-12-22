@@ -16,10 +16,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          clean: false
 
       - name: build
         run: ./build.sh --threads 2
 
       - name: integration-test
-        run: bin/dynamatic tools/dynamatic/samples/integration.dyn
+        run: bin/dynamatic --run tools/dynamatic/samples/integration.dyn
 
