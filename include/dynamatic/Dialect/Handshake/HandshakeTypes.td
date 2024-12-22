@@ -289,6 +289,17 @@ class DataTypesMatchWithVariadicFront<string variadic, string nonvariadic> : Pre
   }] # "($" # variadic # ", $" # nonvariadic # ")">
 >;
 
+/// Multi-entity constraint ensuring that the operands of variadic and non-variadic
+/// operand have the same data types.
+/// Also applies to ControlTypes, as some operations treat them interchangeably.
+class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredOpTrait<
+  "the operands inside the variadic " # name # " and " # nonvariadic # " should all have the same type",
+  And<[
+    AllDataTypesMatchWithinVariadic<variadic>.predicate,
+    DataTypesMatchWithVariadicFront<variadic, nonvariadic>.predicate
+  ]>
+>;
+
 /// Constraint to ensure an input/output is of SimpleControl/Channel type.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " should be of SimpleControl or SimpleChannel type",
