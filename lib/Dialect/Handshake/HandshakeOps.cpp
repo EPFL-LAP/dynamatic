@@ -240,16 +240,20 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   if (operands.size() < 2)
     return failure();
 
-  // We cannot use MergeLikeOpInterface::inferReturnTypes here because this
-  // method is static.
+  // Map to collect extra signals from data operands
   llvm::DenseMap<StringRef, const ExtraSignal *> extraSignalsMap;
+  // SmallVector to collect the extra signals of the result
   llvm::SmallVector<ExtraSignal> extraSignals;
   for (Value operand : operands) {
     auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
     for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
       if (extraSignalsMap.contains(extraSignal.name)) {
-        if (*extraSignalsMap.lookup(extraSignal.name) != extraSignal)
+        if (*extraSignalsMap.lookup(extraSignal.name) != extraSignal) {
+          // We don't accept the coexistence of two different extra signals
+          // with the same name in the data operands.
+          // e.g. [spec: i1] and [spec: i2]
           return failure();
+        }
       } else {
         extraSignalsMap.insert({extraSignal.name, &extraSignal});
         extraSignals.push_back(extraSignal);
@@ -258,6 +262,9 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   }
 
   auto firstDataInType = cast<ExtraSignalsTypeInterface>(operands[1].getType());
+
+  // The return type has the same data type (if applicable) as each data
+  // operand, along with the extra signals collected from all data operands.
   inferredReturnTypes.push_back(
       firstDataInType.replaceExtraSignals(extraSignals));
 

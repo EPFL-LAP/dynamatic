@@ -209,13 +209,14 @@ def ChannelOrSimpleControl : TypeConstraint<
 /// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably
 /// using HandshakeType.
-/// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
+/// For the ControlType case, this predicate is satisfied only when all types are ControlType.
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
     ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
-    // ControlType without extra signals
+    // Compare using ControlType without extra signals
     ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    // Compare using data type
     ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
   }],
   "data type"
@@ -224,19 +225,17 @@ class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
 /// Multi-entity constraint ensuring that all HandshakeTypes have matching extra signals.
 class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
-  [{
-    ::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($_self.getType()).getExtraSignals()
-  }],
+  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($_self.getType()).getExtraSignals()",
   "extra signals"
 >;
 
-/// A constraint ensuring that all types of a variadic operand have the same data type.
+/// A constraint ensuring that all operands of the variadic have the same data type.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
 class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
   "the operands inside the variadic " # name # " should have the same type",
   CPred<[{
     ([&](const mlir::OperandRange &operands) {
-      // Operands are those specified as the variadic input.
+      // Retrive all types of operands in the variadic.
       ValueTypeRange<OperandRange> types = operands.getTypes();
       size_t numTypes = types.size();
 
@@ -247,7 +246,7 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
 
       if (mlir::isa<ControlType>(types.front())) {
         // If the front operand is of ControlType, it is enough to
-        // confirm that all other types are also ControlType
+        // ensure that all other operands are also of ControlType
         for (size_t i = 1; i < numTypes; i++) {
           if (!mlir::isa<ControlType>(types[i]))
             return false;
@@ -257,7 +256,7 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
 
       // Here the front operand is of ChannelType.
 
-      // Confirm that dataTypes of all types are the same
+      // Ensure that data types of all operands are the same
       Type frontDataType = mlir::cast<ChannelType>(types.front()).getDataType();
       for (size_t i = 1; i < numTypes; i++) {
         if (mlir::cast<ChannelType>(types[i]).getDataType() != frontDataType)
@@ -272,30 +271,35 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
 class DataTypesMatchWithVariadicFront<string variadic, string nonvariadic> : PredOpTrait<
-  "the front operand of variadic and non-variadic operand should have the same data types", CPred<[{
+  "the front operand of variadic and non-variadic operand should have the same data type", CPred<[{
     ([&](const mlir::OperandRange &operands, const mlir::Value &op) {
-      auto types = operands.getTypes();
+      // Retrive all types of operands in the variadic.
+      ValueTypeRange<OperandRange> types = operands.getTypes();
 
       // If variadic is empty (no front operand), returns true
       if (types.empty())
         return true;
 
       if (mlir::isa<ControlType>(types.front())) {
-        // Confirm that non-variadic type is also ControlType
+        // Pass if non-variadic type is also ControlType
         return mlir::isa<ControlType>(op.getType());
       }
+
+      // Pass if non-variadic type has the same data type
       return mlir::cast<ChannelType>(types.front()).getDataType() == mlir::cast<ChannelType>(op.getType()).getDataType();
     })
   }] # "($" # variadic # ", $" # nonvariadic # ")">
 >;
 
-/// Multi-entity constraint ensuring that the operands of variadic and non-variadic
+/// Multi-entity constraint ensuring that the all operands of variadic and non-variadic
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
 class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredOpTrait<
   "the operands inside the variadic " # name # " and " # nonvariadic # " should all have the same type",
   And<[
+    // Ensuring the data types of variadic[0], ..., variadic[n] is the same
     AllDataTypesMatchWithinVariadic<variadic>.predicate,
+    // Ensuring the data types of variadic[0] and nonvariadic is the same
     DataTypesMatchWithVariadicFront<variadic, nonvariadic>.predicate
   ]>
 >;
@@ -315,12 +319,19 @@ class MergingExtraSignals<string variadicInterOperands, list<string> intraOperan
   "the extra signals of intraOperands and interOperands should satisfy \\\"Merging Relationship of Extra Signals\\\"",
   CPred<[{
     ([&](const mlir::OperandRange &interOperands, llvm::ArrayRef<Value> intraOperands) {
+
+      // Map to collect extra signals from interOperands
       llvm::DenseMap<StringRef, const ExtraSignal *> extraSignals;
+
+      // Iterate over the type of each interOperand inside the variadic parameter
       for (auto interOperandType : interOperands.getTypes()) {
         for (const ExtraSignal &extraSignal :
             cast<ExtraSignalsTypeInterface>(interOperandType).getExtraSignals()) {
           if (extraSignals.contains(extraSignal.name)) {
             if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
+              // We don't accept the coexistence of two different extra signals
+              // with the same name in the interOperands.
+              // e.g. [spec: i1] and [spec: i2]
               llvm::errs() << "interOperands have different extra signals of the same name: "
                 << extraSignal.name << "\n";
               return false;
@@ -335,6 +346,8 @@ class MergingExtraSignals<string variadicInterOperands, list<string> intraOperan
         auto intraOperandType =
           cast<ExtraSignalsTypeInterface>(intraOperand.getType());
 
+        // Each intraOperand should have the exactly same extraSignals
+        // collected from interOperands, though the order doesn't matter
         for (auto extraSignal : intraOperandType.getExtraSignals()) {
           if (extraSignals.contains(extraSignal.name)) {
             if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
@@ -349,6 +362,9 @@ class MergingExtraSignals<string variadicInterOperands, list<string> intraOperan
           }
         }
 
+        // We have already ensured:
+        // extraSignals collected from interOperands ⊇ extraSignals of this interOperand
+        // Now, verify the sizes match to confirm equality.
         if (extraSignals.size() != intraOperandType.getExtraSignals().size()) {
           llvm::errs() << "intraOperand doesn't have some extra signals operands have\n";
           return false;
