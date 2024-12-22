@@ -19,3 +19,7 @@ jobs:
 
       - name: build
         run: ./build.sh --threads 2
+
+      - name: integration-test
+        run: bin/dynamatic tools/dynamatic/samples/integration.dyn
+
