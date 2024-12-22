@@ -56,8 +56,6 @@ struct ExtraSignal {
   /// Constructs from the storage type (should not be used by client code).
   ExtraSignal(const Storage &storage);
 
-  ExtraSignal() = default;
-
   /// Returns the signal type's bitwidth.
   unsigned getBitWidth() const;
 };
