@@ -608,8 +608,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   // The memory controller does not accept ControlTypes with extra signals.
   // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
-  // (at least in speculative execution scenarios)
-  // TODO: Discuss the change of ChannelTypes to SimpleChannels
+  // See the issue #214.
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
                        Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
