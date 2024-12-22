@@ -206,10 +206,10 @@ def ChannelOrSimpleControl : TypeConstraint<
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
 >;
 
-// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
-// Also applies to ControlTypes, as some operations treat them interchangeably
-// using HandshakeType.
-// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
+/// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
+/// Also applies to ControlTypes, as some operations treat them interchangeably
+/// using HandshakeType.
+/// In the ControlType case, the data type is regarded as a ControlType with no extra signals here.
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
@@ -221,7 +221,7 @@ class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   "data type"
 >;
 
-// Multi-entity constraint ensuring that all HandshakeTypes have matching extra signals.
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra signals.
 class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
@@ -230,6 +230,7 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   "extra signals"
 >;
 
+/// Constraint to ensure an input/output is of SimpleControl/Channel type.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " should be of SimpleControl or SimpleChannel type",
   CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
