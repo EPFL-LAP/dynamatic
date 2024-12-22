@@ -55,3 +55,10 @@ handshake.func @sourceAndConstantWithExtraSignal(%ctrl : !handshake.control<>) -
   %valueWithExtraSignal = constant %ctrlWithExtraSignal {value = 100 : i32} : <[test: i2]>, <i32, [test: i2]>
   end %ctrl : !handshake.control<>
 }
+
+// -----
+
+handshake.func @loadWithExtraSignal(%ctrl : !handshake.control<>, %addr : !handshake.channel<i32, [test: i2]>, %ldData : !handshake.channel<i32>) -> !handshake.control<> {
+  %ldAddrToMem, %ldDataToSucc = load [%addr] %ldData : <i32, [test: i2]>, <i32>, <i32>, <i32, [test: i2]>
+  end %ctrl : !handshake.control<>
+}

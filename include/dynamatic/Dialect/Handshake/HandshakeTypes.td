@@ -230,4 +230,10 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   "extra signals"
 >;
 
+class IsSimpleHandshake<string name> : PredOpTrait<
+  name # " should be of SimpleControl or SimpleChannel type",
+  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getNumExtraSignals() == 0">
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
