@@ -47,3 +47,11 @@ handshake.func @reshapeChannelIntoExtra(%channel: !handshake.channel<f32, [down1
   %backToOriginal = reshape [SplitExtra] %reshaped : <f32, [mergedDown: i10, mergedUp: i8 (U)]> -> <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
   end %backToOriginal : !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
 }
+
+// -----
+
+handshake.func @sourceAndConstantWithExtraSignal(%ctrl : !handshake.control<>) -> !handshake.control<> {
+  %ctrlWithExtraSignal = source : <[test: i2]>
+  %valueWithExtraSignal = constant %ctrlWithExtraSignal {value = 100 : i32} : <[test: i2]>, <i32, [test: i2]>
+  end %ctrl : !handshake.control<>
+}

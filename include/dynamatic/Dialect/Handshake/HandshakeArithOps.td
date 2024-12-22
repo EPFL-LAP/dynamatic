@@ -210,6 +210,7 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi"> {
 }
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
+  AllExtraSignalsMatch<["ctrl", "result"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {

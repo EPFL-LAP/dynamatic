@@ -175,3 +175,12 @@ handshake.func @invalidReshapeMergeExtraSameData(%channel: !handshake.channel<f3
   %reshaped = reshape [MergeExtra] %channel : <f32, [down1: i16, down2: i16]> -> <i32, [mergedDown: i32]>
   end %reshaped : !handshake.channel<i32, [mergedDown: i32]>
 }
+
+// -----
+
+handshake.func @invalidSourceAndConstantWithExtraSignal(%ctrl : !handshake.control<>) -> !handshake.control<> {
+  %ctrlWithExtraSignal = source : <[test: i2]>
+  // expected-error @below {{'handshake.constant' op failed to verify that all of {ctrl, result} have same extra signals}}
+  %valueWithoutExtraSignal = constant %ctrlWithExtraSignal {value = 100 : i32} : <[test: i2]>, <i32>
+  end %ctrl : !handshake.control<>
+}
