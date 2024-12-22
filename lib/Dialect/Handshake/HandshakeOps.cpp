@@ -531,7 +531,15 @@ LogicalResult ConstantOp::inferReturnTypes(
   OperationName opName = OperationName(getOperationName(), context);
   StringAttr attrName = getValueAttrName(opName);
   auto attr = cast<TypedAttr>(attributes.get(attrName));
-  inferredReturnTypes.push_back(handshake::ChannelType::get(attr.getType()));
+
+  auto controlType = cast<ControlType>(operands[0].getType());
+
+  // The return type is a ChannelType with:
+  // - dataType as specified by the attribute
+  // - extra signals matching the input control type
+  inferredReturnTypes.push_back(handshake::ChannelType::get(
+      attr.getType(), controlType.getExtraSignals()));
+
   return success();
 }
 
