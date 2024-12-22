@@ -194,7 +194,7 @@ handshake.func @invalidMuxWithMoreExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op result has an extra signal e4, but none of the operands has it}}
+  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of intraOperands and interOperands should satisfy "Merging Relationship of Extra Signals"}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4, e4: i8]>
   end %ctrl : !handshake.control<>
 }
@@ -208,7 +208,7 @@ handshake.func @invalidMuxWithLessExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op result doesn't have some extra signals operands have}}
+  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of intraOperands and interOperands should satisfy "Merging Relationship of Extra Signals"}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6]>
   end %ctrl : !handshake.control<>
 }
@@ -222,7 +222,7 @@ handshake.func @invalidMuxWithConflictingExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e2: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op operands have different extra signals of the same name: e2}}
+  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of intraOperands and interOperands should satisfy "Merging Relationship of Extra Signals"}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e2: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e2: i6]>
   end %ctrl : !handshake.control<>
 }
