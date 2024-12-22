@@ -212,6 +212,10 @@ Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
   return ControlType::get(getContext(), newExtraSignals);
 }
 
+Type ControlType::replaceExtraSignal(ArrayRef<ExtraSignal> extraSignals) const {
+  return ControlType::get(getContext(), extraSignals);
+}
+
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//
@@ -346,6 +350,10 @@ Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
   SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
   newExtraSignals.emplace_back(signal);
   return ChannelType::get(getDataType(), newExtraSignals);
+}
+
+Type ChannelType::replaceExtraSignal(ArrayRef<ExtraSignal> extraSignals) const {
+  return ChannelType::get(getDataType(), extraSignals);
 }
 
 //===----------------------------------------------------------------------===//

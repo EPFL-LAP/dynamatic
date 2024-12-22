@@ -57,12 +57,43 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     if (!operands.size())
       return concreteOp.emitOpError("must have at least one data operand");
 
-    mlir::Type resultType = $_op->getResult(0).getType();
+    llvm::DenseMap<StringRef, const ExtraSignal *> extraSignals;
+    for (Value operand : operands) {
+      for (const ExtraSignal &extraSignal :
+           cast<ExtraSignalsTypeInterface>(operand.getType()).getExtraSignals()) {
+        if (extraSignals.contains(extraSignal.name)) {
+          if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
+            return concreteOp.emitOpError("operands have different extra signals of the same name: ")
+              << extraSignal.name;
+          }
+        } else {
+          extraSignals.insert({extraSignal.name, &extraSignal});
+        }
+      }
+    }
 
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
+    auto resultType =
+      cast<ExtraSignalsTypeInterface>($_op->getResult(0).getType());
+
+    for (auto extraSignal : resultType.getExtraSignals()) {
+      if (extraSignals.contains(extraSignal.name)) {
+        if (*extraSignals.lookup(extraSignal.name) != extraSignal)
+          return concreteOp.emitOpError("result has an extra signal ") << extraSignal.name
+              << ", but it is different from the operands";
+      } else {
+        return concreteOp.emitOpError("result has an extra signal ") << extraSignal.name
+            << ", but none of the operands has it";
+      }
+    }
+
+    if (extraSignals.size() != resultType.getExtraSignals().size()) {
+      return concreteOp.emitOpError("result doesn't have some extra signals operands have");
+    }
+
+    // for (auto operand : operands)
+    //   if (operand.getType() != resultType)
+    //     return concreteOp.emitOpError("operand has type ") << operand.getType()
+    //         << ", but result has type " << resultType;
 
     return mlir::success();
   }];
