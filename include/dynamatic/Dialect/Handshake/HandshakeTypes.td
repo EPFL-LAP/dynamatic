@@ -230,6 +230,65 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   "extra signals"
 >;
 
+/// A constraint ensuring that all types of a variadic operand have the same data type.
+/// Also applies to ControlTypes, as some operations treat them interchangeably.
+class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
+  "the operands inside the variadic " # name # " should have the same type",
+  CPred<[{
+    ([&](const mlir::OperandRange &operands) {
+      // Operands are those specified as the variadic input.
+      ValueTypeRange<OperandRange> types = operands.getTypes();
+      size_t numTypes = types.size();
+
+      if (numTypes <= 1)
+        return true;
+
+      // Here numTypes > 1 is guaranteed
+
+      if (mlir::isa<ControlType>(types.front())) {
+        // If the front operand is of ControlType, it is enough to
+        // confirm that all other types are also ControlType
+        for (size_t i = 1; i < numTypes; i++) {
+          if (!mlir::isa<ControlType>(types[i]))
+            return false;
+        }
+        return true;
+      }
+
+      // Here the front operand is of ChannelType.
+
+      // Confirm that dataTypes of all types are the same
+      Type frontDataType = mlir::cast<ChannelType>(types.front()).getDataType();
+      for (size_t i = 1; i < numTypes; i++) {
+        if (mlir::cast<ChannelType>(types[i]).getDataType() != frontDataType)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ")">
+>;
+
+/// Multi-entity constraint ensuring that the front operand of variadic and non-variadic
+/// operand have the same data types.
+/// Also applies to ControlTypes, as some operations treat them interchangeably.
+class DataTypesMatchWithVariadicFront<string variadic, string nonvariadic> : PredOpTrait<
+  "the front operand of variadic and non-variadic operand should have the same data types", CPred<[{
+    ([&](const mlir::OperandRange &operands, const mlir::Value &op) {
+      auto types = operands.getTypes();
+
+      // If variadic is empty (no front operand), returns true
+      if (types.empty())
+        return true;
+
+      if (mlir::isa<ControlType>(types.front())) {
+        // Confirm that non-variadic type is also ControlType
+        return mlir::isa<ControlType>(op.getType());
+      }
+      return mlir::cast<ChannelType>(types.front()).getDataType() == mlir::cast<ChannelType>(op.getType()).getDataType();
+    })
+  }] # "($" # variadic # ", $" # nonvariadic # ")">
+>;
+
 /// Constraint to ensure an input/output is of SimpleControl/Channel type.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " should be of SimpleControl or SimpleChannel type",
