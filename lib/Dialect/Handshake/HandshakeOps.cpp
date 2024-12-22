@@ -259,7 +259,7 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 
   auto firstDataInType = cast<ExtraSignalsTypeInterface>(operands[1].getType());
   inferredReturnTypes.push_back(
-      firstDataInType.replaceExtraSignal(extraSignals));
+      firstDataInType.replaceExtraSignals(extraSignals));
 
   return success();
 }

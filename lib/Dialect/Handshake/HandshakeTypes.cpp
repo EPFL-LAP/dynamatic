@@ -212,7 +212,8 @@ Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
   return ControlType::get(getContext(), newExtraSignals);
 }
 
-Type ControlType::replaceExtraSignal(ArrayRef<ExtraSignal> extraSignals) const {
+Type ControlType::replaceExtraSignals(
+    ArrayRef<ExtraSignal> extraSignals) const {
   return ControlType::get(getContext(), extraSignals);
 }
 
@@ -352,7 +353,8 @@ Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
   return ChannelType::get(getDataType(), newExtraSignals);
 }
 
-Type ChannelType::replaceExtraSignal(ArrayRef<ExtraSignal> extraSignals) const {
+Type ChannelType::replaceExtraSignals(
+    ArrayRef<ExtraSignal> extraSignals) const {
   return ChannelType::get(getDataType(), extraSignals);
 }
 

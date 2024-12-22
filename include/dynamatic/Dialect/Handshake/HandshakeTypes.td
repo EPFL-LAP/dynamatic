@@ -40,7 +40,7 @@ def ExtraSignals : TypeParameter<
 }
 
 def ControlType : Handshake_Type<"Control", "control", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal", "replaceExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal", "replaceExtraSignals"]>
 ]> {
   let summary = "a control-only dataflow channel";
   let description = [{
@@ -68,7 +68,7 @@ def ControlType : Handshake_Type<"Control", "control", [
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal", "replaceExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal", "replaceExtraSignals"]>
 ]> {
   let summary = "a dataflow channel with optional extra signals";
   let description = [{
