@@ -210,6 +210,7 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi"> {
 }
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
+  AllExtraSignalsMatch<["ctrl", "result"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
@@ -226,8 +227,10 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     ```
   }];
 
-  let arguments = (ins TypedAttrInterface:$value, SimpleControl:$ctrl);
-  let results = (outs SimpleChannel:$result);
+  // ConstantOp cannot limit the control signal to SimpleControl.
+  // See type verification documentation for details.
+  let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
+  let results = (outs ChannelType:$result);
 
   // The type of the control also needs to be specified in the IR.
   // It may have extra bits, which could affect the result's type and token.
