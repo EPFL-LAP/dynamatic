@@ -242,8 +242,6 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
       if (numTypes <= 1)
         return true;
 
-      // Here numTypes > 1 is guaranteed
-
       if (mlir::isa<ControlType>(types.front())) {
         // If the front operand is of ControlType, it is enough to
         // ensure that all other operands are also of ControlType
