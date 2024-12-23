@@ -335,7 +335,7 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
               return false;
             }
           } else {
-            unionofExtraSignals.insert({extraSignal.name, &extraSignal});
+            unionOfExtraSignals.insert({extraSignal.name, &extraSignal});
           }
         }
       }
@@ -349,7 +349,7 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
       // (1 of 2) Check the number of extra signals
       // #(extraSignals of the output) = #(union(extraSignals of each input))
       if (unionOfExtraSignals.size() != outputOperandType.getExtraSignals().size()) {
-        llvm::errs() << "the output doesn't have some extra signals inputs have\n";
+        llvm::errs() << "#(extraSignals of the output) is different from #(union(extraSignals of each input)).\n";
         return false;
       }
 
