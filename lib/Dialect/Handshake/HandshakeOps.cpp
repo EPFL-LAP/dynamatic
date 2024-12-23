@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cassert>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -249,9 +250,9 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
     for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
       if (extraSignalsMap.contains(extraSignal.name)) {
         if (*extraSignalsMap.lookup(extraSignal.name) != extraSignal) {
-          // We don't accept the coexistence of two different extra signals
-          // with the same name in the data operands.
-          // e.g. [spec: i1] and [spec: i2]
+          // Two different extra signals among inputs must have different names
+          // to be merge-able.
+          // e.g. [spec: i1] and [spec: i2] are prohibited.
           return failure();
         }
       } else {
@@ -263,8 +264,8 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 
   auto firstDataInType = cast<ExtraSignalsTypeInterface>(operands[1].getType());
 
-  // The return type has the same data type (if applicable) as each data
-  // operand, along with the extra signals collected from all data operands.
+  // The return type is data type of any data operand (if ControlType) with
+  // union of data operand's extra signals.
   inferredReturnTypes.push_back(
       firstDataInType.replaceExtraSignals(extraSignals));
 
@@ -2189,12 +2190,13 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
+  assert(operands.size() > 0 && "expected at least one operand");
+  assert(operands[0].getType().isa<ChannelType>() &&
+         "expected first operand to be a channel type");
   inferredReturnTypes.push_back(ChannelType::get(
       builder.getIntegerType(1),
-      // We can assume that
-      // - operand[0] exists
-      // - operand[0] is a channel type
-      // - all operands have the same extra signals
+      // We can assume from the definition in the tablegen file that
+      // all operands have the same extra signals
       cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
@@ -2210,12 +2212,13 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
+  assert(operands.size() > 0 && "expected at least one operand");
+  assert(operands[0].getType().isa<ChannelType>() &&
+         "expected first operand to be a channel type");
   inferredReturnTypes.push_back(ChannelType::get(
       builder.getIntegerType(1),
-      // We can assume that
-      // - operand[0] exists
-      // - operand[0] is a channel type
-      // - all operands have the same extra signals
+      // We can assume from the definition in the tablegen file that
+      // all operands have the same extra signals
       cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
