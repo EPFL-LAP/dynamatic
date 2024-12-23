@@ -309,28 +309,28 @@ class IsSimpleHandshake<string name> : PredOpTrait<
     ".getType()).getNumExtraSignals() == 0">
 >;
 
-/// Merging Relationship of Extra Signals: For all intraOperand and extra signal
-/// A, intraOperand has the extra signal A if and only if there exists an interOperand
-/// which has the extra signal A.
-/// In Merge-like Ops interOperands are always provided as variadic.
-class MergingExtraSignals<string variadicInterOperands, list<string> intraOperands> : PredOpTrait<
+/// Merging Relationship of Extra Signals:
+/// the output has the extra signal A if and only if
+/// there exists an input which has the extra signal A.
+/// In Merge-like Ops inputs are always provided as variadic.
+class MergingExtraSignals<string inputs, string output> : PredOpTrait<
   "the extra signals of intraOperands and interOperands should satisfy \\\"Merging Relationship of Extra Signals\\\"",
   CPred<[{
-    ([&](const mlir::OperandRange &interOperands, llvm::ArrayRef<Value> intraOperands) {
+    ([&](const mlir::OperandRange &inputs, Value output) {
 
-      // Map to collect extra signals from interOperands
+      // Map to collect extra signals from inputs
       llvm::DenseMap<StringRef, const ExtraSignal *> extraSignals;
 
-      // Iterate over the type of each interOperand inside the variadic parameter
-      for (auto interOperandType : interOperands.getTypes()) {
+      // Iterate over the type of each input operand
+      for (auto inputOperandType : inputs.getTypes()) {
         for (const ExtraSignal &extraSignal :
-            cast<ExtraSignalsTypeInterface>(interOperandType).getExtraSignals()) {
+            cast<ExtraSignalsTypeInterface>(inputOperandType).getExtraSignals()) {
           if (extraSignals.contains(extraSignal.name)) {
             if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
-              // We don't accept the coexistence of two different extra signals
-              // with the same name in the interOperands.
-              // e.g. [spec: i1] and [spec: i2]
-              llvm::errs() << "interOperands have different extra signals of the same name: "
+              // Two different extra signals among inputs must have different names
+              // to be merge-able.
+              // e.g. [spec: i1] and [spec: i2] are prohibited.
+              llvm::errs() << "inputs have different extra signals of the same name: "
                 << extraSignal.name << "\n";
               return false;
             }
@@ -340,42 +340,36 @@ class MergingExtraSignals<string variadicInterOperands, list<string> intraOperan
         }
       }
 
-      for (Value intraOperand : intraOperands) {
-        auto intraOperandType =
-          cast<ExtraSignalsTypeInterface>(intraOperand.getType());
+      auto outputOperandType =
+        cast<ExtraSignalsTypeInterface>(output.getType());
 
-        // Each intraOperand should have the exactly same extraSignals
-        // collected from interOperands, though the order doesn't matter
-        for (auto extraSignal : intraOperandType.getExtraSignals()) {
-          if (extraSignals.contains(extraSignal.name)) {
-            if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
-              llvm::errs() << "intraOperand has an extra signal " << extraSignal.name
-                  << ", but it is different from the interOperands\n";
-              return false;
-            }
-          } else {
-            llvm::errs() << "intraOperand has an extra signal " << extraSignal.name
-                << ", but none of the interOperands has it\n";
+      // The type of the output operand should have the exactly same extraSignals
+      // collected from input operands, though the order doesn't matter
+      for (auto extraSignal : outputOperandType.getExtraSignals()) {
+        if (extraSignals.contains(extraSignal.name)) {
+          if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
+            llvm::errs() << "an input has an extra signal " << extraSignal.name
+                << ", but it is different from the output\n";
             return false;
           }
-        }
-
-        // We have already ensured:
-        // extraSignals collected from interOperands ⊇ extraSignals of this interOperand
-        // Now, verify the sizes match to confirm equality.
-        if (extraSignals.size() != intraOperandType.getExtraSignals().size()) {
-          llvm::errs() << "intraOperand doesn't have some extra signals operands have\n";
+        } else {
+          llvm::errs() << "the output has an extra signal " << extraSignal.name
+              << ", which is not from any input\n";
           return false;
         }
       }
 
+      // We have already ensured:
+      // extraSignals collected from interOperands ⊇ extraSignals of this interOperand
+      // Now, verify the sizes match to confirm equality.
+      if (extraSignals.size() != outputOperandType.getExtraSignals().size()) {
+        llvm::errs() << "the output doesn't have some extra signals inputs have\n";
+        return false;
+      }
+
       return true;
     })(
-  }] # "$" # variadicInterOperands # ", {" # !interleave(!foreach(
-    /*var=*/intraOperand,
-    intraOperands,
-    "$" # intraOperand
-  ), ", ") # "})">
+  }] # "$" # inputs # ", $" # output # ")">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

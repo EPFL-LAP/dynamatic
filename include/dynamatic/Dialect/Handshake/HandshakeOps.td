@@ -332,8 +332,9 @@ def MergeOp : Handshake_Op<"merge", [
 
 def MuxOp : Handshake_Op<"mux", [
   Pure,
-  MergingExtraSignals<"dataOperands", ["selectOperand", "result"]>,
+  MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  IsSimpleHandshake<"selectOperand">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -370,8 +371,9 @@ def MuxOp : Handshake_Op<"mux", [
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
-  MergingExtraSignals<"dataOperands", ["result", "index"]>,
+  MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  IsSimpleHandshake<"index">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>

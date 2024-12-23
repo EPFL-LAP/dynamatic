@@ -67,12 +67,12 @@ handshake.func @loadWithExtraSignal(%ctrl : !handshake.control<>, %addr : !hands
 
 handshake.func @muxWithExtraSignal(
     %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2, [e1: i2, e2: i4, e3: i6]>,
+    %sel : !handshake.channel<i2>,
     %data1 : !handshake.channel<i32>,
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [e1: i2, e2: i4, e3: i6]>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e2: i4, e3: i6]>
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>
   end %ctrl : !handshake.control<>
 }
 
@@ -84,6 +84,6 @@ handshake.func @cmergeWithExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  %data, %idx = control_merge %data1, %data2, %data3, %data4 : [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>, <i2, [e1: i2, e3: i6, e2: i4]>
+  %data, %idx = control_merge %data1, %data2, %data3, %data4 : [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>, <i2>
   end %ctrl : !handshake.control<>
 }
