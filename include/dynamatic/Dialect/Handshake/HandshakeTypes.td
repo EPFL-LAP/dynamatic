@@ -319,14 +319,14 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
     ([&](const mlir::OperandRange &inputs, Value output) {
 
       // Map to collect extra signals from inputs
-      llvm::DenseMap<StringRef, const ExtraSignal *> extraSignals;
+      llvm::DenseMap<StringRef, const ExtraSignal *> unionOfExtraSignals;
 
       // Iterate over the type of each input operand
       for (auto inputOperandType : inputs.getTypes()) {
         for (const ExtraSignal &extraSignal :
             cast<ExtraSignalsTypeInterface>(inputOperandType).getExtraSignals()) {
-          if (extraSignals.contains(extraSignal.name)) {
-            if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
+          if (unionOfExtraSignals.contains(extraSignal.name)) {
+            if (*unionOfExtraSignals.lookup(extraSignal.name) != extraSignal) {
               // Two different extra signals among inputs must have different names
               // to be merge-able.
               // e.g. [spec: i1] and [spec: i2] are prohibited.
@@ -335,7 +335,7 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
               return false;
             }
           } else {
-            extraSignals.insert({extraSignal.name, &extraSignal});
+            unionofExtraSignals.insert({extraSignal.name, &extraSignal});
           }
         }
       }
@@ -343,11 +343,11 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
       auto outputOperandType =
         cast<ExtraSignalsTypeInterface>(output.getType());
 
-      // The type of the output operand should have the exactly same extraSignals
+      // The type of the output operand should have the exact unionOfExtraSignals
       // collected from input operands, though the order doesn't matter
       for (auto extraSignal : outputOperandType.getExtraSignals()) {
-        if (extraSignals.contains(extraSignal.name)) {
-          if (*extraSignals.lookup(extraSignal.name) != extraSignal) {
+        if (unionOfExtraSignals.contains(extraSignal.name)) {
+          if (*unionOfExtraSignals.lookup(extraSignal.name) != extraSignal) {
             llvm::errs() << "an input has an extra signal " << extraSignal.name
                 << ", but it is different from the output\n";
             return false;
@@ -362,7 +362,7 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
       // We have already ensured:
       // extraSignals collected from interOperands ⊇ extraSignals of this interOperand
       // Now, verify the sizes match to confirm equality.
-      if (extraSignals.size() != outputOperandType.getExtraSignals().size()) {
+      if (unionOfExtraSignals.size() != outputOperandType.getExtraSignals().size()) {
         llvm::errs() << "the output doesn't have some extra signals inputs have\n";
         return false;
       }
