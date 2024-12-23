@@ -345,6 +345,16 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
 
       // The type of the output operand should have the exact unionOfExtraSignals
       // collected from input operands, though the order doesn't matter
+
+      // (1 of 2) Check the number of extra signals
+      // #(extraSignals of the output) = #(union(extraSignals of each input))
+      if (unionOfExtraSignals.size() != outputOperandType.getExtraSignals().size()) {
+        llvm::errs() << "the output doesn't have some extra signals inputs have\n";
+        return false;
+      }
+
+      // (2 of 2) Check the inclusion relationship (only one direction is sufficient)
+      // extraSignals of the output ⊆ union(extraSignals of each input)
       for (auto extraSignal : outputOperandType.getExtraSignals()) {
         if (unionOfExtraSignals.contains(extraSignal.name)) {
           if (*unionOfExtraSignals.lookup(extraSignal.name) != extraSignal) {
@@ -357,14 +367,6 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
               << ", which is not from any input\n";
           return false;
         }
-      }
-
-      // We have already ensured:
-      // extraSignals collected from interOperands ⊇ extraSignals of this interOperand
-      // Now, verify the sizes match to confirm equality.
-      if (unionOfExtraSignals.size() != outputOperandType.getExtraSignals().size()) {
-        llvm::errs() << "the output doesn't have some extra signals inputs have\n";
-        return false;
       }
 
       return true;
