@@ -220,6 +220,12 @@ RTLDependencyRequest::tryToMatch(const RTLComponent &component) const {
   return new RTLMatch(component, mappings);
 }
 
+RTLSignalManagerRequest::RTLSignalManagerRequest(Location loc)
+    : RTLRequest(loc) {}
+
+RTLMatch *
+RTLSignalManagerRequest::tryToMatch(const RTLComponent &component) const {}
+
 RTLMatch::RTLMatch(const RTLComponent &component,
                    const ParameterMappings &serializedParams)
     : component(&component),

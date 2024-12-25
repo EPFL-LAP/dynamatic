@@ -310,6 +310,14 @@ private:
   ParameterMappings serializedParams;
 };
 
+/// Request for signal manager of RTL components.
+class RTLSignalManagerRequest : public RTLRequest {
+public:
+  RTLSignalManagerRequest(Location loc);
+
+  RTLMatch *tryToMatch(const RTLComponent &component) const override;
+};
+
 /// Represents an RTL component i.e., a top-level entry in the RTL configuration
 /// file. A component maps to an MLIR operation identified by its canonical name
 /// and has a set of named, typed, and  optionally constrained RTL parameters. A
