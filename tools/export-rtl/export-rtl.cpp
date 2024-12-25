@@ -182,14 +182,19 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       assert(signalManagerMatch->component->getDependencies().size() == 0 &&
              "Signal manager should not have dependencies");
 
-      if (failed(signalManagerMatch->concretize(request, dynamaticPath,
-                                                outputPath)))
-        return failure();
+      // Concretize only if this signal manager is new
+      StringRef concreteModName = signalManagerMatch->getConcreteModuleName();
+      if (auto [_, isNew] = modules.insert(concreteModName.str()); isNew) {
+        if (failed(signalManagerMatch->concretize(request, dynamaticPath,
+                                                  outputPath)))
+          return failure();
+      }
     } else {
       externals[extOp] = match;
       isMatchRegistered = true;
     }
-    // No need to do anything if a module with the same name already exists
+    // No need to concretize and check dependencies if a module with the same
+    // name already exists
     StringRef concreteModName = match->getConcreteModuleName();
     if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew) {
       if (isMatchRegistered)
