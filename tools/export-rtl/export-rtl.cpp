@@ -136,24 +136,29 @@ LogicalResult ExportInfo::concretizeExternalModules() {
 
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
-    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew)
+    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew) {
+      if (!extOp)
+        delete match;
       return success();
+    }
 
     // First generate dependencies recursively...
     for (StringRef dep : match->component->getDependencies()) {
       RTLDependencyRequest dependencyRequest(dep, request.loc);
-      if (failed(concretizeComponent(dependencyRequest, nullptr)))
+      if (failed(concretizeComponent(dependencyRequest, nullptr))) {
+        if (!extOp)
+          delete match;
         return failure();
+      }
     }
 
     // ...then generate the component itself
     LogicalResult concretizeResult =
         match->concretize(request, dynamaticPath, outputPath);
-    if (!extOp) {
-      // In this case, `match` is not collected by the member variable
-      // `externals`. Therefore, deallocate it here.
+
+    if (!extOp)
       delete match;
-    }
+
     return concretizeResult;
   };
 
