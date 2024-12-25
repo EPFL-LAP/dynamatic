@@ -147,7 +147,14 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     }
 
     // ...then generate the component itself
-    return match->concretize(request, dynamaticPath, outputPath);
+    LogicalResult concretizeResult =
+        match->concretize(request, dynamaticPath, outputPath);
+    if (!extOp) {
+      // In this case, `match` is not collected by the member variable
+      // `externals`. Therefore, deallocate it here.
+      delete match;
+    }
+    return concretizeResult;
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
