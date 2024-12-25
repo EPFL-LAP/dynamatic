@@ -185,8 +185,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       if (failed(signalManagerMatch->concretize(request, dynamaticPath,
                                                 outputPath)))
         return failure();
-
-      delete signalManagerMatch;
     } else {
       externals[extOp] = match;
       isMatchRegistered = true;
