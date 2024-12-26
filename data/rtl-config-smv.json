@@ -4,24 +4,27 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/addf.smv",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/addf.smv\" addf",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.addi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/addi.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/addi.smv\" addi",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.andi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/andi.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/andi.smv\" andi",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.cmpf",
@@ -35,8 +38,9 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/smv/arith/cmpf.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join", "flopoco_ip_cores"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/cmpf.smv\" cmpf",
+    "dependencies": ["join", "flopoco_ip_cores"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.cmpi",
@@ -50,32 +54,36 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpi-generator\" \"$DYNAMATIC/data/smv/arith/cmpi.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME $PREDICATE smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/cmpi.smv\" cmpi",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/divf.smv",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divf.smv\" divf",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.divsi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/divsi.smv",
-    "dependencies": ["join", "delay_buffer"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divsi.smv\" divsi",
+    "dependencies": ["join", "delay_buffer"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.divui",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/divui.smv",
-    "dependencies": ["join", "delay_buffer"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divui.smv\" divui",
+    "dependencies": ["join", "delay_buffer"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.extsi",
@@ -83,7 +91,8 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/extsi.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extsi.smv\" extsi",
+    "hdl": "smv"
   },
   {
     "name": "handshake.extui",
@@ -91,102 +100,115 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/extui.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extui.smv\" extui",
+    "hdl": "smv"
   },
   {
     "name": "handshake.maximumf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/maximumf.smv",
-    "dependencies": ["join", "delay_buffer"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/maximumf.smv\" maximumf",
+    "dependencies": ["join", "delay_buffer"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.minimumf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/minimumf.smv",
-    "dependencies": ["join", "delay_buffer"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/minimumf.smv\" minimumf",
+    "dependencies": ["join", "delay_buffer"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.mulf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/mulf.smv",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mulf.smv\" mulf",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.muli",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/muli.smv",
-    "dependencies": ["join", "delay_buffer", "oehb"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/muli.smv\" muli",
+    "dependencies": ["join", "delay_buffer"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.negf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/negf.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/negf.smv\" negf",
+    "hdl": "smv"
   },
   {
     "name": "handshake.ori",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/ori.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/ori.smv\" ori",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.select",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/select.smv",
-    "module-name": "selector"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/select.smv\" select",
+    "module-name": "selector",
+    "hdl": "smv"
   },
   {
     "name": "handshake.shli",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/shli.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shli.smv\" shli",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.shrsi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/shrsi.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shrsi.smv\" shrsi",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.shrui",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/shrui.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shrui.smv\" shrui",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.subf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/subf.smv",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/subf.smv\" subf",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.subi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/subi.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/subi.smv\" subi",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.trunci",
@@ -194,7 +216,8 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/trunci.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/trunci.smv\" trunci",
+    "hdl": "smv"
   },
   {
     "name": "handshake.truncf",
@@ -202,36 +225,41 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/truncf.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/truncf.smv\" truncf",
+    "hdl": "smv"
   },
   {
     "name": "handshake.xori",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/xori.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/xori.smv\" xori",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.sitofp",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/sitofp.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/sitofp.smv\" sitofp",
+    "hdl": "smv"
   },
   {
     "name": "handshake.fptosi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/fptosi.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fptosi.smv\" fptosi",
+    "hdl": "smv"
   },
   {
     "name": "handshake.absf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/absf.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/absf.smv\" absf",
+    "hdl": "smv"
   },
   {
     "name": "handshake.extf",
@@ -239,7 +267,8 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/arith/extf.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extf.smv\" extf",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -260,8 +289,9 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/oehb.smv",
-    "module-name": "oehb_dataless"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "module-name": "oehb_dataless",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -276,8 +306,8 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/oehb.smv",
-    "dependencies": ["oehb_dataless"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -298,9 +328,10 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/ofifo.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
     "module-name": "ofifo_dataless",
-    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -315,8 +346,9 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/ofifo.smv",
-    "dependencies": ["tehb", "elastic_fifo_inner"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "dependencies": ["tehb", "elastic_fifo_inner"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -336,8 +368,9 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tehb.smv",
-    "module-name": "tehb_dataless"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "module-name": "tehb_dataless",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -351,8 +384,8 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/tehb.smv",
-    "dependencies": ["tehb_dataless"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -372,9 +405,10 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tfifo.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
     "module-name": "tfifo_dataless",
-    "dependencies": ["elastic_fifo_inner_dataless"]
+    "dependencies": ["elastic_fifo_inner_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
@@ -388,8 +422,9 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/tfifo.smv",
-    "dependencies": ["elastic_fifo_inner"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "dependencies": ["elastic_fifo_inner"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.fork",
@@ -403,9 +438,10 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/fork.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fork.smv\" fork",
     "module-name": "fork_dataless",
-    "dependencies": ["logic", "eager_fork_register_block"]
+    "dependencies": ["logic", "eager_fork_register_block"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.fork",
@@ -413,9 +449,10 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/fork.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fork_$SIZE.smv\" fork $SIZE",
     "module-name": "handshake_fork",
-    "dependencies": ["types", "fork_dataless"]
+    "dependencies": ["types"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.lazy_fork",
@@ -429,9 +466,10 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/lazy_fork.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork.smv\" lazy_fork",
     "module-name": "lazy_fork_dataless",
-    "dependencies": ["logic"]
+    "dependencies": ["logic"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.lazy_fork",
@@ -439,8 +477,9 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/lazy_fork.smv",
-    "dependencies": ["types", "lazy_fork_dataless"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork.smv\" lazy_fork",
+    "dependencies": ["types", "lazy_fork_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.sink",
@@ -454,14 +493,16 @@
       }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/dataless/sink.smv",
-    "module-name": "sink_dataless"
+    "module-name": "sink_dataless",
+    "hdl": "smv"
   },
   {
     "name": "handshake.sink",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/sink.smv"
+    "generic": "$DYNAMATIC/data/smv/handshake/sink.smv",
+    "hdl": "smv"
   },
   {
     "name": "handshake.mux",
@@ -476,9 +517,10 @@
       },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/mux.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE",
     "module-name": "mux_dataless",
-    "dependencies": ["tehb_dataless"]
+    "dependencies": ["tehb_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.mux",
@@ -487,8 +529,9 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/mux.smv",
-    "dependencies": ["types", "tehb"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE",
+    "dependencies": ["types"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.control_merge",
@@ -503,9 +546,9 @@
       },
       { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/control_merge.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/control_merge.smv\" control_merge",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
+    "hdl": "smv"
   },
   {
     "name": "handshake.control_merge",
@@ -514,8 +557,9 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/control_merge.smv",
-    "dependencies": ["types", "control_merge_dataless"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/control_merge.smv\" control_merge",
+    "dependencies": ["types", "control_merge_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.merge",
@@ -531,7 +575,8 @@
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/dataless/merge.smv",
     "module-name": "merge_dataless",
-    "dependencies": ["tehb_dataless"]
+    "dependencies": ["tehb_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.merge",
@@ -540,7 +585,8 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/merge.smv",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["types", "tehb"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.br",
@@ -554,14 +600,16 @@
       }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/dataless/br.smv",
-    "module-name": "br_dataless"
+    "module-name": "br_dataless",
+    "hdl": "smv"
   },
   {
     "name": "handshake.br",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/br.smv"
+    "generic": "$DYNAMATIC/data/smv/handshake/br.smv",
+    "hdl": "smv"
   },
   {
     "name": "handshake.cond_br",
@@ -576,7 +624,8 @@
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/dataless/cond_br.smv",
     "module-name": "cond_br_dataless",
-    "dependencies": ["join"]
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.cond_br",
@@ -584,12 +633,14 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/cond_br.smv",
-    "dependencies": ["cond_br_dataless"]
+    "dependencies": ["cond_br_dataless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.source",
     "parameters": [],
-    "generic": "$DYNAMATIC/data/smv/handshake/source.smv"
+    "generic": "$DYNAMATIC/data/smv/handshake/source.smv",
+    "hdl": "smv"
   },
   {
     "name": "handshake.constant",
@@ -601,7 +652,8 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-text-generator\" \"$DYNAMATIC/data/smv/handshake/constant.smv\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/constant.smv\" constant $VALUE",
+    "hdl": "smv"
   },
   {
     "name": "handshake.load",
@@ -610,7 +662,7 @@
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/load.smv",
-    "dependencies": ["tehb"]
+    "hdl": "smv"
   },
   {
     "name": "handshake.store",
@@ -618,8 +670,9 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/store.smv",
-    "dependencies": ["join"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/store.smv\" store",
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.mem_controller",
@@ -630,8 +683,9 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller_storeless.smv",
-    "dependencies": ["mc_support"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mem_controller.smv\" mem_controller",
+    "dependencies": ["mc_support"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.mem_controller",
@@ -642,8 +696,9 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller_loadless.smv",
-    "dependencies": ["mc_support"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mem_controller.smv\" mem_controller",
+    "dependencies": ["mc_support"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.mem_controller",
@@ -654,14 +709,15 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/mem_controller.smv",
-    "dependencies": ["mem_controller_loadless"]
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mem_controller.smv\" mem_controller",
+    "dependencies": ["mem_controller_loadless"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lsq.smv\" lsq",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
-    "hdl": "verilog",
+    "hdl": "smv",
     "io-kind": "flat",
     "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
     "io-signals": {
@@ -670,7 +726,7 @@
   },
   {
     "name": "handshake.sharing_wrapper",
-    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.smv\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/sharing_wrapper.smv\" sharing_wrapper",
     "parameters": [
       { "name": "CREDITS", "type": "string" },
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb": 1 },
@@ -684,14 +740,16 @@
       "ofifo",
       "tfifo",
       "lazy_fork"
-    ]
+    ],
+    "hdl": "smv"
   },
   {
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
-    "generic": "$DYNAMATIC/data/smv/handshake/join.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/join.smv\" join SIZE",
     "module-name": "join_handshake",
-    "dependencies": ["join"]
+    "dependencies": ["join"],
+    "hdl": "smv"
   },
   {
     "name": "handshake.not",
@@ -699,44 +757,45 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/smv/handshake/not.smv",
-    "module-name": "logic_not"
+    "module-name": "logic_not",
+    "hdl": "smv"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/delay_buffer.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/eager_fork_register_block.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/eager_fork_register_block.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/elastic_fifo_inner.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/dataless/elastic_fifo_inner.smv",
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
     "module-name": "elastic_fifo_inner_dataless"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/logic.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/logic.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/flopoco_ip_cores.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/join.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/join.vhd"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/mc_support.smv",
+    "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",
     "dependencies": ["types"]
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/merge_notehb.smv",
+    "generic": "$DYNAMATIC/data/vhdl/support/merge_notehb.vhd",
     "dependencies": ["types"]
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/dataless/merge_notehb.smv",
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/merge_notehb.vhd",
     "module-name": "merge_notehb_dataless"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/types.smv"
+    "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   },
   {
     "name": "mem_to_bram",
@@ -744,10 +803,10 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
       { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
     ],
-    "generic": "$DYNAMATIC/data/smv/support/mem_to_bram.smv"
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mem_to_bram.smv\" mem_to_bram"
   },
   {
-    "generic": "$DYNAMATIC/data/smv/support/sharing_support.smv",
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
     "dependencies": ["types"]
   }
 ]

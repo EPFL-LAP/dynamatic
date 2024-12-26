@@ -603,7 +603,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   // if (failed(createInternalSignals(data)))
   //   return failure();
 
-  llvm::errs() << "\nMODULE " << modOp.getSymName() << "\n\n";
+  os << "\nMODULE " << modOp.getSymName() << "\n\n";
 
   // // Generic imports
   // os << "library ieee;\n";
@@ -657,6 +657,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   //     [](const llvm::Twine &src, const llvm::Twine &dst,
   //        raw_indented_ostream &os) { os << dst << " <= " << src << ";\n"; });
   // os << "\n";
+  // return success();
   writeModuleInstantiations(data);
 
   // // Close the entity's architecture
@@ -671,7 +672,7 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
     // HDL hdl(HDL::VHDL);
     std::string moduleName;
-    // std::string archName;
+    std::string archName;
     SmallVector<KeyValuePair> genericParams;
 
     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
@@ -683,7 +684,7 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
           const RTLMatch &match = *exportInfo.externals.at(extModOp);
           // hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
-          // archName = match.getConcreteArchName();
+          archName = match.getConcreteArchName();
           genericParams = match.getGenericParameterValues().takeVector();
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
@@ -1012,10 +1013,10 @@ int main(int argc, char **argv) {
 
   // // Parse the RTL configuration files
   RTLConfiguration config;
-  // for (StringRef filepath : rtlConfigs) {
-  //   if (failed(config.addComponentsFromJSON(filepath)))
-  //     return 1;
-  // }
+  for (StringRef filepath : rtlConfigs) {
+    if (failed(config.addComponentsFromJSON(filepath)))
+      return 1;
+  }
 
   // Create the (potentially nested) output directory
   if (auto ec = sys::fs::create_directories(outputPath); ec.value() != 0) {
@@ -1025,8 +1026,8 @@ int main(int argc, char **argv) {
 
   // // Generate/Pull all external modules into the output directory
   ExportInfo info(*modOp, config, outputPath);
-  // if (failed(info.concretizeExternalModules()))
-  //   return 1;
+  if (failed(info.concretizeExternalModules()))
+    return 1;
 
   // Create an SMV writer
   SMVWriter writer(info);

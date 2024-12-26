@@ -29,7 +29,7 @@
 namespace dynamatic {
 
 /// Hardware description languages.
-enum class HDL { VHDL, VERILOG };
+enum class HDL { VHDL, VERILOG, SMV };
 
 /// Returns the file extension (without a leading '.') for files of the HDL.
 StringRef getHDLExtension(HDL hdl);
@@ -91,7 +91,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(std::move(other.name)), type(std::move(other.type)) {};
+      : name(std::move(other.name)), type(std::move(other.type)){};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = std::move(other.name);
@@ -156,7 +156,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()) {};
+      : state(state), serialized(serial.str()){};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -169,7 +169,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc) {};
+  RTLRequest(Location loc) : loc(loc){};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.

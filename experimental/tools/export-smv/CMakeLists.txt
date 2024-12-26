@@ -1,9 +1,9 @@
 set(LLVM_LINK_COMPONENTS
   Support
 )
-add_llvm_executable(exp-export-smv export-smv.cpp)
-llvm_update_compile_flags(exp-export-smv)
-target_link_libraries(exp-export-smv
+add_llvm_executable(export-smv export-smv.cpp)
+llvm_update_compile_flags(export-smv)
+target_link_libraries(export-smv
   PRIVATE
   DynamaticSupport
   DynamaticTransforms
