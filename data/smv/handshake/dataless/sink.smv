@@ -1,0 +1,3 @@
+MODULE sink_dataless(ins_valid)
+DEFINE ins_ready := TRUE;
+

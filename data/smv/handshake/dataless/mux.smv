@@ -1,0 +1,13 @@
+generator
+
+// MODULE mux_*_1(ins_valid_0, ins_valid_1, ...,  index, index_valid, outs_ready)
+// DEFINE ins_ready_0 := (index == 0 & index_valid & tehb_inner.ins_ready & ins_valid_0) | !ins_valid_0;
+// DEFINE ins_ready_1 := (index == 1 & index_valid & tehb_inner.ins_ready & ins_valid_1) | !ins_valid_1;
+// ...
+// DEFINE tehb_ins_valid := case
+//                           index == 0 : index_valid & ins_valid_0;
+//                           index == 1 : index_valid & ins_valid_1;
+//                           ...
+//                           esac;
+// VAR tehb_inner : tehb_dataless(tehb_ins_valid, outs_ready);
+// DEFINE outs_valid := tehb_inner.outs_valid;

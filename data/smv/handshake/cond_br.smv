@@ -1,0 +1,8 @@
+MODULE cond_br(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
+VAR inner_br : cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+DEFINE data_ready := inner_br.data_ready;
+DEFINE condition_ready := inner_br.condition_ready;
+DEFINE trueOut_valid := inner_br.trueOut_valid;
+DEFINE falseOut_valid := inner_br.falseOut_valid;
+DEFINE trueOut := data;
+DEFINE falseOut := data;

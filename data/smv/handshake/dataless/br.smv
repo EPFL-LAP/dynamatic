@@ -1,0 +1,3 @@
+MODULE br_dataless(ins_valid, outs_ready)
+DEFINE outs_valid :=  ins_valid;
+DEFINE ins_ready  :=  outs_ready;

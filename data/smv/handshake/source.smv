@@ -1,0 +1,3 @@
+MODULE source(outs_ready)
+DEFINE outs_valid  := TRUE;
+//DEFINE dataOut0 := FALSE;
