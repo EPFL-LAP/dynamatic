@@ -1,0 +1,6 @@
+MODULE bop(lhs, lhs_valid, rhs, rhs_valid, result_ready)
+VAR inner_join : join_generic(lhs_valid, rhs_valid, result_ready);
+DEFINE result := lhs;
+DEFINE result_valid := inner_join.outs_valid;
+DEFINE lhs_ready := inner_join.ins_ready_0;
+DEFINE rhs_ready := inner_join.ins_ready_1;

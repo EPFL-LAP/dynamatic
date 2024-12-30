@@ -4,8 +4,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/addf.smv\" addf",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/addf.smv\" bop addf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -13,7 +13,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/addi.smv\" addi",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -22,7 +22,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/andi.smv\" andi",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -38,8 +38,8 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/cmpf.smv\" cmpf",
-    "dependencies": ["join", "flopoco_ip_cores"],
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
+    "dependencies": ["join"],
     "hdl": "smv"
   },
   {
@@ -54,7 +54,7 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/cmpi.smv\" cmpi",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -63,8 +63,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divf.smv\" divf",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divf.smv\" bop divf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -72,8 +72,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divsi.smv\" divsi",
-    "dependencies": ["join", "delay_buffer"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divsi.smv\" bop divsi,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -81,8 +81,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divui.smv\" divui",
-    "dependencies": ["join", "delay_buffer"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/divui.smv\" bop divui,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -108,8 +108,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/maximumf.smv\" maximumf",
-    "dependencies": ["join", "delay_buffer"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/maximumf.smv\" bop maximumf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -117,8 +117,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/minimumf.smv\" minimumf",
-    "dependencies": ["join", "delay_buffer"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/minimumf.smv\" bop minimumf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -126,8 +126,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mulf.smv\" mulf",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mulf.smv\" bop mulf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -135,8 +135,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/muli.smv\" muli",
-    "dependencies": ["join", "delay_buffer"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/muli.smv\" bop muli,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -152,7 +152,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/ori.smv\" ori",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -170,7 +170,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shli.smv\" shli",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -179,7 +179,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shrsi.smv\" shrsi",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -188,7 +188,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/shrui.smv\" shrui",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -197,8 +197,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/subf.smv\" subf",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/subf.smv\" bop subf,$DATA_TYPE",
+    "dependencies": ["join", "oehb"],
     "hdl": "smv"
   },
   {
@@ -206,7 +206,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/subi.smv\" subi",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -233,7 +233,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/xori.smv\" xori",
+    "generic": "$DYNAMATIC/data/smv/arith/bop.smv",
     "dependencies": ["join"],
     "hdl": "smv"
   },
@@ -747,8 +747,16 @@
     "name": "handshake.join",
     "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }],
     "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/join.smv\" join SIZE",
-    "module-name": "join_handshake",
-    "dependencies": ["join"],
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.join",
+    "generic": "$DYNAMATIC/data/smv/handshake/join.smv",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.oehb",
+    "generic": "$DYNAMATIC/data/smv/handshake/oehb.smv",
     "hdl": "smv"
   },
   {
@@ -778,9 +786,6 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/join.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",

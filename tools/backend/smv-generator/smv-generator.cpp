@@ -27,15 +27,25 @@ using namespace dynamatic;
 
 namespace dynamatic {
 namespace handshake {
-// allowed 64-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-// 12, 13, 14, 15
 enum class OpTypeEnum : uint64_t {
   DEFAULT = 0,
   JOIN = 1,
   MERGE = 2,
   MUX = 3,
   CONSTANT = 4,
+  BOP = 5,
 };
+
+std::unordered_map<std::string, std::unordered_map<std::string, int>>
+    operationLatencies = {{"addf", {{"32", 9}, {"64", 12}}},
+                          {"subf", {{"32", 9}, {"64", 12}}},
+                          {"mulf", {{"32", 4}, {"64", 4}}},
+                          {"muli", {{"32", 4}}},
+                          {"divf", {{"32", 29}, {"64", 36}}},
+                          {"divsi", {{"32", 36}}},
+                          {"divui", {{"32", 36}}},
+                          {"maximumf", {{"32", 2}, {"64", 2}}},
+                          {"minimumf", {{"32", 2}, {"64", 2}}}};
 
 OpTypeEnum symbolizeOp(const std::string &name) {
   if (name == "join")
@@ -46,6 +56,8 @@ OpTypeEnum symbolizeOp(const std::string &name) {
     return OpTypeEnum::MUX;
   if (name == "constant")
     return OpTypeEnum::CONSTANT;
+  if (name == "bop")
+    return OpTypeEnum::BOP;
   return OpTypeEnum::DEFAULT;
 }
 
@@ -72,11 +84,11 @@ std::string generateJoin(unsigned int inputSignals) {
       "MODULE join_" + std::to_string(inputSignals) + "_1 (ins_valid_0";
   for (unsigned int i = 1; i < inputSignals; i++)
     mod += ", inst_valid_" + std::to_string(i);
-  mod += "outs_ready)\n";
+  mod += ", outs_ready)\n";
 
   for (unsigned int i = 0; i < inputSignals; i++) {
     mod += "DEFINE ins_ready" + std::to_string(i) + "  := outs_ready";
-    for (unsigned int j = 1; j < inputSignals; j++)
+    for (unsigned int j = 0; j < inputSignals; j++)
       if (i != j)
         mod += " & ins_valid_" + std::to_string(j);
     mod += ";\n";
@@ -124,23 +136,6 @@ std::string generateMerge(unsigned int inputSignals) {
 }
 
 std::string generateMux(unsigned int inputSignals) {
-  // assert(inputSignals > 0);
-  //  MODULE mux_*_1(ins_valid_0, ins_valid_1, ...,  index, index_valid,
-  //  outs_ready)
-  //  DEFINE ins_ready_0 := (index == 0 & index_valid &
-  //  tehb_inner.ins_ready & ins_valid_0) | !ins_valid_0;
-  //  DEFINE ins_ready_1 :=
-  //  (index == 1 & index_valid & tehb_inner.ins_ready & ins_valid_1) |
-  //  !ins_valid_1;
-  //  ...
-  //  DEFINE tehb_ins_valid := case
-  //                            index == 0 : index_valid & ins_valid_0;
-  //                            index == 1 : index_valid & ins_valid_1;
-  //                            ...
-  //                            esac;
-  //  VAR tehb_inner : tehb_dataless(tehb_ins_valid, outs_ready);
-  //  DEFINE outs_valid := tehb_inner.outs_valid;
-
   std::string mod =
       "MODULE mux_" + std::to_string(inputSignals) + "_1 (inst_valid_0";
   for (unsigned int i = 1; i < inputSignals; i++)
@@ -181,12 +176,33 @@ std::string generateConstant(int val) {
   return mod;
 }
 
+std::string generateDelayBuffer(int latency) { return ""; }
+
+std::string generateBOP(const std::string &name, int latency) {
+  std::string mod =
+      generateDelayBuffer(latency - 1) + "\n\nMODULE " + name +
+      "(lhs, lhs_valid, rhs, rhs_valid, result_ready)\n"
+      "VAR inner_join : join_generic(lhs_valid, rhs_valid, "
+      "inner_oehb.ins_ready);\n"
+      "VAR inner_delay_buffer : delay_buffer_" +
+      std::to_string(latency - 1) +
+      "(inner_join.outs_valid, "
+      "inner_oehb.ins_ready);\n"
+      "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, result_ready);\n"
+      "DEFINE result := lhs;\n"
+      "DEFINE result_valid := inner_oehb.valid_out;\n"
+      "DEFINE lhs_ready := inner_join.ins_ready_0;\n"
+      "DEFINE rhs_ready := inner_join.ins_ready_1;\n";
+
+  return mod;
+}
+
 std::string generateComponent(handshake::OpTypeEnum name,
                               const std::string &params) {
 
   switch (name) {
   case handshake::OpTypeEnum::JOIN: {
-    int nInputs = std::stoi(params);
+    int nInputs = params.empty() ? 2 : std::stoi(params);
     return generateJoin(nInputs);
   }
   case handshake::OpTypeEnum::MERGE: {
@@ -200,6 +216,13 @@ std::string generateComponent(handshake::OpTypeEnum name,
   case handshake::OpTypeEnum::CONSTANT: {
     int val = std::stoi(params);
     return generateConstant(val);
+  }
+  case handshake::OpTypeEnum::BOP: {
+    int pos = params.find_first_of(',');
+    std::string name = params.substr(0, pos);
+    std::string dataType = params.substr(pos + 1);
+    return generateBOP(
+        name, dynamatic::handshake::operationLatencies[name][dataType]);
   }
   default:
     return "";

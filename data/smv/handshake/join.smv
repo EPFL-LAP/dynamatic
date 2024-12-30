@@ -1,1 +1,4 @@
-generator
+MODULE join_generic (ins_valid_0, inst_valid_1, outs_ready)
+DEFINE ins_ready0  := outs_ready & ins_valid_1;
+DEFINE ins_ready1  := outs_ready & ins_valid_0;
+DEFINE outs_valid  := ins_valid_0 & inst_valid_1;
