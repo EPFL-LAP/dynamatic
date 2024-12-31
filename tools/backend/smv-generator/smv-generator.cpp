@@ -34,6 +34,7 @@ enum class OpTypeEnum : uint64_t {
   MUX = 3,
   CONSTANT = 4,
   BOP = 5,
+  UOP = 6
 };
 
 std::unordered_map<std::string, std::unordered_map<std::string, int>>
@@ -45,7 +46,8 @@ std::unordered_map<std::string, std::unordered_map<std::string, int>>
                           {"divsi", {{"32", 36}}},
                           {"divui", {{"32", 36}}},
                           {"maximumf", {{"32", 2}, {"64", 2}}},
-                          {"minimumf", {{"32", 2}, {"64", 2}}}};
+                          {"minimumf", {{"32", 2}, {"64", 2}}},
+                          {"sitofp", {{"32", 5}}}};
 
 OpTypeEnum symbolizeOp(const std::string &name) {
   if (name == "join")
@@ -57,6 +59,8 @@ OpTypeEnum symbolizeOp(const std::string &name) {
   if (name == "constant")
     return OpTypeEnum::CONSTANT;
   if (name == "bop")
+    return OpTypeEnum::BOP;
+  if (name == "uop")
     return OpTypeEnum::BOP;
   return OpTypeEnum::DEFAULT;
 }
@@ -197,6 +201,21 @@ std::string generateBOP(const std::string &name, int latency) {
   return mod;
 }
 
+std::string generateUOP(const std::string &name, int latency) {
+  std::string mod =
+      generateDelayBuffer(latency - 1) + "\n\nMODULE " + name +
+      "(ins, ins_valid, outs_ready)\n"
+      "VAR inner_delay_buffer : delay_buffer_" +
+      std::to_string(latency - 1) +
+      "(ins_valid, "
+      "inner_oehb.ins_ready);\n"
+      "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, outs_ready);\n"
+      "DEFINE outs := ins;\n"
+      "DEFINE outs_valid := inner_oehb.valid_out;\n"
+      "DEFINE ins_ready := inner_oehb.ins_ready;\n";
+  return mod;
+}
+
 std::string generateComponent(handshake::OpTypeEnum name,
                               const std::string &params) {
 
@@ -222,6 +241,13 @@ std::string generateComponent(handshake::OpTypeEnum name,
     std::string name = params.substr(0, pos);
     std::string dataType = params.substr(pos + 1);
     return generateBOP(
+        name, dynamatic::handshake::operationLatencies[name][dataType]);
+  }
+  case handshake::OpTypeEnum::UOP: {
+    int pos = params.find_first_of(',');
+    std::string name = params.substr(0, pos);
+    std::string dataType = params.substr(pos + 1);
+    return generateUOP(
         name, dynamatic::handshake::operationLatencies[name][dataType]);
   }
   default:

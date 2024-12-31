@@ -91,7 +91,7 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extsi.smv\" extsi",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -100,7 +100,7 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extui.smv\" extui",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -144,7 +144,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/negf.smv\" negf",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -216,7 +216,7 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/trunci.smv\" trunci",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -225,7 +225,7 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/truncf.smv\" truncf",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -242,7 +242,8 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/sitofp.smv\" sitofp",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/sitofp.smv\" uop sitofp,$DATA_TYPE",
+    "dependencies": ["oehb"],
     "hdl": "smv"
   },
   {
@@ -250,7 +251,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fptosi.smv\" fptosi",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -258,7 +259,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/absf.smv\" absf",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
@@ -267,7 +268,7 @@
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/extf.smv\" extf",
+    "generic": "$DYNAMATIC/data/smv/arith/uop.smv",
     "hdl": "smv"
   },
   {
