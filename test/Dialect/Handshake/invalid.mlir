@@ -15,13 +15,28 @@ handshake.func @invalidExtraType(%arg0: !handshake.channel<i32, [extra: index]>)
 
 // -----
 
+// expected-error @below {{expected extra signal type to be IntegerType or FloatType, but extra' has type 'index'}}
+handshake.func @invalidExtraTypeControl(%arg0: !handshake.control<[extra: index]>)  
+
+// -----
+
 // expected-error @below {{expected all signal names to be unique but 'extra' appears more than once}}
 handshake.func @duplicateExtraNames(%arg0: !handshake.channel<i32, [extra: i16, extra: f16]>) 
 
 // -----
 
+// expected-error @below {{expected all signal names to be unique but 'extra' appears more than once}}
+handshake.func @duplicateExtraNamesControl(%arg0: !handshake.control<[extra: i16, extra: f16]>) 
+
+// -----
+
 // expected-error @below {{'valid' is a reserved name, it cannot be used as an extra signal name}}
 handshake.func @reservedExtraSignalName(%arg0: !handshake.channel<i32, [valid: i1]>)  
+
+// -----
+
+// expected-error @below {{'valid' is a reserved name, it cannot be used as an extra signal name}}
+handshake.func @reservedExtraSignalNameControl(%arg0: !handshake.control<[valid: i1]>)  
 
 // -----
 

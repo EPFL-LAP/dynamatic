@@ -12,3 +12,10 @@ mlir_tablegen(HandshakeAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=han
 mlir_tablegen(HandshakeAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=handshake)
 add_public_tablegen_target(MLIRHandshakeAttributesIncGen)
 add_dependencies(dynamatic-headers MLIRHandshakeAttributesIncGen)
+
+# Generation of the type interfaces required an independent target
+set(LLVM_TARGET_DEFINITIONS HandshakeTypeInterfaces.td)
+mlir_tablegen(HandshakeTypeInterfaces.h.inc -gen-type-interface-decls)
+mlir_tablegen(HandshakeTypeInterfaces.cpp.inc -gen-type-interface-defs)
+add_public_tablegen_target(MLIRHandshakeTypeInterfacesIncGen)
+add_dependencies(dynamatic-headers MLIRHandshakeTypeInterfacesIncGen)

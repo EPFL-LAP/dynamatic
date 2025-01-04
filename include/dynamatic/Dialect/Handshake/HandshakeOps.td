@@ -503,8 +503,15 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   }];
 
   let results = (outs ControlType:$result);
-  
-  let assemblyFormat = "attr-dict";
+
+  let builders = [
+    // Unless otherwise specified, output type is SimpleControl
+    OpBuilder<(ins), [{
+      $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
+    }]>
+  ];
+
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -596,20 +603,26 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
     ```
   }];
-  
-  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
+
+  // The memory controller does not accept ControlTypes with extra signals.
+  // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
+  // (at least in speculative execution scenarios)
+  // TODO: Discuss the change of ChannelTypes to SimpleChannels
+  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
+                       Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<SimpleChannel>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
+
+  // Dispatch SimpleControl signals to custom print and parse
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` functional-type($inputs, $outputs)
+    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
@@ -1093,6 +1106,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
+    // Builder for bundling ControlType
     OpBuilder<(ins "::mlir::Value":$valid), [{
       mlir::Type validReadyType = $_builder.getIntegerType(1);
       assert(valid.getType() == validReadyType && "incorrect valid signal");
@@ -1103,6 +1117,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
         validReadyType
       });
     }]>,
+    // Builder for bundling ChannelType
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)
@@ -1150,7 +1165,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$channelLike,
+  let arguments = (ins ChannelOrSimpleControl:$channelLike,
                        Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 

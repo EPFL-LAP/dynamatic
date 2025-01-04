@@ -52,17 +52,17 @@ handshake.func @lsqUnbuffered(%memref: memref<64xi32>, %addr: !handshake.channel
 // CHECK:           %[[VAL_2:.*]]:4 = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] (%[[VAL_3:.*]]#4, %[[VAL_3]]#0, %[[VAL_4:.*]], %[[VAL_5:.*]]#0, %[[VAL_6:.*]], %[[VAL_7:.*]]#0, %[[VAL_8:.*]], %[[VAL_7]]#2)  {groupSizes = [1 : i32, 1 : i32, 1 : i32], handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "2": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "3": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "4": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "5": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "6": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "7": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
 // CHECK:           %[[VAL_9:.*]] = merge %[[VAL_1]], %[[VAL_5]]#2 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00, "1": [0,inf], [1,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
 // CHECK:           %[[VAL_3]]:5 = lazy_fork [5] %[[VAL_9]] {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <>
-// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_3]]#1 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = false} : <i1>
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_3]]#2 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 0 : i32} : <i32>
+// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_3]]#1 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = false} : <>, <i1>
+// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_3]]#2 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 0 : i32} : <>, <i32>
 // CHECK:           %[[VAL_4]], %[[VAL_12:.*]] = load{{\[}}%[[VAL_11]]] %[[VAL_2]]#0 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           %[[VAL_13:.*]], %[[VAL_14:.*]] = cond_br %[[VAL_10]], %[[VAL_3]]#3 {handshake.bb = 1 : ui32, handshake.bufProps = #handshake<bufProps{"1": [0,inf], [1,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i1>, <>
 // CHECK:           sink %[[VAL_12]] : <i32>
 // CHECK:           %[[VAL_5]]:3 = lazy_fork [3] %[[VAL_13]] {handshake.bb = 2 : ui32} : <>
-// CHECK:           %[[VAL_15:.*]] = constant %[[VAL_5]]#1 {handshake.bb = 2 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 1 : i32} : <i32>
+// CHECK:           %[[VAL_15:.*]] = constant %[[VAL_5]]#1 {handshake.bb = 2 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_6]], %[[VAL_16:.*]] = load{{\[}}%[[VAL_15]]] %[[VAL_2]]#1 {handshake.bb = 2 : ui32, handshake.bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           sink %[[VAL_16]] : <i32>
 // CHECK:           %[[VAL_7]]:3 = lazy_fork [3] %[[VAL_14]] {handshake.bb = 3 : ui32} : <>
-// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_7]]#1 {handshake.bb = 3 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 2 : i32} : <i32>
+// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_7]]#1 {handshake.bb = 3 : ui32, handshake.bufProps = #handshake<bufProps{"0": [1,inf], [0,inf], 0.000000e+00, 0.000000e+00, 0.000000e+00}>, value = 2 : i32} : <>, <i32>
 // CHECK:           %[[VAL_8]], %[[VAL_18:.*]] = load{{\[}}%[[VAL_17]]] %[[VAL_2]]#2 {handshake.bb = 3 : ui32, handshake.bufProps = #handshake<bufProps{"1": [0,0], [0,0], 0.000000e+00, 0.000000e+00, 0.000000e+00}>} : <i32>, <i32>
 // CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_18]], %[[VAL_2]]#3 : <i32>, <>
 // CHECK:         }
@@ -72,19 +72,19 @@ handshake.func @lsqBufferControlPath(%memref: memref<64xi32>, %start: !handshake
 // ^^bb1 (from ^^bb0, ^bb2, to ^bb2, ^bb3):
   %ctrl1 = merge %start#0, %lazyForkCtrl2#2 {handshake.bb = 1 : ui32} : <>
   %lazyForkCtrl1:5 = lazy_fork [5] %ctrl1 {handshake.bb = 1 : ui32} : <>
-  %cond = constant %lazyForkCtrl1#1 {value = 0 : i1, handshake.bb = 1 : ui32} : <i1>
-  %addr1 = constant %lazyForkCtrl1#2 {value = 0 : i32, handshake.bb = 1 : ui32} : <i32>
+  %cond = constant %lazyForkCtrl1#1 {value = 0 : i1, handshake.bb = 1 : ui32} : <>, <i1>
+  %addr1 = constant %lazyForkCtrl1#2 {value = 0 : i32, handshake.bb = 1 : ui32} : <>, <i32>
   %ldAddrToMem1, %ldDataToSucc1 = load [%addr1] %ldData1 {handshake.bb = 1 : ui32} : <i32>, <i32>
   %ctrl1To2, %ctrl1To3 = cond_br %cond, %lazyForkCtrl1#3 {handshake.bb = 1 : ui32} : <i1>, <>
   sink %ldDataToSucc1 : <i32>
 // ^^bb2 (from ^^bb1, to ^^bb1):
   %lazyForkCtrl2:3 = lazy_fork [3] %ctrl1To2 {handshake.bb = 2 : ui32} : <>
-  %addr2 = constant %lazyForkCtrl2#1 {value = 1 : i32, handshake.bb = 2 : ui32} : <i32>
+  %addr2 = constant %lazyForkCtrl2#1 {value = 1 : i32, handshake.bb = 2 : ui32} : <>, <i32>
   %ldAddrToMem2, %ldDataToSucc2 = load [%addr2] %ldData2 {handshake.bb = 2 : ui32} : <i32>, <i32>
   sink %ldDataToSucc2 : <i32>
 // ^^bb3:
   %lazyForkCtrl3:3 = lazy_fork [3] %ctrl1To3 {handshake.bb = 3 : ui32} : <>
-  %addr3 = constant %lazyForkCtrl3#1 {value = 2 : i32, handshake.bb = 3 : ui32} : <i32>
+  %addr3 = constant %lazyForkCtrl3#1 {value = 2 : i32, handshake.bb = 3 : ui32} : <>, <i32>
   %ldAddrToMem3, %ldDataToSucc3 = load [%addr3] %ldData3 {handshake.bb = 3 : ui32} : <i32>, <i32>
   end {handshake.bb = 3 : ui32} %ldDataToSucc3, %done : <i32>, <>
 }

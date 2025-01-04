@@ -639,6 +639,7 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
 private:
   /// Indicates whether this pattern is part of the forward or backward pass.
   bool forward;
+  /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
 
@@ -976,6 +977,10 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
   }
 
 protected:
+<<<<<<< HEAD
+=======
+  /// A reference to the pass's name analysis.
+>>>>>>> main
   NameAnalysis &namer;
 };
 
@@ -1051,6 +1056,10 @@ struct ArithSingleType : public OpRewritePattern<Op> {
   }
 
 protected:
+<<<<<<< HEAD
+=======
+  /// A reference to the pass's name analysis.
+>>>>>>> main
   NameAnalysis &namer;
 
 private:
@@ -1115,6 +1124,10 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
   }
 
 protected:
+<<<<<<< HEAD
+=======
+  /// A reference to the pass's name analysis.
+>>>>>>> main
   NameAnalysis &namer;
 
 private:
@@ -1203,6 +1216,10 @@ struct ArithShift : public OpRewritePattern<Op> {
   }
 
 protected:
+<<<<<<< HEAD
+=======
+  /// A reference to the pass's name analysis.
+>>>>>>> main
   NameAnalysis &namer;
 
 private:
@@ -1280,6 +1297,10 @@ struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
   }
 
 protected:
+<<<<<<< HEAD
+=======
+  /// A reference to the pass's name analysis.
+>>>>>>> main
   NameAnalysis &namer;
 };
 
@@ -1593,6 +1614,7 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   patterns.add<ArithSingleType<handshake::AddIOp>,
                ArithSingleType<handshake::SubIOp>>(forward, addWidth, ctx,
                                                    getAnalysis<NameAnalysis>());
+<<<<<<< HEAD
   patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx,
                                                    getAnalysis<NameAnalysis>());
   patterns.add<ArithSingleType<handshake::AndIOp>>(true, andWidth, ctx,
@@ -1603,6 +1625,23 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   patterns.add<ArithShift<handshake::ShLIOp>, ArithShift<handshake::ShRSIOp>,
                ArithShift<handshake::ShRUIOp>, ArithSelect>(
       forward, ctx, getAnalysis<NameAnalysis>());
+=======
+
+  patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx,
+                                                   getAnalysis<NameAnalysis>());
+
+  patterns.add<ArithSingleType<handshake::AndIOp>>(true, andWidth, ctx,
+                                                   getAnalysis<NameAnalysis>());
+
+  patterns.add<ArithSingleType<handshake::OrIOp>,
+               ArithSingleType<handshake::XOrIOp>>(true, orWidth, ctx,
+                                                   getAnalysis<NameAnalysis>());
+
+  patterns.add<ArithShift<handshake::ShLIOp>, ArithShift<handshake::ShRSIOp>,
+               ArithShift<handshake::ShRUIOp>, ArithSelect>(
+      forward, ctx, getAnalysis<NameAnalysis>());
+
+>>>>>>> main
   patterns.add<ArithExtToTruncOpt>(ctx, getAnalysis<NameAnalysis>());
 }
 
@@ -1610,6 +1649,7 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
     RewritePatternSet &patterns, bool forward) {
   MLIRContext *ctx = patterns.getContext();
 
+<<<<<<< HEAD
   patterns.add<HandshakeOptDataNoCfg<handshake::ForkOp>,
                HandshakeOptDataNoCfg<handshake::LazyForkOp>,
                HandshakeOptDataNoCfg<handshake::MergeOp>,
@@ -1624,6 +1664,18 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
           forward, ctx, getAnalysis<NameAnalysis>());
   patterns.add<HandshakeOptData<handshake::BufferOp, BufferDataConfig>>(
       forward, ctx, getAnalysis<NameAnalysis>());
+=======
+  patterns
+      .add<HandshakeOptDataNoCfg<handshake::ForkOp>,
+           HandshakeOptDataNoCfg<handshake::LazyForkOp>,
+           HandshakeOptDataNoCfg<handshake::MergeOp>,
+           HandshakeOptDataNoCfg<handshake::BranchOp>,
+           HandshakeOptData<handshake::ControlMergeOp, CMergeDataConfig>,
+           HandshakeOptData<handshake::MuxOp, MuxDataConfig>,
+           HandshakeOptData<handshake::BufferOp, BufferDataConfig>,
+           HandshakeOptData<handshake::ConditionalBranchOp, CBranchDataConfig>>(
+          forward, ctx, getAnalysis<NameAnalysis>());
+>>>>>>> main
 }
 
 void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
@@ -1639,9 +1691,14 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
 
   // arith operations
   addArithPatterns(fwPatterns, true);
+
   fwPatterns.add<ArithSingleType<handshake::DivUIOp>,
                  ArithSingleType<handshake::DivSIOp>>(
       true, divWidth, ctx, getAnalysis<NameAnalysis>());
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
   fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
 }
 
