@@ -5,6 +5,42 @@ This document contains advanced build instructions targeted at users who would l
 > [!NOTE]
 > In the instructions below, we assume that you have already cloned Dynamatic and its submodules and that the project is rooted in a folder called `dynamatic`. Whenever provided shell commands contain `cd dynamatic`, it refers to this directory created during cloning. Adjust paths as needed depending on your current working directory.  
 
+
+## Gurobi
+
+##### Why do we need Gurobi?
+Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. 
+
+##### Download Gurobi
+Gurobi is available for Linux [here](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The resulting downloaded file will be `gurobiXX.X.X_linux64.tar.gz`.
+
+##### Obtain a license
+Free academic licenses for Gurobi are available [here](https://www.gurobi.com/academia/academic-program-and-licenses/). 
+
+##### Installation
+To install Gurobi, first extract your downloaded file to your desired installation directory.
+We recommend to place this in`/opt/`, e.g. `/opt/gurobiXXXX/linux64/` (with XXXX as the downloaded version).
+
+Using the following command:
+```sh
+# Replace x's with obtained license
+/opt/gurobiXXXX/linux64/bin/grbgetkey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
+```
+to pass your obtained license to Gurobi, which it stores in `~/gurobi.lic`.
+
+##### Configuring your environment
+
+In addition to adding Gurobi to your path, Dynamatic's CMake requires the `GUROBI_HOME` environment variable to find headers and libraries.
+
+```sh
+# Replace "gurobiXXXX" with the correct version
+export GUROBI_HOME="/opt/gurobiXXXX/linux64"
+export PATH="${GUROBI_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:$LD_LIBRARY_PATH"
+```
+
+These lines can be added to your shell initiation script, e.g. `~/.bashrc` or `~/.zshrc`, or used with any other environment setup method.
+
 ## Cloning
 
 The repository is set up so that Polygeist and LLVM are shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.

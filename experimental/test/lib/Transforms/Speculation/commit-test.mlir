@@ -4,7 +4,7 @@
 // CHECK-LABEL:   handshake.func @placeCommitsOnMultipleBranches(
 // CHECK-SAME:                                                   %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]]:2 = fork [2] %[[VAL_0]] {handshake.bb = 0 : ui32, handshake.name = "fork1"} : none
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = true} : i1
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = true} : <>, i1
 // CHECK:           %[[VAL_3:.*]]:2 = fork [2] %[[VAL_2]] {handshake.bb = 0 : ui32, handshake.name = "fork0"} : i1
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = control_merge %[[VAL_1]]#1 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : none, i1
 // CHECK:           %[[VAL_6:.*]] = mux %[[VAL_2]] {{\[}}%[[VAL_4]], %[[VAL_4]]] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : i1, none
@@ -31,7 +31,7 @@
 // CHECK:         }
 handshake.func @placeCommitsOnMultipleBranches(%start: !handshake.control<>) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.control<>) {
   %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
-  %1 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 1 : i1} : <i1>
+  %1 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 1 : i1} : <>, <i1>
   %2:2 = fork [2] %1  {handshake.bb = 0 : ui32, handshake.name = "fork0"} : <i1>
   %result, %index = control_merge %0#1 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <>, <i1>
   %3 = mux %1 [%result, %result] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <>

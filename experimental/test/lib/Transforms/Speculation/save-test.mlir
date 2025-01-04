@@ -4,8 +4,8 @@
 // CHECK-LABEL:   handshake.func @placeSimpleSave(
 // CHECK-SAME:                                    %[[VAL_0:.*]]: none, ...) attributes {argNames = ["start"], resNames = []} {
 // CHECK:           %[[VAL_1:.*]]:2 = fork [2] %[[VAL_0]] {handshake.bb = 0 : ui32, handshake.name = "fork1"} : none
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = false} : i1
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]]#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = true} : i1
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]]#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = false} : <>, i1
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]]#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = true} : <>, i1
 // CHECK:           %[[VAL_4:.*]]:4 = fork [4] %[[VAL_3]] {handshake.bb = 1 : ui32, handshake.name = "fork0"} : i1
 // CHECK:           %[[VAL_5:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_2]], %[[VAL_3]]] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : i1, i1
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]], %[[VAL_11:.*]] = speculator{{\[}}%[[VAL_1]]#1] %[[VAL_5]] {handshake.bb = 1 : ui32, handshake.name = "speculator0"} : i1
@@ -27,8 +27,8 @@
 // CHECK:         }
 handshake.func @placeSimpleSave(%start: !handshake.control<>) -> !handshake.channel<i1> {
   %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
-  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <i1>
-  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <i1>
+  %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <>, <i1>
+  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <>, <i1>
   %2:4 = fork [4] %1  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : <i1>
   %3 = mux %1 [%4, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <i1>
   %trueResult1, %falseResult1 = cond_br %2#0, %3 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <i1>
