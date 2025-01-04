@@ -1,5 +1,19 @@
-#ifndef DYNAMATIC_HANDSHAKE_SUPPORT_SUPPORT_H
-#define DYNAMATIC_HANDSHAKE_SUPPORT_SUPPORT_H
+//===- FtdSupport.h - FTD conversion support -------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Declares some utility functions which are useful for both the fast token
+// delivery algorithm and for the GSA analysis pass. All the functions are about
+// analyzing relationships between blocks and handshake operations.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef DYNAMATIC_HANDSHAKE_EXPERIMENTAL_SUPPORT_FTDSUPPORT_H
+#define DYNAMATIC_HANDSHAKE_EXPERIMENTAL_SUPPORT_FTDSUPPORT_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
@@ -15,10 +29,10 @@ namespace ftd {
 /// custom indexing.
 class BlockIndexing {
 
-  /// Map to store the connection between indexes and blocks.
+  /// Map to store the connection between indices and blocks.
   DenseMap<unsigned, Block *> indexToBlock;
 
-  /// Map to store the connection between blocks and indexes.
+  /// Map to store the connection between blocks and indices.
   DenseMap<Block *, unsigned> blockToIndex;
 
 public:
@@ -26,38 +40,38 @@ public:
   BlockIndexing(mlir::Region &region);
 
   /// Get a block out of an index.
-  Block *getBlockFromIndex(unsigned index) const;
+  std::optional<Block *> getBlockFromIndex(unsigned index) const;
 
   /// Get a block out of a string condition in the format `cX` where X is a
   /// number.
-  Block *getBlockFromCondition(const std::string &condition) const;
+  std::optional<Block *> getBlockFromCondition(StringRef condition) const;
 
   /// Get the index of a block.
-  unsigned getIndexFromBlock(Block *bb) const;
+  std::optional<unsigned> getIndexFromBlock(Block *bb) const;
 
   /// Return true if the index of bb1 is greater than then index of bb2.
-  bool greaterIndex(Block *bb1, Block *bb2) const;
+  bool isGreater(Block *bb1, Block *bb2) const;
 
   /// Return true if the index of bb1 is smaller than then index of bb2.
-  bool lessIndex(Block *bb1, Block *bb2) const;
+  bool isLess(Block *bb1, Block *bb2) const;
 
   /// Given a block whose name is `^BBN` (where N is an integer) return a string
   /// in the format `cN`, used to identify the condition which allows the block
-  /// to be executed. The adopted index is retrived from the BlockIndexing.
+  /// to be executed. The adopted index is retrieved from the BlockIndexing.
   std::string getBlockCondition(Block *block) const;
 };
 
 /// Checks if the source and destination are in a loop
 bool isSameLoopBlocks(Block *source, Block *dest, const mlir::CFGLoopInfo &li);
 
-/// Gets all the paths from block `start` to block `end` using a dfs search.
+/// Gets all the paths from block `start` to block `end` using a DFS search.
 /// If `blockToTraverse` is non null, then we want the paths having
-/// `blockToTraverse` in the path; if `blocksToAvoid` is non empty, then we want
-/// the paths which do not cross those blocks.
+/// `blockToTraverse` in the path; filters paths that do not contain blocks in
+/// `blocksToAvoid`.
 std::vector<std::vector<Block *>>
 findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
              Block *blockToTraverse = nullptr,
-             ArrayRef<Block *> blocksToAvoid = std::vector<Block *>());
+             ArrayRef<Block *> blocksToAvoid = {});
 
 /// Given a sequence of block, find a boolean expression defining the conditions
 /// for which the path is traversed. If one edge is unconditional, then no
@@ -81,4 +95,4 @@ SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);
 } // namespace experimental
 } // namespace dynamatic
 
-#endif
+#endif // DYNAMATIC_HANDSHAKE_EXPERIMENTAL_SUPPORT_FTDSUPPORT_H

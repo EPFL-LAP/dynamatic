@@ -611,8 +611,12 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
                                    Block *block, const ftd::BlockIndexing &bi) {
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
-  auto condition =
-      bi.getBlockFromCondition(singleCond->id)->getTerminator()->getOperand(0);
+  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
+  if (!conditionOpt.has_value()) {
+    llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
+    return nullptr;
+  }
+  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
   if (singleCond->isNegated) {
     rewriter.setInsertionPointToStart(block);
     auto notOp = rewriter.create<handshake::NotOp>(
@@ -697,7 +701,7 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
 
     // Do not add the branch in case of a while loop with backward edge
     if (btlt == BackwardRelationship &&
-        bi.greaterIndex(connection.getParentBlock(), loopExit))
+        bi.isGreater(connection.getParentBlock(), loopExit))
       return connection;
 
     // Get the termination operation, which is supposed to be conditional
@@ -985,7 +989,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
     // We need to suppress a token if the consumer comes before the
     // producer (backward edge)
-    if ((bi.greaterIndex(producerBlock, consumerBlock) ||
+    if ((bi.isGreater(producerBlock, consumerBlock) ||
          (llvm::isa<handshake::MuxOp>(consumerOp) &&
           producerBlock == consumerBlock &&
           isaMergeLoop(consumerOp, loopInfo))) &&

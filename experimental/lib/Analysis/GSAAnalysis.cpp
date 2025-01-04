@@ -213,7 +213,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
   // "indexPerBlock" mapping)
   Gate *newGate =
       new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse));
+               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
   gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
 
   return newGate;

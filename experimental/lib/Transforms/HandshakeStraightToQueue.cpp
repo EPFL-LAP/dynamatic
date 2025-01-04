@@ -140,7 +140,7 @@ static SmallVector<ProdConsMemDep> identifyMemoryDependencies(
       // this case i is the producer, j is the consumer. If this doesn't
       // hold, the dependency will be added when the two blocks are analyzed
       // in the opposite direction
-      if (bi.lessIndex(bbJ, bbI)) {
+      if (bi.isLess(bbJ, bbI)) {
         allMemDeps.push_back(ProdConsMemDep(bbJ, bbI));
 
         // If the two blocks are in the same loop, then bbI is also a
@@ -236,7 +236,7 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
       for (auto &sp : group->preds) {
 
         // if we are considering the same elements, ignore them
-        if (sp->bb == bp->bb || bi.greaterIndex(sp->bb, bp->bb))
+        if (sp->bb == bp->bb || bi.isGreater(sp->bb, bp->bb))
           continue;
 
         // Add the small predecessors to the list of elements to remove in

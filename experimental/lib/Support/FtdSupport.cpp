@@ -1,3 +1,17 @@
+//===- FtdSupport.cpp - FTD conversion support -----------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements some utility functions which are useful for both the fast token
+// delivery algorithm and for the GSA analysis pass. All the functions are about
+// analyzing relationships between blocks and handshake operations.
+//
+//===----------------------------------------------------------------------===//
+
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -9,7 +23,7 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 
 std::string ftd::BlockIndexing::getBlockCondition(Block *block) const {
-  return "c" + std::to_string(getIndexFromBlock(block));
+  return "c" + std::to_string(getIndexFromBlock(block).value_or(0));
 }
 
 ftd::BlockIndexing::BlockIndexing(Region &region) {
@@ -22,8 +36,8 @@ ftd::BlockIndexing::BlockIndexing(Region &region) {
 
   // Sort the vector according to the dominance information, so that a block
   // comes before each dominators.
-  std::sort(allBlocks.begin(), allBlocks.end(),
-            [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
+  llvm::sort(allBlocks.begin(), allBlocks.end(),
+             [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
 
   // Associate a smalled index in the map to the blocks at higer levels of the
   // dominance tree
@@ -33,34 +47,50 @@ ftd::BlockIndexing::BlockIndexing(Region &region) {
   }
 }
 
-Block *ftd::BlockIndexing::getBlockFromIndex(unsigned index) const {
+std::optional<Block *>
+ftd::BlockIndexing::getBlockFromIndex(unsigned index) const {
   auto it = indexToBlock.find(index);
-  return (it == indexToBlock.end()) ? nullptr : it->getSecond();
+  if (it == indexToBlock.end())
+    return {};
+  return it->getSecond();
 }
 
-Block *
-ftd::BlockIndexing::getBlockFromCondition(const std::string &condition) const {
-  std::string conditionNumber = condition;
+std::optional<Block *>
+ftd::BlockIndexing::getBlockFromCondition(StringRef condition) const {
+  std::string conditionNumber = condition.str();
   conditionNumber.erase(0, 1);
-  unsigned index = std::stoi(conditionNumber);
-  return this->getBlockFromIndex(index);
+  StringRef conditionRef = conditionNumber;
+  unsigned index = 0;
+  if (conditionRef.getAsInteger(0, index))
+    return {};
+  return getBlockFromIndex(index);
 }
 
-unsigned ftd::BlockIndexing::getIndexFromBlock(Block *bb) const {
+std::optional<unsigned> ftd::BlockIndexing::getIndexFromBlock(Block *bb) const {
   auto it = blockToIndex.find(bb);
-  return (it == blockToIndex.end()) ? -1 : it->getSecond();
+  if (it == blockToIndex.end())
+    return {};
+  return it->getSecond();
 }
 
-bool dynamatic::experimental::ftd::BlockIndexing::greaterIndex(
-    Block *bb1, Block *bb2) const {
-  return getIndexFromBlock(bb1) > getIndexFromBlock(bb2);
+bool dynamatic::experimental::ftd::BlockIndexing::isGreater(Block *bb1,
+                                                            Block *bb2) const {
+  auto index1 = getIndexFromBlock(bb1);
+  auto index2 = getIndexFromBlock(bb2);
+  if (!index1.has_value() || !index2.has_value())
+    return false;
+  return index1 > index2;
 }
 
-bool ftd::BlockIndexing::lessIndex(Block *bb1, Block *bb2) const {
-  return getIndexFromBlock(bb1) < getIndexFromBlock(bb2);
+bool ftd::BlockIndexing::isLess(Block *bb1, Block *bb2) const {
+  auto index1 = getIndexFromBlock(bb1);
+  auto index2 = getIndexFromBlock(bb2);
+  if (!index1.has_value() || !index2.has_value())
+    return false;
+  return index1 < index2;
 }
 
-/// Recursively check weather 2 blocks belong to the same loop, starting
+/// Recursively check whether 2 blocks belong to the same loop, starting
 /// from the inner-most loops.
 static bool isSameLoop(const CFGLoop *loop1, const CFGLoop *loop2) {
   if (!loop1 || !loop2)
@@ -102,7 +132,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       // Do not run DFS if the successor is in the list of blocks to traverse
       bool incorrectPath = false;
       for (auto *toAvoid : blocksToAvoid) {
-        if (toAvoid == successor && bi.greaterIndex(toAvoid, blockToTraverse)) {
+        if (toAvoid == successor && bi.isGreater(toAvoid, blockToTraverse)) {
           incorrectPath = true;
           break;
         }
@@ -111,7 +141,7 @@ static void dfsAllPaths(Block *start, Block *end, std::vector<Block *> &path,
       if (incorrectPath)
         continue;
 
-      if (visited.find(successor) == visited.end()) {
+      if (!visited.count(successor)) {
         dfsAllPaths(successor, end, path, visited, allPaths, blockToTraverse,
                     blocksToAvoid, bi, blockFound || blockToTraverseFound);
       }
@@ -135,11 +165,9 @@ ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
   return allPaths;
 }
 
-boolean::BoolExpression *
-ftd::getPathExpression(ArrayRef<Block *> path,
-                       DenseSet<unsigned> &blockIndexSet,
-                       const BlockIndexing &bi, const DenseSet<Block *> &deps,
-                       const bool ignoreDeps) {
+boolean::BoolExpression *ftd::getPathExpression(
+    ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
+    const BlockIndexing &bi, const DenseSet<Block *> &deps, bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();
@@ -161,7 +189,12 @@ ftd::getPathExpression(ArrayRef<Block *> path,
       Operation *terminatorOp = firstBlock->getTerminator();
 
       if (isa<cf::CondBranchOp>(terminatorOp)) {
-        unsigned blockIndex = bi.getIndexFromBlock(firstBlock);
+        auto blockIndexOptional = bi.getIndexFromBlock(firstBlock);
+        if (!blockIndexOptional.has_value()) {
+          llvm::errs() << "The block index of a block cannot be obtained\n";
+          continue;
+        }
+        unsigned blockIndex = blockIndexOptional.value();
         std::string blockCondition = bi.getBlockCondition(firstBlock);
 
         // Get a boolean condition out of the block condition
