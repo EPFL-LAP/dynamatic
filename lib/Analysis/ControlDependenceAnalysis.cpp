@@ -81,8 +81,8 @@ static bool enumeratePathsInPostDomTree(DominanceInfoNode *startNode,
 
   // For each of the successors of `startNode`, try each descendent until
   // `endNode` is found
-  for (auto *iter = startNode->begin(); iter < startNode->end(); iter++) {
-    if (enumeratePathsInPostDomTree(*iter, endNode, currentPath))
+  for (auto *node : startNode->children()) {
+    if (enumeratePathsInPostDomTree(node, endNode, currentPath))
       return true;
   }
 
