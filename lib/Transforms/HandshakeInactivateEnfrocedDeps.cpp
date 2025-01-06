@@ -157,9 +157,11 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
 
 /// replaces the memory dependence array attribute with the dependencies 
 /// given in the dictionary `opDeps`
-static void changeOpDeps(DependencyMap& opDeps, MLIRContext* ctx){
+static void changeOpDeps(DependencyMap& opDeps, MLIRContext* ctx)        {
   for (auto &[op, deps] : opDeps)
+
     setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
+    llvm::errs() << "";
 }
 
 
