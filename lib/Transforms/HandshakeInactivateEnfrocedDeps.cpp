@@ -159,9 +159,7 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
 /// given in the dictionary `opDeps`
 static void changeOpDeps(DependencyMap& opDeps, MLIRContext* ctx)        {
   for (auto &[op, deps] : opDeps)
-
     setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
-    llvm::errs() << "";
 }
 
 
