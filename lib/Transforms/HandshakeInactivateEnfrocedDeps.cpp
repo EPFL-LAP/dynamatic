@@ -1,4 +1,4 @@
-//===- HandshakeAnalyzeLSQUsage.cpp - LSQ flow analysis ---------*- C++ -*-===//
+//===- HandshakeInactivateEnforcedDeps.cpp - LSQ flow analysis ---------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the --handshake-analyze-lsq-usage pass, using the logic
+// Implements the --handshake-inactivate-enforced-deps pass, using the logic
 // introduced in https://ieeexplore.ieee.org/document/8977873.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeAnalyzeLSQUsage.h"
+#include "dynamatic/Transforms/HandshakeInactivateEnforcedDeps.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -23,19 +23,22 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "handshake-analyze-lsq-usage"
+#define DEBUG_TYPE "handshake-inactivate-enforced-deps"
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+using DependencyMap = DenseMap<Operation*, SmallVector<MemDependenceAttr>>;
+
 namespace {
 
-/// Simple pass driver for the LSQ usage analysis pass. Does not modify the IR
-/// beyong setting `handshake::MemInterfaceAttr` attributes on memory ports.
-struct HandshakeAnalyzeLSQUsagePass
-    : public dynamatic::impl::HandshakeAnalyzeLSQUsageBase<
-          HandshakeAnalyzeLSQUsagePass> {
+/// Simple pass driver for the Inactivate Enforced Dependencies pass. 
+/// Modifies the IR by marking the enforced dependencies as inactive and then
+/// setting `handshake::MemInterfaceAttr` attributes on memory ports.
+struct HandshakeInactivateEnforcedDepsPass
+    : public dynamatic::impl::HandshakeInactivateEnforcedDepsBase<
+          HandshakeInactivateEnforcedDepsPass> {
 
   void runDynamaticPass() override;
 
@@ -51,7 +54,7 @@ struct HandshakeAnalyzeLSQUsagePass
 };
 } // namespace
 
-void HandshakeAnalyzeLSQUsagePass::runDynamaticPass() {
+void HandshakeInactivateEnforcedDepsPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
 
   // Check that memory access ports are named
@@ -83,7 +86,7 @@ void HandshakeAnalyzeLSQUsagePass::runDynamaticPass() {
     analyzeFunction(funcOp);
 }
 
-void HandshakeAnalyzeLSQUsagePass::analyzeFunction(handshake::FuncOp funcOp) {
+void HandshakeInactivateEnforcedDepsPass::analyzeFunction(handshake::FuncOp funcOp) {
   for (BlockArgument arg : funcOp.getArguments()) {
     HandshakeCFG cfg(funcOp);
     if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg))
@@ -91,31 +94,7 @@ void HandshakeAnalyzeLSQUsagePass::analyzeFunction(handshake::FuncOp funcOp) {
   }
 }
 
-/// Determines whether there exists any RAW dependency between the load and the
-/// stores.
-static bool hasRAW(handshake::LoadOp loadOp,
-                   DenseSet<handshake::StoreOp> &storeOps) {
-  StringRef loadName = getUniqueName(loadOp);
-  for (handshake::StoreOp storeOp : storeOps) {
-    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
-      for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive())
-          continue;
-        if (dependency.getDstAccess() == loadName) {
-          LLVM_DEBUG({
-            llvm::dbgs() << "\tKeeping '" << loadName
-                         << "': RAW dependency with '" << getUniqueName(storeOp)
-                         << "'\n";
-          });
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-/// Determines whether the load is globally in-order independent (GIID) on the
+/// Determines whether the load is globally in-order dependent (GIID) on the
 /// store along all non-cyclic CFG paths between them.
 static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
                               handshake::StoreOp storeOp, HandshakeCFG &cfg) {
@@ -138,11 +117,18 @@ static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
   });
 }
 
-/// Determines whether the load is globally in-order independent (GIID) on all
-/// stores with which it has a WAR dependency along all non-cyclic CFG paths
-/// between them.
-static bool hasEnforcedWARs(handshake::LoadOp loadOp,
+/// returns the inactivated version of the dependency
+static MemDependenceAttr getInactivatedDependency(MemDependenceAttr dependency){
+  MLIRContext* ctx = dependency.getContext();
+  return MemDependenceAttr::get(ctx, dependency.getDstAccess(), dependency.getLoopDepth(), dependency.getComponents(), BoolAttr::get(ctx, false));
+}
+
+
+/// Inactivates the dependencies that are enforced by cheking whether the load is
+/// globally [Instruction] in-order dependent (GIID) on the store or not
+static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
                             DenseSet<handshake::StoreOp> &storeOps,
+                            DependencyMap &opDeps,
                             HandshakeCFG &cfg) {
   DenseMap<StringRef, handshake::StoreOp> storesByName;
   for (handshake::StoreOp storeOp : storeOps)
@@ -151,41 +137,98 @@ static bool hasEnforcedWARs(handshake::LoadOp loadOp,
   // We only need to check stores that depend on the load (WAR dependencies) as
   // others are already provably independent. We may check a single store
   // multiple times if it depends on the load at multiple loop depths
-  if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
-    for (MemDependenceAttr dependency : deps.getDependencies()) {
-      if (!dependency.getIsActive())
-        continue;
-      auto storeOp = storesByName.at(dependency.getDstAccess());
-      if (!isStoreGIIDOnLoad(loadOp, storeOp, cfg)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\tKeeping '" << getUniqueName(loadOp)
-                       << "': non-enforced WAR with '" << getUniqueName(storeOp)
-                       << "'\n";
-        });
-        return false;
+  for (handshake::LoadOp loadOp : loadOps) {
+    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
+      for (MemDependenceAttr dependency : deps.getDependencies()) {
+        if (!dependency.getIsActive().getValue())
+          continue;
+        auto storeOp = storesByName.at(dependency.getDstAccess());
+        // if the laod is GIID which means there is a data dependency,
+        // the dependency should be inactivated
+        if (isStoreGIIDOnLoad(loadOp, storeOp, cfg))
+          opDeps[loadOp].push_back(getInactivatedDependency(dependency));
+        else
+          opDeps[loadOp].push_back(dependency); 
       }
     }
   }
-  return true;
 }
+
+
+/// replaces the memory dependence array attribute with the dependencies 
+/// given in the dictionary `opDeps`
+static void changeOpDeps(DependencyMap& opDeps, MLIRContext* ctx){
+  for (auto &[op, deps] : opDeps)
+    setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
+}
+
+
+/// Inactivates the WAW dependencies between an operation and itself
+static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps, DenseMap<Operation*, SmallVector<MemDependenceAttr>>& opDeps){
+  for (handshake::StoreOp storeOp : storeOps) {
+    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)){
+      StringRef storeName = getUniqueName(storeOp);
+      for (MemDependenceAttr dependency : deps.getDependencies()) {
+        if (!dependency.getIsActive().getValue())
+          continue;
+        StringRef dstName = dependency.getDstAccess();
+
+        // a WAW dependency between an operation and itself may be ignored.
+        if (storeName == dstName)
+          opDeps[storeOp].push_back(getInactivatedDependency(dependency));
+        else
+          opDeps[storeOp].push_back(dependency);
+      }
+    }
+  }
+}
+
+// gets the set of all load/store operations and returns the subset of
+// operations that are involved in at least one active dependency.
+static DenseSet<Operation*> getOpsWithNonEnforcedDeps(DenseSet<Operation*> &loadStoreOps){
+  DenseMap<StringRef, Operation*> nameToOpMapping;
+  for (Operation *op : loadStoreOps){
+    StringRef name = getUniqueName(op);
+    nameToOpMapping[name] = op;
+  }
+
+  DenseSet<Operation*> opsWithNonEnforcedDeps;
+  bool hasAtLeastOneActive;
+
+  for (Operation *op : loadStoreOps){
+    hasAtLeastOneActive = false;
+    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(op)){
+      for (MemDependenceAttr dependency : deps.getDependencies()) {
+        if (!dependency.getIsActive().getValue())
+          continue;
+        hasAtLeastOneActive = true;
+        Operation *dstOp = nameToOpMapping[dependency.getDstAccess()];
+        opsWithNonEnforcedDeps.insert(dstOp);
+      }
+    }
+    if (hasAtLeastOneActive)
+        opsWithNonEnforcedDeps.insert(op);
+  }
+  return opsWithNonEnforcedDeps;
+}
+
 
 /// Mark all accesses with the `MemInterfaceAttr`, indicating whether they
 /// should connect to an MC or LSQ depending on their dependencies with other
 /// accesses.
-template <typename Op>
-static void markLSQPorts(const DenseSet<Op> &accesses,
-                         const DenseSet<Op> &dependentAccesses,
+static void markLSQPorts(const DenseSet<Operation*> allOps,
+                         const DenseSet<Operation*> opsWithNonEnforcedDeps,
                          const DenseMap<Operation *, unsigned> &groupMap,
                          MLIRContext *ctx) {
-  for (Op accessOp : accesses) {
-    if (dependentAccesses.contains(accessOp))
-      setDialectAttr<MemInterfaceAttr>(accessOp, ctx, groupMap.at(accessOp));
+  for (Operation *op : allOps) {
+    if (opsWithNonEnforcedDeps.contains(op))
+      setDialectAttr<MemInterfaceAttr>(op, ctx, groupMap.at(op));
     else
-      setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
+      setDialectAttr<MemInterfaceAttr>(op, ctx);
   }
 };
 
-void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
+void HandshakeInactivateEnforcedDepsPass::analyzeMemRef(
     handshake::FuncOp funcOp, TypedValue<mlir::MemRefType> memref,
     HandshakeCFG &cfg) {
   LLVM_DEBUG({
@@ -228,11 +271,13 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
   // Identify load and store accesses to the LSQ
   DenseSet<handshake::LoadOp> lsqLoadOps;
   DenseSet<handshake::StoreOp> lsqStoreOps;
+  DenseSet<Operation*> loadStoreOps;
   DenseMap<Operation *, unsigned> groupMap;
   LSQPorts lsqPorts = lsqOp.getPorts();
   for (LSQGroup &group : lsqPorts.getGroups()) {
     for (MemoryPort &port : group->accessPorts) {
       groupMap.insert({port.portOp, group.groupID});
+      loadStoreOps.insert(port.portOp);
       if (auto loadOp = dyn_cast<handshake::LoadOp>(port.portOp))
         lsqLoadOps.insert(loadOp);
       else
@@ -240,82 +285,21 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     }
   }
 
-  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  DependencyMap opDeps;
+  inactivateEnforcedWARs(lsqLoadOps, lsqStoreOps, opDeps, cfg);
+  inactivateEnforcedWAWs(lsqStoreOps, opDeps);
+  changeOpDeps(opDeps, ctx);
 
-  // Check whether we can prove independence of some loads w.r.t. other accesses
-  DenseSet<handshake::LoadOp> dependentLoads;
-  DenseSet<handshake::StoreOp> dependentStores;
-  for (handshake::LoadOp loadOp : lsqLoadOps) {
-    // Loads with no RAW dependencies and which satisfy the GIID property with
-    // all stores they have a dependency with may be removed
-    if (hasRAW(loadOp, lsqStoreOps) ||
-        !hasEnforcedWARs(loadOp, lsqStoreOps, cfg)) {
-      dependentLoads.insert(loadOp);
+  DenseSet<Operation*> opsWithNonEnforcedDeps;
+  opsWithNonEnforcedDeps = getOpsWithNonEnforcedDeps(loadStoreOps);
 
-      // All stores involved in a WAR with the load are still dependent
-      if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
-        for (MemDependenceAttr dependency : deps.getDependencies()) {
-          if (!dependency.getIsActive())
-            continue;
-          Operation *dstOp = namer.getOp(dependency.getDstAccess());
-          if (auto storeOp = dyn_cast<StoreOp>(dstOp))
-            dependentStores.insert(storeOp);
-        }
-      }
-    } else {
-      LLVM_DEBUG({
-        llvm::dbgs() << "\tRerouting '" << getUniqueName(loadOp) << "' to MC\n";
-      });
-    }
-  }
-
-  // Stores involed in a RAW ar WAW dependency with another operation are sill
-  // dependent
-  for (handshake::StoreOp storeOp : lsqStoreOps) {
-    auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp);
-    if (!deps)
-      continue;
-
-    // Iterate over all RAW and WAW dependencies to determine those which must
-    // still be honored by an LSQ
-    StringRef storeName = getUniqueName(storeOp);
-    for (MemDependenceAttr dependency : deps.getDependencies()) {
-      if (!dependency.getIsActive())
-        continue;
-      StringRef dstName = dependency.getDstAccess();
-
-      // WAW dependencies on the same operation can be ignored, they are
-      // enforced automatically by the dataflow circuit's construction
-      if (storeName == dstName)
-        continue;
-
-      // The dependency must still be honored
-      Operation *dstOp = namer.getOp(dstName);
-      dependentStores.insert(storeOp);
-      if (auto dstStoreOp = dyn_cast<handshake::StoreOp>(dstOp))
-        dependentStores.insert(dstStoreOp);
-    }
-  }
-
-  LLVM_DEBUG({
-    for (handshake::StoreOp storeOp : lsqStoreOps) {
-      if (dependentStores.contains(storeOp)) {
-        llvm::dbgs() << "\tKeeping '" << getUniqueName(storeOp)
-                     << "': WAW or RAW dependency with other access\n";
-      } else {
-        llvm::dbgs() << "\tRerouting '" << getUniqueName(storeOp)
-                     << "' to MC\n";
-      }
-    }
-  });
 
   // Tag LSQ access ports with the interface they should actually connect to,
   // which may be different from the one they currently connect to
-  markLSQPorts(lsqLoadOps, dependentLoads, groupMap, ctx);
-  markLSQPorts(lsqStoreOps, dependentStores, groupMap, ctx);
+  markLSQPorts(loadStoreOps, opsWithNonEnforcedDeps, groupMap, ctx);
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeAnalyzeLSQUsage() {
-  return std::make_unique<HandshakeAnalyzeLSQUsagePass>();
+dynamatic::createHandshakeInactivateEnforcedDeps() {
+  return std::make_unique<HandshakeInactivateEnforcedDepsPass>();
 }
