@@ -23,58 +23,15 @@ using namespace dynamatic::experimental;
 
 namespace {
 
+using MuxesInLoop = std::map<std::string, DenseSet<Operation *>>;
 using path_t = std::vector<Operation *>;
 using v_path_t = std::vector<path_t>;
-using pathPerMux_t =
-    std::map<Operation *, std::tuple<v_path_t, v_path_t, v_path_t>>;
+using s_block = DenseSet<Block *>;
 
-/// Recursive function which allows to obtain all the paths from block
-/// `start` to block `end` using a DFS.
-static void dfsAllPaths(Operation *start, DenseSet<Operation *> &end,
-                        path_t &path, DenseSet<Operation *> &visited,
-                        pathPerMux_t &allPaths, bool firstStep = false,
-                        unsigned operand = 0) {
+constexpr double ITERATIONS_PER_LOOP = 10;
+constexpr double CLOCK_PERIOD = 4;
 
-  path.push_back(start);
-  visited.insert(start);
-
-  // If we are at the end of the path, then add it to the list of paths
-  if (end.contains(start) && !firstStep) {
-    if (operand == 0)
-      std::get<0>(allPaths[start]).push_back(path);
-    if (operand == 1)
-      std::get<1>(allPaths[start]).push_back(path);
-    if (operand == 2)
-      std::get<2>(allPaths[start]).push_back(path);
-  } else {
-    // Else, for each successor which was not visited, run DFS again
-    for (auto result : start->getResults()) {
-      for (auto &use : result.getUses()) {
-        Operation *user = use.getOwner();
-        if (end.contains(user) || !visited.contains(user)) {
-          dfsAllPaths(user, end, path, visited, allPaths, false,
-                      use.getOperandNumber());
-        }
-      }
-    }
-  }
-
-  path.pop_back();
-  visited.erase(start);
-}
-
-static void findAllPaths(Operation *start, DenseSet<Operation *> &end,
-                         pathPerMux_t &allPaths) {
-  path_t path;
-  DenseSet<Operation *> visited;
-  dfsAllPaths(start, end, path, visited, allPaths, true);
-}
-
-using MuxesInLoop = std::map<std::string, DenseSet<Operation *>>;
-
-/// Export GSA information
-static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer,
-                               TimingDatabase &timingDB) {
+static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer) {
 
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
@@ -82,14 +39,11 @@ static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer,
   std::ofstream ofs;
   MuxesInLoop mil;
 
-  // We print to this file information about the GSA gates and the innermost
-  // loops, if any, containing each.
   ofs.open("ftdscripting/gsaGatesInfo.txt", std::ofstream::out);
-  std::string loopDescription;
+  std::string loopDescription = "";
   llvm::raw_string_ostream loopDescriptionStream(loopDescription);
 
-  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
-  for (auto phi : muxes) {
+  for (auto phi : funcOp.getBody().getOps<handshake::MuxOp>()) {
     ofs << namer.getName(phi).str();
     if (llvm::isa<handshake::MergeOp>(phi->getOperand(0).getDefiningOp()))
       ofs << " (MU)\n";
@@ -111,64 +65,186 @@ static void exportGsaGatesInfo(handshake::FuncOp funcOp, NameAnalysis &namer,
   }
 
   ofs.close();
-  double delay;
+}
 
-  /// For each multiplexer, store all the paths which start start from any mux
-  /// at the same loop level and end in one of their operands. The paths are
-  /// collected according to the related operand.
-  pathPerMux_t pathsPerMux;
-  for (auto &[nameLoop, listMuxes] : mil) {
-    for (auto *mux : listMuxes)
-      findAllPaths(mux, listMuxes, pathsPerMux);
+static void dfsAllPaths(Operation *start, DenseSet<Operation *> &end,
+                        path_t &path, DenseSet<Operation *> &visited,
+                        v_path_t &allPaths, bool firstStep,
+                        const s_block *blocksInLoop) {
+
+  path.push_back(start);
+  visited.insert(start);
+
+  // If we are at the end of the path, then add it to the list of paths
+  if (end.contains(start) && !firstStep) {
+    allPaths.push_back(path);
+  } else {
+    // Else, for each successor which was not visited, run DFS again
+    for (auto result : start->getResults()) {
+      for (auto *user : result.getUsers()) {
+        if (!blocksInLoop->contains(user->getBlock())) {
+          continue;
+        }
+        if (end.contains(user) || !visited.contains(user)) {
+          dfsAllPaths(user, end, path, visited, allPaths, false, blocksInLoop);
+        }
+      }
+    }
   }
 
-  for (auto &[source, pathsOperands] : pathsPerMux) {
+  path.pop_back();
+  visited.erase(start);
+}
 
-    llvm::dbgs() << "===========================\n";
+static void findAllPaths(Operation *start, DenseSet<Operation *> &end,
+                         v_path_t &allPaths, const s_block *blocksInLoop) {
+  path_t path;
+  DenseSet<Operation *> visited;
+  dfsAllPaths(start, end, path, visited, allPaths, true, blocksInLoop);
+}
 
-    double maxDelay0 = 0, maxDelay1 = 0, maxDelay2 = 0, minDelay0 = 99999,
-           minDelay1 = 99999, minDelay2 = 99999;
+static DenseSet<Block *> getBlocksInLoop(CFGLoop *loop) {
+  auto blocksInLoop = loop->getBlocksVector();
+  s_block set;
+  for (auto *x : blocksInLoop)
+    set.insert(x);
+  return set;
+}
 
-    for (auto &path : std::get<0>(pathsOperands)) {
-      double delaySum = 0;
-      for (auto *op : path) {
-        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
-          delay = 0;
-        delaySum += delay;
+static double getOperationDelay(Operation *op, const TimingDatabase &timingDB) {
+
+  double delay = 0, latency = 0;
+
+  if (failed(timingDB.getLatency(op, SignalType::DATA, latency)) ||
+      failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
+    return 0;
+
+  return latency == 0 ? delay : latency * CLOCK_PERIOD;
+}
+
+using info_per_loop_t = DenseMap<CFGLoop *, std::pair<double, path_t>>;
+
+static double getPathDelay(const path_t &path,
+                           const info_per_loop_t &worstPathLoop,
+                           const CFGLoop *loop,
+                           const TimingDatabase &timingDB) {
+
+  // Current timing
+  double timing = 0;
+  // Nested loop that we are currently traversing
+  CFGLoop *inLoop = nullptr;
+  // Blocks of the loop we are traversing
+  s_block blocksInLoop;
+
+  llvm::dbgs() << "\n----------------------\n";
+
+  // For each operation in the loop
+  for (Operation *op : path) {
+
+    // If we were into a loop, check if we are now out of it
+    if (inLoop) {
+      if (!blocksInLoop.contains(op->getBlock())) {
+        llvm::dbgs() << "OUT LOOP: ";
+        inLoop->print(llvm::dbgs(), false, false, 0);
+        llvm::dbgs() << "\n";
+        timing += worstPathLoop.at(inLoop).first * ITERATIONS_PER_LOOP;
+        inLoop = nullptr;
       }
-      maxDelay0 = maxDelay0 < delaySum ? delaySum : maxDelay0,
-      minDelay0 = minDelay0 > delaySum ? delaySum : minDelay0;
     }
 
-    for (auto &path : std::get<1>(pathsOperands)) {
-      double delaySum = 0;
-      for (auto *op : path) {
-        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
-          delay = 0;
-        delaySum += delay;
+    // If we are not in a loop and we are traversing another loop header, then
+    // mark the current loop
+    if (!inLoop) {
+      for (auto &[otherLoop, info] : worstPathLoop) {
+        if (otherLoop != loop && otherLoop->getHeader() == op->getBlock()) {
+          llvm::dbgs() << "IN  LOOP: ";
+          otherLoop->print(llvm::dbgs(), false, false, 0);
+          llvm::dbgs() << "\n";
+
+          inLoop = otherLoop;
+          blocksInLoop = getBlocksInLoop(inLoop);
+        }
       }
-      maxDelay1 = maxDelay1 < delaySum ? delaySum : maxDelay1,
-      minDelay1 = minDelay1 > delaySum ? delaySum : minDelay1;
     }
 
-    for (auto &path : std::get<2>(pathsOperands)) {
-      double delaySum = 0;
-      for (auto *op : path) {
-        if (failed(timingDB.getTotalDelay(op, SignalType::DATA, delay)))
-          delay = 0;
-        delaySum += delay;
-      }
-      maxDelay2 = maxDelay2 < delaySum ? delaySum : maxDelay2,
-      minDelay2 = minDelay2 > delaySum ? delaySum : minDelay2;
-    }
+    // Print current operation
+    op->print(llvm::dbgs());
+    llvm::dbgs() << "\n";
 
-    llvm::dbgs() << "Max delay input 0: " << maxDelay0 << "\n";
-    llvm::dbgs() << "Max delay input 1: " << maxDelay1 << "\n";
-    llvm::dbgs() << "Max delay input 2: " << maxDelay2 << "\n";
-    llvm::dbgs() << "Min delay input 0: " << minDelay0 << "\n";
-    llvm::dbgs() << "Min delay input 1: " << minDelay1 << "\n";
-    llvm::dbgs() << "Min delay input 2: " << minDelay2 << "\n";
+    // If not in loop, get the delay of the current operation.
+    if (!inLoop) {
+      double delay = getOperationDelay(op, timingDB);
+      timing += delay;
+      llvm::dbgs() << " --- > " << delay << "\n";
+    }
   }
+
+  // Delay of the path
+  llvm::dbgs() << "Total delay: " << timing << "\n";
+  llvm::dbgs() << "\n----------------------\n";
+
+  return timing;
+}
+
+static void analyzeWCET(handshake::FuncOp funcOp, NameAnalysis &namer,
+                        TimingDatabase &timingDB) {
+  llvm::dbgs() << "Starting WCET analysis...\n";
+
+  Region &region = funcOp.getBody();
+  mlir::DominanceInfo domInfo;
+  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+
+  auto loops = loopInfo.getLoopsInPreorder();
+  auto loopsR = llvm::reverse(loops);
+
+  info_per_loop_t worstPathLoop;
+
+  for (auto *loop : loopsR) {
+
+    loop->print(llvm::dbgs(), false, false, 0);
+    llvm::dbgs() << "\n";
+
+    worstPathLoop.insert({loop, {0, {}}});
+
+    // Get all the muxes in the loop header and build a set out of it
+    auto muxesInHeader = loop->getHeader()->getOps<handshake::MuxOp>();
+    DenseSet<Operation *> muxesInHeaderSet;
+    for (auto x : muxesInHeader)
+      muxesInHeaderSet.insert(x);
+
+    // Get all the blocks in the loop and build a set out of it
+    auto blocksInLoop = getBlocksInLoop(loop);
+
+    // For each mux in the loop header, find all the paths which end in a mux
+    // of the same loop and have operations that are all in the blocks of the
+    // loop.
+    v_path_t allpaths;
+    for (Operation *mux : muxesInHeader) {
+      v_path_t result;
+      findAllPaths(mux, muxesInHeaderSet, result, &blocksInLoop);
+      for (auto &x : result)
+        allpaths.push_back(x);
+    }
+
+    // Consider each path and find the worst in terms of timing
+    for (auto &path : allpaths) {
+      double timing = getPathDelay(path, worstPathLoop, loop, timingDB);
+      // Update the timing
+      if (timing > worstPathLoop.at(loop).first) {
+        worstPathLoop[loop] = {timing, path};
+      }
+    }
+
+    // Print all the delays
+    llvm::dbgs() << "\nWorst delay: " << worstPathLoop[loop].first << "\n";
+    for (auto *x : worstPathLoop[loop].second) {
+      llvm::dbgs() << "-> ";
+      x->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  }
+
+  llvm::dbgs() << "Done with WCET analysis...\n";
 }
 
 struct FtdProfilingPass
@@ -190,7 +266,8 @@ struct FtdProfilingPass
       if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
         signalPassFailure();
 
-      exportGsaGatesInfo(funcOp, namer, timingDB);
+      exportGsaGatesInfo(funcOp, namer);
+      analyzeWCET(funcOp, namer, timingDB);
 
       if (failed(cfg::flattenFunction(funcOp)))
         signalPassFailure();
