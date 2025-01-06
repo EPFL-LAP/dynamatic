@@ -12,6 +12,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "experimental/Support/CFGAnnotation.h"
+#include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -96,11 +97,59 @@ static void dfsAllPaths(Operation *start, DenseSet<Operation *> &end,
   visited.erase(start);
 }
 
+static void dfsAllPaths(OpOperand &start, Operation *last, path_t &path,
+                        DenseSet<Operation *> &visited, v_path_t &allPaths,
+                        const ftd::BlockIndexing &bi) {
+
+  Operation *startOp = start.getOwner();
+
+  if (llvm::isa_and_nonnull<handshake::ControlMergeOp>(startOp) ||
+      llvm::isa_and_nonnull<handshake::MemoryControllerOp>(startOp) ||
+      llvm::isa_and_nonnull<handshake::LSQOp>(startOp)) {
+    return;
+  }
+
+  if (startOp) {
+    path.push_back(startOp);
+    visited.insert(startOp);
+  }
+
+  // If we are at the end of the path, then add it to the list of paths
+  if (startOp && last == startOp) {
+    allPaths.push_back(path);
+  } else {
+    // Else, for each successor which was not visited, run DFS again
+    for (auto result : startOp->getResults()) {
+      for (auto &use : result.getUses()) {
+        Operation *user = use.getOwner();
+        if (bi.isGreater(start.getOwner()->getBlock(), user->getBlock()))
+          continue;
+        if (!visited.contains(user)) {
+          dfsAllPaths(use, last, path, visited, allPaths, bi);
+        }
+      }
+    }
+  }
+
+  if (startOp) {
+    path.pop_back();
+    visited.erase(startOp);
+  }
+}
+
 static void findAllPaths(Operation *start, DenseSet<Operation *> &end,
                          v_path_t &allPaths, const s_block *blocksInLoop) {
   path_t path;
   DenseSet<Operation *> visited;
   dfsAllPaths(start, end, path, visited, allPaths, true, blocksInLoop);
+}
+
+static void findAllPaths(Value start, Operation *last, v_path_t &allPaths,
+                         const ftd::BlockIndexing &bi) {
+  path_t path;
+  DenseSet<Operation *> visited;
+  for (auto &use : start.getUses())
+    dfsAllPaths(use, last, path, visited, allPaths, bi);
 }
 
 static DenseSet<Block *> getBlocksInLoop(CFGLoop *loop) {
@@ -143,7 +192,8 @@ static double getPathDelay(const path_t &path,
 
     // If we were into a loop, check if we are now out of it
     if (inLoop) {
-      if (!blocksInLoop.contains(op->getBlock())) {
+      if (!blocksInLoop.contains(op->getBlock()) &&
+          !llvm::isa_and_nonnull<handshake::MemoryControllerOp>(op)) {
         llvm::dbgs() << "OUT LOOP: ";
         inLoop->print(llvm::dbgs(), false, false, 0);
         llvm::dbgs() << "\n";
@@ -155,14 +205,16 @@ static double getPathDelay(const path_t &path,
     // If we are not in a loop and we are traversing another loop header, then
     // mark the current loop
     if (!inLoop) {
-      for (auto &[otherLoop, info] : worstPathLoop) {
-        if (otherLoop != loop && otherLoop->getHeader() == op->getBlock()) {
-          llvm::dbgs() << "IN  LOOP: ";
-          otherLoop->print(llvm::dbgs(), false, false, 0);
-          llvm::dbgs() << "\n";
+      if (!llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
+        for (auto &[otherLoop, info] : worstPathLoop) {
+          if (otherLoop != loop && otherLoop->getHeader() == op->getBlock()) {
+            llvm::dbgs() << "IN  LOOP: ";
+            otherLoop->print(llvm::dbgs(), false, false, 0);
+            llvm::dbgs() << "\n";
 
-          inLoop = otherLoop;
-          blocksInLoop = getBlocksInLoop(inLoop);
+            inLoop = otherLoop;
+            blocksInLoop = getBlocksInLoop(inLoop);
+          }
         }
       }
     }
@@ -193,6 +245,7 @@ static void analyzeWCET(handshake::FuncOp funcOp, NameAnalysis &namer,
   Region &region = funcOp.getBody();
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
+  ftd::BlockIndexing bi(region);
 
   auto loops = loopInfo.getLoopsInPreorder();
   auto loopsR = llvm::reverse(loops);
@@ -200,9 +253,6 @@ static void analyzeWCET(handshake::FuncOp funcOp, NameAnalysis &namer,
   info_per_loop_t worstPathLoop;
 
   for (auto *loop : loopsR) {
-
-    loop->print(llvm::dbgs(), false, false, 0);
-    llvm::dbgs() << "\n";
 
     worstPathLoop.insert({loop, {0, {}}});
 
@@ -234,15 +284,42 @@ static void analyzeWCET(handshake::FuncOp funcOp, NameAnalysis &namer,
         worstPathLoop[loop] = {timing, path};
       }
     }
+  }
 
-    // Print all the delays
-    llvm::dbgs() << "\nWorst delay: " << worstPathLoop[loop].first << "\n";
-    for (auto *x : worstPathLoop[loop].second) {
-      llvm::dbgs() << "-> ";
-      x->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
+  double worstTiming = 0;
+  path_t worstPath;
+  Operation *endOp = *funcOp.getOps<handshake::EndOp>().begin();
+  for (auto &argument : funcOp.getArguments()) {
+    v_path_t allpaths;
+    findAllPaths(argument, endOp, allpaths, bi);
+
+    for (auto &path : allpaths) {
+      double timing = getPathDelay(path, worstPathLoop, nullptr, timingDB);
+      worstPath = (timing > worstTiming) ? path : worstPath;
+      worstTiming = (timing > worstTiming) ? timing : worstTiming;
     }
   }
+
+  llvm::dbgs() << "\n----------------------\n";
+
+  for (auto &[loop, info] : worstPathLoop) {
+    loop->print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+    llvm::dbgs() << info.first << "\n";
+    for (auto *op : info.second) {
+      op->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    llvm::dbgs() << "\n";
+  }
+
+  llvm::dbgs() << "Total\n";
+  llvm::dbgs() << worstTiming << "\n";
+  for (auto *op : worstPath) {
+    op->print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+  llvm::dbgs() << "\n";
 
   llvm::dbgs() << "Done with WCET analysis...\n";
 }
