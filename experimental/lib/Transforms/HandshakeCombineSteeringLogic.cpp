@@ -22,6 +22,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 #include <cassert>
 
 using namespace mlir;
@@ -55,6 +56,7 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
     // Get the index of the other input
     int loopIdx = 1 - constIdx;
 
+    // If there are other merges fed from the same input at the loopIdx
     DenseSet<handshake::MergeOp> redundantInits;
     for (auto *user : mergeOp.getDataOperands()[loopIdx].getUsers())
       if (isa_and_nonnull<handshake::MergeOp>(user) && user != mergeOp) {
@@ -76,10 +78,9 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
   }
 };
 
-/// Returns true if the loop under analysis is a self regenerating mux. One
+/// Returns true if the loop under analysis has a self regenerating mux. One
 /// input of the mux comes from the mux itself, while the other input comes from
-/// somewhere else. If two muxes are identical in this sense, one of them can be
-/// removed.
+/// somewhere else.
 bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
 
   // One user must be a Branch; otherwise, the pattern match fails
@@ -92,8 +93,8 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
     }
   }
 
-  // The conditional branches that were found should also form a loop with the
-  // multiplexer under analysis
+  // One of the conditional branches that were found should feed muxOp forming a
+  // cycle
   bool foundCycle = false;
   int operIdx = 0;
   handshake::ConditionalBranchOp condBranchOp;
@@ -115,13 +116,40 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
   return foundCycle;
 }
 
+// Apply DFS on the producers of a particular Mux feeding a particular input,
+// returning the first non-Mux producer's result value
+Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
+  Value val = muxOp.getDataOperands()[idx];
+  Operation *prod = val.getDefiningOp();
+  if (isa_and_nonnull<handshake::MuxOp>(prod))
+    return returnNonMuxProducerVal(cast<handshake::MuxOp>(prod), idx);
+  return val;
+}
+
+// Apply DFS on the consumers of op until you hit a Mux in the same BB as that
+// of referenceMuxOp
+Operation *returnMuxAtSameDepth(Operation *op,
+                                handshake::MuxOp referenceMuxOp) {
+  if (!isa_and_nonnull<handshake::MuxOp>(op) || op == referenceMuxOp)
+    return nullptr;
+
+  if (op->getAttr("handshake.bb") == referenceMuxOp->getAttr("handshake.bb"))
+    return op;
+
+  // Otherwise, continue in the DFS
+  for (auto *cons : cast<handshake::MuxOp>(op).getResult().getUsers())
+    return returnMuxAtSameDepth(cons, referenceMuxOp);
+
+  return nullptr;
+}
+
 // Note: This pattern assumes that all Muxes belonging to 1 loop have the same
 // conventions about the index of the input coming from outside the loop and
 // that coming from inside through a cycle
 // This pattern combines all Muxes that are used to regenerate the same value
 // but to different consumers.. It searches for a Mux that has a bwd edge
-// (cyclic input) and searches for all Muxes using the some condition and the
-// same
+// (cyclic input) and searches for all Muxes using the some condition and also
+// having a bwd edge
 struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
   using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
@@ -142,10 +170,12 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     DenseSet<handshake::MuxOp> dataMuxUsers;
     DenseSet<handshake::MuxOp> redundantMuxes;
 
-    // Get users of the operation at the muxOuterInputIdx
-    for (auto *dataUser : muxOp.getDataOperands()[muxOutIdx].getUsers()) {
-      if (isa_and_nonnull<handshake::MuxOp>(dataUser) && dataUser != muxOp) {
-        auto muxUser = cast<handshake::MuxOp>(dataUser);
+    // Get users of the non-Mux operation at the muxOuterInputIdx
+    for (auto *dataUser :
+         returnNonMuxProducerVal(muxOp, muxOutIdx).getUsers()) {
+      Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
+      if (returnedMux != nullptr) {
+        auto muxUser = cast<handshake::MuxOp>(returnedMux);
         int tempValue;
         if (isSelfRegenerateMux(muxOp, tempValue))
           dataMuxUsers.insert(muxUser);
@@ -160,7 +190,7 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
         int tempValue;
         if (isSelfRegenerateMux(muxUser, tempValue) &&
             dataMuxUsers.contains(muxUser)) {
-          redundantMuxes.contains(muxUser);
+          redundantMuxes.insert(muxUser);
         }
       }
 
@@ -187,7 +217,7 @@ struct RemoveSinkMuxes : public OpRewritePattern<handshake::MuxOp> {
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
 
-    // The pattern fails if the branch has either true or false successors
+    // The pattern fails if the Mux has any successors
     if (!muxOp.getResult().getUsers().empty())
       return failure();
 
