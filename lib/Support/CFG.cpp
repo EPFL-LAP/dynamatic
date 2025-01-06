@@ -366,10 +366,7 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   // Fails if a control already existed and is different from the new value,
   // succeeds otherwise.
   auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
-    if (auto [it, newBB] = ctrlVals.insert({bb, newCtrl}); !newBB) {
-      if (it->second != newCtrl)
-        return failure();
-    }
+    ctrlVals[bb] = newCtrl;
     return success();
   };
 
@@ -397,16 +394,24 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // their outputs
     LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp>(
-                [&](auto) {
-                  addToCtrlOps(ctrlOp->getUsers());
-                  return success();
-                })
+            .Case<handshake::ForkOp, handshake::BufferOp, handshake::BranchOp,
+                  handshake::ConditionalBranchOp, handshake::MuxOp,
+                  handshake::MergeOp>([&](auto) {
+              addToCtrlOps(ctrlOp->getUsers());
+              return success();
+            })
             .Case<handshake::MergeLikeOpInterface>([&](auto) {
               OpResult mergeRes = ctrlOp->getResult(0);
               addToCtrlOps(mergeRes.getUsers());
               return updateCtrl(bb, mergeRes);
+            })
+            .Case<handshake::LazyForkOp>([&](auto) {
+              addToCtrlOps(ctrlOp->getUsers());
+              bool lsqIsUser = llvm::any_of(ctrlOp->getUsers(), [](auto user) {
+                return llvm::isa<handshake::LSQOp>(user);
+              });
+              return lsqIsUser ? updateCtrl(bb, ctrlOp->getResult(1))
+                               : success();
             })
             .Default([&](auto) { return success(); });
     if (failed(res))
@@ -424,6 +429,7 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
       CFGPath newPath;
       llvm::copy(pathSoFar, std::back_inserter(newPath));
       newPath.push_back(to);
+      paths.push_back(newPath);
     } else if (!pathSoFar.contains(nextBB)) {
       mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);

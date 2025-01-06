@@ -16,6 +16,7 @@ TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
+STRAIGHT_TO_QUEUE=${10}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -34,6 +35,7 @@ F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
+F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
@@ -116,26 +118,44 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
 
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
+  echo_info "Running FTD algorithm for handshake conversion"
+
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+      --ftd-lower-cf-to-handshake \
+      --handshake-combine-steering-logic \
+      > "$F_HANDSHAKE"
+    exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
+
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+fi
+
+if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
+
+  echo_info "Using FPGA'23 for LSQ connection"
+
+  # FPT19 should run before straight to the queue, so that no useless components are instantiated.
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage \
+    --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+    > "$F_HANDSHAKE_SQ"
+  exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
+
+  F_HANDSHAKE=$F_HANDSHAKE_SQ
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake with FTD" \
-    "Applied transformations to handshake with FTD"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
 
-else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+else 
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
@@ -145,8 +165,8 @@ else
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
-fi
 
+fi
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then

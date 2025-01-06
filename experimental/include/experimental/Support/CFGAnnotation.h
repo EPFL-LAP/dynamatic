@@ -25,6 +25,7 @@
 #ifndef DYNAMATIC_SUPPORT_CFG_ANNOTATION_H
 #define DYNAMATIC_SUPPORT_CFG_ANNOTATION_H
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 
 namespace dynamatic {
@@ -34,8 +35,6 @@ namespace cfg {
 /// Name used to store the edge annotation on the handshake function
 constexpr llvm::StringLiteral CFG_EDGES("cfg.edges");
 
-constexpr char OPEN_LIST = '{';
-constexpr char CLOSE_LIST = '{';
 constexpr char OPEN_EDGE = '[';
 constexpr char CLOSE_EDGE = ']';
 constexpr char DELIMITER = ',';
@@ -99,13 +98,13 @@ using CFGAnnotation = llvm::DenseMap<unsigned, CFGNode>;
 /// UnconditionalEdge = [source,dest]
 ///
 /// Add the string as annotation of the handshake function.
-void annotateCFG(handshake::FuncOp &funcOp,
-                 ConversionPatternRewriter &rewriter);
+void annotateCFG(handshake::FuncOp &funcOp, PatternRewriter &rewriter,
+                 NameAnalysis &namer);
 
 /// Use an handshake function ot build the cf structure again, thanks to the
 /// information in `edges`.
 LogicalResult restoreCfStructure(handshake::FuncOp &funcOp,
-                                 ConversionPatternRewriter &rewriter);
+                                 PatternRewriter &rewriter);
 
 /// Get rid of the cf structure by moving all the operations in the initial
 /// block and removing all the cf terminators.
@@ -113,8 +112,7 @@ LogicalResult flattenFunction(handshake::FuncOp &funcOp);
 
 /// Sets an integer "bb" attribute on each operation to identify the basic
 /// block from which the operation originates in the std-level IR.
-void markBasicBlocks(handshake::FuncOp &funcOp,
-                     ConversionPatternRewriter &rewriter);
+void markBasicBlocks(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 }; // namespace cfg
 }; // namespace experimental

@@ -26,6 +26,16 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
   let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
 }
 
+def FtdProfiling : DynamaticPass< "ftd-profiling">  {
+  let summary = "Profiling pass to extract relevant IR information";
+  let description = [{
+    The pass is in charge of extracting static information from the IR, 
+    related to the relationship between loops and multiplexers in the circuit.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createFtdProfiling()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
   let description = [{
@@ -116,6 +126,22 @@ def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
       "If true, dump debugging information (identified CFDFCs, MILP "
       "placement decisions, solution summaries) into a directory named "
       "'buffer-placement' at the binary's location.">];
+}
+
+def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
+  let summary = "Size the LSQs based on the buffer placement information.";
+  let description = [{
+    Calculates the necessary Load-Store-Queue depths, based on the buffer placement information, 
+    to ensure that the memory accesses are not restricting the circuits troughput, while 
+    trying to keep the area as low as possible.  
+  }];
+  let constructor = "dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs()";
+  
+  let options = [Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">,
+      Option<"collisions", "collisions", "std::string", "",
+      "Three different cases for memory collsions: none/half/full">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

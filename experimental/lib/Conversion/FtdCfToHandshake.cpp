@@ -11,17 +11,15 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/CFGAnnotation.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdImplementation.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -29,7 +27,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include <fstream>
 #include <utility>
 
 using namespace mlir;
@@ -116,43 +113,11 @@ static void channelifyMuxes(handshake::FuncOp &funcOp) {
   }
 }
 
-void ftd::FtdLowerFuncToHandshake::exportGsaGatesInfo(
-    handshake::FuncOp funcOp) const {
-
-  Region &region = funcOp.getBody();
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-  std::ofstream ofs;
-
-  // We print to this file information about the GSA gates and the innermost
-  // loops, if any, containing each.
-  ofs.open("ftdscripting/gsaGatesInfo.txt", std::ofstream::out);
-  std::string loopDescription;
-  llvm::raw_string_ostream loopDescriptionStream(loopDescription);
-
-  auto muxes = funcOp.getBody().getOps<handshake::MuxOp>();
-  for (auto phi : muxes) {
-    ofs << namer.getName(phi).str();
-    if (llvm::isa<handshake::MergeOp>(phi->getOperand(0).getDefiningOp()))
-      ofs << " (MU)\n";
-    else
-      ofs << " (GAMMA)\n";
-    if (!loopInfo.getLoopFor(phi->getBlock()))
-      ofs << "Not inside any loop\n";
-    else
-      loopInfo.getLoopFor(phi->getBlock())
-          ->print(loopDescriptionStream, false, false, 0);
-    ofs << loopDescription << "\n";
-    loopDescription = "";
-  }
-
-  ofs.close();
-}
-
-// --- Helper functions ---
-
-LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
+/// Converts undefined operations (LLVM::UndefOp) with a default "0"
+/// constant triggered by the start signal of the corresponding function.
+static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
+                                            handshake::FuncOp &funcOp,
+                                            NameAnalysis &namer) {
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -189,8 +154,13 @@ LogicalResult ftd::FtdLowerFuncToHandshake::convertUndefinedValues(
   return success();
 }
 
-LogicalResult ftd::FtdLowerFuncToHandshake::convertConstants(
-    ConversionPatternRewriter &rewriter, handshake::FuncOp &funcOp) const {
+/// Convers arith-level constants to handshake-level constants. Constants are
+/// triggered by the start value of the corresponding function. The FTD
+/// algorithm is then in charge of connecting the constants to the rest of the
+/// network, in order for them to be re-generated
+static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp,
+                                      NameAnalysis &namer) {
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -240,8 +210,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
-  if (failed(gsa::GSAAnalysis::addGsaGates(lowerFuncOp.getRegion(), rewriter,
-                                           gsaAnalysis, startValueBackedge)))
+  if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
+                         startValueBackedge)))
     return failure();
 
   // First lower the parent function itself, without modifying its body
@@ -294,20 +264,15 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
   // control value
-  if (failed(convertConstants(rewriter, funcOp)) ||
-      failed(convertUndefinedValues(rewriter, funcOp)))
+  if (failed(::convertConstants(rewriter, funcOp, namer)) ||
+      failed(::convertUndefinedValues(rewriter, funcOp, namer)))
     return failure();
 
   if (funcOp.getBlocks().size() != 1) {
 
     // Add muxes for regeneration of values in loop
     addRegen(funcOp, rewriter);
-
     channelifyMuxes(funcOp);
-
-    // This function prints to a file information about all GSA gates and the
-    // loops containing them (if any)
-    exportGsaGatesInfo(funcOp);
 
     // Add suppression blocks between each pair of producer and consumer
     addSupp(funcOp, rewriter);
@@ -316,7 +281,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
-  cfg::annotateCFG(funcOp, rewriter);
+  // Annotate the IR with the CFG information
+  cfg::annotateCFG(funcOp, rewriter, namer);
 
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();

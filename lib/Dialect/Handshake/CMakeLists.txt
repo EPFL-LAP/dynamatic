@@ -19,5 +19,6 @@ add_dynamatic_dialect_library(DynamaticHandshake
   DEPENDS
   MLIRHandshakeInterfacesIncGen
   MLIRHandshakeAttributesIncGen
+  MLIRHandshakeTypeInterfacesIncGen
   MLIRHandshakeEnumsIncGen
   )

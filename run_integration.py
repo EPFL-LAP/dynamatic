@@ -1,7 +1,33 @@
+import argparse
 import os
 import shutil
 import subprocess
 from random import shuffle
+
+
+class CLIHandler:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(description="CLI handler for --sq flag.")
+        self.add_arguments()
+
+    def add_arguments(self):
+        """
+        Adds the --sq argument to the parser.
+        """
+        self.parser.add_argument(
+            "--sq",
+            action="store_true",
+            help="Enable straight-to-queue functionality (default: False).",
+        )
+
+    def parse_args(self, args=None):
+        """
+        Parses the command-line arguments.
+        :param args: List of arguments to parse (default: sys.argv).
+        :return: Parsed arguments namespace.
+        """
+        return self.parser.parse_args(args)
+
 
 INTEGRATION_FOLDER = "./integration-test/"
 SCRIPT_CONTENT = """set-src integration-test/if_loop_3/if_loop_3.c
@@ -13,6 +39,9 @@ exit
 FTD_DYN_FILE = "./build/ftd_run.dyn"
 DYN_FILE = "./build/original_run.dyn"
 FTD_COMPILE_COMMAND = "compile --fast-token-delivery --buffer-algorithm on-merges"
+FTD_COMPILE_COMMAND_SQ = (
+    "compile --fast-token-delivery --buffer-algorithm on-merges --straight-to-queue"
+)
 SET_SRC_COMMAND = "set-src "
 DYNAMATIC_COMMAND = "./bin/dynamatic --run "
 TESTS_FAIL_FILE = "./tests_to_skip.txt"
@@ -101,16 +130,25 @@ def append_to_file(filename, text):
 
 
 def main():
+    cli = CLIHandler()
+    args = cli.parse_args()  # Parse the CLI arguments
+
     c_files = find_files_ext(INTEGRATION_FOLDER, ".c")
     shuffle(c_files)
     write_string_to_file(SCRIPT_CONTENT, FTD_DYN_FILE)
     write_string_to_file(SCRIPT_CONTENT, DYN_FILE)
-    modify_line(FTD_DYN_FILE, FTD_COMPILE_COMMAND, 2)
+
+    if args.sq:
+        print(
+            "========= INTEGRATION TEST WITH FAST TOKEN DELIVERY AND STRAIGHT TO QUEUE ========="
+        )
+        modify_line(FTD_DYN_FILE, FTD_COMPILE_COMMAND_SQ, 2)
+    else:
+        print("========= INTEGRATION TEST WITH FAST TOKEN DELIVERY =========")
+        modify_line(FTD_DYN_FILE, FTD_COMPILE_COMMAND, 2)
 
     counter_test, counter_pass_original, counter_pass_ftd = 0, 0, 0
     failed_ftd = []
-
-    print("========= INTEGRATION TEST WITH FAST TOKEN DELIVERY =========")
 
     for c_file in c_files:
 

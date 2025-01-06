@@ -38,8 +38,6 @@ ControlDependenceAnalysis::ControlDependenceAnalysis(Operation *operation) {
   // functions
   unsigned functionsCovered = 0;
 
-  // TODO: Extend to support multiple functions
-
   // The analysis can be instantiated either over a module containing one
   // function only or over a function
   if (ModuleOp modOp = dyn_cast<ModuleOp>(operation); modOp) {
@@ -83,8 +81,8 @@ static bool enumeratePathsInPostDomTree(DominanceInfoNode *startNode,
 
   // For each of the successors of `startNode`, try each descendent until
   // `endNode` is found
-  for (auto *iter = startNode->begin(); iter < startNode->end(); iter++) {
-    if (enumeratePathsInPostDomTree(*iter, endNode, currentPath))
+  for (auto *node : startNode->children()) {
+    if (enumeratePathsInPostDomTree(node, endNode, currentPath))
       return true;
   }
 

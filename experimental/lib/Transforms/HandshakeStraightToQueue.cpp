@@ -14,10 +14,8 @@
 
 #include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Backedge.h"
-#include "experimental/Analysis/GSAAnalysis.h"
 #include "experimental/Support/CFGAnnotation.h"
-#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -142,7 +140,7 @@ static SmallVector<ProdConsMemDep> identifyMemoryDependencies(
       // this case i is the producer, j is the consumer. If this doesn't
       // hold, the dependency will be added when the two blocks are analyzed
       // in the opposite direction
-      if (bi.lessIndex(bbJ, bbI)) {
+      if (bi.isLess(bbJ, bbI)) {
         allMemDeps.push_back(ProdConsMemDep(bbJ, bbI));
 
         // If the two blocks are in the same loop, then bbI is also a
@@ -238,7 +236,7 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
       for (auto &sp : group->preds) {
 
         // if we are considering the same elements, ignore them
-        if (sp->bb == bp->bb || bi.greaterIndex(sp->bb, bp->bb))
+        if (sp->bb == bp->bb || bi.isGreater(sp->bb, bp->bb))
           continue;
 
         // Add the small predecessors to the list of elements to remove in
@@ -264,7 +262,7 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
 static DenseMap<Block *, handshake::LazyForkOp>
 connectLSQToForkGraph(handshake::FuncOp &funcOp,
                       DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
-                      ConversionPatternRewriter &rewriter) {
+                      PatternRewriter &rewriter) {
 
   DenseMap<Block *, handshake::LazyForkOp> forksGraph;
   auto startValue = (Value)funcOp.getArguments().back();
@@ -307,65 +305,6 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp,
   return forksGraph;
 }
 
-/// Use the GSA analysis to replace each non-init merge in the IR with a
-/// multiplexer
-static LogicalResult replaceMergeToGSA(handshake::FuncOp funcOp,
-                                       ConversionPatternRewriter &rewriter) {
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // Create a backedge for the start value, to be sued during the merges to
-  // muxes conversion
-  BackedgeBuilder edgeBuilderStart(rewriter, funcOp.getRegion().getLoc());
-  Backedge startValueBackedge =
-      edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
-
-  // For each merge that was signed with the `NEW_PHI` attribute, substitute
-  // it with its GSA equivalent
-  for (handshake::MergeOp merge : funcOp.getOps<handshake::MergeOp>()) {
-    if (!merge->hasAttr(ftd::NEW_PHI))
-      continue;
-    gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
-    if (failed(gsa::GSAAnalysis::addGsaGates(funcOp.getRegion(), rewriter, gsa,
-                                             startValueBackedge, false)))
-      return failure();
-
-    // Get rid of the merge
-    rewriter.eraseOp(merge);
-  }
-
-  // Replace the backedge
-  startValueBackedge.setValue(startValue);
-
-  return success();
-}
-
-/// Allocate some joins in front of each lazy fork, so that the number of
-/// inputs for each of them is exactly one. The current inputs of the lazy
-/// forks become inputs for the joins.
-static void
-joinInsertion(ConversionPatternRewriter &rewriter,
-              const DenseSet<MemoryGroup *> &groups,
-              const DenseMap<Block *, handshake::LazyForkOp> &forksGraph) {
-
-  // For each group
-  for (MemoryGroup *group : groups) {
-    // Get the corresponding fork and operands
-    Operation *forkNode = forksGraph.at(group->bb);
-    ValueRange operands = forkNode->getOperands();
-    // If the number of inputs is higher than one
-    if (operands.size() > 1) {
-
-      // Join all the inputs, and set the output of this new element as input
-      // of the lazy fork
-      rewriter.setInsertionPointToStart(forkNode->getBlock());
-      auto joinOp =
-          rewriter.create<handshake::JoinOp>(forkNode->getLoc(), operands);
-      /// The result of the JoinOp becomes the input to the LazyFork
-      forkNode->setOperands(joinOp.getResult());
-    }
-  }
-}
-
 /// Get all the load and store operations related to a LSQ operation
 static SmallVector<handshake::MemPortOpInterface>
 getLsqOps(handshake::FuncOp &funcOp, handshake::LSQOp lsqOp) {
@@ -386,47 +325,23 @@ static LogicalResult
 connectForkGraph(handshake::FuncOp &funcOp,
                  const DenseSet<MemoryGroup *> &groupsGraph,
                  const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
-                 ConversionPatternRewriter &rewriter) {
+                 PatternRewriter &rewriter) {
 
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // For each consumer
   for (MemoryGroup *consumerGroup : groupsGraph) {
 
-    // Store all the inputs of the lazy fork
-    SmallVector<Value> differentInputs;
-    Operation *consumerLF = forksGraph.at(consumerGroup->bb);
+    DenseMap<OpOperand *, SmallVector<Value>> deps;
+    SmallVector<Value> forkDeps;
 
-    // For each of its producer
-    for (MemoryGroup *producerGroup : consumerGroup->preds) {
-
+    for (auto &producerGroup : consumerGroup->preds) {
       Operation *producerLF = forksGraph.at(producerGroup->bb);
-
-      // The values to connect are the start value and the output of the
-      // producer
-      SmallVector<Value> forkValuesToConnect = {startValue,
-                                                producerLF->getResult(0)};
-
-      // Build a phi network
-      auto phiNetworkOrFailure = ftd::createPhiNetwork(
-          funcOp.getRegion(), rewriter, forkValuesToConnect);
-      if (failed(phiNetworkOrFailure))
-        return failure();
-
-      auto &phiNetwork = *phiNetworkOrFailure;
-      differentInputs.push_back(phiNetwork[consumerGroup->bb]);
+      forkDeps.push_back(producerLF->getResult(0));
     }
 
-    // If there are no inputs, start feeds the lazy fork directly
-    if (differentInputs.size() == 0)
-      differentInputs.push_back(startValue);
+    deps[&forksGraph.at(consumerGroup->bb)->getOpOperand(0)] = forkDeps;
 
-    // Set the operands (if more than one, a join will be instantiated)
-    consumerLF->setOperands(differentInputs);
+    if (failed(ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps)))
+      return failure();
   }
-
-  joinInsertion(rewriter, groupsGraph, forksGraph);
-
   return success();
 }
 
@@ -435,8 +350,6 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
 
   ConversionPatternRewriter rewriter(ctx);
-
-  llvm::dbgs() << "[INFO] Connecting LSQ with Straight To The Queue\n";
 
   // Return if there are no LSQs in the function
   if (funcOp.getOps<handshake::LSQOp>().empty())
@@ -452,8 +365,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     // Collect all the operations related to that LSQ
     auto lsqOps = getLsqOps(funcOp, lsqOp);
 
-    // Get all the memory depdencies among the operations connected to the same
-    // LSQ
+    // Get all the memory depdencies among the operations connected to the
+    // same LSQ
     auto lsqMemDeps = identifyMemoryDependencies(funcOp, lsqOps);
     for (auto &dep : lsqMemDeps)
       dep.print();
@@ -467,8 +380,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     for (auto &g : groupsGraph)
       g->print();
 
-    // Build a lazy fork for each group and connect it to the related activation
-    // input in the LSQ
+    // Build a lazy fork for each group and connect it to the related
+    // activation input in the LSQ
     auto forksGraph =
         connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, rewriter);
 
@@ -482,7 +395,7 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   }
 
   // Replace each merge created by `createPhiNetwork` with a multiplxer
-  if (failed(replaceMergeToGSA(funcOp, rewriter)))
+  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 
   // Run fast token delivery on the newly inserted operations
