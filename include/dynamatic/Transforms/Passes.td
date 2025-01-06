@@ -109,22 +109,21 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
-  let summary = "Analyzes memory accesses to LSQs to find unnecessary ones";
+def HandshakeInactivateEnforcedDeps : DynamaticPass<"handshake-inactivate-enforced-deps"> {
+  let summary = "Uses `shrink it or shred it` logic to mark the dependencies that are insured as `inactive`";
   let description = [{
     Performs flow analysis to identify WAR dependencies between memory accesses
     that are ensured by the circuit's semantics and which therefore do not need
-    to be enforced by an LSQ. This allows to reduce the number of memory ports
-    that go to LSQs, thereby improving the circuit's performance and area thanks
-    to LSQ size reduction (or elimination, in some instances). The pass does not
-    modify the IR's structure, it only sets `handshake::MemInterfaceAttr`
-    attributes on memory ports to encode the analysis' results.
+    to be enforced by an LSQ. It also finds the WAW dependencies between an 
+    operation and itself. The pass then modifies the IR's structure by seting 
+    these dependencies as inactive and determining `handshake::MemInterfaceAttr`
+    attributes on memory ports at the end.
 
     The pass requires that all eligible operations within Handshake functions
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
-  let constructor = "dynamatic::createHandshakeAnalyzeLSQUsage()";
+  let constructor = "dynamatic::createHandshakeInactivateEnforcedDeps()";
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {

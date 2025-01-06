@@ -91,11 +91,8 @@ void MemDependenceAttr::print(AsmPrinter &odsPrinter) const {
   // Print destination memory access and loop depth
   odsPrinter << "<\"" << getDstAccess().str() << "\" (" << getLoopDepth()
              << ") ";
-  std::string isActiveStr = "inactive";
-  if (getIsActive())
-    isActiveStr = "active";
   
-  odsPrinter << "\"" << isActiveStr << "\"";
+  odsPrinter << "\"" << getIsActive().getValue() << "\"";
 
   // Print dependence components, if present
   auto components = getComponents();
@@ -132,10 +129,11 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
   if (odsParser.parseString(&boolStr))
     return nullptr;
   bool isActive;
-  if (boolStr == "active")
+  if (boolStr == "true")
     isActive = true;
-  else if (boolStr == "inactive")
+  else if (boolStr == "false")
     isActive = false;
+  mlir::BoolAttr isActiveAttr = mlir::BoolAttr::get(ctx, isActive);
   
 
   // Parse dependence components if present
@@ -163,7 +161,7 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
 
   if (odsParser.parseGreater())
     return nullptr;
-  return MemDependenceAttr::get(ctx, dstAccess, loopDepth, components, isActive);
+  return MemDependenceAttr::get(ctx, dstAccess, loopDepth, components, isActiveAttr);
 }
 
 //===----------------------------------------------------------------------===//
