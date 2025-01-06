@@ -208,7 +208,9 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     The dependency is furthermore characterized by the loop depth at which the
     dependency is (`loopDepth`) and a list of dependence components
     (`components`) whose size indicates the number of commom loops surrounding
-    both operations.
+    both operations. Also, there is a boolean (`isActive`) that demonstrates 
+    whether the dependency needs to be considered. An example of when there is
+    no need to consider a dependency is when it is guaranteed by data dependency.
   }];
   
   let parameters = (ins 
@@ -228,7 +230,7 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
         compAttrs.push_back(::dynamatic::handshake::DependenceComponentAttr::get(
           context, comp.lb, comp.ub));
       return $_get(context, ::mlir::StringAttr::get(context, dstAccess), 
-        loopDepth, compAttrs, ::mlir::BoolAttr::get(context, dstAccess));  
+        loopDepth, compAttrs, isActive);  
     }]>
   ];
 
