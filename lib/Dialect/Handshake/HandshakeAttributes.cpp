@@ -127,6 +127,17 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
       odsParser.parseRParen())
     return nullptr;
 
+  // Parse isActive
+  std::string boolStr;
+  if (odsParser.parseString(&boolStr))
+    return nullptr;
+  bool isActive;
+  if (boolStr == "active")
+    isActive = true;
+  else if (boolStr == "inactive")
+    isActive = false;
+  mlir::BoolAttr isActiveAttr = mlir::BoolAttr::get(ctx, isActive);
+  
   // Parse dependence components if present
   SmallVector<DependenceComponentAttr> components;
   if (!odsParser.parseOptionalLSquare()) {
@@ -149,18 +160,6 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
         odsParser.parseRSquare())
       return nullptr;
   }
-
-
-  // Parse isActive
-  std::string boolStr;
-  if (odsParser.parseString(&boolStr))
-    return nullptr;
-  bool isActive;
-  if (boolStr == "active")
-    isActive = true;
-  else if (boolStr == "inactive")
-    isActive = false;
-  mlir::BoolAttr isActiveAttr = mlir::BoolAttr::get(ctx, isActive);
 
   if (odsParser.parseGreater())
     return nullptr;
