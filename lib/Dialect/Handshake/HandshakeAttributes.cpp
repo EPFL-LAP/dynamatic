@@ -136,6 +136,9 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
     isActive = true;
   else if (boolStr == "inactive")
     isActive = false;
+  else
+    return nullptr;
+
   mlir::BoolAttr isActiveAttr = mlir::BoolAttr::get(ctx, isActive);
 
   // Parse dependence components if present

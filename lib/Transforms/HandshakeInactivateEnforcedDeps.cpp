@@ -1,5 +1,4 @@
-//===- HandshakeInactivateEnforcedDeps.cpp - LSQ flow analysis ---------*- C++
-//-*-===//
+//===- HandshakeInactivateEnforcedDeps.h - Inactivate Deps ------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -119,7 +118,7 @@ static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
   });
 }
 
-/// returns the inactivated version of the dependency
+/// Returns the inactivated version of the dependency.
 static MemDependenceAttr
 getInactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
@@ -129,7 +128,7 @@ getInactivatedDependency(MemDependenceAttr dependency) {
 }
 
 /// Inactivates the dependencies that are enforced by cheking whether the load
-/// is globally [Instruction] in-order dependent (GIID) on the store or not
+/// is globally [Instruction] in-order dependent (GIID) on the store or not.
 static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
                                    DenseSet<handshake::StoreOp> &storeOps,
                                    DependencyMap &opDeps, HandshakeCFG &cfg) {
@@ -157,14 +156,14 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
   }
 }
 
-/// replaces the memory dependence array attribute with the dependencies
-/// given in the dictionary `opDeps`
+/// Replaces the memory dependence array attribute with the dependencies
+/// given in the dictionary `opDeps`.
 static void changeOpDeps(DependencyMap &opDeps, MLIRContext *ctx) {
   for (auto &[op, deps] : opDeps)
     setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
 }
 
-/// Inactivates the WAW dependencies between an operation and itself
+/// Inactivates the WAW dependencies between an operation and itself.
 static void inactivateEnforcedWAWs(
     DenseSet<handshake::StoreOp> &storeOps,
     DenseMap<Operation *, SmallVector<MemDependenceAttr>> &opDeps) {
@@ -186,8 +185,8 @@ static void inactivateEnforcedWAWs(
   }
 }
 
-// gets the set of all load/store operations and returns the subset of
-// operations that are involved in at least one active dependency.
+/// Gets the set of all load/store operations and returns the subset of
+/// operations that are involved in at least one active dependency.
 static DenseSet<Operation *>
 getOpsWithNonEnforcedDeps(DenseSet<Operation *> &loadStoreOps) {
   DenseMap<StringRef, Operation *> nameToOpMapping;

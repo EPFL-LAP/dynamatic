@@ -109,15 +109,17 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeInactivateEnforcedDeps : DynamaticPass<"handshake-inactivate-enforced-deps"> {
-  let summary = "Uses `shrink it or shred it` logic to mark the dependencies that are insured as `inactive`";
+def HandshakeInactivateEnforcedDeps : 
+DynamaticPass<"handshake-inactivate-enforced-deps"> {
+  let summary = 
+  "Marks the enforced dependencies as `inactive`";
   let description = [{
     Performs flow analysis to identify WAR dependencies between memory accesses
     that are ensured by the circuit's semantics and which therefore do not need
     to be enforced by an LSQ. It also finds the WAW dependencies between an 
-    operation and itself. The pass then modifies the IR's structure by seting 
-    these dependencies as inactive and determining `handshake::MemInterfaceAttr`
-    attributes on memory ports at the end.
+    operation and itself. The pass then modifies the IR's structure by setting 
+    these dependencies as inactive and determining 
+    `handshake::MemInterfaceAttr` attributes on memory ports at the end.
 
     The pass requires that all eligible operations within Handshake functions
     are tagged with the basic block they belong to, and that all memory access
