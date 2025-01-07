@@ -94,7 +94,7 @@ void MemDependenceAttr::print(AsmPrinter &odsPrinter) const {
   std::string isActiveStr = "inactive";
   if (getIsActive().getValue())
     isActiveStr = "active";
-  
+
   odsPrinter << "\"" << isActiveStr << "\"";
 
   // Print dependence components, if present
@@ -137,7 +137,7 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
   else if (boolStr == "inactive")
     isActive = false;
   mlir::BoolAttr isActiveAttr = mlir::BoolAttr::get(ctx, isActive);
-  
+
   // Parse dependence components if present
   SmallVector<DependenceComponentAttr> components;
   if (!odsParser.parseOptionalLSquare()) {
@@ -163,7 +163,8 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
 
   if (odsParser.parseGreater())
     return nullptr;
-  return MemDependenceAttr::get(ctx, dstAccess, loopDepth, components, isActiveAttr);
+  return MemDependenceAttr::get(ctx, dstAccess, loopDepth, components,
+                                isActiveAttr);
 }
 
 //===----------------------------------------------------------------------===//

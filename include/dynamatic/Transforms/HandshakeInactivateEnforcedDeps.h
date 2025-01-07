@@ -21,7 +21,8 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEINACTIVATEENFORCEDDEPS
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeInactivateEnforcedDeps();
+std::unique_ptr<dynamatic::DynamaticPass>
+createHandshakeInactivateEnforcedDeps();
 
 } // namespace dynamatic
 
