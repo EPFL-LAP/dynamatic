@@ -744,11 +744,12 @@ class Handshake_MemPortOp<string mnemonic> :
     MemPortOpInterface,
     AllTypesMatch<["address", "addressResult"]>,
     AllTypesMatch<["data", "dataResult"]>,
+    AllTypesMatch<["done", "doneResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins IntChannelType:$address, ChannelType:$data, ControlType:$done);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult, ControlType:$memDoneResult);
   let assemblyFormat = [{
     `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
   }];
@@ -766,10 +767,12 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     The order of operands is
     1. address (from predecessor)
     2. data value (from memory interface)
+    3. done signal (from memory interface)
 
     The order of results is
-    1. address (to memory interface).
+    1. address (to memory interface)
     2. data value (to successor)
+    3. done signal (to successor)
 
     Example:
 
@@ -787,18 +790,32 @@ def LoadOp : Handshake_MemPortOp<"load"> {
       $_state.types.push_back(address.getType());
       $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
         memrefType.getElementType()));
+      $_state.types.push_back(::dynamatic::handshake::ControlType);
     }]>
   ];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return (idx == 0) ? "addrIn" : "dataFromMem";
+      switch(idx) {
+        case 0:
+          return "addrIn";
+        case 1:
+          return "dataFromMem";
+        default:
+          return "doneFromMem";
+      }
     }
-
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
-      return (idx == 0) ? "addrOut" : "dataOut";
+      switch(idx) {
+        case 0:
+          return "addrOut";
+        case 1:
+          return "dataOut";
+        default:
+          return "doneOut";
+      }
     }
   }];
 }
@@ -814,10 +831,12 @@ def StoreOp : Handshake_MemPortOp<"store"> {
     The order of operands is
     1. address (from predecessor)
     2. data value (from predecessor)
+    3. done signal (from memory interface)
 
     The order of results is
     1. address (to memory interface).
     2. data value (to memory interface)
+    3. done signal (to successor)
 
     Example:
 
@@ -828,11 +847,25 @@ def StoreOp : Handshake_MemPortOp<"store"> {
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned int idx) {
-      return (idx == 0) ? "addrIn" : "dataIn";
+      switch(idx) {
+        case 0:
+          return "addrIn";
+        case 1:
+          return "dataIn";
+        default:
+          return "doneFromMem";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned int idx) {
-      return (idx == 0) ? "addrOut" : "dataToMem";
+      switch(idx) {
+        case 0:
+          return "addrOut";
+        case 1:
+          return "dataToMem";
+        default:
+          return "doneOut";
+      }
     }
   }];
 }
