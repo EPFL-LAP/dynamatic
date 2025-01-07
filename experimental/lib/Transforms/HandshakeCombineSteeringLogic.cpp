@@ -136,9 +136,16 @@ Operation *returnMuxAtSameDepth(Operation *op,
   if (op->getAttr("handshake.bb") == referenceMuxOp->getAttr("handshake.bb"))
     return op;
 
-  // Otherwise, continue in the DFS
-  for (auto cons : cast<handshake::MuxOp>(op).getResult().getUsers())
-    return returnMuxAtSameDepth(cons, referenceMuxOp);
+  // Otherwise, explore all users in DFS-like traversal until you hit a match
+  Operation *finalOp = nullptr;
+  for (auto cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
+    Operation *potentialOp = returnMuxAtSameDepth(cons, referenceMuxOp);
+    if (potentialOp != nullptr) {
+      finalOp = potentialOp;
+      break;
+    }
+  }
+  return finalOp;
 }
 
 // Note: This pattern assumes that all Muxes belonging to 1 loop have the same
@@ -167,9 +174,12 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     DenseSet<handshake::MuxOp> dataMuxUsers;
     DenseSet<handshake::MuxOp> redundantMuxes;
 
+    // Identify the first non-Mux producer of the muxOp by running a DFS-like
+    // traversal and return its produced value
+    Value valProducedByNonMux = returnNonMuxProducerVal(muxOp, muxOutIdx);
+
     // Get users of the non-Mux operation at the muxOuterInputIdx
-    for (auto *dataUser :
-         returnNonMuxProducerVal(muxOp, muxOutIdx).getUsers()) {
+    for (auto *dataUser : valProducedByNonMux.getUsers()) {
       Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
       if (returnedMux != nullptr) {
         auto muxUser = cast<handshake::MuxOp>(returnedMux);
