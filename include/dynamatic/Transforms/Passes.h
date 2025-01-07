@@ -22,7 +22,6 @@
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "dynamatic/Transforms/FuncSetArgNames.h"
-#include "dynamatic/Transforms/HandshakeAnalyzeLSQUsage.h"
 #include "dynamatic/Transforms/HandshakeInactivateEnforcedDeps.h"
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
