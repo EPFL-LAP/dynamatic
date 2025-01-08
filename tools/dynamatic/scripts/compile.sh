@@ -124,7 +124,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
       --ftd-lower-cf-to-handshake \
       --handshake-combine-steering-logic \
       > "$F_HANDSHAKE"
-    exit_on_fail "Failed to compile cf to handshake with FTD + SQ" "Compiled cf to handshake with FTD + SQ"
+    exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \

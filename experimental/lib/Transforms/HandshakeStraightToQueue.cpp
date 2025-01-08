@@ -14,10 +14,12 @@
 
 #include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include <stack>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -345,15 +347,103 @@ connectForkGraph(handshake::FuncOp &funcOp,
   return success();
 }
 
-/// Run straight to the queue
+/// Remove the network of cmerges in case the function is void. The SQ pass
+/// guarantees that no network is required any longer. All the remaining
+/// connections (to the number of store constants and to the memory controllers)
+/// are substitued with start.
+static void removeNetworkCMerges(handshake::FuncOp &funcOp,
+                                 PatternRewriter &rewriter) {
+
+  // Get the end operation and its operands.
+  handshake::EndOp endOperation = *funcOp.getOps<handshake::EndOp>().begin();
+  auto operands = endOperation->getOperands();
+
+  // Check if the function is void. This happens if all the types of the
+  // arguments of the `end` operands are identical.
+  bool hasReturnValue = llvm::any_of(operands, [&](Value v) -> bool {
+    return v.getType() != operands[0].getType();
+  });
+
+  // Cannot remove the network if the function is void
+  if (!hasReturnValue)
+    return;
+
+  // The FTD circuit introduces no branch operations, so the ones in the circuit
+  // are only related to the network of cmerges
+  auto branchOps = funcOp.getOps<handshake::BranchOp>();
+
+  // Operations that needs to be removed
+  DenseSet<Operation *> operationsToRemove;
+  // Operations that needs to be traversed via BFS, handled in a FIFO approach
+  SmallVector<Operation *> operationsToTraverse;
+
+  // Insert in both the sets the list of
+  operationsToTraverse.push_back((Operation *)(*branchOps.begin()));
+  operationsToRemove.insert(operationsToTraverse.front());
+
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // While there are operations to be traversed
+  while (!operationsToTraverse.empty()) {
+    Operation *toTraverse = operationsToTraverse.pop_back_val();
+
+    // The network is made of control merges, branches and conditional branches:
+    // ignore anything else.
+    if (!(llvm::isa<handshake::ControlMergeOp>(toTraverse) ||
+          llvm::isa<handshake::BranchOp>(toTraverse) ||
+          llvm::isa<handshake::ConditionalBranchOp>(toTraverse))) {
+      continue;
+    }
+
+    // The operation needs to be removed
+    operationsToRemove.insert(toTraverse);
+
+    // Consider all the users of some results of the operations, and add them to
+    // the operations to traverse
+    for (auto result : toTraverse->getResults()) {
+      for (auto *user : result.getUsers()) {
+        if (!operationsToRemove.contains(user))
+          operationsToTraverse.push_back(user);
+      }
+    }
+
+    // Since the operations is to be remove, its results are not needed anymore,
+    // and can be substitued with `start`. This is useful to guarantee that any
+    // operation is not in use once it gets removed.
+
+    // Substitute all the control merge results with start
+    if (auto cmerge = llvm::dyn_cast<handshake::ControlMergeOp>(toTraverse);
+        cmerge)
+      rewriter.replaceAllUsesWith(cmerge.getResult(), startValue);
+
+    // Substitute all the branch results with start
+    if (auto br = llvm::dyn_cast<handshake::BranchOp>(toTraverse); br)
+      rewriter.replaceAllUsesWith(br.getResult(), startValue);
+
+    // Substitute all the conditional branch results with start
+    if (auto condBr =
+            llvm::dyn_cast<handshake::ConditionalBranchOp>(toTraverse);
+        condBr) {
+      rewriter.replaceAllUsesWith(condBr.getTrueResult(), startValue);
+      rewriter.replaceAllUsesWith(condBr.getFalseResult(), startValue);
+    }
+  }
+
+  for (auto *toRemove : operationsToRemove)
+    toRemove->erase();
+}
+
+/// Run straight to the queue.
 static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
 
   ConversionPatternRewriter rewriter(ctx);
 
   // Return if there are no LSQs in the function
-  if (funcOp.getOps<handshake::LSQOp>().empty())
+  if (funcOp.getOps<handshake::LSQOp>().empty()) {
+    removeNetworkCMerges(funcOp, rewriter);
     return success();
+  }
 
   // Restore the cf structure to work on a structured IR
   if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
@@ -402,6 +492,10 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   experimental::ftd::addRegen(funcOp, rewriter);
   experimental::ftd::addSupp(funcOp, rewriter);
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
+
+  // Try to remove the network of cmerges if possible (i.e. if the function was
+  // void)
+  removeNetworkCMerges(funcOp, rewriter);
 
   // Remove the blocks and terminators
   if (failed(cfg::flattenFunction(funcOp)))
