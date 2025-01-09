@@ -749,10 +749,22 @@ class Handshake_MemPortOp<string mnemonic> :
   ]
 > {
   let arguments = (ins IntChannelType:$address, ChannelType:$data, ControlType:$done);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult, ControlType:$memDoneResult);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult, ControlType:$doneResult);
   let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    `[` $address `]` $data $done attr-dict `:` type($address) `,` type($data) `,` type($done)
   }];
+  let builders = [
+  OpBuilder<(ins "Value":$address, "Value":$data), [{
+    // Address and data (done operand needs to be added later)
+    $_state.addOperands(address);
+    $_state.addOperands(data);
+
+    // Data and address results
+    $_state.types.push_back(address.getType());
+    $_state.types.push_back(data.getType());
+    $_state.types.push_back(::dynamatic::handshake::ControlType::get(
+      $_state.getContext()));
+    }]>];
 }
 
 def LoadOp : Handshake_MemPortOp<"load"> {
@@ -782,6 +794,18 @@ def LoadOp : Handshake_MemPortOp<"load"> {
   }];
 
   let builders = [
+    OpBuilder<(ins "Value":$address, "Value":$data), [{
+      // Address and data (done operand needs to be added later)
+      $_state.addOperands(address);
+      $_state.addOperands(data);
+
+      // Data and address results
+      $_state.types.push_back(address.getType());
+      $_state.types.push_back(data.getType());
+      $_state.types.push_back(::dynamatic::handshake::ControlType::get(
+        $_state.getContext()));
+    }]>,
+
     OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
       // Address (data operand needs to be added later)
       $_state.addOperands(address);
@@ -790,7 +814,8 @@ def LoadOp : Handshake_MemPortOp<"load"> {
       $_state.types.push_back(address.getType());
       $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
         memrefType.getElementType()));
-      $_state.types.push_back(::dynamatic::handshake::ControlType);
+      $_state.types.push_back(::dynamatic::handshake::ControlType::get(
+       $_state.getContext()));
     }]>
   ];
 
