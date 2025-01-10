@@ -429,6 +429,10 @@
     "hdl": "smv"
   },
   {
+    "generic": "$DYNAMATIC/data/smv/support/eager_fork_register_block.smv",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
@@ -440,9 +444,9 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fork.smv\" fork",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fork_dataless_$SIZE.smv\" fork $SIZE,dataless",
     "module-name": "fork_dataless",
-    "dependencies": ["logic", "eager_fork_register_block"],
+    "dependencies": ["eager_fork_register_block"],
     "hdl": "smv"
   },
   {
@@ -452,8 +456,8 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/fork_$SIZE.smv\" fork $SIZE",
-    "module-name": "handshake_fork",
-    "dependencies": ["types"],
+    "module-name": "fork",
+    "dependencies": ["eager_fork_register_block"],
     "hdl": "smv"
   },
   {
@@ -468,9 +472,8 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork.smv\" lazy_fork",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork_dataless_$SIZE.smv\" lazy_fork $SIZE,dataless",
     "module-name": "lazy_fork_dataless",
-    "dependencies": ["logic"],
     "hdl": "smv"
   },
   {
@@ -479,8 +482,8 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork.smv\" lazy_fork",
-    "dependencies": ["types", "lazy_fork_dataless"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/lazy_fork_$SIZE.smv\" lazy_fork $SIZE",
+    "module-name": "lazy_fork",
     "hdl": "smv"
   },
   {
@@ -519,7 +522,7 @@
       },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE,dataless",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux_$SIZE.smv\" mux $SIZE,dataless",
     "module-name": "mux_dataless",
     "dependencies": ["tehb_dataless"],
     "hdl": "smv"
@@ -531,7 +534,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux_$SIZE.smv\" mux $SIZE",
     "dependencies": ["tehb"],
     "hdl": "smv"
   },
@@ -769,5 +772,54 @@
     "generic": "$DYNAMATIC/data/smv/handshake/not.smv",
     "module-name": "logic_not",
     "hdl": "smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/eager_fork_register_block.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
+    "module-name": "elastic_fifo_inner_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/logic.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/join.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",
+    "dependencies": ["types"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/merge_notehb.vhd",
+    "dependencies": ["types"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/dataless/merge_notehb.vhd",
+    "module-name": "merge_notehb_dataless"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
+  },
+  {
+    "name": "mem_to_bram",
+    "parameters": [
+      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
+    "dependencies": ["types"]
   }
 ]

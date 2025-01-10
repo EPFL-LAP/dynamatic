@@ -30,11 +30,13 @@ namespace handshake {
 enum class OpTypeEnum : uint64_t {
   DEFAULT = 0,
   JOIN = 1,
-  MERGE = 2,
-  MUX = 3,
-  CONSTANT = 4,
-  BOP = 5,
-  UOP = 6
+  FORK = 2,
+  LAZY_FORK = 3,
+  MERGE = 4,
+  MUX = 5,
+  CONSTANT = 6,
+  BOP = 7,
+  UOP = 8
 };
 
 std::unordered_map<std::string, std::unordered_map<std::string, int>>
@@ -52,6 +54,10 @@ std::unordered_map<std::string, std::unordered_map<std::string, int>>
 OpTypeEnum symbolizeOp(const std::string &name) {
   if (name == "join")
     return OpTypeEnum::JOIN;
+  if (name == "fork")
+    return OpTypeEnum::FORK;
+  if (name == "lazy_fork")
+    return OpTypeEnum::LAZY_FORK;
   if (name == "merge")
     return OpTypeEnum::MERGE;
   if (name == "mux")
@@ -83,11 +89,10 @@ static cl::opt<std::string> parameters(cl::Positional, cl::Optional,
                                        cl::cat(mainCategory));
 
 std::string generateJoin(unsigned int inputSignals) {
-  assert(inputSignals > 0);
   std::string mod =
       "MODULE join_" + std::to_string(inputSignals) + "_1 (ins_valid_0";
   for (unsigned int i = 1; i < inputSignals; i++)
-    mod += ", inst_valid_" + std::to_string(i);
+    mod += ", ins_valid_" + std::to_string(i);
   mod += ", outs_ready)\n";
 
   for (unsigned int i = 0; i < inputSignals; i++) {
@@ -103,6 +108,107 @@ std::string generateJoin(unsigned int inputSignals) {
     mod += " & inst_valid_" + std::to_string(i);
   mod += ";\n\n";
 
+  return mod;
+}
+
+std::string generateFork(unsigned int outputSignals, bool isDataless) {
+  std::string mod =
+      "MODULE fork_dataless_1_" + std::to_string(outputSignals) + "(ins_valid";
+  unsigned int i;
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + ")\n";
+
+  for (unsigned int i = 0; i < outputSignals; i++) {
+    mod += "VAR regblock_" + std::to_string(i) +
+           " : eager_fork_register_block(ins_valid, outs_ready_" +
+           std::to_string(i) + ", backpressure);\n";
+  }
+
+  mod += "DEFINE any_block_stop := ";
+  for (i = 0; i < outputSignals - 1; i++) {
+    mod += "regblock_" + std::to_string(i) + ".block_stop | ";
+  }
+  mod += "regblock_" + std::to_string(i) + ".block_stop;\n";
+
+  mod += "DEFINE ins_ready := !any_block_stop;\n";
+
+  for (unsigned int i = 0; i < outputSignals; i++) {
+    mod += "DEFINE outs_valid_" + std::to_string(i) + " := regblock_" +
+           std::to_string(i) + ".outs_valid;\n";
+  }
+
+  if (isDataless)
+    return mod;
+
+  mod += "\nMODULE fork_1_" + std::to_string(outputSignals) + "(ins, ins_valid";
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + ")\n";
+
+  mod += "VAR fork_inner : fork_dataless_1_" + std::to_string(outputSignals) +
+         "(ins_valid, ";
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + ");\n";
+
+  for (i = 0; i < outputSignals; i++) {
+    mod += "DEFINE outs_" + std::to_string(i) + " := ins;\n";
+    mod += "DEFINE outs_ready_" + std::to_string(i) +
+           " := fork_inner.outs_ready_" + std::to_string(i) + ";\n";
+  }
+  return mod;
+}
+
+std::string generateLazyFork(unsigned int outputSignals, bool isDataless) {
+  std::string mod = "MODULE lazy_fork_dataless_1_" +
+                    std::to_string(outputSignals) + "(ins_valid";
+  unsigned int i;
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + ")\n";
+
+  mod += "DEFINE ins_ready := ";
+  for (i = 0; i < outputSignals - 1; i++) {
+    mod += "outs_ready_" + std::to_string(i) + " & ";
+  }
+  mod += "outs_ready_" + std::to_string(i) + ";\n";
+
+  mod += "VAR tmp_ready : array 0.." + std::to_string(outputSignals) +
+         " of boolean;\n";
+  mod += "ASSIGN\ninit(tmp_ready) := [TRUE];\n";
+  for (i = 0; i < outputSignals; i++)
+    for (unsigned int j = 0; j < outputSignals; j++)
+      if (i != j)
+        mod += "next(tmp_ready[" + std::to_string(i) + "]) := tmp_ready[" +
+               std::to_string(i) + "] & outs_ready[" + std::to_string(j) +
+               "];\n";
+
+  for (unsigned int i = 0; i < outputSignals; i++) {
+    mod += "DEFINE outs_valid_" + std::to_string(i) +
+           " := ins_valid & tmp_ready[" + std::to_string(i) + "];\n";
+  }
+
+  if (isDataless)
+    return mod;
+
+  mod += "\nMODULE lazy_fork_1_" + std::to_string(outputSignals) +
+         "(ins, ins_valid";
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + "\n";
+
+  mod += "VAR fork_inner : lazy_fork_dataless_1_" +
+         std::to_string(outputSignals) + "(ins_valid, ";
+  for (i = 0; i < outputSignals - 1; i++)
+    mod += ", outs_ready_" + std::to_string(i);
+  mod += ", outs_ready_" + std::to_string(i) + ");\n";
+
+  for (i = 0; i < outputSignals; i++) {
+    mod += "DEFINE outs_" + std::to_string(i) + " := ins;\n";
+    mod += "DEFINE outs_ready_" + std::to_string(i) +
+           " := fork_inner.outs_ready_" + std::to_string(i) + ";\n";
+  }
   return mod;
 }
 
@@ -208,27 +314,27 @@ std::string generateConstant(int val) {
 std::string generateDelayBuffer(int latency) { return ""; }
 
 std::string generateBOP(const std::string &name, int latency) {
-  std::string mod =
-      generateDelayBuffer(latency - 1) + "\n\nMODULE " + name +
-      "(lhs, lhs_valid, rhs, rhs_valid, result_ready)\n"
-      "VAR inner_join : join_generic(lhs_valid, rhs_valid, "
-      "inner_oehb.ins_ready);\n"
-      "VAR inner_delay_buffer : delay_buffer_" +
-      std::to_string(latency - 1) +
-      "(inner_join.outs_valid, "
-      "inner_oehb.ins_ready);\n"
-      "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, result_ready);\n"
-      "DEFINE result := lhs;\n"
-      "DEFINE result_valid := inner_oehb.valid_out;\n"
-      "DEFINE lhs_ready := inner_join.ins_ready_0;\n"
-      "DEFINE rhs_ready := inner_join.ins_ready_1;\n";
+  std::string mod = generateDelayBuffer(latency - 1) + "\nMODULE " + name +
+                    "(lhs, lhs_valid, rhs, rhs_valid, result_ready)\n"
+                    "VAR inner_join : join_generic(lhs_valid, rhs_valid, "
+                    "inner_oehb.ins_ready);\n"
+                    "VAR inner_delay_buffer : delay_buffer_" +
+                    std::to_string(latency - 1) +
+                    "(inner_join.outs_valid, "
+                    "inner_oehb.ins_ready);\n"
+                    "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, "
+                    "result_ready);\n"
+                    "DEFINE result := lhs;\n"
+                    "DEFINE result_valid := inner_oehb.valid_out;\n"
+                    "DEFINE lhs_ready := inner_join.ins_ready_0;\n"
+                    "DEFINE rhs_ready := inner_join.ins_ready_1;\n";
 
   return mod;
 }
 
 std::string generateUOP(const std::string &name, int latency) {
   std::string mod =
-      generateDelayBuffer(latency - 1) + "\n\nMODULE " + name +
+      generateDelayBuffer(latency - 1) + "\nMODULE " + name +
       "(ins, ins_valid, outs_ready)\n"
       "VAR inner_delay_buffer : delay_buffer_" +
       std::to_string(latency - 1) +
@@ -246,8 +352,32 @@ std::string generateComponent(handshake::OpTypeEnum name,
 
   switch (name) {
   case handshake::OpTypeEnum::JOIN: {
-    int nInputs = params.empty() ? 2 : std::stoi(params);
-    return generateJoin(nInputs);
+    return generateJoin(std::stoi(params));
+  }
+  case handshake::OpTypeEnum::FORK: {
+    auto pos = params.find_first_of(',');
+
+    if (pos == std::string::npos) {
+      int nOutputs = std::stoi(params);
+      return generateFork(nOutputs, false);
+    }
+    std::string firstParam = params.substr(0, pos);
+    std::string secondParam = params.substr(pos + 1);
+    int nOutputs = std::stoi(firstParam);
+    bool isDataless = secondParam == "dataless";
+    return generateFork(nOutputs, isDataless);
+  }
+  case handshake::OpTypeEnum::LAZY_FORK: {
+    auto pos = params.find_first_of(',');
+    if (pos == std::string::npos) {
+      int nOutputs = std::stoi(params);
+      return generateLazyFork(nOutputs, false);
+    }
+    std::string firstParam = params.substr(0, pos);
+    std::string secondParam = params.substr(pos + 1);
+    int nOutputs = std::stoi(firstParam);
+    bool isDataless = secondParam == "dataless";
+    return generateLazyFork(nOutputs, isDataless);
   }
   case handshake::OpTypeEnum::MERGE: {
     auto pos = params.find_first_of(',');
