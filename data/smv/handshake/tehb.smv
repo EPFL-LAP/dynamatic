@@ -1,13 +1,13 @@
 MODULE tehb(ins, ins_valid, outs_ready)
-VAR full : boolean;
-VAR dataReg : integer;
 VAR inner_tehb : tehb_dataless(ins_valid, outs_ready);
-DEFINE regEnable := ins_ready & ins_valid & !outs_ready
-DEFINE ins_ready := inner_tehb.ins_ready;
-DEFINE outs_valid := inner_tehb.outs_valid;
-DEFINE outs := full ? dataReg : ins;
+VAR data : DATA_TYPE;
 ASSIGN
-init(dataReg) := 0;
-next(dataReg) := regEnable ? ins : dataReg;
-init(full) := FALSE;
-next(full) := outs_valid and not outs_ready;
+init(data) := 0;
+next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+DEFINE ins_ready := inner_tehb.ins_ready;
+DEFINE outs := tehb_dataless.full ? data : ins;
+
+VAR data : DATA_TYPE;
+ASSIGN
+init(data) := 0;
+next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;

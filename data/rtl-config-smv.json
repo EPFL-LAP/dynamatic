@@ -369,7 +369,7 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tehb.smv",
     "module-name": "tehb_dataless",
     "hdl": "smv"
   },
@@ -385,7 +385,8 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "generic": "$DYNAMATIC/data/smv/handshake/tehb.smv",
+    "module-name": "tehb",
     "hdl": "smv"
   },
   {
@@ -518,7 +519,7 @@
       },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE,dataless",
     "module-name": "mux_dataless",
     "dependencies": ["tehb_dataless"],
     "hdl": "smv"
@@ -531,7 +532,7 @@
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux.smv\" mux $SIZE",
-    "dependencies": ["types"],
+    "dependencies": ["tehb"],
     "hdl": "smv"
   },
   {
@@ -559,7 +560,7 @@
       { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/control_merge.smv\" control_merge",
-    "dependencies": ["types", "control_merge_dataless"],
+    "dependencies": ["fork", "control_merge_dataless"],
     "hdl": "smv"
   },
   {
@@ -574,7 +575,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/merge.smv",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge.smv\" merge $SIZE",
     "module-name": "merge_dataless",
     "dependencies": ["tehb_dataless"],
     "hdl": "smv"
@@ -585,8 +586,8 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/merge.smv",
-    "dependencies": ["types", "tehb"],
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge.smv\" merge $SIZE,dataless",
+    "dependencies": ["tehb"],
     "hdl": "smv"
   },
   {
@@ -768,51 +769,5 @@
     "generic": "$DYNAMATIC/data/smv/handshake/not.smv",
     "module-name": "logic_not",
     "hdl": "smv"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/eager_fork_register_block.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
-    "module-name": "elastic_fifo_inner_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/logic.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",
-    "dependencies": ["types"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/merge_notehb.vhd",
-    "dependencies": ["types"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/merge_notehb.vhd",
-    "module-name": "merge_notehb_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
-  },
-  {
-    "name": "mem_to_bram",
-    "parameters": [
-      { "name": "DATA_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "ADDR_WIDTH", "type": "unsigned", "lb": 1 }
-    ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mem_to_bram.smv\" mem_to_bram"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
-    "dependencies": ["types"]
   }
 ]

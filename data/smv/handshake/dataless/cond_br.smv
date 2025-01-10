@@ -1,7 +1,7 @@
 MODULE cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
-VAR inner_join : join_2_1(data_valid, condition_valid, branch_ready);
+VAR inner_join : join_generic(data_valid, condition_valid, branch_ready);
 DEFINE data_ready := inner_join.ins_ready_0;
 DEFINE condition_ready := inner_join.ins_ready_1;
 DEFINE trueOut_valid := condition & inner_join.outs_valid_0;
 DEFINE falseOut_valid := !condition & inner_join.outs_valid_0;
-branch_ready := (falseOut_ready and not condition(0)) or (trueOut_ready and condition(0));
+branch_ready := (falseOut_ready and not condition(0)) | (trueOut_ready and condition(0));

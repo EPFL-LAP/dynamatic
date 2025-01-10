@@ -106,23 +106,30 @@ std::string generateJoin(unsigned int inputSignals) {
   return mod;
 }
 
-std::string generateMerge(unsigned int inputSignals) {
+std::string generateMerge(unsigned int inputSignals, bool isDataless) {
   assert(inputSignals > 0);
-  // MODULE merge_*_1_dataless(ins_valid_0, ins_valid_1, ..., outs_ready)
-  // VAR tehb_inner : tehb_dataless(tehb_pvalid, outs_ready);
-  // DEFINE ins_ready_0 := tehb_inner.ins_ready;
-  // DEFINE ins_ready_1 := tehb_inner.ins_ready;
-  // ...
-  // DEFINE outs_valid := tehb_inner.outs_valid;
-  // DEFINE tehb_pvalid := ins_valid_0 | ins_valid_1 | ...
 
-  std::string mod =
-      "MODULE merge_" + std::to_string(inputSignals) + "_1 (inst_valid_0";
-  for (unsigned int i = 1; i < inputSignals; i++)
-    mod += ", inst_valid_" + std::to_string(i);
+  std::string mod = (isDataless ? "MODULE merge_dataless_" : "MODULE merge_");
+
+  mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0") +
+         "ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    if (!isDataless)
+      mod += ", ins_" + std::to_string(i);
+    mod += ", ins_valid_" + std::to_string(i);
+  }
   mod += ", outs_ready)\n";
 
-  mod += "VAR tehb_inner : tehb_dataless(tehb_pvalid, outs_ready);\n";
+  if (isDataless)
+    mod += "VAR tehb_inner : tehb_dataless(tehb_valid, outs_ready);\n";
+  else {
+    mod += "DEFINE tehb_data_in := case\n";
+    for (unsigned int i = 0; i < inputSignals; i++)
+      mod += "ins_valid_" + std::to_string(i) + " : ins_" + std::to_string(i) +
+             ";\n";
+    mod += "TRUE : ins_0;\nesac;\n";
+    mod += "VAR tehb_inner : tehb(tehb_data_in, tehb_valid, outs_ready);\n";
+  }
 
   for (unsigned int i = 0; i < inputSignals; i++) {
     mod +=
@@ -130,8 +137,10 @@ std::string generateMerge(unsigned int inputSignals) {
   }
 
   mod += "DEFINE outs_valid := tehb_inner.outs_valid;\n";
+  if (!isDataless)
+    mod += "DEFINE outs := tehb_inner.outs;\n";
 
-  mod += "DEFINE tehb_pvalid := ins_valid_0;";
+  mod += "DEFINE tehb_valid := ins_valid_0;";
   for (unsigned int i = 1; i < inputSignals; i++)
     mod += " | ins_valid_" + std::to_string(i);
   mod += ";\n";
@@ -139,11 +148,16 @@ std::string generateMerge(unsigned int inputSignals) {
   return mod;
 }
 
-std::string generateMux(unsigned int inputSignals) {
-  std::string mod =
-      "MODULE mux_" + std::to_string(inputSignals) + "_1 (inst_valid_0";
-  for (unsigned int i = 1; i < inputSignals; i++)
-    mod += ", inst_valid_" + std::to_string(i);
+std::string generateMux(unsigned int inputSignals, bool isDataless) {
+  std::string mod = (isDataless ? "MODULE mux_dataless_" : "MODULE mux_");
+
+  mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0, ") +
+         "ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    if (!isDataless)
+      mod += ", ins_" + std::to_string(i);
+    mod += ", ins_valid_" + std::to_string(i);
+  }
   mod += ", index, index_valid, outs_ready)\n";
 
   for (unsigned int i = 0; i < inputSignals; i++) {
@@ -160,9 +174,20 @@ std::string generateMux(unsigned int inputSignals) {
            std::to_string(i) + ";\n";
   }
 
-  mod += "VAR tehb_inner : tehb_dataless(tehb_ins_valid, outs_ready);\n";
+  if (!isDataless) {
+    mod += "DEFINE tehb_ins := case\n";
+    for (unsigned int i = 0; i < inputSignals; i++) {
+      mod += "index == " + std::to_string(i) + " : index_valid & ins_valid_" +
+             std::to_string(i) + ";\n";
+    }
+    mod += "VAR tehb_inner : tehb(tehb_ins, tehb_ins_valid, outs_ready);\n";
+  } else {
+    mod += "VAR tehb_inner : tehb_dataless(tehb_ins_valid, outs_ready);\n";
+  }
 
-  mod += "DEFINE outs_valid := tehb_inner.outs_valid;";
+  mod += "DEFINE outs_valid := tehb_inner.outs_valid;\n";
+  if (!isDataless)
+    mod += "DEFINE outs := tehb_inner.outs;\n";
 
   return mod;
 }
@@ -225,12 +250,28 @@ std::string generateComponent(handshake::OpTypeEnum name,
     return generateJoin(nInputs);
   }
   case handshake::OpTypeEnum::MERGE: {
-    int nInputs = std::stoi(params);
-    return generateMerge(nInputs);
+    auto pos = params.find_first_of(',');
+    if (pos == std::string::npos) {
+      int nInputs = std::stoi(params);
+      return generateMerge(nInputs, false);
+    }
+    std::string firstParam = params.substr(0, pos);
+    std::string secondParam = params.substr(pos + 1);
+    int nInputs = std::stoi(firstParam);
+    bool isDataless = secondParam == "dataless";
+    return generateMerge(nInputs, isDataless);
   }
   case handshake::OpTypeEnum::MUX: {
-    int nInputs = std::stoi(params);
-    return generateMux(nInputs);
+    auto pos = params.find_first_of(',');
+    if (pos == std::string::npos) {
+      int nInputs = std::stoi(params);
+      return generateMux(nInputs, false);
+    }
+    std::string firstParam = params.substr(0, pos);
+    std::string secondParam = params.substr(pos + 1);
+    int nInputs = std::stoi(firstParam);
+    bool isDataless = secondParam == "dataless";
+    return generateMux(nInputs, isDataless);
   }
   case handshake::OpTypeEnum::CONSTANT: {
     int val = std::stoi(params);

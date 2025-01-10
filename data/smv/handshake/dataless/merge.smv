@@ -1,9 +1,0 @@
-generator
-
-// MODULE merge_*_1_dataless(ins_valid_0, ins_valid_1, ..., outs_ready)
-// VAR tehb_inner : tehb_dataless(tehb_pvalid, outs_ready);
-// DEFINE ins_ready_0 := tehb_inner.ins_ready;
-// DEFINE ins_ready_1 := tehb_inner.ins_ready;
-// ...
-// DEFINE outs_valid := tehb_inner.outs_valid;
-// DEFINE tehb_pvalid := ins_valid_0 | ins_valid_1 | ...

@@ -2,7 +2,7 @@ MODULE tehb_dataless(ins_valid, outs_ready)
 VAR full : boolean;
 ASSIGN
 init(full) := FALSE;
-next(full) := outs_valid and not outs_ready;
+next(full) := outs_valid & !outs_ready;
 DEFINE
 ins_ready := !full;
 outs_valid := ins_valid | full;
