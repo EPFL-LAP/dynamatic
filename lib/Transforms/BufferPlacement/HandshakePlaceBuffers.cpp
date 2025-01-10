@@ -16,14 +16,15 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
@@ -43,7 +44,7 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22"), MAPBUF("mapbuf");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -96,7 +97,8 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
+    StringRef blifFiles) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -104,6 +106,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->targetCP = targetCP;
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
+  this->blifFiles = blifFiles.str();
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -122,6 +125,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -489,6 +493,13 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
         logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
   }
 
+  if (algorithm == MAPBUF) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP,
+        blifFiles);
+  }
+
   llvm_unreachable("unknown algorithm");
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -583,10 +594,13 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakePlaceBuffers(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+dynamatic::buffer::createHandshakePlaceBuffers(StringRef algorithm,
+                                               StringRef frequencies,
+                                               StringRef timingModels,
+                                               bool firstCFDFC, double targetCP,
+                                               unsigned timeout, bool dumpLogs,
+                                               StringRef blifFiles) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
+      dumpLogs, blifFiles);
 }

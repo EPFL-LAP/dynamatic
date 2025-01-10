@@ -272,7 +272,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
     "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
     "interprets the MILP's results as legacy Dynamatic would, placing at most "
-    "a single buffer type on any given channel), 'fpl22'.">,
+    "a single buffer type on any given channel), 'fpl22', 'mapbuf'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -288,7 +288,9 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"blifFiles", "blif-file", "std::string", "",
+    "Path to Blif files for MAPBUF.">];
 }
 
 //===----------------------------------------------------------------------===//
