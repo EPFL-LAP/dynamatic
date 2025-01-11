@@ -290,7 +290,7 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/oehb.smv",
     "module-name": "oehb_dataless",
     "hdl": "smv"
   },
@@ -307,7 +307,12 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "generic": "$DYNAMATIC/data/smv/handshake/oehb.smv",
+    "dependencies": ["oehb_dataless"],
+    "hdl": "smv"
+  },
+  {
+    "generic": "$DYNAMATIC/data/smv/support/dataless/elastic_fifo_inner.smv",
     "hdl": "smv"
   },
   {
@@ -329,9 +334,13 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
-    "module-name": "ofifo_dataless",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/ofifo.smv",
+    "module-name": "ofifo_dataless_$NUM_SLOTS",
     "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"],
+    "hdl": "smv"
+  },
+    {
+    "generic": "$DYNAMATIC/data/smv/support/elastic_fifo_inner.smv",
     "hdl": "smv"
   },
   {
@@ -347,7 +356,8 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
+    "generic": "$DYNAMATIC/data/smv/handshake/ofifo.smv",
+    "module-name": "ofifo_$NUM_SLOTS",
     "dependencies": ["tehb", "elastic_fifo_inner"],
     "hdl": "smv"
   },
@@ -407,8 +417,8 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/buffer.smv\" buffer",
-    "module-name": "tfifo_dataless",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tfifo.smv",
+    "module-name": "tfifo_dataless_$NUM_SLOTS",
     "dependencies": ["elastic_fifo_inner_dataless"],
     "hdl": "smv"
   },
