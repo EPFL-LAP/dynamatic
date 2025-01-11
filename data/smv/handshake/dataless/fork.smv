@@ -1,0 +1,7 @@
+MODULE fork_dataless_generic(ins_valid, outs_ready_0, outs_ready_1)
+VAR regblock_0 : eager_fork_register_block(ins_valid, outs_ready_0, backpressure);
+VAR regblock_1 : eager_fork_register_block(ins_valid, outs_ready_1, backpressure);
+DEFINE any_block_stop := regblock_0.block_stop | regblock_1.block_stop;
+DEFINE ins_ready := !any_block_stop;
+DEFINE outs_valid_0 := regblock_0.outs_valid;
+DEFINE outs_valid_1 := regblock_1.outs_valid;

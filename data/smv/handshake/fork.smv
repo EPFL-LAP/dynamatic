@@ -1,0 +1,6 @@
+MODULE fork_generic(ins, ins_valid, outs_ready_0, outs_ready_1)
+VAR fork_inner : fork_dataless_1_2(ins_valid, , outs_ready_0, outs_ready_1);
+DEFINE outs_0 := ins;
+DEFINE outs_ready_0 := fork_inner.outs_ready_0;
+DEFINE outs_1 := ins;
+DEFINE outs_ready_1 := fork_inner.outs_ready_1;

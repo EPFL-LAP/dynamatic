@@ -33,10 +33,11 @@ enum class OpTypeEnum : uint64_t {
   FORK = 2,
   LAZY_FORK = 3,
   MERGE = 4,
-  MUX = 5,
-  CONSTANT = 6,
-  BOP = 7,
-  UOP = 8
+  CONTROL_MERGE = 5,
+  MUX = 6,
+  CONSTANT = 7,
+  BOP = 8,
+  UOP = 9
 };
 
 std::unordered_map<std::string, std::unordered_map<std::string, int>>
@@ -60,6 +61,8 @@ OpTypeEnum symbolizeOp(const std::string &name) {
     return OpTypeEnum::LAZY_FORK;
   if (name == "merge")
     return OpTypeEnum::MERGE;
+  if (name == "control_merge")
+    return OpTypeEnum::CONTROL_MERGE;
   if (name == "mux")
     return OpTypeEnum::MUX;
   if (name == "constant")
@@ -67,7 +70,7 @@ OpTypeEnum symbolizeOp(const std::string &name) {
   if (name == "bop")
     return OpTypeEnum::BOP;
   if (name == "uop")
-    return OpTypeEnum::BOP;
+    return OpTypeEnum::UOP;
   return OpTypeEnum::DEFAULT;
 }
 
@@ -213,8 +216,6 @@ std::string generateLazyFork(unsigned int outputSignals, bool isDataless) {
 }
 
 std::string generateMerge(unsigned int inputSignals, bool isDataless) {
-  assert(inputSignals > 0);
-
   std::string mod = (isDataless ? "MODULE merge_dataless_" : "MODULE merge_");
 
   mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0") +
@@ -250,6 +251,125 @@ std::string generateMerge(unsigned int inputSignals, bool isDataless) {
   for (unsigned int i = 1; i < inputSignals; i++)
     mod += " | ins_valid_" + std::to_string(i);
   mod += ";\n";
+
+  return mod;
+}
+
+std::string generateMergeNoTehb(unsigned int inputSignals, bool isDataless) {
+  std::string mod =
+      (isDataless ? "MODULE merge_notehb_dataless_" : "MODULE merge_notehb_");
+  mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0") +
+         "ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    if (!isDataless)
+      mod += ", ins_" + std::to_string(i);
+    mod += ", ins_valid_" + std::to_string(i);
+  }
+  mod += ", outs_ready)\n";
+  if (!isDataless) {
+    mod += "VAR outs : DATA_TYPE;\n";
+    mod += "ASSIGN\ninit(outs) := 0;\n";
+    mod += "next(outs) := case\n";
+    for (unsigned int i = 1; i < inputSignals; i++) {
+      mod += "ins_valid_" + std::to_string(i) + ": ins_" + std::to_string(i) +
+             ";\n";
+    }
+    mod += "TRUE : outs;\nesac;\n\n";
+  }
+
+  mod += "VAR outs_valid : boolean;\n";
+  mod += "ASSIGN\ninit(outs_valid) := FALSE;\n";
+  mod += "next(outs_valid) := ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += " | ins_valid_" + std::to_string(i);
+  }
+  mod += ";\n";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += "DEFINE ins_ready_" + std::to_string(i) + " := outs_ready;\n";
+  }
+
+  return mod;
+}
+
+std::string generateControlMerge(unsigned int inputSignals, bool isDataless) {
+  std::string mod = generateMergeNoTehb(inputSignals, true);
+
+  mod += "\n\nMODULE control_merge_dataless_";
+
+  mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0") +
+         "ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += ", ins_valid_" + std::to_string(i);
+  }
+  mod += ", index_ready, outs_ready)\n";
+
+  mod += "VAR index_tehb : integer;\n";
+  mod += "ASSIGN\ninit(index_tehb) := 0;\n";
+  mod += "next(index_tehb) := case\n";
+
+  for (unsigned int i = 0; i < inputSignals; i++) {
+    mod += "ins_valid_" + std::to_string(i) + " : " + std::to_string(i) + ";\n";
+  }
+  mod += "TRUE : index_tehb;\nesac;\n";
+
+  mod += std::string("VAR inner_merge : merge_notehb_dataless_") +
+         std::to_string(inputSignals) + "(ins_valid_0";
+
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += ", ins_valid_" + std::to_string(i);
+  }
+  mod += ", inner_tehb.ins_ready)\n";
+
+  mod +=
+      "VAR tehb(index_tehb, inner_merge.outs_valid, inner_fork.ins_ready);\n";
+
+  mod += "VAR inner_fork : fork_dataless_generic(tehb.outs_valid, outs_ready, "
+         "index_ready);\n";
+
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += "DEFINE ins_ready_" + std::to_string(i) +
+           ":= inner_merge.ins_ready_" + std::to_string(i) + ";\n";
+  }
+
+  mod += "DEFINE outs_valid := inner_fork.outs_valid_0;\n";
+  mod += "DEFINE index := inner_tehb.outs;\n";
+  mod += "DEFINE index_valid := inner_fork.outs_valid_1;\n";
+
+  if (isDataless)
+    return mod;
+
+  mod += "\n\nMODULE control_merge_";
+
+  mod += std::to_string(inputSignals) + "_1 (" + (isDataless ? "" : "ins_0") +
+         "ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    if (!isDataless)
+      mod += ", ins_" + std::to_string(i);
+    mod += ", ins_valid_" + std::to_string(i);
+  }
+  mod += ", index_ready, outs_ready)\n";
+  mod += "VAR inner_control_merge : control_merge_dataless_";
+  mod += std::to_string(inputSignals) + "_1 (ins_valid_0";
+  for (unsigned int i = 1; i < inputSignals; i++) {
+    mod += ", ins_valid_" + std::to_string(i);
+  }
+  mod += ", index_ready, outs_ready)\n";
+
+  for (unsigned int i = 0; i < inputSignals; i++) {
+    mod += "DEFINE ins_ready_" + std::to_string(i) +
+           " : inner_control_merge.ins_ready" + std::to_string(i) + ";\n";
+  }
+
+  mod += "DEFINE index := inner_control_merge.index;\n";
+  mod += "DEFINE index_valid := inner_control_merge.index_valid;\n";
+
+  mod += "DEFINE outs := case\n";
+  for (unsigned int i = 0; i < inputSignals; i++) {
+    mod +=
+        "index = " + std::to_string(i) + " : ins_" + std::to_string(i) + ";\n";
+  }
+  mod += "esac;\n\n";
+  mod += "DEFINE outs_valid := inner_control_merge.outs_valid;\n";
 
   return mod;
 }
@@ -311,35 +431,34 @@ std::string generateConstant(int val) {
   return mod;
 }
 
-std::string generateDelayBuffer(int latency) { return ""; }
-
 std::string generateBOP(const std::string &name, int latency) {
-  std::string mod = generateDelayBuffer(latency - 1) + "\nMODULE " + name +
-                    "(lhs, lhs_valid, rhs, rhs_valid, result_ready)\n"
-                    "VAR inner_join : join_generic(lhs_valid, rhs_valid, "
-                    "inner_oehb.ins_ready);\n"
-                    "VAR inner_delay_buffer : delay_buffer_" +
-                    std::to_string(latency - 1) +
-                    "(inner_join.outs_valid, "
-                    "inner_oehb.ins_ready);\n"
-                    "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, "
-                    "result_ready);\n"
-                    "DEFINE result := lhs;\n"
-                    "DEFINE result_valid := inner_oehb.valid_out;\n"
-                    "DEFINE lhs_ready := inner_join.ins_ready_0;\n"
-                    "DEFINE rhs_ready := inner_join.ins_ready_1;\n";
+  std::string mod =
+      "MODULE " + name +
+      "(lhs, lhs_valid, rhs, rhs_valid, result_ready)\n"
+      "VAR inner_join : join_generic(lhs_valid, rhs_valid, "
+      "inner_oehb.ins_ready);\n"
+      "VAR inner_delay_buffer : delay_buffer(inner_join.outs_valid, "
+      "inner_oehb.ins_ready, " +
+      std::to_string(latency - 1) +
+      ");\n"
+      "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, "
+      "result_ready);\n"
+      "DEFINE result := lhs;\n"
+      "DEFINE result_valid := inner_oehb.valid_out;\n"
+      "DEFINE lhs_ready := inner_join.ins_ready_0;\n"
+      "DEFINE rhs_ready := inner_join.ins_ready_1;\n";
 
   return mod;
 }
 
 std::string generateUOP(const std::string &name, int latency) {
   std::string mod =
-      generateDelayBuffer(latency - 1) + "\nMODULE " + name +
+      "MODULE " + name +
       "(ins, ins_valid, outs_ready)\n"
-      "VAR inner_delay_buffer : delay_buffer_" +
+      "VAR inner_delay_buffer : delay_buffer(ins_valid, "
+      "inner_oehb.ins_ready, " +
       std::to_string(latency - 1) +
-      "(ins_valid, "
-      "inner_oehb.ins_ready);\n"
+      ");\n"
       "VAR inner_oehb : oehb_1(inner_delay_buffer.outs_valid, outs_ready);\n"
       "DEFINE outs := ins;\n"
       "DEFINE outs_valid := inner_oehb.valid_out;\n"
@@ -390,6 +509,18 @@ std::string generateComponent(handshake::OpTypeEnum name,
     int nInputs = std::stoi(firstParam);
     bool isDataless = secondParam == "dataless";
     return generateMerge(nInputs, isDataless);
+  }
+  case handshake::OpTypeEnum::CONTROL_MERGE: {
+    auto pos = params.find_first_of(',');
+    if (pos == std::string::npos) {
+      int nInputs = std::stoi(params);
+      return generateControlMerge(nInputs, false);
+    }
+    std::string firstParam = params.substr(0, pos);
+    std::string secondParam = params.substr(pos + 1);
+    int nInputs = std::stoi(firstParam);
+    bool isDataless = secondParam == "dataless";
+    return generateControlMerge(nInputs, isDataless);
   }
   case handshake::OpTypeEnum::MUX: {
     auto pos = params.find_first_of(',');
