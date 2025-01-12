@@ -36,7 +36,12 @@ public:
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
       : depth(depth), leaves({leaves}), root(root){};
 
-  // Getters and Setters
+  void addLeaves(Node *leaf) { this->leaves.insert(leaf); }
+
+  void addLeaves(std::set<Node *> &leavesToAdd) {
+    this->leaves.insert(leavesToAdd.begin(), leavesToAdd.end());
+  }
+
   int getDepth() { return depth; }
 
   GRBVar &getCutSelectionVariable() { return cutSelection; }
@@ -44,12 +49,6 @@ public:
   Node *getNode() { return root; }
 
   std::set<Node *> &getLeaves() { return leaves; }
-
-  void addLeaves(Node *leaf) { this->leaves.insert(leaf); }
-
-  void addLeaves(std::set<Node *> &leavesToAdd) {
-    this->leaves.insert(leavesToAdd.begin(), leavesToAdd.end());
-  }
 
   void setLeaves(std::set<Node *> &leavesToSet) { this->leaves = leavesToSet; }
 

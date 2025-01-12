@@ -161,42 +161,16 @@ struct PointerCompare {
 
 class BlifData {
 private:
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> latches;
   std::string moduleName;
   std::unordered_map<std::string, Node *> nodes;
   std::vector<Node *> nodesTopologicalOrder;
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> latches;
   std::unordered_map<std::string, std::set<std::string>> submodules;
 
 public:
   BlifData() = default;
 
   void addLatch(Node *input, Node *output) { latches[input] = output; }
-
-  Node *getNodeByName(const std::string &name) {
-    auto it = nodes.find(name);
-    if (it != nodes.end()) {
-      return it->second;
-    }
-    return nullptr;
-  }
-
-  Node *createNode(const std::string &name) {
-    if (nodes.find(name) != nodes.end()) {
-      return nodes[name]; // Return existing node if name is already used
-    }
-    nodes[name] = new Node(name, this);
-    return nodes[name];
-  }
-
-  void renameNode(const std::string &oldName, const std::string &newName) {
-    auto it = nodes.find(oldName);
-    if (it != nodes.end()) {
-      auto *node = it->second;
-      nodes.erase(it);
-      node->name = newName;
-      nodes[newName] = node;
-    }
-  }
 
   Node *addNode(Node *node) {
     static unsigned int counter = 0;
@@ -208,6 +182,41 @@ public:
     }
     nodes[node->getName()] = node;
     return node;
+  }
+
+  Node *createNode(const std::string &name) {
+    if (nodes.find(name) != nodes.end()) {
+      return nodes[name]; // Return existing node if name is already used
+    }
+    nodes[name] = new Node(name, this);
+    return nodes[name];
+  }
+
+  std::vector<Node *> findPath(Node *start, Node *end);
+
+  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
+                                                  std::set<Node *> &wavyLine);
+
+  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
+
+  Node *getNodeByName(const std::string &name) {
+    auto it = nodes.find(name);
+    if (it != nodes.end()) {
+      return it->second;
+    }
+    return nullptr;
+  }
+
+  std::set<Node *> getAllNodes() {
+    std::set<Node *> result;
+    for (auto &pair : nodes) {
+      result.insert(pair.second);
+    }
+    return result;
+  }
+
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> getLatches() const {
+    return latches;
   }
 
   std::set<Node *> getPrimaryInputs() {
@@ -262,33 +271,26 @@ public:
     return result;
   }
 
+  void generateBlifFile(const std::string &filename);
+
+  void printModuleInfo();
+
+  void renameNode(const std::string &oldName, const std::string &newName) {
+    auto it = nodes.find(oldName);
+    if (it != nodes.end()) {
+      auto *node = it->second;
+      nodes.erase(it);
+      node->name = newName;
+      nodes[newName] = node;
+    }
+  }
+
   void setModuleName(const std::string &moduleName) {
     this->moduleName = moduleName;
   }
 
   void traverseUtil(Node *node, std::set<Node *> &visitedNodes);
   void traverseNodes();
-  void printModuleInfo();
-  void generateBlifFile(const std::string &filename);
-
-  std::set<Node *> getAllNodes() {
-    std::set<Node *> result;
-    for (auto &pair : nodes) {
-      result.insert(pair.second);
-    }
-    return result;
-  }
-
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> getLatches() const {
-    return latches;
-  }
-
-  std::vector<Node *> findPath(Node *start, Node *end);
-
-  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
-                                                  std::set<Node *> &wavyLine);
-
-  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
 };
 
 class BlifParser {

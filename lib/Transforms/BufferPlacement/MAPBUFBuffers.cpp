@@ -138,12 +138,12 @@ double getDelay(const std::map<unsigned int, double> &delayTable,
 
 void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   Operation *definingOp = channel.getDefiningOp();
-  bool isCmpi = false;
 
   if (!definingOp) {
     return;
   }
 
+  bool isCmpi = false;
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
   // Need a bool for CMPI as it has a different delay than ADDI and SUBI
   if (isa<handshake::AddIOp>(definingOp) ||

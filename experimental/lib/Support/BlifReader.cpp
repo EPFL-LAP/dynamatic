@@ -24,10 +24,7 @@
 
 using namespace dynamatic::experimental;
 
-void Node::setName(const std::string &newName) {
-  // If we do it like this, then the parent blif will not see the change
-  this->name = newName;
-}
+void Node::setName(const std::string &newName) { this->name = newName; }
 
 void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
   if (std::find(nodesTopologicalOrder.begin(), nodesTopologicalOrder.end(),
