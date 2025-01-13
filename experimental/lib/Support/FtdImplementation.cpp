@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements some utility functions which are useful for both the fast token
-// delivery algorithm and for the GSA anlaysis pass. All the functions are about
-// anlayzing relationships between blocks and handshake operations.
+// Implements the core functions to run the Fast Token Delivery algorithm,
+// according to the original FPGA'22 paper by Elakhras et al.
+// (https://ieeexplore.ieee.org/document/10035134).
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,26 +30,50 @@ using namespace dynamatic::experimental::boolean;
 
 /// Different types of loop suppression.
 enum BranchToLoopType {
+
+  // In this case, the producer is inside a loop, while the consumer is outside.
+  // The token must be suppressed as long as the loop is executed, in order to
+  // provide only the final token handled.
   MoreProducerThanConsumers,
+
+  // In this case, the producer is the consumer itself; this is the case of a
+  // regeneration multiplexer. The token must be suppressed only if the loop is
+  // done iterating.
   SelfRegeneration,
+
+  // In this case, the token is used back in a loop. The token is to be
+  // suppressed only if the loop is done iterating.
   BackwardRelationship
 };
 
+/// Annotation to use in the IR when an operation needs to be skipped by the FTD
+/// algorithm.
 constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
+/// Annotation to use when a suppression branch is added which needs to go
+/// through the suppression mechanism again.
 constexpr llvm::StringLiteral FTD_NEW_SUPP("ftd.supp");
+/// Annotation to use for a multiplxer crated with the `addGsaGates`
+/// functionalities. This will no go through the FTD process.
 constexpr llvm::StringLiteral FTD_EXPLICIT_PHI("ftd.phi");
+/// Temporary annotation to be used with merges created with the
+/// `createPhiNetwork` functionality, which will then be converted into muxes.
 constexpr llvm::StringLiteral NEW_PHI("nphi");
+/// Annotation to use for initial merges and initial false constants.
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
+/// Annotation to use for regeneration multiplexers.
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
 /// Given a block, get its immediate dominator if exists
 static Block *getImmediateDominator(Region &region, Block *bb) {
+
   // Avoid a situation with no blocks in the region
   if (region.getBlocks().empty())
     return nullptr;
+
   // The first block in the CFG has both non predecessors and no dominators
   if (bb->hasNoPredecessors())
     return nullptr;
+
   DominanceInfo domInfo;
   llvm::DominatorTreeBase<Block, false> &domTree = domInfo.getDomTree(&region);
   return domTree.getNode(bb)->getIDom()->getBlock();
@@ -84,10 +108,10 @@ getDominanceFrontier(Region &region) {
     if (numberOfPredecessors < 2)
       continue;
 
-    // Run the algorihm as explained in the paper
+    // Run the algorithm as explained in the paper
     for (auto *pred : predecessors) {
       Block *runner = pred;
-      // Runer performs a bottom up traversal of the dominator tree
+      // Runner performs a bottom up traversal of the dominator tree
       while (runner != getImmediateDominator(region, &bb)) {
         result[runner].insert(&bb);
         runner = getImmediateDominator(region, runner);
@@ -118,11 +142,11 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
 };
 
 /// Given two sets containing object of type `Block*`, remove the common
-/// entries
+/// entries.
 static void eliminateCommonBlocks(DenseSet<Block *> &s1,
                                   DenseSet<Block *> &s2) {
 
-  std::vector<Block *> intersection;
+  SmallVector<Block *> intersection;
   for (auto &e1 : s1) {
     if (s2.contains(e1))
       intersection.push_back(e1);
@@ -135,7 +159,8 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
 }
 
 /// Given an operation, returns true if the operation is a conditional branch
-/// which terminates a for loop
+/// which terminates a for loop. This is the case if it is in one of the exiting
+/// blocks of the innermost loop it is in.
 static bool isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
   if (isa<handshake::ConditionalBranchOp>(op)) {
     if (CFGLoop *loop = li.getLoopFor(op->getBlock()); loop) {
@@ -147,44 +172,42 @@ static bool isBranchLoopExit(Operation *op, CFGLoopInfo &li) {
   return false;
 }
 
-/// Given an operation, return true if the two operands of a merge come from
-/// two different loops. When this happens, the merge is connecting two loops
-static bool isaMergeLoop(Operation *merge, CFGLoopInfo &li) {
+/// Given an operation, return true if the two operands of a multiplexer come
+/// from two different loops. When this happens, the mux is connecting two
+/// loops.
+static bool isaMuxLoop(Operation *mux, CFGLoopInfo &li) {
 
-  if (merge->getNumOperands() == 1)
+  auto muxOp = llvm::dyn_cast<handshake::MuxOp>(mux);
+  if (!muxOp)
     return false;
 
-  Block *bb1 = merge->getOperand(0).getParentBlock();
-  if (merge->getOperand(0).getDefiningOp()) {
-    auto *op1 = merge->getOperand(0).getDefiningOp();
-    while (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op1) &&
-           op1->getBlock() == merge->getBlock()) {
-      auto op = dyn_cast<handshake::ConditionalBranchOp>(op1);
-      if (op.getOperand(1).getDefiningOp()) {
-        op1 = op.getOperand(1).getDefiningOp();
-        bb1 = op1->getBlock();
-      } else {
+  auto dataOperands = muxOp.getDataOperands();
+
+  // Get the basic block of the "real" value, so going up the hierarchy as long
+  // as there are conditional branches involved.
+  auto getBasicBlockProducer = [&](Value op) -> Block * {
+    Block *bb = op.getParentBlock();
+
+    // If the operand is produced by a real operation, such operation might be a
+    // conditional branch in the same bb of the original.
+    if (auto *owner = op.getDefiningOp(); owner) {
+      while (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(owner) &&
+             owner->getBlock() == muxOp->getBlock()) {
+        auto op = dyn_cast<handshake::ConditionalBranchOp>(owner);
+        if (op.getOperand(1).getDefiningOp()) {
+          owner = op.getOperand(1).getDefiningOp();
+          bb = owner->getBlock();
+          continue;
+        }
         break;
       }
     }
-  }
 
-  Block *bb2 = merge->getOperand(1).getParentBlock();
-  if (merge->getOperand(1).getDefiningOp()) {
-    auto *op2 = merge->getOperand(1).getDefiningOp();
-    while (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op2) &&
-           op2->getBlock() == merge->getBlock()) {
-      auto op = dyn_cast<handshake::ConditionalBranchOp>(op2);
-      if (op.getOperand(1).getDefiningOp()) {
-        op2 = op.getOperand(1).getDefiningOp();
-        bb2 = op2->getBlock();
-      } else {
-        break;
-      }
-    }
-  }
+    return bb;
+  };
 
-  return li.getLoopFor(bb1) != li.getLoopFor(bb2);
+  return li.getLoopFor(getBasicBlockProducer(dataOperands[0])) !=
+         li.getLoopFor(getBasicBlockProducer(dataOperands[1]));
 }
 
 /// The boolean condition to either generate or suppress a token are computed
@@ -218,16 +241,19 @@ static BoolExpression *enumeratePaths(Block *start, Block *end,
 }
 
 /// Get a boolean expression representing the exit condition of the current
-/// loop block
+/// loop block.
 static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
                                                  CFGLoopInfo &li,
                                                  const ftd::BlockIndexing &bi) {
+
+  // Get the boolean expression associated to the block exit
   BoolExpression *blockCond =
       BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
   auto *terminatorOperation = loopExit->getTerminator();
-  assert(isa<cf::CondBranchOp>(terminatorOperation) &&
-         "Terminator condition of a loop exit must be a conditional branch.");
   auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
 
   // If the destination of the false outcome is not the block, then the
   // condition must be negated
@@ -454,7 +480,7 @@ LogicalResult ftd::createPhiNetworkDeps(
       // If the producer and the consumer are in the same basic block, and the
       // producer properly dominates the consumer (i.e. comes before in a linear
       // sense) then the consumer is directly connected to the producer without
-      // further mechansim.
+      // further mechanism.
       if (dep.getParentBlock() == operandOwner->getBlock() &&
           domInfo.properlyDominates(depOwner, operandOwner)) {
         op->set(dep);
@@ -515,13 +541,14 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
-  // it comes from the explicit phi process or if it is an operation to skip
+  // it comes from the explicit phi process or if it is a generic operation to
+  // skip
   if (consumerOp->hasAttr(FTD_REGEN) || consumerOp->hasAttr(FTD_EXPLICIT_PHI) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
     return;
 
-  // Skip if the consumer has to do with memory operations, c-merge networks or
+  // Skip if the consumer has to do with memory operations, cmerge networks or
   // if it is a conditional branch.
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
@@ -547,10 +574,45 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   // corresponding value
   SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
       consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
+  unsigned numberOfLoops = loops.size();
 
   auto cstType = rewriter.getIntegerType(1);
   auto cstAttr = IntegerAttr::get(cstType, 0);
-  unsigned numberOfLoops = loops.size();
+
+  auto createRegenMux = [&](CFGLoop *loop) -> handshake::MuxOp {
+    rewriter.setInsertionPointToStart(loop->getHeader());
+    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
+
+    // Get the condition for the block exiting
+    Value conditionValue =
+        loop->getExitingBlock()->getTerminator()->getOperand(0);
+
+    // Create the false constant to feed `init`
+    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
+                                                          cstAttr, startValue);
+    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+    // Create the `init` operation
+    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
+    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+                                                           mergeOperands);
+    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+
+    // The multiplexer is to be fed by the init block, and takes as inputs the
+    // regenerated value and the result itself (to be set after) it was created.
+    auto selectSignal = initMergeOp.getResult();
+    selectSignal.setType(channelifyType(selectSignal.getType()));
+
+    SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
+    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
+                                                   regeneratedValue.getType(),
+                                                   selectSignal, muxOperands);
+
+    muxOp->setOperand(2, muxOp->getResult(0));
+    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
+
+    return muxOp;
+  };
 
   // For each of the loop, from the outermost to the innermost
   for (unsigned i = 0; i < numberOfLoops; i++) {
@@ -560,63 +622,37 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     if (i == numberOfLoops - 1 && consumerOp->hasAttr(NEW_PHI))
       break;
 
-    // Add the merge to the network, by substituting the operand with
-    // the output of the merge, and forwarding the output of the merge
-    // to its inputs.
-    //
-    rewriter.setInsertionPointToStart(loops[i]->getHeader());
-
-    // The type of the input must be channelified
-    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
-
-    // Create an INIT merge to provide the select of the multiplexer
-    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-    Value conditionValue =
-        loops[i]->getExitingBlock()->getTerminator()->getOperand(0);
-
-    SmallVector<Value> mergeOperands;
-    mergeOperands.push_back(constOp.getResult());
-    mergeOperands.push_back(conditionValue);
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
-    // Create the multiplexer
-    auto selectSignal = initMergeOp->getResult(0);
-    selectSignal.setType(channelifyType(selectSignal.getType()));
-
-    SmallVector<Value> muxOperands;
-    muxOperands.push_back(regeneratedValue);
-    muxOperands.push_back(regeneratedValue);
-
-    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                   regeneratedValue.getType(),
-                                                   selectSignal, muxOperands);
-
-    // The new producer operand is the output of the multiplxer
+    auto muxOp = createRegenMux(loops[i]);
     regeneratedValue = muxOp.getResult();
-
-    // Set the output of the mux as its input as well
-    muxOp->setOperand(2, muxOp->getResult(0));
-    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
   }
 
+  // Final replace the usage of the operand in the consumer with the output of
+  // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
 
-/// Get a value out of the input boolean expression
+/// Startin from a boolean expresssion which is a single variable (either direct
+/// or complect) return its corresponding circuit equivalent. This means, either
+/// we obtain the output of the operation determinig the condition, or we add a
+/// `not` to complement.
 static Value boolVariableToCircuit(PatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
                                    Block *block, const ftd::BlockIndexing &bi) {
+
+  // Convert the expression into a single condition (for instance, `c0` or
+  // `~c0`).
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
+
+  // Use the BlockIndexing to access the block correspndoing to such condition
+  // and access its terminator to determine the condition.
   auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
   if (!conditionOpt.has_value()) {
     llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
     return nullptr;
   }
   auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
+
+  // Add a not if the condition is negated.
   if (singleCond->isNegated) {
     rewriter.setInsertionPointToStart(block);
     auto notOp = rewriter.create<handshake::NotOp>(
@@ -630,7 +666,7 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
 }
 
 /// Get a circuit out a boolean expression, depending on the different kinds
-/// of expressions you might have
+/// of expressions you might have.
 static Value boolExpressionToCircuit(PatternRewriter &rewriter,
                                      BoolExpression *expr, Block *block,
                                      const ftd::BlockIndexing &bi) {
@@ -992,7 +1028,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     if ((bi.isGreater(producerBlock, consumerBlock) ||
          (llvm::isa<handshake::MuxOp>(consumerOp) &&
           producerBlock == consumerBlock &&
-          isaMergeLoop(consumerOp, loopInfo))) &&
+          isaMuxLoop(consumerOp, loopInfo))) &&
         consumerLoop) {
       addSuppressionInLoop(rewriter, consumerLoop, consumerOp, operand,
                            BackwardRelationship, loopInfo, newToCover, bi);

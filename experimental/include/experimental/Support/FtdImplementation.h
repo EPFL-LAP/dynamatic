@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Declares some utility functions which are useful for both the fast token
-// delivery algorithm and for the GSA anlaysis pass. All the functions are about
-// anlayzing relationships between blocks and handshake operations.
+// Declares the core functions to run the Fast Token Delivery algorithm,
+// according to the original FPGA'22 paper by Elakhras et al.
+// (https://ieeexplore.ieee.org/document/10035134).
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,12 +23,14 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-/// Add some regen multiplexers between an opearation and one of its operands
+/// This function implements the regeneration mechanism over a pair made of a
+/// producer and a consumer (see `addRegen` description).
 void addRegenOperandConsumer(PatternRewriter &rewriter,
                              dynamatic::handshake::FuncOp &funcOp,
                              Operation *consumerOp, Value operand);
 
-/// Add suppression mechanism to all the inputs and outputs of a producer
+/// This function implements the suppression mechanism over a pair made of a
+/// producer and a consumer (see `addSupp` description).
 void addSuppOperandConsumer(PatternRewriter &rewriter,
                             handshake::FuncOp &funcOp, Operation *consumerOp,
                             Value operand);
@@ -43,19 +45,21 @@ void addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 /// Given each pairs of producers and consumers within the circuit, the
 /// producer might create a token which is never used by the corresponding
 /// consumer, because of the control decisions. In this scenario, the token
-/// must be suprressed. This function inserts a `SUPPRESS` block whenever it
+/// must be suppressed. This function inserts a `SUPPRESS` block whenever it
 /// is necessary, according to FPGA'22 (IV.C and V)
 void addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
 /// Starting from the information collected by the gsa analysis pass,
-/// instantiate some merge operations at the beginning of each block which
-/// work as explicit phi functions.
+/// instantiate some mux operations at the beginning of each block which
+/// work as explicit phi functions. If `removeTerminators` is true, the `cf`
+/// terminators in the function are modified to stop feeding the successive
+/// blocks.
 LogicalResult addGsaGates(Region &region, PatternRewriter &rewriter,
                           const gsa::GSAAnalysis &gsa, Backedge startValue,
                           bool removeTerminators = true);
 
-/// Use the GSA analysis to replace each non-init merge in the IR with a
-/// multiplexer.
+/// For each non-init merge in the IR, run the GSA analysis to obtain its GSA
+/// equivalent, then use `addGsaGates` to instantiate such operations in the IR.
 LogicalResult replaceMergeToGSA(handshake::FuncOp &funcOp,
                                 PatternRewriter &rewriter);
 
@@ -72,7 +76,7 @@ LogicalResult createPhiNetwork(Region &funcRegion, PatternRewriter &rewriter,
 /// that operand is `dependent` on, meaning it is produced once that each of the
 /// other operands are ready as well. This function generates a set of SSA-nodes
 /// and appropriate joins to combine them together so that such a dependency is
-/// fullfilled.
+/// fulfilled.
 LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
