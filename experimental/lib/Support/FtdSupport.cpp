@@ -165,9 +165,11 @@ ftd::findAllPaths(Block *start, Block *end, const BlockIndexing &bi,
   return allPaths;
 }
 
-boolean::BoolExpression *ftd::getPathExpression(
-    ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
-    const BlockIndexing &bi, const DenseSet<Block *> &deps, bool ignoreDeps) {
+boolean::BoolExpression *
+ftd::getPathExpression(ArrayRef<Block *> path,
+                       DenseSet<unsigned> &blockIndexSet,
+                       const BlockIndexing &bi, const DenseSet<Block *> &deps,
+                       const bool ignoreDeps) {
 
   // Start with a boolean expression of one
   boolean::BoolExpression *exp = boolean::BoolExpression::boolOne();

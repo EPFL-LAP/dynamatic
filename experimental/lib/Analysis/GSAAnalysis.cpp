@@ -409,7 +409,8 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
         // Remove the current operand from the list of blocks to avoid
         blocksToAvoid.erase(blocksToAvoid.begin());
 
-        // through operand's block but not through any of the `blocksToAvoid`
+        // Find all the paths from "commonDominator" to "phiBlock" which pass
+        // through operand's block but not through any of the "blocksToAvoid"
         auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
 
