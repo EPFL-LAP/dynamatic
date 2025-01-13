@@ -13,6 +13,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -162,14 +163,38 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
                                       handshake::FuncOp &funcOp,
                                       NameAnalysis &namer) {
 
+  // Check whether the current constant can be connected to a source rather than
+  // to start.
+  auto isCstSourcable = [](arith::ConstantOp cstOp) -> bool {
+    std::function<bool(Operation *)> isValidUser =
+        [&](Operation *user) -> bool {
+      if (isa<UnrealizedConversionCastOp>(user))
+        return llvm::all_of(user->getUsers(), isValidUser);
+      return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+                  handshake::LoadOp, handshake::StoreOp, handshake::MergeOp>(
+          user);
+    };
+
+    return llvm::all_of(cstOp->getUsers(), isValidUser);
+  };
+
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
+  llvm::DenseMap<Block *, Value> sourcesPerBlock;
 
   // For each constant
   auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
   for (auto cstOp : llvm::make_early_inc_range(constants)) {
 
     rewriter.setInsertionPoint(cstOp);
+
+    auto controlValue = startValue;
+
+    if (isCstSourcable(cstOp)) {
+      auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+      inheritBB(cstOp, sourceOp);
+      controlValue = sourceOp.getResult();
+    }
 
     // Convert the constant to the handshake equivalent, using the start value
     // as control signal
@@ -181,8 +206,8 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
           intType, cast<IntegerAttr>(cstAttr).getValue().trunc(32));
     }
 
-    auto newCstOp = rewriter.create<handshake::ConstantOp>(cstOp.getLoc(),
-                                                           cstAttr, startValue);
+    auto newCstOp = rewriter.create<handshake::ConstantOp>(
+        cstOp.getLoc(), cstAttr, controlValue);
 
     newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
 
