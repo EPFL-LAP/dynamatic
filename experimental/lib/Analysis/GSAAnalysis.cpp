@@ -333,6 +333,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
 
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
+  ftd::BlockIndexing bi(funcOp.getBody());
 
   // For each block
   for (auto const &[phiBlock, phis] : gatesPerBlock) {
@@ -381,7 +382,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
 
         // Find all the paths from "commonDominator" to "phiBlock" which pass
         // through operand's block but not through any of the "blocksToAvoid"
-        auto paths = findAllPaths(commonDominator, phiBlock,
+        auto paths = findAllPaths(commonDominator, phiBlock, bi,
                                   operand->getBlock(), blocksToAvoid);
 
         BoolExpression *phiInputCondition = BoolExpression::boolZero();
@@ -389,7 +390,7 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(func::FuncOp &funcOp) {
         // Sum all the conditions for each path
         for (std::vector<Block *> &path : paths) {
           boolean::BoolExpression *condition =
-              getPathExpression(path, blocksWithConditionInPath, indexPerBlock);
+              getPathExpression(path, blocksWithConditionInPath, bi);
           phiInputCondition =
               BoolExpression::boolOr(condition, phiInputCondition);
           phiInputCondition = phiInputCondition->boolMinimize();

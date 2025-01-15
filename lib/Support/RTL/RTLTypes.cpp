@@ -232,8 +232,15 @@ std::string RTLDataflowType::serialize(Attribute attr) {
     }
     return ss.str();
   }
-  if (isa<handshake::ControlType>(typeAttr.getValue()))
-    return "0";
+  if (auto ty = dyn_cast<handshake::ControlType>(typeAttr.getValue())) {
+    std::stringstream ss;
+    ss << "0";
+    for (const handshake::ExtraSignal &extra : ty.getExtraSignals()) {
+      ss << "-" << extra.name.str() << "-" << extra.getBitWidth()
+         << (extra.downstream ? "-D" : "-U");
+    }
+    return ss.str();
+  }
   return "";
 }
 

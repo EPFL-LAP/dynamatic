@@ -38,6 +38,9 @@ public:
   // Constructor for the analysis pass
   ControlDependenceAnalysis(Operation *operation);
 
+  // Constructor for the analysis pass
+  ControlDependenceAnalysis(Region &region);
+
   // Given a BB, return all its control dependencies
   std::optional<DenseSet<Block *>> getBlockAllControlDeps(Block *block) const;
 
@@ -63,14 +66,14 @@ private:
   BlockControlDepsMap blocksControlDeps;
 
   /// Get all the control dependencies of a block
-  void identifyAllControlDeps(mlir::func::FuncOp &funcOp);
+  void identifyAllControlDeps(Region &region);
 
   // Get the forward dependencies only of a block
-  void identifyForwardControlDeps(mlir::func::FuncOp &funcOp);
+  void identifyForwardControlDeps(Region &region);
 
   /// Modify the control dependencies to include the dependencies of each
   /// dependent block too
-  void addDepsOfDeps(mlir::func::FuncOp &funcOp);
+  void addDepsOfDeps(Region &region);
 };
 
 } // namespace dynamatic
