@@ -140,23 +140,18 @@ LogicalResult ExportInfo::concretizeExternalModules() {
 
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
-    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew) {
+    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew)
       return success();
-    }
 
     // First generate dependencies recursively...
     for (StringRef dep : match->component->getDependencies()) {
       RTLDependencyRequest dependencyRequest(dep, request.loc);
-      if (failed(concretizeComponent(dependencyRequest, nullptr))) {
+      if (failed(concretizeComponent(dependencyRequest, nullptr)))
         return failure();
-      }
     }
 
     // ...then generate the component itself
-    LogicalResult concretizeResult =
-        match->concretize(request, dynamaticPath, outputPath);
-
-    return concretizeResult;
+    return match->concretize(request, dynamaticPath, outputPath);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
