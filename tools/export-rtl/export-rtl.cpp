@@ -131,14 +131,16 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
     }
+    // If match is not external, it must be freed when function returns
+    std::unique_ptr<RTLMatch> matchUniquePtr;
     if (extOp)
       externals[extOp] = match;
+    else
+      matchUniquePtr.reset(match);
 
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
     if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew) {
-      if (!extOp)
-        delete match;
       return success();
     }
 
@@ -146,8 +148,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     for (StringRef dep : match->component->getDependencies()) {
       RTLDependencyRequest dependencyRequest(dep, request.loc);
       if (failed(concretizeComponent(dependencyRequest, nullptr))) {
-        if (!extOp)
-          delete match;
         return failure();
       }
     }
@@ -155,9 +155,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // ...then generate the component itself
     LogicalResult concretizeResult =
         match->concretize(request, dynamaticPath, outputPath);
-
-    if (!extOp)
-      delete match;
 
     return concretizeResult;
   };
