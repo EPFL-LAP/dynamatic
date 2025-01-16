@@ -1,0 +1,41 @@
+set(LLVM_LINK_COMPONENTS
+  Support
+)
+
+add_llvm_tool(elastic-miter
+  elastic-miter.cpp
+)
+
+llvm_update_compile_flags(elastic-miter)
+target_link_libraries(elastic-miter
+  PRIVATE
+  AffineToScf
+  DynamaticLowerScfToCf
+  DynamaticBufferPlacement
+  DynamaticLSQSizing
+  DynamaticSpeculation
+  DynamaticExperimentalResourceSharing
+  DynamaticCfToHandshake
+  DynamaticHandshake
+  DynamaticHandshakeToHW
+  DynamaticTestTransforms
+  DynamaticTransforms
+  DynamaticTutorialsCreatingPasses
+  DynamaticExperimentalTestTransforms
+  DynamaticExperimentalSupport
+  DynamaticExperimentalTransforms
+
+  MLIRIR
+  MLIRAffineTransforms
+  MLIRArithTransforms
+  MLIRSCFTransforms
+  MLIRMemRefTransforms
+  MLIRLLVMDialect
+  MLIRMemRefDialect
+  MLIROptLib
+  MLIRParser
+  MLIRFuncDialect
+  MLIRSupport
+  MLIRTransforms
+  MLIRSCFDialect
+)
