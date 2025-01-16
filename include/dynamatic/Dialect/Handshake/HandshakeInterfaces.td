@@ -57,13 +57,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
     if (!operands.size())
       return concreteOp.emitOpError("must have at least one data operand");
 
-    mlir::Type resultType = $_op->getResult(0).getType();
-
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
-
     return mlir::success();
   }];
 }

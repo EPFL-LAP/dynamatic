@@ -36,10 +36,12 @@
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cassert>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -238,8 +240,35 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   // operand)
   if (operands.size() < 2)
     return failure();
-  // Result type is type of any data operand
-  inferredReturnTypes.push_back(operands[1].getType());
+
+  // Map to collect extra signals from data operands
+  llvm::DenseMap<StringRef, const ExtraSignal *> extraSignalsMap;
+  // SmallVector to collect the extra signals of the result
+  llvm::SmallVector<ExtraSignal> extraSignals;
+  for (Value operand : operands) {
+    auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
+    for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
+      if (extraSignalsMap.contains(extraSignal.name)) {
+        if (*extraSignalsMap.lookup(extraSignal.name) != extraSignal) {
+          // Two different extra signals among inputs must have different names
+          // to be merge-able.
+          // e.g. [spec: i1] and [spec: i2] are prohibited.
+          return failure();
+        }
+      } else {
+        extraSignalsMap.insert({extraSignal.name, &extraSignal});
+        extraSignals.push_back(extraSignal);
+      }
+    }
+  }
+
+  auto firstDataInType = cast<ExtraSignalsTypeInterface>(operands[1].getType());
+
+  // The return type is data type of any data operand (if ControlType) with
+  // union of data operand's extra signals.
+  inferredReturnTypes.push_back(
+      firstDataInType.replaceExtraSignals(extraSignals));
+
   return success();
 }
 
@@ -249,29 +278,45 @@ bool MuxOp::isControl() {
 
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> dataOperands;
   handshake::ChannelType selectType;
-  Type dataType;
-  SmallVector<Type, 2> dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
+  // Parse until the type of the select operand
   if (parser.parseOperand(selectOperand) || parser.parseLSquare() ||
-      parser.parseOperandList(allOperands) || parser.parseRSquare() ||
+      parser.parseOperandList(dataOperands) || parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseCustomTypeWithFallback(selectType) || parser.parseComma() ||
-      parseHandshakeType(parser, dataType))
+      parser.parseLSquare())
     return failure();
 
-  int size = allOperands.size();
-  dataOperandsTypes.assign(size, dataType);
-  result.addTypes(dataType);
-  allOperands.insert(allOperands.begin(), selectOperand);
-  if (parser.resolveOperands(
-          allOperands,
-          llvm::concat<const Type>(ArrayRef<Type>(selectType),
-                                   ArrayRef<Type>(dataOperandsTypes)),
-          allOperandLoc, result.operands))
+  int numDataOperands = dataOperands.size();
+
+  // Parse the data operands types
+  SmallVector<Type> dataOperandsTypes(numDataOperands);
+  for (int i = 0; i < numDataOperands; i++) {
+    if (i > 0) {
+      if (parser.parseComma())
+        return failure();
+    }
+    if (parseHandshakeType(parser, dataOperandsTypes[i]))
+      return failure();
+  }
+
+  // Parse the result type
+  Type resultType;
+  if (parser.parseRSquare() || parser.parseKeyword("to") ||
+      parseHandshakeType(parser, resultType))
     return failure();
-  return success();
+  result.addTypes(resultType);
+
+  // Fill the result.operands
+  return parser.resolveOperands(
+      llvm::concat<const OpAsmParser::UnresolvedOperand>(
+          ArrayRef<OpAsmParser::UnresolvedOperand>(selectOperand),
+          dataOperands),
+      llvm::concat<const Type>(ArrayRef<Type>(selectType), dataOperandsTypes),
+      allOperandLoc, result.operands);
 }
 
 void MuxOp::print(OpAsmPrinter &p) {
@@ -283,7 +328,16 @@ void MuxOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : ";
   p.printStrippedAttrOrType(getSelectOperand().getType());
-  p << ", ";
+  p << ", [";
+  int i = 0;
+  for (auto op : getDataOperands()) {
+    if (i > 0) {
+      p << ", ";
+    }
+    printHandshakeType(p, op.getType());
+    i++;
+  }
+  p << "] to ";
   printHandshakeType(p, getResult().getType());
 }
 
@@ -300,17 +354,43 @@ OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
 
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
-  Type dataType;
-  handshake::ChannelType indexType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
+  // Parse until just before the operand types
   if (parser.parseOperandList(operands) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, dataType) || parser.parseComma() ||
-      parser.parseCustomTypeWithFallback(indexType))
+      parser.parseLSquare())
     return failure();
 
-  SmallVector<Type> operandTypes(operands.size(), dataType);
-  result.addTypes({dataType, indexType});
+  int numOperands = operands.size();
+
+  // Parse the operand types
+  SmallVector<Type> operandTypes(numOperands);
+  for (int i = 0; i < numOperands; i++) {
+    if (i > 0) {
+      if (parser.parseComma())
+        return failure();
+    }
+    if (parseHandshakeType(parser, operandTypes[i]))
+      return failure();
+  }
+
+  // Parse the return data type
+  Type resultDataType;
+  if (parser.parseRSquare() || parser.parseKeyword("to") ||
+      parseHandshakeType(parser, resultDataType))
+    return failure();
+
+  handshake::ChannelType indexType;
+
+  // Parse the index type
+  if (parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
+    return failure();
+
+  // Register the result types
+  result.addTypes({resultDataType, indexType});
+
+  // Fill the result.operands
   return parser.resolveOperands(operands, operandTypes, allOperandLoc,
                                 result.operands);
 }
@@ -318,23 +398,22 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 void ControlMergeOp::print(OpAsmPrinter &p) {
   p << " " << getOperands() << " ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : ";
+  p << " : [";
+  int i = 0;
+  for (auto op : getOperands()) {
+    if (i > 0) {
+      p << ", ";
+    }
+    printHandshakeType(p, op.getType());
+    i++;
+  }
+  p << "] to ";
   printHandshakeType(p, getResult().getType());
   p << ", ";
   p.printStrippedAttrOrType(getIndex().getType());
 }
 
 LogicalResult ControlMergeOp::verify() {
-  TypeRange operandTypes = getOperandTypes();
-  if (operandTypes.empty())
-    return emitOpError("operation must have at least one operand");
-  Type refType = operandTypes.front();
-  for (Type type : operandTypes.drop_front()) {
-    if (refType != type)
-      return emitOpError("all operands should have the same type");
-  }
-  if (refType != getResult().getType())
-    return emitOpError("type of data result should match type of operands");
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
 
@@ -531,7 +610,15 @@ LogicalResult ConstantOp::inferReturnTypes(
   OperationName opName = OperationName(getOperationName(), context);
   StringAttr attrName = getValueAttrName(opName);
   auto attr = cast<TypedAttr>(attributes.get(attrName));
-  inferredReturnTypes.push_back(handshake::ChannelType::get(attr.getType()));
+
+  auto controlType = cast<ControlType>(operands[0].getType());
+
+  // The return type is a ChannelType with:
+  // - dataType as specified by the attribute
+  // - extra signals matching the input control type
+  inferredReturnTypes.push_back(handshake::ChannelType::get(
+      attr.getType(), controlType.getExtraSignals()));
+
   return success();
 }
 
@@ -2103,7 +2190,14 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  assert(operands.size() > 0 && "expected at least one operand");
+  assert(operands[0].getType().isa<ChannelType>() &&
+         "expected first operand to be a channel type");
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume from the definition in the tablegen file that
+      // all operands have the same extra signals
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
@@ -2118,7 +2212,14 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  assert(operands.size() > 0 && "expected at least one operand");
+  assert(operands[0].getType().isa<ChannelType>() &&
+         "expected first operand to be a channel type");
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume from the definition in the tablegen file that
+      // all operands have the same extra signals
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
