@@ -595,7 +595,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
           [&](handshake::ConditionalBranchOp condBrOp) {
             // The data operand or the condition operand must depend on the
             // predecessor
-            return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
+            return foldGIIDStatusOr(recurse, condBrOp->getOperands());
           })
       .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
         // The data input on the path must depend on the predecessor
