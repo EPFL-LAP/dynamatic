@@ -17,42 +17,18 @@ module divui #(
   output rhs_ready
 );
 
-  wire join_valid;
-
-  // Instantiate the join node
-  join_type #(
-    .SIZE(2)
-  ) join_inputs (
-    .ins_valid  ({rhs_valid, lhs_valid}),
-    .outs_ready (result_ready             ),
-    .ins_ready  ({rhs_ready, lhs_ready}  ),
-    .outs_valid (join_valid             )
-  );
-
-  array_RAM_udiv_32ns_32ns_32_36_1 #(
-    .ID(1),
-    .NUM_STAGE(36),
-    .din0_TYPE(32),
-    .din1_TYPE(32),
-    .dout_TYPE(32)
-  ) array_RAM_udiv_32ns_32ns_32_36_1_U1 (
-    .clk(clk),
-    .reset(rst),
-    .ce(result_ready),
-    .din0(lhs),
-    .din1(rhs),
-    .dout(result)
-  );
-
-  delay_buffer #(
-    .SIZE(35)
-  ) buff (
+  xls_divui32 ip (
     .clk(clk),
     .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(result_ready),
-    .valid_out(result_valid)
+    .lhs(lhs),
+    .lhs_valid(lhs_valid),
+    .lhs_ready(lhs_ready),
+    .rhs(rhs),
+    .rhs_valid(rhs_valid),
+    .rhs_ready(rhs_ready),
+    .result(result),
+    .result_valid(result_valid),
+    .result_ready(result_ready)
   );
-
 
 endmodule
