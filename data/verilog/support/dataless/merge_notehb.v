@@ -19,11 +19,10 @@ module merge_notehb_dataless #(
 	always @(*) begin
 		tmp_valid_out = 0;
     tmp_ready_out = {INPUTS{1'b0}}; 
-		for (i = 0; i < N; i = i + 1) begin
-			if (ins_valid[i]) begin
+		for (i = 0; i < INPUTS; i = i + 1) begin
+			if (!tmp_valid_out && ins_valid[i]) begin
 				tmp_valid_out = 1;
         tmp_ready_out[i] = outs_ready;
-        break;
 			end
 		end
 	end
