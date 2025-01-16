@@ -11,64 +11,56 @@
 
 #include "dynamatic/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
-#include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/ADT/iterator_range.h"
-#include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include <cassert>
-#include <iterator>
-#include <vector>
 
 using namespace mlir;
 using namespace dynamatic;
 
 namespace {
 
+/// Combine redundant init merges. These merges have one constant input and a
+/// condition input. If two merges are identical, then one of them can be
+/// removed
 struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
                                 PatternRewriter &rewriter) const override {
-    // Doublecheck that the Merge has 2 inputs
+
+    // Work only with merges having two inputs
     if (mergeOp->getNumOperands() != 2)
       return failure();
 
-    // One of the inputs of the Merge must be a constant; otherwise the pattern
-    // match fails
-    if (!isa_and_nonnull<handshake::ConstantOp>(
-            mergeOp.getDataOperands()[0].getDefiningOp()) &&
-        !isa_and_nonnull<handshake::ConstantOp>(
-            mergeOp.getDataOperands()[1].getDefiningOp()))
+    // One of the inputs of the merge must be a constants
+    int constIdx = -1;
+    for (int i = 0; i < 2; i++) {
+      if (isa_and_nonnull<handshake::ConstantOp>(
+              mergeOp.getDataOperands()[i].getDefiningOp()))
+        constIdx = i;
+    }
+
+    if (constIdx == -1)
       return failure();
 
-    int constOperandIdx;
-    if (isa_and_nonnull<handshake::ConstantOp>(
-            mergeOp.getDataOperands()[0].getDefiningOp()))
-      constOperandIdx = 0;
-    else {
-      assert(isa_and_nonnull<handshake::ConstantOp>(
-          mergeOp.getDataOperands()[1].getDefiningOp()));
-      constOperandIdx = 1;
-    }
-    // auto constVal = cast<handshake::ConstantOp>(constOperandIdx).getValue();
-    int loopCondOperandIdx = (constOperandIdx == 1) ? 0 : 1;
+    // Get the index of the other input
+    int loopIdx = 1 - constIdx;
 
+    // If there are other merges fed from the same input at the loopIdx
     DenseSet<handshake::MergeOp> redundantInits;
-
-    for (auto user : mergeOp.getDataOperands()[loopCondOperandIdx].getUsers())
+    for (auto *user : mergeOp.getDataOperands()[loopIdx].getUsers())
       if (isa_and_nonnull<handshake::MergeOp>(user) && user != mergeOp) {
         handshake::MergeOp mergeUser = cast<handshake::MergeOp>(user);
         if (isa_and_nonnull<handshake::ConstantOp>(
-                mergeUser.getDataOperands()[constOperandIdx].getDefiningOp()))
+                mergeUser.getDataOperands()[constIdx].getDefiningOp()))
           redundantInits.insert(mergeUser);
       }
 
@@ -76,49 +68,82 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
       return failure();
 
     for (auto init : redundantInits) {
-      handshake::MergeOp redunInit = cast<handshake::MergeOp>(init);
-      rewriter.replaceAllUsesWith(redunInit.getResult(), mergeOp.getResult());
+      rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
       rewriter.eraseOp(init);
     }
 
-    llvm::errs() << "\t***Combine INITs***\n";
     return success();
   }
 };
 
-bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxOuterInputIdx,
-                         int &muxCycleInputIdx) {
+/// Returns true if the loop under analysis has a self regenerating mux. One
+/// input of the mux comes from the mux itself, while the other input comes from
+/// somewhere else.
+bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
+
   // One user must be a Branch; otherwise, the pattern match fails
-  bool foundCondBranch = false;
   DenseSet<handshake::ConditionalBranchOp> branches;
-  for (auto muxUser : muxOp.getResult().getUsers()) {
+
+  for (auto *muxUser : muxOp.getResult().getUsers()) {
     if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
-      foundCondBranch = true;
-      branches.insert(cast<handshake::ConditionalBranchOp>(muxUser));
+      auto br = cast<handshake::ConditionalBranchOp>(muxUser);
+      branches.insert(br);
     }
   }
 
-  // This condBranchOp must also be an operand forming a cycle with the
-  // mux; otherwise, the pattern match fails
+  // One of the conditional branches that were found should feed muxOp forming a
+  // cycle
   bool foundCycle = false;
   int operIdx = 0;
   handshake::ConditionalBranchOp condBranchOp;
+
   for (auto muxOperand : muxOp.getDataOperands()) {
-    if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-            muxOperand.getDefiningOp()))
-      if (branches.contains(cast<handshake::ConditionalBranchOp>(
-              muxOperand.getDefiningOp()))) {
+    auto *op = muxOperand.getDefiningOp();
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
+      auto br = cast<handshake::ConditionalBranchOp>(op);
+      if (branches.contains(br)) {
         foundCycle = true;
         muxCycleInputIdx = operIdx;
-        condBranchOp =
-            cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp());
+        condBranchOp = br;
         break;
       }
+    }
     operIdx++;
   }
-  if (foundCondBranch)
-    muxOuterInputIdx = !muxCycleInputIdx;
-  return (foundCycle);
+
+  return foundCycle;
+}
+
+// Apply DFS on the producers of a particular Mux feeding a particular input,
+// returning the first non-Mux producer's result value
+Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
+  Value val = muxOp.getDataOperands()[idx];
+  Operation *prod = val.getDefiningOp();
+  if (isa_and_nonnull<handshake::MuxOp>(prod))
+    return returnNonMuxProducerVal(cast<handshake::MuxOp>(prod), idx);
+  return val;
+}
+
+// Apply DFS on the consumers of op until you hit a Mux in the same BB as that
+// of referenceMuxOp
+Operation *returnMuxAtSameDepth(Operation *op,
+                                handshake::MuxOp referenceMuxOp) {
+  if (!isa_and_nonnull<handshake::MuxOp>(op) || op == referenceMuxOp)
+    return nullptr;
+
+  if (op->getAttr("handshake.bb") == referenceMuxOp->getAttr("handshake.bb"))
+    return op;
+
+  // Otherwise, explore all users in DFS-like traversal until you hit a match
+  Operation *finalOp = nullptr;
+  for (auto cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
+    Operation *potentialOp = returnMuxAtSameDepth(cons, referenceMuxOp);
+    if (potentialOp != nullptr) {
+      finalOp = potentialOp;
+      break;
+    }
+  }
+  return finalOp;
 }
 
 // Note: This pattern assumes that all Muxes belonging to 1 loop have the same
@@ -126,52 +151,53 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxOuterInputIdx,
 // that coming from inside through a cycle
 // This pattern combines all Muxes that are used to regenerate the same value
 // but to different consumers.. It searches for a Mux that has a bwd edge
-// (cyclic input) and searches for all Muxes using the some condition and the
-// same
+// (cyclic input) and searches for all Muxes using the some condition and also
+// having a bwd edge
 struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
   using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
 
-    // Doublecheck that the Mux has 3 inputs
+    // The mux needs to have three inputs
     if (muxOp.getNumOperands() != 3)
       return failure();
 
-    int muxOuterInputIdx = -1;
-    int muxCycleInputIdx = -1;
-    if (!isSelfRegenerateMux(muxOp, muxOuterInputIdx, muxCycleInputIdx))
+    int muxCycleIdx;
+    // Exit if it's not a self regenerate mux
+    if (!isSelfRegenerateMux(muxOp, muxCycleIdx))
       return failure();
 
-    DenseSet<handshake::MuxOp> conditionMuxUsers;
+    int muxOutIdx = 1 - muxCycleIdx;
+
     DenseSet<handshake::MuxOp> dataMuxUsers;
     DenseSet<handshake::MuxOp> redundantMuxes;
 
-    // Get users of the operation at the muxOuterInputIdx
-    for (auto dataUser : muxOp.getDataOperands()[muxOuterInputIdx].getUsers())
-      if (isa_and_nonnull<handshake::MuxOp>(dataUser) && dataUser != muxOp) {
-        int tempMuxouterInputIdx = -1;
-        int tempMuxCycleInputIdx = -1;
-        if (isSelfRegenerateMux(cast<handshake::MuxOp>(dataUser),
-                                tempMuxouterInputIdx, tempMuxCycleInputIdx))
-          dataMuxUsers.insert(cast<handshake::MuxOp>(dataUser));
-      }
+    // Identify the first non-Mux producer of the muxOp by running a DFS-like
+    // traversal and return its produced value
+    Value valProducedByNonMux = returnNonMuxProducerVal(muxOp, muxOutIdx);
 
-    // Get users of the operation at the select (condition) of the Mux
-    for (auto selUser : muxOp.getSelectOperand().getUsers())
+    // Get users of the non-Mux operation at the muxOuterInputIdx
+    for (auto *dataUser : valProducedByNonMux.getUsers()) {
+      Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
+      if (returnedMux != nullptr) {
+        auto muxUser = cast<handshake::MuxOp>(returnedMux);
+        int tempValue;
+        if (isSelfRegenerateMux(muxOp, tempValue))
+          dataMuxUsers.insert(muxUser);
+      }
+    }
+
+    // Get users of the operation at the select input, and consider only the
+    // users which were also in `dataMuxUsers`
+    for (auto *selUser : muxOp.getSelectOperand().getUsers())
       if (isa_and_nonnull<handshake::MuxOp>(selUser) && selUser != muxOp) {
-        int tempMuxouterInputIdx = -1;
-        int tempMuxCycleInputIdx = -1;
-        if (isSelfRegenerateMux(cast<handshake::MuxOp>(selUser),
-                                tempMuxouterInputIdx, tempMuxCycleInputIdx))
-          conditionMuxUsers.insert(cast<handshake::MuxOp>(selUser));
+        auto muxUser = cast<handshake::MuxOp>(selUser);
+        int tempValue;
+        if (isSelfRegenerateMux(muxUser, tempValue) &&
+            dataMuxUsers.contains(muxUser)) {
+          redundantMuxes.insert(muxUser);
+        }
       }
-
-    // Loop over dataMuxUsers and consider those that are found in
-    // muxUsers
-    for (auto mux : dataMuxUsers)
-      if (conditionMuxUsers.find(mux) != conditionMuxUsers.end())
-        redundantMuxes.insert(mux);
 
     if (redundantMuxes.empty())
       return failure();
@@ -180,169 +206,176 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     // muxOp Note that the users of all redundantMuxes include the Branches
     // forming cycles with each of them, but as we erase the redundantMuxes,
     // these Branches will have their two outputs feeding nothing and will be
-    // erased using the RemoveDoubleSinkeBranches
+    // erased using the RemoveDoubleSinkBranches
     for (auto mux : redundantMuxes) {
-      handshake::MuxOp redunMux = cast<handshake::MuxOp>(mux);
-      rewriter.replaceAllUsesWith(redunMux.getResult(), muxOp.getResult());
+      rewriter.replaceAllUsesWith(mux.getResult(), muxOp.getResult());
       rewriter.eraseOp(mux);
     }
 
-    llvm::errs() << "\t***Combine Muxes***\n";
     return success();
   }
 };
 
-/// Remove Conditional Branches that have no successors
+/// Remove muxes that have no successors
+struct RemoveSinkMuxes : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+
+    // The pattern fails if the Mux has any successors
+    if (!muxOp.getResult().getUsers().empty())
+      return failure();
+
+    rewriter.eraseOp(muxOp);
+    return success();
+  }
+};
+
+/// Remove conditional branches that have no successors
 struct RemoveDoubleSinkBranches
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
+
     Value branchTrueResult = condBranchOp.getTrueResult();
     Value branchFalseResult = condBranchOp.getFalseResult();
 
-    // Pattern match fails if the Branch has a true or false successor
-    if (!branchTrueResult.getUsers().empty() ||
-        !branchFalseResult.getUsers().empty())
+    // The pattern fails if the branch has either true or false successors
+    if (!branchTrueResult.getUsers().empty())
+      return failure();
+
+    if (!branchFalseResult.getUsers().empty())
       return failure();
 
     rewriter.eraseOp(condBranchOp);
-
     return success();
   }
 };
 
+static DenseSet<handshake::ConditionalBranchOp>
+findRedundantBranches(Value condOperand, Value dataOperand,
+                      handshake::ConditionalBranchOp originalBranch) {
+  DenseSet<handshake::ConditionalBranchOp> condUsers;
+  DenseSet<handshake::ConditionalBranchOp> redundantBranches;
+
+  // Get all the users of the condition operand, and keep the branches only
+  for (auto *condUser : condOperand.getUsers()) {
+    if (condUser == originalBranch)
+      continue;
+    if (auto br = dyn_cast<handshake::ConditionalBranchOp>(condUser); br) {
+      if (br.getConditionOperand() == condOperand)
+        condUsers.insert(br);
+    }
+  }
+
+  // Check if one of the branch users of the data input was also a user of
+  // the condition input: in this case, the branch is redundant
+  for (auto *dataUser : dataOperand.getUsers()) {
+    if (dataUser == originalBranch)
+      continue;
+    if (auto br = dyn_cast<handshake::ConditionalBranchOp>(dataUser); br) {
+      if (br.getDataOperand() == dataOperand && condUsers.contains(br))
+        redundantBranches.insert(br);
+    }
+  }
+
+  return redundantBranches;
+}
+
+/// Remove branches which have the same data operands but opposite condition
+/// operand
 struct CombineBranchesOppositeSign
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
 
-    // 1st step: Get the input data value and input condition value
-    // 2nd step: Get the users of both the data value and condition value, and
-    // if there are common users that are of type Branch, they should be all
-    // combined to a single Branch
     Value dataOperand = condBranchOp.getDataOperand();
     Value condOperand = condBranchOp.getConditionOperand();
-    DenseSet<handshake::ConditionalBranchOp> conditionBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> dataBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> redundantBranches;
 
-    // If the condition of condBranchOp is a NOT, then we need to get its input
-    bool searchForANot = false;
-    Value actualCondOperand = condOperand;
-    if (isa_and_nonnull<handshake::NotOp>(condOperand.getDefiningOp()))
-      actualCondOperand = condOperand.getDefiningOp()->getOperand(0);
-    else
-      searchForANot = true;
-
-    if (!searchForANot) {
-      for (auto condUser : actualCondOperand.getUsers())
-        if (isa_and_nonnull<handshake::ConditionalBranchOp>(condUser) &&
-            condUser != condBranchOp)
-          conditionBranchUsers.insert(
-              cast<handshake::ConditionalBranchOp>(condUser));
-    } else {
-      // Do not directly store all users of the condition; rather, store the
-      // Branch users of any NOT that is itself a user of the condition
-      for (auto condUser : actualCondOperand.getUsers())
-        if (isa_and_nonnull<handshake::NotOp>(condUser)) {
-          handshake::NotOp notOp = cast<handshake::NotOp>(condUser);
-          for (auto notOpUser : notOp.getResult().getUsers()) {
-            if (isa_and_nonnull<handshake::ConditionalBranchOp>(notOpUser))
-              conditionBranchUsers.insert(
-                  cast<handshake::ConditionalBranchOp>(notOpUser));
-          }
-        }
-    }
-
-    for (auto dataUser : dataOperand.getUsers())
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(dataUser) &&
-          dataUser != condBranchOp)
-        dataBranchUsers.insert(cast<handshake::ConditionalBranchOp>(dataUser));
-
-    if (conditionBranchUsers.empty() || dataBranchUsers.empty())
+    if (!isa_and_nonnull<handshake::NotOp>(condOperand.getDefiningOp()))
       return failure();
 
-    // Loop over dataBranchUsers and consider those that are found in
-    // conditionBranchUsers
-    for (auto br : dataBranchUsers)
-      if (conditionBranchUsers.find(br) != conditionBranchUsers.end())
-        redundantBranches.insert(br);
+    condOperand = condOperand.getDefiningOp()->getOperand(0);
 
+    auto redundantBranches =
+        findRedundantBranches(condOperand, dataOperand, condBranchOp);
+
+    // Nothing to erase
     if (redundantBranches.empty())
       return failure();
 
-    // Erase redundant Branches by putting their true succs at the false succs
-    // of the condBranchOp and their false succs at the true succs of the
-    // condBranchOp
+    // Erase the redundant branch
     for (auto br : redundantBranches) {
-      handshake::ConditionalBranchOp redunBr =
-          cast<handshake::ConditionalBranchOp>(br);
-      rewriter.replaceAllUsesWith(redunBr.getTrueResult(),
-                                  condBranchOp.getFalseResult());
-      rewriter.replaceAllUsesWith(redunBr.getFalseResult(),
+      rewriter.replaceAllUsesWith(br.getFalseResult(),
                                   condBranchOp.getTrueResult());
+      rewriter.replaceAllUsesWith(br.getTrueResult(),
+                                  condBranchOp.getFalseResult());
       rewriter.eraseOp(br);
     }
 
-    llvm::errs() << "\t***Combine Branches Oppostie Signs***\n";
     return success();
   }
 };
 
+/// Remove branches with same data operands and same conditional operand
+struct RemoveNotCondition
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
+                                PatternRewriter &rewriter) const override {
+
+    Value condValue = condBranchOp.getConditionOperand();
+    Operation *condOp = condValue.getDefiningOp();
+
+    if (!llvm::isa_and_nonnull<handshake::NotOp>(condOp))
+      return failure();
+
+    auto drivingNot = llvm::dyn_cast<handshake::NotOp>(condOp);
+
+    rewriter.setInsertionPointAfter(condBranchOp);
+
+    auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        condOp->getLoc(), drivingNot.getOperand(),
+        condBranchOp.getDataOperand());
+
+    rewriter.replaceAllUsesWith(condBranchOp.getTrueResult(),
+                                newBranch.getFalseResult());
+    rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(),
+                                newBranch.getTrueResult());
+
+    newBranch->setAttr("handshake.bb", condBranchOp->getAttr("handshake.bb"));
+
+    return success();
+  }
+};
+
+/// Remove branches with same data operands and same conditional operand
 struct CombineBranchesSameSign
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
-    // 1st step: Get the input data value and input condition value
-    // 2nd step: Get the users of both the data value and condition value, and
-    // if there are common users that are of type Branch, they should be all
-    // combined to a single Branch
+
     Value dataOperand = condBranchOp.getDataOperand();
     Value condOperand = condBranchOp.getConditionOperand();
-    DenseSet<handshake::ConditionalBranchOp> conditionBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> dataBranchUsers;
-    DenseSet<handshake::ConditionalBranchOp> redundantBranches;
 
-    for (auto condUser : condOperand.getUsers())
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(condUser) &&
-          condUser != condBranchOp)
-        conditionBranchUsers.insert(
-            cast<handshake::ConditionalBranchOp>(condUser));
+    auto redundantBranches =
+        findRedundantBranches(condOperand, dataOperand, condBranchOp);
 
-    for (auto dataUser : dataOperand.getUsers())
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(dataUser) &&
-          dataUser != condBranchOp)
-        dataBranchUsers.insert(cast<handshake::ConditionalBranchOp>(dataUser));
-
-    if (conditionBranchUsers.empty() || dataBranchUsers.empty())
-      return failure();
-
-    // Loop over dataBranchUsers and consider those that are found in
-    // conditionBranchUsers
-    for (auto br : dataBranchUsers)
-      if (conditionBranchUsers.find(br) != conditionBranchUsers.end())
-        redundantBranches.insert(br);
-
+    // Nothing to erase
     if (redundantBranches.empty())
       return failure();
 
+    // Erase the redundant branch
     for (auto br : redundantBranches) {
-      handshake::ConditionalBranchOp redunBr =
-          cast<handshake::ConditionalBranchOp>(br);
-      rewriter.replaceAllUsesWith(redunBr.getTrueResult(),
+      rewriter.replaceAllUsesWith(br.getTrueResult(),
                                   condBranchOp.getTrueResult());
-      rewriter.replaceAllUsesWith(redunBr.getFalseResult(),
+      rewriter.replaceAllUsesWith(br.getFalseResult(),
                                   condBranchOp.getFalseResult());
       rewriter.eraseOp(br);
     }
-
-    llvm::errs() << "\t***Combine Branches Same Signs***\n";
     return success();
   }
 };
@@ -361,8 +394,9 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<CombineBranchesSameSign, CombineBranchesOppositeSign,
-                 CombineInits, CombineMuxes, RemoveDoubleSinkBranches>(ctx);
+    patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
+                 CombineBranchesSameSign, CombineBranchesOppositeSign,
+                 CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
