@@ -3,6 +3,9 @@ add_dynamatic_library(DynamaticExperimentalSupport
   StdProfiler.cpp
   HandshakeSimulator.cpp
   FtdSupport.cpp
+  CutEnumeration.cpp
+  BlifReader.cpp
+  SubjectGraph.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

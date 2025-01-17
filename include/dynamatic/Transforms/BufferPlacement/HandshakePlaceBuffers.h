@@ -31,7 +31,7 @@ namespace buffer {
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffers(
     StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
-    unsigned timeout = 180, bool dumpLogs = false);
+    unsigned timeout = 180, bool dumpLogs = false, StringRef blifFile = "");
 
 #define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERS
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
@@ -50,7 +50,8 @@ struct HandshakePlaceBuffersPass
   /// Trivial field-by-field constructor.
   HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
                             StringRef timingModels, bool firstCFDFC,
-                            double targetCP, unsigned timeout, bool dumpLogs);
+                            double targetCP, unsigned timeout, bool dumpLogs,
+                            StringRef blifFiles = "");
 
   /// Called on the MLIR module provided as input.
   void runDynamaticPass() override;

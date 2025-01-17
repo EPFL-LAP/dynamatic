@@ -189,6 +189,7 @@ static Res callKernel(Res (*kernel)(void)) {
 #ifdef HLS_VERIFICATION
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 
 /// Whenever HLS_VERIFICATION is defined, this macro must contain the path to
