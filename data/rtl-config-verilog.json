@@ -39,7 +39,7 @@
       }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/verilog/arith/cmpf.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join_type"],
+    "dependencies": ["join_type", "xls_float_ip"],
     "hdl": "verilog"
   },
   {
@@ -64,7 +64,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/divf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "dependencies": ["join_type", "delay_buffer", "oehb", "xls_float_ip"],
     "hdl": "verilog"
   },
   {
@@ -198,7 +198,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/subf.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb"],
+    "dependencies": ["join_type", "delay_buffer", "oehb", "xls_float_ip"],
     "hdl": "verilog"
   },
   {
