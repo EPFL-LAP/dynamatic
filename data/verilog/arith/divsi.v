@@ -17,18 +17,18 @@ module divsi #(
   output rhs_ready
 );
 
-  xls_divsi32 ip (
+  __xls_float_ips__divsi32_0_next ip (
     .clk(clk),
     .rst(rst),
-    .lhs(lhs),
-    .lhs_valid(lhs_valid),
-    .lhs_ready(lhs_ready),
-    .rhs(rhs),
-    .rhs_valid(rhs_valid),
-    .rhs_ready(rhs_ready),
-    .result(result),
-    .result_valid(result_valid),
-    .result_ready(result_ready)
+    .xls_float_ips__lhs(lhs),
+    .xls_float_ips__lhs_vld(lhs_valid),
+    .xls_float_ips__lhs_rdy(lhs_ready),
+    .xls_float_ips__rhs(rhs),
+    .xls_float_ips__rhs_vld(rhs_valid),
+    .xls_float_ips__rhs_rdy(rhs_ready),
+    .xls_float_ips__result(result),
+    .xls_float_ips__result_vld(result_valid),
+    .xls_float_ips__result_rdy(result_ready)
   );
 
 endmodule
