@@ -13,6 +13,11 @@
 // circuit.
 //===----------------------------------------------------------------------===//
 
+/// IMPPP TO NOTE WHEN INTEGRATING WITH MAIN:
+// (1) SHOULD SKIP LSQS
+// (2) FINE TO CONNECT MC DIRECTLY TO START (ASSUMING NON-VOID FUNCTIONS) AND
+// SHOOULD HAPPEN NATURALLY?
+
 #include "dynamatic/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -30,6 +35,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
 #include <cassert>
+#include <cstddef>
 #include <iterator>
 #include <vector>
 
@@ -199,160 +205,115 @@ struct RemoveDoubleSinkBranches
   }
 };
 
-// Rules E
-/// Remove floating cycles
-struct RemoveMergeFloatingLoop : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
+/// Returns Operation holding a Branch, if it exists, and the its index (by
+/// reference) in the operands of the Mux. Returns a nullptr and -1 (by
+/// reference) otherwise
+/// Takes a generic Operation, but returns if it is not a MuxOp or MergeOp
+Operation *returnBranchFormingCycle(Operation *muxOrMergeOp,
+                                    int &cycleInputIdx) {
+  cycleInputIdx = -1;
+  if (!isa_and_nonnull<handshake::MergeOp>(muxOrMergeOp) &&
+      !isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
+    return nullptr;
 
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
-                                PatternRewriter &rewriter) const override {
-    // Doublecheck that the Merge has 2 inputs
-    if (mergeOp->getNumOperands() != 2)
-      return failure();
+  // One user must be a Branch; otherwise, the pattern match fails
+  DenseSet<handshake::ConditionalBranchOp> branches;
 
-    // Get the users of the Mux
-    auto mergeUsers = (mergeOp.getResult()).getUsers();
-    if (mergeUsers.empty())
-      return failure();
+  for (auto *user : muxOrMergeOp->getResults()[0].getUsers()) {
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(user)) {
+      auto br = cast<handshake::ConditionalBranchOp>(user);
+      branches.insert(br);
+    }
+  }
 
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto mergeUser : mergeUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
+  // One of the conditional branches that were found should feed the
+  // muxOrMergeOp forming a cycle
+  int operIdx = 0;
+  handshake::ConditionalBranchOp cycleBranchOp;
+
+  for (auto muxOperand : muxOrMergeOp->getOperands()) {
+    auto *op = muxOperand.getDefiningOp();
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
+      auto br = cast<handshake::ConditionalBranchOp>(op);
+      if (branches.contains(br)) {
+        cycleInputIdx = operIdx;
+        cycleBranchOp = br;
+        break;
       }
     }
-    if (!foundCondBranch)
+    operIdx++;
+  }
+
+  return cycleBranchOp;
+}
+
+int returnTotalCondBranchUsers(handshake::ConditionalBranchOp condBranchOp) {
+  return std::distance(condBranchOp.getTrueResult().getUsers().begin(),
+                       condBranchOp.getTrueResult().getUsers().end()) +
+         std::distance(condBranchOp.getFalseResult().getUsers().begin(),
+                       condBranchOp.getFalseResult().getUsers().end());
+}
+
+// Rules E
+/// Remove floating cycles that can have a Mux or a Merge at the cycle header
+template <typename MuxOrMergeOp>
+struct RemoveFloatingLoop : public OpRewritePattern<MuxOrMergeOp> {
+  using OpRewritePattern<MuxOrMergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(MuxOrMergeOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!isa_and_nonnull<handshake::MergeOp>(op) &&
+        !isa_and_nonnull<handshake::MuxOp>(op))
       return failure();
 
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int mergeOuterInputIdx = 0;
-    int mergeCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto mergeOperand : mergeOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                mergeOperand.getDefiningOp()))) {
-          foundCycle = true;
-          mergeCycleInputIdx = operIdx;
-          iterCondBranchOp = cast<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
+    Operation *muxOrMergeOp;
+    if (isa_and_nonnull<handshake::MergeOp>(op)) {
+      muxOrMergeOp = cast<handshake::MergeOp>(op);
+    } else {
+      assert(isa_and_nonnull<handshake::MuxOp>(op));
+      muxOrMergeOp = cast<handshake::MuxOp>(op);
     }
-    if (!foundCycle)
-      return failure();
-    mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
 
-    // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
-    // only user of the exitCondBranchOp is the Mux
-    if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 1 ||
-        (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-                       iterCondBranchOp.getTrueResult().getUsers().end()) +
-             std::distance(
-                 iterCondBranchOp.getFalseResult().getUsers().begin(),
-                 iterCondBranchOp.getFalseResult().getUsers().end()) !=
-         1))
+    if (muxOrMergeOp->getNumOperands() < 2)
       return failure();
 
-    // llvm::errs() << "\t\tDeleting isolated cycle\n";
-    rewriter.replaceAllUsesWith(iterCondBranchOp.getDataOperand(),
-                                mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    rewriter.eraseOp(mergeOp);
-    rewriter.eraseOp(iterCondBranchOp);
+    auto users = (muxOrMergeOp->getResults()[0]).getUsers();
+    // Pattern match fails if the muxOrMergeOp has more than 1 user or no users
+    // at all
+    if (users.empty() || std::distance(users.begin(), users.end()) != 1)
+      return failure();
 
-    // llvm::errs() << "\t***Rules E: remove-floating-merge-loop!***\n";
+    int cycleInputIdx;
+    Operation *potentialBranchOp =
+        returnBranchFormingCycle(muxOrMergeOp, cycleInputIdx);
+    if (potentialBranchOp == nullptr)
+      return failure();
+
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+    handshake::ConditionalBranchOp condBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialBranchOp);
+
+    int outsideInputIdx = 1 - cycleInputIdx;
+
+    // Pattern match fails if the Branch has more than 1 user
+    if ((returnTotalCondBranchUsers(condBranchOp) != 1))
+      return failure();
+
+    // Safety step to be able to delete the cycle, we first replace all uses of
+    // condBranchOp with muxOrMerge, then erase the latter then erase the former
+    rewriter.replaceAllUsesWith(condBranchOp.getDataOperand(),
+                                muxOrMergeOp->getOperands()[outsideInputIdx]);
+    rewriter.eraseOp(muxOrMergeOp);
+    rewriter.eraseOp(condBranchOp);
+
+    llvm::errs() << "\t***Rules E: remove-GENERIC-floating-loop!***\n";
 
     return success();
   }
 };
 
-// Rules E
-/// Remove floating cycles
-struct RemoveMuxFloatingLoop : public OpRewritePattern<handshake::MuxOp> {
-  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
-                                PatternRewriter &rewriter) const override {
-    // Doublecheck that the Mux has 3 inputs
-    if (muxOp->getNumOperands() != 3)
-      return failure();
-
-    // Get the users of the Mux
-    auto muxUsers = (muxOp.getResult()).getUsers();
-    if (muxUsers.empty())
-      return failure();
-
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto muxUser : muxUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(muxUser));
-      }
-    }
-    if (!foundCondBranch)
-      return failure();
-
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int muxOuterInputIdx = 0;
-    int muxCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto muxOperand : muxOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              muxOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                muxOperand.getDefiningOp()))) {
-          foundCycle = true;
-          muxCycleInputIdx = operIdx;
-          iterCondBranchOp =
-              cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
-    muxOuterInputIdx = (muxCycleInputIdx == 0) ? 1 : 0;
-
-    // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
-    // only user of the exitCondBranchOp is the Mux
-    if (std::distance(muxUsers.begin(), muxUsers.end()) != 1 ||
-        (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-                       iterCondBranchOp.getTrueResult().getUsers().end()) +
-             std::distance(
-                 iterCondBranchOp.getFalseResult().getUsers().begin(),
-                 iterCondBranchOp.getFalseResult().getUsers().end()) !=
-         1))
-      return failure();
-
-    // llvm::errs() << "\t\tDeleting isolated cycle\n";
-    rewriter.replaceAllUsesWith(iterCondBranchOp.getDataOperand(),
-                                muxOp.getDataOperands()[muxOuterInputIdx]);
-    rewriter.eraseOp(muxOp);
-    rewriter.eraseOp(iterCondBranchOp);
-
-    // llvm::errs() << "\t***Rules E: remove-floating-merge-loop!***\n";
-
-    return success();
-  }
-};
-
-// Rules A Removes Conditional Branch and Merge
-// operation pairs if both the inputs of the Merge are outputs of the
-// Conditional Branch. The results of the Merge are replaced with the data
-// operand of the Conditional Branch.
+// Rules A
+// Remove redundant if-then-else structures
 struct RemoveBranchMergeIfThenElse
     : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
@@ -2691,6 +2652,13 @@ struct DistributeMuxRepeats : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+/*
+  Not clean but is temporary anyways:
+  Eventually, a subset of the network of CMerges will be extracted solely for
+  triggering constants, it will contain Merges. There is no risk of disordering
+  here, since both sides of the Merge circulate Start. Yet, this function is
+  needed if the RTL of merge cannot accommodate having two active inputs.
+*/
 struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
 
@@ -2880,7 +2848,8 @@ struct HandshakeRewriteTermsPass
         EraseUnconditionalBranches, EraseSingleInputMerges,
         EraseSingleInputMuxes, EraseSingleInputControlMerges,
         DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop, ConstructSuppresses,
+        RemoveFloatingLoop<handshake::MuxOp>,
+        RemoveFloatingLoop<handshake::MergeOp>, ConstructSuppresses,
         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
         DistributeMuxRepeats, ExtractIfThenElseCondition, ExtractLoopCondition,
         RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,

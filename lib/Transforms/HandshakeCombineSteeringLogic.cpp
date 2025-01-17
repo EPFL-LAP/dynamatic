@@ -77,8 +77,8 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
 };
 
 /// Returns true if the loop under analysis has a self regenerating mux. One
-/// input of the mux comes from the mux itself, while the other input comes from
-/// somewhere else.
+/// input of the mux is forming a cycle with the mux itself, while the other
+/// input comes from somewhere else.
 bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
 
   // One user must be a Branch; otherwise, the pattern match fails
