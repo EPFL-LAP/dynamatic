@@ -17,41 +17,18 @@ module divsi #(
   output rhs_ready
 );
 
-  wire join_valid;
-
-  // Instantiate the join node
-  join_type #(
-    .SIZE(2)
-  ) join_inputs (
-    .ins_valid  ({rhs_valid, lhs_valid}),
-    .outs_ready (result_ready             ),
-    .ins_ready  ({rhs_ready, lhs_ready}  ),
-    .outs_valid (join_valid             )
-  );
-
-  array_RAM_sdiv_32ns_32ns_32_36_1 #(
-    .ID(1),
-    .NUM_STAGE(36),
-    .din0_TYPE(32),
-    .din1_TYPE(32),
-    .dout_TYPE(32)
-  ) array_RAM_sdiv_32ns_32ns_32_36_1_U1 (
-    .clk(clk),
-    .reset(rst),
-    .ce(result_ready),
-    .din0(lhs),
-    .din1(rhs),
-    .dout(result)
-  );
-
-  delay_buffer #(
-    .SIZE(35)
-  ) buff (
+  __xls_float_ips__divsi32_0_next ip (
     .clk(clk),
     .rst(rst),
-    .valid_in(join_valid),
-    .ready_in(result_ready),
-    .valid_out(result_valid)
+    .xls_float_ips__lhs(lhs),
+    .xls_float_ips__lhs_vld(lhs_valid),
+    .xls_float_ips__lhs_rdy(lhs_ready),
+    .xls_float_ips__rhs(rhs),
+    .xls_float_ips__rhs_vld(rhs_valid),
+    .xls_float_ips__rhs_rdy(rhs_ready),
+    .xls_float_ips__result(result),
+    .xls_float_ips__result_vld(result_valid),
+    .xls_float_ips__result_rdy(result_ready)
   );
 
 endmodule
