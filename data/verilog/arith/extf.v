@@ -15,7 +15,7 @@ module extf #(
   input outs_ready
 );
 
-  __xls_float_ips__extf32_0_next ip (
+  __xls_float_ips__extf_0_next ip (
     .clk(clk),
     .rst(rst),
     .xls_float_ips__ins(ins),
