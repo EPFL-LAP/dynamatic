@@ -1,4 +1,4 @@
-//===- FtdProfiling.h - Runs a profiling algorithm  -----*----- C++ -*-----===//
+//===- FtdProfiling.cpp - Runs a profiling algorithm  ---*----- C++ -*-----===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

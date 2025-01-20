@@ -119,7 +119,21 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
       Channel channel(mergeOp.getResult(), true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
+    }
+  }
+
+  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (muxOp->getNumOperands() > 1) {
+      Channel channel(muxOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
+    }
+  }
+
+  for (handshake::ForkOp fork : funcOp.getOps<handshake::ForkOp>()) {
+    for (auto result : fork->getResults()) {
+      Channel channel(result, true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
     }
   }
 

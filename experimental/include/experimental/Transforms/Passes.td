@@ -36,6 +36,17 @@ def FtdProfiling : DynamaticPass< "ftd-profiling">  {
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
+def ConvertMuxToMerge : DynamaticPass< "convert-mux-to-merge">  {
+  let summary = "Convert a set of muxes to merges";
+  let description = [{
+    The pass reads the content of a file containing the set of muxes to transform to merges.
+    That same mux is converted to a cmerge, and all the other muxes in the same loop 
+    header are connected to the index output of the new component.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createConvertMuxToMerge()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
   let description = [{
