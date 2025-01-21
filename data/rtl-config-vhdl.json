@@ -540,7 +540,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/merge.vhd",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["types", "tehb", "merge_notehb"]
   },
   {
     "name": "handshake.br",
