@@ -101,6 +101,8 @@ static void convertMuxToMerge(handshake::FuncOp funcOp, NameAnalysis &namer) {
         usesOperand->set(newCmergeOp.getIndex());
       }
     }
+
+    mux.erase();
   }
 
   llvm::dbgs() << "\n-----------------------\n";

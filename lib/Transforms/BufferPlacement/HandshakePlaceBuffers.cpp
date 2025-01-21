@@ -16,8 +16,8 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -503,6 +503,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
 
+  const bool useManyTEHB = true;
+
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
     // Map all channels in the function to their specific buffering properties,
     // adjusting for internal buffers present inside the units
@@ -510,26 +512,138 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    // Make sure that the data output channels of all merge-like operations have
-    // at least one opaque and one transparent slot, unless a constraint
-    // explicitly prevents us from putting a buffer there
-    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-      ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
-      if (resProps.maxTrans.value_or(1) >= 1) {
-        resProps.minTrans = std::max(resProps.minTrans, 1U);
-      } else {
-        mergeLikeOp->emitWarning()
-            << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
-               "yield an invalid buffering.";
+    if (!useManyTEHB) {
+
+      // Make sure that the data output channels of all merge-like operations
+      // have at least one opaque and one transparent slot, unless a constraint
+      // explicitly prevents us from putting a buffer there
+      for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, 1U);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
       }
-      if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
-      } else {
-        mergeLikeOp->emitWarning()
-            << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
-               "yield an invalid buffering.";
+    } else {
+
+      const unsigned tehbs = 100U;
+
+      for (auto mergeLikeOp : funcOp.getOps<handshake::MuxOp>()) {
+
+        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+
+      for (auto mergeLikeOp : funcOp.getOps<handshake::MergeOp>()) {
+
+        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+
+      for (auto mergeLikeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+
+        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+
+        resProps = channelProps[mergeLikeOp->getResult(1)];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+        if (resProps.maxOpaque.value_or(1) >= 1) {
+          resProps.minOpaque = std::max(resProps.minOpaque, tehbs);
+        } else {
+          mergeLikeOp->emitWarning()
+              << "Cannot place opaque buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+
+      for (auto sostInterfaceOp : funcOp.getOps<handshake::ForkOp>()) {
+        for (auto res : sostInterfaceOp->getResults()) {
+          ChannelBufProps &resProps = channelProps[res];
+          if (resProps.maxTrans.value_or(1) >= 1) {
+            resProps.minTrans = std::max(resProps.minTrans, tehbs);
+          } else {
+            sostInterfaceOp->emitWarning()
+                << "Cannot place transparent buffer on merge-like operation's "
+                   "output due to channel-specific buffering constraints. This "
+                   "may "
+                   "yield an invalid buffering.";
+          }
+        }
       }
     }
 

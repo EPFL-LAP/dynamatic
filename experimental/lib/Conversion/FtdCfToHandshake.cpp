@@ -190,11 +190,11 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
     auto controlValue = startValue;
 
-    if (isCstSourcable(cstOp)) {
-      auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-      inheritBB(cstOp, sourceOp);
-      controlValue = sourceOp.getResult();
-    }
+    // if (isCstSourcable(cstOp)) {
+    //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+    //   inheritBB(cstOp, sourceOp);
+    //   controlValue = sourceOp.getResult();
+    // }
 
     // Convert the constant to the handshake equivalent, using the start value
     // as control signal
