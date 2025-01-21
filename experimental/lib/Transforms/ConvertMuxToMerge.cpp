@@ -50,7 +50,7 @@ Operation *getOpByName(handshake::FuncOp &funcOp, const std::string &name) {
 
 static void convertMuxToMerge(handshake::FuncOp funcOp, NameAnalysis &namer) {
 
-  llvm::dbgs() << "Start conversion\n";
+  llvm::dbgs() << "[INFO] Start conversion from MUX to Merge\n";
   std::ifstream file("ftdscripting/muxes.txt");
   if (!file.is_open()) {
     llvm::errs() << "Error: Could not open file ftdscripting/muxes.txt\n";
@@ -71,7 +71,6 @@ static void convertMuxToMerge(handshake::FuncOp funcOp, NameAnalysis &namer) {
       return;
     }
 
-    muxOp->print(llvm::dbgs());
     if (!llvm::isa<handshake::MuxOp>(muxOp)) {
       llvm::errs() << "Operation to convert is not a mux\n";
       return;
@@ -93,21 +92,14 @@ static void convertMuxToMerge(handshake::FuncOp funcOp, NameAnalysis &namer) {
       allUses.push_back(&usesOperand);
 
     for (auto &usesOperand : allUses) {
-      if (auto mux = llvm::dyn_cast<handshake::MuxOp>(usesOperand->getOwner());
-          mux) {
-        llvm::dbgs() << "-> ";
-        mux->print(llvm::dbgs());
-        llvm::dbgs() << "\n";
+      auto mux = llvm::dyn_cast<handshake::MuxOp>(usesOperand->getOwner());
+      if (mux)
         usesOperand->set(newCmergeOp.getIndex());
-      }
     }
 
+    llvm::dbgs() << "[INFO] -> " << nameOp << " has been converted to cmerge\n";
     mux.erase();
   }
-
-  llvm::dbgs() << "\n-----------------------\n";
-  funcOp.print(llvm::dbgs());
-  llvm::dbgs() << "\n-----------------------\n";
 }
 
 struct ConvertMuxToMergePass
