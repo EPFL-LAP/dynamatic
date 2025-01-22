@@ -13,7 +13,7 @@ entity merge_notehb is
     -- input channels
     ins       : in  data_array(INPUTS - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic_vector(INPUTS - 1 downto 0);
-    ins_ready : out std_logic_vector(INPUTS - 1 downto 0)
+    ins_ready : out std_logic_vector(INPUTS - 1 downto 0);
     -- output channel
     outs       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     outs_valid : out std_logic;
