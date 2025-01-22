@@ -1,6 +1,4 @@
-//===-- BlifReader.cpp - Exp. support for MAPBUF buffer placement -----*-
-// C++
-//-*-===//
+//===- BlifReader.cpp - Exp. support for MAPBUF -----------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -24,16 +22,17 @@
 
 using namespace dynamatic::experimental;
 
-void Node::setName(const std::string &newName) { this->name = newName; }
+void AigNode::setName(const std::string &newName) { this->name = newName; }
 
-void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
+void BlifData::traverseUtil(AigNode *node, std::set<AigNode *> &visitedNodes) {
+  // if the node is already added to topological order, return.
   if (std::find(nodesTopologicalOrder.begin(), nodesTopologicalOrder.end(),
                 node) != nodesTopologicalOrder.end()) {
     return;
   }
 
+  // Search using DFS.
   visitedNodes.insert(node);
-  // llvm::errs() << "Node: " << node << "\n";
   for (auto *const fanin : node->getFanins()) {
     if (std::find(nodesTopologicalOrder.begin(), nodesTopologicalOrder.end(),
                   fanin) == nodesTopologicalOrder.end() &&
@@ -51,9 +50,8 @@ void BlifData::traverseUtil(Node *node, std::set<Node *> &visitedNodes) {
 }
 
 void BlifData::traverseNodes() {
-  // traverse the nodes using DFS, sorting them into topological order
-  std::set<Node *> primaryInputs;
-  std::set<Node *> primaryOutputs;
+  std::set<AigNode *> primaryInputs;
+  std::set<AigNode *> primaryOutputs;
 
   for (auto &node : nodes) {
     if (node.second->isPrimaryInput()) {
@@ -64,11 +62,13 @@ void BlifData::traverseNodes() {
     }
   }
 
+  // Add primary inputs to the topological order as first elements.
   for (auto *input : primaryInputs) {
     nodesTopologicalOrder.push_back(input);
   }
 
-  std::set<Node *> visitedNodes;
+  // Perform dfs on primary outputs to traverse the nodes in topological order.
+  std::set<AigNode *> visitedNodes;
   for (const auto &node : primaryOutputs) {
     traverseUtil(node, visitedNodes);
   }
@@ -82,11 +82,15 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
   }
 
   std::string line;
+  // Loop over all the lines in .blif file.
   while (std::getline(file, line)) {
+    // If comment or empty line, skip.
     if (line.empty() || line.find("#") == 0) {
       continue;
     }
 
+    // If line ends with '\\', read the next line and append to the current
+    // line.
     while (line.back() == '\\') {
       line.pop_back();
       std::string nextLine;
@@ -94,32 +98,36 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
       line += nextLine;
     }
 
+    // Model name
     if (line.find(".model") == 0) {
       data->setModuleName(line.substr(7));
     }
 
+    // Input nodes. These are also Dataflow graph channels.
     else if (line.find(".inputs") == 0) {
       std::string inputs = line.substr(8);
       std::istringstream iss(inputs);
       std::string input;
       while (iss >> input) {
-        Node *inputNode = data->createNode(input);
+        AigNode *inputNode = data->createNode(input);
         inputNode->setInput(true);
         inputNode->setChannelEdge(true);
       }
     }
 
+    // Output nodes. These are also Dataflow graph channels.
     else if (line.find(".outputs") == 0) {
       std::string outputs = line.substr(9);
       std::istringstream iss(outputs);
       std::string output;
       while (iss >> output) {
-        Node *outputNode = data->createNode(output);
+        AigNode *outputNode = data->createNode(output);
         outputNode->setOutput(true);
         outputNode->setChannelEdge(true);
       }
     }
 
+    // Latches.
     else if (line.find(".latch") == 0) {
       std::string latch = line.substr(7);
       std::istringstream iss(latch);
@@ -128,28 +136,34 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
       iss >> regInput;
       iss >> regOutput;
 
-      Node *regInputNode = data->createNode(regInput);
+      AigNode *regInputNode = data->createNode(regInput);
       regInputNode->setLatchInput(true);
 
-      Node *regOutputNode = data->createNode(regOutput);
+      AigNode *regOutputNode = data->createNode(regOutput);
       regOutputNode->setLatchOutput(true);
 
       data->addLatch(regInputNode, regOutputNode);
     }
 
+    // .names stand for logic gates.
     else if (line.find(".names") == 0) {
       std::string function;
       std::vector<std::string> currNodes;
 
+      // Extracts the substring from position 7 to the end of line. ".names "
+      // consists of 7 characters, so we start from 7.
+      // Example: .names a b c
       std::string names = line.substr(7);
       std::istringstream iss(names);
 
       std::string node;
-      while (iss >> node) { // read the nodes
+
+      while (iss >> node) { // Read the nodes. Example: a b c
         currNodes.push_back(node);
       }
 
-      std::getline(file, line); // read the function
+      std::getline(file, line); // Read the function. Function is in the next
+                                // line. Example: 11 1
       std::istringstream iss2(line);
       iss2 >> function;
 
@@ -157,8 +171,9 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
         llvm::errs() << "No nodes found in .names\n";
       }
 
+      // If there is only one node, it is a constant node.
       if (currNodes.size() == 1) {
-        Node *fanOut = data->createNode(currNodes[0]);
+        AigNode *fanOut = data->createNode(currNodes[0]);
         if (function == "0") {
           fanOut->setConstZero(true);
         } else if (function == "1") {
@@ -167,16 +182,19 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
           llvm::errs() << "Unknown constant value: " << function << "\n";
         }
         fanOut->setFunction(function);
+        // If there are two nodes, it is a wire.
       } else if (currNodes.size() == 2) {
-        Node *fanout = data->createNode(currNodes.back());
-        Node *fanin = data->createNode(currNodes.front());
+        AigNode *fanout = data->createNode(currNodes.back());
+        AigNode *fanin = data->createNode(currNodes.front());
         fanout->addFanin(fanin);
         fanin->addFanout(fanout);
         fanout->setFunction(line);
+        // If there are three nodes, it is a logic gate. First the nodes are
+        // fanins, and the last node is fanout.
       } else if (currNodes.size() == 3) {
-        Node *fanin1 = data->createNode(currNodes[0]);
-        Node *fanin2 = data->createNode(currNodes[1]);
-        Node *fanout = data->createNode(currNodes.back());
+        AigNode *fanin1 = data->createNode(currNodes[0]);
+        AigNode *fanin2 = data->createNode(currNodes[1]);
+        AigNode *fanout = data->createNode(currNodes.back());
         fanout->addFanin(fanin1);
         fanout->addFanin(fanin2);
         fanin1->addFanout(fanout);
@@ -188,15 +206,17 @@ BlifData *BlifParser::parseBlifFile(const std::string &filename) {
       }
     }
 
+    // Subcircuits. not used for now.
     else if (line.find(".subckt") == 0) {
       continue;
     }
-
+    // Ends the file.
     else if (line.find(".end") == 0) {
       break;
     }
   }
 
+  // Sorts the nodes in topological order.
   data->traverseNodes();
   return data;
 }
@@ -251,21 +271,22 @@ void BlifData::generateBlifFile(const std::string &filename) {
   file.close();
 }
 
-std::vector<Node *> BlifData::findPath(Node *start, Node *end) {
-  std::queue<Node *> queue;
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> parent;
-  std::set<Node *> visited;
+std::vector<AigNode *> BlifData::findPath(AigNode *start, AigNode *end) {
+  // BFS search to find the shortest path from start to end.
+  std::queue<AigNode *> queue;
+  std::unordered_map<AigNode *, AigNode *, boost::hash<AigNode *>> parent;
+  std::set<AigNode *> visited;
 
   queue.push(start);
   visited.insert(start);
 
   while (!queue.empty()) {
-    Node *current = queue.front();
+    AigNode *current = queue.front();
     queue.pop();
 
     if (current == end) {
       // Reconstruct the path
-      std::vector<Node *> path;
+      std::vector<AigNode *> path;
       while (current != start) {
         path.push_back(current);
         current = parent[current];
@@ -288,10 +309,10 @@ std::vector<Node *> BlifData::findPath(Node *start, Node *end) {
   return {};
 }
 
-std::set<Node *>
+std::set<AigNode *>
 BlifData::findNodesWithLimitedWavyInputs(size_t limit,
-                                         std::set<Node *> &wavyLine) {
-  std::set<Node *> nodesWithLimitedPrimaryInputs;
+                                         std::set<AigNode *> &wavyLine) {
+  std::set<AigNode *> nodesWithLimitedPrimaryInputs;
 
   for (auto &node : nodesTopologicalOrder) {
     bool erased = false;
@@ -301,7 +322,7 @@ BlifData::findNodesWithLimitedWavyInputs(size_t limit,
         erased = true;
       }
     }
-    std::set<Node *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
+    std::set<AigNode *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
     if (wavyInputs.size() <= limit) {
       nodesWithLimitedPrimaryInputs.insert(node);
     }
@@ -313,11 +334,11 @@ BlifData::findNodesWithLimitedWavyInputs(size_t limit,
   return nodesWithLimitedPrimaryInputs;
 }
 
-std::set<Node *> BlifData::findWavyInputsOfNode(Node *node,
-                                                std::set<Node *> &wavyLine) {
-  std::set<Node *> primaryInputs;
-  std::set<Node *> visited;
-  std::function<void(Node *)> dfs = [&](Node *currentNode) {
+std::set<AigNode *>
+BlifData::findWavyInputsOfNode(AigNode *node, std::set<AigNode *> &wavyLine) {
+  std::set<AigNode *> primaryInputs;
+  std::set<AigNode *> visited;
+  std::function<void(AigNode *)> dfs = [&](AigNode *currentNode) {
     if (visited.count(currentNode) > 0) {
       return;
     }
@@ -335,26 +356,4 @@ std::set<Node *> BlifData::findWavyInputsOfNode(Node *node,
 
   dfs(node);
   return primaryInputs;
-}
-
-void BlifData::printModuleInfo() {
-  llvm::errs() << "Module Name: " << moduleName << "\n";
-
-  llvm::errs() << "Inputs: ";
-  for (auto &input : getPrimaryInputs()) {
-    llvm::errs() << input->str() << " ";
-  }
-  llvm::errs() << "\n";
-
-  llvm::errs() << "Primary Outputs: ";
-  for (auto &output : getPrimaryOutputs()) {
-    llvm::errs() << output->str() << " ";
-  }
-  llvm::errs() << "\n";
-
-  llvm::errs() << "Nodes: ";
-  for (auto &node : nodesTopologicalOrder) {
-    llvm::errs() << node->str() << " ";
-  }
-  llvm::errs() << "\n";
 }
