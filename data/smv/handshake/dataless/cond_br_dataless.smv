@@ -4,4 +4,4 @@ DEFINE data_ready := inner_join.ins_ready_0;
 DEFINE condition_ready := inner_join.ins_ready_1;
 DEFINE trueOut_valid := condition & inner_join.outs_valid_0;
 DEFINE falseOut_valid := !condition & inner_join.outs_valid_0;
-branch_ready := (falseOut_ready and not condition(0)) | (trueOut_ready and condition(0));
+DEFINE branch_ready := (falseOut_ready & !condition(0)) | (trueOut_ready & condition(0));

@@ -1,0 +1,6 @@
+[0m[[0m[0mdebug[0m] [0m[0m[zinc] IncrementalCompile -----------[0m
+[0m[[0m[0mdebug[0m] [0m[0mIncrementalCompile.incrementalCompile[0m
+[0m[[0m[0mdebug[0m] [0m[0mprevious = Stamps for: 41 products, 16 sources, 6 libraries[0m
+[0m[[0m[0mdebug[0m] [0m[0mcurrent source = Set(${BASE}/src/main/scala/lsq/port/StoreDataPort.scala, ${BASE}/src/main/scala/lsq/queues/AxiLoadQueue.scala, ${BASE}/src/main/scala/lsq/LSQMaster.scala, ${BASE}/src/main/scala/lsq/axi/AxiRead.scala, ${BASE}/src/main/scala/lsq/queues/StoreQueue.scala, ${BASE}/src/main/scala/lsq/LSQAXI.scala, ${BASE}/src/main/scala/lsq/queues/LoadQueue.scala, ${BASE}/src/main/scala/lsq/config/LsqConfigs.scala, ${BASE}/src/main/scala/lsq/port/LoadPort.scala, ${BASE}/src/main/scala/lsq/util/util.scala, ${BASE}/src/main/scala/lsq/Main.scala, ${BASE}/src/main/scala/lsq/axi/AxiWrite.scala, ${BASE}/src/main/scala/lsq/queues/AxiStoreQueue.scala, ${BASE}/src/main/scala/lsq/port/StoreAddrPort.scala, ${BASE}/src/main/scala/lsq/LSQSlave.scala, ${BASE}/src/main/scala/lsq/GA/GroupAllocator.scala)[0m
+[0m[[0m[0mdebug[0m] [0m[0m> initialChanges = InitialChanges(Changes(added = Set(), removed = Set(), changed = Set(), unmodified = ...),Set(),Set(),API Changes: Set())[0m
+[0m[[0m[0mdebug[0m] [0m[0mNo changes[0m

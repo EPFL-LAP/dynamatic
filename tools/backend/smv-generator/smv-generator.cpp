@@ -418,7 +418,7 @@ std::string generateMux(unsigned int inputSignals, bool isDataless) {
   return mod;
 }
 
-std::string generateConstant(int val) {
+std::string generateConstant(long val) {
   std::string mod = "MODULE constant_" + std::to_string(val) +
                     "(ctrl_valid, outs_ready)\n"
                     "DEFINE\n"
@@ -535,7 +535,7 @@ std::string generateComponent(handshake::OpTypeEnum name,
     return generateMux(nInputs, isDataless);
   }
   case handshake::OpTypeEnum::CONSTANT: {
-    int val = std::stoi(params);
+    long val = std::stol(params, nullptr, 2);
     return generateConstant(val);
   }
   case handshake::OpTypeEnum::BOP: {

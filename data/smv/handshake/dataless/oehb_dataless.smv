@@ -1,6 +1,6 @@
 MODULE oehb_dataless (ins_valid, outs_ready)
 VAR outs_valid : boolean;
 ASSIGN
-init(outs_valid) := FALSE
+init(outs_valid) := FALSE;
 next(outs_valid) := ins_valid | (outs_valid & !outs_ready);
-DEFINE ins_ready := !outs_valid | outs_ready
+DEFINE ins_ready := !outs_valid | outs_ready;

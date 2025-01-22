@@ -293,7 +293,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/oehb.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/oehb_dataless.smv",
     "module-name": "oehb_dataless",
     "hdl": "smv"
   },
@@ -337,7 +337,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/ofifo.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/ofifo_dataless.smv",
     "module-name": "ofifo_dataless_$NUM_SLOTS",
     "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"],
     "hdl": "smv"
@@ -382,7 +382,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tehb.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tehb_dataless.smv",
     "module-name": "tehb_dataless",
     "hdl": "smv"
   },
@@ -420,7 +420,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tfifo.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/tfifo_dataless.smv",
     "module-name": "tfifo_dataless_$NUM_SLOTS",
     "dependencies": ["elastic_fifo_inner_dataless"],
     "hdl": "smv"
@@ -475,7 +475,7 @@
   },
   {
     "name": "handshake.fork",
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/fork.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/fork_dataless.smv",
     "hdl": "smv"
   },
   {
@@ -521,7 +521,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/sink.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/sink_dataless.smv",
     "module-name": "sink_dataless",
     "hdl": "smv"
   },
@@ -546,7 +546,7 @@
       },
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux_$SIZE.smv\" mux $SIZE,dataless",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/mux_$SIZE_dataless.smv\" mux $SIZE,dataless",
     "module-name": "mux_dataless",
     "dependencies": ["tehb_dataless"],
     "hdl": "smv"
@@ -575,7 +575,7 @@
       },
       { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/control_merge.smv\" control_merge $SIZE,dataless",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/control_merge_dataless.smv\" control_merge $SIZE,dataless",
     "dependencies": ["fork", "tehb"],
     "module-name": "control_merge_dataless",
     "hdl": "smv"
@@ -603,7 +603,7 @@
         "generic": false
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge.smv\" merge $SIZE",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge_dataless.smv\" merge $SIZE",
     "module-name": "merge_dataless",
     "dependencies": ["tehb_dataless"],
     "hdl": "smv"
@@ -614,7 +614,7 @@
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge.smv\" merge $SIZE,dataless",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/merge_$SIZE_dataless.smv\" merge $SIZE,dataless",
     "dependencies": ["tehb"],
     "hdl": "smv"
   },
@@ -629,7 +629,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/br.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/br_dataless.smv",
     "module-name": "br_dataless",
     "hdl": "smv"
   },
@@ -652,7 +652,7 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/smv/handshake/dataless/cond_br.smv",
+    "generic": "$DYNAMATIC/data/smv/handshake/dataless/cond_br_dataless.smv",
     "module-name": "cond_br_dataless",
     "dependencies": ["join"],
     "hdl": "smv"
@@ -682,7 +682,7 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/constant.smv\" constant $VALUE",
+    "generator": "\"$DYNAMATIC/bin/generators/smv-generator\" \"$OUTPUT_DIR/constant_$VALUE.smv\" constant $VALUE",
     "hdl": "smv"
   },
   {

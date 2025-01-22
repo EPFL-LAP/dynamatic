@@ -1,0 +1,10 @@
+
+#include "../../smv/arith/uop.smv"
+MODULE main
+VAR ins : boolean;
+VAR ins_valid : boolean;
+VAR outs_ready : boolean;
+
+VAR
+  instance : uop(ins, ins_valid, outs_ready);
+    
