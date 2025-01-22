@@ -555,7 +555,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                  "yield an invalid buffering.";
         }
         if (resProps.maxOpaque.value_or(1) >= 1) {
-          resProps.minOpaque = std::max(resProps.minOpaque, tehbs);
+          resProps.minOpaque = std::max(resProps.minOpaque, 1U);
         } else {
           mergeLikeOp->emitWarning()
               << "Cannot place opaque buffer on merge-like operation's "
