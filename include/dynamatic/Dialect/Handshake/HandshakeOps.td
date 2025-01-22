@@ -246,6 +246,23 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 }
 
+def NDWireOp : Handshake_Op<"ndwire", [
+  HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
   Handshake_Op<mnemonic, traits # [
     Pure, HasClock, SameOperandsAndResultType,
