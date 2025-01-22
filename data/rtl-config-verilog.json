@@ -387,6 +387,14 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.ndwire",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/ndwire.v",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
