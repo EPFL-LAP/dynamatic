@@ -392,6 +392,14 @@
     "dependencies": ["elastic_fifo_inner"]
   },
   {
+    "name": "handshake.ndwire",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/ndwire.vhd",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
