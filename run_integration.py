@@ -11,9 +11,18 @@ class CLIHandler:
     self.add_arguments()
 
   def add_arguments(self):
-    self.parser.add_argument("-l", "--list")
-    self.parser.add_argument("-i", "--ignore")
-    self.parser.add_argument("-t", "--timeout")
+    self.parser.add_argument(
+      "-l", "--list", 
+      help="Path to a text file with names of tests to run. If not given, runs all tests."
+    )
+    self.parser.add_argument(
+      "-i", "--ignore",
+      help="Path to a text file with names of tests to ignore (i.e. skip)."
+    )
+    self.parser.add_argument(
+      "-t", "--timeout",
+      help="Custom timeout value for a single test. If not given, 500 seconds is used."
+    )
 
   def parse_args(self, args=None):
     """
