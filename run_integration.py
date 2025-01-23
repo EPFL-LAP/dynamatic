@@ -38,8 +38,6 @@ set-src {src_path}
 compile
 write-hdl
 simulate
-write-hdl --hdl verilog
-simulate
 exit
 """
 DYN_FILE = "./build/original_run.dyn"
