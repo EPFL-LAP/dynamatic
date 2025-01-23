@@ -1,4 +1,0 @@
-gcd
-binary_search
-fir
-matrix
