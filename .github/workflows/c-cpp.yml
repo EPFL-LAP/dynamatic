@@ -1,13 +1,10 @@
 name: C/C++ CI
 
 on:
-  push:
-    branches: ["github-actions-test"]
-
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
   pull_request:
-    branches: ["github-actions-test"]
+    branches: ["main"]
 
 jobs:
   integration:
