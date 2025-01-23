@@ -4,13 +4,14 @@ import ast
 
 from generators import *
 
-def generate_code(name, mod_type, parameters):
+def generate_code (name, mod_type, parameters):
     match mod_type:
         case "fork": return generate_fork(name, parameters)
+        case "buffer": return generate_buffer(name, parameters)
         case _ : print(f"Module type {mod_type} not found")
 
 
-def parse_parameters(param_string):
+def parse_parameters (param_string):
     try:
         param_dict = {}
         for pair in param_string.split(','):
