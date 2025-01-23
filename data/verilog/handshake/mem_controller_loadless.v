@@ -40,6 +40,7 @@ module mem_controller_loadless #(
   // Access ports    : circuit to memory_controller;
   // Interface ports : memory_controller to memory_interface (e.g., BRAM/AXI);
 
+  // TODO: The size of this counter should be configurable
   wire [31 : 0] remainingStores;
   // Indicating the store interface port that there is a valid store request
   // (currently not used).

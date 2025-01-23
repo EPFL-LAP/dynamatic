@@ -50,7 +50,7 @@ end entity;
 
 architecture arch of mem_controller_loadless is
   
-  -- TODO: the size of this counter should be configurable
+  -- TODO: The size of this counter should be configurable
   signal remainingStores                    : std_logic_vector(31 downto 0);
   
   -- Indicating the store interface port that there is a valid store request
