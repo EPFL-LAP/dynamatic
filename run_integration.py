@@ -3,7 +3,7 @@ import os
 import sys
 import shutil
 import subprocess
-from random import shuffle
+import re
 
 class CLIHandler:
   def __init__(self):
@@ -59,7 +59,6 @@ def find_files_ext(directory, ext):
         c_files.append(os.path.join(root, file))
   return c_files
 
-
 def write_string_to_file(content, file_path):
   with open(file_path, "w") as file:
     file.write(content)
@@ -68,7 +67,6 @@ def write_string_to_file(content, file_path):
 def read_file(file_path):
   with open(file_path, "r") as file:
     return file.read()
-
 
 def modify_line(file_path, new_first_line, line_number):
   with open(file_path, "r") as file:
@@ -105,6 +103,25 @@ def replace_filename_with(file_path, to_add):
 def append_to_file(filename, text):
   with open(filename, "a") as file:
     file.write(text + "\n")
+
+def get_sim_time(log_path):
+  # Regular expression to match the desired line format
+  pattern = re.compile(r"Time: (\d+) ns")
+    
+  last_time = None
+
+  # Open the file and read it in reverse line order
+  with open(log_path, "r") as file:
+    for line in reversed(file.readlines()):
+      match = pattern.search(line)
+      if match:
+        last_time = int(match.group(1))
+        break
+
+  if last_time is not None:
+    return last_time
+  else:
+    return None
 
 def main():
   cli = CLIHandler()
@@ -147,22 +164,22 @@ def main():
     # Remove previous out directory
     if os.path.isdir(out_dir):
       shutil.rmtree(out_dir)
-
-    # Check whether either the input file works on dynamatic or if it was in the list of files already checked
-    #if c_file in read_file(TEST_CORRECT_FILE):
-    #  continue
     
     # Run test and output result
     result = run_command_with_timeout(DYNAMATIC_COMMAND.format(script_path=DYN_FILE))
     if result == 0:
-      #append_to_file(TEST_CORRECT_FILE, c_file)
-      color_print(f"[PASS] {c_file}", bcolors.OKGREEN)
+      sim_log_path = os.path.join(out_dir, "sim", "report.txt")
+      sim_time = get_sim_time(sim_log_path)
+
+      if sim_time != None: 
+        color_print(f"[PASS] {c_file} (simulation time: {sim_time} ns)", bcolors.OKGREEN)
+      else:
+        color_print(f"[PASS] {c_file}", bcolors.OKGREEN)
+      
       passed_cnt += 1
     elif result == 1:
-      #append_to_file(TESTS_FAIL_FILE, c_file)
       color_print(f"[FAIL] {c_file}", bcolors.FAIL)
     else:
-      #append_to_file(TESTS_FAIL_FILE, c_file)
       color_print(f"[TIMEOUT] {c_file}", bcolors.WARNING)
 
   print(f"** Integration testing finished: passed {passed_cnt}/{test_cnt} tests ({100 * passed_cnt / test_cnt : .2f}% ), {ignored_cnt} ignored **")
