@@ -171,8 +171,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
         }
         // If there are two nodes, it is a wire.
       } else if (currNodes.size() == 2) {
-        fanOut = data->createNode(currNodes.back());
         Node *fanin = data->createNode(currNodes.front());
+        fanOut = data->createNode(currNodes.back());
         fanOut->addFanin(fanin);
         fanin->addFanout(fanOut);
         // If there are three nodes, it is a logic gate. First the nodes are
@@ -196,6 +196,8 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
 
     // Subcircuits. not used for now.
     else if (line.find(".subckt") == 0) {
+      llvm::errs() << "Subcircuits not supported "
+                   << "\n";
       continue;
     }
     // Ends the file.
