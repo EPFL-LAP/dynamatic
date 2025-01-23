@@ -1,28 +1,28 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_buffer (name, params):
-    if params["transparent"]:
+    if "R: 1" in params["timing"]:
         if "slots" in params and params["slots"] > 1:
-            if "data_type" in params:
-                return _generate_tfifo(name, params["slots"], params["data_type"])
-            else:
+            if "data_type" not in params or params["data_type"] == "!handshake.control<>":
                 return _generate_tfifo_dataless(name, params["slots"])
-        else:
-            if "data_type" in params:
-                return _generate_tehb(name, params["data_type"])
             else:
+                return _generate_tfifo(name, params["slots"], params["data_type"])
+        else:
+            if "data_type" not in params or params["data_type"] == "!handshake.control<>":
                 return _generate_tehb_dataless(name)
+            else:
+                return _generate_tehb(name, params["data_type"])
     else:
         if "slots" in params and params["slots"] > 1:
-            if "data_type" in params:
-                return _generate_ofifo(name, params["slots"], params["data_type"])
-            else:
+            if "data_type" not in params or params["data_type"] == "!handshake.control<>":
                 return _generate_ofifo_dataless(name, params["slots"])
-        else:
-            if "data_type" in params:
-                return _generate_oehb(name, params["data_type"])
             else:
+                return _generate_ofifo(name, params["slots"], params["data_type"])
+        else:
+            if "data_type" not in params or params["data_type"] == "!handshake.control<>":
                 return _generate_oehb_dataless(name)
+            else:
+                return _generate_oehb(name, params["data_type"])
 
 def _generate_oehb_dataless (name):
     return f"""
@@ -152,11 +152,11 @@ MODULE {name} (ins, ins_valid, outs_ready)
 
 
 if __name__ == "__main__":
-    print(generate_buffer("test_tfifo", {"transparent" : True, "slots" : 5, "data_type" : "int"}))
-    print(generate_buffer("test_tfifo_dataless", {"transparent" : True, "slots" : 5}))
-    print(generate_buffer("test_tehb", {"transparent" : True, "data_type" : "int"}))
-    print(generate_buffer("test_tehb_dataless", {"transparent" : True}))
-    print(generate_buffer("test_ofifo", {"transparent" : False, "slots" : 5, "data_type" : "int"}))
-    print(generate_buffer("test_ofifo_dataless", {"transparent" : False, "slots" : 5}))
-    print(generate_buffer("test_oehb", {"transparent" : False, "data_type" : "int"}))
-    print(generate_buffer("test_oehb_dataless", {"transparent" : False}))
+    print(generate_buffer("test_tfifo_dataless", {"timing" : "#handshake<timing {{R: 1\}", "slots" : 5}))
+    print(generate_buffer("test_tfifo", {"timing" : "#handshake<timing {{R: 1\}", "slots" : 5, "data_type" : "i32"}))
+    print(generate_buffer("test_tehb_dataless", {"timing" : "#handshake<timing {{R: 1\}"}))
+    print(generate_buffer("test_tehb", {"timing" : "#handshake<timing {{R: 1\}", "data_type" : "i32"}))
+    print(generate_buffer("test_ofifo_dataless", {"timing" : "#handshake<timing {{R: 0\}", "slots" : 5}))
+    print(generate_buffer("test_ofifo", {"timing" : "#handshake<timing {{R: 0\}", "slots" : 5, "data_type" : "i32"}))
+    print(generate_buffer("test_oehb_dataless", {"timing" : "#handshake<timing {{R: 0\}"}))
+    print(generate_buffer("test_oehb", {"timing" : "#handshake<timing {{R: 0\}", "data_type" : "i32"}))
