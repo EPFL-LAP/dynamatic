@@ -68,7 +68,7 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
           maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
         return maxWidth;
       })
-      .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
+      .Case<handshake::LoadOp, handshake::StoreOp>([&](auto) {
         return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
                         getHandshakeTypeBitWidth(op->getOperand(1).getType()));
       })
@@ -124,7 +124,20 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   if (!model)
     return failure();
 
-  return model->latency.getCeilMetric(op, latency);
+  if (failed(model->latency.getCeilMetric(op, latency)))
+    return failure();
+
+  // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
+  // of latency on loads compared to an MC here because our timing models are
+  // currenty unable to account for this. It's obviosuly very bad to
+  // special-case this here so we should find a waay to properly express this
+  // information in our models.
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+    auto memOp = findMemInterface(loadOp.getAddressResult());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      latency += 3;
+  }
+  return success();
 }
 
 LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,

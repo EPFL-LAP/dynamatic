@@ -49,11 +49,11 @@ bool CAnalyser::parseAsArrayType(const string &str, CFunctionParameter &param) {
     param.dims = vector<int>();
     for (auto &dimension : dimensions) {
       int len = 0;
-      if (dimension.substr(0, 2) == "0x") {
+      if (dimension.substr(0, 2) == "0x")
         len = stoi(dimension, nullptr, 16);
-      } else {
+      else
         len = stoi(dimension, nullptr, 10);
-      }
+
       param.dims.push_back(len);
       param.arrayLength *= len;
     }
@@ -213,9 +213,9 @@ string CAnalyser::getActualType(const string &cSrc, string type) {
   string result;
   stream >> result;
   string word;
-  while (stream >> word) {
+  while (stream >> word)
     result = result + " " + word;
-  }
+
   return result;
 }
 
@@ -310,16 +310,16 @@ bool CAnalyser::isFloatType(const string &type) {
 string CAnalyser::getPreprocOutput(const string &cFilePath,
                                    const string &cIncludeDir) {
   string preProcCmd = "gcc -E " + cFilePath + " -I ";
-  if (cIncludeDir.empty()) {
+  if (cIncludeDir.empty())
     preProcCmd += extractParentDirectoryPath(cFilePath);
-  } else {
+  else
     preProcCmd += cIncludeDir;
-  }
+
   preProcCmd += " -o hls_preproc.tmp";
   int status = system(preProcCmd.c_str());
-  if (status != 0) {
+  if (status != 0)
     logErr(LOG_TAG, "Preprocessing failed for " + cFilePath + ".");
-  }
+
   ifstream t("hls_preproc.tmp");
   std::string cSrc((istreambuf_iterator<char>(t)), istreambuf_iterator<char>());
   t.close();
@@ -338,9 +338,8 @@ bool CAnalyser::parseCFunction(const string &cSrc, const string &fuvName,
 
   // m[0] whole pattern, m[1] return type, m[2] param list
 
-  if (!boost::regex_search(cSrc, m, eFuncDec)) {
+  if (!boost::regex_search(cSrc, m, eFuncDec))
     return false;
-  }
 
   string returnType = m[1];
   string paramList = m[4];

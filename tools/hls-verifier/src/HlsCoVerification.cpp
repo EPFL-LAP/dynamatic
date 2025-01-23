@@ -24,10 +24,10 @@ bool runCoverification(vector<string> args) {
   }
 
   vector<string> temp;
-  for (auto &arg : args) {
+  for (auto &arg : args)
     if (arg.empty() || arg[0] != '-')
       temp.push_back(arg);
-  }
+
   args = temp;
 
   string resourceDir = args[0];

@@ -24,8 +24,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -50,8 +50,8 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
   topLevelOp->walk([&](Operation *memOp) {
     // We only care about supported load/store memory accesses
     if (!isa<memref::LoadOp, memref::StoreOp, affine::AffineLoadOp,
-             affine::AffineStoreOp, handshake::LoadOpInterface,
-             handshake::StoreOpInterface>(memOp))
+             affine::AffineStoreOp, handshake::LoadOp, handshake::StoreOp>(
+            memOp))
       return;
 
     // Read potential memory dependencies stored on the memory operation
@@ -85,23 +85,25 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
 // MemoryInterfaceBuilder
 //===----------------------------------------------------------------------===//
 
-void MemoryInterfaceBuilder::addMCPort(Operation *memOp) {
-  std::optional<unsigned> bb = getLogicBB(memOp);
+void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
+  std::optional<unsigned> bb = getLogicBB(portOp);
   assert(bb && "MC port must belong to basic block");
-  if (isa<handshake::MCLoadOp>(memOp)) {
+  if (isa<handshake::LoadOp>(portOp)) {
     ++mcNumLoads;
   } else {
-    assert(isa<handshake::MCStoreOp>(memOp) && "invalid MC port");
+    assert(isa<handshake::StoreOp>(portOp) && "invalid MC port");
   }
-  mcPorts[*bb].push_back(memOp);
+  mcPorts[*bb].push_back(portOp);
 }
 
-void MemoryInterfaceBuilder::addLSQPort(unsigned group, Operation *memOp) {
-  if (isa<handshake::LSQLoadOp>(memOp))
+void MemoryInterfaceBuilder::addLSQPort(unsigned group,
+                                        handshake::MemPortOpInterface portOp) {
+  if (isa<handshake::LoadOp>(portOp)) {
     ++lsqNumLoads;
-  else
-    assert(isa<handshake::LSQStoreOp>(memOp) && "invalid LSQ port");
-  lsqPorts[group].push_back(memOp);
+  } else {
+    assert(isa<handshake::StoreOp>(portOp) && "invalid LSQ port");
+  }
+  lsqPorts[group].push_back(portOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
@@ -109,7 +111,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(builder, memref.getLoc());
 
-  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     loadOp->setOperand(1, dataIn);
   };
   return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
@@ -119,7 +121,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
-  FConnectLoad connect = [&](LoadOpInterface loadOp, Value dataIn) {
+  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
   return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
@@ -205,11 +207,11 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 SmallVector<Value, 2>
 MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
   // For loads, address output goes to memory
-  if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
-    return SmallVector<Value, 2>{loadOp.getAddressOutput()};
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
+    return SmallVector<Value, 2>{loadOp.getAddressResult()};
 
   // For stores, all outputs (address and data) go to memory
-  auto storeOp = dyn_cast<handshake::StoreOpInterface>(memOp);
+  auto storeOp = dyn_cast<handshake::StoreOp>(memOp);
   assert(storeOp && "input operation must either be load or store");
   return SmallVector<Value, 2>{storeOp->getResults()};
 }
@@ -264,7 +266,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   DenseMap<unsigned, unsigned> lsqStoresPerBlock;
   for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
-      if (isa<handshake::LSQStoreOp>(lsqOp)) {
+      if (isa<handshake::StoreOp>(lsqOp)) {
         std::optional<unsigned> block = getLogicBB(lsqOp);
         if (!block)
           return lsqOp->emitError() << "LSQ port must belong to a BB.";
@@ -280,7 +282,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     // to the MC or going through an LSQ
     unsigned numStoresInBlock = lsqStoresPerBlock.lookup(block);
     for (Operation *memOp : mcBlockOps) {
-      if (isa<handshake::MCStoreOp>(memOp))
+      if (isa<handshake::StoreOp>(memOp))
         ++numStoresInBlock;
     }
 
@@ -338,10 +340,9 @@ void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
                                             const FConnectLoad &connect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
-    for (Operation *memOp : memGroupOps) {
-      if (auto loadOp = dyn_cast<handshake::LoadOpInterface>(memOp))
+    for (Operation *memOp : memGroupOps)
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
         connect(loadOp, memIfaceOp->getResult(resIdx++));
-    }
   }
 }
 
@@ -364,6 +365,19 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
+  handshake::LSQDepthAttr lsqDepthAttr =
+      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
+  if (lsqDepthAttr) {
+    depthLoad = lsqDepthAttr.getLoadQueueDepth();
+    depthStore = lsqDepthAttr.getStoreQueueDepth();
+    // "depth" Parameter is theoretically unused, but still needed by the
+    // current LSQGenerator
+    depth = std::max(depthLoad, depthStore);
+  } else {
+    depthLoad = 16;
+    depthStore = 16;
+  }
+
   numGroups = ports.getNumGroups();
   numLoads = ports.getNumPorts<LoadPort>();
   numStores = ports.getNumPorts<StorePort>();
@@ -374,19 +388,45 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     loadsPerGroup.push_back(groupPorts.getNumPorts<LoadPort>());
     storesPerGroup.push_back(groupPorts.getNumPorts<StorePort>());
 
-    // Compute the ffset of first load/store in the group and indices of each
-    // load/store port
+    // Track the numebr of stores and ld idx within a group
+    unsigned numStoresCount = 0, ldIdx = 0;
+
+    // Compute the offset of first load/store in the group and indices of
+    // each load/store port
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
+    unsigned numLoadEntries = groupPorts.getNumPorts<LoadPort>()
+                              ? groupPorts.getNumPorts<LoadPort>()
+                              : 1;
+
+
+    // ldOrderOfOneGroup: the ldOrder of all the loads in one group
+    // Example: ldOrder = [
+    //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this vector
+    //    [1]     
+    // ]
+    SmallVector<unsigned> ldOrderOfOneGroup(numLoadEntries, 0);
+
+    // This for loop has two purposes:
+    // 1. It iterates through all the LDs/STs in a group, for each LD/ST:
+    //   If it is an LD, then it saves how many STs have to 
+    //   complete before it
+    // 2. It records the IDs of the LDs/STs in a group.
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
       if (isa<LoadPort>(accessPort)) {
         if (!firstLoadOffset)
           firstLoadOffset = portIdx;
+
+        // Sets "the number of stores before load[ldIdx]" = numStoresCount
+        ldOrderOfOneGroup[ldIdx++] = numStoresCount;
+
         groupLoadPorts.push_back(loadIdx++);
       } else {
         assert(isa<StorePort>(accessPort) && "port must be load or store");
         if (!firstStoreOffset)
           firstStoreOffset = portIdx;
+
+        numStoresCount++;
         groupStorePorts.push_back(storeIdx++);
       }
     }
@@ -398,6 +438,11 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
 
     loadPorts.push_back(groupLoadPorts);
     storePorts.push_back(groupStorePorts);
+    ldPortIdx.push_back(groupLoadPorts);
+    stPortIdx.push_back(groupStorePorts);
+
+    // Push back the new ldOrder Info
+    ldOrder.push_back(ldOrderOfOneGroup);
   }
 
   /// Adds as many 0s as necessary to the array so that its size equals the
@@ -416,9 +461,25 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
       capArray(array, depth);
   };
 
+  // Add only 1 0 if the size of the array is 0
+  auto extendArray = [&](SmallVector<SmallVector<unsigned>> &inArray) -> void {
+    for (size_t i = 0; i < inArray.size(); i++) {
+      if (inArray[i].size() == 0) {
+        inArray[i].push_back(0);
+      }
+    }
+  };
+
   // Port offsets and index arrays must have length equal to the depth
-  capBiArray(loadOffsets, depth);
-  capBiArray(storeOffsets, depth);
-  capBiArray(loadPorts, depth);
-  capBiArray(storePorts, depth);
+  capBiArray(loadOffsets, depthLoad);
+  capBiArray(storeOffsets, depthStore);
+  capBiArray(loadPorts, depthLoad);
+  capBiArray(storePorts, depthStore);
+
+  // Expand arrays defined for the new lsq config file
+  extendArray(ldPortIdx);
+  extendArray(stPortIdx);
+
+  // Update the index width
+  indexWidth = llvm::Log2_64_Ceil(depthLoad);
 }

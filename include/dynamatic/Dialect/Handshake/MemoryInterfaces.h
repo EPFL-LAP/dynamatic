@@ -98,12 +98,12 @@ public:
   /// access to an MC. The operation must be tagged with the basic block it
   /// belongs to, which will be used to determine with which other MC ports this
   /// one belongs.
-  void addMCPort(Operation *memOp);
+  void addMCPort(handshake::MemPortOpInterface portOp);
 
   /// Adds an access port to a specific LSQ group. The operation must be a load
   /// or store access to an LSQ. The operation must be tagged with the basic
   /// block it belongs to.
-  void addLSQPort(unsigned group, Operation *memOp);
+  void addLSQPort(unsigned group, handshake::MemPortOpInterface portOp);
 
   /// Instantiates appropriate memory interfaces for all the ports that were
   /// added to the builder so far. This may insert no interface, a single MC, a
@@ -185,7 +185,7 @@ private:
   /// value exists for the block.
   Value getCtrl(unsigned block);
 
-  using FConnectLoad = std::function<void(handshake::LoadOpInterface, Value)>;
+  using FConnectLoad = std::function<void(handshake::LoadOp, Value)>;
 
   /// For a provided memory interface and its memory ports, invoke the load
   /// connection callback for all load-like operations with successive results
@@ -225,6 +225,45 @@ struct LSQGenerationInfo {
   SmallVector<SmallVector<unsigned>> loadPorts, storePorts;
   /// Depth of queues within the LSQ.
   unsigned depth = 16, depthLoad = 16, depthStore = 16, bufferDepth = 0;
+  /// Below are params needed by the new LSQ config file
+  /// Number of channels at memory interface
+  unsigned numLdChannels = 1, numStChannels = 1;
+  /// Number of bits for ID in the memory interface
+  unsigned indexWidth = 6;
+  /// Indicate whether the store response channel 
+  /// in store access port is enabled
+  unsigned stResp = 0;
+  /// Indicate whether the multiple groups are allowed
+  /// to request an allocation at the same cycle
+  unsigned groupMulti = 0;
+  /// Indicate whether pipeline registers are inserted
+  unsigned pipe0En = 0, pipe1En = 0, pipeCompEn = 0;
+  /// Indicate whether the head pointer of the load queue is
+  /// updated one cycle later than the valid bits of entries
+  unsigned headLagEn = 0; 
+
+  // Configurations needed for the new lsq design
+  // LdOrder indicates for each load entry in each group, 
+  // which store entries need to be completed before this 
+  // load is issued. Foe example:
+  // Group 0: {st0, ld0, st1, ld1}
+  // Group 1: {st2, ld2, st3}
+  // Then we have the following configuration for the ldOrder
+  // ldOrder = [
+  //    [1, 2], (in group 0: there is a store before ld0 and two stores before ld1)
+  //    [1]     (in group 1: there is a store before ld2)
+  // ]
+  SmallVector<SmallVector<unsigned>> ldOrder;
+  // Ports indices for store and load ports
+  // which contain the same information as the previous two 2d vectors, just no
+  // padding included.
+  // Following the example above, we have the following configuration for stPortIdx
+  // stPortIdx = [
+  //    [0, 1], (two st in group 0)
+  //    [2, 3]  (two st in group 1)
+  // ]
+  // ldPortIdx follows the same pattern
+  SmallVector<SmallVector<unsigned>> ldPortIdx, stPortIdx;
 
   /// Derives generation information for the provided LSQ.
   LSQGenerationInfo(handshake::LSQOp lsqOp, StringRef name = "LSQ");

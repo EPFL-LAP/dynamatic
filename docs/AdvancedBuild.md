@@ -5,6 +5,42 @@ This document contains advanced build instructions targeted at users who would l
 > [!NOTE]
 > In the instructions below, we assume that you have already cloned Dynamatic and its submodules and that the project is rooted in a folder called `dynamatic`. Whenever provided shell commands contain `cd dynamatic`, it refers to this directory created during cloning. Adjust paths as needed depending on your current working directory.  
 
+
+## Gurobi
+
+##### Why do we need Gurobi?
+Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. 
+
+##### Download Gurobi
+Gurobi is available for Linux [here](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The resulting downloaded file will be `gurobiXX.X.X_linux64.tar.gz`.
+
+##### Obtain a license
+Free academic licenses for Gurobi are available [here](https://www.gurobi.com/academia/academic-program-and-licenses/). 
+
+##### Installation
+To install Gurobi, first extract your downloaded file to your desired installation directory.
+We recommend to place this in`/opt/`, e.g. `/opt/gurobiXXXX/linux64/` (with XXXX as the downloaded version).
+
+Using the following command:
+```sh
+# Replace x's with obtained license
+/opt/gurobiXXXX/linux64/bin/grbgetkey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
+```
+to pass your obtained license to Gurobi, which it stores in `~/gurobi.lic`.
+
+##### Configuring your environment
+
+In addition to adding Gurobi to your path, Dynamatic's CMake requires the `GUROBI_HOME` environment variable to find headers and libraries.
+
+```sh
+# Replace "gurobiXXXX" with the correct version
+export GUROBI_HOME="/opt/gurobiXXXX/linux64"
+export PATH="${GUROBI_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:$LD_LIBRARY_PATH"
+```
+
+These lines can be added to your shell initiation script, e.g. `~/.bashrc` or `~/.zshrc`, or used with any other environment setup method.
+
 ## Cloning
 
 The repository is set up so that Polygeist and LLVM are shallow cloned by default, meaning the clone command downloads just enough of them to check out currently specified commits. If you wish to work with the full history of these repositories, you can manually unshallow them after cloning.
@@ -57,7 +93,7 @@ The build script builds the entire project in *Debug* mode by default, which ena
 
 ### Multi-threaded builds
 
-By default, *Ninja* builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly or making you run out of RAM (especially during linking of LLVM/MLIR). You can customize the maximum number of concurrent threads that are used to build the project using the `--threads` argument.
+By default, *Ninja* builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly. You can customize the maximum number of concurrent threads that are used to build the project using the `--threads` argument.
 
 ```sh
 # Build using at most one thread per logical core on your machine
@@ -68,6 +104,14 @@ By default, *Ninja* builds the project by concurrently using at most one thread 
 # Build using at most 4 concurrent threads
 ./build.sh --threads 4
 ```
+
+It is also common to run out of RAM especially during linking of LLVM/MLIR. If this is a problem, consider limiting the maximum number of parallel LLVM link jobs to one per 15GB of available RAM, using the `--llvm-parallel-link-jobs` flag:
+```sh
+# Perform at most 1 concurrent LLVM link jobs
+./build.sh --llvm-parallel-link-jobs 1
+```
+
+Note that this flag defaults to a value of `2`
 
 ### Forcing CMake re-configuration
 

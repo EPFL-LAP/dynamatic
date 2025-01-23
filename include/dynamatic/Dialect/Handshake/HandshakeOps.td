@@ -503,8 +503,15 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   }];
 
   let results = (outs ControlType:$result);
-  
-  let assemblyFormat = "attr-dict";
+
+  let builders = [
+    // Unless otherwise specified, output type is SimpleControl
+    OpBuilder<(ins), [{
+      $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
+    }]>
+  ];
+
+  let assemblyFormat = "attr-dict `:` type($result)";
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -596,20 +603,26 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     3. Control signal indicating completion.
     ```
   }];
-  
-  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
-                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
+
+  // The memory controller does not accept ControlTypes with extra signals.
+  // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
+  // (at least in speculative execution scenarios)
+  // TODO: Discuss the change of ChannelTypes to SimpleChannels
+  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
+                       Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
+  let results = (outs Variadic<SimpleChannel>:$outputs, SimpleControl:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
+
+  // Dispatch SimpleControl signals to custom print and parse
   let assemblyFormat = [{
     `[` $memRef `:` type($memRef) `]` $memStart ` ` `(` $inputs `)` $ctrlEnd
-    attr-dict `:` functional-type($inputs, $outputs)
+    attr-dict `:` custom<SimpleControl>(type($memStart)) custom<SimpleControl>(type($memEnd)) custom<SimpleControl>(type($ctrlEnd)) functional-type($inputs, $outputs)
   }];
 
   let extraClassDeclaration = [{
@@ -726,8 +739,9 @@ def LSQOp : Handshake_Op<"lsq", [
 // Memory ports
 //===----------------------------------------------------------------------===//
 
-class Handshake_MemPortOp<string mnemonic, Trait PortInterface> :
-  Handshake_Op<mnemonic, [PortInterface] # [
+class Handshake_MemPortOp<string mnemonic> :
+  Handshake_Op<mnemonic, [
+    MemPortOpInterface,
     AllTypesMatch<["address", "addressResult"]>,
     AllTypesMatch<["data", "dataResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -740,9 +754,41 @@ class Handshake_MemPortOp<string mnemonic, Trait PortInterface> :
   }];
 }
 
-class Handshake_LoadOp<string mnemonic> :
-  Handshake_MemPortOp<mnemonic, LoadOpInterface> {
-  let builders = [OpBuilder<(ins "MemRefType":$memrefType, "Value":$address)>];
+def LoadOp : Handshake_MemPortOp<"load"> {
+  let summary = "load port for memory interface";
+  let description = [{
+    Represents a load memory port which sends load requests to a memory
+    interface. It receives an address from a dataflow predecessor and a data
+    value from the memory interface that eventually holds the loaded data. It
+    returns an address that is sent to the memory interface as well as a data
+    value that is sent to its dataflow successor.
+
+    The order of operands is
+    1. address (from predecessor)
+    2. data value (from memory interface)
+
+    The order of results is
+    1. address (to memory interface).
+    2. data value (to successor)
+
+    Example:
+
+    ```mlir
+    %addrOut, %dataOut = load [%addrIn] %dataFromMem : <i32>, <i32>
+    ```
+  }];
+
+  let builders = [
+    OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
+      // Address (data operand needs to be added later)
+      $_state.addOperands(address);
+
+      // Data and address results
+      $_state.types.push_back(address.getType());
+      $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+        memrefType.getElementType()));
+    }]>
+  ];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
@@ -757,8 +803,29 @@ class Handshake_LoadOp<string mnemonic> :
   }];
 }
 
-class Handshake_StoreOp<string mnemonic> :
-  Handshake_MemPortOp<mnemonic, StoreOpInterface> {
+def StoreOp : Handshake_MemPortOp<"store"> {
+  let summary = "store operation for memory controller (MC)";
+  let description = [{
+    Represents a store memory port which sends store requests to a memory
+    interface. It receives an address and a data value to store in memory from
+    its dataflow predecessors. It returns the value to store and an address,
+    both of which are sent to the memory interface.
+
+    The order of operands is
+    1. address (from predecessor)
+    2. data value (from predecessor)
+
+    The order of results is
+    1. address (to memory interface).
+    2. data value (to memory interface)
+
+    Example:
+
+    ```mlir
+    %addrOut, %dataToMem = store [%addrIn] %dataIn : <i32>, <i32>
+    ```
+  }];
+
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned int idx) {
       return (idx == 0) ? "addrIn" : "dataIn";
@@ -767,106 +834,6 @@ class Handshake_StoreOp<string mnemonic> :
     std::string $cppClass::getResultName(unsigned int idx) {
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
-  }];
-}
-
-def MCLoadOp : Handshake_LoadOp<"mc_load"> {
-  let summary = "load operation for memory controller (MC)";
-  let description = [{
-    Represents a load memory port which sends load requests to a memory
-    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an
-    address from a dataflow predecessor and a data value from the memory
-    interface that eventually holds the loaded data. It returns an address that
-    is sent to the memory interface as well as a data value that is sent to its
-    dataflow successor.
-
-    The order of operands is
-    1. address (from predecessor)
-    2. data value (from memory interface)
-
-    The order of results is
-    1. address (to memory interface).
-    2. data value (to successor)
-
-    Example:
-
-    ```mlir
-    %addrOut, %dataOut = mc_load [%addrIn] %dataFromMem : <i32>, <i32>
-    ```
-  }];
-}
-
-def LSQLoadOp : Handshake_LoadOp<"lsq_load"> {
-  let summary = "load operation for load-store queue (LSQ)";
-  let description = [{
-    Represents a load memory port which sends load requests to an LSQ
-    (`dynamatic::handshake::LSQOp`). It receives an address from a dataflow
-    predecessor and a data value from the memory interface that eventually holds
-    the loaded data. It returns an address that is sent to the memory interface
-    as well as a data value that is sent to its dataflow successor.
-
-    The order of operands is
-    1. address (from predecessor)
-    2. data value (from memory interface)
-
-    The order of results is
-    1. address (to memory interface).
-    2. data value (to successor)
-
-    Example:
-
-    ```mlir
-    %addrOut, %dataOut = lsq_load [%addrIn] %dataFromMem : <i32>, <i32>
-    ```
-  }];
-}
-
-def MCStoreOp : Handshake_StoreOp<"mc_store"> {
-  let summary = "store operation for memory controller (MC)";
-  let description = [{
-    Represents a store memory port which sends store requests to a memory
-    controller (`dynamatic::handshake::MemoryControllerOp`). It receives an
-    address and a data value to store in memory from its dataflow predecessors.
-    It returns the value to store and an address, both of which are sent to the
-    memory interface.
-
-    The order of operands is
-    1. address (from predecessor)
-    2. data value (from predecessor)
-
-    The order of results is
-    1. address (to memory interface).
-    2. data value (to memory interface)
-
-    Example:
-
-    ```mlir
-    %addrOut, %dataToMem = mc_load [%addrIn] %dataIn : <i32>, <i32>
-    ```
-  }];
-}
-
-def LSQStoreOp : Handshake_StoreOp<"lsq_store"> {
-  let summary = "store operation for load-store queue (LSQ)";
-  let description = [{
-    Represents a store memory port which sends store requests to an LSQ
-    (`dynamatic::handshake::LSQOp`). It receives an address and a data value to
-    store in memory from its dataflow predecessors. It returns the value to
-    store and an address, both of which are sent to the memory interface.
-
-    The order of operands is
-    1. address (from predecessor)
-    2. data value (from predecessor)
-
-    The order of results is
-    1. address (to memory interface).
-    2. data value (to memory interface)
-
-    Example:
-
-    ```mlir
-    %addrOut, %dataToMem = lsq_load [%addrIn] %dataIn : <i32>, <i32>
-    ```
   }];
 }
 
@@ -1139,6 +1106,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let skipDefaultBuilders = 1;
   let builders = [
+    // Builder for bundling ControlType
     OpBuilder<(ins "::mlir::Value":$valid), [{
       mlir::Type validReadyType = $_builder.getIntegerType(1);
       assert(valid.getType() == validReadyType && "incorrect valid signal");
@@ -1149,6 +1117,7 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
         validReadyType
       });
     }]>,
+    // Builder for bundling ChannelType
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)
@@ -1196,7 +1165,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$channelLike,
+  let arguments = (ins ChannelOrSimpleControl:$channelLike,
                        Variadic<SignalType>: $upstreams);
   let results = (outs Variadic<AnyType>:$signals);
 

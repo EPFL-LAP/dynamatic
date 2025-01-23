@@ -261,7 +261,7 @@
       }
     }
   },
-  "handshake.mc_load": {
+  "handshake.load": {
     "latency": {
       "64": 1.0
     },
@@ -328,7 +328,7 @@
       }
     }
   },
-  "handshake.mc_store": {
+  "handshake.store": {
     "latency": {
       "64": 0.0
     },
@@ -343,128 +343,6 @@
         "1": 1.4
       },
       "VR": 1.409,
-      "CV": 0,
-      "CR": 0,
-      "VC": 0,
-      "VD": 0
-    },
-    "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    },
-    "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    }
-  },
-  "handshake.lsq_load": {
-    "latency": {
-      "64": 5.0
-    },
-    "delay": {
-      "data": {
-        "64": 0.0
-      },
-      "valid": {
-        "1": 0.0
-      },
-      "ready": {
-        "1": 0.0
-      },
-      "VR": 0,
-      "CV": 0,
-      "CR": 0,
-      "VC": 0,
-      "VD": 0
-    },
-    "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    },
-    "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
-      "delay": {
-        "data": {
-          "64": 0
-        },
-        "valid": {
-          "1": 0
-        },
-        "ready": {
-          "1": 0
-        },
-        "VR": 0,
-        "CV": 0,
-        "CR": 0,
-        "VC": 0,
-        "VD": 0
-      }
-    }
-  },
-  "handshake.lsq_store": {
-    "latency": {
-      "64": 0.0
-    },
-    "delay": {
-      "data": {
-        "64": 0.0
-      },
-      "valid": {
-        "1": 0.0
-      },
-      "ready": {
-        "1": 0.0
-      },
-      "VR": 0,
       "CV": 0,
       "CR": 0,
       "VC": 0,
@@ -574,7 +452,7 @@
   },
   "handshake.addf": {
     "latency": {
-      "64": 10.0
+      "64": 9.0
     },
     "delay": {
       "data": {
@@ -635,7 +513,7 @@
   },
   "handshake.subf": {
     "latency": {
-      "64": 10.0
+      "64": 9.0
     },
     "delay": {
       "data": {
@@ -696,7 +574,7 @@
   },
   "handshake.mulf": {
     "latency": {
-      "64": 6.0
+      "64": 4.0
     },
     "delay": {
       "data": {
@@ -940,7 +818,7 @@
   },
   "handshake.cmpf": {
     "latency": {
-      "64": 2.0
+      "64": 0.0
     },
     "delay": {
       "data": {

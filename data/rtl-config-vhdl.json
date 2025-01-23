@@ -540,7 +540,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/merge.vhd",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["types", "tehb", "merge_notehb"]
   },
   {
     "name": "handshake.br",
@@ -604,38 +604,22 @@
     "generator": "\"$DYNAMATIC/bin/generators/rtl-text-generator\" \"$DYNAMATIC/data/vhdl/handshake/constant.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" ENTITY_NAME $MODULE_NAME VALUE $VALUE"
   },
   {
-    "name": "handshake.mc_load",
+    "name": "handshake.load",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/mc_load.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/handshake/load.vhd",
     "dependencies": ["tehb"]
   },
   {
-    "name": "handshake.lsq_load",
+    "name": "handshake.store",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/lsq_load.vhd"
-  },
-  {
-    "name": "handshake.mc_store",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/mc_store.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/handshake/store.vhd",
     "dependencies": ["join"]
-  },
-  {
-    "name": "handshake.lsq_store",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/lsq_store.vhd"
   },
   {
     "name": "handshake.mem_controller",
@@ -675,9 +659,9 @@
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "generator": "/usr/bin/env python3 $DYNAMATIC/tools/backend/lsq-generator-python/lsq-generator.py -o $OUTPUT_DIR -c $OUTPUT_DIR/$MODULE_NAME.json",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
-    "hdl": "verilog",
+    "hdl": "vhdl",
     "io-kind": "flat",
     "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
     "io-signals": {
@@ -686,14 +670,21 @@
   },
   {
     "name": "handshake.sharing_wrapper",
-    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"" ,
+    "generator": "\"$DYNAMATIC/bin/generators/exp-sharing-wrapper-generator\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME \"$CREDITS\" \"$NUM_SHARED_OPERANDS\" \"$DATA_WIDTH\" \"$LATENCY\"",
     "parameters": [
       { "name": "CREDITS", "type": "string" },
-      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb" : 1},
-      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq" : 0},
-      { "name": "LATENCY", "type": "unsigned", "lb": 1}
+      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "LATENCY", "type": "unsigned", "lb": 1 }
     ],
-    "dependencies": ["logic", "types", "sharing_support", "ofifo", "tfifo", "lazy_fork"]
+    "dependencies": [
+      "logic",
+      "types",
+      "sharing_support",
+      "ofifo",
+      "tfifo",
+      "lazy_fork"
+    ]
   },
   {
     "name": "handshake.join",
@@ -757,6 +748,6 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
-    "dependencies" : ["types"]
+    "dependencies": ["types"]
   }
 ]
