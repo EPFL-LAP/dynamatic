@@ -22,5 +22,5 @@ jobs:
         run: ./build.sh --release
 
       - name: integration-test
-        run: bin/dynamatic --run tools/dynamatic/samples/integration.dyn
+        run: python3 run_integration.py --list integration-test/integration_list.txt --ignore integration-test/ignored_tests.txt
 
