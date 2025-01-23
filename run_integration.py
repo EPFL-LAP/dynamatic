@@ -80,7 +80,7 @@ def modify_line(file_path, new_first_line, line_number):
   with open(file_path, "w") as file:
     file.writelines(lines)
 
-def run_command_with_timeout(command, timeout=220):
+def run_command_with_timeout(command, timeout=500):
   try:
     proc = subprocess.run(
       command,
