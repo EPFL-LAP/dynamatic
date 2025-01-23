@@ -27,7 +27,7 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
-class BlifData;
+class LogicNetwork;
 
 struct MILPVarsSubjectGraph {
   GRBVar tIn;
@@ -50,7 +50,7 @@ struct MILPVarsSubjectGraph {
 ///
 /// The class integrates with MILP through the gurobiVars member for buffer
 /// placement.
-class AigNode {
+class Node {
 private:
   std::string name;
   bool isChannelEdge = false;
@@ -62,19 +62,19 @@ private:
   bool isConstZeroBool = false;
   bool isConstOneBool = false;
   std::string function;
-  std::set<AigNode *> fanins = {};
-  std::set<AigNode *> fanouts = {};
+  std::set<Node *> fanins = {};
+  std::set<Node *> fanouts = {};
 
 public:
   MILPVarsSubjectGraph *gurobiVars;
 
-  AigNode() = default;
-  AigNode(const std::string &name)
+  Node() = default;
+  Node(const std::string &name)
       : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
-  AigNode(const std::string &name, BlifData *parent)
+  Node(const std::string &name, LogicNetwork *parent)
       : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
 
-  AigNode &operator=(const AigNode &other) {
+  Node &operator=(const Node &other) {
     if (this == &other) {
       // Handle self-assignment
       return *this;
@@ -108,7 +108,7 @@ public:
     return *this;
   }
 
-  ~AigNode() {
+  ~Node() {
     delete gurobiVars;
     fanins.clear();
     fanouts.clear();
@@ -141,33 +141,33 @@ public:
   bool isConstOne() const { return isConstOneBool; }
   const std::string &getFunction() const { return function; }
 
-  std::set<AigNode *> &getFanins() { return fanins; }
-  std::set<AigNode *> &getFanouts() { return fanouts; }
+  std::set<Node *> &getFanins() { return fanins; }
+  std::set<Node *> &getFanouts() { return fanouts; }
 
-  void addFanin(AigNode *node) { fanins.insert(node); }
-  void addFanout(AigNode *node) { fanouts.insert(node); }
-  void addFanin(std::set<AigNode *> &nodes) {
+  void addFanin(Node *node) { fanins.insert(node); }
+  void addFanout(Node *node) { fanouts.insert(node); }
+  void addFanin(std::set<Node *> &nodes) {
     fanins.insert(nodes.begin(), nodes.end());
   }
-  void addFanout(std::set<AigNode *> &nodes) {
+  void addFanout(std::set<Node *> &nodes) {
     fanouts.insert(nodes.begin(), nodes.end());
   }
 
-  bool operator==(const AigNode &other) const { return name == other.name; }
-  bool operator==(const AigNode *other) const { return name == other->name; }
-  bool operator!=(const AigNode &other) const { return name != other.name; }
-  bool operator<(const AigNode &other) const { return name < other.name; }
-  bool operator<(const AigNode *other) const { return name < other->name; }
-  bool operator>(const AigNode &other) const { return name > other.name; }
+  bool operator==(const Node &other) const { return name == other.name; }
+  bool operator==(const Node *other) const { return name == other->name; }
+  bool operator!=(const Node &other) const { return name != other.name; }
+  bool operator<(const Node &other) const { return name < other.name; }
+  bool operator<(const Node *other) const { return name < other->name; }
+  bool operator>(const Node &other) const { return name > other.name; }
   std::string str() const { return name; }
 
-  friend class BlifData;
+  friend class LogicNetwork;
 };
 
-/// Custom comparator for AigNode pointers using node names. Required for
+/// Custom comparator for Node pointers using node names. Required for
 /// unordered_map.
 struct PointerCompare {
-  bool operator()(const AigNode *lhs, const AigNode *rhs) const {
+  bool operator()(const Node *lhs, const Node *rhs) const {
     return lhs->getName() < rhs->getName();
   }
 };
@@ -184,24 +184,24 @@ struct PointerCompare {
 ///
 /// Node uniqueness is enforced through automatic name conflict resolution.
 /// Memory ownership of nodes is maintained by this class through the nodes map.
-class BlifData {
+class LogicNetwork {
 private:
-  std::unordered_map<AigNode *, AigNode *, boost::hash<AigNode *>> latches;
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> latches;
   std::string moduleName;
-  std::unordered_map<std::string, AigNode *> nodes;
-  std::vector<AigNode *> nodesTopologicalOrder;
+  std::unordered_map<std::string, Node *> nodes;
+  std::vector<Node *> nodesTopologicalOrder;
   std::unordered_map<std::string, std::set<std::string>> submodules;
 
 public:
-  BlifData() = default;
+  LogicNetwork() = default;
 
   /// Adds a latch to the circuit data structure.
-  void addLatch(AigNode *input, AigNode *output) { latches[input] = output; }
+  void addLatch(Node *input, Node *output) { latches[input] = output; }
 
   /// Adds a node to the circuit data structure, resolving name conflicts. If a
   /// node with the same name already exists, counter value is appended to the
   /// name.
-  AigNode *addNode(AigNode *node) {
+  Node *addNode(Node *node) {
     static unsigned int counter = 0;
     if (nodes.find(node->getName()) != nodes.end()) {
       if (node->isChannelEdgeNode()) {
@@ -215,31 +215,30 @@ public:
 
   /// Creates a new Node and returns it. If a Node with the same name already
   /// exists, the existing Node is returned.
-  AigNode *createNode(const std::string &name) {
+  Node *createNode(const std::string &name) {
     if (nodes.find(name) != nodes.end()) {
       return nodes[name]; // Return existing node if name is already used
     }
-    nodes[name] = new AigNode(name, this);
+    nodes[name] = new Node(name, this);
     return nodes[name];
   }
 
   // Finds the path from "start" to "end" using bfs.
-  std::vector<AigNode *> findPath(AigNode *start, AigNode *end);
+  std::vector<Node *> findPath(Node *start, Node *end);
 
   // Implements the "Cutless FPGA Mapping" algorithm.Returns the nodes in the
   // circuit that can be implemented with "limit" number of nodes from the set
   // "wavyLine". For example, if the limit is 6 (6-input LUT), returns all the
   // nodes that can be implemented with 6 Nodes from wavyLine set.
-  std::set<AigNode *>
-  findNodesWithLimitedWavyInputs(size_t limit, std::set<AigNode *> &wavyLine);
+  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
+                                                  std::set<Node *> &wavyLine);
 
   // Helper function for findNodesWithLimitedWavyInputs. Finds the wavy inputs
   // using dfs.
-  std::set<AigNode *> findWavyInputsOfNode(AigNode *node,
-                                           std::set<AigNode *> &wavyLine);
+  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
 
   // Retrieves the node with the given name.
-  AigNode *getNodeByName(const std::string &name) {
+  Node *getNodeByName(const std::string &name) {
     auto it = nodes.find(name);
     if (it != nodes.end()) {
       return it->second;
@@ -248,8 +247,8 @@ public:
   }
 
   // Returns all of the Aig Nodes.
-  std::set<AigNode *> getAllNodes() {
-    std::set<AigNode *> result;
+  std::set<Node *> getAllNodes() {
+    std::set<Node *> result;
     for (auto &pair : nodes) {
       result.insert(pair.second);
     }
@@ -257,16 +256,15 @@ public:
   }
 
   // Returns latch map.
-  std::unordered_map<AigNode *, AigNode *, boost::hash<AigNode *>>
-  getLatches() const {
+  std::unordered_map<Node *, Node *, boost::hash<Node *>> getLatches() const {
     return latches;
   }
 
   // Returns the Primary Inputs by looping over all the AigNodes and checking if
   // they are Primary Inputs by calling isPrimaryInput member function from
-  // AigNode class.
-  std::set<AigNode *> getPrimaryInputs() {
-    std::set<AigNode *> result;
+  // Node class.
+  std::set<Node *> getPrimaryInputs() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isPrimaryInput()) {
         result.insert(pair.second);
@@ -277,9 +275,9 @@ public:
 
   // Returns the Primary Outputs by looping over all the AigNodes and checking
   // if they are Primary Outputs by calling isPrimaryOutput member function from
-  // AigNode class.
-  std::set<AigNode *> getPrimaryOutputs() {
-    std::set<AigNode *> result;
+  // Node class.
+  std::set<Node *> getPrimaryOutputs() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isPrimaryOutput()) {
         result.insert(pair.second);
@@ -289,8 +287,8 @@ public:
   }
 
   // Returns the Nodes that correspond to Dataflow Graph Channels Edges.
-  std::set<AigNode *> getChannels() {
-    std::set<AigNode *> result;
+  std::set<Node *> getChannels() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isChannelEdgeNode()) {
         result.insert(pair.second);
@@ -300,12 +298,12 @@ public:
   }
 
   // Returns the AigNodes in topological order. Nodes were sorted in topological
-  // order when BlifData class is instantiated.
-  std::vector<AigNode *> getNodesInOrder() { return nodesTopologicalOrder; }
+  // order when LogicNetwork class is instantiated.
+  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
 
   // Returns Inputs of the Blif file.
-  std::set<AigNode *> getInputs() {
-    std::set<AigNode *> result;
+  std::set<Node *> getInputs() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isInput()) {
         result.insert(pair.second);
@@ -315,8 +313,8 @@ public:
   }
 
   // Returns Outputs of the Blif file.
-  std::set<AigNode *> getOutputs() {
-    std::set<AigNode *> result;
+  std::set<Node *> getOutputs() {
+    std::set<Node *> result;
     for (const auto &pair : nodes) {
       if (pair.second->isOutput()) {
         result.insert(pair.second);
@@ -334,18 +332,19 @@ public:
   }
 
   // Helper function for traverseNodes. Sorts the Nodes using dfs.
-  void traverseUtil(AigNode *node, std::set<AigNode *> &visitedNodes);
+  void traverseUtil(Node *node, std::set<Node *> &visitedNodes);
 
   // Traverses the nodes, sorting them into topological order from
   // Primary Inputs to Primary Outputs.
   void traverseNodes();
 };
 
-/// Parses Berkeley Logic Interchange Format (BLIF) files into BlifData class.
+/// Parses Berkeley Logic Interchange Format (BLIF) files into LogicNetwork
+/// class.
 class BlifParser {
 public:
   BlifParser() = default;
-  experimental::BlifData *parseBlifFile(const std::string &filename);
+  experimental::LogicNetwork *parseBlifFile(const std::string &filename);
 };
 
 } // namespace experimental
