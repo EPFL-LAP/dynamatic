@@ -4,9 +4,10 @@ on:
   push:
     branches: ["github-actions-test"]
 
-  # We must not run on pull requests due to security concerns!
-  # pull_request:
-  #  branches: ["master"]
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["github-actions-test"]
 
 jobs:
   build:
@@ -16,7 +17,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # clean: false
 
       - name: build
         run: ./build.sh --release
