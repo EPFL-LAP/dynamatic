@@ -36,21 +36,18 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
 #include <cctype>
-#include <charconv>
 #include <cstdint>
 #include <iterator>
 #include <string>
-
-#define DEBUG_TYPE "HandshakeToHW"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -58,6 +55,21 @@ using namespace dynamatic::handshake;
 
 /// Name of ports representing the clock and reset signals.
 static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
+
+/// Converts all ExtraSignal types to signless integer.
+static SmallVector<ExtraSignal>
+lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
+  SmallVector<ExtraSignal> newExtraSignals;
+  for (const ExtraSignal &extra : extraSignals) {
+    unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
+
+    // Convert to integer with the same bit width
+    Type newType = IntegerType::get(extra.type.getContext(), extraWidth);
+
+    newExtraSignals.emplace_back(extra.name, newType, extra.downstream);
+  }
+  return newExtraSignals;
+}
 
 /// Makes all (nested) types signless IntegerType's of the same width as the
 /// original type. At the HW/RTL level we treat everything as opaque bitvectors,
@@ -70,20 +82,21 @@ static Type lowerType(Type type) {
         unsigned width = channelType.getDataBitWidth();
         Type dataType = IntegerType::get(type.getContext(), width);
 
-        // Make sure all extra signals are signless IntegerType's as well
-        SmallVector<ExtraSignal> extraSignals;
-        for (const ExtraSignal &extra : channelType.getExtraSignals()) {
-          unsigned extraWidth = extra.type.getIntOrFloatBitWidth();
-          Type newType = IntegerType::get(type.getContext(), extraWidth);
-          extraSignals.emplace_back(extra.name, newType, extra.downstream);
-        }
+        // Convert all ExtraSignals to signless integer
+        SmallVector<ExtraSignal> extraSignals =
+            lowerExtraSignals(channelType.getExtraSignals());
         return handshake::ChannelType::get(dataType, extraSignals);
       })
       .Case<FloatType, IntegerType>([](auto type) {
         unsigned width = type.getIntOrFloatBitWidth();
         return IntegerType::get(type.getContext(), width);
       })
-      .Case<handshake::ControlType>([](auto type) { return type; })
+      .Case<handshake::ControlType>([](handshake::ControlType type) {
+        // Convert all ExtraSignals to signless integer
+        SmallVector<ExtraSignal> extraSignals =
+            lowerExtraSignals(type.getExtraSignals());
+        return handshake::ControlType::get(type.getContext(), extraSignals);
+      })
       .Default([](auto type) { return nullptr; });
 }
 
@@ -501,16 +514,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // No discrimianting parameters, just to avoid falling into the
         // default case for sources
       })
-      .Case<handshake::LoadOpInterface>([&](handshake::LoadOpInterface loadOp) {
-        // Data bitwidth and address bitwidth
-        addType("DATA_TYPE", loadOp.getDataInput());
-        addType("ADDR_TYPE", loadOp.getAddressInput());
-      })
-      .Case<handshake::StoreOpInterface>(
-          [&](handshake::StoreOpInterface storeOp) {
+      .Case<handshake::MemPortOpInterface>(
+          [&](handshake::MemPortOpInterface portOp) {
             // Data bitwidth and address bitwidth
-            addType("DATA_TYPE", storeOp.getDataInput());
-            addType("ADDR_TYPE", storeOp.getAddressInput());
+            addType("DATA_TYPE", portOp.getDataInput());
+            addType("ADDR_TYPE", portOp.getAddressInput());
           })
       .Case<handshake::SharingWrapperOp>(
           [&](handshake::SharingWrapperOp sharingWrapperOp) {
@@ -694,6 +702,19 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addBiArrayIntAttr("storeOffsets", genInfo.storeOffsets);
         addBiArrayIntAttr("loadPorts", genInfo.loadPorts);
         addBiArrayIntAttr("storePorts", genInfo.storePorts);
+        /// Add the attributes needed by the new lsq config file
+        addBiArrayIntAttr("ldOrder", genInfo.ldOrder);
+        addBiArrayIntAttr("ldPortIdx", genInfo.ldPortIdx);
+        addBiArrayIntAttr("stPortIdx", genInfo.stPortIdx);
+        addUnsigned("indexWidth", genInfo.indexWidth);
+        addUnsigned("numLdChannels", genInfo.numLdChannels);
+        addUnsigned("numStChannels", genInfo.numStChannels);
+        addUnsigned("stResp", genInfo.stResp);
+        addUnsigned("groupMulti", genInfo.groupMulti);
+        addUnsigned("pipe0En", genInfo.pipe0En);
+        addUnsigned("pipe1En", genInfo.pipe1En);
+        addUnsigned("pipeCompEn", genInfo.pipeCompEn);
+        addUnsigned("headLagEn", genInfo.headLagEn);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
@@ -1720,10 +1741,8 @@ public:
                     ConvertToHWInstance<handshake::SinkOp>,
                     ConvertToHWInstance<handshake::ForkOp>,
                     ConvertToHWInstance<handshake::LazyForkOp>,
-                    ConvertToHWInstance<handshake::MCLoadOp>,
-                    ConvertToHWInstance<handshake::LSQLoadOp>,
-                    ConvertToHWInstance<handshake::MCStoreOp>,
-                    ConvertToHWInstance<handshake::LSQStoreOp>,
+                    ConvertToHWInstance<handshake::LoadOp>,
+                    ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
                     // Arith operations

@@ -13,6 +13,8 @@
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
@@ -84,6 +86,19 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
   if (logger)
     logResults(placement);
+
+  llvm::MapVector<size_t, double> cfdfcTPResult;
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+
+    cfdfcTPResult[idx] = tmpThroughput;
+  }
+
+  // Create and add the handshake.tp attribute
+  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+      funcInfo.funcOp.getContext(), cfdfcTPResult);
+  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
@@ -255,13 +270,12 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
           }
         }
       })
-      .Case<handshake::MCLoadOp, handshake::LSQLoadOp, handshake::MCStoreOp,
-            handshake::LSQStoreOp, handshake::AddIOp, handshake::AddFOp,
-            handshake::SubIOp, handshake::SubFOp, handshake::AndIOp,
-            handshake::OrIOp, handshake::XOrIOp, handshake::MulIOp,
-            handshake::MulFOp, handshake::DivUIOp, handshake::DivSIOp,
-            handshake::DivFOp, handshake::ShRSIOp, handshake::ShLIOp,
-            handshake::CmpIOp, handshake::CmpFOp>(
+      .Case<handshake::LoadOp, handshake::StoreOp, handshake::AddIOp,
+            handshake::AddFOp, handshake::SubIOp, handshake::SubFOp,
+            handshake::AndIOp, handshake::OrIOp, handshake::XOrIOp,
+            handshake::MulIOp, handshake::MulFOp, handshake::DivUIOp,
+            handshake::DivSIOp, handshake::DivFOp, handshake::ShRSIOp,
+            handshake::ShLIOp, handshake::CmpIOp, handshake::CmpFOp>(
           [&](auto) { addJoinedOprdConstraints(); });
 
   StringRef unitName = getUniqueName(unit);

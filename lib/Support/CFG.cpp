@@ -424,6 +424,7 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
       CFGPath newPath;
       llvm::copy(pathSoFar, std::back_inserter(newPath));
       newPath.push_back(to);
+      paths.push_back(newPath);
     } else if (!pathSoFar.contains(nextBB)) {
       mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);
@@ -609,14 +610,13 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
         // Otherwise, data inputs on the path must depend on the predecessor
         return foldGIIDStatusAnd(recurse, defOp->getOperands());
       })
-      .Case<handshake::MCLoadOp, handshake::LSQLoadOp>([&](auto) {
-        auto loadOp = cast<handshake::LoadOpInterface>(defOp);
-        if (loadOp.getDataOutput() != val)
+      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+        if (loadOp.getDataResult() != val)
           return GIIDStatus::FAIL_ON_PATH;
 
         // If the address operand depends on the predecessor then the data
         // result depends on the predecessor
-        return recurse(loadOp.getAddressInput());
+        return recurse(loadOp.getAddress());
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Similarly to the mux, if the select operand depends on the

@@ -132,8 +132,8 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // consecutive Commit-Save units.
         placements.addSaveCommit(dstOpOperand);
         placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOpInterface,
-                     handshake::StoreOpInterface>(succOp)) {
+      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOp,
+                     handshake::StoreOp>(succOp)) {
         // A commit is needed in front of memory operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::EndOp>(succOp)) {

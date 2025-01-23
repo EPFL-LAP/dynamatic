@@ -18,24 +18,19 @@ module merge # (
   wire tehb_pvalid;
   wire tehb_ready;
 
-  reg [DATA_TYPE - 1 : 0] tmp_data_out;
-  reg tmp_valid_out = 0;
-  integer i;
-
-  always @(*) begin
-    tmp_valid_out = 0;
-    tmp_data_out = ins[0 +: DATA_TYPE];
-    for (i = SIZE - 1; i >= 0; i = i - 1) begin
-      if (ins_valid[i]) begin
-        tmp_data_out = ins[i * DATA_TYPE +: DATA_TYPE];
-        tmp_valid_out = 1;
-      end
-    end
-  end
-
-  assign tehb_data_in = tmp_data_out;
-  assign tehb_pvalid = tmp_valid_out;
-  assign ins_ready = {SIZE{tehb_ready}};
+  merge_notehb #(
+    .INPUTS(SIZE),
+    .DATA_TYPE(DATA_TYPE)
+  ) merge_ins (
+    .clk        (clk          ),
+    .rst        (rst          ),
+    .ins        (ins          ),
+    .ins_valid  (ins_valid    ),
+    .ins_ready  (ins_ready    ),
+    .outs       (tehb_data_in ),
+    .outs_valid (tehb_pvalid  ),
+    .outs_ready (tehb_ready   )
+  );
 
   tehb #(
     .DATA_TYPE(DATA_TYPE)

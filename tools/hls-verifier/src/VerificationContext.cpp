@@ -87,9 +87,8 @@ string VerificationContext::getCFuvFunctionName() const {
 }
 
 string VerificationContext::getVhdlDuvEntityName() const {
-  if (!vhdlDUVEntityName.empty()) {
+  if (!vhdlDUVEntityName.empty())
     return vhdlDUVEntityName;
-  }
   return cFUVFunctionName;
 }
 
@@ -183,22 +182,22 @@ CFunction VerificationContext::getCFuv() const { return fuv; }
 
 vector<CFunctionParameter> VerificationContext::getFuvInputParams() const {
   vector<CFunctionParameter> result;
-  for (const auto &param : fuv.params) {
+  for (const auto &param : fuv.params)
     if (param.isInput)
       result.push_back(param);
-  }
+
   return result;
 }
 
 vector<CFunctionParameter> VerificationContext::getFuvOutputParams() const {
   vector<CFunctionParameter> result;
-  if (fuv.returnVal.isOutput) {
+  if (fuv.returnVal.isOutput)
     result.push_back(fuv.returnVal);
-  }
-  for (const auto &param : fuv.params) {
+
+  for (const auto &param : fuv.params)
     if (param.isOutput)
       result.push_back(param);
-  }
+
   return result;
 }
 

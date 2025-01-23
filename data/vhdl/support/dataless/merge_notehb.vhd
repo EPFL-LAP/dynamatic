@@ -19,23 +19,23 @@ end entity;
 
 architecture arch of merge_notehb_dataless is
 begin
-  process (ins_valid)
+  process (ins_valid, outs_ready)
     variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector(INPUTS - 1 downto 0);
   begin
     tmp_valid_out := '0';
-    for i in INPUTS - 1 downto 0 loop
+    tmp_ready_out := (others => '0');
+    
+    for i in 0 to (INPUTS - 1) loop
       if (ins_valid(i) = '1') then
-        tmp_valid_out := ins_valid(i);
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
       end if;
     end loop;
-    outs_valid <= tmp_valid_out;
-  end process;
 
-  process (outs_ready)
-  begin
-    for i in 0 to INPUTS - 1 loop
-      ins_ready(i) <= outs_ready;
-    end loop;
+    outs_valid <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
   end process;
 
 end architecture;

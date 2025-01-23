@@ -43,10 +43,27 @@ entity mem_controller_loadless is
   );
 end entity;
 
+
+-- Terminology:
+-- Access ports    : circuit to memory_controller;
+-- Interface ports : memory_controller to memory_interface (e.g., BRAM/AXI);
+
 architecture arch of mem_controller_loadless is
+  
+  -- TODO: The size of this counter should be configurable
   signal remainingStores                    : std_logic_vector(31 downto 0);
-  signal storePorts_valid, storePorts_ready : std_logic_vector(NUM_STORES - 1 downto 0);
+  
+  -- Indicating the store interface port that there is a valid store request
+  -- (currently not used).
+  signal interface_port_valid               : std_logic_vector(NUM_STORES - 1 downto 0);
+
+  -- Indicating a store port has both a valid data and a valid address.
+  signal store_access_port_complete_request : std_logic_vector(NUM_STORES - 1 downto 0);
+
+  -- Indicating the store port is selected by the arbiter.
+  signal store_access_port_selected         : std_logic_vector(NUM_STORES - 1 downto 0);
   signal allRequestsDone                    : std_logic;
+
 
   constant zeroStore : std_logic_vector(31 downto 0)               := (others => '0');
   constant zeroCtrl  : std_logic_vector(NUM_CONTROLS - 1 downto 0) := (others => '0');
@@ -54,6 +71,9 @@ architecture arch of mem_controller_loadless is
 begin
   loadEn   <= '0';
   loadAddr <= (others => '0');
+
+  -- A store request is complete if both address and data are valid.
+  store_access_port_complete_request <= stAddr_valid and stData_valid;
 
   write_arbiter : entity work.write_memory_arbiter
     generic map(
@@ -64,19 +84,19 @@ begin
     port map(
       rst            => rst,
       clk            => clk,
-      pValid         => stAddr_valid,
-      ready          => storePorts_ready,
+      pValid         => store_access_port_complete_request,
+      ready          => store_access_port_selected,
       address_in     => stAddr,
       data_in        => stData,
       nReady         => (others => '1'),
-      valid          => storePorts_valid,
+      valid          => interface_port_valid,
       write_enable   => storeEn,
       write_address  => storeAddr,
       data_to_memory => storeData
     );
 
-  stData_ready <= storePorts_ready;
-  stAddr_ready <= storePorts_ready;
+  stData_ready <= store_access_port_selected;
+  stAddr_ready <= store_access_port_selected;
   ctrl_ready   <= (others => '1');
 
   count_stores : process (clk)
