@@ -22,5 +22,5 @@ jobs:
         run: ./build.sh --release
 
       - name: integration-test
-        run: python3 run_integration.py --list integration-tests/integration_list.txt --ignore integration-tests/ignored_tests.txt
+        run: python3 run_integration.py --list integration-test/integration_list.txt --ignore integration-test/ignored_tests.txt
 
