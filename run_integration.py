@@ -13,6 +13,7 @@ class CLIHandler:
   def add_arguments(self):
     self.parser.add_argument("-l", "--list")
     self.parser.add_argument("-i", "--ignore")
+    self.parser.add_argument("-t", "--timeout")
 
   def parse_args(self, args=None):
     """
@@ -166,7 +167,11 @@ def main():
       shutil.rmtree(out_dir)
     
     # Run test and output result
-    result = run_command_with_timeout(DYNAMATIC_COMMAND.format(script_path=DYN_FILE))
+    if args.timeout:
+      result = run_command_with_timeout(DYNAMATIC_COMMAND.format(script_path=DYN_FILE), timeout=int(args.timeout))
+    else:
+      result = run_command_with_timeout(DYNAMATIC_COMMAND.format(script_path=DYN_FILE))
+    
     if result == 0:
       sim_log_path = os.path.join(out_dir, "sim", "report.txt")
       sim_time = get_sim_time(sim_log_path)
