@@ -2,16 +2,19 @@ import argparse
 import sys
 import ast
 
-import generators.handshake.fork as fork
 import generators.handshake.buffer as buffer
+import generators.handshake.fork as fork
+import generators.handshake.lazy_fork as lazy_fork
 
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
-    case "fork":
-      return fork.generate_fork(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
+    case "fork":
+      return fork.generate_fork(name, parameters)
+    case "lazy_fork":
+      return lazy_fork.generate_lazy_fork(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
