@@ -318,7 +318,8 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
   CPred<[{
     ([&](const mlir::OperandRange &inputs, Value output) {
 
-      // Map to collect extra signals from inputs
+      // Variable to collect extra signals from inputs
+      // Map used to help check uniqueness of extra signal names
       llvm::DenseMap<StringRef, const ExtraSignal *> unionOfExtraSignals;
 
       // Iterate over the type of each input operand

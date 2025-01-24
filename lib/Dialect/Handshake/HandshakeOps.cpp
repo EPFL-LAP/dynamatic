@@ -241,23 +241,17 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   if (operands.size() < 2)
     return failure();
 
-  // Map to collect extra signals from data operands
-  llvm::DenseMap<StringRef, const ExtraSignal *> extraSignalsMap;
-  // SmallVector to collect the extra signals of the result
-  llvm::SmallVector<ExtraSignal> extraSignals;
+  // DenseSet to collect the extra signal names from data operands
+  llvm::DenseSet<StringRef> unionOfExtraSignalNames;
+  // SmallVector to store the extra signals for the output type
+  llvm::SmallVector<ExtraSignal> unionOfExtraSignals;
   for (Value operand : operands) {
     auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
     for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
-      if (extraSignalsMap.contains(extraSignal.name)) {
-        if (*extraSignalsMap.lookup(extraSignal.name) != extraSignal) {
-          // Two different extra signals among inputs must have different names
-          // to be merge-able.
-          // e.g. [spec: i1] and [spec: i2] are prohibited.
-          return failure();
-        }
-      } else {
-        extraSignalsMap.insert({extraSignal.name, &extraSignal});
-        extraSignals.push_back(extraSignal);
+      if (!unionOfExtraSignalNames.contains(extraSignal.name)) {
+        // The constraint MergingExtraSignals guarantees that
+        // extra signals sharing the same name is equivalent.
+        unionOfExtraSignals.push_back(extraSignal);
       }
     }
   }
@@ -267,7 +261,7 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   // The return type is data type of any data operand (if ControlType) with
   // union of data operand's extra signals.
   inferredReturnTypes.push_back(
-      firstDataInType.replaceExtraSignals(extraSignals));
+      firstDataInType.replaceExtraSignals(unionOfExtraSignals));
 
   return success();
 }
