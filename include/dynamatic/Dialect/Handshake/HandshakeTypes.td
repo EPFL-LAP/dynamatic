@@ -314,7 +314,7 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 /// there exists an input which has the extra signal A.
 /// In Merge-like Ops inputs are always provided as variadic.
 class MergingExtraSignals<string inputs, string output> : PredOpTrait<
-  "the extra signals of intraOperands and interOperands should satisfy \\\"Merging Relationship of Extra Signals\\\"",
+  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
   CPred<[{
     ([&](const mlir::OperandRange &inputs, Value output) {
 
