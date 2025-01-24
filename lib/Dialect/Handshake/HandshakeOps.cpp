@@ -2190,14 +2190,14 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  assert(operands.size() > 0 && "expected at least one operand");
-  assert(operands[0].getType().isa<ChannelType>() &&
-         "expected first operand to be a channel type");
   inferredReturnTypes.push_back(ChannelType::get(
       builder.getIntegerType(1),
-      // We can assume from the definition in the tablegen file that
-      // all operands have the same extra signals
-      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      // Note that this cast throws an error if the assumption is not met
+      operands[0].getType().cast<ChannelType>().getExtraSignals()));
   return success();
 }
 
@@ -2212,14 +2212,14 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  assert(operands.size() > 0 && "expected at least one operand");
-  assert(operands[0].getType().isa<ChannelType>() &&
-         "expected first operand to be a channel type");
   inferredReturnTypes.push_back(ChannelType::get(
       builder.getIntegerType(1),
-      // We can assume from the definition in the tablegen file that
-      // all operands have the same extra signals
-      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      // Note that this cast throws an error if the assumption is not met
+      operands[0].getType().cast<ChannelType>().getExtraSignals()));
   return success();
 }
 
