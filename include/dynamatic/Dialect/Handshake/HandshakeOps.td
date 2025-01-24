@@ -306,6 +306,7 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure, SameOperandsAndResultType,
+  VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
@@ -332,6 +333,7 @@ def MergeOp : Handshake_Op<"merge", [
 
 def MuxOp : Handshake_Op<"mux", [
   Pure,
+  VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
   IsSimpleHandshake<"selectOperand">,
@@ -371,6 +373,7 @@ def MuxOp : Handshake_Op<"mux", [
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
+  VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
   IsSimpleHandshake<"index">,

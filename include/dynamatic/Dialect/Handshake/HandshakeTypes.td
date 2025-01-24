@@ -374,4 +374,10 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
   }] # "$" # inputs # ", $" # output # ")">
 >;
 
+/// Constraint to ensure that the variadic has at least one element.
+class VariadicHasElement<string variadic> : PredOpTrait<
+  "the variadic " # variadic # " should have at least one element",
+  CPred<"!$" # variadic # ".empty()">
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

@@ -48,17 +48,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       "mlir::OpResult", "getDataResult", (ins)
     >,
   ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    auto operands = concreteOp.getDataOperands();
-
-    if (!operands.size())
-      return concreteOp.emitOpError("must have at least one data operand");
-
-    return mlir::success();
-  }];
 }
 
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {

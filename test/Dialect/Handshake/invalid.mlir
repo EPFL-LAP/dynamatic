@@ -226,3 +226,13 @@ handshake.func @invalidMuxWithConflictingExtraSignal(
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e2: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e2: i6]>
   end %ctrl : !handshake.control<>
 }
+
+// -----
+
+handshake.func @invalidMuxWithNoDataInputs(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that the variadic dataOperands should have at least one element}}
+  %data = mux %sel [] : <i2>, [] to <i32>
+  end %ctrl : !handshake.control<>
+}
