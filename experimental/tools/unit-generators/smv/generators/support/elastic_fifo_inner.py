@@ -1,8 +1,9 @@
-def generate_elastic_fifo_inner(name, slots, data_type = None):
+def generate_elastic_fifo_inner(name, slots, data_type=None):
     if data_type is None:
         return _generate_elastic_fifo_inner_dataless(name, slots)
     else:
         return _generate_elastic_fifo_inner(name, slots, data_type)
+
 
 def _generate_elastic_fifo_inner_dataless(name, slots):
     return f"""
@@ -57,6 +58,7 @@ MODULE {name}(ins_valid, outs_ready)
     DEFINE ins_ready := !full & outs_ready;
     DEFINE outs_valid := !empty;
 """
+
 
 def _generate_elastic_fifo_inner(name, slots, data_type):
     return f"""
