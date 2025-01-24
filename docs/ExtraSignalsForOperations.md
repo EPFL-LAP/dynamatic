@@ -1,12 +1,12 @@
 # Extra Signals for Operations
 
-The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. In some cases, operations may impose constraints, requiring operands to have no extra signals. This document outlines how each operation processes extra signals.
+The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. We use MLIR's type verification tools to enforce rules for how extra signals are passed to and from operations. Since these rules differ from operation to operation, we describe them in this document.
 
 ## Operations Within a Basic Block
 
-With a few exceptions, most operations confined to a single basic block are required to have consistent extra signals across all their inputs and outputs.
+Here, operations are considered within a basic block if all their operands and results are used exclusively within that block. With a few exceptions, most operations within a basic block are required to have consistent extra signals across all their inputs and outputs.
 
-An operation is considered *confined to a basic block* if all of its operands and results are used exclusively within that block. For example, the `addi` operation is usually confined to a basic block. If one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
+To further specify the meaning of "consistent extra signals across all their inputs and outputs", we provide an example: if one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
 
 <img alt="the IO of addi" src="./Figures/ExtraSignalsForOperations/addi.png" width="300" />
 
@@ -24,7 +24,7 @@ These operations may have different extra signals for each input because they ty
 
 <img alt="the inputs of Mux" src="./Figures/ExtraSignalsForOperations/mux_inputs.png" width="500" />
 
-Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`.
+Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`. This is because when there are two input signals with the same name but different widths, they cannot both be propagated to the output with that name.
 
 The extra signals on the data output are determined as follows:
 
@@ -38,7 +38,7 @@ As a result, the complete structure of a Mux or CMerge operation appears as foll
 
 The data output has spec: i1 and tag: i8 because some inputs have them, and nothing else.
 
-The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must complement the missing extra signal in the output.
+The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must provide the value of the missing extra signal for the output.
 
 These rules are enforced using the following constraints:
 
