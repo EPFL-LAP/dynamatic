@@ -1,8 +1,0 @@
-complex_div
-covariance
-dct
-kmp
-matching_2
-path_profiling
-trisolv
-spmv

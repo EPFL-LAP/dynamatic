@@ -32,16 +32,16 @@ class CLIHandler:
     """
     return self.parser.parse_args(args)
 
-INTEGRATION_FOLDER = "./integration-test/"
-SCRIPT_CONTENT = """
+INTEGRATION_FOLDER = "../../integration-test/"
+SCRIPT_CONTENT = """set-dynamatic-path ../..
 set-src {src_path}
 compile
 write-hdl
 simulate
 exit
 """
-DYN_FILE = "./build/original_run.dyn"
-DYNAMATIC_COMMAND = "./bin/dynamatic --run {script_path}"
+DYN_FILE = "../../build/run_test.dyn"
+DYNAMATIC_COMMAND = "../../bin/dynamatic --run {script_path}"
 
 # Class to have different colors while writing in terminal
 class bcolors:
