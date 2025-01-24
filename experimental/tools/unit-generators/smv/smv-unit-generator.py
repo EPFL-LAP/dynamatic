@@ -2,6 +2,7 @@ import argparse
 import sys
 import ast
 
+import generators.handshake.br as br
 import generators.handshake.buffer as buffer
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
@@ -9,6 +10,8 @@ import generators.handshake.lazy_fork as lazy_fork
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
+    case "br":
+      return br.generate_br(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
     case "fork":
