@@ -50,7 +50,8 @@ def main():
         print(f"Error parsing parameters: {e}")
         sys.exit(1)
 
-    print(generate_code(args.name, args.type, parameters))
+    header = f"// {args.name} : {args.type}({args.parameters})\n\n"
+    print(header + generate_code(args.name, args.type, parameters))
 
 
 if __name__ == "__main__":
