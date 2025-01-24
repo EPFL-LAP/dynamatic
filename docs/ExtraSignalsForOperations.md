@@ -8,7 +8,7 @@ With a few exceptions, most operations confined to a single basic block are requ
 
 An operation is considered *confined to a basic block* if all of its operands and results are used exclusively within that block. For example, the `addi` operation is usually confined to a basic block. If one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
 
-![the IO of addi](./Figures/ExtraSignalsForOperations/addi.png)
+<img alt="the IO of addi" src="./Figures/ExtraSignalsForOperations/addi.png" width="300" />
 
 This constraint is designed to reduce variability in these operations, simplifying the RTL generation process.
 
@@ -22,7 +22,7 @@ This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/d
 
 These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
 
-![the inputs of Mux](./Figures/ExtraSignalsForOperations/mux_inputs.png)
+<img alt="the inputs of Mux" src="./Figures/ExtraSignalsForOperations/mux_inputs.png" width="700" />
 
 Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`.
 
@@ -34,7 +34,7 @@ The selector input (for Mux) or the output (for CMerge) is kept simple, meaning 
 
 As a result, the complete structure of a Mux or CMerge operation appears as follows:
 
-![the IO of Mux and Cmerge](./Figures/ExtraSignalsForOperations/mux_cmerge.png)
+<img alt="the IO of Mux and Cmerge" src="./Figures/ExtraSignalsForOperations/mux_cmerge.png" width="700" />
 
 The data output has spec: i1 and tag: i8 because some inputs have them, and nothing else.
 
@@ -60,14 +60,14 @@ Note that these operations can also be considered to reside at the boundary of a
 
 For the load operation, the structure is as follows:
 
-![the IO of Load](./Figures/ExtraSignalsForOperations/load.png)
+<img alt="the IO of Load" src="./Figures/ExtraSignalsForOperations/load.png" width="400" />
 
 - The `addrResult` and `data` ports, used to communicate with the memory controller, must be simple.
 - The `addr` and `dataResult` ports must carry the same set of extra signals.
 
 For the store operation, the structure is:
 
-![the IO of Store](./Figures/ExtraSignalsForOperations/store.png)
+<img alt="the IO of Store" src="./Figures/ExtraSignalsForOperations/store.png" width="400" />
 
 - The `addrResult` and `dataResult` ports, which interface with the memory controller, must also be simple.
 - The `addr` and `data` ports must have matching extra signals.
@@ -86,7 +86,7 @@ While this operation falls under the category of "operations within a basic bloc
 
 `ConstantOp` has one input (a `ControlType` to trigger the emission) and one output (a `ChannelType`). Like other operations, the extra signals of the input and output should match.
 
-![the IO of Constant](./Figures/ExtraSignalsForOperations/constant.png)
+<img alt="the IO of Constant" src="./Figures/ExtraSignalsForOperations/constant.png" width="300" />
 
 However, how are the extra signals of the input handled?
 
