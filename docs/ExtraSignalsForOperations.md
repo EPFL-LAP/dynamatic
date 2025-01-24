@@ -6,7 +6,7 @@ The concept of extra signals has been introduced into the Handshake TypeSystem, 
 
 With a few exceptions, most operations confined to a single basic block are required to have consistent extra signals across all their inputs and outputs.
 
-An operation is considered *confined to a basic block* if all of its operands and results are used exclusively within that block. For example, the `addi` operation is confined to a basic block. If one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
+An operation is considered *confined to a basic block* if all of its operands and results are used exclusively within that block. For example, the `addi` operation is usually confined to a basic block. If one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
 
 ![the IO of addi](./Figures/ExtraSignalsForOperations/addi.png)
 
@@ -26,15 +26,17 @@ These operations may have different extra signals for each input because they ty
 
 Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`.
 
-The selector input (for Mux) or the output (for CMerge) is kept simple, meaning it does not carry any extra signals.
-
 The extra signals on the data output are determined as follows:
 
 - The data output includes an extra signal `A` if, and only if, at least one of the inputs carries the extra signal `A`.
 
+The selector input (for Mux) or the output (for CMerge) is kept simple, meaning it does not carry any extra signals.
+
 As a result, the complete structure of a Mux or CMerge operation appears as follows:
 
 ![the IO of Mux and Cmerge](./Figures/ExtraSignalsForOperations/mux_cmerge.png)
+
+The data output has spec: i1 and tag: i8 because some inputs have them, and nothing else.
 
 The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must complement the missing extra signal in the output.
 
@@ -90,7 +92,7 @@ However, how are the extra signals of the input handled?
 
 Since control tokens can now carry extra signals, it’s natural that a control token with extra signals would trigger the `ConstantOp`.
 
-Upon review, we found it more effective to forward the extra signals from the input directly to the output token, rather than hardcoding constant extra signal values in the operation.
+Upon review, we found it more effective to forward the extra signals from the input directly to the output token, rather than discarding them and hardcoding constant extra signal values in the operation.
 
 As a result, `ConstantOp` is considered constant only for its data, while its extra signal values remain variable.
 
