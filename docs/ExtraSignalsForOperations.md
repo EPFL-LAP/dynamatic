@@ -22,7 +22,7 @@ This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/d
 
 These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
 
-<img alt="the inputs of Mux" src="./Figures/ExtraSignalsForOperations/mux_inputs.png" width="700" />
+<img alt="the inputs of Mux" src="./Figures/ExtraSignalsForOperations/mux_inputs.png" width="500" />
 
 Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`.
 
