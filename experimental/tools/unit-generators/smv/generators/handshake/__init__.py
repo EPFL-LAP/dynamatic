@@ -8,3 +8,4 @@ from generators.handshake.lazy_fork import generate_lazy_fork
 from generators.handshake.merge import generate_merge
 from generators.handshake.mux import generate_mux
 from generators.handshake.sink import generate_sink
+from generators.handshake.source import generate_source

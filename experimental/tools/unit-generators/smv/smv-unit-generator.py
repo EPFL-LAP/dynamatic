@@ -12,6 +12,7 @@ import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.merge as merge
 import generators.handshake.mux as mux
 import generators.handshake.sink as sink
+import generators.handshake.source as source
 
 
 def generate_code(name, mod_type, parameters):
@@ -36,6 +37,8 @@ def generate_code(name, mod_type, parameters):
       return mux.generate_mux(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
+    case "source":
+      return source.generate_source(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
