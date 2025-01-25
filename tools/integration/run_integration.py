@@ -194,6 +194,8 @@ def main():
     else:
       color_print(f"[TIMEOUT] {c_file}", bcolors.WARNING)
 
+    sys.stdout.flush()
+
   print(f"** Integration testing finished: passed {passed_cnt}/{test_cnt} tests ({100 * passed_cnt / test_cnt : .2f}% ), {ignored_cnt} ignored **")
   if passed_cnt == test_cnt:
     sys.exit(0)
