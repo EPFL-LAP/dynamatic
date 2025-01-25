@@ -10,6 +10,7 @@ import generators.handshake.join as join
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.merge as merge
+import generators.handshake.mux as mux
 
 
 def generate_code(name, mod_type, parameters):
@@ -30,6 +31,8 @@ def generate_code(name, mod_type, parameters):
       return lazy_fork.generate_lazy_fork(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
+    case "mux":
+      return mux.generate_mux(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
