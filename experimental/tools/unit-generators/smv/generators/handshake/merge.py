@@ -1,0 +1,47 @@
+from generators.support.merge_notehb import (
+    generate_merge_notehb,
+)
+from generators.handshake.buffer import generate_buffer
+
+
+def generate_merge(name, params):
+    if "data_type" not in params or params["data_type"] == "!handshake.control<>":
+        return _generate_merge_dataless(name, params["size"])
+    else:
+        return _generate_merge(name, params["size"], params["data_type"])
+
+
+def _generate_merge_dataless(name, size):
+    return f"""
+MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
+    VAR inner_tehb : {name}__tehb_dataless(inner_merge.outs_valid, outs_ready);
+    VAR inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
+
+    // output
+    {"\n    ".join([f"DEFINE ins_ready_{n} := inner_merge.ins_ready{n};" for n in range(size)])}
+    DEFINE outs_valid = inner_tehb.outs_valid;
+
+{generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
+{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1"})}
+"""
+
+
+def _generate_merge(name, size, data_type):
+    return f"""
+MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
+    VAR inner_tehb : {name}__tehb(inner_merge.outs, inner_merge.outs_valid, outs_ready);
+    VAR inner_merge : {name}__merge_notehb({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
+
+    // output
+    {"\n    ".join([f"DEFINE ins_ready_{n} := inner_merge.ins_ready{n};" for n in range(size)])}
+    DEFINE outs := inner_tehb.outs;
+    DEFINE outs_valid := inner_tehb.outs_valid;
+
+{generate_merge_notehb(f"{name}__merge_notehb", size, data_type)}
+{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type})}
+"""
+
+
+if __name__ == "__main__":
+    print(generate_merge("test_merge_dataless", {"size": 4}))
+    print(generate_merge("test_merge", {"size": 2, "data_type": "int"}))

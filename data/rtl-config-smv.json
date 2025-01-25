@@ -22,5 +22,9 @@
   {
     "name": "handshake.lazy_fork",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE,datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.merge",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE,datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
 ]

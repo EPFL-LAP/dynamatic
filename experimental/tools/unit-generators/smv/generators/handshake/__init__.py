@@ -4,3 +4,4 @@ from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.join import generate_join
 from generators.handshake.fork import generate_fork
 from generators.handshake.lazy_fork import generate_lazy_fork
+from generators.handshake.merge import generate_merge

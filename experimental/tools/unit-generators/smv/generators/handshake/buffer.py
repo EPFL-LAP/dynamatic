@@ -49,21 +49,12 @@ MODULE {name} (ins, ins_valid, outs_ready)
   VAR inner_oehb : {name}__oehb_dataless(ins_valid, outs_ready);
   VAR data : {data_type};
 
-<<<<<<< HEAD
   ASSIGN
   init(data) := {data_type.format_constant(0)};
   next(data) := case
     ins_ready & ins_valid : ins;
     TRUE : data;
   esac;
-=======
-    ASSIGN
-    init(outs_i) := {smv_init_data_type(data_type)};
-    next(outs_i) := case
-                      ins_ready & ins_valid : ins;
-                      TRUE : outs_i;
-                    esac;
->>>>>>> befeb371 (Add data types)
     
   // output
   DEFINE ins_ready := inner_oehb.ins_ready;
@@ -126,7 +117,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR inner_tehb : {name}__tehb_dataless(ins_valid, outs_ready);
   VAR data : {data_type};
 
-<<<<<<< HEAD
   ASSIGN
   init(data) := {data_type.format_constant(0)};
   next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
@@ -135,11 +125,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
   DEFINE ins_ready := inner_tehb.ins_ready;
   DEFINE outs_valid := inner_tehb.outs_valid;
   DEFINE outs := tehb_dataless.full ? data : ins;
-=======
-    ASSIGN
-    init(outs_i) := {smv_init_data_type(data_type)};
-    next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
->>>>>>> befeb371 (Add data types)
 
 {_generate_tehb_dataless(f"{name}__tehb_dataless")}
 """
