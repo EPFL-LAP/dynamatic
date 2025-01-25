@@ -1,6 +1,7 @@
 from generators.handshake.br import generate_br
 from generators.handshake.buffer import generate_buffer
 from generators.handshake.cond_br import generate_cond_br
+from generators.handshake.control_merge import generate_control_merge
 from generators.handshake.join import generate_join
 from generators.handshake.fork import generate_fork
 from generators.handshake.lazy_fork import generate_lazy_fork

@@ -12,6 +12,10 @@
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
+    "name": "handshake.control_merge",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE,datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
     "name": "handshake.fork",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },

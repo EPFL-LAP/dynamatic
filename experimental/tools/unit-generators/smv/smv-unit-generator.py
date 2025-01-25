@@ -5,6 +5,7 @@ import ast
 import generators.handshake.br as br
 import generators.handshake.buffer as buffer
 import generators.handshake.cond_br as cond_br
+import generators.handshake.control_merge as control_merge
 import generators.handshake.join as join
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
@@ -19,6 +20,8 @@ def generate_code(name, mod_type, parameters):
       return buffer.generate_buffer(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
+    case "control_merge":
+      return control_merge.generate_control_merge(name, parameters)
     case "join":
       return join.generate_join(name, parameters)
     case "fork":
