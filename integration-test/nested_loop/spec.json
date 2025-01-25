@@ -1,0 +1,48 @@
+{
+  "speculator": {
+    "operation-name": "fork8",
+    "operand-idx": 0
+  },
+  "buffers": [
+    {
+      "operation-name": "mux1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "mux6",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "extsi3",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci3",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br2",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "cond_br5",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "mux5",
+      "operand-idx": 2
+    }
+  ]
+}
