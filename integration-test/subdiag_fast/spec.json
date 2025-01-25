@@ -1,0 +1,24 @@
+{
+  "speculator": {
+    "operation-name": "fork3",
+    "operand-idx": 0
+  },
+  "buffers": [
+    {
+      "operation-name": "andi0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci0",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci1",
+      "operand-idx": 0
+    },
+    {
+      "operation-name": "trunci2",
+      "operand-idx": 0
+    }
+  ]
+}
