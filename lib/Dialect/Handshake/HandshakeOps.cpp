@@ -654,7 +654,7 @@ static handshake::ChannelType wrapChannel(Type type) {
 void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                                Value memRef, Value memStart, ValueRange inputs,
                                Value ctrlEnd, ArrayRef<unsigned> blocks,
-                               unsigned numLoads) {
+                               unsigned numLoads, unsigned numStores) {
   // Memory operands
   odsState.addOperands({memRef, memStart});
   odsState.addOperands(inputs);
@@ -663,8 +663,12 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   // Data outputs (get their type from memref)
   MemRefType memrefType = memRef.getType().cast<MemRefType>();
   MLIRContext *ctx = odsBuilder.getContext();
-  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
-  odsState.types.push_back(handshake::ControlType::get(ctx));
+  Type control = handshake::ControlType::get(ctx);
+  SmallVector<Type> loadresults = {wrapChannel(memrefType.getElementType()), control};
+  for (int i = 0; i < numLoads; i++)
+    odsState.types.append(loadresults);
+  odsState.types.append(numStores, control);
+  odsState.types.push_back(control);
 
   // Set "connectedBlocks" attribute
   SmallVector<int> blocksAttribute;
@@ -748,7 +752,8 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
 
       // Add a load port to the group
       currentGroup->accessPorts.push_back(
-          LoadPort(loadOp, input.index(), resIdx++));
+          LoadPort(loadOp, input.index(), resIdx));
+      resIdx += 2;
       return success();
     };
 
@@ -769,7 +774,8 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
         return failure();
 
       // Add a store port to the block
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
+      currentGroup->accessPorts.push_back(
+        StorePort(storeOp, input.index(), resIdx++));
       return success();
     };
 
@@ -1034,7 +1040,8 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
 
       // Add a load port to the group
       currentGroup->accessPorts.push_back(
-          LoadPort(loadOp, input.index(), resIdx++));
+          LoadPort(loadOp, input.index(), resIdx));
+      resIdx += 2;
       --(*currentGroupRemaining);
       return success();
     };
@@ -1047,7 +1054,8 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
         return failure();
 
       // Add a store port to the group and decrement our group size by one
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
+      currentGroup->accessPorts.push_back(
+        StorePort(storeOp, input.index(), resIdx++));
       --(*currentGroupRemaining);
       return success();
     };
@@ -1276,14 +1284,15 @@ ControlPort::ControlPort(Operation *ctrlOp, unsigned ctrlInputIdx)
 
 LoadPort::LoadPort(handshake::LoadOp loadOp, unsigned addrInputIdx,
                    unsigned dataOutputIdx)
-    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD) {}
+    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx, dataOutputIdx+1}, Kind::LOAD) {}
 
 handshake::LoadOp LoadPort::getLoadOp() const {
   return cast<handshake::LoadOp>(portOp);
 }
 
-StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
+StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
+                      unsigned doneOutputIdx)
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {doneOutputIdx}, Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1318,26 +1327,26 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 
 GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
-unsigned GroupMemoryPorts::getNumInputs() const {
-  unsigned numInputs = hasControl() ? 1 : 0;
-  for (const MemoryPort &port : accessPorts) {
-    if (isa<LoadPort>(port))
-      numInputs += 1;
-    else if (isa<StorePort>(port))
-      numInputs += 2;
-  }
-  return numInputs;
-}
+// unsigned GroupMemoryPorts::getNumInputs() const {
+//   unsigned numInputs = hasControl() ? 1 : 0;
+//   for (const MemoryPort &port : accessPorts) {
+//     if (isa<LoadPort>(port))
+//       numInputs += 1;
+//     else if (isa<StorePort>(port))
+//       numInputs += 2;
+//   }
+//   return numInputs;
+// }
 
-unsigned GroupMemoryPorts::getNumResults() const {
-  unsigned numResults = 0;
-  for (const MemoryPort &port : accessPorts) {
-    // There is one data output per load port
-    if (isa<LoadPort>(port))
-      numResults += 1;
-  }
-  return numResults;
-}
+// unsigned GroupMemoryPorts::getNumResults() const {
+//   unsigned numResults = 0;
+//   for (const MemoryPort &port : accessPorts) {
+//     // There is one data output per load port
+//     if (isa<LoadPort>(port))
+//       numResults += 1;
+//   }
+//   return numResults;
+// }
 
 size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)

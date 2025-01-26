@@ -237,8 +237,9 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
+  MLIRContext *ctx = getContext();
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo)))
+                              memInfo, ctx)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports get
@@ -690,7 +691,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefIndices,
     BackedgeBuilder &edgeBuilder,
-    LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
+    LowerFuncToHandshake::MemInterfacesInfo &memInfo,
+    MLIRContext* ctx) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -748,7 +750,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               assert(addr && "failed to remap address");
               Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
               Value data = edgeBuilder.get(channelifyType(dataTy));
-              auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
+              Value done = edgeBuilder.get(handshake::ControlType::get(ctx));
+              auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data, done);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(loadOp, newOp, false);
@@ -762,8 +765,9 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
+              Value done = edgeBuilder.get(handshake::ControlType::get(ctx));
               assert((addr && data) && "failed to remap address or data");
-              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
+              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data, done);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(storeOp, newOp, false);

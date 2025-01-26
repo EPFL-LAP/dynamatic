@@ -101,7 +101,8 @@ public:
   virtual LogicalResult convertMemoryOps(
       handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
       const DenseMap<Value, unsigned> &memrefIndices,
-      BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo) const;
+      BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
+      MLIRContext* ctx) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group

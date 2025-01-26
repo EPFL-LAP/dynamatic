@@ -185,12 +185,14 @@ public:
 /// memory interface, and
 /// 2. the data value produced by the port operation and consumed by the
 /// memory interface.
+/// RouzbehTodo
 class StorePort : public MemoryPort {
 public:
   /// Constructs the store port from a store operation, the index of the
   /// store's address output in the memory interface's inputs (the store's data
   /// output is assumed to be at the next index), and the specific store kind.
-  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx,
+            unsigned dataOutputIdx);
 
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
