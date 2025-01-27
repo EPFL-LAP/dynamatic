@@ -1,4 +1,5 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
+from generators.support.utils import *
 
 
 def generate_buffer(name, params):
@@ -10,7 +11,7 @@ def generate_buffer(name, params):
       ):
         return _generate_tfifo_dataless(name, params["slots"])
       else:
-        return _generate_tfifo(name, params["slots"], params["data_type"])
+        return _generate_tfifo(name, params["slots"], hw_type_to_smv_type(params["data_type"]))
     else:
       if (
           "data_type" not in params
@@ -18,7 +19,7 @@ def generate_buffer(name, params):
       ):
         return _generate_tehb_dataless(name)
       else:
-        return _generate_tehb(name, params["data_type"])
+        return _generate_tehb(name, hw_type_to_smv_type(params["data_type"]))
   else:
     if "slots" in params and params["slots"] > 1:
       if (
@@ -27,7 +28,7 @@ def generate_buffer(name, params):
       ):
         return _generate_ofifo_dataless(name, params["slots"])
       else:
-        return _generate_ofifo(name, params["slots"], params["data_type"])
+        return _generate_ofifo(name, params["slots"], hw_type_to_smv_type(params["data_type"]))
     else:
       if (
           "data_type" not in params
@@ -35,7 +36,7 @@ def generate_buffer(name, params):
       ):
         return _generate_oehb_dataless(name)
       else:
-        return _generate_oehb(name, params["data_type"])
+        return _generate_oehb(name, hw_type_to_smv_type(params["data_type"]))
 
 
 def _generate_oehb_dataless(name):
@@ -60,7 +61,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
     VAR outs_i : {data_type};
 
     ASSIGN
-    init(outs_i) := 0;
+    init(outs_i) := {smv_init_data_type(data_type)};
     next(outs_i) := case
                       ins_ready & ins_valid : ins;
                       TRUE : outs_i;
@@ -128,7 +129,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
     VAR data : {data_type};
 
     ASSIGN
-    init(data) := 0;
+    init(outs_i) := {smv_init_data_type(data_type)};
     next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
 
     // output
@@ -183,7 +184,7 @@ if __name__ == "__main__":
       generate_buffer(
           "test_tfifo",
           {"timing": "#handshake<timing {{R: 1}}",
-              "slots": 5, "data_type": "i32"},
+              "slots": 5, "data_type": "!handshake.channel<i1>"},
       )
   )
   print(
@@ -193,7 +194,7 @@ if __name__ == "__main__":
   print(
       generate_buffer(
           "test_tehb", {
-              "timing": "#handshake<timing {{R: 1}}", "data_type": "i32"}
+              "timing": "#handshake<timing {{R: 1}}", "data_type": "!handshake.channel<i32>"}
       )
   )
   print(
@@ -206,7 +207,7 @@ if __name__ == "__main__":
       generate_buffer(
           "test_ofifo",
           {"timing": "#handshake<timing {{R: 0}}",
-              "slots": 5, "data_type": "i32"},
+              "slots": 5, "data_type": "!handshake.channel<i1>"},
       )
   )
   print(
@@ -216,6 +217,6 @@ if __name__ == "__main__":
   print(
       generate_buffer(
           "test_oehb", {
-              "timing": "#handshake<timing {{R: 0}}", "data_type": "i32"}
+              "timing": "#handshake<timing {{R: 0}}", "data_type": "!handshake.channel<i32>"}
       )
   )

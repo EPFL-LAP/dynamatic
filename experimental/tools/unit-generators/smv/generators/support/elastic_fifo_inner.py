@@ -1,3 +1,6 @@
+from generators.support.utils import *
+
+
 def generate_elastic_fifo_inner(name, slots, data_type=None):
   if data_type is None:
     return _generate_elastic_fifo_inner_dataless(name, slots)
@@ -63,7 +66,7 @@ MODULE {name}(ins_valid, outs_ready)
 def _generate_elastic_fifo_inner(name, slots, data_type):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-    {"\n    ".join([f"VAR mem_{n} : boolean;" for n in range(slots)])}
+    {"\n    ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}
     VAR full : boolean;
     VAR empty : boolean;
     VAR head : 0..({slots - 1});
@@ -86,7 +89,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
                   esac;
 
     {"\n    ".join([f"""ASSIGN
-    init(mem_{n}) := FALSE;
+    init(mem_{n}) := {smv_init_data_type(data_type)};
     next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n}""" for n in range(slots)])}
 
     ASSIGN

@@ -1,13 +1,14 @@
 from generators.support.eager_fork_register_block import (
     generate_eager_fork_register_block,
 )
+from generators.support.utils import hw_type_to_smv_type
 
 
 def generate_fork(name, params):
   if "data_type" not in params or params["data_type"] == "!handshake.control<>":
     return _generate_fork_dataless(name, params["size"])
   else:
-    return _generate_fork(name, params["size"], params["data_type"])
+    return _generate_fork(name, params["size"], hw_type_to_smv_type(params["data_type"]))
 
 
 def _generate_fork_dataless(name, size):
@@ -42,4 +43,5 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
 if __name__ == "__main__":
   print(generate_fork("test_fork_dataless", {"size": 4}))
-  print(generate_fork("test_fork", {"size": 2, "data_type": "int"}))
+  print(generate_fork("test_fork", {
+        "size": 2, "data_type": "!handshake.channel<i32>"}))

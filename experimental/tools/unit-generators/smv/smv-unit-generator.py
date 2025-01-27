@@ -12,7 +12,7 @@ def generate_code(name, mod_type, parameters):
     case "buffer":
       return generate_buffer(name, parameters)
     case _:
-      print(f"Module type {mod_type} not found")
+      raise ValueError(f"Module type {mod_type} not found")
 
 
 def parse_parameters(param_string):
