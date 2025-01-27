@@ -3,13 +3,14 @@ from generators.support.merge_notehb import (
 )
 from generators.handshake.buffer import generate_buffer
 from generators.handshake.fork import generate_fork
+from generators.support.utils import *
 
 
 def generate_control_merge(name, params):
   if "data_type" not in params or params["data_type"] == "!handshake.control<>":
     return _generate_control_merge_dataless(name, params["size"])
   else:
-    return _generate_control_merge(name, params["size"], params["data_type"])
+    return _generate_control_merge(name, params["size"], hw_type_to_smv_type(params["data_type"]))
 
 
 def _generate_control_merge_dataless(name, size):
@@ -32,7 +33,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
     DEFINE index := inner_tehb.outs;
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
-{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": "integer"})}
+{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.channel<i32>"})}
 {generate_fork(f"{name}__fork_datraless", {"size": 2})}
 """
 
@@ -44,7 +45,7 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
     DEFINE data := case
                      {"\n                     ".join([f"ins_valid_{n} : ins_{n};" for n in range(size)])}
-                     TRUE: FALSE;
+                     TRUE: {smv_init_data_type(data_type)};
                    esac:
 
     // output
@@ -61,4 +62,4 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 if __name__ == "__main__":
   print(generate_control_merge("test_control_merge_dataless", {"size": 4}))
   print(generate_control_merge(
-      "test_control_merge_fork", {"size": 2, "data_type": "int"}))
+      "test_control_merge_fork", {"size": 2, "data_type": "!handshake.channel<i32>"}))

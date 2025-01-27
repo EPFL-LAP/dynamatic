@@ -2,6 +2,7 @@ from generators.support.merge_notehb import (
     generate_merge_notehb,
 )
 from generators.handshake.buffer import generate_buffer
+from generators.support.utils import hw_type_to_smv_type
 
 
 def generate_merge(name, params):
@@ -37,11 +38,11 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
     DEFINE outs := inner_tehb.outs;
     DEFINE outs_valid := inner_tehb.outs_valid;
 
-{generate_merge_notehb(f"{name}__merge_notehb", size, data_type)}
+{generate_merge_notehb(f"{name}__merge_notehb", size, hw_type_to_smv_type(data_type))}
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type})}
 """
 
 
 if __name__ == "__main__":
   print(generate_merge("test_merge_dataless", {"size": 4}))
-  print(generate_merge("test_merge", {"size": 2, "data_type": "int"}))
+  print(generate_merge("test_merge", {"size": 2, "data_type": "!handshake.channel<i32>"}))

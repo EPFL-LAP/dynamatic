@@ -1,11 +1,12 @@
 from generators.handshake.join import generate_join
+from generators.support.utils import hw_type_to_smv_type
 
 
 def generate_cond_br(name, params):
   if "data_type" not in params or params["data_type"] == "!handshake.control<>":
     return _generate_cond_br_dataless(name)
   else:
-    return _generate_cond_br(name, params["data_type"])
+    return _generate_cond_br(name, hw_type_to_smv_type(params["data_type"]))
 
 
 def _generate_cond_br_dataless(name):
@@ -44,4 +45,4 @@ MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, false
 
 if __name__ == "__main__":
   print(generate_cond_br("test_cond_br_dataless", {}))
-  print(generate_cond_br("test_cond_br", {"data_type": "int"}))
+  print(generate_cond_br("test_cond_br", {"data_type": "!handshake.channel<i32>"}))
