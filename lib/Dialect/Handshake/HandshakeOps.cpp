@@ -351,7 +351,8 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
 
   // Parse until just before the operand types
-  if (parser.parseOperandList(operands) ||
+  if (parser.parseLSquare() || parser.parseOperandList(operands) ||
+      parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseLSquare())
     return failure();
