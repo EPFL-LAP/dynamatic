@@ -249,6 +249,8 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
     auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
     for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
       if (!unionOfExtraSignalNames.contains(extraSignal.name)) {
+        unionOfExtraSignalNames.insert(extraSignal.name);
+
         // The constraint MergingExtraSignals guarantees that
         // extra signals sharing the same name is equivalent.
         unionOfExtraSignals.push_back(extraSignal);
