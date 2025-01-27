@@ -63,40 +63,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }]
     >,
   ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    auto operands = concreteOp.getDataOperands();
-
-    if (operands.size() < 1)
-      return concreteOp.emitOpError("must have at least one data operand");
-
-    // Verification of the spec tag
-    // If any input has a spec tag, the result must have a spec tag
-    // If no input has a spec tag, the result must not have a spec tag
-
-    // We don't care any other extra signals than spec tag here.
-    // That means, the verification succeeds even if the result suddenly has an unknown extra signal none of the inputs have.
-    // Also, the verify succeeds even if the result drops an unknown extra signal that all of the inputs have.
-    // If someone wants to verify other extra signals, they should implement a new verification here,
-    // or impose new constraints to the operations.
-
-    mlir::Type resultType = $_op->getResult(0).getType();
-    auto resultExtraSignalsType = cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(resultType);
-    bool resultHasSpecTag = resultExtraSignalsType.hasExtraSignal("spec");
-    if (concreteOp.hasSpecInput()) {
-      // If any input has a spec tag, the result must have a spec tag
-      if (!resultHasSpecTag)
-        return concreteOp.emitOpError("result must have a spec tag");
-    } else {
-      // If no input has a spec tag, the result must not have a spec tag
-      if (resultHasSpecTag)
-        return concreteOp.emitOpError("result must not have a spec tag");
-    }
-
-    return mlir::success();
-  }];
 }
 
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
