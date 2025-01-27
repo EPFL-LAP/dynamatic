@@ -390,7 +390,7 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
-  p << " " << getOperands() << " ";
+  p << " [" << getOperands() << "] ";
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : [";
   int i = 0;
