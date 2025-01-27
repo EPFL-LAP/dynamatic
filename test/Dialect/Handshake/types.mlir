@@ -8,6 +8,18 @@ handshake.func @simpleChannel(%arg0: !handshake.channel<i32>) -> !handshake.cont
 
 // -----
 
+handshake.func @simpleControlWithDownExtra(%arg0: !handshake.control<[extra: i1]>) -> !handshake.control<>
+
+// -----
+
+handshake.func @simpleControlWithUpExtra(%arg0: !handshake.control<[extra: i1 (U)]>) -> !handshake.control<>
+
+// -----
+
+handshake.func @simpleControlWithDownAndUpExtra(%arg0: !handshake.control<[extraDown: i1, extraUp: i1 (U)]>) -> !handshake.control<>
+
+// -----
+
 handshake.func @simpleChannelWithDownExtra(%arg0: !handshake.channel<i32, [extra: i1]>) -> !handshake.control<>
 
 // -----

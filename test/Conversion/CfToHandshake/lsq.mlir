@@ -153,7 +153,7 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_32:.*]] = merge %[[VAL_19]] {handshake.bb = 2 : ui32} : <i32>
 // CHECK:           %[[VAL_33:.*]], %[[VAL_34:.*]] = control_merge %[[VAL_21]]  {handshake.bb = 2 : ui32} : <>, <i1>
 // CHECK:           %[[VAL_35:.*]] = source {handshake.bb = 2 : ui32}
-// CHECK:           %[[VAL_36:.*]] = constant %[[VAL_35]] {handshake.bb = 2 : ui32, value = 1 : i32} : <i32>
+// CHECK:           %[[VAL_36:.*]] = constant %[[VAL_35]] {handshake.bb = 2 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_37:.*]] = addi %[[VAL_32]], %[[VAL_36]] {handshake.bb = 2 : ui32} : <i32>
 // CHECK:           %[[VAL_7]], %[[VAL_38:.*]] = load{{\[}}%[[VAL_37]]] %[[VAL_4]]#1 {handshake.bb = 2 : ui32} : <i32>, <i32>
 // CHECK:           %[[VAL_39:.*]] = br %[[VAL_38]] {handshake.bb = 2 : ui32} : <i32>

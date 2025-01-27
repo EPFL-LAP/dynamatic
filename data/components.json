@@ -452,7 +452,7 @@
   },
   "handshake.addf": {
     "latency": {
-      "64": 10.0
+      "64": 9.0
     },
     "delay": {
       "data": {
@@ -513,7 +513,7 @@
   },
   "handshake.subf": {
     "latency": {
-      "64": 10.0
+      "64": 9.0
     },
     "delay": {
       "data": {
@@ -574,7 +574,7 @@
   },
   "handshake.mulf": {
     "latency": {
-      "64": 6.0
+      "64": 4.0
     },
     "delay": {
       "data": {
@@ -818,7 +818,7 @@
   },
   "handshake.cmpf": {
     "latency": {
-      "64": 2.0
+      "64": 0.0
     },
     "delay": {
       "data": {

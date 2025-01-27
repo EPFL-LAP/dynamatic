@@ -23,23 +23,14 @@ module store #(
   input  addrOut_ready 
 );
 
-  wire join_valid;
-
-  // Instantiate join
-  join_type #(
-    .SIZE(2)
-  ) join_inst (
-    .ins_valid  ({addrIn_valid, dataIn_valid}),
-    .outs_ready (dataToMem_ready             ),
-    .ins_ready  ({addrIn_ready, dataIn_ready}),
-    .outs_valid  (join_valid                  )
-  );
+  // Data assignment
+  assign dataToMem = dataIn;
+  assign dataToMem_valid = dataIn_valid;
+  assign dataIn_ready = dataToMem_ready;
 
   // Address assignment
   assign addrOut = addrIn;
-  assign addrOut_valid = join_valid;
-  // Data assignment
-  assign dataToMem = dataIn;
-  assign dataToMem_valid = join_valid;
+  assign addrOut_valid = addrIn_valid;
+  assign addrIn_ready = addrOut_ready;
 
 endmodule

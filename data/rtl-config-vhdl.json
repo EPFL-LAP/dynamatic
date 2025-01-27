@@ -530,7 +530,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/merge.vhd",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["types", "tehb", "merge_notehb"]
   },
   {
     "name": "handshake.br",
@@ -647,9 +647,9 @@
   },
   {
     "name": "handshake.lsq",
-    "generator": "java -jar -Xmx7G \"$DYNAMATIC/bin/generators/lsq-generator.jar\" --target-dir \"$OUTPUT_DIR\" --spec-file \"$OUTPUT_DIR/$MODULE_NAME.json\" > /dev/null",
+    "generator": "/usr/bin/env python3 $DYNAMATIC/tools/backend/lsq-generator-python/lsq-generator.py -o $OUTPUT_DIR -c $OUTPUT_DIR/$MODULE_NAME.json",
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
-    "hdl": "verilog",
+    "hdl": "vhdl",
     "io-kind": "flat",
     "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
     "io-signals": {

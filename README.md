@@ -48,6 +48,8 @@ The following instructions can be used to setup Dynamatic from source. If you in
     curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
     ```
 
+    Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to [our tutorial](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/AdvancedBuild.md#getting-gurobi) for guidance on how to setup the Gurobi solver.
+
     Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your `PATH`. Alternatively, open a new terminal and proceed to cloning the project.
 
 2. **Clone the project and its submodules.** Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). You need to clone with the SSH link to be able to push to the repository.

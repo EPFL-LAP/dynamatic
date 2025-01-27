@@ -209,15 +209,6 @@ Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
   return ControlType::get(getContext(), newExtraSignals);
 }
 
-Type ControlType::removeExtraSignal(const std::string &name) const {
-  SmallVector<ExtraSignal> newExtraSignals;
-  for (const ExtraSignal &signal : getExtraSignals()) {
-    if (signal.name != name)
-      newExtraSignals.emplace_back(signal);
-  }
-  return ControlType::get(getContext(), newExtraSignals);
-}
-
 //===----------------------------------------------------------------------===//
 // ChannelType
 //===----------------------------------------------------------------------===//
@@ -345,15 +336,6 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
 Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
   SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
   newExtraSignals.emplace_back(signal);
-  return ChannelType::get(getDataType(), newExtraSignals);
-}
-
-Type ChannelType::removeExtraSignal(const std::string &name) const {
-  SmallVector<ExtraSignal> newExtraSignals;
-  for (const ExtraSignal &signal : getExtraSignals()) {
-    if (signal.name != name)
-      newExtraSignals.emplace_back(signal);
-  }
   return ChannelType::get(getDataType(), newExtraSignals);
 }
 
