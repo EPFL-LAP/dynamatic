@@ -1,12 +1,12 @@
 def generate_elastic_fifo_inner(name, slots, data_type=None):
-    if data_type is None:
-        return _generate_elastic_fifo_inner_dataless(name, slots)
-    else:
-        return _generate_elastic_fifo_inner(name, slots, data_type)
+  if data_type is None:
+    return _generate_elastic_fifo_inner_dataless(name, slots)
+  else:
+    return _generate_elastic_fifo_inner(name, slots, data_type)
 
 
 def _generate_elastic_fifo_inner_dataless(name, slots):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, outs_ready)
     VAR full : boolean;
     VAR empty : boolean;
@@ -61,7 +61,7 @@ MODULE {name}(ins_valid, outs_ready)
 
 
 def _generate_elastic_fifo_inner(name, slots, data_type):
-    return f"""
+  return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
     {"\n    ".join([f"VAR mem_{n} : boolean;" for n in range(slots)])}
     VAR full : boolean;
