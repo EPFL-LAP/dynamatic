@@ -119,11 +119,11 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
                   SmallVectorImpl<ExtraSignal> &extraSignals) {
 
   auto parseSignal = [&]() -> ParseResult {
-    auto &signal = extraSignals.emplace_back();
-    signal.downstream = true;
+    auto &extraSignal = extraSignals.emplace_back();
+    extraSignal.downstream = true;
 
-    if (odsParser.parseKeyword(&signal.name) || odsParser.parseColon() ||
-        odsParser.parseType(signal.type))
+    if (odsParser.parseKeyword(&extraSignal.name) || odsParser.parseColon() ||
+        odsParser.parseType(extraSignal.type))
       return failure();
 
     // Attempt to parse the optional upstream symbol
@@ -132,7 +132,7 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
       if (odsParser.parseKeywordOrString(&upstreamSymbol) ||
           upstreamSymbol != UPSTREAM_SYMBOL || odsParser.parseRParen())
         return failure();
-      signal.downstream = false;
+      extraSignal.downstream = false;
     }
     return success();
   };
