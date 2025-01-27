@@ -36,4 +36,5 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
 if __name__ == "__main__":
   print(generate_lazy_fork("test_lazy_fork_dataless", {"size": 4}))
-  print(generate_lazy_fork("test_lazy_fork", {"size": 2, "data_type": "!handshake.channel<i32>"}))
+  print(generate_lazy_fork("test_lazy_fork", {
+        "size": 2, "data_type": "!handshake.channel<i32>"}))

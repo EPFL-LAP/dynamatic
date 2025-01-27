@@ -45,4 +45,5 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
 if __name__ == "__main__":
   print(generate_merge("test_merge_dataless", {"size": 4}))
-  print(generate_merge("test_merge", {"size": 2, "data_type": "!handshake.channel<i32>"}))
+  print(generate_merge("test_merge", {
+        "size": 2, "data_type": "!handshake.channel<i32>"}))

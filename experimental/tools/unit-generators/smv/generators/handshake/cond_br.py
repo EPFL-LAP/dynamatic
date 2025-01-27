@@ -45,4 +45,5 @@ MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, false
 
 if __name__ == "__main__":
   print(generate_cond_br("test_cond_br_dataless", {}))
-  print(generate_cond_br("test_cond_br", {"data_type": "!handshake.channel<i32>"}))
+  print(generate_cond_br("test_cond_br", {
+        "data_type": "!handshake.channel<i32>"}))
