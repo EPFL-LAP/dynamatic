@@ -21,6 +21,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -130,6 +131,9 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     return;
 
   for (OpResult res : currOp->getResults()) {
+    // auto t = res.getType();
+    // t.dump();
+    // std::cerr << "pointer: " << t.getImpl() << "\n";
     for (OpOperand &dstOpOperand : res.getUses()) {
       Operation *succOp = dstOpOperand.getOwner();
       if (placements.containsSave(dstOpOperand)) {

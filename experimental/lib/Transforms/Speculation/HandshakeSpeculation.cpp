@@ -598,7 +598,9 @@ updateTypesRecursive(MLIRContext &ctx, OpOperand &opOperand,
 
   visited.insert(op);
 
-  op->dump();
+  // auto operand = opOperand.get().getType();
+  // operand.dump();
+  // std::cerr << "pointer: " << operand.getImpl() << "\n";
 
   // Exceptional cases
   if (isa<handshake::SpecCommitOp>(op)) {
