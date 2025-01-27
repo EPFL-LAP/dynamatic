@@ -120,7 +120,6 @@ parseExtraSignals(function_ref<InFlightDiagnostic()> emitError,
 
   auto parseSignal = [&]() -> ParseResult {
     auto &extraSignal = extraSignals.emplace_back();
-    extraSignal.downstream = true;
 
     if (odsParser.parseKeyword(&extraSignal.name) || odsParser.parseColon() ||
         odsParser.parseType(extraSignal.type))
