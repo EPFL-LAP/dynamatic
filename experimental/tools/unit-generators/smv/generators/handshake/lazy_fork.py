@@ -1,12 +1,12 @@
 def generate_lazy_fork(name, params):
-    if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-        return _generate_lazy_fork_dataless(name, params["size"])
-    else:
-        return _generate_lazy_fork(name, params["size"], params["data_type"])
+  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
+    return _generate_lazy_fork_dataless(name, params["size"])
+  else:
+    return _generate_lazy_fork(name, params["size"], params["data_type"])
 
 
 def _generate_lazy_fork_dataless(name, size):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
     DEFINE all_ready = {" & ".join([f"outs_ready_{n}" for n in range(size)])};
@@ -18,7 +18,7 @@ MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
 
 def _generate_lazy_fork(name, size, data_type):
-    return f"""
+  return f"""
 MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
     VAR inner_lazy_fork : {name}__lazy_fork_dataless(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])});
 
@@ -32,5 +32,5 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
 
 if __name__ == "__main__":
-    print(generate_lazy_fork("test_lazy_fork_dataless", {"size": 4}))
-    print(generate_lazy_fork("test_lazy_fork", {"size": 2, "data_type": "int"}))
+  print(generate_lazy_fork("test_lazy_fork_dataless", {"size": 4}))
+  print(generate_lazy_fork("test_lazy_fork", {"size": 2, "data_type": "int"}))

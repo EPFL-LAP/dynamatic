@@ -6,14 +6,14 @@ from generators.handshake.fork import generate_fork
 
 
 def generate_control_merge(name, params):
-    if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-        return _generate_control_merge_dataless(name, params["size"])
-    else:
-        return _generate_control_merge(name, params["size"], params["data_type"])
+  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
+    return _generate_control_merge_dataless(name, params["size"])
+  else:
+    return _generate_control_merge(name, params["size"], params["data_type"])
 
 
 def _generate_control_merge_dataless(name, size):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
     VAR inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
     VAR inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
@@ -38,7 +38,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
 
 
 def _generate_control_merge(name, size, data_type):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
     VAR inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready);
 
@@ -59,5 +59,6 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
 
 if __name__ == "__main__":
-    print(generate_control_merge("test_control_merge_dataless", {"size": 4}))
-    print(generate_control_merge("test_control_merge_fork", {"size": 2, "data_type": "int"}))
+  print(generate_control_merge("test_control_merge_dataless", {"size": 4}))
+  print(generate_control_merge(
+      "test_control_merge_fork", {"size": 2, "data_type": "int"}))

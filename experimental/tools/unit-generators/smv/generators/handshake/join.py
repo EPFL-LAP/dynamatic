@@ -1,9 +1,9 @@
 def generate_join(name, params):
-    return _generate_join(name, params["size"])
+  return _generate_join(name, params["size"])
 
 
 def _generate_join(name, size):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
     DEFINE all_valid = {" & ".join([f"ins_valid_{n}" for n in range(size)])};
@@ -15,4 +15,4 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
 
 if __name__ == "__main__":
-    print(generate_join("test_fork_dataless", {"size": 3}))
+  print(generate_join("test_fork_dataless", {"size": 3}))

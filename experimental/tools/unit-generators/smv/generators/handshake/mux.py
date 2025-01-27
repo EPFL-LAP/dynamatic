@@ -2,14 +2,14 @@ from generators.handshake.buffer import generate_buffer
 
 
 def generate_mux(name, params):
-    if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-        return _generate_mux_dataless(name, params["size"])
-    else:
-        return _generate_mux(name, params["size"], params["data_type"])
+  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
+    return _generate_mux_dataless(name, params["size"])
+  else:
+    return _generate_mux(name, params["size"], params["data_type"])
 
 
 def _generate_mux_dataless(name, size):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index_valid, outs_ready)
     VAR inner_tehb : {name}__tehb(tehb_ins_valid, outs_ready);
 
@@ -28,7 +28,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index
 
 
 def _generate_mux(name, size, data_type):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index_valid, outs_ready)
     VAR inner_tehb : {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
 
@@ -52,5 +52,5 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
 
 if __name__ == "__main__":
-    print(generate_mux("test_mux_dataless", {"size": 4}))
-    print(generate_mux("test_mux", {"size": 2, "data_type": "int"}))
+  print(generate_mux("test_mux_dataless", {"size": 4}))
+  print(generate_mux("test_mux", {"size": 2, "data_type": "int"}))

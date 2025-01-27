@@ -1,5 +1,5 @@
 def generate_source(name, params):
-    return f"""
+  return f"""
 MODULE {name}(outs_ready)
 
     // output
@@ -8,4 +8,4 @@ MODULE {name}(outs_ready)
 
 
 if __name__ == "__main__":
-    print(generate_source("test_source", {}))
+  print(generate_source("test_source", {}))
