@@ -306,7 +306,6 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure, SameOperandsAndResultType,
-  // AllTypesMatchWithVariadics<["dataOperands"], ["result"]>,
   VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
