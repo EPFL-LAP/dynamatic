@@ -251,6 +251,8 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
     auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
     for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
       if (!unionOfExtraSignalNames.contains(extraSignal.name)) {
+        unionOfExtraSignalNames.insert(extraSignal.name);
+
         // The constraint MergingExtraSignals guarantees that
         // extra signals sharing the same name is equivalent.
         unionOfExtraSignals.push_back(extraSignal);
@@ -263,7 +265,7 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   // The return type is data type of any data operand (if ControlType) with
   // union of data operand's extra signals.
   inferredReturnTypes.push_back(
-      firstDataInType.replaceExtraSignals(unionOfExtraSignals));
+      firstDataInType.copyWithExtraSignals(unionOfExtraSignals));
 
   return success();
 }
@@ -353,7 +355,8 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
 
   // Parse until just before the operand types
-  if (parser.parseOperandList(operands) ||
+  if (parser.parseLSquare() || parser.parseOperandList(operands) ||
+      parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseLSquare())
     return failure();
@@ -392,7 +395,7 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
-  p << " " << getOperands() << " ";
+  p << " [" << getOperands() << "] ";
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : [";
   int i = 0;

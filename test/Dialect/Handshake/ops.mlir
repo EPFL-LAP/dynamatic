@@ -76,14 +76,14 @@ handshake.func @muxWithExtraSignal(
   end %ctrl : !handshake.control<>
 }
 
-// ----
+// -----
 
 handshake.func @cmergeWithExtraSignal(
     %ctrl : !handshake.control<>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e3: i6]>,
-    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  %data, %idx = control_merge %data1, %data2, %data3, %data4 : [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>, <i2>
+    %data1 : !handshake.control<>,
+    %data2 : !handshake.control<[e1: i2]>,
+    %data3 : !handshake.control<[e3: i6]>,
+    %data4 : !handshake.control<[e1: i2, e2: i4]>) -> !handshake.control<> {
+  %data, %idx = control_merge [%data1, %data2, %data3, %data4] : [<>, <[e1: i2]>, <[e3: i6]>, <[e1: i2, e2: i4]>] to <[e1: i2, e3: i6, e2: i4]>, <i2>
   end %ctrl : !handshake.control<>
 }

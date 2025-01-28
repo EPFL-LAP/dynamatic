@@ -45,12 +45,12 @@ handshake.func @forkResult(%start: !handshake.control<>) -> !handshake.channel<i
 
 // CHECK-LABEL:   handshake.func @sinkResult(
 // CHECK-SAME:                               %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.control<> attributes {argNames = ["start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_1:.*]], %[[VAL_2:.*]] = control_merge %[[VAL_0]]  : <>, <i32>
+// CHECK:           %[[VAL_1:.*]], %[[VAL_2:.*]] = control_merge [%[[VAL_0]]]  : [<>] to <>, <i32>
 // CHECK:           sink %[[VAL_2]] : <i32>
 // CHECK:           end %[[VAL_1]] : <>
 // CHECK:         }
 handshake.func @sinkResult(%start: !handshake.control<>) -> !handshake.control<> {
-  %ctrl, %idx = control_merge %start : <>, <i32>
+  %ctrl, %idx = control_merge [%start] : [<>] to <>, <i32>
   end %ctrl : <>
 }
 

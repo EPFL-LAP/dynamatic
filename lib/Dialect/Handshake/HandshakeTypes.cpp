@@ -218,7 +218,7 @@ Type ControlType::removeExtraSignal(const llvm::StringRef &name) const {
   return ControlType::get(getContext(), newExtraSignals);
 }
 
-Type ControlType::replaceExtraSignals(
+Type ControlType::copyWithExtraSignals(
     ArrayRef<ExtraSignal> extraSignals) const {
   return ControlType::get(getContext(), extraSignals);
 }
@@ -362,7 +362,7 @@ Type ChannelType::removeExtraSignal(const llvm::StringRef &name) const {
   return ChannelType::get(getDataType(), newExtraSignals);
 }
 
-Type ChannelType::replaceExtraSignals(
+Type ChannelType::copyWithExtraSignals(
     ArrayRef<ExtraSignal> extraSignals) const {
   return ChannelType::get(getDataType(), extraSignals);
 }
