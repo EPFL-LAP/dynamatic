@@ -147,6 +147,7 @@ public:
 /// memory interface, and
 /// 2. the data value produced by the memory interface and consumed by the port
 /// operation.
+/// 3. TODO
 class LoadPort : public MemoryPort {
 public:
   /// Constructs the load port from a load operation, the index of the load's
@@ -172,6 +173,10 @@ public:
   /// Returns the index of the load data value in the memory interface's
   /// outputs.
   unsigned getDataOutputIndex() const { return resIndices[0]; }
+
+  /// Returns the index of the load done value in the memory interface's
+  /// outputs
+  unsigned getDoneOutputIndex() const { return resIndices[1]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
@@ -210,6 +215,10 @@ public:
   /// Returns the index of the store data value in the memory interface's
   /// inputs.
   unsigned getDataInputIndex() const { return oprdIndices[1]; }
+
+  /// Returns the index of the store done value in the memory interface's
+  /// outputs
+  unsigned getDoneOutputIndex() const { return resIndices[0]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {

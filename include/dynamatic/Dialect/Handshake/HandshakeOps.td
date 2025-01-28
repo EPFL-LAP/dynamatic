@@ -694,10 +694,11 @@ def LSQOp : Handshake_Op<"lsq", [
 
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
-                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads, "unsigned":$numStores)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
-                   "unsigned":$numLoads)>,
+                   "unsigned":$numLoads,
+                   "unsigned":$numStores)>,
   ];
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;

@@ -195,6 +195,7 @@ struct HandshakeMinimizeCstWidthPass
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
 
+    llvm::errs() << "Number of saved bits is " << savedBits << "\n";
     LLVM_DEBUG(llvm::dbgs() << "Number of saved bits is " << savedBits << "\n");
   };
 };

@@ -173,6 +173,8 @@ private:
   InterfacePorts lsqPorts;
   /// Number of loads to the LSQ.
   unsigned lsqNumLoads = 0;
+  /// Number of stores to the LSQ.
+  unsigned lsqNumStores = 0;
 
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the

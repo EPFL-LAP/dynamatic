@@ -743,14 +743,25 @@ struct MemInterfaceAddrOpt
 
   LogicalResult matchAndRewrite(handshake::MemoryOpInterface memOp,
                                 PatternRewriter &rewriter) const override {
+    llvm::errs() << "interface start! \n";
+
     unsigned optWidth = APInt(APInt::APINT_BITS_PER_WORD,
                               memOp.getMemRef().getType().getDimSize(0))
                             .ceilLogBase2();
 
+    llvm::errs() << "mid0\n";
     FuncMemoryPorts ports = getMemoryPorts(memOp);
+    llvm::errs() << "&&&& ???? \n";
+    for (auto ch : ports.interfacePorts){
+      if (ch.getKind() == MemoryPort::Kind::LOAD){
+          llvm::errs() << "&&&& load \n";
+      }
+      llvm::errs() << "&&&& not load \n";
+    }
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
       return failure();
 
+    llvm::errs() << "mid1\n";
     ValueRange operands = memOp->getOperands();
     TypeRange resultTypes = memOp->getResultTypes();
     // Optimizes the bitwidth of the address channel currently being pointed to
@@ -761,6 +772,7 @@ struct MemInterfaceAddrOpt
                          optWidth, rewriter);
     };
 
+    llvm::errs() << "mid2\n";
     // Replace new operands and result types with the narrrower address type by
     // iterating over the memory interface's ports
     SmallVector<Value> newOperands(operands);
@@ -816,6 +828,14 @@ struct MemInterfaceAddrOpt
         StringAttr::get(getContext(), memOp->getName().getStringRef()),
         newOperands, newResultTypes, memOp->getAttrs()));
     SmallVector<Value> replacementValues(newMemOp->getResults());
+
+    llvm::errs() << "^^^^^\n";
+    for (auto a : replacementValues)
+      llvm::errs() << a << "\n";
+
+    llvm::errs() << "^^^^^\n";
+
+    
     for (unsigned resIdx : addrResultIndices) {
       replacementValues[resIdx] = modBitWidth(
           {cast<ChannelVal>(replacementValues[resIdx]), ExtType::LOGICAL},
@@ -824,6 +844,7 @@ struct MemInterfaceAddrOpt
     inheritBB(memOp, newMemOp);
     namer.replaceOp(memOp, newMemOp);
     rewriter.replaceOp(memOp, replacementValues);
+    llvm::errs() << "interface done! \n";
     return success();
   }
 
@@ -846,6 +867,7 @@ struct MemPortAddrOpt
 
   LogicalResult matchAndRewrite(handshake::MemPortOpInterface portOp,
                                 PatternRewriter &rewriter) const override {
+    llvm::errs() << "start of mem port \n";
     // Check whether we can optimize the address bitwidth
     ChannelVal addrRes = portOp.getAddressOutput();
     unsigned addrWidth = addrRes.getType().getDataBitWidth();
@@ -858,8 +880,9 @@ struct MemPortAddrOpt
         {getMinimalValue(portOp.getAddressInput()), ExtType::LOGICAL}, optWidth,
         rewriter);
     Value dataIn = portOp.getDataInput();
-    SmallVector<Value, 2> newOperands{newAddr, dataIn};
-    SmallVector<Type, 2> newResultTypes{newAddr.getType(), dataIn.getType()};
+    Value done = portOp.getDoneInput();
+    SmallVector<Value, 3> newOperands{newAddr, dataIn, done};
+    SmallVector<Type, 3> newResultTypes{newAddr.getType(), dataIn.getType(), done.getType()};
 
     // Replace the memory port
     rewriter.setInsertionPoint(portOp);
@@ -871,7 +894,8 @@ struct MemPortAddrOpt
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
         {newPortOp.getAddressOutput(), ExtType::LOGICAL}, addrWidth, rewriter);
-    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
+    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput(), newPortOp.getDoneOutput()});
+    llvm::errs() << "that\n";
     return success();
   }
 
@@ -1539,9 +1563,11 @@ struct HandshakeOptimizeBitwidthsPass
     RewritePatternSet patterns(ctx);
     patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
                  MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
+    llvm::errs() << "pattern start\n";
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
+    llvm::errs() << "pattern end\n";
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
       bool fwChanged, bwChanged;
@@ -1569,6 +1595,8 @@ struct HandshakeOptimizeBitwidthsPass
           return signalPassFailure();
       while (fwChanged || bwChanged);
     }
+
+    llvm::errs() << "opt finished\n";
   }
 
 private:
