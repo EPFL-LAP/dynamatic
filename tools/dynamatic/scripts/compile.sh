@@ -142,6 +142,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
     --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
+    --convert-mux-to-merge \
     > "$F_HANDSHAKE_SQ"
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
@@ -150,7 +151,6 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --convert-mux-to-merge \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
@@ -162,7 +162,6 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --convert-mux-to-merge \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
