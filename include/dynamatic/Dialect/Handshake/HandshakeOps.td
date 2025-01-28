@@ -305,7 +305,10 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 }
 
 def MergeOp : Handshake_Op<"merge", [
-  Pure, SameOperandsAndResultType,
+  Pure,
+  // MergeOp imposes this constraint, while MuxOp and CMergeOp
+  // only require that the data types match.
+  SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
