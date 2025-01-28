@@ -408,10 +408,6 @@ void ControlMergeOp::print(OpAsmPrinter &p) {
   }
   p << "] to ";
   printHandshakeType(p, getResult().getType());
-  for (auto op : getOperands()) {
-    p << ", ";
-    printHandshakeType(p, op.getType());
-  }
   p << ", ";
   p.printStrippedAttrOrType(getIndex().getType());
 }
