@@ -13,6 +13,7 @@
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -27,6 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Casting.h"
 #include <iostream>
 #include <list>
 #include <queue>
@@ -643,22 +645,27 @@ updateTypesRecursive(MLIRContext &ctx, OpOperand &opOperand,
     return success();
   }
 
-  bool performUpstreamTraversal = true;
   if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    // only perform downstream traversal for these operations
-    performUpstreamTraversal = false;
-  }
-
-  // Upstream traversal
-  if (performUpstreamTraversal) {
-    for (auto &operand : op->getOpOperands()) {
-      if (isTraversalDown && operand.get() == opOperand.get())
-        continue;
+    // Only perform traversal to the dataResult
+    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
+    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
       if (failed(markTypeOfValueWithSpecTag(operand.get())))
         return failure();
       if (failed(updateTypesRecursive(ctx, operand, false, visited)))
         return failure();
     }
+
+    return success();
+  }
+
+  // Upstream traversal
+  for (auto &operand : op->getOpOperands()) {
+    if (isTraversalDown && operand.get() == opOperand.get())
+      continue;
+    if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      return failure();
+    if (failed(updateTypesRecursive(ctx, operand, false, visited)))
+      return failure();
   }
 
   // Downstream traversal
