@@ -26,7 +26,7 @@ begin
     tmp_valid_out := '0';
     tmp_ready_out := (others => '0');
     
-    for i in 0 to (INPUTS - 1) loop
+    for i in INPUTS - 1 downto 0 loop
       if (ins_valid(i) = '1') then
         tmp_valid_out := '1';
         tmp_ready_out(i) := outs_ready;

@@ -32,7 +32,7 @@ begin
     tmp_valid_out := '0';
     tmp_ready_out := (others => '0');
 
-    for I in 0 to (INPUTS - 1) loop
+    for I in INPUTS-1 downto 0 loop
       if (ins_valid(I) = '1') then
         tmp_data_out  := unsigned(ins(I));
         tmp_valid_out := '1';

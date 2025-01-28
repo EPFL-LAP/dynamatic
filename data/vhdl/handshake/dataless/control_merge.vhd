@@ -29,7 +29,7 @@ begin
   process (ins_valid)
   begin
     index_tehb <= (INDEX_TYPE - 1 downto 0 => '0');
-    for i in 0 to (SIZE - 1) loop
+    for i in (SIZE - 1) downto 0 loop
       if (ins_valid(i) = '1') then
         index_tehb <= std_logic_vector(to_unsigned(i, INDEX_TYPE));
         exit;
