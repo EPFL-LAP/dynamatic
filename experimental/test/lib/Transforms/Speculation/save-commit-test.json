@@ -1,7 +1,7 @@
 {
   "speculator": {
-    "operation-name": "cond_br1",
-    "operand-idx": 1
+    "operation-name": "fork0",
+    "operand-idx": 0
   },
   "saves": [
   ],
@@ -14,15 +14,11 @@
   "save-commits": [
     {
       "operation-name": "cond_br0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "cond_br0",
       "operand-idx": 1
     },
     {
-      "operation-name": "cond_br1",
-      "operand-idx": 0
+      "operation-name": "cond_br2",
+      "operand-idx": 1
     }
   ]
 }

@@ -36,8 +36,8 @@ handshake.func @placeCommitsOnMultipleBranches(%start: !handshake.control<>) -> 
   %result, %index = control_merge %0#1 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <>, <i1>
   %3 = mux %1 [%result, %result] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <>
   %trueResult1, %falseResult1 = cond_br %2#0, %3 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <>
-  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {handshake.bb = 1 : ui32, handshake.name = "cond_br2"} : <i1>, <>
-  %trueResult3, %falseResult3 = cond_br %1, %trueResult2  {handshake.bb = 1 : ui32, handshake.name = "cond_br3"} : <i1>, <>
-  %trueResult4, %falseResult4 = cond_br %1, %falseResult2  {handshake.bb = 1 : ui32, handshake.name = "cond_br4"} : <i1>, <>
+  %trueResult2, %falseResult2 = cond_br %2#1, %trueResult1 {handshake.bb = 2 : ui32, handshake.name = "cond_br2"} : <i1>, <>
+  %trueResult3, %falseResult3 = cond_br %1, %trueResult2  {handshake.bb = 3 : ui32, handshake.name = "cond_br3"} : <i1>, <>
+  %trueResult4, %falseResult4 = cond_br %1, %falseResult2  {handshake.bb = 4 : ui32, handshake.name = "cond_br4"} : <i1>, <>
   end {handshake.bb = 1 : ui32, handshake.name = "end0"} %falseResult1, %trueResult3, %trueResult4, %falseResult3, %falseResult4 : <>, <>, <>, <>, <>
 }

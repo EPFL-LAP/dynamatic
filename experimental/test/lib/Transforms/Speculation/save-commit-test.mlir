@@ -27,13 +27,17 @@
 // CHECK:           end {handshake.bb = 1 : ui32, handshake.name = "end0"} %[[VAL_36]] : i1
 // CHECK:         }
 handshake.func @placeSaveCommitsOnAllPaths(%start: !handshake.control<>) -> !handshake.channel<i1> {
-  %0:2 =  fork [2] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
+  %0:3 =  fork [3] %start  {handshake.bb = 0 : ui32, handshake.name = "fork1"} : <>
+  %1 = constant %0#2 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <>, <i1>
   %4 = constant %0#0 {handshake.bb = 0 : ui32, handshake.name = "constant1", value = 0 : i1} : <>, <i1>
-  %result, %index = control_merge %trueResult, %4 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <i1>, <i1>
-  %trueResult, %falseResult = cond_br %3#2, %result {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : <i1>, <i1>
-  %1 = constant %0#1 {handshake.bb = 1 : ui32, handshake.name = "constant0", value = 1 : i1} : <>, <i1>
-  %2 = mux %index [%trueResult1, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <i1>
-  %3:3 = fork [3] %2  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : <i1>
+  %control, %index = control_merge %trueResult2, %0#1 {handshake.bb = 1 : ui32, handshake.name = "control_merge0"} : <>, <i1>
+  %control_forked:2 = fork [2] %control {handshake.bb = 1 : ui32, handshake.name = "control_fork"} : <>
+  %index_forked:2 = fork [2] %index {handshake.bb = 1 : ui32, handshake.name = "index_fork"} : <i1>
+  %res = mux %index_forked#0 [%trueResult, %4] {handshake.bb = 1 : ui32, handshake.name = "mux1"} : <i1>, <i1>
+  %trueResult, %falseResult = cond_br %3#2, %res {handshake.bb = 1 : ui32, handshake.name = "cond_br0"} : <i1>, <i1>
+  %2 = mux %index_forked#1 [%trueResult1, %1] {handshake.bb = 1 : ui32, handshake.name = "mux0"} : <i1>, <i1>
+  %3:4 = fork [4] %2  {handshake.bb = 1 : ui32, handshake.name = "fork0"} : <i1>
   %trueResult1, %falseResult1 = cond_br %3#0, %3#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br1"} : <i1>, <i1>
+  %trueResult2, %falseResult2 = cond_br %3#3, %control_forked#1 {handshake.bb = 1 : ui32, handshake.name = "cond_br2"} : <i1>, <>
   end {handshake.bb = 1 : ui32, handshake.name =  "end0"} %falseResult  : <i1>
 }
