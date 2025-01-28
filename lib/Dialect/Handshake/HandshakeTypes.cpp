@@ -206,12 +206,6 @@ Type ControlType::parse(AsmParser &odsParser) {
   return ControlType::get(odsParser.getContext(), {});
 }
 
-Type ControlType::addExtraSignal(const ExtraSignal &signal) const {
-  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-  newExtraSignals.emplace_back(signal);
-  return ControlType::get(getContext(), newExtraSignals);
-}
-
 Type ControlType::copyWithExtraSignals(
     ArrayRef<ExtraSignal> extraSignals) const {
   return ControlType::get(getContext(), extraSignals);
@@ -345,12 +339,6 @@ Type dynamatic::handshake::detail::jointHandshakeTypeParser(AsmParser &parser) {
     return parseControlAfterLSquare(parser);
   }
   return parseChannelAfterLess(parser);
-}
-
-Type ChannelType::addExtraSignal(const ExtraSignal &signal) const {
-  SmallVector<ExtraSignal> newExtraSignals(getExtraSignals());
-  newExtraSignals.emplace_back(signal);
-  return ChannelType::get(getDataType(), newExtraSignals);
 }
 
 Type ChannelType::copyWithExtraSignals(
