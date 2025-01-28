@@ -263,7 +263,7 @@ MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   // The return type is data type of any data operand (if ControlType) with
   // union of data operand's extra signals.
   inferredReturnTypes.push_back(
-      firstDataInType.replaceExtraSignals(unionOfExtraSignals));
+      firstDataInType.copyWithExtraSignals(unionOfExtraSignals));
 
   return success();
 }

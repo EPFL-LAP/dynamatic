@@ -75,7 +75,7 @@ def ExtraSignalsTypeInterface : TypeInterface<"ExtraSignalsTypeInterface"> {
     InterfaceMethod<"Returns a new type with the extraSignal added",
       "mlir::Type", "addExtraSignal", (ins "const ExtraSignal &":$extraSignal)>,
     InterfaceMethod<"Returns a new type with extraSignals specified",
-      "mlir::Type", "replaceExtraSignals", (ins "llvm::ArrayRef<ExtraSignal>":$extraSignals)>,
+      "mlir::Type", "copyWithExtraSignals", (ins "llvm::ArrayRef<ExtraSignal>":$extraSignals)>,
   ];
 }
 
