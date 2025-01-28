@@ -1,7 +1,7 @@
 from tabulate import tabulate
 
 
-def getTableSimulation(isMerge: bool, inOut: int, K: int, N: int, cycles: int) -> str:
+def getTableSimulation(isMerge: bool, ii_in: int, K: int, N: int, cycles: int) -> str:
 
     # Sequence of tokens on the `out input` of the component
     in0_sequence = ["" for _ in range(cycles)]
@@ -27,8 +27,8 @@ def getTableSimulation(isMerge: bool, inOut: int, K: int, N: int, cycles: int) -
     # For each simulation cycle
     for i in range(cycles):
 
-        # Add a new token in the input if the cycle is multiple of inOut
-        if i % inOut == 0:
+        # Add a new token in the input if the cycle is multiple of ii_in
+        if i % ii_in == 0:
             in0_sequence[i] = token_counter
             inputs_to_handle.append(token_counter)
             # Get next token
@@ -60,6 +60,21 @@ def getTableSimulation(isMerge: bool, inOut: int, K: int, N: int, cycles: int) -
                 if i + K * N < cycles:
                     loop_sequence[i + K * N] = new_token
 
+    non_empty_out = 0
+    non_empty_loop = 0
+    for x in loop_sequence:
+        non_empty_loop += x != ""
+    for x in out_sequence:
+        non_empty_out += x != ""
+
+    ii_loop_expr = "max(II_in, K * N)" if not isMerge else "max(II_in, N)"
+    print("Mux: " if not isMerge else "Merge: ")
+    print(f"\tK = {K}")
+    print(f"\tN = {N}")
+    print(f"\tII_in = {ii_in}")
+    print(f"\tII_loop = {ii_loop_expr} = {len(loop_sequence) / non_empty_loop}")
+    print(f"\tII_out = II_loop / {N} =  {len(out_sequence) / non_empty_out}")
+
     # Make a table out of the simulation
     return tabulate(
         [
@@ -74,20 +89,19 @@ def getTableSimulation(isMerge: bool, inOut: int, K: int, N: int, cycles: int) -
 
 
 def main():
-    IN_OUT = 2
+    II_IN = 13
     K = 7
-    N = 3
-    CYCLES = 50
+    N = 14
+    CYCLES = 100000
     with open("ftdscripting/simulation.txt", "w") as file:
         print(
-            f"Mux   simulation: \n{getTableSimulation(False, IN_OUT, K, N, CYCLES)}\n\n",
+            f"Mux   simulation: \n{getTableSimulation(False, II_IN, K, N, CYCLES)}\n\n",
             file=file,
         )
         print(
-            f"Merge simulation: \n{getTableSimulation(True, IN_OUT, K, N, CYCLES)}\n\n",
+            f"Merge simulation: \n{getTableSimulation(True, II_IN, K, N, CYCLES)}\n\n",
             file=file,
         )
-        print("Simulation correct; see the result in `ftdscripting/simulation.txt`")
 
 
 if __name__ == "__main__":
