@@ -231,6 +231,7 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
 
 /// A constraint ensuring that all operands of the variadic have the same data type.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
+/// Returns true if the variadic is empty.
 class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
   "the operands inside the variadic " # name # " should have the same type",
   CPred<[{
@@ -268,6 +269,7 @@ class AllDataTypesMatchWithinVariadic<string name> : PredOpTrait<
 /// Multi-entity constraint ensuring that the front operand of variadic and non-variadic
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
+/// Returns true if the variadic is empty.
 class DataTypesMatchWithVariadicFront<string variadic, string nonvariadic> : PredOpTrait<
   "the front operand of variadic and non-variadic operand should have the same data type", CPred<[{
     ([&](const mlir::OperandRange &operands, const mlir::Value &op) {
@@ -292,6 +294,7 @@ class DataTypesMatchWithVariadicFront<string variadic, string nonvariadic> : Pre
 /// Multi-entity constraint ensuring that the all operands of variadic and non-variadic
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
+/// Returns true if the variadic is empty.
 class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredOpTrait<
   "the operands inside the variadic " # name # " and " # nonvariadic # " should all have the same type",
   And<[
