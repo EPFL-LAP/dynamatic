@@ -11,7 +11,7 @@ def generate_buffer(name, params):
       ):
         return _generate_tfifo_dataless(name, params["slots"])
       else:
-        return _generate_tfifo(name, params["slots"], hw_type_to_smv_type(params["data_type"]))
+        return _generate_tfifo(name, params["slots"], mlir_type_to_smv_type(params["data_type"]))
     else:
       if (
           "data_type" not in params
@@ -19,7 +19,7 @@ def generate_buffer(name, params):
       ):
         return _generate_tehb_dataless(name)
       else:
-        return _generate_tehb(name, hw_type_to_smv_type(params["data_type"]))
+        return _generate_tehb(name, mlir_type_to_smv_type(params["data_type"]))
   else:
     if "slots" in params and params["slots"] > 1:
       if (
@@ -28,7 +28,7 @@ def generate_buffer(name, params):
       ):
         return _generate_ofifo_dataless(name, params["slots"])
       else:
-        return _generate_ofifo(name, params["slots"], hw_type_to_smv_type(params["data_type"]))
+        return _generate_ofifo(name, params["slots"], mlir_type_to_smv_type(params["data_type"]))
     else:
       if (
           "data_type" not in params
@@ -36,7 +36,7 @@ def generate_buffer(name, params):
       ):
         return _generate_oehb_dataless(name)
       else:
-        return _generate_oehb(name, hw_type_to_smv_type(params["data_type"]))
+        return _generate_oehb(name, mlir_type_to_smv_type(params["data_type"]))
 
 
 def _generate_oehb_dataless(name):

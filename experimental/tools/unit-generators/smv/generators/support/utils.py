@@ -1,7 +1,7 @@
 import re
 
 
-def hw_type_to_smv_type(type):
+def mlir_type_to_smv_type(type):
   pattern = r"^!handshake\.channel<i(\d+)>$"
   match = re.match(pattern, type)
 

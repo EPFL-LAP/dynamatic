@@ -47,9 +47,10 @@ def main():
   try:
     parameters = parse_parameters(args.parameters)
   except ValueError as e:
-    print(f"Error parsing parameters: {e}")
+    sys.stderr.write(f"Error parsing parameters: {e}")
     sys.exit(1)
 
+  # Printing parameters for diagnostic purposes
   header = f"// {args.name} : {args.type}({args.parameters})\n\n"
   print(header + generate_code(args.name, args.type, parameters))
 
