@@ -222,13 +222,17 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
 static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   // Iterate through all memory ports to find out the type of the
   // operand
-  unsigned loadIdx = 0;
+  unsigned loadIdx = 0, storeIdx = 0;
   for (const GroupMemoryPorts &blockPorts : ports.groups) {
     for (const MemoryPort &accessPort : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
-        if (loadPort->getDataOutputIndex() == idx)
+        if (loadPort->getDataOutputIndex() == idx || loadPort->getDoneOutputIndex() == idx)
           return getArrayElemName(LD_DATA, loadIdx);
         ++loadIdx;
+      } else if (std::optional<StorePort> storePort = dyn_cast<StorePort>(accessPort)){
+        if (storePort->getDoneOutputIndex() == idx)
+          return getArrayElemName(ST_DATA, storeIdx);
+        ++storeIdx;
       }
     }
   }
