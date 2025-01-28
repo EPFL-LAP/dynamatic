@@ -49,9 +49,8 @@ struct ExtraSignal {
   /// Returns the signal type's bitwidth.
   unsigned getBitWidth() const;
 
-  /// Called inside the type builder to move data into the MLIR context
-  /// if SelfAllocationParameter or ArrayRefOfSelfAllocationParameter is
-  /// specified to this type parameter
+  /// Automatically called inside the type builder to make sure that the MLIR
+  /// context guarantees the lifetime of the ExtraSignal.
   ExtraSignal allocateInto(mlir::TypeStorageAllocator &alloc) const;
 };
 
