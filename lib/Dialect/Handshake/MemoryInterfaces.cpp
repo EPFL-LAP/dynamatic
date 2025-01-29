@@ -90,8 +90,8 @@ void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
   assert(bb && "MC port must belong to basic block");
   if (isa<handshake::LoadOp>(portOp)) {
     ++mcNumLoads;
-  } else {
-    assert(isa<handshake::StoreOp>(portOp) && "invalid MC port");
+  } else if (isa<handshake::StoreOp>(portOp)){
+    ++mcNumStores;
   }
   mcPorts[*bb].push_back(portOp);
 }
@@ -100,8 +100,8 @@ void MemoryInterfaceBuilder::addLSQPort(unsigned group,
                                         handshake::MemPortOpInterface portOp) {
   if (isa<handshake::LoadOp>(portOp)) {
     ++lsqNumLoads;
-  } else {
-    assert(isa<handshake::StoreOp>(portOp) && "invalid LSQ port");
+  } else if (isa<handshake::StoreOp>(portOp)) {
+    ++lsqNumStores;
   }
   lsqPorts[group].push_back(portOp);
 }
@@ -111,31 +111,50 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(builder, memref.getLoc());
 
-  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
+  FConnectLoad connectLoad = [&](LoadOp loadOp, Value dataIn, Value done) {
     loadOp->setOperand(1, dataIn);
+    loadOp->setOperand(2, done);
   };
-  return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
+  FConnectStore connectStore = [&](StoreOp storeOp, Value done) {
+    storeOp->setOperand(2, done);
+  };
+  return instantiateInterfaces(builder, edgeBuilder, connectLoad, connectStore, 
+        mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     PatternRewriter &rewriter, handshake::MemoryControllerOp &mcOp,
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
-  FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
-    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+  FConnectLoad connectLoad = [&](LoadOp loadOp, Value dataIn, Value done) {
+    rewriter.updateRootInPlace(loadOp, [&] { 
+      loadOp->setOperand(1, dataIn);
+      loadOp->setOperand(2, done); 
+    });
   };
-  return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
+  FConnectStore connectStore = [&](StoreOp storeOp, Value done) {
+    rewriter.updateRootInPlace(storeOp, [&] { 
+      storeOp->setOperand(2, done); 
+    });
+  };
+  return instantiateInterfaces(rewriter, edgeBuilder, connectLoad, connectStore, 
+        mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, BackedgeBuilder &edgeBuilder,
-    const FConnectLoad &connect, handshake::MemoryControllerOp &mcOp,
-    handshake::LSQOp &lsqOp) {
+    const FConnectLoad &connectLoad, const FConnectStore &connectStore, 
+    handshake::MemoryControllerOp &mcOp, handshake::LSQOp &lsqOp) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
   if (failed(determineInterfaceInputs(inputs, builder)))
     return failure();
+  
+  // llvm::errs() << "???\n";
+  // for (auto a : inputs.lsqInputs){
+  //   llvm::errs() << "(())" << a.getType() << "\n";
+  // }
   if (inputs.mcInputs.empty() && inputs.lsqInputs.empty())
     return success();
 
@@ -146,20 +165,23 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   Location loc = memref.getLoc();
 
   if (!inputs.mcInputs.empty() && inputs.lsqInputs.empty()) {
+    llvm::errs() << "---MC\n";
     // We only need a memory controller
     mcOp = builder.create<handshake::MemoryControllerOp>(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads);
+        mcNumLoads, mcNumStores);
   } else if (inputs.mcInputs.empty() && !inputs.lsqInputs.empty()) {
     // We only need an LSQ
+    llvm::errs() << "---LSQ\n";
     lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart,
                                              inputs.lsqInputs, ctrlEnd,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
     // load address, store address, and store data channels from the LSQ to
     // the MC and a load data channel from the MC to the LSQ
+    llvm::errs() << "---Both\n";
     MemRefType memrefType = memref.getType().cast<MemRefType>();
 
     // Create 3 backedges (load address, store address, store data) for the MC
@@ -178,14 +200,18 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // generates a load data result for the LSQ
     mcOp = builder.create<handshake::MemoryControllerOp>(
         loc, memref, memStart, inputs.mcInputs, ctrlEnd, inputs.mcBlocks,
-        mcNumLoads + 1);
+        mcNumLoads + 1, mcNumStores);
 
     // Add the MC's load data result to the LSQ's inputs and create the LSQ,
     // passing a flag to the builder so that it generates the necessary
     // outputs that will go to the MC
-    inputs.lsqInputs.push_back(mcOp.getOutputs().back());
+    ResultRange lastThree = mcOp.getOutputs().take_back(3);
+    for (Value last: lastThree){
+      llvm::errs() << "uuu\n";
+      inputs.lsqInputs.push_back(last);
+    }
     lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, inputs.lsqInputs,
-                                             inputs.lsqGroupSizes, lsqNumLoads);
+                                             inputs.lsqGroupSizes, lsqNumLoads, lsqNumStores);
 
     // Resolve the backedges to fully connect the MC and LSQ
     ValueRange lsqMemResults = lsqOp.getOutputs().take_back(3);
@@ -197,9 +223,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   // At this point, all load ports are missing their second operand which is the
   // data value coming from a memory interface back to the port
   if (mcOp)
-    reconnectLoads(mcPorts, mcOp, connect);
+    reconnectMemoryPorts(mcPorts, mcOp, connectLoad, connectStore);
   if (lsqOp)
-    reconnectLoads(lsqPorts, lsqOp, connect);
+    reconnectMemoryPorts(lsqPorts, lsqOp, connectLoad, connectStore);
 
   return success();
 }
@@ -210,10 +236,10 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
     return SmallVector<Value, 2>{loadOp.getAddressResult()};
 
-  // For stores, all outputs (address and data) go to memory
+  // For stores, address and data go to memory
   auto storeOp = dyn_cast<handshake::StoreOp>(memOp);
   assert(storeOp && "input operation must either be load or store");
-  return SmallVector<Value, 2>{storeOp->getResults()};
+  return SmallVector<Value, 2>{storeOp->getResult(0), storeOp->getResult(1)};
 }
 
 Value MemoryInterfaceBuilder::getMCControl(Value ctrl, unsigned numStores,
@@ -305,7 +331,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     inputs.mcBlocks.push_back(block);
   }
 
-  // Control ports from blocks which do not have memory ports directly
+  
   // connected to the MC but from which the LSQ will forward store requests from
   // are then added to the future MC's operands
   for (auto &[lsqBlock, numStores] : lsqStoresPerBlock) {
@@ -335,14 +361,27 @@ Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
   return groupCtrl->second;
 }
 
-void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
+void MemoryInterfaceBuilder::reconnectMemoryPorts(InterfacePorts &ports,
                                             Operation *memIfaceOp,
-                                            const FConnectLoad &connect) {
+                                            const FConnectLoad &connectLoad,
+                                            const FConnectStore &connectStore) {
+  llvm::errs() << "interface op: " << *memIfaceOp << "\n";
+  for (unsigned i = 0; i< memIfaceOp->getNumResults(); i++){
+    llvm::errs() << "-" << memIfaceOp->getResult(i) << "\n";
+  }
+
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
     for (Operation *memOp : memGroupOps)
-      if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
-        connect(loadOp, memIfaceOp->getResult(resIdx++));
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp)){
+        connectLoad(loadOp, memIfaceOp->getResult(resIdx), memIfaceOp->getResult(resIdx+1));
+        resIdx+=2;
+      }
+      else if (auto storeOp = dyn_cast<handshake::StoreOp>(memOp)){
+        connectStore(storeOp, memIfaceOp->getResult(resIdx));
+        resIdx++;
+      }
+
   }
 }
 

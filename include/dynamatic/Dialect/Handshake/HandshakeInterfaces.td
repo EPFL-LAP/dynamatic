@@ -158,6 +158,22 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
         return concreteOp.getDataResult();
       }]
     >,
+    InterfaceMethod<
+      "Returns the port's done input.",
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getDoneInput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getDone();
+      }]
+    >,
+    InterfaceMethod<
+      "Returns the port's done output.",
+      "::mlir::TypedValue<::dynamatic::handshake::ControlType>", "getDoneOutput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getDoneResult();
+      }]
+    >
   ];
 }
 

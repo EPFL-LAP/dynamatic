@@ -147,6 +147,7 @@ public:
 /// memory interface, and
 /// 2. the data value produced by the memory interface and consumed by the port
 /// operation.
+/// 3. TODO
 class LoadPort : public MemoryPort {
 public:
   /// Constructs the load port from a load operation, the index of the load's
@@ -173,6 +174,10 @@ public:
   /// outputs.
   unsigned getDataOutputIndex() const { return resIndices[0]; }
 
+  /// Returns the index of the load done value in the memory interface's
+  /// outputs
+  unsigned getDoneOutputIndex() const { return resIndices[1]; }
+
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
     return port->getKind() == Kind::LOAD;
@@ -185,12 +190,14 @@ public:
 /// memory interface, and
 /// 2. the data value produced by the port operation and consumed by the
 /// memory interface.
+/// RouzbehTodo
 class StorePort : public MemoryPort {
 public:
   /// Constructs the store port from a store operation, the index of the
   /// store's address output in the memory interface's inputs (the store's data
   /// output is assumed to be at the next index), and the specific store kind.
-  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx,
+            unsigned dataOutputIdx);
 
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
@@ -208,6 +215,10 @@ public:
   /// Returns the index of the store data value in the memory interface's
   /// inputs.
   unsigned getDataInputIndex() const { return oprdIndices[1]; }
+
+  /// Returns the index of the store done value in the memory interface's
+  /// outputs
+  unsigned getDoneOutputIndex() const { return resIndices[0]; }
 
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {

@@ -17,6 +17,9 @@ entity store is
     addrIn       : in  std_logic_vector(ADDR_TYPE - 1 downto 0);
     addrIn_valid : in  std_logic;
     addrIn_ready : out std_logic;
+    -- done from interface channel
+    doneFromMem_valid  : in std_logic;
+    doneFromMem_ready  : out std_logic;
     -- data to interface channel
     dataToMem       : out std_logic_vector(DATA_TYPE - 1 downto 0);
     dataToMem_valid : out std_logic;
@@ -25,6 +28,9 @@ entity store is
     addrOut       : out std_logic_vector(ADDR_TYPE - 1 downto 0);
     addrOut_valid : out std_logic;
     addrOut_ready : in  std_logic
+    -- done to circuit channel
+    doneOut_valid : out std_logic;
+    doneOut_ready : in  std_logic;
   );
 end entity;
 
@@ -38,4 +44,8 @@ begin
   addrOut         <= addrIn;
   addrOut_valid   <= addrIn_valid;
   addrIn_ready    <= addrOut_ready;
+  -- done
+  doneOut_valid   <= doneFromMem_valid
+  doneOut_ready   <= doneFromMem_ready
+
 end architecture;

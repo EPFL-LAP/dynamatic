@@ -616,7 +616,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks, 
-                                 "unsigned":$numLoads)>];
+                                 "unsigned":$numLoads,
+                                 "unsigned":$numStores)>];
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -693,10 +694,11 @@ def LSQOp : Handshake_Op<"lsq", [
 
   let builders = [
     OpBuilder<(ins "Value":$memref, "Value":$memStart, "ValueRange":$inputs, 
-                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads)>,
+                   "Value":$ctrlEnd, "ArrayRef<unsigned>":$groupSizes, "unsigned":$numLoads, "unsigned":$numStores)>,
     OpBuilder<(ins "::dynamatic::handshake::MemoryControllerOp":$mcOp, 
                    "ValueRange":$inputs, "ArrayRef<unsigned>":$groupSizes, 
-                   "unsigned":$numLoads)>,
+                   "unsigned":$numLoads,
+                   "unsigned":$numStores)>,
   ];
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -744,13 +746,16 @@ class Handshake_MemPortOp<string mnemonic> :
     MemPortOpInterface,
     AllTypesMatch<["address", "addressResult"]>,
     AllTypesMatch<["data", "dataResult"]>,
+    AllTypesMatch<["done", "doneResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins IntChannelType:$address, ChannelType:$data, 
+    ControlType:$done);
+  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult, 
+    ControlType:$doneResult);
   let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    `[` $address `]` $data $done attr-dict `:` type($address) `,` type($data) `,` type($done)
   }];
 }
 
@@ -766,10 +771,12 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     The order of operands is
     1. address (from predecessor)
     2. data value (from memory interface)
+    3. done signal (from memory interface)
 
     The order of results is
-    1. address (to memory interface).
+    1. address (to memory interface)
     2. data value (to successor)
+    3. done signal (to successor)
 
     Example:
 
@@ -793,12 +800,26 @@ def LoadOp : Handshake_MemPortOp<"load"> {
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return (idx == 0) ? "addrIn" : "dataFromMem";
+      switch(idx) {
+        case 0:
+          return "addrIn";
+        case 1:
+          return "dataFromMem";
+        default:
+          return "doneFromMem";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
-      return (idx == 0) ? "addrOut" : "dataOut";
+      switch(idx) {
+        case 0:
+          return "addrOut";
+        case 1:
+          return "dataOut";
+        default:
+          return "doneOut";
+      }
     }
   }];
 }
@@ -814,10 +835,12 @@ def StoreOp : Handshake_MemPortOp<"store"> {
     The order of operands is
     1. address (from predecessor)
     2. data value (from predecessor)
+    3. done signal (from memory interface)
 
     The order of results is
     1. address (to memory interface).
     2. data value (to memory interface)
+    3. done signal (to successor)
 
     Example:
 
@@ -828,11 +851,25 @@ def StoreOp : Handshake_MemPortOp<"store"> {
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned int idx) {
-      return (idx == 0) ? "addrIn" : "dataIn";
+      switch(idx) {
+        case 0:
+          return "addrIn";
+        case 1:
+          return "dataIn";
+        default:
+          return "doneFromMem";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned int idx) {
-      return (idx == 0) ? "addrOut" : "dataToMem";
+      switch(idx) {
+        case 0:
+          return "addrOut";
+        case 1:
+          return "dataToMem";
+        default:
+          return "doneOut";
+      }
     }
   }];
 }

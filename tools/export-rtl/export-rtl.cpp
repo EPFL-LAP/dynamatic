@@ -724,6 +724,9 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     PortMapWriter writePortMap = [](const Port &port,
                                     ArrayRef<std::string> signalNames,
                                     raw_indented_ostream &os) {
+      for (auto a : signalNames){
+        llvm::errs() << a << "-\n";
+      }
       assert(!signalNames.empty() && "no signal name associated to port");
       if (!port.second) {
         assert(signalNames.size() == 1 &&
