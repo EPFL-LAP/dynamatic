@@ -7,8 +7,8 @@ OUT_DIR="tools/elastic-miter/out/"
 F_HW="$OUT_DIR/hw.mlir"
 
 COMP_DIR="$OUT_DIR/comp"
-F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
-
+F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_miter.mlir"
+DOT="$COMP_DIR/miter.dot"
 
 
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
@@ -16,7 +16,7 @@ F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 
 
-bin/export-rtl $F_HW $OUT_DIR/miter data/rtl-config-verilog.json --hdl verilog
+"bin/export-dot" $F_HANDSHAKE_EXPORT "--edge-style=spline" > $DOT
+dot -Tpng $DOT > $COMP_DIR/visual.png
 
-find $OUT_DIR/miter -name "*.v" > $OUT_DIR/miter/filelist.f
-
+# python3 "../dot2smv/dot2smv" "./miter.dot"
