@@ -74,7 +74,7 @@ protected:
 private:
   float lutDelay = 0.55;
   int bigConstant = 100;
-  experimental::BlifData *blifData;
+  experimental::LogicNetwork *blifData;
   pathMap leafToRootPaths;
   StringRef blifFiles;
 

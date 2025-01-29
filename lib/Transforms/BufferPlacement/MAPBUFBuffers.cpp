@@ -266,7 +266,7 @@ void MAPBUFBuffers::addCutSelectionConstraints(
 std::vector<experimental::Node *>
 getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
                           pathMap &leafToRootPaths,
-                          experimental::BlifData *blif) {
+                          experimental::LogicNetwork *blif) {
 
   // Check if the path from leaf to root has already been computed, if so then
   // returns it. If not, returns the shortest path by running BFS.
@@ -560,12 +560,12 @@ void MAPBUFBuffers::connectSubjectGraphs() {
     module.first->connectInputNodes();
   }
 
-  experimental::BlifData *mergedBlif = new experimental::BlifData();
+  experimental::LogicNetwork *mergedBlif = new experimental::LogicNetwork();
 
   mergedBlif->setModuleName("merged");
 
   for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    experimental::BlifData *blifModule = module.first->getBlifData();
+    experimental::LogicNetwork *blifModule = module.first->getBlifData();
     for (auto &latch : blifModule->getLatches()) {
       mergedBlif->addLatch(latch.first, latch.second);
     }
@@ -574,7 +574,8 @@ void MAPBUFBuffers::connectSubjectGraphs() {
     }
   }
 
-  // Sort the nodes of the newly created Merged BlifData in topological order
+  // Sort the nodes of the newly created Merged LogicNetwork in topological
+  // order
   mergedBlif->traverseNodes();
   blifData = mergedBlif;
 }
