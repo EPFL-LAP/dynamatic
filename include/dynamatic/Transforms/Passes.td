@@ -289,7 +289,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
     "'buffer-placement' at the binary's location.">,
-    Option<"blifFiles", "blif-file", "std::string", "",
+    Option<"blifFiles", "blif-files", "std::string", "",
     "Path to Blif files for MAPBUF.">];
 }
 

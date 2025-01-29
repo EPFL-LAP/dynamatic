@@ -156,14 +156,6 @@ public:
   friend class LogicNetwork;
 };
 
-/// Custom comparator for Node pointers using node names. Required for
-/// unordered_map.
-struct PointerCompare {
-  bool operator()(const Node *lhs, const Node *rhs) const {
-    return lhs->getName() < rhs->getName();
-  }
-};
-
 /// Represents BLIF (Berkeley Logic Interchange Format) circuit data structure.
 ///
 /// Manages a collection of interconnected nodes representing a digital
