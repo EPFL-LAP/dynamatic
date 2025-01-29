@@ -80,7 +80,7 @@ using NodeToCuts =
 
 class CutManager {
 public:
-  CutManager(BlifData *blif, int lutSize);
+  CutManager(LogicNetwork *blif, int lutSize);
 
   // Node to Cuts Map
   static inline NodeToCuts cuts;
@@ -93,7 +93,7 @@ private:
   // size of the LUT
   int lutSize{};
   // AIG that the cut enumeration is performed on
-  experimental::BlifData *blif;
+  experimental::LogicNetwork *blif;
 
   // Cutless algorithm
   NodeToCuts cutless(bool includeChannels);

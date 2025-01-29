@@ -106,7 +106,7 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
   }
 }
 
-CutManager::CutManager(BlifData *blif, int lutSize)
+CutManager::CutManager(LogicNetwork *blif, int lutSize)
     : lutSize(lutSize), blif(blif) {
   // Call the cutless algorithm, if argument is true, include channels in the
   // Primary Inputs set as well

@@ -96,7 +96,7 @@ protected:
   std::string fullPath;
   std::string moduleType;
   std::string uniqueName;
-  BlifData *blifData;
+  LogicNetwork *blifData;
 
   void assignSignals(ChannelSignals &signals, Node *node,
                      const std::string &nodeName);
@@ -117,7 +117,7 @@ public:
                           BaseSubjectGraph *oldInput);
   void appendVarsToPath(std::initializer_list<unsigned int> inputs);
   void connectSignals(Node *currentSignal, Node *beforeSignal);
-  BlifData *getBlifData() const;
+  LogicNetwork *getBlifData() const;
   static BaseSubjectGraph *getSubjectGraph(Operation *op);
   std::string &getUniqueNameGraph();
   std::string &getModuleType();

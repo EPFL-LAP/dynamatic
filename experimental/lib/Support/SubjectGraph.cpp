@@ -191,7 +191,7 @@ void BaseSubjectGraph::connectSignals(Node *currentSignal, Node *beforeSignal) {
   currentSignal = beforeSignal;
 }
 
-BlifData *BaseSubjectGraph::getBlifData() const { return blifData; }
+LogicNetwork *BaseSubjectGraph::getBlifData() const { return blifData; }
 
 BaseSubjectGraph *BaseSubjectGraph::getSubjectGraph(Operation *op) {
   return moduleMap[op];
