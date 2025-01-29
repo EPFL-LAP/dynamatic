@@ -41,7 +41,10 @@ simulate
 exit
 """
 DYN_FILE = "../../build/run_test.dyn"
-DYNAMATIC_COMMAND = "../../bin/dynamatic --run {script_path}"
+
+# Note: Must use --exit-on-failure in order for run_command_with_timeout
+#       to be able to detect the status code properly
+DYNAMATIC_COMMAND = "../../bin/dynamatic --exit-on-failure --run {script_path}"
 
 # Class to have different colors while writing in terminal
 class bcolors:
@@ -76,16 +79,6 @@ def read_file(file_path):
   with open(file_path, "r") as file:
     return file.read()
 
-def modify_line(file_path, new_first_line, line_number):
-  with open(file_path, "r") as file:
-    lines = file.readlines()
-
-  if len(lines) >= line_number and line_number > 0:
-    lines[line_number - 1] = new_first_line + "\n"
-
-  with open(file_path, "w") as file:
-    file.writelines(lines)
-
 def run_command_with_timeout(command, timeout=500):
   try:
     proc = subprocess.run(
@@ -96,21 +89,18 @@ def run_command_with_timeout(command, timeout=500):
       stdout=subprocess.PIPE,  # Suppress standard output
       stderr=subprocess.PIPE,  # Suppress standard error
     )
-    stderr = proc.stdout.decode()
-    if "FATAL" in stderr or "FAIL" in stderr:
-      return 1
     return 0
-  except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+  except subprocess.CalledProcessError:
+    # Test returned non-zero
+    return 1
+  except subprocess.TimeoutExpired:
+    # Test timed out
     return 2
 
 def replace_filename_with(file_path, to_add):
   directory = os.path.dirname(file_path)
   new_path = os.path.join(directory, to_add)
   return new_path
-
-def append_to_file(filename, text):
-  with open(filename, "a") as file:
-    file.write(text + "\n")
 
 def get_sim_time(log_path):
   # Regular expression to match the desired line format
@@ -129,7 +119,7 @@ def get_sim_time(log_path):
   if last_time is not None:
     return last_time
   else:
-    return None
+    raise ValueError("Log file does not contain simulation time!")
 
 def main():
   cli = CLIHandler()
@@ -181,12 +171,12 @@ def main():
     
     if result == 0:
       sim_log_path = os.path.join(out_dir, "sim", "report.txt")
-      sim_time = get_sim_time(sim_log_path)
-
-      if sim_time != None: 
-        color_print(f"[PASS] {c_file} (simulation time: {sim_time} ns)", bcolors.OKGREEN)
-      else:
-        color_print(f"[PASS] {c_file}", bcolors.OKGREEN)
+      try:
+        sim_time = get_sim_time(sim_log_path)
+        color_print(f"[PASS] {c_file} (simulation duration: {round(sim_time / 4)} cycles)", bcolors.OKGREEN)
+      except ValueError:
+        # This should never happen
+        color_print(f"[PASS] {c_file} (simulation duration: NOT FOUND)", bcolors.OKGREEN)
       
       passed_cnt += 1
     elif result == 1:
