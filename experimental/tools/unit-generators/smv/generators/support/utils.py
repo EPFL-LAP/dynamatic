@@ -2,7 +2,7 @@ import re
 
 
 def mlir_type_to_smv_type(type):
-  pattern = r"^!handshake\.channel<[u]?i(\d+)>$"
+  pattern = r"^!handshake\.channel<([u]?i)(\d+)>$"
   match = re.match(pattern, type)
 
   if match:
