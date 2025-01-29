@@ -1,0 +1,25 @@
+name: C/C++ CI
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  integration:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: build
+        run: ./build.sh --release
+
+      - name: integration-test
+        run: | 
+          cd tools/integration
+          python3 run_integration.py --ignore ignored_tests.txt
+
