@@ -70,7 +70,19 @@ def FuncOp : Op<Handshake_Dialect, "func", [
   let extraClassDeclaration = [{
     // Add an entry block to an empty function, and set up the block arguments
     // to match the signature of the function.
-    Block *addEntryBlock();
+    Block *addEntryBlock() {
+      assert(empty() && "function already has an entry block");
+      Block *entry = new Block();
+      push_back(entry);
+
+      // FIXME: Allow for passing in locations for these arguments instead of using
+      // the operations location.
+      ArrayRef<Type> inputTypes = this->getArgumentTypes();
+      SmallVector<Location> locations(inputTypes.size(),
+                                      this->getOperation()->getLoc());
+      entry->addArguments(inputTypes, locations);
+      return entry;
+    }
 
     /// Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
