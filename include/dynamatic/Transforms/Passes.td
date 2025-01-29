@@ -127,6 +127,14 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
   let constructor = "dynamatic::createHandshakeAnalyzeLSQUsage()";
 }
 
+def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"> {
+  let summary = "*";
+  let description = [{
+    **
+  }];
+  let constructor = "dynamatic::createHandshakeInsertSkippableSeq()";
+}
+
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
