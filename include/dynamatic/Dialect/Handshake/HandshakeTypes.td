@@ -23,15 +23,16 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-/// The vector of ExtraSignal objects contains underlying data whose lifetime is not guaranteed.
-/// On construction of a HandshakeType (ChannelType or ControlType), this data must
-/// therefore be allocated into the MLIR context.
-/// "ArrayRefOfSelfAllocationParameter" is used to invoke the
-/// ExtraSignal::allocateInto C++ function to perform that allocation process.
-/// ArrayRefParameter cannot be used here, as it is strictly for value types.
-def ExtraSignals : ArrayRefOfSelfAllocationParameter<
-  "ExtraSignal",
-  "Array of ExtraSignal objects"> {}
+def ExtraSignals : ArrayRefOfSelfAllocationParameter<"ExtraSignal", [{
+  This `TypeParameter` describes an array of `ExtraSignal` objects that a
+  `ChannelType` or `ControlType` value carries.
+  `ExtraSignal` contains data whose lifetime is not guaranteed, so this data must
+  be allocated into the MLIR context when constructing a `ChannelType` or
+  `ControlType`.
+  This type aliases `ArrayRefOfSelfAllocationParameter` to automatically invoke
+  `ExtraSignal::allocateInto` C++ function to perform that allocation process.
+  `ArrayRefParameter` cannot be used here, as it is strictly for value types.
+}]> {}
 
 def ControlType : Handshake_Type<"Control", "control", [
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
