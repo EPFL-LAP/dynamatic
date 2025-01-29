@@ -8,10 +8,8 @@ kmp
 correlation_float
 dct
 cordic
-symm_float
 complexdiv
 covariance
-kernel_3mm_float
 trisolv
 polyn_mult
 cnn
