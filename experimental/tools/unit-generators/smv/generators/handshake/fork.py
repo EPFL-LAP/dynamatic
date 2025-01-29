@@ -5,10 +5,14 @@ from generators.support.utils import mlir_type_to_smv_type
 
 
 def generate_fork(name, params):
-  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-    return _generate_fork_dataless(name, params["size"])
+  size = params["size"]
+  data_type = None if "data_type" not in params or params["data_type"] == "!handshake.control<>" else mlir_type_to_smv_type(
+      params["data_type"])
+
+  if data_type is None:
+    return _generate_fork_dataless(name, size)
   else:
-    return _generate_fork(name, params["size"], mlir_type_to_smv_type(params["data_type"]))
+    return _generate_fork(name, size, data_type)
 
 
 def _generate_fork_dataless(name, size):

@@ -3,40 +3,30 @@ from generators.support.utils import *
 
 
 def generate_buffer(name, params):
-  if "R: 1" in params["timing"]:
-    if "slots" in params and params["slots"] > 1:
-      if (
-          "data_type" not in params
-          or params["data_type"] == "!handshake.control<>"
-      ):
-        return _generate_tfifo_dataless(name, params["slots"])
-      else:
-        return _generate_tfifo(name, params["slots"], mlir_type_to_smv_type(params["data_type"]))
-    else:
-      if (
-          "data_type" not in params
-          or params["data_type"] == "!handshake.control<>"
-      ):
-        return _generate_tehb_dataless(name)
-      else:
-        return _generate_tehb(name, mlir_type_to_smv_type(params["data_type"]))
-  else:
-    if "slots" in params and params["slots"] > 1:
-      if (
-          "data_type" not in params
-          or params["data_type"] == "!handshake.control<>"
-      ):
-        return _generate_ofifo_dataless(name, params["slots"])
-      else:
-        return _generate_ofifo(name, params["slots"], mlir_type_to_smv_type(params["data_type"]))
-    else:
-      if (
-          "data_type" not in params
-          or params["data_type"] == "!handshake.control<>"
-      ):
-        return _generate_oehb_dataless(name)
-      else:
-        return _generate_oehb(name, mlir_type_to_smv_type(params["data_type"]))
+  timing_r = bool(re.search(r"R: (\d+)", params["timing"]))
+  timing_d = bool(re.search(r"D: (\d+)", params["timing"]))
+  timing_v = bool(re.search(r"V: (\d+)", params["timing"]))
+  transparent = timing_r and not (timing_d or timing_v)
+  slots = params["slots"] if "slots" in params else 1
+  data_type = None if "data_type" not in params or params["data_type"] == "!handshake.control<>" else mlir_type_to_smv_type(
+      params["data_type"])
+
+  if transparent and slots > 1 and data_type is None:
+    return _generate_tfifo_dataless(name, slots)
+  elif transparent and slots > 1 and data_type is not None:
+    return _generate_tfifo(name, slots, data_type)
+  elif transparent and slots == 1 and data_type is None:
+    return _generate_tehb_dataless(name)
+  elif transparent and slots == 1 and data_type is not None:
+    return _generate_tehb(name, data_type)
+  elif not transparent and slots > 1 and data_type is None:
+    return _generate_ofifo_dataless(name, slots)
+  elif not transparent and slots > 1 and data_type is not None:
+    return _generate_ofifo(name, slots, data_type)
+  elif not transparent and slots == 1 and data_type is None:
+    return _generate_oehb_dataless(name)
+  elif not transparent and slots == 1 and data_type is not None:
+    return _generate_oehb(name, data_type)
 
 
 def _generate_oehb_dataless(name):
