@@ -16,6 +16,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
+#include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
@@ -69,8 +70,6 @@ public:
   MILPVarsSubjectGraph *gurobiVars;
 
   Node() = default;
-  Node(const std::string &name)
-      : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
   Node(const std::string &name, LogicNetwork *parent)
       : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
 
@@ -114,6 +113,29 @@ public:
     fanouts.clear();
   }
 
+  void configureIONode(const std::string &type) {
+    setChannelEdge(true);
+    if (type == ".inputs")
+      isInputBool = true;
+    else if (type == ".outputs")
+      isOutputBool = true;
+  }
+
+  static void configureLatch(Node *regInputNode, Node *regOutputNode) {
+    regInputNode->setLatchInput(true);
+    regOutputNode->setLatchOutput(true);
+  }
+
+  void configureConstantNode() {
+    if (function == "0") {
+      isConstZeroBool = true;
+    } else if (function == "1") {
+      isConstOneBool = true;
+    } else {
+      llvm::errs() << "Unknown constant value: " << function << "\n";
+    }
+  }
+
   const std::string &getName() const { return name; }
   void setName(const std::string &newName);
   void setChannelEdge(bool value) { isChannelEdge = value; }
@@ -153,28 +175,12 @@ public:
     fanouts.insert(nodes.begin(), nodes.end());
   }
 
-  bool operator==(const Node &other) const { return name == other.name; }
-  bool operator==(const Node *other) const { return name == other->name; }
-  bool operator!=(const Node &other) const { return name != other.name; }
-  bool operator<(const Node &other) const { return name < other.name; }
-  bool operator<(const Node *other) const { return name < other->name; }
-  bool operator>(const Node &other) const { return name > other.name; }
   std::string str() const { return name; }
 
   friend class LogicNetwork;
 };
 
-/// Custom comparator for Node pointers using node names. Required for
-/// unordered_map.
-struct PointerCompare {
-  bool operator()(const Node *lhs, const Node *rhs) const {
-    return lhs->getName() < rhs->getName();
-  }
-};
-
-/// Represents BLIF (Berkeley Logic Interchange Format) circuit data structure.
-///
-/// Manages a collection of interconnected AIG nodes representing a digital
+/// Manages a collection of interconnected nodes representing a
 /// circuit, maintaining relationships between nodes including latches,
 /// submodules, and topological ordering. The class provides functionality for:
 /// - Node management (creation, modification, lookup)
@@ -186,7 +192,7 @@ struct PointerCompare {
 /// Memory ownership of nodes is maintained by this class through the nodes map.
 class LogicNetwork {
 private:
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> latches;
+  std::vector<std::pair<Node *, Node *>> latches;
   std::string moduleName;
   std::unordered_map<std::string, Node *> nodes;
   std::vector<Node *> nodesTopologicalOrder;
@@ -195,8 +201,50 @@ private:
 public:
   LogicNetwork() = default;
 
-  /// Adds a latch to the circuit data structure.
-  void addLatch(Node *input, Node *output) { latches[input] = output; }
+  /// Add input/output nodes to the circuit. Calls configureIONode on the Node
+  /// to set I/O type.
+  void addIONode(const std::string &name, const std::string &type) {
+    Node *node = createNode(name);
+    node->configureIONode(type);
+  }
+
+  /// Add latch nodes to the circuit. Calls configureLatch on the Node to set
+  /// I/O type.
+  void addLatch(const std::string &inputName, const std::string &outputName) {
+    // Create the input and output nodes for the latch. Nodes are created in
+    // LogicNetwork to ensure uniqueness, and avoids circular dependencies.
+    Node *regInputNode = createNode(inputName);
+    Node *regOutputNode = createNode(outputName);
+
+    // Configure the latch.
+    Node::configureLatch(regInputNode, regOutputNode);
+
+    // Add the latch to the latches vector.
+    latches.emplace_back(regInputNode, regOutputNode);
+  }
+
+  /// Add a logic gate to the circuit. The function takes a vector of node
+  /// names, parsed from a file, and a boolean function. Sets the fanins and
+  /// fanouts, and calls Node functions to configure the fanout node.
+  void addLogicGate(const std::vector<std::string> &nodes,
+                    const std::string &function) {
+
+    // Create the fanout node, which is the last element in the nodes vector.
+    Node *fanOut = createNode(nodes.back());
+    fanOut->setFunction(function);
+
+    // If there is only one node, it is a constant node.
+    if (nodes.size() == 1) {
+      fanOut->configureConstantNode();
+    } else {
+      // Create the fanin nodes. Set fanins and fanouts for each node.
+      for (size_t i = 0; i < nodes.size() - 1; ++i) {
+        Node *fanIn = createNode(nodes[i]);
+        fanOut->addFanin(fanIn);
+        fanIn->addFanout(fanOut);
+      }
+    }
+  }
 
   /// Adds a node to the circuit data structure, resolving name conflicts. If a
   /// node with the same name already exists, counter value is appended to the
@@ -237,16 +285,7 @@ public:
   // using dfs.
   std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
 
-  // Retrieves the node with the given name.
-  Node *getNodeByName(const std::string &name) {
-    auto it = nodes.find(name);
-    if (it != nodes.end()) {
-      return it->second;
-    }
-    return nullptr;
-  }
-
-  // Returns all of the Aig Nodes.
+  // Returns all of the Nodes.
   std::set<Node *> getAllNodes() {
     std::set<Node *> result;
     for (auto &pair : nodes) {
@@ -256,11 +295,9 @@ public:
   }
 
   // Returns latch map.
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> getLatches() const {
-    return latches;
-  }
+  std::vector<std::pair<Node *, Node *>> getLatches() const { return latches; }
 
-  // Returns the Primary Inputs by looping over all the AigNodes and checking if
+  // Returns the Primary Inputs by looping over all the Nodes and checking if
   // they are Primary Inputs by calling isPrimaryInput member function from
   // Node class.
   std::set<Node *> getPrimaryInputs() {
@@ -273,7 +310,7 @@ public:
     return result;
   }
 
-  // Returns the Primary Outputs by looping over all the AigNodes and checking
+  // Returns the Primary Outputs by looping over all the Nodes and checking
   // if they are Primary Outputs by calling isPrimaryOutput member function from
   // Node class.
   std::set<Node *> getPrimaryOutputs() {
@@ -297,7 +334,10 @@ public:
     return result;
   }
 
-  // Returns the AigNodes in topological order. Nodes were sorted in topological
+  // Returns the Module Name
+  std::string getModuleName() { return moduleName; };
+
+  // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
   std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
 
@@ -323,20 +363,25 @@ public:
     return result;
   }
 
-  // Generates a file in .blif format.
-  void generateBlifFile(const std::string &filename);
-
   // Sets the Module Name of the Blif file.
   void setModuleName(const std::string &moduleName) {
     this->moduleName = moduleName;
   }
 
   // Helper function for traverseNodes. Sorts the Nodes using dfs.
-  void traverseUtil(Node *node, std::set<Node *> &visitedNodes);
+  void topologicalOrderUtil(Node *node, std::set<Node *> &visitedNodes,
+                            std::vector<Node *> &order);
 
   // Traverses the nodes, sorting them into topological order from
   // Primary Inputs to Primary Outputs.
-  void traverseNodes();
+  void generateTopologicalOrder();
+};
+
+// Generates a file in .blif format using the LogicNetwork data structure.
+class BlifWriter {
+public:
+  BlifWriter() = default;
+  void writeToFile(LogicNetwork &network, const std::string &filename);
 };
 
 /// Parses Berkeley Logic Interchange Format (BLIF) files into LogicNetwork
