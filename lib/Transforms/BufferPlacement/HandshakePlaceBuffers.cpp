@@ -30,6 +30,8 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
+#include <fstream>
+#include <iostream>
 #include <string>
 
 using namespace mlir;
@@ -540,7 +542,22 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     } else {
 
-      const unsigned tehbs = 100U;
+      int tehbs;
+      std::ifstream file("ftdscripting/buffers.txt");
+      if (!file.is_open()) {
+        llvm::errs() << "Error opening file\n";
+        return failure();
+      }
+
+      if (!(file >> tehbs)) {
+        llvm::errs() << "Error reading number from file\n";
+        return failure();
+      }
+
+      file.close();
+
+      llvm::dbgs() << "[INFO] Number of transparent buffers to use: " << tehbs
+                   << "\n";
 
       for (auto mergeLikeOp : funcOp.getOps<handshake::MuxOp>()) {
 
