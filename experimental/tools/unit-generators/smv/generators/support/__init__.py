@@ -1,1 +1,0 @@
-from generators.support.utils import mlir_type_to_smv_type
