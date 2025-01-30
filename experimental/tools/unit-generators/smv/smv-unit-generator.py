@@ -51,6 +51,9 @@ def generate_code(name, mod_type, parameters):
       return source.generate_source(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "addi" | "muli":
+      parameters["op_type"] = mod_type
+      return arith.generate_binary_op(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

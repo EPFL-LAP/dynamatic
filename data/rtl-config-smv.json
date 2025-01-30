@@ -52,10 +52,6 @@
     "hdl": "smv"
   },
   {
-    "name": "handshake.join",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE >> $OUTPUT_DIR/$MODULE_NAME.v"
-  },
-  {
     "name": "handshake.lazy_fork",
    "parameters": [
       {"name": "SIZE", "type": "unsigned"}
@@ -103,5 +99,13 @@
     "name": "handshake.store",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t store -p port_types=$PORT_TYPES",
     "hdl": "smv"
+  },
+  {
+    "name": "handshake.addi",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.muli",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
 ]
