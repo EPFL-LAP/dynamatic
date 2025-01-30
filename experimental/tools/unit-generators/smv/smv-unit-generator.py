@@ -2,15 +2,15 @@ import argparse
 import sys
 import ast
 
-from generators import *
+import generators.handshake as handshake
 
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "fork":
-      return generate_fork(name, parameters)
+      return handshake.generate_fork(name, parameters)
     case "buffer":
-      return generate_buffer(name, parameters)
+      return handshake.generate_buffer(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
