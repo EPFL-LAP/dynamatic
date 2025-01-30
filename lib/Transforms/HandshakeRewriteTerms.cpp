@@ -2688,176 +2688,6 @@ struct DistributeMuxRepeats : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
-struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
-                                PatternRewriter &rewriter) const override {
-    // Doublecheck that the Merge has 2 inputs
-    if (mergeOp->getNumOperands() != 2)
-      return failure();
-
-    // Get the users of the Merge
-    auto mergeUsers = (mergeOp.getResult()).getUsers();
-    if (mergeUsers.empty())
-      return failure();
-
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto mergeUser : mergeUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
-      }
-    }
-    if (!foundCondBranch)
-      return failure();
-
-    // This condBranchOp must also be an operand forming a cycle with the
-    // merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int mergeOuterInputIdx = 0;
-    int mergeCycleInputIdx = 0;
-    handshake::ConditionalBranchOp condBranchOp;
-    for (auto mergeOperand : mergeOp->getOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                mergeOperand.getDefiningOp()))) {
-          foundCycle = true;
-          mergeCycleInputIdx = operIdx;
-          condBranchOp = cast<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
-
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New condition: The condBranchOp has to be a suppress; otherwise,
-      // the pattern match fails
-      if (!condBranchOp.getTrueResult().getUsers().empty() ||
-          condBranchOp.getFalseResult().getUsers().empty())
-        return failure();
-    }
-
-    mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
-
-    // Retrieve the values at the merge inputs
-    OperandRange mergeDataOperands = mergeOp.getDataOperands();
-    Value mergeInnerOperand = mergeDataOperands[mergeCycleInputIdx];
-
-    // Identify the output of the Branch going outside of the loop (even if it
-    // has no users)
-    bool isTrueOutputOuter = false;
-    Value branchTrueResult = condBranchOp.getTrueResult();
-    Value branchFalseResult = condBranchOp.getFalseResult();
-    Value branchOuterResult;
-    if (branchTrueResult == mergeInnerOperand)
-      branchOuterResult = branchFalseResult;
-    else if (branchFalseResult == mergeInnerOperand) {
-      branchOuterResult = branchTrueResult;
-      isTrueOutputOuter = true;
-    } else
-      return failure();
-
-    // 1st) Identify whether the loop condition will be connected directly or
-    // through a NOT
-    // Note: This strategy is correct, but might result in the insertion of
-    // double NOT
-    Value condition = condBranchOp.getConditionOperand();
-    bool needNot = ((isTrueOutputOuter && mergeCycleInputIdx == 1) ||
-                    (!isTrueOutputOuter && mergeCycleInputIdx == 0));
-    Value iterCond;
-    if (needNot) {
-
-      // Check if the condition already feeds a NOT, no need to create a new one
-      bool foundNot = false;
-      handshake::NotOp existingNotOp;
-      for (auto condRes : condition.getUsers()) {
-        if (isa_and_nonnull<handshake::NotOp>(condRes)) {
-          foundNot = true;
-          existingNotOp = cast<handshake::NotOp>(condRes);
-          break;
-        }
-      }
-      if (foundNot) {
-        iterCond = existingNotOp.getResult();
-      } else {
-        rewriter.setInsertionPoint(condBranchOp);
-        handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
-            condBranchOp->getLoc(), condition);
-        inheritBB(condBranchOp, notOp);
-        iterCond = notOp.getResult();
-      }
-
-    } else {
-      iterCond = condition;
-    }
-
-    // 2nd) Identify the value of the constant that will be triggered from Start
-    // and add it
-    // The value of the constant should be the mergeOuterInputIdx
-    int constVal = mergeOuterInputIdx;
-    // Obtain the start signal from the last argument of any block
-    Block *mergeBlock = mergeOp->getBlock();
-    MutableArrayRef<BlockArgument> l = mergeBlock->getArguments();
-    if (l.empty())
-      return failure();
-    mlir::Value start = l.back();
-    if (!isa<NoneType>(start.getType()))
-      return failure();
-
-    // Check if there is an already existing INIT, i.e., a Merge fed from the
-    // iterCond
-    bool foundInit = false;
-    handshake::MergeOp existingInit;
-    for (auto iterCondRes : iterCond.getUsers()) {
-      if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
-        foundInit = true;
-        existingInit = cast<handshake::MergeOp>(iterCondRes);
-        break;
-      }
-    }
-    Value muxSel;
-    if (foundInit) {
-      muxSel = existingInit.getResult();
-    } else {
-      // Create a new ConstantOp in the same block as that of the branch
-      // forming the cycle
-      Type constantType = rewriter.getIntegerType(1);
-      rewriter.setInsertionPoint(mergeOp);
-      Value valueOfConstant = rewriter.create<handshake::ConstantOp>(
-          mergeOp->getLoc(), constantType,
-          rewriter.getIntegerAttr(constantType, constVal), start);
-
-      // 3rd) Add a new Merge operation to serve as the INIT
-      ValueRange operands = {iterCond, valueOfConstant};
-      rewriter.setInsertionPoint(mergeOp);
-      handshake::MergeOp initMergeOp =
-          rewriter.create<handshake::MergeOp>(mergeOp.getLoc(), operands);
-      inheritBB(mergeOp, initMergeOp);
-
-      muxSel = initMergeOp.getResult();
-    }
-
-    // Create a new muxOp and make it replace the mergeOp
-    rewriter.setInsertionPoint(mergeOp);
-    handshake::MuxOp newMuxOp = rewriter.create<handshake::MuxOp>(
-        mergeOp.getLoc(), muxSel, mergeOp->getOperands());
-    rewriter.replaceOp(mergeOp, newMuxOp);
-    inheritBB(mergeOp, newMuxOp);
-
-    llvm::errs() << "\t***Converted Merge to Mux!***\n";
-
-    return success();
-  }
-};
-
 /// Simple driver for the Handshake Rewrite Terms pass, based on a greedy
 /// pattern rewriter.
 struct HandshakeRewriteTermsPass
@@ -2871,6 +2701,7 @@ struct HandshakeRewriteTermsPass
     GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
+
     RewritePatternSet patterns(ctx);
     patterns.add<
         EraseUnconditionalBranches, EraseSingleInputMerges,
@@ -2880,11 +2711,10 @@ struct HandshakeRewriteTermsPass
         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
         DistributeMuxRepeats, ExtractIfThenElseCondition, ExtractLoopCondition,
         RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
-        RemoveMergeBranchLoop, RemoveMuxBranchLoop, /*, ShortenSuppressPairs,*/
-        ConvertLoopMergeToMux /*, ShortenMuxRepeatPairs*/>(ctx);
+        RemoveMergeBranchLoop, RemoveMuxBranchLoop /*, ShortenSuppressPairs,*/
+        /*, ShortenMuxRepeatPairs*/>(ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
-      return signalPassFailure();
+    auto stat = applyPatternsAndFoldGreedily(mod, std::move(patterns), config);
   };
 };
 }; // namespace
