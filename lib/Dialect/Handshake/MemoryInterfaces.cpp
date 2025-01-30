@@ -365,11 +365,6 @@ void MemoryInterfaceBuilder::reconnectMemoryPorts(InterfacePorts &ports,
                                             Operation *memIfaceOp,
                                             const FConnectLoad &connectLoad,
                                             const FConnectStore &connectStore) {
-  llvm::errs() << "interface op: " << *memIfaceOp << "\n";
-  for (unsigned i = 0; i< memIfaceOp->getNumResults(); i++){
-    llvm::errs() << "-" << memIfaceOp->getResult(i) << "\n";
-  }
-
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
     for (Operation *memOp : memGroupOps)

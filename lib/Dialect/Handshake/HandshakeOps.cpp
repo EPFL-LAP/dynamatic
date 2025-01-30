@@ -687,7 +687,7 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
   ValueRange memResults = mcPorts.memOp->getResults();
   SmallVector<unsigned> blocks = mcPorts.getMCOp().getMCBlocks();
 
-  llvm::errs() << "get MC\n";
+  // llvm::errs() << "get MC\n";
   // Moves forward in our list of blocks, checking that we do not overflow it.
   auto getNextBlockID = [&]() -> LogicalResult {
     if (nextBlockIdx == blocks.size())
@@ -1026,7 +1026,7 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
   ValueRange memResults = lsqPorts.memOp->getResults();
   SmallVector<unsigned> groupSizes = lsqPorts.getLSQOp().getLSQGroupSizes();
 
-  llvm::errs() << "LSQ\n";
+  // llvm::errs() << "LSQ\n";
   auto checkGroupIsValid = [&]() -> LogicalResult {
     if (!currentGroupRemaining)
       return lsqPorts.memOp->emitError()

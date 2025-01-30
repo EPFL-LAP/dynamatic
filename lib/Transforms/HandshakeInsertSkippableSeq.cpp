@@ -38,7 +38,7 @@ struct HandshakeInsertSkippableSeqPass
 
 
 };
-
+} // namespace
 
 void findMemAccessesInFunc(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAccesses){
 
@@ -99,18 +99,39 @@ SmallVector<Value> insertBranches(SmallVector<Value> mainValues, SmallVector<Val
   return results;
 }
 
-Value createSkip(Value waitingToken, Value cond, OpBuilder& builder, Location loc){
+Value boolToSelect (Value cond, Value startSignal, OpBuilder& builder, Location loc){
+  handshake::ConstantOp zeroConstOp = builder.create<handshake::ConstantOp>(loc, builder.getI32IntegerAttr(0), startSignal);
+  handshake::ConstantOp oneConstOp = builder.create<handshake::ConstantOp>(loc, builder.getI32IntegerAttr(1), startSignal);
+  handshake::NotOp notOp = builder.create<handshake::NotOp>(loc, cond);
+  handshake::ConditionalBranchOp zeroConditionalBranchOp = builder.create<handshake::ConditionalBranchOp>(loc, cond, zeroConstOp);
+  handshake::ConditionalBranchOp oneConditionalBranchOp = builder.create<handshake::ConditionalBranchOp>(loc, notOp.getResult(), oneConstOp);
+
+  SmallVector<Value, 2> values = {zeroConditionalBranchOp.getResult(0), oneConditionalBranchOp.getResult(0)};
+  handshake::MergeOp mergeOp = builder.create<handshake::MergeOp>(loc, values);
+
+  return mergeOp.getResult();
+}
+
+
+Value createSkip(Value waitingToken, Value cond, Value startSignal, OpBuilder& builder, Location loc){
   handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(loc, cond);
   handshake::ConditionalBranchOp conditionalBranchOp = builder.create<handshake::ConditionalBranchOp>(loc, cond, unbundleOp.getResult(0));
   SmallVector<Value, 2> muxOpValues = {conditionalBranchOp.getResult(1), waitingToken};
-  handshake::MuxOp muxOp = builder.create<handshake::MuxOp>(loc, cond, muxOpValues);
+  Value select = boolToSelect(cond, startSignal, builder, loc);
+  handshake::MuxOp muxOp = builder.create<handshake::MuxOp>(loc, select, muxOpValues);
+
+  ValueRange *ab = new ValueRange();
+  handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+  handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(loc, unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
+
+  builder.create<handshake::SinkOp>(loc, bundleOp.getResult(0));
   return muxOp.getResult();
 }
 
-SmallVector<Value> insertMuxes(SmallVector<Value> mainValues, SmallVector<Value> conds, OpBuilder& builder, Location loc){
+SmallVector<Value> insertMuxes(SmallVector<Value> mainValues, SmallVector<Value> conds, Value startSignal, OpBuilder& builder, Location loc){
   SmallVector<Value> results;
   for (auto [mainValue, cond] : llvm::zip(mainValues, conds)){
-    results.push_back(createSkip(mainValue, cond, builder, loc));
+    results.push_back(createSkip(mainValue, cond, startSignal, builder, loc));
   }
   return results;
 }
@@ -124,9 +145,9 @@ Value calculateCFGCond(Operation* sourceOp, Operation* dstOp, Value startSignal,
 Value createWaitingSignalForPair(Value sourceOpDoneSignal, SmallVector<Value> conds, Value CFGCond, Value startSignal, OpBuilder& builder, Location loc){
   SmallVector<Value> delayedDoneSignals = getNDelayedValues(sourceOpDoneSignal, startSignal, builder, loc);
   SmallVector<Value> branchedDoneSignals = insertBranches(delayedDoneSignals, conds, builder, loc);
-  SmallVector<Value> muxedDoneSignals = insertMuxes(branchedDoneSignals, conds, builder, loc);
+  SmallVector<Value> muxedDoneSignals = insertMuxes(branchedDoneSignals, conds, startSignal, builder, loc);
   handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(loc, muxedDoneSignals);
-  return createSkip(joinOp.getResult(), CFGCond, builder, loc);
+  return createSkip(joinOp.getResult(), CFGCond, startSignal, builder, loc);
 }
 
 void createWaitingSignals(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &waitingSignalsForEachDst, DenseMap<StringRef, DenseMap<StringRef, SmallVector<Value>>> &skipConditionForEachPair, OpBuilder& builder){
@@ -150,13 +171,19 @@ void createWaitingSignals(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAcc
         }
       }
     }
+    llvm::errs() << "[] Created Waiting Signals\n";
 }
 
 void gateAddress(Operation* op, SmallVector<Value> waitingValues, OpBuilder& builder, Location loc){
   Value address = op->getOperand(0);
-  waitingValues.push_back(address);
+  handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(loc, address);
+  waitingValues.push_back(unbundleOp.getResult(0));
+  llvm::errs() << "&&&" << unbundleOp.getResult(0) << "\n";
   handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(loc, waitingValues);
-  op->setOperand(0, joinOp.getResult());
+  ValueRange *ab = new ValueRange();
+  handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+  handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(loc, joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+  op->setOperand(0, bundleOp.getResult(0));
 }
 
 void gateAllDstAccesses(DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, SmallVector<Value>> &waitingSignalsForEachDst, OpBuilder& builder){
@@ -164,6 +191,7 @@ void gateAllDstAccesses(DenseMap<StringRef, Operation*> &memAccesses, DenseMap<S
     Operation* op = memAccesses[dstAccess];
     gateAddress(op, waitingSignals, builder, op->getLoc());
   }
+  llvm::errs() << "[] Gated Dst Accesses\n";
 }
 
 void createSkipConditions(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAccesses, DenseMap<StringRef, DenseMap<StringRef, SmallVector<Value>>> &skipConditionForEachPair, OpBuilder &builder){
@@ -188,14 +216,41 @@ void createSkipConditions(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAcc
 
           SmallVector<Value> diffTokens = {sourceOpDoneSignal};
           diffTokens.append(N, startSignal);
-          handshake::MergeOp mergeOp2 = builder.create<handshake::MergeOp>(loc, diffTokens);
+          handshake::MergeOp mergeOp = builder.create<handshake::MergeOp>(loc, diffTokens);
 
           Value CFGCond = calculateCFGCond(sourceOpPointer, dstOpPointer, startSignal, builder, loc);
           handshake::ConditionalBranchOp conditionalBranchOp = builder.create<handshake::ConditionalBranchOp>(loc, CFGCond, dstOpPointer->getOperand(0));
 
-          SmallVector<Value, 2> JoinOpValues = {mergeOp2->getResult(0), conditionalBranchOp.getResult(0)};
-          handshake::JoinOp JoinOp = builder.create<handshake::JoinOp>(loc, JoinOpValues);
-          Value gatedDstOpaddr = JoinOp.getResult();
+          // Type addrType = conditionalBranchOp.getResult(0).getType();
+          // // TypedAttr typedattr = TypedAttr(addrType);
+          // handshake::ConstantOp constOp = builder.create<handshake::ConstantOp>(loc, builder.getI32IntegerAttr(1000), startSignal);
+          // ValueRange *ab = new ValueRange();
+          // llvm::errs()<< addrType<<"**\n";
+          
+          // handshake::ChannelType ch =  dyn_cast<handshake::ChannelType>(addrType);
+          // llvm::errs()<< ch <<"**\n";
+          // handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(loc, constOp);
+
+          // llvm::errs() << unbundleOp.getResult(1) << "8\n";
+
+
+          // handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(loc, mergeOp2.getResult(), unbundleOp.getResult(1), *ab, ch);
+
+
+          // llvm::errs()<< "^^^^^" << bundleOp.getResult(0).getType() << "\n";
+
+          // llvm::errs()<< "^^^^^" << conditionalBranchOp.getResult(0).getType() << "\n";
+
+          handshake::UnbundleOp unbundleOp = builder.create<handshake::UnbundleOp>(loc, conditionalBranchOp.getResult(0));
+
+          SmallVector<Value, 2> JoinOpValues = {mergeOp.getResult(), unbundleOp.getResult(0)};
+          handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(loc, JoinOpValues);
+
+          ValueRange *ab = new ValueRange();
+          handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
+          handshake::BundleOp bundleOp = builder.create<handshake::BundleOp>(loc, joinOp.getResult(), unbundleOp.getResult(1), *ab, ch);
+
+          Value gatedDstOpaddr = bundleOp.getResult(0);
 
           for (Value delayedAddress : delayedAddresses){
               handshake::CmpIOp cmpIOp = builder.create<handshake::CmpIOp>(loc, CmpIPredicate::ne, gatedDstOpaddr, delayedAddress);
@@ -204,10 +259,11 @@ void createSkipConditions(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAcc
         }
       }
     }
-    
+    llvm::errs() << "[] Created Skip Conditions\n";
 }
 
 void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
+  llvm::errs() << "@@@@@@@@@@@@@@@@@@@@@@@@@\n";
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
@@ -221,14 +277,17 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
       findMemAccessesInFunc(funcOp, memAccesses);
 
       createSkipConditions(funcOp, memAccesses, skipConditionForEachPair, builder);
+      
 
       createWaitingSignals(funcOp, memAccesses, waitingSignalsForEachDst, skipConditionForEachPair, builder);
+      
 
       gateAllDstAccesses(memAccesses, waitingSignalsForEachDst, builder);
+      
   }
 }
 
-} // namespace
+
 
 
 std::unique_ptr<dynamatic::DynamaticPass>
