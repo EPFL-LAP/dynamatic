@@ -33,7 +33,7 @@
   },
   {
     "name": "handshake.load",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\",addrtype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\",addrtype=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.merge",
@@ -50,5 +50,9 @@
   {
     "name": "handshake.source",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.store",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\",addrtype=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
 ]

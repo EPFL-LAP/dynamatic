@@ -15,6 +15,7 @@ import generators.handshake.merge as merge
 import generators.handshake.mux as mux
 import generators.handshake.sink as sink
 import generators.handshake.source as source
+import generators.handshake.store as store
 
 
 def generate_code(name, mod_type, parameters):
@@ -45,6 +46,8 @@ def generate_code(name, mod_type, parameters):
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
+    case "store":
+      return store.generate_store(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
