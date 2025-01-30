@@ -10,7 +10,7 @@ def generate_control_merge(name, params):
   if "data_type" not in params or params["data_type"] == "!handshake.control<>":
     return _generate_control_merge_dataless(name, params["size"])
   else:
-    return _generate_control_merge(name, params["size"], hw_type_to_smv_type(params["data_type"]))
+    return _generate_control_merge(name, params["size"], mlir_type_to_smv_type(params["data_type"]))
 
 
 def _generate_control_merge_dataless(name, size):

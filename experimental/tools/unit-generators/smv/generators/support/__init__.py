@@ -1,1 +1,1 @@
-from generators.support.utils import hw_type_to_smv_type
+from generators.support.utils import mlir_type_to_smv_type
