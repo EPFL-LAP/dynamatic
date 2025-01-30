@@ -16,21 +16,21 @@ def generate_control_merge(name, params):
 def _generate_control_merge_dataless(name, size):
   return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
-    VAR inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
-    VAR inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
-    VAR inner_fork : {name}__fork_datraless(inner_tehb.outs_valid, outs_ready, index_ready);
-    VAR index_in : 0..{size};
+  VAR inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
+  VAR inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
+  VAR inner_fork : {name}__fork_datraless(inner_tehb.outs_valid, outs_ready, index_ready);
+  VAR index_in : 0..{size};
 
-    index_in := case
-                  {"\n                  ".join([f"ins_valid_{n} : {n};" for n in range(size)])}
-                  TRUE: 0;
-                esac:
+  index_in := case
+    {"\n    ".join([f"ins_valid_{n} : {n};" for n in range(size)])}
+    TRUE: 0;
+  esac;
 
-    // output
-    {"\n    ".join([f"DEFINE ins_ready_{n} := inner_merge.ins_ready{n};" for n in range(size)])}
-    DEFINE outs_valid := inner_fork.outs_valid_0;
-    DEFINE index_valid := inner_fork.outs_valid_1;
-    DEFINE index := inner_tehb.outs;
+  // output
+  {"\n  ".join([f"DEFINE ins_ready_{n} := inner_merge.ins_ready{n};" for n in range(size)])}
+  DEFINE outs_valid := inner_fork.outs_valid_0;
+  DEFINE index_valid := inner_fork.outs_valid_1;
+  DEFINE index := inner_tehb.outs;
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.channel<i32>"})}
@@ -41,19 +41,19 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
 def _generate_control_merge(name, size, data_type):
   return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
-    VAR inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready);
+  VAR inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready);
 
-    DEFINE data := case
-                     {"\n                     ".join([f"ins_valid_{n} : ins_{n};" for n in range(size)])}
-                     TRUE: {smv_init_data_type(data_type)};
-                   esac:
+  DEFINE data := case
+    {"\n    ".join([f"ins_valid_{n} : ins_{n};" for n in range(size)])}
+    TRUE: {smv_format_constant(0, data_type)};
+  esac;
 
-    // output
-    {"\n    ".join([f"DEFINE ins_ready_{n} := inner_control_merge.ins_ready{n};" for n in range(size)])}
-    DEFINE outs_valid := inner_control_merge.outs_valid;
-    DEFINE index_valid := inner_control_merge.index_valid;
-    DEFINE outs := data;
-    DEFINE index := inner_control_merge.index;
+  // output
+  {"\n  ".join([f"DEFINE ins_ready_{n} := inner_control_merge.ins_ready{n};" for n in range(size)])}
+  DEFINE outs_valid := inner_control_merge.outs_valid;
+  DEFINE index_valid := inner_control_merge.index_valid;
+  DEFINE outs := data;
+  DEFINE index := inner_control_merge.index;
 
 {_generate_control_merge_dataless(f"{name}__control_merge_dataless", size)}
 """

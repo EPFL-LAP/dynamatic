@@ -12,9 +12,9 @@ def _generate_br_dataless(name):
   return f"""
 MODULE {name}(ins_valid, outs_ready)
 
-    // output
-    DEFINE outs_valid :=  ins_valid;
-    DEFINE ins_ready  :=  outs_ready;
+  // output
+  DEFINE outs_valid :=  ins_valid;
+  DEFINE ins_ready  :=  outs_ready;
 """
 
 
@@ -22,10 +22,10 @@ def _generate_br(name, data_type):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
 
-    // output
-    DEFINE outs := ins;
-    DEFINE outs_valid :=  ins_valid;
-    DEFINE ins_ready  :=  outs_ready;
+  // output
+  DEFINE outs := ins;
+  DEFINE outs_valid :=  ins_valid;
+  DEFINE ins_ready  :=  outs_ready;
 """
 
 

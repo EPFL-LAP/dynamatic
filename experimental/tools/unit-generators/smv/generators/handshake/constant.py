@@ -9,10 +9,10 @@ def _generate_constant(name, value, data_type):
   return f"""
 MODULE {name}(ins_valid, outs_ready)
 
-    // output
-    DEFINE ins_ready := {smv_format_constant(value, data_type)};
-    DEFINE outs_valid := ins_valid;
-    DEFINE outs :=
+  // output
+  DEFINE ins_ready := {smv_format_constant(value, data_type)};
+  DEFINE outs_valid := ins_valid;
+  DEFINE outs :=
 """
 
 

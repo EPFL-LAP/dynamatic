@@ -12,15 +12,15 @@ def generate_cond_br(name, params):
 def _generate_cond_br_dataless(name):
   return f"""
 MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
-    VAR inner_join : {name}__join(data_valid, condition_valid, branch_ready);
+  VAR inner_join : {name}__join(data_valid, condition_valid, branch_ready);
 
-    DEFINE branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
+  DEFINE branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
 
-    // output
-    DEFINE data_ready := inner_join.ins_ready_0;
-    DEFINE condition_ready := inner_join.ins_ready_1;
-    DEFINE trueOut_valid := condition & inner_join.outs_valid_0;
-    DEFINE falseOut_valid := !condition & inner_join.outs_valid_0;
+  // output
+  DEFINE data_ready := inner_join.ins_ready_0;
+  DEFINE condition_ready := inner_join.ins_ready_1;
+  DEFINE trueOut_valid := condition & inner_join.outs_valid_0;
+  DEFINE falseOut_valid := !condition & inner_join.outs_valid_0;
 
 {generate_join(f"{name}__join", {"size": 2})}
 """
@@ -29,15 +29,15 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
 def _generate_cond_br(name, data_type):
   return f"""
 MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
-    VAR inner_br : cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+  VAR inner_br : cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
 
-    // output
-    DEFINE data_ready := inner_br.data_ready;
-    DEFINE condition_ready := inner_br.condition_ready;
-    DEFINE trueOut_valid := inner_br.trueOut_valid;
-    DEFINE falseOut_valid := inner_br.falseOut_valid;
-    DEFINE trueOut := data;
-    DEFINE falseOut := data;
+  // output
+  DEFINE data_ready := inner_br.data_ready;
+  DEFINE condition_ready := inner_br.condition_ready;
+  DEFINE trueOut_valid := inner_br.trueOut_valid;
+  DEFINE falseOut_valid := inner_br.falseOut_valid;
+  DEFINE trueOut := data;
+  DEFINE falseOut := data;
 
 {_generate_cond_br_dataless(f"{name}__cond_br_dataless")}
 """
