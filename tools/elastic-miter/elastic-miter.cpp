@@ -42,6 +42,10 @@ using namespace dynamatic::handshake;
 
 static cl::OptionCategory mainCategory("elastic-miter Options");
 
+static cl::opt<size_t>
+    nrOfBufferSlots("bufferSlots", cl::Prefix, cl::Required,
+                    cl::desc("Specify the number of required buffers."),
+                    cl::cat(mainCategory));
 static cl::opt<std::string>
     lhsFilenameArg("lhs", cl::Prefix, cl::Required,
                    cl::desc("Specify the left-hand side (LHS) input file"),
@@ -204,7 +208,7 @@ static LogicalResult createFiles(StringRef outputDir, ModuleOp mod,
 // exactely one handshake.func.
 static FailureOr<std::pair<ModuleOp, llvm::json::Object>>
 createElasticMiter(MLIRContext &context, StringRef lhsFilename,
-                   StringRef rhsFilename) {
+                   StringRef rhsFilename, size_t bufferSlots) {
 
   OwningOpRef<ModuleOp> lhsModule =
       parseSourceFile<ModuleOp>(lhsFilename, &context);
@@ -261,6 +265,7 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
   builder.setInsertionPointToStart(newBlock);
 
+  // We need to keep track of the names to add them to the JSON config file
   llvm::json::Array inputBufferNames;
   llvm::json::Array outputBufferNames;
   llvm::json::Array ndwireNames;
@@ -281,10 +286,12 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     ForkOp forkOp = builder.create<ForkOp>(newFuncOp.getLoc(), miterArgs, 2);
     setHandshakeAttributes(builder, forkOp, 0, forkName);
 
-    BufferOp lhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResults()[0], TimingInfo::oehb(), 3);
-    BufferOp rhsBufferOp = builder.create<BufferOp>(
-        forkOp.getLoc(), forkOp.getResults()[1], TimingInfo::oehb(), 3);
+    BufferOp lhsBufferOp =
+        builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[0],
+                                 TimingInfo::oehb(), bufferSlots);
+    BufferOp rhsBufferOp =
+        builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[1],
+                                 TimingInfo::oehb(), bufferSlots);
     setHandshakeAttributes(builder, lhsBufferOp, 0, lhsBufName);
     setHandshakeAttributes(builder, rhsBufferOp, 0, rhsBufName);
 
@@ -332,7 +339,10 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   EndOp lhsEndOp = *lhsFuncOp.getOps<EndOp>().begin();
   EndOp rhsEndOp = *rhsFuncOp.getOps<EndOp>().begin();
 
-  // Create comparison logic
+  // Create the output side auxillary logic. The output of the module is feed
+  // into a chain of a non-deterministic wire and a buffer to decouple the two
+  // sides.
+  // Then we add a cmpi to compare the results pairwise.
   llvm::SmallVector<Value> eqResults;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
@@ -357,10 +367,10 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), lhsEndNDWireOp.getResult(), TimingInfo::oehb(),
-        3);
+        bufferSlots);
     BufferOp rhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), rhsEndNDWireOp.getResult(), TimingInfo::oehb(),
-        3);
+        bufferSlots);
     setHandshakeAttributes(builder, lhsEndBufferOp, 3, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, 3, rhsBufName);
 
@@ -404,8 +414,8 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     previousOp = &op;
   }
 
-  llvm::json::Object jsonObject;
-
+  // Create a new jsonObject and put all required names into it
+  llvm::json::Object jsonObject = *new llvm::json::Object;
   jsonObject["input_buffers"] = std::move(inputBufferNames);
   jsonObject["out_buffers"] = std::move(outputBufferNames);
   jsonObject["ndwires"] = std::move(ndwireNames);
@@ -430,7 +440,8 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
 
-  auto ret = createElasticMiter(context, lhsFilenameArg, rhsFilenameArg);
+  auto ret = createElasticMiter(context, lhsFilenameArg, rhsFilenameArg,
+                                nrOfBufferSlots);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return 1;
