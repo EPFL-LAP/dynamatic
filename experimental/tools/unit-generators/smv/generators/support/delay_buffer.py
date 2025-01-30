@@ -1,0 +1,42 @@
+from generators.support.utils import *
+from generators.handshake.buffer import generate_buffer
+
+
+def generate_delay_buffer(name, latency):
+  if latency == 1:
+    return _generate_single_delay_buffer(name)
+  else:
+    return _generate_delay_buffer(name, latency)
+
+
+def _generate_single_delay_buffer(name):
+  return f"""
+MODULE {name}(ins_valid, outs_ready)
+  VAR inner_oehb : {name}__oehb_dataless(ins, ins_valid, outs_ready);
+
+  // output
+  DEFINE ins_ready = inner_oehb.ins_ready;
+  DEFINE outs_valid = inner_oehb.outs_valid;
+
+  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "D: 1, V: 1"})}
+"""
+
+
+def _generate_delay_buffer(name, latency):
+  return f"""
+MODULE {name}(ins_valid, outs_ready)
+  VAR inner_oehb : {name}__oehb_dataless(v{latency - 1}, outs_ready);
+  {"\n  ".join([f"VAR v{n + 1} : boolean;" for n in range(latency - 1)])}
+
+  DEFINE v{latency} := inner_oehb.ins_vald;
+
+  {"\n  ".join([f"""ASSIGN init(v{n + 1}) := FALSE;
+  ASSIGN next(v{n + 1}) := inner_oehb.ins_ready ? v{n} : v{n + 1};
+""" for n in range(latency - 1)])}
+
+  // output
+  DEFINE ins_ready = inner_oehb.ins_ready;
+  DEFINE outs_valid = inner_oehb.outs_valid;
+
+  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "D: 1, V: 1"})}
+"""
