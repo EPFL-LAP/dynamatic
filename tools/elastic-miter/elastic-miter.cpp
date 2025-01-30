@@ -22,7 +22,6 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
-#include <utility>
 
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -43,15 +42,17 @@ using namespace dynamatic::handshake;
 
 static cl::OptionCategory mainCategory("elastic-miter Options");
 
-static cl::opt<std::string> lhsFilenameArg("lhs", cl::Prefix, cl::Required,
-                                           cl::desc("<lhs MLIR input file>"),
-                                           cl::cat(mainCategory));
-static cl::opt<std::string> rhsFilenameArg("rhs", cl::Prefix, cl::Required,
-                                           cl::desc("<rhs MLIR input file>"),
-                                           cl::cat(mainCategory));
+static cl::opt<std::string>
+    lhsFilenameArg("lhs", cl::Prefix, cl::Required,
+                   cl::desc("Specify the left-hand side (LHS) input file"),
+                   cl::cat(mainCategory));
+static cl::opt<std::string>
+    rhsFilenameArg("rhs", cl::Prefix, cl::Required,
+                   cl::desc("Specify the right-hand side (RHS) input file"),
+                   cl::cat(mainCategory));
 
 static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
-                                      cl::desc("<output directory>"),
+                                      cl::desc("Specify output directory"),
                                       cl::cat(mainCategory));
 
 //    ______ _           _   _             __  __ _ _
@@ -117,15 +118,18 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
   return std::make_pair(newFuncOp, newEntryBlock);
 }
 
-// TODO clean this up, documentation
+// Build a elastic-miter template function with the interface of the LHS FuncOp.
+// The output interface names have EQ_ prefixed.
 static FailureOr<std::pair<FuncOp, Block *>>
 buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
-  // Check equality of interfaces TODO should we really do this in this function
+  // Check equality of interfaces
   if (lhsFuncOp.getArgumentTypes() != rhsFuncOp.getArgumentTypes()) {
+    llvm::errs() << "The input interfaces are not equivalent\n";
     return failure();
   }
   if (lhsFuncOp.getResultTypes() != rhsFuncOp.getResultTypes()) {
+    llvm::errs() << "The output interfaces are not equivalent\n";
     return failure();
   }
 
@@ -173,23 +177,31 @@ static LogicalResult createFiles(StringRef outputDir, ModuleOp mod,
     return failure();
   }
 
+  // Create the the handshake miter file
   SmallString<128> outMLIRFile;
   llvm::sys::path::append(outMLIRFile, outputDir, "handshake_miter.mlir");
   llvm::raw_fd_ostream fileStream(outMLIRFile, ec, llvm::sys::fs::OF_None);
 
   mod->print(fileStream, printingFlags);
+  fileStream.close();
 
+  // Create the JSON config file
   SmallString<128> outJsonFile;
   llvm::sys::path::append(outJsonFile, outputDir, "elastic-miter-config.json");
   llvm::raw_fd_ostream jsonFileStream(outJsonFile, ec, llvm::sys::fs::OF_None);
 
+  // Convert the JSON object to a JSON value in order to be printed
   llvm::json::Value jsonValue(std::move(jsonObject));
+  // Print the JSON to the file with proper formatting
   jsonFileStream << llvm::formatv("{0:2}", jsonValue);
+  jsonFileStream.close();
 
   return success();
 }
 
-// TODO description: create the elatic miter module, given two circuits
+// This creates an elastic-miter module given the path to two MLIR files. The
+// files need to contain exactely one module each. Each module needs to contain
+// exactely one handshake.func.
 static FailureOr<std::pair<ModuleOp, llvm::json::Object>>
 createElasticMiter(MLIRContext &context, StringRef lhsFilename,
                    StringRef rhsFilename) {
@@ -203,8 +215,18 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   if (!rhsModule)
     return failure();
 
-  // The module can only have one function so we just take the first element
-  // TODO add a check for this
+  size_t lhsFuncOpCount = std::distance(lhsModule->getOps<FuncOp>().begin(),
+                                        lhsModule->getOps<FuncOp>().end());
+  size_t rhsFuncOpCount = std::distance(rhsModule->getOps<FuncOp>().begin(),
+                                        rhsModule->getOps<FuncOp>().end());
+
+  if (lhsFuncOpCount != 1 && rhsFuncOpCount != 1) {
+    llvm::errs() << "The provided module is invalid. It needs to contain "
+                    "exactely one FuncOp.\n";
+    return failure();
+  }
+
+  // We know the module contains one FuncOp. So we can take take first element.
   FuncOp lhsFuncOp = *lhsModule->getOps<FuncOp>().begin();
   FuncOp rhsFuncOp = *rhsModule->getOps<FuncOp>().begin();
 
@@ -244,7 +266,6 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   llvm::json::Array ndwireNames;
   llvm::json::Array eqNames;
 
-  // TODO improve locations, also rename
   Operation *nextLocation;
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
     BlockArgument lhsArgs = lhsFuncOp.getArgument(i);
@@ -298,12 +319,14 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
   size_t lhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
                                        lhsFuncOp.getOps<EndOp>().end());
-  size_t rhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
-                                       lhsFuncOp.getOps<EndOp>().end());
+  size_t rhsEndOpCount = std::distance(rhsFuncOp.getOps<EndOp>().begin(),
+                                       rhsFuncOp.getOps<EndOp>().end());
 
-  // TODO should we really use assert?
-  assert(lhsEndOpCount == 1 && rhsEndOpCount == 1 &&
-         "A handshake::FuncOp can only have one EndOp.");
+  if (lhsEndOpCount != 1 && rhsEndOpCount != 1) {
+    llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
+                    "exactely one EndOp.\n";
+    return failure();
+  }
 
   // Get lhs and rhs EndOp, after checking there is only one EndOp each
   EndOp lhsEndOp = *lhsFuncOp.getOps<EndOp>().begin();
@@ -394,7 +417,13 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
-  cl::ParseCommandLineOptions(argc, argv, "Placeholder TODO.");
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "Creates an elastic-miter module in the handshake dialect.\n"
+      "Takes two MLIR files as input. The files need to contain exactely one "
+      "module each.\nEach module needs to contain exactely one handshake.func. "
+      "\nThe resulting miter MLIR file and JSON config file are placed in the "
+      "specified output directory.");
 
   // Register the supported dynamatic dialects and create a context
   DialectRegistry registry;
