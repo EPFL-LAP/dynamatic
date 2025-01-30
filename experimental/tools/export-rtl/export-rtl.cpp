@@ -915,11 +915,12 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
 
   // Open the file in which we will create the module, it is named like the
   // module itself
-  const llvm::Twine &filepath = writer.exportInfo.outputPath +
-                                sys::path::get_separator() +
-                                modOp.getSymName() + ext;
+  std::string filepath = writer.exportInfo.outputPath.str() +
+                                sys::path::get_separator().str() +
+                                modOp.getSymName().str() + ext.str();
+
   std::error_code ec;
-  llvm::raw_fd_ostream fileStream(filepath.str(), ec);
+  llvm::raw_fd_ostream fileStream(filepath, ec);
   if (ec.value() != 0) {
     return modOp->emitOpError() << "Failed to create file for export @ \""
                                 << filepath << "\": " << ec.message();
