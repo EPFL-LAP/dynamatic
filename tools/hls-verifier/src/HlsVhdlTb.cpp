@@ -76,7 +76,8 @@ string commonTbBody =
     "       tb_temp_idle <= tb_temp_idle;\n"
     "       if (tb_start_valid = '1') then\n"
     "           tb_temp_idle <= '0';\n"
-    "       elsif(tb_end_valid = '1') then\n"
+    "       end if;\n"
+    "       if (tb_stop = '1') then\n"
     "           tb_temp_idle <= '1';\n"
     "       end if;\n"
     "   end if;\n"
@@ -84,6 +85,18 @@ string commonTbBody =
     "\n"
     "--------------------------------------------------------------------------"
     "--\n"
+    "acknowledge_tb_end: process(tb_clk,tb_rst)\n"
+    "begin\n"
+    "   if (tb_rst = '1') then\n"
+    "       tb_end_ready <= '1';\n"
+    "       tb_stop <= '0';\n"
+    "   elsif rising_edge(tb_clk) then\n"
+    "       if (tb_end_valid = '1') then\n"
+    "           tb_end_ready <= '0';\n"
+    "           tb_stop <= '1';\n"
+    "       end if;\n"
+    "   end if;\n"
+    "end process;\n"
     "generate_start_signal : process(tb_clk, tb_rst)\n"
     "begin\n"
     "   if (tb_rst = '1') then\n"
@@ -324,7 +337,8 @@ string HlsVhdlTb::getArchitectureBegin() {
 string HlsVhdlTb::getConstantDeclaration() {
   stringstream code;
   for (const auto &c : constants) {
-    code << "\t" << "constant " << c.constName << " : " << c.constType
+    code << "\t"
+         << "constant " << c.constName << " : " << c.constType
          << " := " << c.constValue << ";" << endl;
   }
   return code.str();
@@ -340,6 +354,9 @@ string HlsVhdlTb::getSignalDeclaration() {
   code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
 
   code << "\tsignal tb_end_valid : std_logic;" << endl;
+  code << "\tsignal tb_end_ready : std_logic;" << endl;
+
+  code << "\tsignal tb_stop : std_logic;" << endl;
 
   code << endl;
 
@@ -415,8 +432,10 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
            << m.addrWidthParamValue << endl;
       code << "\t)" << endl;
       code << "\tport map(" << endl;
-      code << "\t\t" << MemElem::clkPortName << " => " << "tb_clk," << endl;
-      code << "\t\t" << MemElem::rstPortName << " => " << "tb_rst," << endl;
+      code << "\t\t" << MemElem::clkPortName << " => "
+           << "tb_clk," << endl;
+      code << "\t\t" << MemElem::rstPortName << " => "
+           << "tb_rst," << endl;
       code << "\t\t" << MemElem::ce0PortName << " => " << m.ce0SignalName << ","
            << endl;
       code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName << ","
@@ -437,8 +456,8 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
            << "," << endl;
       code << "\t\t" << MemElem::dIn1PortName << " => " << m.dIn1SignalName
            << "," << endl;
-      code << "\t\t" << MemElem::donePortName << " => " << "tb_temp_idle"
-           << endl;
+      code << "\t\t" << MemElem::donePortName << " => "
+           << "tb_temp_idle" << endl;
       code << "\t);" << endl << endl;
     } else {
 
@@ -455,22 +474,27 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dataWidthParamValue << endl;
         code << "\t)" << endl;
         code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => " << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => " << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => " << "'1'" << ","
-             << endl;
-        code << "\t\t" << MemElem::we0PortName << " => " << "'0'" << ","
-             << endl;
+        code << "\t\t" << MemElem::clkPortName << " => "
+             << "tb_clk," << endl;
+        code << "\t\t" << MemElem::rstPortName << " => "
+             << "tb_rst," << endl;
+        code << "\t\t" << MemElem::ce0PortName << " => "
+             << "'1'"
+             << "," << endl;
+        code << "\t\t" << MemElem::we0PortName << " => "
+             << "'0'"
+             << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName + "_valid => "
              << m.dOut0SignalName << "_valid," << endl;
         code << "\t\t" << MemElem::dOut0PortName + "_ready => "
              << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::dIn0PortName << " => " << "(others => '0')"
+        code << "\t\t" << MemElem::dIn0PortName << " => "
+             << "(others => '0')"
              << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => " << "tb_temp_idle"
-             << endl;
+        code << "\t\t" << MemElem::donePortName << " => "
+             << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
       }
       if (p.isInput && p.isOutput && !p.isReturn) {
@@ -486,10 +510,13 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dataWidthParamValue << endl;
         code << "\t)" << endl;
         code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => " << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => " << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => " << "'1'" << ","
-             << endl;
+        code << "\t\t" << MemElem::clkPortName << " => "
+             << "tb_clk," << endl;
+        code << "\t\t" << MemElem::rstPortName << " => "
+             << "tb_rst," << endl;
+        code << "\t\t" << MemElem::ce0PortName << " => "
+             << "'1'"
+             << "," << endl;
         code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
@@ -500,8 +527,8 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => " << "tb_temp_idle"
-             << endl;
+        code << "\t\t" << MemElem::donePortName << " => "
+             << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
       }
 
@@ -518,11 +545,15 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dataWidthParamValue << endl;
         code << "\t)" << endl;
         code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => " << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => " << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => " << "'1'" << ","
-             << endl;
-        code << "\t\t" << MemElem::we0PortName << " => " << "tb_end_valid"
+        code << "\t\t" << MemElem::clkPortName << " => "
+             << "tb_clk," << endl;
+        code << "\t\t" << MemElem::rstPortName << " => "
+             << "tb_rst," << endl;
+        code << "\t\t" << MemElem::ce0PortName << " => "
+             << "'1'"
+             << "," << endl;
+        code << "\t\t" << MemElem::we0PortName << " => "
+             << "tb_end_valid"
              << "," << endl;
         code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
              << "," << endl;
@@ -532,8 +563,8 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dOut0SignalName << "_ready," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
              << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => " << "tb_temp_idle"
-             << endl;
+        code << "\t\t" << MemElem::donePortName << " => "
+             << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
       }
 
@@ -550,10 +581,13 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dataWidthParamValue << endl;
         code << "\t)" << endl;
         code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => " << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => " << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => " << "'1'" << ","
-             << endl;
+        code << "\t\t" << MemElem::clkPortName << " => "
+             << "tb_clk," << endl;
+        code << "\t\t" << MemElem::rstPortName << " => "
+             << "tb_rst," << endl;
+        code << "\t\t" << MemElem::ce0PortName << " => "
+             << "'1'"
+             << "," << endl;
         code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName
              << "," << endl;
         code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
@@ -564,8 +598,8 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
              << m.dOut0SignalName << "_valid," << endl;
         code << "\t\t" << MemElem::dOut0PortName + "_ready => "
              << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::donePortName << " => " << "tb_temp_idle"
-             << endl;
+        code << "\t\t" << MemElem::donePortName << " => "
+             << "tb_temp_idle" << endl;
         code << "\t);" << endl << endl;
       }
     }
@@ -682,7 +716,7 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
           if (ctx.experimental) {
             duvPortMap.emplace_back("out0", m.dIn0SignalName);
             duvPortMap.emplace_back("out0_valid", "tb_end_valid");
-            duvPortMap.emplace_back("out0_ready", "'1'");
+            duvPortMap.emplace_back("out0_ready", "tb_end_ready");
           } else {
             duvPortMap.emplace_back("end_out", m.dIn0SignalName);
             duvPortMap.emplace_back("end_valid", "tb_end_valid");
@@ -772,15 +806,20 @@ string HlsVhdlTb::getDuvComponentDeclaration() {
       }
 
       if (!m.isArray && p.isOutput && p.isReturn) {
-        code << "\t\t" << "end_out : out std_logic_vector("
-             << ((int)p.dtWidth - 1) << " downto 0);" << endl;
-        code << "\t\t" << "end_valid : out std_logic;" << endl;
-        code << "\t\t" << "end_ready : in std_logic;" << endl;
+        code << "\t\t"
+             << "end_out : out std_logic_vector(" << ((int)p.dtWidth - 1)
+             << " downto 0);" << endl;
+        code << "\t\t"
+             << "end_valid : out std_logic;" << endl;
+        code << "\t\t"
+             << "end_ready : in std_logic;" << endl;
       }
 
       if (!m.isArray && !p.isOutput && p.isReturn) {
-        code << "\t\t" << "end_valid : out std_logic;" << endl;
-        code << "\t\t" << "end_ready : in std_logic;" << endl;
+        code << "\t\t"
+             << "end_valid : out std_logic;" << endl;
+        code << "\t\t"
+             << "end_ready : in std_logic;" << endl;
       }
 
       if (!m.isArray && p.isOutput && !p.isReturn) {
