@@ -13,14 +13,6 @@
 // circuit.
 //===----------------------------------------------------------------------===//
 
-/// IMPPP TO NOTE WHEN INTEGRATING WITH MAIN:
-// (1) SHOULD SKIP LSQS
-// I should make sure that the rewrites skip LSQs to not mess up with their
-// interface
-// (2) FINE TO CONNECT MC DIRECTLY TO START (ASSUMING NON-VOID FUNCTIONS) AND
-// SHOOULD HAPPEN NATURALLY?
-// It should naturally happen, thanks to the rewrites
-
 #include "dynamatic/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -122,6 +114,58 @@ Operation *returnBranchFormingCycle(Operation *muxOrMergeOp, int &cycleInputIdx,
   }
 
   return cycleBranchOp;
+}
+
+Operation *returnBranchExitingCycle(Operation *muxOrMergeOp) {
+  int cycleInputIdx;
+  bool isCycleBranchTrueSucc;
+  Operation *potentialBranchOp = returnBranchFormingCycle(
+      muxOrMergeOp, cycleInputIdx, isCycleBranchTrueSucc);
+  if (potentialBranchOp == nullptr)
+    return nullptr;
+
+  assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+  handshake::ConditionalBranchOp cyclicBranchOp =
+      cast<handshake::ConditionalBranchOp>(potentialBranchOp);
+
+  Value loopCond = cyclicBranchOp.getConditionOperand();
+  Value origLoopCond;
+  bool isNegatedCyclicBr = false;
+  int countOfInverters = 0;
+  while (isa_and_nonnull<handshake::NotOp>(loopCond.getDefiningOp())) {
+    loopCond = loopCond.getDefiningOp()->getOperand(0);
+    countOfInverters++;
+  }
+  if (countOfInverters % 2 != 0)
+    isNegatedCyclicBr = true;
+  origLoopCond = loopCond.getDefiningOp()->getOperand(0);
+
+  handshake::ConditionalBranchOp exitingBranch = nullptr;
+  for (auto *user : muxOrMergeOp->getResults().getUsers()) {
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(user) &&
+        user != cyclicBranchOp) {
+      auto br = cast<handshake::ConditionalBranchOp>(user);
+
+      Value cond = br.getConditionOperand();
+      Value origCond;
+      bool isNegated = false;
+      countOfInverters = 0;
+      while (isa_and_nonnull<handshake::NotOp>(cond.getDefiningOp())) {
+        cond = cond.getDefiningOp()->getOperand(0);
+        countOfInverters++;
+      }
+      if (countOfInverters % 2 != 0)
+        isNegated = true;
+      origCond = cond.getDefiningOp()->getOperand(0);
+
+      if (origCond == origLoopCond && isNegated != isNegatedCyclicBr) {
+        exitingBranch = br;
+        break;
+      }
+    }
+  }
+
+  return exitingBranch;
 }
 
 Operation *isConditionInverted(Value condition) {
@@ -580,588 +624,70 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
-// Update: 27/10: This should not be the case now that we check if a similar NOT
-// is already there before inserting a new one
-// TODO: A limitation here and in other patterns is that NOTs are inserted
-// separately, so two values outputted from a NOT fed from the same condition
-// will be considered different although they are equivalent... [But, this
-// problem is never triggered so far so todo in the future]
 // Rules A
-// Removes Merge and Branch operation pairs there exits a loop between
-// the Merge and the Branch.
-struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
+// Removes redundant loops that are guarded by two suppresses
+template <typename MuxOrMergeOp>
+struct EliminateRedundantLoop : public OpRewritePattern<MuxOrMergeOp> {
+  using OpRewritePattern<MuxOrMergeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+  LogicalResult matchAndRewrite(MuxOrMergeOp muxOrMergeOp,
                                 PatternRewriter &rewriter) const override {
-    // Doublecheck that the Merge has 2 inputs
-    if (mergeOp->getNumOperands() != 2)
+    bool isMux = false;
+    if (isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
+      isMux = true;
+    else if (!isa_and_nonnull<handshake::MergeOp>(muxOrMergeOp))
       return failure();
 
-    // Get the users of the Merge
-    auto mergeUsers = (mergeOp.getResult()).getUsers();
-    // if (mergeUsers.empty())
-    //   return failure();
-
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: ANother New condition: The pattern match
-      // should fail if the merge has more than two users (this is important to
-      // make the Repeat distribute rules effective and useful)
-      if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 2)
-        return failure();
-    }
-
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto mergeUser : mergeUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
-      }
-    }
-    if (!foundCondBranch)
+    if (muxOrMergeOp->getNumOperands() < 2)
       return failure();
 
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int mergeOuterInputIdx = 0;
-    int mergeCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto mergeOperand : mergeOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                mergeOperand.getDefiningOp()))) {
-          foundCycle = true;
-          mergeCycleInputIdx = operIdx;
-          iterCondBranchOp = cast<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
+    auto users = (muxOrMergeOp->getResults()[0]).getUsers();
+
+    // Pattern match fails if the muxOrMergeOp does not have exactly 2 users (2
+    // suppresses: one feeding the cycle and the other going outside of the
+    // loop)
+    if (users.empty() || std::distance(users.begin(), users.end()) != 2)
       return failure();
 
-    // llvm::errs() << "\t\t(1) Found an iter Branch in "
-    //              << getLogicBB(iterCondBranchOp) << "\n";
-
-    mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
-
-    // One of the branches in the set of Branches must have the same condition
-    // as that of iterCondBranchOp but has none of its succs equal to the merge
-    Value iterBranchCondition = iterCondBranchOp.getConditionOperand();
-    Value iterOriginalBranchCondition = iterBranchCondition;
-    if (isa_and_nonnull<handshake::NotOp>(iterBranchCondition.getDefiningOp()))
-      iterOriginalBranchCondition =
-          iterBranchCondition.getDefiningOp()->getOperand(0);
-
-    // This will be used to check inside the loop that the condition of the exit
-    // branch has the same value but opposite sign
-    bool firstPassWithTrueCond =
-        ((iterCondBranchOp.getTrueResult() ==
-              mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-          iterBranchCondition == iterOriginalBranchCondition) ||
-         (iterCondBranchOp.getFalseResult() ==
-              mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-          iterBranchCondition != iterOriginalBranchCondition));
-
-    bool foundExitBranch = false;
-    handshake::ConditionalBranchOp exitCondBranchOp;
-    Value exitBranchCondition;
-    Value exitOriginalBranchCondition;
-
-    for (auto br : branches) {
-      // Identify the brBranch condition to compare it to that of the iterBranch
-      Value brBranchCondition = br.getConditionOperand();
-      Value brOriginalBranchCondition = brBranchCondition;
-      if (isa_and_nonnull<handshake::NotOp>(brBranchCondition.getDefiningOp()))
-        brOriginalBranchCondition =
-            brBranchCondition.getDefiningOp()->getOperand(0);
-
-      Value brTrueResult = br.getTrueResult();
-      Value brFalseResult = br.getFalseResult();
-      // Make sure that this Branch is having at least 1 succ that is not making
-      // a cycle with the Merge
-      if (brTrueResult != mergeOp.getDataOperands()[mergeCycleInputIdx] ||
-          brFalseResult != mergeOp.getDataOperands()[mergeCycleInputIdx]) {
-
-        // In case we are doing it the optimized way, it could be that
-        // iterBranch itself has the other successor going outside of the loop
-        // WE take it as exitBranch only if it has succs both in the true and
-        // false sides
-        if (br == iterCondBranchOp && !br.getTrueResult().getUsers().empty() &&
-            !br.getFalseResult().getUsers().empty()) {
-          foundExitBranch = true;
-          exitCondBranchOp = br;
-          exitBranchCondition = brBranchCondition;
-          exitOriginalBranchCondition = brOriginalBranchCondition;
-          break;
-        } else {
-          bool passWithTrueCond =
-              ((!br.getTrueResult().getUsers().empty() &&
-                brBranchCondition == brOriginalBranchCondition) ||
-               (!br.getFalseResult().getUsers().empty() &&
-                brBranchCondition != brOriginalBranchCondition));
-
-          bool consistentSigns = (passWithTrueCond == firstPassWithTrueCond);
-          if (brOriginalBranchCondition == iterOriginalBranchCondition &&
-              !consistentSigns) {
-            foundExitBranch = true;
-            exitCondBranchOp = br;
-            exitBranchCondition = brBranchCondition;
-            exitOriginalBranchCondition = brOriginalBranchCondition;
-            break;
-          }
-        }
-      }
-
-      ///////////////////////////////////////////////////////////
-      // bool passWithTrueCond =
-      //     ((!br.getTrueResult().getUsers().empty() &&
-      //       brBranchCondition == brOriginalBranchCondition) ||
-      //      (!br.getFalseResult().getUsers().empty() &&
-      //       brBranchCondition != brOriginalBranchCondition));
-
-      // bool consistentSigns = (passWithTrueCond == firstPassWithTrueCond);
-
-      // if (brOriginalBranchCondition == iterOriginalBranchCondition &&
-      //     !consistentSigns) {
-      //   Value brTrueResult = br.getTrueResult();
-      //   Value brFalseResult = br.getFalseResult();
-      //   // Make sure that this Branch is not making a cycle with the Merge
-      //   if (brTrueResult != mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-      //       brFalseResult != mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-      //       brTrueResult != mergeOp.getDataOperands()[mergeOuterInputIdx] &&
-      //       brFalseResult != mergeOp.getDataOperands()[mergeOuterInputIdx]) {
-      //     foundExitBranch = true;
-      //     exitCondBranchOp = br;
-      //     exitBranchCondition = brBranchCondition;
-      //     exitOriginalBranchCondition = brOriginalBranchCondition;
-      //     break;
-      //   }
-      // }
-      ////////////////////////////////////////////////////////////
-    }
-
-    if (!foundExitBranch)
+    int cycleInputIdx;
+    bool isCycleBranchTrueSucc;
+    Operation *potentialBranchOp = returnBranchFormingCycle(
+        muxOrMergeOp, cycleInputIdx, isCycleBranchTrueSucc);
+    if (potentialBranchOp == nullptr)
       return failure();
 
-    // llvm::errs() << "\t\t(2) Found an exit Branch in "
-    //              << getLogicBB(exitCondBranchOp) << "\n";
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+    handshake::ConditionalBranchOp condBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialBranchOp);
 
-    // Pattern match fails if both outputs of the exitCondBranchOp are empty
-    if (exitCondBranchOp.getTrueResult().getUsers().empty() &&
-        exitCondBranchOp.getFalseResult().getUsers().empty())
+    if (!isSuppress(condBranchOp))
       return failure();
 
-    // llvm::errs() << "\t\t(2) Found an exit Branch in "
-    //              << getLogicBB(exitCondBranchOp) << "\n";
+    int outsideInputIdx = 1 - cycleInputIdx;
 
-    if (!OPTIM_BRANCH_TO_SUPP) {
-
-      // This exitCondBranchOp has to be a suppress with at least one succ in
-      // only one side; otherwise, the pattern match fails Not only this, but it
-      // has to be a literal suppress meaning that the successors must be only
-      // in the false direction
-      if ((!exitCondBranchOp.getTrueResult().getUsers().empty()) ||
-          (exitCondBranchOp.getTrueResult().getUsers().empty() &&
-           exitCondBranchOp.getFalseResult().getUsers().empty()))
-        return failure();
-
-      // New conditions: the iterCondBranch must also be a suppress; otherwise
-      // the pattern match fails If the first branch is not a suppress, the
-      // pattern match fails
-      if ((!iterCondBranchOp.getTrueResult().getUsers().empty()) ||
-          (iterCondBranchOp.getTrueResult().getUsers().empty() &&
-           iterCondBranchOp.getFalseResult().getUsers().empty()))
-        return failure();
-    }
-
-    // llvm::errs() << "\t\t(3) The 2 Branches are suppresses " << "\n";
-
-    // llvm::errs() << "\t\t(3) Exit Branch is a Suppress\n";
-
-    // Removed this because now we do not choose an exit branch if it does not
-    // have same condition as that of the iter branch but oppostie sign
-    // The two branches must be steering oppositely: Either have the same exact
-    // condition but opposite result signs OR opposite conditions and same
-    // result signs; otherwise, if they are steering with the same sign, the
-    // pattern match fails
-    // bool firstPassWithTrueCond =
-    //     ((iterCondBranchOp.getTrueResult() ==
-    //           mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-    //       iterBranchCondition == iterOriginalBranchCondition) ||
-    //      (iterCondBranchOp.getFalseResult() ==
-    //           mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-    //       iterBranchCondition != iterOriginalBranchCondition));
-
-    // bool secondPassWithTrueCond =
-    //     ((!exitCondBranchOp.getTrueResult().getUsers().empty() &&
-    //       exitBranchCondition == exitOriginalBranchCondition) ||
-    //      (!exitCondBranchOp.getFalseResult().getUsers().empty() &&
-    //       exitBranchCondition != exitOriginalBranchCondition));
-    // if (secondPassWithTrueCond == firstPassWithTrueCond)
-    //   return failure();
-
-    // llvm::errs() << "\t\t(4) The 2 Branches are steering oppositely\n";
-
-    // llvm::errs() << "\t\t(3) Exit Branch and Loop Branch haave opposite
-    // signs\n";
-
-    // Doublecheck which output of the exitCondBranchOp is not empty and is not
-    // feeding the cycle of the Merge
-    Value brTrueResult = exitCondBranchOp.getTrueResult();
-    Value brFalseResult = exitCondBranchOp.getFalseResult();
-    if (brTrueResult != mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-        !brTrueResult.getUsers().empty()) {
-      rewriter.replaceAllUsesWith(
-          brTrueResult, mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    } else {
-      if (brFalseResult != mergeOp.getDataOperands()[mergeCycleInputIdx] &&
-          !brFalseResult.getUsers().empty()) {
-        rewriter.replaceAllUsesWith(
-            brFalseResult, mergeOp.getDataOperands()[mergeOuterInputIdx]);
-      }
-    }
-
-    // Replace all uses of the branchOuterResult with
-    // the mergeOuterOperand
-    // Value brTrueResult = exitCondBranchOp.getTrueResult();
-    // if (!brTrueResult.getUsers().empty())
-    //   rewriter.replaceAllUsesWith(
-    //       brTrueResult, mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    // else {
-    //   Value brFalseResult = exitCondBranchOp.getFalseResult();
-    //   assert(!brFalseResult.getUsers().empty());
-    //   rewriter.replaceAllUsesWith(
-    //       brFalseResult, mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    // }
-
-    // llvm::errs() << "\t\t(4) Found a Merge-Branch loop";
-
-    // Decided on delegating this to another function that is reponsible for
-    // deleting floating cycles
-    // If the only user of the merge output are the 2 Branches AND the only
-    // user of the iterCondBranchOp's iterator output is the merge, delete both
-    // of them
-    // llvm::errs()
-    //     << "DISTANCES: " << std::distance(mergeUsers.begin(),
-    //     mergeUsers.end())
-    //     << ", "
-    //     <<
-    //     (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-    //                       iterCondBranchOp.getTrueResult().getUsers().end())
-    //                       +
-    //         std::distance(iterCondBranchOp.getFalseResult().getUsers().begin(),
-    //                       iterCondBranchOp.getFalseResult().getUsers().end()))
-    //     << "\n";
-    // if (std::distance(mergeUsers.begin(), mergeUsers.end()) < 3 &&
-    //     ((std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-    //                     iterCondBranchOp.getTrueResult().getUsers().end()) +
-    //       std::distance(iterCondBranchOp.getFalseResult().getUsers().begin(),
-    //                     iterCondBranchOp.getFalseResult().getUsers().end()))
-    //                     ==
-    //      1)) {
-    //   llvm::errs() << "\t\tSHOULD DELETE!!\n";
-    //   rewriter.replaceAllUsesWith(
-    //       iterCondBranchOp.getDataOperand(),
-    //       mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    //   rewriter.eraseOp(mergeOp);
-    //   rewriter.eraseOp(iterCondBranchOp);
-    // }
-
-    // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
-    // only user of the exitCondBranchOp is the Mux
-
-    llvm::errs() << "\t***Rules A: remove-merge-branch-loop!***\n";
-
-    return success();
-  }
-};
-
-// Rules A
-// Removes Mux and Branch operation pairs there exits a loop between
-// the Mux and the Branch.
-struct RemoveMuxBranchLoop : public OpRewritePattern<handshake::MuxOp> {
-  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
-                                PatternRewriter &rewriter) const override {
-    // Doublecheck that the Mux has 3 inputs
-    if (muxOp->getNumOperands() != 3)
+    Operation *potentialExitingBranchOp =
+        returnBranchExitingCycle(muxOrMergeOp);
+    if (potentialExitingBranchOp == nullptr)
       return failure();
 
-    // Get the users of the Mux
-    auto muxUsers = (muxOp.getResult()).getUsers();
-    // if (muxUsers.empty())
-    //   return failure();
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(
+        potentialExitingBranchOp));
+    handshake::ConditionalBranchOp exitingCondBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialExitingBranchOp);
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another New condition: The pattern match
-      // should fail if the merge has more than two users (this is important to
-      // make the Repeat distribute rules effective and useful)
-      if (std::distance(muxUsers.begin(), muxUsers.end()) != 2)
-        return failure();
-    }
-
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto muxUser : muxUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(muxUser));
-      }
-    }
-    if (!foundCondBranch)
+    if (!isSuppress(exitingCondBranchOp))
       return failure();
 
-    // llvm::errs() << "\t\t(1) Found a Merge-Branch loop";
+    auto muxOrMergeOperands = muxOrMergeOp->getOperands();
+    if (isMux)
+      muxOrMergeOperands =
+          cast<handshake::MuxOp>(muxOrMergeOp).getDataOperands();
 
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int muxOuterInputIdx = 0;
-    int muxCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto muxOperand : muxOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              muxOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                muxOperand.getDefiningOp()))) {
-          foundCycle = true;
-          muxCycleInputIdx = operIdx;
-          iterCondBranchOp =
-              cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
+    rewriter.replaceAllUsesWith(exitingCondBranchOp.getFalseResult(),
+                                muxOrMergeOperands[outsideInputIdx]);
 
-    // llvm::errs() << "\t\t(1) Found an iter Branch in "
-    //              << getLogicBB(iterCondBranchOp) << "\n";
-
-    muxOuterInputIdx = (muxCycleInputIdx == 0) ? 1 : 0;
-
-    // One of the branches in the set of Branches must have the same condition
-    // as that of iterCondBranchOp but has none of its succs equal to the Cmerge
-    Value iterBranchCondition = iterCondBranchOp.getConditionOperand();
-    Value iterOriginalBranchCondition = iterBranchCondition;
-    if (isa_and_nonnull<handshake::NotOp>(iterBranchCondition.getDefiningOp()))
-      iterOriginalBranchCondition =
-          iterBranchCondition.getDefiningOp()->getOperand(0);
-
-    // This will be used to check inside the loop that the condition of the exit
-    // branch has the same value but opposite sign
-    bool firstPassWithTrueCond =
-        ((iterCondBranchOp.getTrueResult() ==
-              muxOp.getDataOperands()[muxCycleInputIdx] &&
-          iterBranchCondition == iterOriginalBranchCondition) ||
-         (iterCondBranchOp.getFalseResult() ==
-              muxOp.getDataOperands()[muxCycleInputIdx] &&
-          iterBranchCondition != iterOriginalBranchCondition));
-
-    bool foundExitBranch = false;
-    handshake::ConditionalBranchOp exitCondBranchOp;
-    Value exitBranchCondition;
-    Value exitOriginalBranchCondition;
-
-    for (auto br : branches) {
-      Value brBranchCondition = br.getConditionOperand();
-      Value brOriginalBranchCondition = brBranchCondition;
-      if (isa_and_nonnull<handshake::NotOp>(brBranchCondition.getDefiningOp()))
-        brOriginalBranchCondition =
-            brBranchCondition.getDefiningOp()->getOperand(0);
-
-      Value brTrueResult = br.getTrueResult();
-      Value brFalseResult = br.getFalseResult();
-      // Make sure that this Branch is having at least 1 succ that is not making
-      // a cycle with the Merge
-      if (brTrueResult != muxOp.getDataOperands()[muxCycleInputIdx] ||
-          brFalseResult != muxOp.getDataOperands()[muxCycleInputIdx]) {
-
-        // In case we are doing it the optimized way, it could be that
-        // iterBranch itself has the other successor going outside of the loop
-        // WE take it as exitBranch only if it has succs both in the true and
-        // false sides
-        if (br == iterCondBranchOp && !br.getTrueResult().getUsers().empty() &&
-            !br.getFalseResult().getUsers().empty()) {
-          foundExitBranch = true;
-          exitCondBranchOp = br;
-          exitBranchCondition = brBranchCondition;
-          exitOriginalBranchCondition = brOriginalBranchCondition;
-          break;
-        } else {
-          bool passWithTrueCond =
-              ((!br.getTrueResult().getUsers().empty() &&
-                brBranchCondition == brOriginalBranchCondition) ||
-               (!br.getFalseResult().getUsers().empty() &&
-                brBranchCondition != brOriginalBranchCondition));
-
-          bool consistentSigns = (passWithTrueCond == firstPassWithTrueCond);
-          if (brOriginalBranchCondition == iterOriginalBranchCondition &&
-              !consistentSigns) {
-            foundExitBranch = true;
-            exitCondBranchOp = br;
-            exitBranchCondition = brBranchCondition;
-            exitOriginalBranchCondition = brOriginalBranchCondition;
-            break;
-          }
-        }
-      }
-
-      ////////////////////////////////////////////////////////////
-      // bool passWithTrueCond =
-      //     ((!br.getTrueResult().getUsers().empty() &&
-      //       brBranchCondition == brOriginalBranchCondition) ||
-      //      (!br.getFalseResult().getUsers().empty() &&
-      //       brBranchCondition != brOriginalBranchCondition));
-
-      // bool consistentSigns = (passWithTrueCond == firstPassWithTrueCond);
-
-      // if (brOriginalBranchCondition == iterOriginalBranchCondition &&
-      //     !consistentSigns) {
-      //   Value brTrueResult = br.getTrueResult();
-      //   Value brFalseResult = br.getFalseResult();
-      //   // Make sure that this Branch is not making a cycle with the Merge
-      //   if (brTrueResult != muxOp.getDataOperands()[muxCycleInputIdx] &&
-      //       brFalseResult != muxOp.getDataOperands()[muxCycleInputIdx] &&
-      //       brTrueResult != muxOp.getDataOperands()[muxOuterInputIdx] &&
-      //       brFalseResult != muxOp.getDataOperands()[muxOuterInputIdx]) {
-      //     foundExitBranch = true;
-      //     exitCondBranchOp = br;
-      //     exitBranchCondition = brBranchCondition;
-      //     exitOriginalBranchCondition = brOriginalBranchCondition;
-      //     break;
-      //   }
-      // }
-      ////////////////////////////////////////////////////////////
-    }
-
-    if (!foundExitBranch)
-      return failure();
-
-    // llvm::errs() << "\t\t(2) Found an exit Branch in "
-    //              << getLogicBB(exitCondBranchOp) << "\n";
-
-    // Pattern match fails if both outputs of the exitCondBranchOp are empty
-    if (exitCondBranchOp.getTrueResult().getUsers().empty() &&
-        exitCondBranchOp.getFalseResult().getUsers().empty())
-      return failure();
-
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // This exitCondBranchOp has to be a suppress with at least one succ in
-      // only one side; otherwise, the pattern match fails
-      if ((!exitCondBranchOp.getTrueResult().getUsers().empty()) ||
-          (exitCondBranchOp.getTrueResult().getUsers().empty() &&
-           exitCondBranchOp.getFalseResult().getUsers().empty()))
-        return failure();
-
-      // New conditions: the iterCondBranch must also be a suppress; otherwise
-      // the pattern match fails If the first branch is not a suppress, the
-      // pattern match fails
-      if ((!iterCondBranchOp.getTrueResult().getUsers().empty()) ||
-          (iterCondBranchOp.getTrueResult().getUsers().empty() &&
-           iterCondBranchOp.getFalseResult().getUsers().empty()))
-        return failure();
-    }
-
-    // llvm::errs() << "\t\t(3) The 2 Branches are suppresses " << "\n";
-
-    // Removed this because now we do not choose an exit branch if it does not
-    // have same condition as that of the iter branch but oppostie sign
-    // The two branches must be steering oppositely: Either have the same exact
-    // condition but opposite result signs OR opposite conditions and same
-    // result signs; otherwise, if they are steering with the same sign, the
-    // pattern match fails
-    // bool firstPassWithTrueCond =
-    //     ((iterCondBranchOp.getTrueResult() ==
-    //           muxOp.getDataOperands()[muxCycleInputIdx] &&
-    //       iterBranchCondition == iterOriginalBranchCondition) ||
-    //      (iterCondBranchOp.getFalseResult() ==
-    //           muxOp.getDataOperands()[muxCycleInputIdx] &&
-    //       iterBranchCondition != iterOriginalBranchCondition));
-    // bool secondPassWithTrueCond =
-    //     ((!exitCondBranchOp.getTrueResult().getUsers().empty() &&
-    //       exitBranchCondition == exitOriginalBranchCondition) ||
-    //      (!exitCondBranchOp.getFalseResult().getUsers().empty() &&
-    //       exitBranchCondition != exitOriginalBranchCondition));
-
-    // if (secondPassWithTrueCond == firstPassWithTrueCond)
-    //   return failure();
-
-    // llvm::errs() << "\t\t(4) The 2 Branches are steering oppositely\n";
-
-    // Doublecheck which output of the exitCondBranchOp is not empty and is not
-    // feeding the cycle of the Merge
-    Value brTrueResult = exitCondBranchOp.getTrueResult();
-    Value brFalseResult = exitCondBranchOp.getFalseResult();
-    if (brTrueResult != muxOp.getDataOperands()[muxCycleInputIdx] &&
-        !brTrueResult.getUsers().empty()) {
-      rewriter.replaceAllUsesWith(brTrueResult,
-                                  muxOp.getDataOperands()[muxOuterInputIdx]);
-    } else {
-      if (brFalseResult != muxOp.getDataOperands()[muxCycleInputIdx] &&
-          !brFalseResult.getUsers().empty()) {
-        rewriter.replaceAllUsesWith(brFalseResult,
-                                    muxOp.getDataOperands()[muxOuterInputIdx]);
-      }
-    }
-
-    // Replace all uses of the branchOuterResult with
-    // the muxOuterOperand
-    // Value brTrueResult = exitCondBranchOp.getTrueResult();
-    // if (!brTrueResult.getUsers().empty())
-    //   rewriter.replaceAllUsesWith(brTrueResult,
-    //                               muxOp.getDataOperands()[muxOuterInputIdx]);
-    // else {
-    //   Value brFalseResult = exitCondBranchOp.getFalseResult();
-    //   assert(!brFalseResult.getUsers().empty());
-    //   rewriter.replaceAllUsesWith(brFalseResult,
-    //                               muxOp.getDataOperands()[muxOuterInputIdx]);
-    // }
-
-    // llvm::errs() << "\t\t(4) Found a Merge-Branch loop";
-
-    // Decided on delegating this to another function that is reponsible for
-    // deleting floating cycles
-    // If the only user of the merge output are the 2
-    // Branches AND the only user of the iterCondBranchOp's iterator output is
-    // the merge, delete both of them llvm::errs()
-    //     << "DISTANCES: " << std::distance(muxUsers.begin(), muxUsers.end())
-    //     << ", "
-    //     <<
-    //     (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-    //                       iterCondBranchOp.getTrueResult().getUsers().end())
-    //                       +
-    //         std::distance(iterCondBranchOp.getFalseResult().getUsers().begin(),
-    //                       iterCondBranchOp.getFalseResult().getUsers().end()))
-    //     << "\n";
-    // if (std::distance(muxUsers.begin(), muxUsers.end()) < 3 &&
-    //     ((std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-    //                     iterCondBranchOp.getTrueResult().getUsers().end()) +
-    //       std::distance(iterCondBranchOp.getFalseResult().getUsers().begin(),
-    //                     iterCondBranchOp.getFalseResult().getUsers().end()))
-    //                     ==
-    //      1)) {
-    //   llvm::errs() << "\t\tSHOULD DELETE!!\n";
-    //   rewriter.replaceAllUsesWith(iterCondBranchOp.getDataOperand(),
-    //                               muxOp.getDataOperands()[muxOuterInputIdx]);
-    //   rewriter.eraseOp(muxOp);
-    //   rewriter.eraseOp(iterCondBranchOp);
-    // }
-
-    // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
-    // only user of the exitCondBranchOp is the Mux
-
-    llvm::errs() << "\t***Rules A: remove-mux-branch-loop!***\n";
+    rewriter.eraseOp(exitingCondBranchOp);
+    llvm::errs() << "\t***Rules A: eliminate-GENERIC-redundant-loop!***\n";
 
     return success();
   }
@@ -2195,7 +1721,7 @@ struct ConstructSuppresses
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchFalseResult, newBranchFalseResult);
 
-    llvm::errs() << "\t***Rules D: break-branches!***\n";
+    // llvm::errs() << "\t***Rules D: break-branches!***\n";
 
     return success();
   }
@@ -2249,7 +1775,7 @@ struct FixSuppresses : public OpRewritePattern<handshake::ConditionalBranchOp> {
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchTrueResult, newBranchFalseResult);
 
-    llvm::errs() << "\t***Rules D: fix-branches-for-suppresses!***\n";
+    // llvm::errs() << "\t***Rules D: fix-branches-for-suppresses!***\n";
 
     return success();
   }
@@ -2298,7 +1824,7 @@ struct DistributeSuppresses
       i++;
     }
 
-    llvm::errs() << "\t***Rules D: distribute-suppresses!***\n";
+    // llvm::errs() << "\t***Rules D: distribute-suppresses!***\n";
     return success();
   }
 };
@@ -2430,6 +1956,9 @@ struct DistributeRepeats : public OpRewritePattern<MuxOrMergeOp> {
   }
 };
 
+// This is not entirely true because in the simple buffer placement, I skip
+// Merges to avoid placing a buffer after an Init, but we might need it if there
+// is a Merge at the loop header
 /*
   Not clean but is temporary anyways:
   Eventually, a subset of the network of CMerges will be extracted solely for
@@ -2622,19 +2151,20 @@ struct HandshakeRewriteTermsPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns
-        .add<EraseUnconditionalBranches, EraseSingleInputMerges,
-             EraseSingleInputMuxes, EraseSingleInputControlMerges,
-             DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-             RemoveFloatingLoop<handshake::MuxOp>,
-             RemoveFloatingLoop<handshake::MergeOp>, ConstructSuppresses,
-             FixSuppresses, DistributeSuppresses,
-             DistributeRepeats<handshake::MuxOp>,
-             DistributeRepeats<handshake::MergeOp>, ExtractIfThenElseCondition,
-             ExtractLoopCondition, RemoveBranchMergeIfThenElse,
-             RemoveBranchMuxIfThenElse, RemoveMergeBranchLoop,
-             RemoveMuxBranchLoop, /*, ShortenSuppressPairs,*/
-             ConvertLoopMergeToMux /*, ShortenMuxRepeatPairs*/>(ctx);
+    patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
+                 EraseSingleInputMuxes, EraseSingleInputControlMerges,
+                 DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
+                 RemoveFloatingLoop<handshake::MergeOp>,
+                 RemoveFloatingLoop<handshake::MuxOp>,
+                 ConstructSuppresses, FixSuppresses, DistributeSuppresses,
+                 DistributeRepeats<handshake::MuxOp>,
+                 DistributeRepeats<handshake::MergeOp>,
+                 ExtractIfThenElseCondition, ExtractLoopCondition,
+                 RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
+                 EliminateRedundantLoop<handshake::MuxOp>,
+                 EliminateRedundantLoop<handshake::MergeOp>, ConvertLoopMergeToMux
+                 /*ShortenSuppressPairs,
+                 , ShortenMuxRepeatPairs*/>(ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
