@@ -10,6 +10,7 @@ import generators.handshake.control_merge as control_merge
 import generators.handshake.join as join
 import generators.handshake.fork as fork
 import generators.handshake.lazy_fork as lazy_fork
+import generators.handshake.load as load
 import generators.handshake.merge as merge
 import generators.handshake.mux as mux
 import generators.handshake.sink as sink
@@ -34,6 +35,8 @@ def generate_code(name, mod_type, parameters):
       return fork.generate_fork(name, parameters)
     case "lazy_fork":
       return lazy_fork.generate_lazy_fork(name, parameters)
+    case "load":
+      return load.generate_load(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
     case "mux":
