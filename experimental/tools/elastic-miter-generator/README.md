@@ -6,8 +6,10 @@ This creates an elastic-miter module in the Handshake dialect using two MLIR fil
 
 
 #### Usage
+```bash
+elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> --bufferSlots=<nr-of-slots>
+```
 
-elastic-miter --lhs=\<lhs-file-path\> --rhs=\<lhs-file-path\> -o \<out-dir\> --bufferSlots=\<nr-of-slots\>
 
 ##### Command-line options
 
