@@ -48,19 +48,19 @@ def _generate_oehb(name, data_type):
   return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR inner_oehb : {name}__oehb_dataless(ins_valid, outs_ready);
-  VAR outs_i : {data_type};
+  VAR data : {data_type};
 
   ASSIGN
-  init(outs_i) := {smv_format_constant(0, data_type)};
-  next(outs_i) := case
+  init(data) := {smv_format_constant(0, data_type)};
+  next(data) := case
     ins_ready & ins_valid : ins;
-    TRUE : outs_i;
+    TRUE : data;
   esac;
     
   // output
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
-  DEFINE outs := outs_i;
+  DEFINE outs := data;
 
 {_generate_oehb_dataless(f"{name}__oehb_dataless")}
 """
@@ -119,7 +119,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR data : {data_type};
 
   ASSIGN
-  init(outs_i) := {smv_format_constant(0, data_type)};
+  init(data) := {smv_format_constant(0, data_type)};
   next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
 
   // output
