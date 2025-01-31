@@ -417,7 +417,7 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   // Create a new jsonObject and put all required names into it
   llvm::json::Object jsonObject = *new llvm::json::Object;
   jsonObject["input_buffers"] = std::move(inputBufferNames);
-  jsonObject["out_buffers"] = std::move(outputBufferNames);
+  jsonObject["output_buffers"] = std::move(outputBufferNames);
   jsonObject["ndwires"] = std::move(ndwireNames);
   jsonObject["eq"] = std::move(eqNames);
 
