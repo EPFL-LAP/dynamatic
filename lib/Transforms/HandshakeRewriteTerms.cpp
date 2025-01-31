@@ -38,14 +38,9 @@ using namespace dynamatic;
 
 namespace {
 
-#define OPTIM_DISTR                                                            \
-  true // associate it with a disable of DistributeSuppresses,
-       // DistributeMergeRepeats,DistributeMuxRepeats
-#define OPTIM_BRANCH_TO_SUPP                                                   \
-  true // associate it with a disable of ConstructSuppresses,
-       // FixBranchesToSuppresses
+#define OPTIM_DISTR true
+#define OPTIM_BRANCH_TO_SUPP true
 
-// Rules E
 /// Erases unconditional branches (which would eventually lower to simple
 /// wires).
 struct EraseUnconditionalBranches
