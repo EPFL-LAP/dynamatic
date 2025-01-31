@@ -2357,43 +2357,39 @@ struct FixBranchesToSuppresses
                                 PatternRewriter &rewriter) const override {
     if (OPTIM_BRANCH_TO_SUPP)
       return failure();
+
     // The pattern match fails if the Branch has no true succs or has both
     // true and false succs
-    Value branchTrueResult = condBranchOp.getTrueResult();
-    Value branchFalseResult = condBranchOp.getFalseResult();
-    if (branchTrueResult.getUsers().empty() ||
-        (!branchFalseResult.getUsers().empty() &&
-         !branchTrueResult.getUsers().empty()))
+    // Value branchTrueResult = condBranchOp.getTrueResult();
+    // Value branchFalseResult = condBranchOp.getFalseResult();
+    // if (branchTrueResult.getUsers().empty() ||
+    //     (!branchFalseResult.getUsers().empty() &&
+    //      !branchTrueResult.getUsers().empty()))
+    //   return failure();
+
+    if (isSuppress(condBranchOp))
       return failure();
 
-    // Construct a new Branch that should feed the true side of the old with
-    // its false side and takes the inverse of the condition
+    Value dataOperand = condBranchOp.getDataOperand();
+    Value condOperand = condBranchOp.getConditionOperand();
 
-    // Check if the condition already feeds a NOT, no need to create a new one
     bool foundNot = false;
     handshake::NotOp existingNotOp;
-    for (auto condRes : condBranchOp.getConditionOperand().getUsers()) {
-      if (isa_and_nonnull<handshake::NotOp>(condRes)) {
-        foundNot = true;
-        existingNotOp = cast<handshake::NotOp>(condRes);
-        break;
-      }
+    Operation *potentialNotOp = isConditionInverted(condOperand);
+    if (potentialNotOp != nullptr) {
+      foundNot = true;
+      existingNotOp = cast<handshake::NotOp>(potentialNotOp);
     }
 
-    Value condOperand;
     if (foundNot) {
       condOperand = existingNotOp.getResult();
-
     } else {
       rewriter.setInsertionPoint(condBranchOp);
       handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
-          condBranchOp->getLoc(), condBranchOp.getConditionOperand());
+          condBranchOp->getLoc(), condOperand);
       inheritBB(condBranchOp, notOp);
-
       condOperand = notOp.getResult();
     }
-
-    Value dataOperand = condBranchOp.getDataOperand();
 
     ValueRange branchOperands = {condOperand, dataOperand};
     rewriter.setInsertionPoint(condBranchOp);
@@ -2402,12 +2398,11 @@ struct FixBranchesToSuppresses
                                                         branchOperands);
     inheritBB(condBranchOp, newBranch);
 
+    // Value newBranchFalseResult = newBranch.getFalseResult();
+    // rewriter.replaceAllUsesWith(branchTrueResult, newBranchFalseResult);
+    Value branchTrueResult = condBranchOp.getTrueResult();
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchTrueResult, newBranchFalseResult);
-
-    // Commented it out because now I rely on RemoveUselessBranches to erase all
-    // such Branches
-    // rewriter.eraseOp(condBranchOp);
 
     // llvm::errs() << "\t***Rules D: fix-branches-for-suppresses!***\n";
 
