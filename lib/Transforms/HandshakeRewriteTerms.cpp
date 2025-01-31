@@ -344,43 +344,59 @@ struct RemoveDoubleSinkBranches
   }
 };
 
-// Rules E
-/// Remove floating cycles
-struct RemoveMergeFloatingLoop : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
+template <typename MuxOrMergeOp>
+struct RemoveFloatingLoop : public OpRewritePattern<MuxOrMergeOp> {
+  using OpRewritePattern<MuxOrMergeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+  LogicalResult matchAndRewrite(MuxOrMergeOp muxOrMergeOp,
                                 PatternRewriter &rewriter) const override {
-    if (mergeOp->getNumOperands() != 2)
+    bool isMux = false;
+    if (isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
+      isMux = true;
+    else if (!isa_and_nonnull<handshake::MergeOp>(muxOrMergeOp))
       return failure();
 
-    // Get the users of the Mux
-    auto mergeUsers = (mergeOp.getResult()).getUsers();
-    if (mergeUsers.empty())
+    if (muxOrMergeOp->getNumOperands() < 2)
+      return failure();
+
+    auto users = (muxOrMergeOp->getResults()[0]).getUsers();
+    // Pattern match fails if the muxOrMergeOp has more than 1 user or no users
+    // at all
+    if (users.empty() || std::distance(users.begin(), users.end()) != 1)
       return failure();
 
     int cycleInputIdx;
     bool isCycleBranchTrueSucc;
-    Operation *potentialBranchOp =
-        returnBranchFormingCycle(mergeOp, cycleInputIdx, isCycleBranchTrueSucc);
+    Operation *potentialBranchOp = returnBranchFormingCycle(
+        muxOrMergeOp, cycleInputIdx, isCycleBranchTrueSucc);
     if (potentialBranchOp == nullptr)
       return failure();
 
     assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
-    handshake::ConditionalBranchOp iterCondBranchOp =
+    handshake::ConditionalBranchOp condBranchOp =
         cast<handshake::ConditionalBranchOp>(potentialBranchOp);
 
-    int mergeOuterInputIdx = 1 - cycleInputIdx;
+    int outsideInputIdx = 1 - cycleInputIdx;
 
-    if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 1 ||
-        (returnTotalCondBranchUsers(iterCondBranchOp) != 1))
+    if (std::distance(users.begin(), users.end()) != 1 ||
+        (returnTotalCondBranchUsers(condBranchOp) != 1))
       return failure();
 
-    // llvm::errs() << "\t\tDeleting isolated cycle\n";
-    rewriter.replaceAllUsesWith(iterCondBranchOp.getDataOperand(),
-                                mergeOp.getDataOperands()[mergeOuterInputIdx]);
-    rewriter.eraseOp(mergeOp);
-    rewriter.eraseOp(iterCondBranchOp);
+    auto muxOrMergeOperands = muxOrMergeOp->getOperands();
+    if (isMux)
+      muxOrMergeOperands =
+          cast<handshake::MuxOp>(muxOrMergeOp).getDataOperands();
+
+    // Safety step to be able to delete the cycle, we first replace all uses of
+    // condBranchOp with muxOrMerge, then erase the latter then erase the former
+    rewriter.replaceAllUsesWith(condBranchOp.getDataOperand(),
+                                muxOrMergeOperands[outsideInputIdx]);
+
+    // // llvm::errs() << "\t\tDeleting isolated cycle\n";
+    // rewriter.replaceAllUsesWith(iterCondBranchOp.getDataOperand(),
+    //                             mergeOp.getDataOperands()[mergeOuterInputIdx]);
+    rewriter.eraseOp(muxOrMergeOp);
+    rewriter.eraseOp(condBranchOp);
 
     // llvm::errs() << "\t***Rules E: remove-floating-merge-loop!***\n";
 
@@ -2792,7 +2808,8 @@ struct HandshakeRewriteTermsPass
         EraseUnconditionalBranches, EraseSingleInputMerges,
         EraseSingleInputMuxes, EraseSingleInputControlMerges,
         DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-        RemoveMuxFloatingLoop, RemoveMergeFloatingLoop, ConstructSuppresses,
+        RemoveFloatingLoop<handshake::MuxOp>,
+        RemoveFloatingLoop<handshake::MergeOp>, ConstructSuppresses,
         FixBranchesToSuppresses, DistributeSuppresses, DistributeMergeRepeats,
         DistributeMuxRepeats, ExtractIfThenElseCondition, ExtractLoopCondition,
         RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
