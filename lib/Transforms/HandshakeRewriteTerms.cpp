@@ -38,12 +38,157 @@ using namespace dynamatic;
 
 namespace {
 
-#define OPTIM_DISTR                                                            \
+//#define OPTIM_DISTR                                                            \
   true // associate it with a disable of DistributeSuppresses,
-       // DistributeMergeRepeats,DistributeMuxRepeats
+// DistributeMergeRepeats,DistributeMuxRepeats
 #define OPTIM_BRANCH_TO_SUPP                                                   \
   false // associate it with a disable of ConstructSuppresses,
         // FixBranchesToSuppresses
+
+// Helper functions
+bool isSuppress(handshake::ConditionalBranchOp condBranchOp) {
+  return (condBranchOp.getTrueResult().getUsers().empty() &&
+          !condBranchOp.getFalseResult().getUsers().empty());
+}
+
+int returnTotalCondBranchUsers(handshake::ConditionalBranchOp condBranchOp) {
+  return std::distance(condBranchOp.getTrueResult().getUsers().begin(),
+                       condBranchOp.getTrueResult().getUsers().end()) +
+         std::distance(condBranchOp.getFalseResult().getUsers().begin(),
+                       condBranchOp.getFalseResult().getUsers().end());
+}
+
+/// Returns Operation holding a Branch, if it exists, and the its index (by
+/// reference) in the operands of the Mux. Returns a nullptr and -1 (by
+/// reference) otherwise
+/// Takes a generic Operation, but returns if it is not a MuxOp or MergeOp
+Operation *returnBranchFormingCycle(Operation *muxOrMergeOp, int &cycleInputIdx,
+                                    bool &isCycleBranchTrueSucc) {
+  cycleInputIdx = -1;
+  isCycleBranchTrueSucc = false;
+  bool isMux = false;
+  if (isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
+    isMux = true;
+  else if (!isa_and_nonnull<handshake::MergeOp>(muxOrMergeOp) &&
+           !isa_and_nonnull<handshake::ControlMergeOp>(muxOrMergeOp))
+    return nullptr;
+
+  DenseSet<handshake::ConditionalBranchOp> branches;
+  for (auto *user : muxOrMergeOp->getResults().getUsers()) {
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(user)) {
+      auto br = cast<handshake::ConditionalBranchOp>(user);
+      branches.insert(br);
+    }
+  }
+
+  // One of the conditional branches that were found should feed the
+  // muxOrMergeOp forming a cycle
+  int operIdx = 0;
+  handshake::ConditionalBranchOp cycleBranchOp = nullptr;
+  auto muxOrMergeOperands = muxOrMergeOp->getOperands();
+  if (isMux)
+    muxOrMergeOperands = cast<handshake::MuxOp>(muxOrMergeOp).getDataOperands();
+  for (auto operand : muxOrMergeOperands) {
+    auto *op = operand.getDefiningOp();
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
+      auto br = cast<handshake::ConditionalBranchOp>(op);
+      if (branches.contains(br)) {
+        cycleInputIdx = operIdx;
+        cycleBranchOp = br;
+        break;
+      }
+    }
+    operIdx++;
+  }
+
+  if (cycleBranchOp != nullptr) {
+    Value muxOrMergeInnerOperand = muxOrMergeOperands[cycleInputIdx];
+    Value branchTrueResult = cycleBranchOp.getTrueResult();
+    Value branchFalseResult = cycleBranchOp.getFalseResult();
+    if (branchTrueResult == muxOrMergeInnerOperand)
+      isCycleBranchTrueSucc = true;
+    else if (branchFalseResult == muxOrMergeInnerOperand) {
+      isCycleBranchTrueSucc = false;
+    }
+  }
+
+  return cycleBranchOp;
+}
+
+Operation *returnBranchExitingCycle(Operation *muxOrMergeOp) {
+  int cycleInputIdx;
+  bool isCycleBranchTrueSucc;
+  Operation *potentialBranchOp = returnBranchFormingCycle(
+      muxOrMergeOp, cycleInputIdx, isCycleBranchTrueSucc);
+  if (potentialBranchOp == nullptr)
+    return nullptr;
+
+  assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+  handshake::ConditionalBranchOp cyclicBranchOp =
+      cast<handshake::ConditionalBranchOp>(potentialBranchOp);
+
+  Value loopCond = cyclicBranchOp.getConditionOperand();
+  Value origLoopCond;
+  bool isNegatedCyclicBr = false;
+  int countOfInverters = 0;
+  while (isa_and_nonnull<handshake::NotOp>(loopCond.getDefiningOp())) {
+    loopCond = loopCond.getDefiningOp()->getOperand(0);
+    countOfInverters++;
+  }
+  if (countOfInverters % 2 != 0)
+    isNegatedCyclicBr = true;
+  origLoopCond = loopCond.getDefiningOp()->getOperand(0);
+
+  handshake::ConditionalBranchOp exitingBranch = nullptr;
+  for (auto *user : muxOrMergeOp->getResults().getUsers()) {
+    if (isa_and_nonnull<handshake::ConditionalBranchOp>(user) &&
+        user != cyclicBranchOp) {
+      auto br = cast<handshake::ConditionalBranchOp>(user);
+
+      Value cond = br.getConditionOperand();
+      Value origCond;
+      bool isNegated = false;
+      countOfInverters = 0;
+      while (isa_and_nonnull<handshake::NotOp>(cond.getDefiningOp())) {
+        cond = cond.getDefiningOp()->getOperand(0);
+        countOfInverters++;
+      }
+      if (countOfInverters % 2 != 0)
+        isNegated = true;
+      origCond = cond.getDefiningOp()->getOperand(0);
+
+      if (origCond == origLoopCond && isNegated != isNegatedCyclicBr) {
+        exitingBranch = br;
+        break;
+      }
+    }
+  }
+
+  return exitingBranch;
+}
+
+Operation *isConditionInverted(Value condition) {
+  handshake::NotOp existingNotOp = nullptr;
+  for (auto condUser : condition.getUsers()) {
+    if (isa_and_nonnull<handshake::NotOp>(condUser)) {
+      existingNotOp = cast<handshake::NotOp>(condUser);
+      break;
+    }
+  }
+  return existingNotOp;
+}
+
+Operation *isConditionFeedingInit(Value condition) {
+  handshake::MergeOp existingInit = nullptr;
+  for (auto iterCondRes : condition.getUsers()) {
+    if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
+      existingInit = cast<handshake::MergeOp>(iterCondRes);
+      break;
+    }
+  }
+
+  return existingInit;
+}
 
 // Rules E
 /// Erases unconditional branches (which would eventually lower to simple
@@ -206,7 +351,6 @@ struct RemoveMergeFloatingLoop : public OpRewritePattern<handshake::MergeOp> {
 
   LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
                                 PatternRewriter &rewriter) const override {
-    // Doublecheck that the Merge has 2 inputs
     if (mergeOp->getNumOperands() != 2)
       return failure();
 
@@ -215,51 +359,21 @@ struct RemoveMergeFloatingLoop : public OpRewritePattern<handshake::MergeOp> {
     if (mergeUsers.empty())
       return failure();
 
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto mergeUser : mergeUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(mergeUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(mergeUser));
-      }
-    }
-    if (!foundCondBranch)
+    int cycleInputIdx;
+    bool isCycleBranchTrueSucc;
+    Operation *potentialBranchOp =
+        returnBranchFormingCycle(mergeOp, cycleInputIdx, isCycleBranchTrueSucc);
+    if (potentialBranchOp == nullptr)
       return failure();
 
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int mergeOuterInputIdx = 0;
-    int mergeCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto mergeOperand : mergeOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                mergeOperand.getDefiningOp()))) {
-          foundCycle = true;
-          mergeCycleInputIdx = operIdx;
-          iterCondBranchOp = cast<handshake::ConditionalBranchOp>(
-              mergeOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
-    mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+    handshake::ConditionalBranchOp iterCondBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialBranchOp);
 
-    // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
-    // only user of the exitCondBranchOp is the Mux
+    int mergeOuterInputIdx = 1 - cycleInputIdx;
+
     if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 1 ||
-        (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-                       iterCondBranchOp.getTrueResult().getUsers().end()) +
-             std::distance(
-                 iterCondBranchOp.getFalseResult().getUsers().begin(),
-                 iterCondBranchOp.getFalseResult().getUsers().end()) !=
-         1))
+        (returnTotalCondBranchUsers(iterCondBranchOp) != 1))
       return failure();
 
     // llvm::errs() << "\t\tDeleting isolated cycle\n";
@@ -290,51 +404,23 @@ struct RemoveMuxFloatingLoop : public OpRewritePattern<handshake::MuxOp> {
     if (muxUsers.empty())
       return failure();
 
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto muxUser : muxUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(muxUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(muxUser));
-      }
-    }
-    if (!foundCondBranch)
+    int cycleInputIdx;
+    bool isCycleBranchTrueSucc;
+    Operation *potentialBranchOp =
+        returnBranchFormingCycle(muxOp, cycleInputIdx, isCycleBranchTrueSucc);
+    if (potentialBranchOp == nullptr)
       return failure();
 
-    // One of the branches in the set of Branches must be also be an operand
-    // forming a cycle with the merge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int muxOuterInputIdx = 0;
-    int muxCycleInputIdx = 0;
-    handshake::ConditionalBranchOp iterCondBranchOp;
-    for (auto muxOperand : muxOp.getDataOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              muxOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                muxOperand.getDefiningOp()))) {
-          foundCycle = true;
-          muxCycleInputIdx = operIdx;
-          iterCondBranchOp =
-              cast<handshake::ConditionalBranchOp>(muxOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
-    muxOuterInputIdx = (muxCycleInputIdx == 0) ? 1 : 0;
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+    handshake::ConditionalBranchOp iterCondBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialBranchOp);
+
+    int muxOuterInputIdx = 1 - cycleInputIdx;
 
     // We rely on the RemoveUselessBranches to remove exitCondBranchOp if the
     // only user of the exitCondBranchOp is the Mux
     if (std::distance(muxUsers.begin(), muxUsers.end()) != 1 ||
-        (std::distance(iterCondBranchOp.getTrueResult().getUsers().begin(),
-                       iterCondBranchOp.getTrueResult().getUsers().end()) +
-             std::distance(
-                 iterCondBranchOp.getFalseResult().getUsers().begin(),
-                 iterCondBranchOp.getFalseResult().getUsers().end()) !=
-         1))
+        (returnTotalCondBranchUsers(iterCondBranchOp) != 1))
       return failure();
 
     // llvm::errs() << "\t\tDeleting isolated cycle\n";
@@ -390,19 +476,23 @@ struct RemoveBranchMergeIfThenElse
         return failure();
     }
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
-      // use of the suppress->distribute rule): the two suppresses should have
-      // only a single usage; otherwise the pattern match fails
-      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                        firstBranchOperand.getFalseResult().getUsers().end()) !=
-          1)
-        return failure();
-      if (std::distance(
-              secondBranchOperand.getFalseResult().getUsers().begin(),
-              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
-        return failure();
-    }
+    // if (!OPTIM_DISTR) {
+    //   // Kill Distrib. for Optim.: Another new condition (to make a
+    //   meaningful
+    //   // use of the suppress->distribute rule): the two suppresses should
+    //   have
+    //   // only a single usage; otherwise the pattern match fails
+    //   if
+    //   (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
+    //                     firstBranchOperand.getFalseResult().getUsers().end())
+    //                     !=
+    //       1)
+    //     return failure();
+    //   if (std::distance(
+    //           secondBranchOperand.getFalseResult().getUsers().begin(),
+    //           secondBranchOperand.getFalseResult().getUsers().end()) != 1)
+    //     return failure();
+    // }
     Value firstBranchCondition = firstBranchOperand.getConditionOperand();
     Value firstOriginalBranchCondition = firstBranchCondition;
     if (isa_and_nonnull<handshake::NotOp>(firstBranchCondition.getDefiningOp()))
@@ -499,19 +589,23 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
         return failure();
     }
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
-      // use of the suppress->distribute rule): the two suppresses should have
-      // only a single usage; otherwise the pattern match fails
-      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                        firstBranchOperand.getFalseResult().getUsers().end()) !=
-          1)
-        return failure();
-      if (std::distance(
-              secondBranchOperand.getFalseResult().getUsers().begin(),
-              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
-        return failure();
-    }
+    // if (!OPTIM_DISTR) {
+    //   // Kill Distrib. for Optim.: Another new condition (to make a
+    //   meaningful
+    //   // use of the suppress->distribute rule): the two suppresses should
+    //   have
+    //   // only a single usage; otherwise the pattern match fails
+    //   if
+    //   (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
+    //                     firstBranchOperand.getFalseResult().getUsers().end())
+    //                     !=
+    //       1)
+    //     return failure();
+    //   if (std::distance(
+    //           secondBranchOperand.getFalseResult().getUsers().begin(),
+    //           secondBranchOperand.getFalseResult().getUsers().end()) != 1)
+    //     return failure();
+    // }
 
     Value firstBranchCondition = firstBranchOperand.getConditionOperand();
     Value firstOriginalBranchCondition = firstBranchCondition;
@@ -571,13 +665,6 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
-// TODO: A limitation here and in other patterns is that NOTs are inserted
-// separately, so two values outputted from a NOT fed from the same condition
-// will be considered different although they are equivalent... [But, this
-// problem is never triggered so far so todo in the future]
-// Rules A
-// Removes Merge and Branch operation pairs there exits a loop between
-// the Merge and the Branch.
 struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
 
@@ -592,13 +679,14 @@ struct RemoveMergeBranchLoop : public OpRewritePattern<handshake::MergeOp> {
     // if (mergeUsers.empty())
     //   return failure();
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: ANother New condition: The pattern match
-      // should fail if the merge has more than two users (this is important to
-      // make the Repeat distribute rules effective and useful)
-      if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 2)
-        return failure();
-    }
+    // if (!OPTIM_DISTR) {
+    //   // Kill Distrib. for Optim.: ANother New condition: The pattern match
+    //   // should fail if the merge has more than two users (this is important
+    //   to
+    //   // make the Repeat distribute rules effective and useful)
+    //   if (std::distance(mergeUsers.begin(), mergeUsers.end()) != 2)
+    //     return failure();
+    // }
 
     // One user must be a Branch; otherwise, the pattern match fails
     bool foundCondBranch = false;
@@ -889,13 +977,14 @@ struct RemoveMuxBranchLoop : public OpRewritePattern<handshake::MuxOp> {
     // if (muxUsers.empty())
     //   return failure();
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another New condition: The pattern match
-      // should fail if the merge has more than two users (this is important to
-      // make the Repeat distribute rules effective and useful)
-      if (std::distance(muxUsers.begin(), muxUsers.end()) != 2)
-        return failure();
-    }
+    // if (!OPTIM_DISTR) {
+    //   // Kill Distrib. for Optim.: Another New condition: The pattern match
+    //   // should fail if the merge has more than two users (this is important
+    //   to
+    //   // make the Repeat distribute rules effective and useful)
+    //   if (std::distance(muxUsers.begin(), muxUsers.end()) != 2)
+    //     return failure();
+    // }
 
     // One user must be a Branch; otherwise, the pattern match fails
     bool foundCondBranch = false;
@@ -2336,8 +2425,8 @@ struct DistributeSuppresses
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (OPTIM_DISTR)
-      return failure();
+    // if (OPTIM_DISTR)
+    //   return failure();
     // If this Branch has any users in the true side, then it is not a
     // suppress, so the pattern match fails. It also fails if it has no users
     // on the false side
@@ -2394,8 +2483,8 @@ struct DistributeMergeRepeats : public OpRewritePattern<handshake::MergeOp> {
   LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
                                 PatternRewriter &rewriter) const override {
 
-    if (OPTIM_DISTR)
-      return failure();
+    // if (OPTIM_DISTR)
+    //   return failure();
     // 1st) Search for a Repeat that is composed of a Merge feeding a Supp and
     // feeding other stuff
     auto mergeUsers = (mergeOp.getResult()).getUsers();
@@ -2544,8 +2633,8 @@ struct DistributeMuxRepeats : public OpRewritePattern<handshake::MuxOp> {
 
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
-    if (OPTIM_DISTR)
-      return failure();
+    // if (OPTIM_DISTR)
+    //   return failure();
 
     // 1st) Search for a Repeat that is composed of a Mux feeding a Supp and
     // feeding other stuff
@@ -2714,7 +2803,10 @@ struct HandshakeRewriteTermsPass
         RemoveMergeBranchLoop, RemoveMuxBranchLoop /*, ShortenSuppressPairs,*/
         /*, ShortenMuxRepeatPairs*/>(ctx);
 
-    auto stat = applyPatternsAndFoldGreedily(mod, std::move(patterns), config);
+    // auto stat = applyPatternsAndFoldGreedily(mod, std::move(patterns),
+    // config);
+    if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+      return signalPassFailure();
   };
 };
 }; // namespace
