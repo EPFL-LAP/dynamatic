@@ -109,14 +109,6 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
-  let summary = "Combine common steering logic between different handshake operations.";
-  let description = [{
-      Eliminates redundant steering units that have the same inputs but
-      different outputs by combining them into single units feeding multiple outputs.
-  }];
-  let constructor = "dynamatic::combineSteeringLogic()";
-}
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
