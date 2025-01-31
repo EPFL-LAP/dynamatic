@@ -42,8 +42,8 @@ namespace {
   true // associate it with a disable of DistributeSuppresses,
        // DistributeMergeRepeats,DistributeMuxRepeats
 #define OPTIM_BRANCH_TO_SUPP                                                   \
-  false // associate it with a disable of ConstructSuppresses,
-        // FixBranchesToSuppresses
+  true // associate it with a disable of ConstructSuppresses,
+       // FixBranchesToSuppresses
 
 // Rules E
 /// Erases unconditional branches (which would eventually lower to simple
