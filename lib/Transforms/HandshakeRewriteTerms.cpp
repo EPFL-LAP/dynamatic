@@ -1262,109 +1262,104 @@ struct ExtractLoopCondition
     if (cmergeUsers.empty())
       return failure();
 
-    // One user must be a Branch; otherwise, the pattern match fails
-    bool foundCondBranch = false;
-    DenseSet<handshake::ConditionalBranchOp> branches;
-    for (auto cmergeUser : cmergeUsers) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(cmergeUser)) {
-        foundCondBranch = true;
-        branches.insert(cast<handshake::ConditionalBranchOp>(cmergeUser));
-      }
-    }
-    if (!foundCondBranch)
+    int cmergeCycleInputIdx;
+    bool isCycleBranchTrueSucc;
+    Operation *potentialBranchOp = returnBranchFormingCycle(
+        cmergeOp, cmergeCycleInputIdx, isCycleBranchTrueSucc);
+    if (potentialBranchOp == nullptr)
       return failure();
 
-    // This condBranchOp must also be an operand forming a cycle with the
-    // cmerge; otherwise, the pattern match fails
-    bool foundCycle = false;
-    int operIdx = 0;
-    int cmergeOuterInputIdx = 0;
-    int cmergeCycleInputIdx = 0;
-    handshake::ConditionalBranchOp condBranchOp;
-    for (auto cmergeOperand : cmergeOp->getOperands()) {
-      if (isa_and_nonnull<handshake::ConditionalBranchOp>(
-              cmergeOperand.getDefiningOp()))
-        if (branches.contains(cast<handshake::ConditionalBranchOp>(
-                cmergeOperand.getDefiningOp()))) {
-          foundCycle = true;
-          cmergeCycleInputIdx = operIdx;
-          condBranchOp = cast<handshake::ConditionalBranchOp>(
-              cmergeOperand.getDefiningOp());
-          break;
-        }
-      operIdx++;
-    }
-    if (!foundCycle)
-      return failure();
+    assert(isa_and_nonnull<handshake::ConditionalBranchOp>(potentialBranchOp));
+    handshake::ConditionalBranchOp condBranchOp =
+        cast<handshake::ConditionalBranchOp>(potentialBranchOp);
+
+    int cmergeOuterInputIdx = 1 - cmergeCycleInputIdx;
 
     if (!OPTIM_BRANCH_TO_SUPP) {
-      // New condition: The condBranchOp has to be a suppress; otherwise, the
-      // pattern match fails
-      if (!condBranchOp.getTrueResult().getUsers().empty() ||
-          condBranchOp.getFalseResult().getUsers().empty())
+      if (!isSuppress(condBranchOp))
         return failure();
     }
 
-    cmergeOuterInputIdx = (cmergeCycleInputIdx == 0) ? 1 : 0;
-
-    // Retrieve the values at the Cmerge inputs
-    OperandRange cmergeDataOperands = cmergeOp.getDataOperands();
-    Value cmergeInnerOperand = cmergeDataOperands[cmergeCycleInputIdx];
-
     // Identify the output of the Branch going outside of the loop (even if it
     // has no users)
-    bool isTrueOutputOuter = false;
-    Value branchTrueResult = condBranchOp.getTrueResult();
-    Value branchFalseResult = condBranchOp.getFalseResult();
-    Value branchOuterResult;
-    if (branchTrueResult == cmergeInnerOperand)
-      branchOuterResult = branchFalseResult;
-    else if (branchFalseResult == cmergeInnerOperand) {
-      branchOuterResult = branchTrueResult;
-      isTrueOutputOuter = true;
-    } else
-      return failure();
+    // bool isTrueOutputOuter = false;
+    // Value branchTrueResult = condBranchOp.getTrueResult();
+    // Value branchFalseResult = condBranchOp.getFalseResult();
+    // Value branchOuterResult;
+    // if (branchTrueResult == cmergeInnerOperand)
+    //   branchOuterResult = branchFalseResult;
+    // else if (branchFalseResult == cmergeInnerOperand) {
+    //   branchOuterResult = branchTrueResult;
+    //   isTrueOutputOuter = true;
+    // } else
+    //   return failure();
 
-    // Replace all uses of the cmerge index with an INIT
-    // 1st) Identify whether the loop condition will be connected directly or
-    // through a NOT
-    // Note: This strategy is correct, but might result in the insertion of
-    // double NOTs
+    // // Replace all uses of the cmerge index with an INIT
+    // // 1st) Identify whether the loop condition will be connected directly or
+    // // through a NOT
+    // // Note: This strategy is correct, but might result in the insertion of
+    // // double NOTs
+    // Value condition = condBranchOp.getConditionOperand();
+    // bool needNot = ((isTrueOutputOuter && cmergeCycleInputIdx == 1) ||
+    //                 (!isTrueOutputOuter && cmergeCycleInputIdx == 0));
+    // Value iterCond;
+    // if (needNot) {
+
+    //   // Check if the condition already feeds a NOT, no need to create a new
+    //   one bool foundNot = false; handshake::NotOp existingNotOp; for (auto
+    //   condRes : condition.getUsers()) {
+    //     if (isa_and_nonnull<handshake::NotOp>(condRes)) {
+    //       foundNot = true;
+    //       existingNotOp = cast<handshake::NotOp>(condRes);
+    //       break;
+    //     }
+    //   }
+
+    //   if (foundNot) {
+    //     iterCond = existingNotOp.getResult();
+    //   } else {
+    //     rewriter.setInsertionPoint(condBranchOp);
+    //     handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
+    //         condBranchOp->getLoc(), condition);
+    //     inheritBB(notOp, condBranchOp);
+    //     iterCond = notOp.getResult();
+    //   }
+
+    // } else {
+    //   iterCond = condition;
+    // }
+
+    // // 2nd) Identify the value of the constant that will be triggered from
+    // Start
+    // // and add it
+    // // The value of the constant should be the cmergeOuterInputIdx
+    // int constVal = cmergeOuterInputIdx;
+
     Value condition = condBranchOp.getConditionOperand();
-    bool needNot = ((isTrueOutputOuter && cmergeCycleInputIdx == 1) ||
-                    (!isTrueOutputOuter && cmergeCycleInputIdx == 0));
-    Value iterCond;
+    bool needNot = ((isCycleBranchTrueSucc && cmergeCycleInputIdx == 0) ||
+                    (!isCycleBranchTrueSucc && cmergeCycleInputIdx == 1));
+    bool foundNot = false;
+    handshake::NotOp existingNotOp;
+    Operation *potentialNotOp = isConditionInverted(condition);
+    if (potentialNotOp != nullptr) {
+      foundNot = true;
+      existingNotOp = cast<handshake::NotOp>(potentialNotOp);
+    }
     if (needNot) {
-
-      // Check if the condition already feeds a NOT, no need to create a new one
-      bool foundNot = false;
-      handshake::NotOp existingNotOp;
-      for (auto condRes : condition.getUsers()) {
-        if (isa_and_nonnull<handshake::NotOp>(condRes)) {
-          foundNot = true;
-          existingNotOp = cast<handshake::NotOp>(condRes);
-          break;
-        }
-      }
-
-      if (foundNot) {
-        iterCond = existingNotOp.getResult();
-      } else {
+      if (foundNot)
+        condition = existingNotOp.getResult();
+      else {
         rewriter.setInsertionPoint(condBranchOp);
         handshake::NotOp notOp = rewriter.create<handshake::NotOp>(
             condBranchOp->getLoc(), condition);
         inheritBB(notOp, condBranchOp);
-        iterCond = notOp.getResult();
+        condition = notOp.getResult();
       }
-
-    } else {
-      iterCond = condition;
     }
 
-    // 2nd) Identify the value of the constant that will be triggered from Start
-    // and add it
-    // The value of the constant should be the cmergeOuterInputIdx
+    // Identify the value of the Init token
     int constVal = cmergeOuterInputIdx;
+
     // Obtain the start signal from the last argument of any block
     Block *cmergeBlock = cmergeOp->getBlock();
     MutableArrayRef<BlockArgument> l = cmergeBlock->getArguments();
@@ -1377,17 +1372,23 @@ struct ExtractLoopCondition
     // Check if there is an already existing INIT, i.e., a Merge fed from the
     // iterCond
     bool foundInit = false;
-    handshake::MergeOp existingInit;
-    for (auto iterCondRes : iterCond.getUsers()) {
-      if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
-        foundInit = true;
-        existingInit = cast<handshake::MergeOp>(iterCondRes);
-        break;
-      }
+    handshake::MergeOp existingInitOp;
+    // for (auto iterCondRes : iterCond.getUsers()) {
+    //   if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
+    //     foundInit = true;
+    //     existingInit = cast<handshake::MergeOp>(iterCondRes);
+    //     break;
+    //   }
+    // }
+    Operation *potentialInitOp = isConditionFeedingInit(condition);
+    if (potentialInitOp != nullptr) {
+      foundInit = true;
+      existingInitOp = cast<handshake::MergeOp>(potentialInitOp);
     }
+
     Value muxSel;
     if (foundInit) {
-      muxSel = existingInit.getResult();
+      muxSel = existingInitOp.getResult();
     } else {
       // Create a new ConstantOp in the same block as that of the branch
       // forming the cycle
@@ -1397,7 +1398,7 @@ struct ExtractLoopCondition
           rewriter.getIntegerAttr(constantType, constVal), start);
 
       // 3rd) Add a new Merge operation to serve as the INIT
-      ValueRange operands = {iterCond, valueOfConstant};
+      ValueRange operands = {condition, valueOfConstant};
       rewriter.setInsertionPoint(cmergeOp);
       handshake::MergeOp mergeOp =
           rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
