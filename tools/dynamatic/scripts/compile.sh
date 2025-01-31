@@ -125,7 +125,6 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-concretize-index-type="width=32" \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths="legacy" \
   --handshake-rewrite-terms \
-  --handshake-combine-steering-logic \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
