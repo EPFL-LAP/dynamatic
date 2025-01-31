@@ -622,6 +622,20 @@
     "dependencies": ["join"]
   },
   {
+    "name": "handshake.unbundle",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/unbundle.vhd"
+  },
+  {
+    "name": "handshake.bundle",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/bundle.vhd"
+  },
+  {
     "name": "handshake.mem_controller",
     "parameters": [
       { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },

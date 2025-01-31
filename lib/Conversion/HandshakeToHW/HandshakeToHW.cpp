@@ -473,6 +473,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
   llvm::TypeSwitch<Operation *, void>(op)
       .Case<handshake::InstanceOp>(
           [&](handshake::InstanceOp instOp) { modName = instOp.getModule(); })
+      .Case<handshake::UnbundleOp>([&](auto){
+        addType("DATA_TYPE", op->getOperand(0));
+      })
+      .Case<handshake::BundleOp>([&](auto){
+        handshake::ChannelType ch =  handshake::ChannelType::get(op->getOperand(1).getType());
+        addType("DATA_TYPE", ch);
+      })
       .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
         // Number of output channels and bitwidth
         addUnsigned("SIZE", op->getNumResults());
@@ -1745,6 +1752,8 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::UnbundleOp>,
+                    ConvertToHWInstance<handshake::BundleOp>,
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,

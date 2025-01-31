@@ -111,10 +111,10 @@ RTLMatch *RTLRequestFromOp::tryToMatch(const RTLComponent &component) const {
 LogicalResult
 RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
                                           ParameterMappings &mappings) const {
-  LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component "
-                          << component.getName() << "\n";);
+  // llvm::errs() << "Attempting match with RTL component "
+                          // << component.getName() << "\n";
   if (name != component.getName()) {
-    LLVM_DEBUG(llvm::dbgs() << "\t-> Names do not match.\n");
+    // llvm::errs() << "\t-> Names do not match.\n";
     return failure();
   }
 
@@ -126,27 +126,29 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
   SmallVector<StringRef> ignoredParams;
 
   for (const RTLParameter *parameter : component.getParameters()) {
+
+    llvm::errs() << component.getName() << "\n";
     ParamMatch paramMatch = matchParameter(*parameter);
     StringRef paramName = parameter->getName();
-    LLVM_DEBUG({
+
       switch (paramMatch.state) {
       case ParamMatch::State::DOES_NOT_EXIST:
-        llvm::dbgs() << "\t-> Parameter \"" << paramName
+        llvm::errs() << "\t-> Parameter \"" << paramName
                      << "\" does not exist\n";
         break;
       case ParamMatch::State::FAILED_VERIFICATION:
-        llvm::dbgs() << "\t-> Failed constraint checking for parameter \""
+        llvm::errs() << "\t-> Failed constraint checking for parameter \""
                      << paramName << "\"\n";
         break;
       case ParamMatch::State::FAILED_SERIALIZATION:
-        llvm::dbgs() << "\t-> Failed serialization for parameter \""
+        llvm::errs() << "\t-> Failed serialization for parameter \""
                      << paramName << "\"\n";
         break;
+
       case ParamMatch::State::SUCCESS:
-        llvm::dbgs() << "\t-> Matched parameter \"" << paramName << "\"\n";
+        llvm::errs() << "\t-> Matched parameter \"" << paramName << "\"\n";
         break;
       }
-    });
     if (paramMatch.state != ParamMatch::SUCCESS)
       return failure();
     mappings[paramName] = paramMatch.serialized;
@@ -200,18 +202,21 @@ RTLDependencyRequest::RTLDependencyRequest(const Twine &moduleName,
 
 RTLMatch *
 RTLDependencyRequest::tryToMatch(const RTLComponent &component) const {
+  // llvm::errs() << "Attempting dependency match between request for \""
+  //                  << moduleName << "\" and RTL component "
+  //                  << component.getName() << "\n\t-> ";
   LLVM_DEBUG(
       llvm::dbgs() << "Attempting dependency match between request for \""
                    << moduleName << "\" and RTL component "
                    << component.getName() << "\n\t-> ";);
 
   if (!component.isGeneric()) {
-    LLVM_DEBUG(llvm::dbgs() << "Component is not generic\n");
+    // llvm::errs() << "Component is not generic\n";
     return nullptr;
   }
   if (component.getModuleName() != moduleName) {
-    LLVM_DEBUG(llvm::dbgs() << "Component has incorrect module name \""
-                            << component.getModuleName() << "\"\n");
+    // llvm::errs() << "Component has incorrect module name \""
+                            // << component.getModuleName() << "\"\n";
     return nullptr;
   }
 

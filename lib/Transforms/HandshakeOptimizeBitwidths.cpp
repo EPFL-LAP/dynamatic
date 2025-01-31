@@ -1326,6 +1326,9 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
                                 PatternRewriter &rewriter) const override {
+
+    llvm::errs() << "!!!!!yyyy\n";
+    llvm::errs() << condOp.getResult(0) << "\n";
     // The data type must be optimizable
     ChannelVal channelVal = asTypedIfLegal(condOp.getDataOperand());
     if (!channelVal)
@@ -1338,11 +1341,29 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     // each branch outcome
     ChannelVal trueRes = cast<ChannelVal>(condOp.getTrueResult()),
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
+
+    for (auto a : condOp.getResult(0).getUsers())
+        llvm::errs() << "zero " <<  *a << "\n";
+    llvm::errs() << "--------  ------\n";
+    for (auto a : condOp.getResult(1).getUsers())
+        llvm::errs() << "one " << *a << "\n";
+
+    llvm::errs() << "^^" << condOp.getConditionOperand() << "\n";
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
     for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+      llvm::errs() << "LHS: " << cmpOp.getLhs() << "\n";
+      llvm::errs() << "RHS: " << cmpOp.getRhs() << "\n";
+
       ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
+            ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
+      llvm::errs() << "min RHS:" << minRhs << "\n";
+      
       ChannelVal minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
-      ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
+    llvm::errs() << "min LHS:" << minLhs << "\n";
+      
+
+
+
 
       // One of the two comparison operands must be the data input
       unsigned width;
@@ -1575,6 +1596,7 @@ struct HandshakeOptimizeBitwidthsPass
 
       // Runs the forward or backward pass on the function
       auto applyPass = [&](bool forward, bool &changed) {
+        llvm::errs() << "apply pass \n";
         changed = false;
         RewritePatternSet patterns{ctx};
         if (forward)

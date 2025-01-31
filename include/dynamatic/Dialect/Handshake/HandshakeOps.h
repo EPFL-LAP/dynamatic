@@ -425,11 +425,12 @@ public:
   /// Ports to other memory interfaces (outside groups).
   mlir::SmallVector<MemoryPort> interfacePorts;
   /// Bitwidth of control signals.
-  unsigned ctrlWidth = 0;
+  unsigned ctrlWidth = -1;
+  unsigned zeroCtrlWidth = -1;
   /// Bitwidth of address signals.
-  unsigned addrWidth = 0;
+  unsigned addrWidth = -1;
   /// Bitwidth of data signals.
-  unsigned dataWidth = 0;
+  unsigned dataWidth = -1;
 
   /// Initializes a function's memory ports from the memory interface it
   /// corresponds to (and without any port).

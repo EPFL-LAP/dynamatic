@@ -628,7 +628,7 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
   }
   unsigned inputWidth = getHandshakeTypeBitWidth(inType);
 
-  if (width == 0) {
+  if (width == -1) {
     // This is the first time we encounter a signal of this type, consider its
     // width as the reference one for its category
     width = inputWidth;
@@ -735,10 +735,20 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
 
     auto handleLoad = [&](handshake::LoadOp loadOp) -> LogicalResult {
       // llvm::errs() << "handle load\n";
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.dataWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.ctrlWidth)))
-        return failure();
+      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) )
+      {
+        llvm::errs() << "uuu\n";
+        exit(0);
+      }
+      if (failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.dataWidth))){
+        llvm::errs() << "uuu2\n";
+        exit(0);
+      } 
+      if (failed(checkAndSetBitwidth(memResults[resIdx+1], mcPorts.zeroCtrlWidth))){
+        llvm::errs() << "uuu3\n";
+        exit(0);
+      }
+
 
       if (!currentGroup || portOpBlock != *currentBlockID) {
         // If this is the first input or if the load belongs to a different
@@ -763,11 +773,18 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
     auto handleStore = [&](handshake::StoreOp storeOp) -> LogicalResult {
       // llvm::errs() << "handle store\n";
       auto dataInput = *(++currentIt);
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(dataInput.value(), mcPorts.dataWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.ctrlWidth)))
-        return failure();
-
+      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth))){
+        llvm::errs() << "iiiii\n";
+        exit(0);
+      } 
+      if (failed(checkAndSetBitwidth(dataInput.value(), mcPorts.dataWidth))){
+        llvm::errs() << "jjjj\n";
+        exit(0);
+      }
+      if (failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.zeroCtrlWidth))){
+        llvm::errs() << "kkkk\n";
+        exit(0);
+      }
       // All basic blocks with at least one store access must have a control
       // input, so the block's memory ports must already be defined and point to
       // the same block
