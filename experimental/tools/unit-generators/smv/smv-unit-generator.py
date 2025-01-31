@@ -18,7 +18,7 @@ def generate_code(name, mod_type, parameters):
 def parse_parameters(param_string):
   try:
     param_dict = {}
-    for pair in param_string.split(","):
+    for pair in param_string.split("|"):
       key, value = pair.split("=")
       if value != "":
         param_dict[key.strip()] = ast.literal_eval(value.strip())
@@ -39,7 +39,7 @@ def main():
       "-p",
       "--parameters",
       required=True,
-      help="Set of parameters in key=value,key=value format",
+      help="Set of parameters in key=value|key=value format",
   )
 
   args = parser.parse_args()
