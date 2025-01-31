@@ -348,10 +348,10 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
 
-    std::string lhsBufName = "lhs_out_buf_" + lhsFuncOp.getArgName(i).str();
-    std::string rhsBufName = "rhs_out_buf_" + lhsFuncOp.getArgName(i).str();
-    std::string lhsNDwName = "lhs_out_ndw_" + lhsFuncOp.getArgName(i).str();
-    std::string rhsNDwName = "rhs_out_ndw_" + lhsFuncOp.getArgName(i).str();
+    std::string lhsBufName = "lhs_out_buf_" + lhsFuncOp.getResName(i).str();
+    std::string rhsBufName = "rhs_out_buf_" + lhsFuncOp.getResName(i).str();
+    std::string lhsNDwName = "lhs_out_ndw_" + lhsFuncOp.getResName(i).str();
+    std::string rhsNDwName = "rhs_out_ndw_" + lhsFuncOp.getResName(i).str();
     std::string eqName = "out_eq_" + lhsFuncOp.getResName(i).str();
 
     NDWireOp lhsEndNDWireOp;
