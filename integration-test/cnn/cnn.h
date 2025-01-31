@@ -5,14 +5,14 @@ typedef int in_int_t;
 typedef int out_int_t;
 typedef int inout_int_t;
 
-#define ParallelOut 1 // 2
+#define ParallelOut 1
 #define ImSize 10
 #define OutImSize 10
 #define NumIn 10
 #define NumOut 10
-#define kKernel 1 // 4
+#define kKernel 1
 
-#define Div 5 // NumOut / ParallelOut
+#define Div 5
 
 // TODO: the parameters below can be defined in terms of the parameters above,
 // but this is not yet supported in the legacy hls-verifier (it needs the array
