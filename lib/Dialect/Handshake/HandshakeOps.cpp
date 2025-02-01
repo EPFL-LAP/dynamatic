@@ -796,8 +796,10 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
         return failure();
 
       // Add a store port to the block
+      StorePort storPort = StorePort(storeOp, input.index(), resIdx);
+      resIdx++;
       currentGroup->accessPorts.push_back(
-        StorePort(storeOp, input.index(), resIdx++));
+        storPort);
       return success();
     };
 
@@ -1108,7 +1110,8 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
 
       // Add a store port to the group and decrement our group size by one
       currentGroup->accessPorts.push_back(
-        StorePort(storeOp, input.index(), resIdx++));
+        StorePort(storeOp, input.index(), resIdx));
+      resIdx++;
       --(*currentGroupRemaining);
       return success();
     };

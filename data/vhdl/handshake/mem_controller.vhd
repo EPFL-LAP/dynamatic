@@ -34,6 +34,9 @@ entity mem_controller is
     ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ldData_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
     ldData_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
+    -- load done output
+    ldDone_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldDone_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     -- store address input channels
     stAddr       : in  data_array (NUM_STORES - 1 downto 0)(ADDR_TYPE - 1 downto 0);
     stAddr_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
@@ -42,6 +45,9 @@ entity mem_controller is
     stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_TYPE - 1 downto 0);
     stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
+    -- store done output
+    stDone_valid : out std_logic_vector(NUM_STORES - 1 downto 0);
+    stDone_ready : in  std_logic_vector(NUM_STORES - 1 downto 0);
     -- interface to dual-port BRAM
     loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     loadEn    : out std_logic;

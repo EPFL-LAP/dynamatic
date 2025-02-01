@@ -127,6 +127,8 @@ LogicalResult ExportInfo::concretizeExternalModules() {
           hw::HWModuleExternOp extOp) -> LogicalResult {
     // Try to find a matching component
     RTLMatch *match = config.getMatchingComponent(request);
+    //ajib
+    // match->component->getRTLPortName();
     if (!match) {
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
@@ -521,6 +523,9 @@ void RTLWriter::constructIOMappings(
     const FGetValueName &getValueName,
     const FGetTypedSignalName &getTypedSignalName,
     const FGetSignalName &getSignalName, IOMap &mappings) const {
+    if (instOp.getModuleName().contains("unbundle")){
+      llvm::errs() << instOp.getModuleName() << "9999 ------\n";
+    }
   auto addValidAndReady = [&](StringRef port, StringRef signal) -> void {
     mappings[getTypedSignalName(port, SignalType::VALID)].push_back(
         getInternalSignalName(signal, SignalType::VALID));
@@ -552,9 +557,17 @@ void RTLWriter::constructIOMappings(
         });
   };
 
+  //ajib
+
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
-  for (auto [oprd, portAttr] : ins)
+  for (auto [oprd, portAttr] : ins){
+    if (instOp.getModuleName().contains("unbundle")){
+      llvm::errs() << "888" << oprd << "-" << portAttr << "\n";
+    }
     addPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
+
+  }
+    
 
   auto outs = llvm::zip_equal(instOp.getResults(), modOp.getOutputNamesStr());
   for (auto [oprd, portAttr] : outs)
@@ -564,9 +577,22 @@ void RTLWriter::constructIOMappings(
 void RTLWriter::fillIOMappings(hw::InstanceOp instOp,
                                const FGetValueName &getValueName,
                                IOMap &mappings) const {
+
   hw::HWModuleLike modOp = getHWModule(instOp);
   if (auto extModOp = dyn_cast<hw::HWModuleExternOp>(modOp.getOperation())) {
+    if (extModOp.getName().contains("unbundle")){
+      llvm::errs() << extModOp.getName() << "------\n";
+    }
+    
     const RTLMatch &match = *exportInfo.externals.at(extModOp);
+    if (extModOp.getName().contains("unbundle")){
+      llvm::errs() << instOp << "*****--- \n ";
+      llvm::errs() << extModOp << "*****--- \n ";
+      llvm::errs() << match.component << "*******------\n";
+    }
+
+    //ajib
+
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) -> Port {
       return match.component->getRTLPortName(port, type, ::hdl);
     };
@@ -576,6 +602,7 @@ void RTLWriter::fillIOMappings(hw::InstanceOp instOp,
     constructIOMappings(instOp, modOp, getValueName, getTypedSignalName,
                         getSignalName, mappings);
   } else {
+    llvm::errs() << "2\n";
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) -> Port {
       return {getInternalSignalName(port, type), false};
     };
@@ -724,9 +751,6 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     PortMapWriter writePortMap = [](const Port &port,
                                     ArrayRef<std::string> signalNames,
                                     raw_indented_ostream &os) {
-      for (auto a : signalNames){
-        llvm::errs() << a << "-\n";
-      }
       assert(!signalNames.empty() && "no signal name associated to port");
       if (!port.second) {
         assert(signalNames.size() == 1 &&
@@ -734,6 +758,7 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
         os << port.first << " => " << signalNames.front();
         return;
       }
+
 
       ArrayRef<std::string> signals(signalNames);
       for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
@@ -748,6 +773,14 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     os.indent();
     IOMap mappings;
     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
+    if (moduleName == "unbundle"){
+      llvm::errs() << instOp << "\n";
+      for (auto [a, b] : mappings){
+        llvm::errs() << "- " << a.first << "- " << a.second  << "-\n";
+        for (auto c : b)
+          llvm::errs() << "* " << c << "\n";
+      }
+    }
     writeIOMap(mappings, writePortMap, os);
     os.unindent();
     os << ");\n";

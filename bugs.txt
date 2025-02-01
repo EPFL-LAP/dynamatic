@@ -1,1 +1,4 @@
 [31.01] Having an unbundle which only its result 0 is used won't go to sink automatically and make buffer placement have error
+
+[01.02] in getMemResultName we should use LD_DONE
+getMatchingComponent

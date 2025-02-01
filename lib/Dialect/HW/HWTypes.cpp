@@ -926,10 +926,13 @@ Type ModuleType::getOutputType(size_t idx) {
 
 SmallVector<StringAttr> ModuleType::getInputNamesStr() {
   SmallVector<StringAttr> retval;
-  for (auto &p : getPorts())
+  for (auto &p : getPorts()){
+    // llvm::errs() << "666666\n" << p.name << "\n";
     if (p.dir != ModulePort::Direction::Output)
       retval.push_back(p.name);
+  }
   return retval;
+
 }
 
 SmallVector<StringAttr> ModuleType::getOutputNamesStr() {

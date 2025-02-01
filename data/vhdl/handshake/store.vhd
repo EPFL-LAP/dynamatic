@@ -27,7 +27,7 @@ entity store is
     -- address to interface channel
     addrOut       : out std_logic_vector(ADDR_TYPE - 1 downto 0);
     addrOut_valid : out std_logic;
-    addrOut_ready : in  std_logic
+    addrOut_ready : in  std_logic;
     -- done to circuit channel
     doneOut_valid : out std_logic;
     doneOut_ready : in  std_logic;

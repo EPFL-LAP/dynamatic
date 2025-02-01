@@ -167,7 +167,7 @@ std::string handshake::SelectOp::getResultName(unsigned idx) {
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
-    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+    LD_DATA("ldData"), LD_DONE("ldDone"), ST_DONE("stDone"), ST_ADDR("stAddr"), ST_DATA("stData");
 
 static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
   if (!memOp.isMasterInterface())
@@ -220,18 +220,21 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
 
 /// Common result naming logic for memory controllers and LSQs.
 static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
+  llvm::errs() << "777777 " << idx << "\n";
   // Iterate through all memory ports to find out the type of the
   // operand
   unsigned loadIdx = 0, storeIdx = 0;
   for (const GroupMemoryPorts &blockPorts : ports.groups) {
     for (const MemoryPort &accessPort : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
-        if (loadPort->getDataOutputIndex() == idx || loadPort->getDoneOutputIndex() == idx)
+        if (loadPort->getDataOutputIndex() == idx)
           return getArrayElemName(LD_DATA, loadIdx);
+        if (loadPort->getDoneOutputIndex() == idx)
+          return getArrayElemName(LD_DONE, loadIdx);
         ++loadIdx;
       } else if (std::optional<StorePort> storePort = dyn_cast<StorePort>(accessPort)){
         if (storePort->getDoneOutputIndex() == idx)
-          return getArrayElemName(ST_DATA, storeIdx);
+          return getArrayElemName(ST_DONE, storeIdx);
         ++storeIdx;
       }
     }

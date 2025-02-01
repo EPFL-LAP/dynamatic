@@ -28,6 +28,9 @@ entity mem_controller_storeless is
     ldData       : out data_array (NUM_LOADS - 1 downto 0)(DATA_TYPE - 1 downto 0);
     ldData_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
     ldData_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
+    -- load done output
+    ldDone_valid : out std_logic_vector(NUM_LOADS - 1 downto 0);
+    ldDone_ready : in  std_logic_vector(NUM_LOADS - 1 downto 0);
     -- interface to dual-port BRAM
     loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     loadEn    : out std_logic;
@@ -65,6 +68,9 @@ begin
       read_address     => loadAddr,
       data_from_memory => loadData
     );
+
+    ldData_valid => ldDone_valid;
+    ldData_ready => ldDone_ready;
 
   -- NOTE: (lucas-rami) In addition to making sure there are no stores pending,
   -- we should also check that there are no loads pending as well. To achieve 

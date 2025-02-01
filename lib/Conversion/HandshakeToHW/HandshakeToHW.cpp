@@ -352,6 +352,10 @@ public:
     auto modOp = op->getParentOfType<mlir::ModuleOp>();
     StringRef opName = op->getName().getStringRef();
 
+    if (op->getName().getStringRef().contains("unbundle"))
+      llvm::errs() << "salam \n" << op->getName().getStringRef();
+
+
     // Try to find an external module with the same RTL name and parameters. If
     // we find one, then we can assign the same external module name to the
     // operation
@@ -1367,8 +1371,10 @@ public:
   /// module builder.
   void addWrapperInputs(ModuleBuilder &modBuilder, StringRef baseName) {
     wrapperToConverter.srcIdx = modBuilder.getNumInputs();
-    for (const hw::ModulePort port : getSlicedInputs(wrapperToConverter))
+    for (const hw::ModulePort port : getSlicedInputs(wrapperToConverter)){
+      llvm::errs() << "^^^^^^^$ " << baseName + "_" + port.name.strref() << "\n";
       modBuilder.addInput(baseName + "_" + port.name.strref(), port.type);
+  }
   }
 
   /// Adds wrapper output that will originate from the converter instance to the
@@ -1377,6 +1383,7 @@ public:
     converterToWrapper.dstIdx = modBuilder.getNumOutputs();
     for (const hw::ModulePort port : getSlicedOutputs(converterToWrapper))
       modBuilder.addOutput(baseName + "_" + port.name.strref(), port.type);
+      //ajib
   }
 
   /// Adds backedges matching the converter instance's outputs going to the

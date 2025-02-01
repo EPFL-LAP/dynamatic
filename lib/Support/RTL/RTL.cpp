@@ -111,8 +111,9 @@ RTLMatch *RTLRequestFromOp::tryToMatch(const RTLComponent &component) const {
 LogicalResult
 RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
                                           ParameterMappings &mappings) const {
-  // llvm::errs() << "Attempting match with RTL component "
-                          // << component.getName() << "\n";
+  if (name == ("handshake.unbundle"))
+    llvm::errs() << "Attempting match with RTL component "
+                          << component.getName() << "\n";
   if (name != component.getName()) {
     // llvm::errs() << "\t-> Names do not match.\n";
     return failure();
@@ -152,6 +153,8 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
     if (paramMatch.state != ParamMatch::SUCCESS)
       return failure();
     mappings[paramName] = paramMatch.serialized;
+    llvm::errs() << paramName << "----" <<paramMatch.serialized <<"\n";
+    
   }
   LLVM_DEBUG(llvm::dbgs() << "\t-> Matched!\n");
   return success();
