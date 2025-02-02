@@ -52,60 +52,56 @@ struct MILPVarsSubjectGraph {
 /// The class integrates with MILP through the gurobiVars member for buffer
 /// placement.
 class Node {
-private:
-  std::string name;
-  bool isChannelEdge = false;
+public:
   bool isBlackboxOutput = false;
-  bool isInputBool = false;
-  bool isOutputBool = false;
-  bool isLatchInputBool = false;
-  bool isLatchOutputBool = false;
-  bool isConstZeroBool = false;
-  bool isConstOneBool = false;
-  std::string function;
+  bool isChannelEdge = false;
+  bool isConstZero = false;
+  bool isConstOne = false;
+  bool isInput = false;
+  bool isOutput = false;
+  bool isLatchInput = false;
+  bool isLatchOutput = false;
+
+  MILPVarsSubjectGraph *gurobiVars;
   std::set<Node *> fanins = {};
   std::set<Node *> fanouts = {};
-
-public:
-  MILPVarsSubjectGraph *gurobiVars;
+  std::string function;
+  std::string name;
 
   Node() = default;
   Node(const std::string &name, LogicNetwork *parent)
-      : name(name), gurobiVars(new MILPVarsSubjectGraph()) {}
+      : gurobiVars(new MILPVarsSubjectGraph()), name(name) {}
 
-  Node &operator=(const Node &other) {
-    if (this == &other) {
-      // Handle self-assignment
-      return *this;
-    }
+  // Adds a fanin node to the current node.
+  void addFanin(Node *node) { fanins.insert(node); }
+  // Adds a fanout node to the current node.
+  void addFanout(Node *node) { fanouts.insert(node); }
 
-    // Copy the primitive types and strings
-    name = other.name;
-    isChannelEdge = other.isChannelEdge;
-    isBlackboxOutput = other.isBlackboxOutput;
-    isInputBool = other.isInputBool;
-    isOutputBool = other.isOutputBool;
-    isLatchInputBool = other.isLatchInputBool;
-    isLatchOutputBool = other.isLatchOutputBool;
-    isConstZeroBool = other.isConstZeroBool;
-    isConstOneBool = other.isConstOneBool;
-    function = other.function;
-    gurobiVars = other.gurobiVars;
-
-    // Clear and copy the fanins and fanouts sets (deep copy of pointers)
-    fanins.clear();
-    for (auto *nodePtr : other.fanins) {
-      fanins.insert(nodePtr); // Copy pointers, not the objects themselves
-    }
-
-    fanouts.clear();
-    for (auto *nodePtr : other.fanouts) {
-      fanouts.insert(nodePtr); // Copy pointers, not the objects themselves
-    }
-
-    // Return *this to allow chain assignment
-    return *this;
+  // Adds an edge between two nodes, updating fanin and fanout relationships.
+  static void addEdge(Node *fanin, Node *fanout) {
+    fanout->addFanin(fanin);
+    fanin->addFanout(fanout);
   }
+
+  // Configures the node as a latch based on the input and output nodes.
+  static void configureLatch(Node *regInputNode, Node *regOutputNode) {
+    regInputNode->isLatchInput = true;
+    regOutputNode->isLatchOutput = true;
+  }
+
+  // Configures the node based on the type of I/O node.
+  void configureIONode(const std::string &type);
+
+  // Configures the node as a constant node based on the function.
+  void configureConstantNode();
+
+  bool isPrimaryInput() const {
+    return (isConstOne || isConstZero || isInput || isLatchOutput ||
+            isBlackboxOutput);
+  }
+  bool isPrimaryOutput() const { return (isOutput || isLatchInput); }
+
+  std::string str() const { return name; }
 
   ~Node() {
     delete gurobiVars;
@@ -113,76 +109,12 @@ public:
     fanouts.clear();
   }
 
-  void configureIONode(const std::string &type) {
-    setChannelEdge(true);
-    if (type == ".inputs")
-      isInputBool = true;
-    else if (type == ".outputs")
-      isOutputBool = true;
-  }
-
-  static void configureLatch(Node *regInputNode, Node *regOutputNode) {
-    regInputNode->setLatchInput(true);
-    regOutputNode->setLatchOutput(true);
-  }
-
-  void configureConstantNode() {
-    if (function == "0") {
-      isConstZeroBool = true;
-    } else if (function == "1") {
-      isConstOneBool = true;
-    } else {
-      llvm::errs() << "Unknown constant value: " << function << "\n";
-    }
-  }
-
-  const std::string &getName() const { return name; }
-  void setName(const std::string &newName);
-  void setChannelEdge(bool value) { isChannelEdge = value; }
-  void setBlackboxOutput(bool value) { isBlackboxOutput = value; }
-  void setInput(bool value) { isInputBool = value; }
-  void setOutput(bool value) { isOutputBool = value; }
-  void setLatchInput(bool value) { isLatchInputBool = value; }
-  void setLatchOutput(bool value) { isLatchOutputBool = value; }
-  void setConstZero(bool value) { isConstZeroBool = value; }
-  void setConstOne(bool value) { isConstOneBool = value; }
-  void setFunction(const std::string &func) { function = func; }
-
-  bool isInput() const { return isInputBool; }
-  bool isOutput() const { return isOutputBool; }
-  bool isChannelEdgeNode() const { return isChannelEdge; }
-  bool isBlackboxOutputNode() const { return isBlackboxOutput; }
-  bool isPrimaryInput() const {
-    return (isConstOneBool || isConstZeroBool || isInputBool ||
-            isLatchOutputBool || isBlackboxOutput);
-  }
-  bool isPrimaryOutput() const { return (isOutputBool || isLatchInputBool); }
-  bool isLatchInput() const { return isLatchInputBool; }
-  bool isLatchOutput() const { return isLatchOutputBool; }
-  bool isConstZero() const { return isConstZeroBool; }
-  bool isConstOne() const { return isConstOneBool; }
-  const std::string &getFunction() const { return function; }
-
-  std::set<Node *> &getFanins() { return fanins; }
-  std::set<Node *> &getFanouts() { return fanouts; }
-
-  void addFanin(Node *node) { fanins.insert(node); }
-  void addFanout(Node *node) { fanouts.insert(node); }
-  void addFanin(std::set<Node *> &nodes) {
-    fanins.insert(nodes.begin(), nodes.end());
-  }
-  void addFanout(std::set<Node *> &nodes) {
-    fanouts.insert(nodes.begin(), nodes.end());
-  }
-
-  std::string str() const { return name; }
-
   friend class LogicNetwork;
 };
 
 /// Manages a collection of interconnected nodes representing a
-/// circuit, maintaining relationships between nodes including latches,
-/// submodules, and topological ordering. The class provides functionality for:
+/// circuit, maintaining relationships between nodes including latches and
+/// topological ordering. The class provides functionality for:
 /// - Node management (creation, modification, lookup)
 /// - Circuit topology analysis (path finding, traversal)
 /// - Circuit element categorization (inputs, outputs, channels)
@@ -193,83 +125,42 @@ public:
 class LogicNetwork {
 private:
   std::vector<std::pair<Node *, Node *>> latches;
-  std::string moduleName;
   std::unordered_map<std::string, Node *> nodes;
   std::vector<Node *> nodesTopologicalOrder;
-  std::unordered_map<std::string, std::set<std::string>> submodules;
 
 public:
   LogicNetwork() = default;
+  std::string moduleName;
 
-  /// Add input/output nodes to the circuit. Calls configureIONode on the Node
-  /// to set I/O type.
-  void addIONode(const std::string &name, const std::string &type) {
-    Node *node = createNode(name);
-    node->configureIONode(type);
-  }
+  // Add input/output nodes to the circuit. Calls configureIONode on the Node
+  // to set I/O type.
+  void addIONode(const std::string &name, const std::string &type);
 
-  /// Add latch nodes to the circuit. Calls configureLatch on the Node to set
-  /// I/O type.
-  void addLatch(const std::string &inputName, const std::string &outputName) {
-    // Create the input and output nodes for the latch. Nodes are created in
-    // LogicNetwork to ensure uniqueness, and avoids circular dependencies.
-    Node *regInputNode = createNode(inputName);
-    Node *regOutputNode = createNode(outputName);
+  // Add latch nodes to the circuit. Calls configureLatch on the Node to set
+  // I/O type.
+  void addLatch(const std::string &inputName, const std::string &outputName);
 
-    // Configure the latch.
-    Node::configureLatch(regInputNode, regOutputNode);
+  // Add a constant node to the circuit. The function takes a vector of nodes
+  // with only one element (ensured by parser) and a boolean function.
+  void addConstantNode(const std::vector<std::string> &nodes,
+                       const std::string &function);
 
-    // Add the latch to the latches vector.
-    latches.emplace_back(regInputNode, regOutputNode);
-  }
-
-  /// Add a logic gate to the circuit. The function takes a vector of node
-  /// names, parsed from a file, and a boolean function. Sets the fanins and
-  /// fanouts, and calls Node functions to configure the fanout node.
+  // Add a logic gate to the circuit. The function takes a vector of node
+  // names, parsed from a file, and a boolean function. Sets the fanins and
+  // fanouts, and calls Node functions to configure the fanout node.
   void addLogicGate(const std::vector<std::string> &nodes,
-                    const std::string &function) {
+                    const std::string &function);
 
-    // Create the fanout node, which is the last element in the nodes vector.
-    Node *fanOut = createNode(nodes.back());
-    fanOut->setFunction(function);
+  // Adds a node to the circuit data structure, resolving name conflicts. If a
+  // node with the same name already exists, counter value is appended to the
+  // name. This function is used to add node that was already created to a
+  // LogicNetwork object. Used to merge different LogicNetwork objects.
+  Node *addNode(Node *node);
 
-    // If there is only one node, it is a constant node.
-    if (nodes.size() == 1) {
-      fanOut->configureConstantNode();
-    } else {
-      // Create the fanin nodes. Set fanins and fanouts for each node.
-      for (size_t i = 0; i < nodes.size() - 1; ++i) {
-        Node *fanIn = createNode(nodes[i]);
-        fanOut->addFanin(fanIn);
-        fanIn->addFanout(fanOut);
-      }
-    }
-  }
-
-  /// Adds a node to the circuit data structure, resolving name conflicts. If a
-  /// node with the same name already exists, counter value is appended to the
-  /// name.
-  Node *addNode(Node *node) {
-    static unsigned int counter = 0;
-    if (nodes.find(node->getName()) != nodes.end()) {
-      if (node->isChannelEdgeNode()) {
-        return nodes[node->getName()];
-      }
-      node->setName(node->getName() + "_" + std::to_string(counter++));
-    }
-    nodes[node->getName()] = node;
-    return node;
-  }
-
-  /// Creates a new Node and returns it. If a Node with the same name already
-  /// exists, the existing Node is returned.
-  Node *createNode(const std::string &name) {
-    if (nodes.find(name) != nodes.end()) {
-      return nodes[name]; // Return existing node if name is already used
-    }
-    nodes[name] = new Node(name, this);
-    return nodes[name];
-  }
+  // Creates a new Node and returns it. If a Node with the same name already
+  // exists, the existing Node is returned. This function is used while parsing
+  // a BLIF file.
+  Node *createNode(const std::string &name);
 
   // Finds the path from "start" to "end" using bfs.
   std::vector<Node *> findPath(Node *start, Node *end);
@@ -286,87 +177,33 @@ public:
   std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
 
   // Returns all of the Nodes.
-  std::set<Node *> getAllNodes() {
-    std::set<Node *> result;
-    for (auto &pair : nodes) {
-      result.insert(pair.second);
-    }
-    return result;
-  }
+  std::set<Node *> getAllNodes();
 
-  // Returns latch map.
+  // Returns the Nodes that correspond to Dataflow Graph Channels Edges.
+  std::set<Node *> getChannels();
+
+  // Returns latch vector.
   std::vector<std::pair<Node *, Node *>> getLatches() const { return latches; }
 
   // Returns the Primary Inputs by looping over all the Nodes and checking if
   // they are Primary Inputs by calling isPrimaryInput member function from
   // Node class.
-  std::set<Node *> getPrimaryInputs() {
-    std::set<Node *> result;
-    for (const auto &pair : nodes) {
-      if (pair.second->isPrimaryInput()) {
-        result.insert(pair.second);
-      }
-    }
-    return result;
-  }
+  std::set<Node *> getPrimaryInputs();
 
   // Returns the Primary Outputs by looping over all the Nodes and checking
   // if they are Primary Outputs by calling isPrimaryOutput member function from
   // Node class.
-  std::set<Node *> getPrimaryOutputs() {
-    std::set<Node *> result;
-    for (const auto &pair : nodes) {
-      if (pair.second->isPrimaryOutput()) {
-        result.insert(pair.second);
-      }
-    }
-    return result;
-  }
-
-  // Returns the Nodes that correspond to Dataflow Graph Channels Edges.
-  std::set<Node *> getChannels() {
-    std::set<Node *> result;
-    for (const auto &pair : nodes) {
-      if (pair.second->isChannelEdgeNode()) {
-        result.insert(pair.second);
-      }
-    }
-    return result;
-  }
-
-  // Returns the Module Name
-  std::string getModuleName() { return moduleName; };
+  std::set<Node *> getPrimaryOutputs();
 
   // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
   std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
 
   // Returns Inputs of the Blif file.
-  std::set<Node *> getInputs() {
-    std::set<Node *> result;
-    for (const auto &pair : nodes) {
-      if (pair.second->isInput()) {
-        result.insert(pair.second);
-      }
-    }
-    return result;
-  }
+  std::set<Node *> getInputs();
 
   // Returns Outputs of the Blif file.
-  std::set<Node *> getOutputs() {
-    std::set<Node *> result;
-    for (const auto &pair : nodes) {
-      if (pair.second->isOutput()) {
-        result.insert(pair.second);
-      }
-    }
-    return result;
-  }
-
-  // Sets the Module Name of the Blif file.
-  void setModuleName(const std::string &moduleName) {
-    this->moduleName = moduleName;
-  }
+  std::set<Node *> getOutputs();
 
   // Helper function for traverseNodes. Sorts the Nodes using dfs.
   void topologicalOrderUtil(Node *node, std::set<Node *> &visitedNodes,
@@ -377,7 +214,7 @@ public:
   void generateTopologicalOrder();
 };
 
-// Generates a file in .blif format using the LogicNetwork data structure.
+/// Generates a file in .blif format using the LogicNetwork data structure.
 class BlifWriter {
 public:
   BlifWriter() = default;

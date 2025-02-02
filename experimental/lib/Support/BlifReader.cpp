@@ -21,7 +21,146 @@
 
 using namespace dynamatic::experimental;
 
-void Node::setName(const std::string &newName) { this->name = newName; }
+void Node::configureIONode(const std::string &type) {
+  isChannelEdge = true;
+  if (type == ".inputs")
+    isInput = true;
+  else if (type == ".outputs")
+    isOutput = true;
+}
+
+void Node::configureConstantNode() {
+  if (function == "0") {
+    isConstZero = true;
+  } else if (function == "1") {
+    isConstOne = true;
+  } else {
+    llvm::errs() << "Unknown constant value: " << function << "\n";
+  }
+}
+
+void LogicNetwork::addConstantNode(const std::vector<std::string> &nodes,
+                                   const std::string &function) {
+  // Create the fanout node, which is the last element in the nodes vector.
+  Node *fanOut = createNode(nodes.back());
+  fanOut->function = function;
+  fanOut->configureConstantNode();
+}
+
+void LogicNetwork::addLatch(const std::string &inputName,
+                            const std::string &outputName) {
+  // Create the input and output nodes for the latch. Nodes are created in
+  // LogicNetwork to ensure uniqueness, and avoids circular dependencies.
+  Node *regInputNode = createNode(inputName);
+  Node *regOutputNode = createNode(outputName);
+
+  // Configure the latch.
+  Node::configureLatch(regInputNode, regOutputNode);
+
+  // Add the latch to the latches vector.
+  latches.emplace_back(regInputNode, regOutputNode);
+}
+
+void LogicNetwork::addIONode(const std::string &name, const std::string &type) {
+  Node *node = createNode(name);
+  node->configureIONode(type);
+}
+
+void LogicNetwork::addLogicGate(const std::vector<std::string> &nodes,
+                                const std::string &function) {
+
+  // Create the fanout node, which is the last element in the nodes vector.
+  Node *fanOut = createNode(nodes.back());
+  fanOut->function = function;
+
+  // Create the fanin nodes. Set fanins and fanouts for each node.
+  for (size_t i = 0; i < nodes.size() - 1; ++i) {
+    Node *fanIn = createNode(nodes[i]);
+    Node::addEdge(fanIn, fanOut);
+  }
+}
+
+Node *LogicNetwork::addNode(Node *node) {
+  static unsigned int counter = 0;
+  if (nodes.find(node->name) !=
+      nodes.end()) {           // Name conflict with another Node
+    if (node->isChannelEdge) { // Channel nodes are unique, so return the node
+      return nodes[node->name];
+    }
+    node->name = (node->name + "_" +
+                  std::to_string(counter++)); // Otherwise, resolve conflict
+  }
+  nodes[node->name] = node; // Add the node to the map
+  return node;
+}
+
+Node *LogicNetwork::createNode(const std::string &name) {
+  if (nodes.find(name) != nodes.end()) {
+    return nodes[name]; // Return existing node if name is already used
+  }
+  nodes[name] = new Node(name, this);
+  return nodes[name];
+}
+
+std::set<Node *> LogicNetwork::getAllNodes() {
+  std::set<Node *> allNodes;
+  for (auto &pair : nodes) {
+    allNodes.insert(pair.second);
+  }
+  return allNodes;
+}
+
+std::set<Node *> LogicNetwork::getChannels() {
+  std::set<Node *> channels;
+  for (const auto &pair : nodes) {
+    if (pair.second->isChannelEdge) {
+      channels.insert(pair.second);
+    }
+  }
+  return channels;
+}
+
+// Returns Inputs of the Blif file.
+std::set<Node *> LogicNetwork::getInputs() {
+  std::set<Node *> inputs;
+  for (const auto &pair : nodes) {
+    if (pair.second->isInput) {
+      inputs.insert(pair.second);
+    }
+  }
+  return inputs;
+}
+
+// Returns Outputs of the Blif file.
+std::set<Node *> LogicNetwork::getOutputs() {
+  std::set<Node *> outputs;
+  for (const auto &pair : nodes) {
+    if (pair.second->isOutput) {
+      outputs.insert(pair.second);
+    }
+  }
+  return outputs;
+}
+
+std::set<Node *> LogicNetwork::getPrimaryInputs() {
+  std::set<Node *> primaryInputs;
+  for (const auto &pair : nodes) {
+    if (pair.second->isPrimaryInput()) {
+      primaryInputs.insert(pair.second);
+    }
+  }
+  return primaryInputs;
+}
+
+std::set<Node *> LogicNetwork::getPrimaryOutputs() {
+  std::set<Node *> primaryOutputs;
+  for (const auto &pair : nodes) {
+    if (pair.second->isPrimaryOutput()) {
+      primaryOutputs.insert(pair.second);
+    }
+  }
+  return primaryOutputs;
+}
 
 void LogicNetwork::topologicalOrderUtil(Node *node,
                                         std::set<Node *> &visitedNodes,
@@ -33,7 +172,7 @@ void LogicNetwork::topologicalOrderUtil(Node *node,
 
   // Search using DFS.
   visitedNodes.insert(node);
-  for (auto *const fanin : node->getFanins()) {
+  for (auto *const fanin : node->fanins) {
     if (std::find(order.begin(), order.end(), fanin) == order.end() &&
         visitedNodes.count(fanin) > 0) {
       llvm::errs() << "Cyclic dependency detected!\n";
@@ -107,7 +246,7 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
     if (type == ".model") {
       std::string moduleName;
       iss >> moduleName;
-      data->setModuleName(moduleName);
+      data->moduleName = moduleName;
     }
 
     // Input/Output nodes. These are also Dataflow graph channels.
@@ -141,7 +280,11 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
       std::istringstream functionStream(line);
       functionStream >> function;
 
-      data->addLogicGate(nodeNames, function);
+      if (nodeNames.size() == 1) {
+        data->addConstantNode(nodeNames, function);
+      } else {
+        data->addLogicGate(nodeNames, function);
+      }
     }
 
     // Subcircuits. not used for now.
@@ -187,7 +330,7 @@ std::vector<Node *> LogicNetwork::findPath(Node *start, Node *end) {
       return path;
     }
 
-    for (const auto &fanout : current->getFanouts()) {
+    for (const auto &fanout : current->fanouts) {
       if (visited.count(fanout) == 0) {
         queue.push(fanout);
         visited.insert(fanout);
@@ -246,7 +389,7 @@ LogicNetwork::findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
       return;
     }
 
-    for (const auto &fanin : currentNode->getFanins()) {
+    for (const auto &fanin : currentNode->fanins) {
       dfs(fanin);
     }
   };
@@ -263,42 +406,40 @@ void BlifWriter::writeToFile(LogicNetwork &network,
     return;
   }
 
-  file << ".model " << network.getModuleName() << "\n";
+  file << ".model " << network.moduleName << "\n";
 
   file << ".inputs";
   for (const auto &input : network.getInputs()) {
-    file << " " << input->getName();
+    file << " " << input->name;
   }
   file << "\n";
 
   file << ".outputs";
   for (const auto &output : network.getOutputs()) {
-    file << " " << output->getName();
+    file << " " << output->name;
   }
   file << "\n";
 
   for (const auto &latch : network.getLatches()) {
-    file << ".latch " << latch.first->getName() << " "
-         << latch.second->getName() << "\n";
+    file << ".latch " << latch.first->name << " " << latch.second->name << "\n";
   }
 
   for (const auto &node : network.getNodesInOrder()) {
-    if (node->isConstZero() || node->isConstOne()) {
-      file << ".names " << node->getName() << "\n";
-      file << (node->isConstZero() ? "0" : "1") << "\n";
-    } else if (node->getFanins().size() == 1) {
-      file << ".names " << (*node->getFanins().begin())->getName() << " "
-           << node->getName() << "\n";
-      file << node->getFunction() << "\n";
-    } else if (node->getFanins().size() == 2) {
-      auto fanins = node->getFanins();
-      auto it = fanins.begin();
-      auto name1 = (*it)->getName();
-      ++it;
-      auto name2 = (*it)->getName();
-      file << ".names " << name1 << " " << name2 << " " << node->getName()
+    if (node->isConstZero || node->isConstOne) {
+      file << ".names " << node->name << "\n";
+      file << (node->isConstZero ? "0" : "1") << "\n";
+    } else if (node->fanins.size() == 1) {
+      file << ".names " << (*node->fanins.begin())->name << " " << node->name
            << "\n";
-      file << node->getFunction() << "\n";
+      file << node->function << "\n";
+    } else if (node->fanins.size() == 2) {
+      auto fanins = node->fanins;
+      auto it = fanins.begin();
+      auto name1 = (*it)->name;
+      ++it;
+      auto name2 = (*it)->name;
+      file << ".names " << name1 << " " << name2 << " " << node->name << "\n";
+      file << node->function << "\n";
     }
   }
 
