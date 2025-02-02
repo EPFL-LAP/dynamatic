@@ -124,7 +124,7 @@ getInactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
   return MemDependenceAttr::get(
       ctx, dependency.getDstAccess(), dependency.getLoopDepth(),
-      dependency.getComponents(), BoolAttr::get(ctx, false));
+      dependency.getComponents(), false);
 }
 
 /// Inactivates the dependencies that are enforced by cheking whether the load
@@ -142,7 +142,7 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
   for (handshake::LoadOp loadOp : loadOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
       for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive().getValue())
+        if (!dependency.getIsActive())
           continue;
         auto storeOp = storesByName.at(dependency.getDstAccess());
         // if the laod is GIID which means there is a data dependency,
@@ -171,7 +171,7 @@ static void inactivateEnforcedWAWs(
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       StringRef storeName = getUniqueName(storeOp);
       for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive().getValue())
+        if (!dependency.getIsActive())
           continue;
         StringRef dstName = dependency.getDstAccess();
 
@@ -202,7 +202,7 @@ getOpsWithNonEnforcedDeps(DenseSet<Operation *> &loadStoreOps) {
     hasAtLeastOneActive = false;
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(op)) {
       for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive().getValue())
+        if (!dependency.getIsActive())
           continue;
         hasAtLeastOneActive = true;
         Operation *dstOp = nameToOpMapping[dependency.getDstAccess()];

@@ -217,14 +217,14 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     "::mlir::StringAttr":$dstAccess,
     "unsigned":$loopDepth,
     ArrayRefParameter<"::dynamatic::handshake::DependenceComponentAttr">:$components,
-    "::mlir::BoolAttr":$isActive
+    "bool":$isActive
   );
 
   let builders = [
     AttrBuilder<(ins  "::mlir::StringRef":$dstAccess, 
                       "unsigned":$loopDepth,
                       "::mlir::ArrayRef<::mlir::affine::DependenceComponent>":$components, 
-                      "::mlir::BoolAttr":$isActive), [{
+                      "bool":$isActive), [{
       SmallVector<::dynamatic::handshake::DependenceComponentAttr> compAttrs;
       for (auto &comp : components)
         compAttrs.push_back(::dynamatic::handshake::DependenceComponentAttr::get(

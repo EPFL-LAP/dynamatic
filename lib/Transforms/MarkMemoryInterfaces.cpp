@@ -132,7 +132,7 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
     bool connectToMC = true;
     if (auto allDeps = getDialectAttr<MemDependenceArrayAttr>(op)) {
       for (MemDependenceAttr memDep : allDeps.getDependencies()) {
-        if (!memDep.getIsActive().getValue())
+        if (!memDep.getIsActive())
           continue;
         // Both the source and destination operation need to connect to an LSQ
         StringRef dstOpName = memDep.getDstAccess();
