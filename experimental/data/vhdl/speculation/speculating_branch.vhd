@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
 
-entity speculating_branch_with_tag is
+entity speculating_branch is
   generic(
     DATA_TYPE : integer;
     SPEC_TAG_DATA_TYPE : integer
@@ -30,9 +30,9 @@ entity speculating_branch_with_tag is
     falseOut_spec_tag : out std_logic;
     falseOut_ready : in  std_logic
   );
-end speculating_branch_with_tag;
+end speculating_branch;
 
-architecture arch of speculating_branch_with_tag is
+architecture arch of speculating_branch is
   signal cond_br_condition : std_logic_vector(0 downto 0);
 begin
 
