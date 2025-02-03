@@ -867,7 +867,7 @@
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
-    "dependencies": ["types", "fork"]
+    "dependencies": ["types", "handshake_fork"]
   },
   {
     "name": "mem_to_bram",

@@ -21,7 +21,7 @@ entity spec_commit_dataless_with_tag is
   );
 end entity;
 
-architecture arch of spec_commit_wrapper_dataless_with_tag is
+architecture arch of spec_commit_dataless_with_tag is
   signal ins_inner : std_logic_vector(0 downto 0);
   signal outs_inner : std_logic_vector(0 downto 0);
 begin

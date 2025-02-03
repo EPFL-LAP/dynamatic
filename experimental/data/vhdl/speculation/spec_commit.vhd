@@ -32,6 +32,7 @@ signal fifo_disc_outs : std_logic_vector(0 downto 0);
 signal fifo_disc_outs_valid : std_logic;
 signal fifo_disc_outs_ready : std_logic;
 
+signal branch_in_condition : std_logic_vector(0 downto 0);
 signal branch_in_condition_ready : std_logic;
 signal branch_in_trueOut : std_logic_vector(DATA_TYPE - 1 downto 0);
 signal branch_in_trueOut_valid : std_logic;
@@ -75,6 +76,7 @@ fifo_disc: entity work.tfifo(arch)
     outs_ready => fifo_disc_outs_ready
   );
 
+branch_in_condition(0) <= ins_spec_tag;
 branch_in: entity work.cond_br(arch)
   generic map (
     DATA_TYPE => DATA_TYPE
@@ -85,7 +87,7 @@ branch_in: entity work.cond_br(arch)
     data => ins,
     data_valid => ins_valid,
     data_ready => ins_ready,
-    condition => not ins_spec_tag, -- internally flipped
+    condition => branch_in_condition,
     condition_valid => '1', -- always valid
     condition_ready => branch_in_condition_ready,
     trueOut => branch_in_trueOut,
@@ -104,9 +106,9 @@ buff: entity work.tfifo(arch)
   port map (
     clk => clk,
     rst => rst,
-    ins => branch_in_falseOut,
-    ins_valid => branch_in_falseOut_valid,
-    ins_ready => branch_in_falseOut_ready,
+    ins => branch_in_trueOut,
+    ins_valid => branch_in_trueOut_valid,
+    ins_ready => branch_in_trueOut_ready,
     outs => buff_outs,
     outs_valid => buff_outs_valid,
     outs_ready => buff_outs_ready
@@ -133,10 +135,10 @@ branch_disc: entity work.cond_br(arch)
     falseOut_ready => branch_disc_falseOut_ready
   );
 
-merge_ins <= (branch_disc_trueOut, branch_in_trueOut);
-merge_ins_valid <= (branch_disc_trueOut_valid, branch_in_trueOut_valid);
+merge_ins <= (branch_disc_trueOut, branch_in_falseOut);
+merge_ins_valid <= (branch_disc_trueOut_valid, branch_in_falseOut_valid);
 branch_disc_trueOut_ready <= merge_ins_ready(1);
-branch_in_trueOut_ready <= merge_ins_ready(0);
+branch_in_falseOut_ready <= merge_ins_ready(0);
 
 merge_out: entity work.merge(arch)
   generic map (
