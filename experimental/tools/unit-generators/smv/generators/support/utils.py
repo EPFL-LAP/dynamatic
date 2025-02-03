@@ -1,30 +1,46 @@
 import re
 
 
-def mlir_type_to_smv_type(type):
-  pattern = r"^!handshake\.channel<([u]?i)(\d+)>$"
-  match = re.match(pattern, type)
+class SmvScalarType:
 
-  if match:
-    signed = not match.group(1).startswith("u")
-    type_width = int(match.group(2))
-    if type_width == 1:
-      return "boolean"
-    elif signed:
-      return f"signed word [{type_width}]"
+  mlir_type: str
+  bitwidth: int
+  signed: bool
+  smv_type: str
+
+  def __init__(self, mlir_type: str):
+    """
+    Constructor for SmvScalarType.
+    Parses an incoming MLIR type string.
+    """
+    self.mlir_type = mlir_type
+
+    control_pattern = "!handshake.control<>"
+    channel_pattern = r"^!handshake\.channel<([u]?i)(\d+)>$"
+    match = re.match(channel_pattern, mlir_type)
+
+    if mlir_type == control_pattern:
+      self.bitwidth = 0
+    elif match:
+      self.signed = not match.group(1).startswith("u")
+      self.bitwidth = int(match.group(2))
+      if self.bitwidth == 1:
+        self.smv_type = "boolean"
+      elif self.signed:
+        self.smv_type = f"signed word [{self.bitwidth}]"
+      else:
+        self.smv_type = f"unsigned word [{self.bitwidth}]"
     else:
-      return f"unsigned word [{type_width}]"
-  else:
-    raise ValueError(f"Type {type} doesn't correspond to any SMV type")
+      raise ValueError(f"Type {mlir_type} doesn't correspond to any SMV type")
 
+  def format_constant(self, value) -> str:
+    """
+    Formats a given constant value based on the type.
+    """
+    if self.bitwidth == 1:
+      return "TRUE" if bool(value) else "FALSE"
+    else:
+      return int(value)
 
-def smv_format_constant(const_value, smv_type):
-  pattern = r"^[un]?signed word \[(\d+)\]$"
-  match = re.match(pattern, smv_type)
-
-  if smv_type == "boolean":
-    return "TRUE" if bool(const_value) else "FALSE"
-  elif match:
-    return int(const_value)
-  else:
-    raise ValueError(f"Type {smv_type} isn't supported")
+  def __str__(self):
+    return f"{self.smv_type}"

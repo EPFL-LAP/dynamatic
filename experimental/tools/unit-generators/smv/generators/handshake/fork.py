@@ -1,15 +1,14 @@
 from generators.support.eager_fork_register_block import (
     generate_eager_fork_register_block,
 )
-from generators.support.utils import mlir_type_to_smv_type
+from generators.support.utils import SmvScalarType
 
 
 def generate_fork(name, params):
   size = params["size"]
-  data_type = None if "data_type" not in params or params["data_type"] == "!handshake.control<>" else mlir_type_to_smv_type(
-      params["data_type"])
+  data_type = SmvScalarType(params["data_type"])
 
-  if data_type is None:
+  if data_type.bitwidth == 0:
     return _generate_fork_dataless(name, size)
   else:
     return _generate_fork(name, size, data_type)
@@ -46,6 +45,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
 
 if __name__ == "__main__":
-  print(generate_fork("test_fork_dataless", {"size": 4}))
+  print(generate_fork("test_fork_dataless", {
+        "size": 4, "data_type": "!handshake.control<>"}))
   print(generate_fork("test_fork", {
         "size": 2, "data_type": "!handshake.channel<i32>"}))

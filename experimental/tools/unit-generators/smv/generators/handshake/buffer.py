@@ -8,24 +8,23 @@ def generate_buffer(name, params):
   timing_v = bool(re.search(r"V: (\d+)", params["timing"]))
   transparent = timing_r and not (timing_d or timing_v)
   slots = params["slots"] if "slots" in params else 1
-  data_type = None if "data_type" not in params or params["data_type"] == "!handshake.control<>" else mlir_type_to_smv_type(
-      params["data_type"])
+  data_type = SmvScalarType(params["data_type"])
 
-  if transparent and slots > 1 and data_type is None:
+  if transparent and slots > 1 and data_type.bitwidth == 0:
     return _generate_tfifo_dataless(name, slots)
-  elif transparent and slots > 1 and data_type is not None:
+  elif transparent and slots > 1 and data_type.bitwidth != 0:
     return _generate_tfifo(name, slots, data_type)
-  elif transparent and slots == 1 and data_type is None:
+  elif transparent and slots == 1 and data_type.bitwidth == 0:
     return _generate_tehb_dataless(name)
-  elif transparent and slots == 1 and data_type is not None:
+  elif transparent and slots == 1 and data_type.bitwidth != 0:
     return _generate_tehb(name, data_type)
-  elif not transparent and slots > 1 and data_type is None:
+  elif not transparent and slots > 1 and data_type.bitwidth == 0:
     return _generate_ofifo_dataless(name, slots)
-  elif not transparent and slots > 1 and data_type is not None:
+  elif not transparent and slots > 1 and data_type.bitwidth != 0:
     return _generate_ofifo(name, slots, data_type)
-  elif not transparent and slots == 1 and data_type is None:
+  elif not transparent and slots == 1 and data_type.bitwidth == 0:
     return _generate_oehb_dataless(name)
-  elif not transparent and slots == 1 and data_type is not None:
+  elif not transparent and slots == 1 and data_type.bitwidth != 0:
     return _generate_oehb(name, data_type)
 
 
@@ -51,7 +50,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   VAR data : {data_type};
 
   ASSIGN
-  init(data) := {smv_format_constant(0, data_type)};
+  init(data) := {data_type.format_constant(0)};
   next(data) := case
     ins_ready & ins_valid : ins;
     TRUE : data;
@@ -119,7 +118,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR data : {data_type};
 
   ASSIGN
-  init(data) := {smv_format_constant(0, data_type)};
+  init(data) := {data_type.format_constant(0)};
   next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
 
   // output
@@ -168,19 +167,19 @@ if __name__ == "__main__":
   print(
       generate_buffer(
           "test_tfifo_dataless", {
-              "timing": "#handshake<timing {{R: 1}}", "slots": 5}
+              "timing": "#handshake<timing {{R: 1}}", "slots": 5, "data_type": "!handshake.control<>"}
       )
   )
   print(
       generate_buffer(
           "test_tfifo",
           {"timing": "#handshake<timing {{R: 1}}",
-              "slots": 5, "data_type": "!handshake.channel<i1>"},
+           "slots": 5, "data_type": "!handshake.channel<i1>"}
       )
   )
   print(
       generate_buffer("test_tehb_dataless", {
-                      "timing": "#handshake<timing {{R: 1}}"})
+                      "timing": "#handshake<timing {{R: 1}}", "data_type": "!handshake.control<>"})
   )
   print(
       generate_buffer(
@@ -191,7 +190,7 @@ if __name__ == "__main__":
   print(
       generate_buffer(
           "test_ofifo_dataless", {
-              "timing": "#handshake<timing {{R: 0}}", "slots": 5}
+              "timing": "#handshake<timing {{R: 0}}", "slots": 5, "data_type": "!handshake.control<>"}
       )
   )
   print(
@@ -203,7 +202,7 @@ if __name__ == "__main__":
   )
   print(
       generate_buffer("test_oehb_dataless", {
-                      "timing": "#handshake<timing {{R: 0}}"})
+                      "timing": "#handshake<timing {{R: 0}}", "data_type": "!handshake.control<>"})
   )
   print(
       generate_buffer(

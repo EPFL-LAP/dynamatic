@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_elastic_fifo_inner(name, slots, data_type=None):
-  if data_type is None:
+  if data_type.bitwidth == 0:
     return _generate_elastic_fifo_inner_dataless(name, slots)
   else:
     return _generate_elastic_fifo_inner(name, slots, data_type)
@@ -90,7 +90,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   esac;
 
   {"\n  ".join([f"""ASSIGN
-  init(mem_{n}) := {smv_format_constant(0, data_type)};
+  init(mem_{n}) := {data_type.format_constant(0)};
   next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n}""" for n in range(slots)])}
 
   ASSIGN
