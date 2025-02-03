@@ -851,9 +851,6 @@
     "dependencies": ["ofifo"]
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old_dep.vhd"
-  },
-  {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"
   },
   {
