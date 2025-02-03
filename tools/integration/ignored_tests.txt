@@ -14,3 +14,11 @@ trisolv
 polyn_mult
 cnn
 matching_2
+fixed
+if_convert
+loop_path
+nested_loop
+single_loop
+sparse
+subdiag
+subdiag_fast
