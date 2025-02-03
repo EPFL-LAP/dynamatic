@@ -833,7 +833,6 @@ entity speculator is
     ins_ready: out std_logic;
     -- enable is dataless (control token)
     enable_valid: in std_logic;
-    enable_spec_tag: in std_logic;
     enable_ready: out std_logic;
     -- outputs
     outs: out std_logic_vector(DATA_TYPE - 1 downto 0);
@@ -843,23 +842,18 @@ entity speculator is
     -- control signals
     ctrl_save: out std_logic_vector(0 downto 0);
     ctrl_save_valid: out std_logic;
-    ctrl_save_spec_tag: out std_logic;
     ctrl_save_ready: in std_logic;
     ctrl_commit: out std_logic_vector(0 downto 0);
     ctrl_commit_valid: out std_logic;
-    ctrl_commit_spec_tag: out std_logic;
     ctrl_commit_ready: in std_logic;
     ctrl_sc_save: out std_logic_vector(2 downto 0);
     ctrl_sc_save_valid: out std_logic;
-    ctrl_sc_save_spec_tag: out std_logic;
     ctrl_sc_save_ready: in std_logic;
     ctrl_sc_commit: out std_logic_vector(2 downto 0);
     ctrl_sc_commit_valid: out std_logic;
-    ctrl_sc_commit_spec_tag: out std_logic;
     ctrl_sc_commit_ready: in std_logic;
     ctrl_sc_branch: out std_logic_vector(0 downto 0);
     ctrl_sc_branch_valid: out std_logic;
-    ctrl_sc_branch_spec_tag: out std_logic;
     ctrl_sc_branch_ready: in std_logic
   );
 end speculator;
@@ -890,12 +884,6 @@ signal fork_control_outs : data_array (4 downto 0)(2 downto 0);
 signal fork_control_outs_valid : std_logic_vector(4 downto 0);
 signal fork_control_outs_ready : std_logic_vector(4 downto 0);
 begin
-
-ctrl_save_spec_tag <= '0';
-ctrl_commit_spec_tag <= '0';
-ctrl_sc_save_spec_tag <= '0';
-ctrl_sc_commit_spec_tag <= '0';
-ctrl_sc_branch_spec_tag <= '0';
 
 data_fork: entity work.handshake_fork_with_tag(arch)
   generic map(
