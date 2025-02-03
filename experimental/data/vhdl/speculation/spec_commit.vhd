@@ -114,6 +114,7 @@ buff: entity work.tfifo(arch)
     outs_ready => buff_outs_ready
   );
 
+branch_disc_trueOut_ready <= '1';
 branch_disc: entity work.cond_br(arch)
   generic map (
     DATA_TYPE => DATA_TYPE
@@ -135,9 +136,9 @@ branch_disc: entity work.cond_br(arch)
     falseOut_ready => branch_disc_falseOut_ready
   );
 
-merge_ins <= (branch_disc_trueOut, branch_in_falseOut);
-merge_ins_valid <= (branch_disc_trueOut_valid, branch_in_falseOut_valid);
-branch_disc_trueOut_ready <= merge_ins_ready(1);
+merge_ins <= (branch_disc_falseOut, branch_in_falseOut);
+merge_ins_valid <= (branch_disc_falseOut_valid, branch_in_falseOut_valid);
+branch_disc_falseOut_ready <= merge_ins_ready(1);
 branch_in_falseOut_ready <= merge_ins_ready(0);
 
 merge_out: entity work.merge(arch)
