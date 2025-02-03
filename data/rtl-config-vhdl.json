@@ -743,16 +743,16 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_wrapper.vhd",
-    "dependencies": ["types", "spec_save"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
+    "dependencies": ["types", "handshake_fork", "tfifo", "cond_br", "merge"]
   },
   {
     "name": "handshake.spec_save",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "extra-eq": 0, "generic": false }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_wrapper.vhd",
-    "module-name": "spec_save_wrapper_dataless",
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save.vhd",
+    "module-name": "spec_save_dataless",
     "dependencies": ["types", "spec_save_wrapper"]
   },
   {
@@ -852,10 +852,6 @@
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old_dep.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
-    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"

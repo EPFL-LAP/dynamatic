@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity spec_save_wrapper_dataless_with_tag is
+entity spec_save_dataless_with_tag is
   port (
     clk, rst : in std_logic;
     -- input channel
@@ -21,12 +21,12 @@ entity spec_save_wrapper_dataless_with_tag is
   );
 end entity;
 
-architecture arch of spec_save_wrapper_dataless_with_tag is
+architecture arch of spec_save_dataless_with_tag is
   signal ins_inner : std_logic_vector(0 downto 0);
   signal outs_inner : std_logic_vector(0 downto 0);
 begin
   ins_inner(0) <= '0';
-  spec_save_wrapper : entity work.spec_save_wrapper_with_tag
+  spec_save : entity work.spec_save_with_tag
     generic map(
       DATA_TYPE => 1
     )

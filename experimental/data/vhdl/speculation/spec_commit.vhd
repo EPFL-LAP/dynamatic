@@ -114,7 +114,7 @@ buff: entity work.tfifo(arch)
     outs_ready => buff_outs_ready
   );
 
-branch_disc_trueOut_ready <= '1';
+branch_disc_trueOut_ready <= '1'; -- sink
 branch_disc: entity work.cond_br(arch)
   generic map (
     DATA_TYPE => DATA_TYPE
