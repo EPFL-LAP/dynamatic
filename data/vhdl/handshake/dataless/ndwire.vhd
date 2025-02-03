@@ -18,7 +18,9 @@ architecture arch of ndwire_dataless is
   signal state, next_state : nd_state_t;
 
   -- This is the source of non-determism.
-  -- E.g. it needs to be set to a primary input in a formal tool
+  -- It needs to be set to a primary input in a formal tool
+  -- If the formal tools does not implicitly treat undriven signals
+  -- like primary inputs this needs to be done explicitly.
   signal nd_next_state : nd_state_t;
 
 begin

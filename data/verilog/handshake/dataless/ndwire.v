@@ -13,7 +13,9 @@ module ndwire_dataless (
   typedef enum logic {SLEEPING, RUNNING} nd_state_t;
 
   // This is the source of non-determism.
-  // E.g. it needs to be set to a primary input in a formal tool
+  // It needs to be set to a primary input in a formal tool
+  // If the formal tools does not implicitly treat undriven signals
+  // like primary inputs this needs to be done explicitly.
   nd_state_t nd_next_state;
 
   nd_state_t state, next_state;
