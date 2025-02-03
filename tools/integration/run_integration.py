@@ -288,12 +288,17 @@ def main():
             sim_log_path = os.path.join(out_dir, "sim", "report.txt")
             try:
                 sim_time = get_sim_time(sim_log_path)
-                color_print(f"[PASS] {c_file} (simulation duration: {
-                            round(sim_time / 4)} cycles)", TermColors.OKGREEN)
+                color_print(
+                    f"[PASS] {c_file} (simulation duration: "
+                    f"{round(sim_time / 4)} cycles)",
+                    TermColors.OKGREEN
+                )
             except ValueError:
                 # This should never happen
                 color_print(
-                    f"[PASS] {c_file} (simulation duration: NOT FOUND)", TermColors.OKGREEN)
+                    f"[PASS] {c_file} (simulation duration: NOT FOUND)",
+                    TermColors.OKGREEN
+                )
 
             passed_cnt += 1
         elif result == 1:
@@ -303,8 +308,12 @@ def main():
 
         sys.stdout.flush()
 
-    print(f"** Integration testing finished: passed {passed_cnt}/{test_cnt} tests ({
-          100 * passed_cnt / test_cnt: .2f}% ), {ignored_cnt} ignored **")
+    print(
+        f"** Integration testing finished: "
+        f"passed {passed_cnt}/{test_cnt} tests "
+        f"({100 * passed_cnt / test_cnt: .2f}% ), "
+        f"{ignored_cnt} ignored **"
+    )
     if passed_cnt == test_cnt:
         sys.exit(0)
     else:
