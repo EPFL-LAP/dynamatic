@@ -10,27 +10,27 @@ entity specgenCore is
   port (
     clk, rst : in std_logic;
 
-    ins : in std_logic(DATA_SIZE - 1 downto 0);
+    ins : in std_logic_vector(DATA_SIZE - 1 downto 0);
     ins_valid : in std_logic;
     ins_spec_tag : in std_logic;
     ins_ready : out std_logic;
 
-    predict_ins : in std_logic(DATA_SIZE - 1 downto 0);
+    predict_ins : in std_logic_vector(DATA_SIZE - 1 downto 0);
     predict_ins_valid : in std_logic;
     predict_ins_ready : out std_logic;
 
-    fifo_ins : in std_logic(DATA_SIZE - 1 downto 0);
+    fifo_ins : in std_logic_vector(DATA_SIZE - 1 downto 0);
     fifo_ins_valid : in std_logic;
     fifo_ins_ready : out std_logic;
 
-    outs : out std_logic(DATA_SIZE - 1 downto 0);
+    outs : out std_logic_vector(DATA_SIZE - 1 downto 0);
     outs_spec_tag : out std_logic;
 
-    fifo_outs : out std_logic(DATA_SIZE - 1 downto 0);
+    fifo_outs : out std_logic_vector(DATA_SIZE - 1 downto 0);
     fifo_outs_valid : out std_logic;
     fifo_outs_ready : in std_logic;
 
-    control_outs : out std_logic(2 downto 0); -- 000:spec, 001:no cmp, 010:cmp correct, 011:resend, 100:kill, 101:correct-spec
+    control_outs : out std_logic_vector(2 downto 0); -- 000:spec, 001:no cmp, 010:cmp correct, 011:resend, 100:kill, 101:correct-spec
     control_outs_valid : out std_logic;
     control_outs_ready : in std_logic
   );
@@ -652,11 +652,11 @@ entity predFifo is
 
     data_in : in std_logic_vector(DATA_SIZE - 1 downto 0);
     data_in_valid : in std_logic;
-    data_in_ready : out std_logic_vector(0 downto 0);
+    data_in_ready : out std_logic;
 
     data_out : out std_logic_vector(DATA_SIZE - 1 downto 0);
     data_out_valid : out std_logic;
-    data_out_ready : in std_logic_vector(0 downto 0)
+    data_out_ready : in std_logic
   );
 end predFifo;
 
