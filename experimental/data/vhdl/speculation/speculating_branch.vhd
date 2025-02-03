@@ -4,7 +4,8 @@ use work.types.all;
 
 entity speculating_branch_with_tag is
   generic(
-    DATA_TYPE : integer
+    DATA_TYPE : integer;
+    SPEC_TAG_DATA_TYPE : integer
   );
   port(
     clk, rst : in std_logic;
@@ -14,7 +15,7 @@ entity speculating_branch_with_tag is
     data_spec_tag : in std_logic;
     data_ready : out std_logic;
     -- spec_tag_data used for condition
-    spec_tag_data       : in  std_logic_vector(0 downto 0);
+    spec_tag_data       : in  std_logic_vector(SPEC_TAG_DATA_TYPE - 1 downto 0);
     spec_tag_data_valid : in  std_logic;
     spec_tag_data_spec_tag : in std_logic;
     spec_tag_data_ready : out std_logic;
