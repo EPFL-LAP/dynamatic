@@ -1,31 +1,32 @@
-library IEEE;
-USE IEEE.STD_LOGIC_1164.ALL;
-USE IEEE.NUMERIC_STD.ALL;
-USE work.types.all;
-entity spec_save_commit is
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.types.all;
 
-  Generic (
-    DATA_SIZE_IN:integer; 
-    DATA_SIZE_OUT:integer; 
+entity spec_save_commit is
+  generic (
+    DATA_TYPE : integer;
     FIFO_DEPTH : integer
   );
- 
-  Port ( 
-    clk, rst : in std_logic;  
-    dataInArray : in data_array(0 downto 0)(DATA_SIZE_IN - 1 downto 0);
-    specInArray   : in  data_array(0 downto 0)(0 downto 0);
-    controlInArray : in data_array(0 downto 0)(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
-    pValidArray : in std_logic_vector(1 downto 0); -- (control, data)
-    readyArray : out std_logic_vector(1 downto 0); -- (control, data)
-
-    dataOutArray : out data_array(0 downto 0)(DATA_SIZE_OUT - 1 downto 0);
-    specOutArray  : out data_array(0 downto 0)(0 downto 0);
-    validArray : out std_logic_vector(0 downto 0);
-    nReadyArray : in std_logic_vector(0 downto 0)
-
+  port (
+    clk, rst : in std_logic;
+    -- inputs
+    ins : in std_logic_vector(DATA_TYPE - 1 downto 0);
+    ins_valid : in std_logic;
+    ins_spec_tag : in std_logic;
+    ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
+    ctrl_valid : in std_logic;
+    ctrl_spec_tag : in std_logic; -- not used
+    outs_ready : in std_logic;
+    -- outputs
+    outs : out std_logic_vector(DATA_TYPE - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_spec_tag : out std_logic;
+    ins_ready : out std_logic;
+    ctrl_ready : out std_logic
   );
 end spec_save_commit;
- 
+
 architecture arch of spec_save_commit is
 
     signal HeadEn   : std_logic := '0';
@@ -47,47 +48,47 @@ architecture arch of spec_save_commit is
     signal Empty    : std_logic;
     signal Full : std_logic;
 
-    type FIFO_Memory is array (0 to FIFO_DEPTH - 1) of STD_LOGIC_VECTOR (DATA_SIZE_IN+1 -1 downto 0);
+    type FIFO_Memory is array (0 to FIFO_DEPTH - 1) of STD_LOGIC_VECTOR (DATA_TYPE+1 -1 downto 0);
     signal Memory : FIFO_Memory;
 
-    signal specdataInArray  : data_array(0 downto 0)(DATA_SIZE_IN+1 - 1 downto 0);
+    signal specdataInArray  : data_array(0 downto 0)(DATA_TYPE+1 - 1 downto 0);
 
     signal bypass : std_logic;
 
 begin
-    specdataInArray(0) <= specInArray(0) & dataInArray(0);
+    specdataInArray(0) <= ins_spec_tag & ins;
 
-    readyArray(0) <= not Full;
-    validArray(0) <= (PassEn and (not CurrEmpty or pValidArray(0))) or (ResendEn and not Empty);
+    ins_ready <= not Full;
+    outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
     --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
-    
-    CurrHeadEqual <= '1' when Curr = Head else '0';
-    TailEn <= not Full and pValidArray(0);
-    HeadEn <= not Empty and ((nReadyArray(0) and ResendEn) or (readyArray(1) and KillEn));
-    CurrEn <= ( (not CurrEmpty or pValidArray(0)) and (nReadyArray(0) and PassEn) ) or
-              (not Empty and (nReadyArray(0) and NoCmpEn) ) or
-              (CurrHeadEqual and readyArray(1) and KillEn);
 
-    bypass <= pValidArray(0) and CurrEmpty;
+    CurrHeadEqual <= '1' when Curr = Head else '0';
+    TailEn <= not Full and ins_valid;
+    HeadEn <= not Empty and ((outs_ready and ResendEn) or (ctrl_ready and KillEn));
+    CurrEn <= ( (not CurrEmpty or ins_valid) and (outs_ready and PassEn) ) or
+              (not Empty and (outs_ready and NoCmpEn) ) or
+              (CurrHeadEqual and ctrl_ready and KillEn);
+
+    bypass <= ins_valid and CurrEmpty;
 -------------------
 -- comb process for control en
-en_proc : process (pValidArray, controlInArray)
+en_proc : process (ins_valid, ctrl_valid, ctrl)
     begin
         PassEn <= '0';
         KillEn <= '0';
         ResendEn <= '0';
         NoCmpEn <= '0';
 
-        if pValidArray(1) = '1' and controlInArray(0) = "000" then
+        if ctrl_valid = '1' and ctrl = "000" then
             PassEn <= '1';
-        elsif pValidArray(1) = '1' and controlInArray(0) = "001" then
+        elsif ctrl_valid = '1' and ctrl = "001" then
             KillEn <= '1';
-        elsif pValidArray(1) = '1' and controlInArray(0) = "010" then
+        elsif ctrl_valid = '1' and ctrl = "010" then
             ResendEn <= '1';
-        elsif pValidArray(1) = '1' and controlInArray(0) = "011" then
+        elsif ctrl_valid = '1' and ctrl = "011" then
             PassEn <= '1';
             KillEn <= '1';
-        elsif pValidArray(1) = '1' and controlInArray(0) = "100" then
+        elsif ctrl_valid = '1' and ctrl = "100" then
             ResendEn <= '1';
             NoCmpEn <= '1';
         end if;
@@ -95,19 +96,19 @@ en_proc : process (pValidArray, controlInArray)
 
 -------------------------------------------
 -- comb process for control ready
-ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, nReadyArray, pValidArray)
+ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, outs_ready, ctrl_valid, ins_valid)
     begin
         -- Note: PassEn and KillEn can be simultaneously '1'
         -- In that case, PassEn is prioritized
         if PassEn = '1' then
-            readyArray(1) <= (not CurrEmpty or pValidArray(0)) and nReadyArray(0);
-            --readyArray(1) <= not CurrEmpty and nReadyArray(0);
+            ctrl_ready <= (not CurrEmpty or ins_valid) and outs_ready;
+            --ctrl_ready <= not CurrEmpty and outs_ready;
         elsif ResendEn = '1' then
-            readyArray(1) <= not Empty and nReadyArray(0);
+            ctrl_ready <= not Empty and outs_ready;
         elsif KillEn = '1' then
-            readyArray(1) <= not Empty;
+            ctrl_ready <= not Empty;
         else
-            readyArray(1) <= '0';
+            ctrl_ready <= '0';
         end if;
     end process;
 -------------------------------------------
@@ -116,15 +117,15 @@ output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
     begin
         if PassEn = '1' then
             if bypass = '1' then
-                dataOutArray(0) <=  specdataInArray(0)(DATA_SIZE_OUT - 1 downto 0);
-                specOutArray(0)(0) <= specdataInArray(0)(DATA_SIZE_OUT+1 - 1);
+                outs <=  specdataInArray(0)(DATA_TYPE - 1 downto 0);
+                outs_spec_tag <= specdataInArray(0)(DATA_TYPE+1 - 1);
             else
-                dataOutArray(0) <=  Memory(Curr)(DATA_SIZE_OUT - 1 downto 0);
-                specOutArray(0)(0) <= Memory(Curr)(DATA_SIZE_OUT+1 - 1);
+                outs <=  Memory(Curr)(DATA_TYPE - 1 downto 0);
+                outs_spec_tag <= Memory(Curr)(DATA_TYPE+1 - 1);
             end if;
         else
-            dataOutArray(0) <=  Memory(Head)(DATA_SIZE_OUT - 1 downto 0);
-            specOutArray(0)(0) <= '0';
+            outs <=  Memory(Head)(DATA_TYPE - 1 downto 0);
+            outs_spec_tag <= '0';
         end if;
     end process;
 
@@ -138,99 +139,99 @@ output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
 -------------------------------------------
 -- process for writing data
 fifo_proc : process (clk)
-   
-     begin        
+
+     begin
         if rising_edge(clk) then
           if rst = '1' then
-           
+
           else
-            
+
             if (TailEn = '1' ) then
                 -- Write Data to Memory
                 Memory(Tail) <= specdataInArray(0);
-                
+
             end if;
-            
+
           end if;
         end if;
     end process;
 
 
- 
+
 -------------------------------------------
 -- process for updating tail
 TailUpdate_proc : process (clk)
-   
+
       begin
         if rising_edge(clk) then
-          
+
             if rst = '1' then
                Tail <= 0;
             else
-          
+
                 if (TailEn = '1') then
 
                     Tail  <= (Tail + 1) mod FIFO_DEPTH;
-                              
+
                 end if;
-               
+
             end if;
         end if;
-    end process; 
+    end process;
 
 -------------------------------------------
 -- process for updating head
 HeadUpdate_proc : process (clk)
-   
+
   begin
   if rising_edge(clk) then
-  
+
     if rst = '1' then
        Head <= 0;
     else
-  
+
         if (HeadEn = '1') then
 
             Head  <= (Head + 1) mod FIFO_DEPTH;
-                      
+
         end if;
-       
+
     end if;
   end if;
-end process; 
+end process;
 
 -------------------------------------------
 -- process for updating curr
 CurrUpdate_proc : process (clk)
-   
+
   begin
   if rising_edge(clk) then
-  
+
     if rst = '1' then
        Curr <= 0;
     else
-  
+
         if (CurrEn = '1') then
 
             Curr  <= (Curr + 1) mod FIFO_DEPTH;
-                      
+
         end if;
-       
+
     end if;
   end if;
-end process; 
+end process;
 
 -------------------------------------------
 -- process for updating full
 FullUpdate_proc : process (clk)
-   
+
   begin
   if rising_edge(clk) then
-  
+
     if rst = '1' then
        Full <= '0';
     else
-  
+
         -- if only filling but not emptying
         if (TailEn = '1') and (HeadEn = '0') then
 
@@ -244,20 +245,20 @@ FullUpdate_proc : process (clk)
         elsif (TailEn = '0') and (HeadEn = '1') then
                 Full <= '0';
         -- otherwise, nothing is happening or simultaneous read and write
-                      
+
         end if;
-       
+
     end if;
   end if;
 end process;
-  
+
  -------------------------------------------
 -- process for updating empty
 EmptyUpdate_proc : process (clk)
-   
+
   begin
   if rising_edge(clk) then
-  
+
     if rst = '1' then
        Empty <= '1';
     else
@@ -274,9 +275,9 @@ EmptyUpdate_proc : process (clk)
         elsif (TailEn = '1') and (HeadEn = '0') then
                 Empty <= '0';
        -- otherwise, nothing is happening or simultaneous read and write
-                      
+
         end if;
-       
+
     end if;
   end if;
 end process;
@@ -284,10 +285,10 @@ end process;
  -------------------------------------------
 -- process for updating curr empty
 CurrEmptyUpdate_proc : process (clk)
-   
+
   begin
   if rising_edge(clk) then
-  
+
     if rst = '1' then
        CurrEmpty <= '1';
     else
@@ -304,9 +305,9 @@ CurrEmptyUpdate_proc : process (clk)
         elsif (TailEn = '1') and (CurrEn = '0') then
                 CurrEmpty <= '0';
        -- otherwise, nothing is happening or simultaneous read and write
-                      
+
         end if;
-       
+
     end if;
   end if;
 end process;

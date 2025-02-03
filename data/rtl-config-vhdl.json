@@ -858,8 +858,7 @@
     "dependencies": ["old_dep"]
   },
   {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
-    "dependencies": ["old_dep"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",

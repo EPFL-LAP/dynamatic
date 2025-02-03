@@ -28,17 +28,6 @@ entity spec_save_commit_wrapper_with_tag is
 end entity;
 
 architecture arch of spec_save_commit_wrapper_with_tag is
-  signal dataInArray   :  data_array(0 downto 0)(DATA_TYPE - 1 downto 0);
-  signal specInArray   :  data_array(0 downto 0)(0 downto 0);
-  signal controlInArray  :  data_array(0 downto 0)(2 downto 0);
-  signal pValidArray : std_logic_vector(1 downto 0);
-  signal readyArray  : std_logic_vector(1 downto 0);
-
-  signal dataOutArray : data_array(0 downto 0)(DATA_TYPE - 1 downto 0);
-  signal specOutArray  : data_array(0 downto 0)(0 downto 0);
-  signal validArray   : std_logic_vector(0 downto 0);
-  signal nReadyArray  : std_logic_vector(0 downto 0);
-
   signal ctrl_inner : std_logic_vector(2 downto 0);
   signal ctrl_valid_inner : std_logic;
   signal ctrl_spec_tag_inner : std_logic;
@@ -61,33 +50,25 @@ begin
       outs_spec_tag => ctrl_spec_tag_inner,
       outs_ready => ctrl_ready_inner
     );
-  dataInArray(0) <= ins;
-  specInArray(0)(0) <= ins_spec_tag;
-  controlInArray(0) <= ctrl_inner;
-  pValidArray <= ctrl_valid_inner & ins_valid;
-  ctrl_ready_inner <= readyArray(1);
-  ins_ready <= readyArray(0);
-  outs <= dataOutArray(0);
-  outs_spec_tag <= specOutArray(0)(0);
-  outs_valid <= validArray(0);
-  nReadyArray(0) <= outs_ready;
   spec_save_commit : entity work.spec_save_commit(arch)
     generic map(
-      DATA_SIZE_IN => DATA_TYPE,
-      DATA_SIZE_OUT => DATA_TYPE,
+      DATA_TYPE => DATA_TYPE,
       FIFO_DEPTH => FIFO_DEPTH
     )
     port map(
       clk => clk,
       rst => rst,
-      dataInArray => dataInArray,
-      specInArray => specInArray,
-      controlInArray => controlInArray,
-      pValidArray => pValidArray,
-      readyArray => readyArray,
-      dataOutArray => dataOutArray,
-      specOutArray => specOutArray,
-      validArray => validArray,
-      nReadyArray => nReadyArray
+      ins => ins,
+      ins_valid => ins_valid,
+      ins_spec_tag => ins_spec_tag,
+      ctrl => ctrl_inner,
+      ctrl_valid => ctrl_valid_inner,
+      ctrl_spec_tag => ctrl_spec_tag_inner,
+      outs_ready => outs_ready,
+      outs => outs,
+      outs_valid => outs_valid,
+      outs_spec_tag => outs_spec_tag,
+      ins_ready => ins_ready,
+      ctrl_ready => ctrl_ready_inner
     );
 end architecture;
