@@ -78,5 +78,12 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 echo_info "Created synthesis scripts"
 echo_info "Launching Vivado synthesis"
 cd "$SYNTH_DIR"
-LD_PRELOAD=/lib/x86_64-linux-gnu/libudev.so.1 vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+
+# If we are inside a docker container (set by ENV container=docker)
+if [ "$container" = "docker" ]; then
+  LD_PRELOAD=/lib/x86_64-linux-gnu/libudev.so.1 vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+else
+  vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+fi
+
 exit_on_fail "Logic synthesis failed" "Logic synthesis succeeded"
