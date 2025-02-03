@@ -646,7 +646,23 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
             resProps.minTrans = tehbs;
           } else {
             sostInterfaceOp->emitWarning()
-                << "Cannot place transparent buffer on merge-like operation's "
+                << "Cannot place transparent buffer on fork operation's "
+                   "output due to channel-specific buffering constraints. This "
+                   "may "
+                   "yield an invalid buffering.";
+          }
+        }
+      }
+
+      for (auto sostInterfaceOp :
+           funcOp.getOps<handshake::ConditionalBranchOp>()) {
+        for (auto res : sostInterfaceOp->getResults()) {
+          ChannelBufProps &resProps = channelProps[res];
+          if (resProps.maxTrans.value_or(1) >= 1) {
+            resProps.minTrans = tehbs;
+          } else {
+            sostInterfaceOp->emitWarning()
+                << "Cannot place transparent buffer on condBr operation's "
                    "output due to channel-specific buffering constraints. This "
                    "may "
                    "yield an invalid buffering.";
