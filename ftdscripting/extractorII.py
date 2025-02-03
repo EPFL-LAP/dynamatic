@@ -1,5 +1,6 @@
 import argparse
 import csv
+import os
 import re
 import statistics
 import subprocess
@@ -11,6 +12,7 @@ PATH_TO_OUT = ""
 PATH_TO_COMP = ""
 PATH_TO_SIM = ""
 PATH_TO_WLF = ""
+PATH_TO_CSV = ""
 PATH_TO_WLF2CSV = ""
 SRC_COMP = "src_component"
 
@@ -36,6 +38,7 @@ def set_paths(kernel_name: str):
     global PATH_TO_COMP
     global PATH_TO_SIM
     global PATH_TO_WLF
+    global PATH_TO_CSV
     global PATH_TO_WLF2CSV
 
     KERNEL_NAME = kernel_name
@@ -44,6 +47,7 @@ def set_paths(kernel_name: str):
     PATH_TO_COMP = f"{PATH_TO_OUT}/comp"
     PATH_TO_SIM = f"{PATH_TO_OUT}/sim"
     PATH_TO_WLF = f"{PATH_TO_SIM}/HLS_VERIFY/vsim.wlf"
+    PATH_TO_CSV = f"{PATH_TO_SIM}/HLS_VERIFY/vsim.csv"
     PATH_TO_WLF2CSV = "./bin/wlf2csv"
 
 
@@ -54,20 +58,30 @@ def set_paths(kernel_name: str):
 # token is received.
 def get_sim_transactions(component_name):
 
-    # Run `wlf2csv` to obtain the execution trace
-    wlf2csv_result = subprocess.run(
-        [
-            PATH_TO_WLF2CSV,
-            f"{PATH_TO_COMP}/handshake_export.mlir",
-            PATH_TO_WLF,
-            KERNEL_NAME,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    if os.path.exists(PATH_TO_CSV):
+        with open(PATH_TO_CSV, "r", encoding="utf-8") as file:
+            csv_result = file.read()
+    else:
 
-    # Get a CSV out of the execution trace
-    csv_result = wlf2csv_result.stdout
+        # Run `wlf2csv` to obtain the execution trace
+        wlf2csv_result = subprocess.run(
+            [
+                PATH_TO_WLF2CSV,
+                f"{PATH_TO_COMP}/handshake_export.mlir",
+                PATH_TO_WLF,
+                KERNEL_NAME,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        # Get a CSV out of the execution trace
+        csv_result = wlf2csv_result.stdout
+
+        # Write the result
+        with open(f"{PATH_TO_CSV}", "w", encoding="utf-8") as file:
+            file.writelines(csv_result)
+
     f = StringIO(csv_result)
     reader = csv.DictReader(f, delimiter=",", skipinitialspace=True)
 
@@ -103,13 +117,13 @@ def analyze_delay_muxes(component_name, output_port, transactions):
     # Some constants
     LAST_TYPE = "last_type"
     LAST_CC = "last_time"
-    TRANSACTION_COUNT = "number_of_transactions"
     DELAY = "delay"
     TRANSFER = "transfer"
     ACCEPT = "accept"
     SRC_PORT = "src_port"
     CC = "cycle"
     STATE = "state"
+    TRANSACTION = "transaction"
 
     # Get the total simulation time
     simulation_time = get_sim_time(f"{PATH_TO_SIM}/report.txt")
@@ -120,7 +134,12 @@ def analyze_delay_muxes(component_name, output_port, transactions):
     #   - `last_time`: time of the last transaction received
     #   - `number_of_transactions`: how many transactions received per port
     #   - `delay`: list of all the delays of tokens at each input port, kept in order
-    data_extracted = {LAST_TYPE: ACCEPT, LAST_CC: -1, TRANSACTION_COUNT: 0, DELAY: []}
+    data_extracted = {
+        LAST_TYPE: ACCEPT,
+        LAST_CC: -1,
+        DELAY: [],
+        TRANSACTION: [],
+    }
     transactions_component = {}
     last_transaction = 0
 
@@ -155,8 +174,6 @@ def analyze_delay_muxes(component_name, output_port, transactions):
                 if data_extracted[LAST_CC] != -1:
                     # Add a delay between transactions
                     data_extracted[DELAY].append(delay)
-                # Increment the number of transactions by 1
-                data_extracted[TRANSACTION_COUNT] += 1
                 updated = True
                 # Update the last cc
                 data_extracted[LAST_CC] = int(cc)
@@ -169,21 +186,21 @@ def analyze_delay_muxes(component_name, output_port, transactions):
             data_extracted[DELAY].append(delay)
             data_extracted[LAST_TYPE] = TRANSFER
             data_extracted[LAST_CC] = int(cc)
-            data_extracted[TRANSACTION_COUNT] += 1
             updated = True
 
         if updated:
-            print(cc)
+            data_extracted[TRANSACTION].append(cc)
+            print(f"Transaction @ {cc}")
 
     print(f"Component {component_name}; output port {output_port}:")
     print(f"\tSimulation time: {simulation_time}")
-    print(f"\tNumber of transactions on port: {data_extracted[TRANSACTION_COUNT]};")
-    print(
-        f"\tAvg. delay between transactions: {statistics.mean(data_extracted[DELAY])}"
-    )
-    print(
-        f"\tAvg. time for transaction: {simulation_time / data_extracted[TRANSACTION_COUNT]}"
-    )
+    print(f"\tNumber of transactions on port: {len(data_extracted[TRANSACTION])};")
+    if len(data_extracted[TRANSACTION]) > 1:
+        print(f"\tFirst transaction @ {data_extracted[TRANSACTION][0]}")
+        print(f"\tLast  transaction @ {data_extracted[TRANSACTION][-1]}")
+        print(
+            f"\tII approx = {(data_extracted[TRANSACTION][-1] - data_extracted[TRANSACTION][0] + 1) / len(data_extracted[TRANSACTION])}"
+        )
 
 
 def main():

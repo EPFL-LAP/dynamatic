@@ -20,6 +20,11 @@ def get_bb(operation):
     return int(match.group(1)) if match else 0
 
 
+def get_ssa_name(operation):
+    match = re.search(r"^    %(\d+)", operation)
+    return "%" + match.group(1) if match else ""
+
+
 def get_type(operation):
     bracket_match = re.search(r"<([^>]*)>$", operation)
     return bracket_match.group(1) if bracket_match else None
@@ -43,14 +48,14 @@ TIMING = #handshake<timing {{D: 1, V: 1, R: 0}}>}}}} \
     )
 
 
-def look_for_ssa(lines, ssa_name, end_ssa_counter):
-    found_ssa_name = False
+def look_for_ssa(lines, ssa_name):
+    found_ssa_name = 0
     for line in lines:
         if ssa_name in line:
-            found_ssa_name = True
-        if ssa_name in line and "buffer" in line and "D: 1" in line:
-            end_ssa_counter -= 1
-    return found_ssa_name, end_ssa_counter
+            found_ssa_name = 1
+        if f'handshake.name = "{ssa_name}' in line:
+            found_ssa_name = 2
+    return found_ssa_name
 
 
 def get_max_ssa(lines):
@@ -73,11 +78,16 @@ def process_file(file_name, ssa_name, buffer_size):
     end_ssa_counter = start_ssa_counter + buffer_size
     new_lines = []
 
-    found_ssa_name, end_ssa_counter = look_for_ssa(lines, ssa_name, end_ssa_counter)
+    found_ssa_name = look_for_ssa(lines, ssa_name)
 
-    if not found_ssa_name:
+    if found_ssa_name == 0:
         print(f"SSA name {ssa_name} cannot be found")
         exit(1)
+
+    if found_ssa_name == 2:
+        for line in lines:
+            if f'handshake.name = "{ssa_name}' in line:
+                ssa_name = get_ssa_name(line)
 
     for line in lines:
         new_lines.append(line)
