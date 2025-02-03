@@ -39,7 +39,7 @@ begin
   end process;
   spec_tag <= outs_inner(0);
   outs_spec_tag <= spec_tag;
-  index_spec_tag <= spec_tag;
+  index_spec_tag <= 0;
   -- This is actually control_merge with 1-bit data
   control_merge_inner : entity work.control_merge(arch)
     generic map (

@@ -115,7 +115,7 @@ begin
 
   outs <= outs_inner(DATA_TYPE - 1 downto 0);
   outs_spec_tag <= outs_inner(DATA_TYPE);
-  process (ins, ins_valid, ins_spec_tag, outs_ready, index, index_valid, index_spec_tag, tehb_ins_ready)
+  process (ins, ins_valid, ins_spec_tag, outs_ready, index, index_valid, tehb_ins_ready)
     variable selectedData                   : std_logic_vector(DATA_TYPE - 1 downto 0);
     variable selectedData_spec_tag          : std_logic;
     variable selectedData_valid, indexEqual : std_logic;
@@ -138,7 +138,7 @@ begin
     end loop;
 
     index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins       <= (selectedData_spec_tag or index_spec_tag) & selectedData;
+    tehb_ins       <= selectedData_spec_tag & selectedData;
     tehb_ins_valid <= selectedData_valid;
   end process;
 
