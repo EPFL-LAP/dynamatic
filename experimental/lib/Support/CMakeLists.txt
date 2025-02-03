@@ -18,11 +18,3 @@ add_dynamatic_library(DynamaticExperimentalSupport
 )
 
 add_subdirectory(BooleanLogic)
-
-if (GUROBI_FOUND)
-  target_link_libraries(DynamaticBufferPlacement
-    PUBLIC
-    ${GUROBI_CXX_LIBRARY}
-    ${GUROBI_LIBRARY}
-  )
-endif()

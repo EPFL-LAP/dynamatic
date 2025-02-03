@@ -14,8 +14,10 @@
 #ifndef EXPERIMENTAL_SUPPORT_BLIF_READER_H
 #define EXPERIMENTAL_SUPPORT_BLIF_READER_H
 
-#include "dynamatic/Support/LLVM.h"
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
+
+#include "dynamatic/Support/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <set>
@@ -232,4 +234,5 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
