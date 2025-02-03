@@ -7,8 +7,6 @@ entity ndwire is
   );
   port (
     clk, rst : in std_logic;
-    -- random stall
-    stall    : in std_logic;
     -- input channel
     ins       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic;
@@ -20,11 +18,18 @@ entity ndwire is
   );
 end entity;
 
-architecture arch of br is
+architecture arch of ndwire is
 begin
+  control : entity work.ndwire_dataless
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => ins_valid,
+      ins_ready  => ins_ready,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
 
-  outs_valid <= ins_valid and not stall;
-  ins_ready  <= outs_ready and not stall;
   outs <= ins;
 
 end architecture;

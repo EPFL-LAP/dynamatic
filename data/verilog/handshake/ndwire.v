@@ -4,8 +4,6 @@ module ndwire #(
 ) (
   input  clk,
   input  rst,
-  // Random stall
-  input stall,
   // Input channel
   input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
@@ -16,8 +14,17 @@ module ndwire #(
   input  outs_ready
 );
 
-  assign ins_ready = outs_ready && !stall;
-  assign outs_valid = ins_valid && !stall;
+  ndwire_dataless #(
+    .SIZE(DATA_TYPE)
+  ) control (
+    .clk        (clk        ),
+    .rst        (rst        ),
+    .ins_valid  (ins_valid  ),
+    .ins_ready  (ins_ready  ),
+    .outs_valid (outs_valid ),
+    .outs_ready (outs_ready )
+  );
+  
   assign outs = ins;
 
 endmodule
