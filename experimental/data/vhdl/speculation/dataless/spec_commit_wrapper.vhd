@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
-entity spec_commit_wrapper_dataless_with_tag is
+entity spec_commit_dataless_with_tag is
   port (
     clk, rst : in std_logic;
     -- inputs
@@ -26,7 +26,7 @@ architecture arch of spec_commit_wrapper_dataless_with_tag is
   signal outs_inner : std_logic_vector(0 downto 0);
 begin
   ins_inner(0) <= '0';
-  spec_commit_wrapper : entity work.spec_commit_wrapper_with_tag
+  spec_commit : entity work.spec_commit_with_tag
     generic map(
       DATA_TYPE => 1
     )
