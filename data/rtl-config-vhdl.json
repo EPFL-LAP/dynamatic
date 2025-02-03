@@ -394,9 +394,27 @@
   {
     "name": "handshake.ndwire",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0, 
+        "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/ndwire.vhd",
+    "module-name": "ndwire_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.ndwire",
+    "parameters": [
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1, 
+        "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/ndwire.vhd",
+    "dependencies": ["ndwire_dataless"],
     "hdl": "verilog"
   },
   {
