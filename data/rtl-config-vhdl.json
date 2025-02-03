@@ -780,8 +780,8 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 },
       { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
-    "dependencies": ["types", "speculating_branch", "tfifo"]
+    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
+    "dependencies": ["types", "cond_br"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
@@ -855,10 +855,6 @@
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
-    "dependencies": ["old_dep"]
   },
   {
     "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
