@@ -65,13 +65,13 @@ private:
 
 struct NodePtrHash {
   std::size_t operator()(const Node *node) const {
-    return std::hash<std::string>()(node->getName()); // Hash the name
+    return std::hash<std::string>()(node->name); // Hash the name
   }
 };
 
 struct NodePtrEqual {
   bool operator()(const Node *lhs, const Node *rhs) const {
-    return lhs->getName() == rhs->getName();
+    return lhs->name == rhs->name;
   }
 };
 

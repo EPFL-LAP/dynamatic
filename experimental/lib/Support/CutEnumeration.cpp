@@ -54,8 +54,8 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
         }
 
         // Compare names
-        if (nodeA->getName() != nodeB->getName()) {
-          return nodeA->getName() < nodeB->getName();
+        if (nodeA->name != nodeB->name) {
+          return nodeA->name < nodeB->name;
         }
 
         ++itA;
@@ -93,7 +93,7 @@ void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                     }
 
                                     // Compare names
-                                    if (nodeA->getName() != nodeB->getName()) {
+                                    if (nodeA->name != nodeB->name) {
                                       return false;
                                     }
 
@@ -197,7 +197,7 @@ NodeToCuts CutManager::cutless(bool includeChannels) {
                                  leavesA.begin(), leavesA.end(),
                                  leavesB.begin(), leavesB.end(),
                                  [](const Node *nodeA, const Node *nodeB) {
-                                   return nodeA->getName() == nodeB->getName();
+                                   return nodeA->name == nodeB->name;
                                  });
                            }),
                cuts.end());

@@ -15,50 +15,16 @@
 #define EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
 
 #include "BlifReader.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Conversion/HandshakeToHW.h"
-#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
-#include "dynamatic/Dialect/HW/HWOps.h"
-#include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Dialect/HW/PortImplementation.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
-#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Block.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Region.h"
-#include "mlir/IR/Value.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <boost/functional/hash/extensions.hpp>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -79,6 +45,7 @@ public:
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
   static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
   static inline std::string baseBlifPath;
+  LogicNetwork *blifData;
 
 protected:
   bool isBlackbox = false;
@@ -96,7 +63,6 @@ protected:
   std::string fullPath;
   std::string moduleType;
   std::string uniqueName;
-  LogicNetwork *blifData;
 
   void assignSignals(ChannelSignals &signals, Node *node,
                      const std::string &nodeName);
@@ -116,13 +82,6 @@ public:
   static void changeInput(BaseSubjectGraph *graph, BaseSubjectGraph *newInput,
                           BaseSubjectGraph *oldInput);
   void appendVarsToPath(std::initializer_list<unsigned int> inputs);
-  void connectSignals(Node *currentSignal, Node *beforeSignal);
-  LogicNetwork *getBlifData() const;
-  static BaseSubjectGraph *getSubjectGraph(Operation *op);
-  std::string &getUniqueNameGraph();
-  std::string &getModuleType();
-  std::vector<BaseSubjectGraph *> getInputSubjectGraphs();
-  std::vector<BaseSubjectGraph *> getOutputSubjectGraphs();
   static void setBaseBlifPath(llvm::StringRef path) {
     baseBlifPath = path.str();
   }
@@ -357,14 +316,6 @@ public:
 
     return BufferPair(oehb, tehb);
   }
-};
-
-class OperationDifferentiator {
-  Operation *op;
-
-public:
-  static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
-  OperationDifferentiator(Operation *ops);
 };
 
 class SubjectGraphGenerator {

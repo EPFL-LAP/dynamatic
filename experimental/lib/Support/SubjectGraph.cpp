@@ -1,4 +1,4 @@
-//===- SubjectGraph.cpp - Exp. support for MAPBUF buffer placement -------*- C++
+//===- SubjectGraph.cpp - Exp. support for MAPBUF buffer placement --*- C++
 //-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
@@ -11,11 +11,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Utils/Utils.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/Visitors.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include "experimental/Support/SubjectGraph.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
+#include <utility>
+
 using namespace dynamatic::experimental;
 
 BaseSubjectGraph::BaseSubjectGraph() = default;
@@ -63,26 +80,27 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *before, Operation *after) {
 void BaseSubjectGraph::connectInputNodesHelper(
     ChannelSignals &currentSignals,
     BaseSubjectGraph *moduleBeforeSubjectGraph) {
+
   ChannelSignals &moduleBeforeOutputNodes =
       moduleBeforeSubjectGraph->returnOutputNodes(
           inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
 
-  connectSignals(moduleBeforeOutputNodes.readySignal,
-                 currentSignals.readySignal);
-  connectSignals(currentSignals.validSignal,
-                 moduleBeforeOutputNodes.validSignal);
+  // Connect ready and valid singals. Only 1 bit each.
+  Node::connectNodes(moduleBeforeOutputNodes.readySignal,
+                     currentSignals.readySignal);
+  Node::connectNodes(currentSignals.validSignal,
+                     moduleBeforeOutputNodes.validSignal);
 
   if (isBlackbox) {
-    // If the module is a blackbox, we don't need to connect the data signals,
-    // as it will result in cut generation for blackbox modules
+    // If the module is a blackbox, we don't connect the data signals.
     for (auto *node : currentSignals.dataSignals) {
-      node->setInput(false);
-      node->setOutput(false);
+      node->setIOChannel();
     }
   } else {
+    // Connect data signals. Multiple bits.
     for (unsigned int j = 0; j < currentSignals.dataSignals.size(); j++) {
-      connectSignals(currentSignals.dataSignals[j],
-                     moduleBeforeOutputNodes.dataSignals[j]);
+      Node::connectNodes(currentSignals.dataSignals[j],
+                         moduleBeforeOutputNodes.dataSignals[j]);
     }
   }
 }
@@ -166,49 +184,6 @@ void BaseSubjectGraph::appendVarsToPath(
   fullPath += moduleType + ".blif";
 }
 
-void BaseSubjectGraph::connectSignals(Node *currentSignal, Node *beforeSignal) {
-  beforeSignal->addFanout(currentSignal->getFanouts());
-  currentSignal->setInput(false);
-  beforeSignal->setOutput(false);
-  beforeSignal->setInput(false);
-  currentSignal->setOutput(false);
-  beforeSignal->setChannelEdge(true);
-  currentSignal->setChannelEdge(true);
-
-  if (beforeSignal->isBlackboxOutputNode()) {
-    beforeSignal->setInput(true);
-  }
-
-  for (auto &fanout : currentSignal->getFanouts()) {
-    fanout->getFanins().erase(currentSignal);
-    fanout->getFanins().insert(beforeSignal);
-  }
-
-  if (beforeSignal->getName().find("ready") != std::string::npos) {
-    beforeSignal->setName(currentSignal->getName());
-  }
-
-  currentSignal = beforeSignal;
-}
-
-LogicNetwork *BaseSubjectGraph::getBlifData() const { return blifData; }
-
-BaseSubjectGraph *BaseSubjectGraph::getSubjectGraph(Operation *op) {
-  return moduleMap[op];
-}
-
-std::string &BaseSubjectGraph::getUniqueNameGraph() { return uniqueName; }
-
-std::string &BaseSubjectGraph::getModuleType() { return moduleType; }
-
-std::vector<BaseSubjectGraph *> BaseSubjectGraph::getInputSubjectGraphs() {
-  return inputSubjectGraphs;
-}
-
-std::vector<BaseSubjectGraph *> BaseSubjectGraph::getOutputSubjectGraphs() {
-  return outputSubjectGraphs;
-}
-
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   llvm::TypeSwitch<Operation *, void>(op)
@@ -219,6 +194,7 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
         dataWidth =
             handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
         appendVarsToPath({dataWidth});
+        // Ops are mapped to DSP blocks if the bitwidth is greater than 4
         if ((dataWidth > 4) && (llvm::isa<handshake::AddIOp>(op) ||
                                 llvm::isa<handshake::SubIOp>(op) ||
                                 llvm::isa<handshake::MulIOp>(op) ||
@@ -244,20 +220,20 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("result") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
       if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
                          nodeName.find("ready") == std::string::npos)) {
-        node->setBlackboxOutput(true);
+        node->isBlackboxOutput = (true);
       }
     } else if (nodeName.find("lhs") != std::string::npos) {
       assignSignals(inputNodes[0], node, nodeName);
     } else if (nodeName.find("rhs") != std::string::npos) {
       assignSignals(inputNodes[1], node, nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -280,6 +256,7 @@ CmpISubjectGraph::CmpISubjectGraph(Operation *op) : BaseSubjectGraph(op) {
         dataWidth =
             handshake::getHandshakeTypeBitWidth(cmpIOp.getOperand(0).getType());
         appendVarsToPath({dataWidth});
+        // Ops are mapped to DSP blocks if the bitwidth is greater than 4
         if (dataWidth > 4) {
           isBlackbox = true;
         }
@@ -293,20 +270,20 @@ CmpISubjectGraph::CmpISubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("result") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
       if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
                          nodeName.find("ready") == std::string::npos)) {
-        node->setBlackboxOutput(true);
+        node->isBlackboxOutput = true;
       }
     } else if (nodeName.find("lhs") != std::string::npos) {
       assignSignals(inputNodes[0], node, nodeName);
     } else if (nodeName.find("rhs") != std::string::npos) {
       assignSignals(inputNodes[1], node, nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -404,15 +381,15 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("outs") != std::string::npos) {
       auto [newName, num] = generateNewName(nodeName);
       assignSignals(outputNodes[num], node, newName);
-      node->setName(uniqueName + "_" + newName);
+      node->name = (uniqueName + "_" + newName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     } else if (nodeName.find("ins") != std::string::npos &&
-               (node->isInput() || node->isOutput())) {
+               (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     }
   }
@@ -449,9 +426,9 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       size_t bracketPos = nodeName.find('[');
       std::string number = nodeName.substr(bracketPos + 1);
       number = number.substr(0, number.find_first_not_of("0123456789"));
@@ -465,9 +442,9 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       assignSignals(indexNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -511,9 +488,9 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       if (size == 1) {
         assignSignals(inputNodes[0], node, nodeName);
         continue;
@@ -529,12 +506,12 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
       assignSignals(inputNodes[num], node, nodeName);
     } else if (nodeName.find("index") != std::string::npos) {
       assignSignals(indexNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -574,19 +551,19 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("true") != std::string::npos) {
       assignSignals(outputNodes[0], node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find("false") != std::string::npos) {
       assignSignals(outputNodes[1], node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find("condition") != std::string::npos) {
       assignSignals(conditionNodes, node, nodeName);
     } else if (nodeName.find("data") != std::string::npos) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -614,12 +591,12 @@ SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -651,17 +628,17 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("addrIn") != std::string::npos) {
       assignSignals(addrInSignals, node, nodeName);
     } else if (nodeName.find("addrOut") != std::string::npos) {
       assignSignals(addrOutSignals, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find("dataOut") != std::string::npos) {
       assignSignals(dataOutSignals, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -694,16 +671,16 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("dataIn") != std::string::npos) {
       assignSignals(dataInSignals, node, nodeName);
     } else if (nodeName.find("addrIn") != std::string::npos) {
       assignSignals(addrInSignals, node, nodeName);
     } else if (nodeName.find("addrOut") != std::string::npos) {
       assignSignals(addrOutSignals, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -742,14 +719,14 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("outs") != std::string::npos) {
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
       assignSignals(outputNodes, node, nodeName);
     } else if (nodeName.find("ctrl") != std::string::npos) {
       assignSignals(controlSignals, node, nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -783,15 +760,15 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -822,21 +799,21 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("trueValue") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes[1], node, nodeName);
     } else if (nodeName.find("falseValue") != std::string::npos &&
-               (node->isInput() || node->isOutput())) {
+               (node->isInput || node->isOutput)) {
       assignSignals(inputNodes[2], node, nodeName);
     } else if (nodeName.find("condition") != std::string::npos &&
-               (node->isInput() || node->isOutput())) {
+               (node->isInput || node->isOutput)) {
       assignSignals(inputNodes[0], node, nodeName);
     } else if (nodeName.find("result") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -869,9 +846,9 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       if (size == 1) {
         assignSignals(inputNodes[0], node, nodeName);
         continue;
@@ -887,10 +864,10 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       assignSignals(inputNodes[num], node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -928,16 +905,16 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -987,16 +964,16 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -1005,7 +982,7 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
                                        std::string bufferType)
     : BaseSubjectGraph() {
   subjectGraphMap[this] = nullptr;
-  moduleType = bufferType;
+  moduleType = std::move(bufferType);
 
   BaseSubjectGraph *graph1 = moduleMap[op1];
   BaseSubjectGraph *graph2 = moduleMap[op2];
@@ -1035,16 +1012,16 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -1053,7 +1030,7 @@ BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
                                        Operation *op2, std::string bufferType)
     : BaseSubjectGraph() {
   subjectGraphMap[this] = nullptr;
-  moduleType = bufferType;
+  moduleType = std::move(bufferType);
 
   BaseSubjectGraph *graph2 = moduleMap[op2];
   inputSubjectGraphs.push_back(graph1);
@@ -1082,16 +1059,16 @@ BufferSubjectGraph::BufferSubjectGraph(BufferSubjectGraph *graph1,
   blifData = parser.parseBlifFile(fullPath);
 
   for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->getName();
+    auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput() || node->isOutput())) {
+        (node->isInput || node->isOutput)) {
       assignSignals(inputNodes, node, nodeName);
     } else if (nodeName.find("outs") != std::string::npos) {
       assignSignals(outputNodes, node, nodeName);
-      node->setName(uniqueName + "_" + nodeName);
+      node->name = (uniqueName + "_" + nodeName);
     } else if (nodeName.find(".") != std::string::npos ||
                nodeName.find("dataReg") != std::string::npos) {
-      node->setName(uniqueName + "." + nodeName);
+      node->name = (uniqueName + "." + nodeName);
     }
   }
 }
@@ -1104,79 +1081,80 @@ ChannelSignals &BufferSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
-// OperationDifferentiator implementation
-OperationDifferentiator::OperationDifferentiator(Operation *ops) : op(ops) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::InstanceOp>([&](handshake::InstanceOp instOp) {
-        // op->emitRemark("Instance Op");
-      })
-      .Case<handshake::ForkOp, handshake::LazyForkOp>(
-          [&](auto) { moduleMap[op] = new ForkSubjectGraph(op); })
-      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-        moduleMap[op] = new MuxSubjectGraph(op);
-      })
-      .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
-        moduleMap[op] = new ControlMergeSubjectGraph(op);
-      })
-      .Case<handshake::MergeOp>(
-          [&](auto) { moduleMap[op] = new MergeSubjectGraph(op); })
-      .Case<handshake::JoinOp>([&](auto) { op->emitRemark("Join Op"); })
-      .Case<handshake::BranchOp, handshake::SinkOp>(
-          [&](auto) { moduleMap[op] = new BranchSinkSubjectGraph(op); })
-      .Case<handshake::BufferOp, handshake::SinkOp>(
-          [&](auto) { moduleMap[op] = new BufferSubjectGraph(op); })
-      .Case<handshake::ConditionalBranchOp>(
-          [&](handshake::ConditionalBranchOp cbrOp) {
-            moduleMap[op] = new ConditionalBranchSubjectGraph(op);
-          })
-      .Case<handshake::SourceOp>(
-          [&](auto) { moduleMap[op] = new SourceSubjectGraph(op); })
-      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        moduleMap[op] = new LoadSubjectGraph(op);
-      })
-      .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
-        moduleMap[op] = new StoreSubjectGraph(op);
-      })
-      .Case<handshake::SharingWrapperOp>(
-          [&](handshake::SharingWrapperOp sharingWrapperOp) {
-            assert(false && "operation unsupported");
-          })
-      .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
-        moduleMap[op] = new ConstantSubjectGraph(op);
-      })
-      .Case<handshake::AddFOp, handshake::DivFOp, handshake::MaximumFOp,
-            handshake::MinimumFOp, handshake::MulFOp, handshake::NegFOp,
-            handshake::NotOp, handshake::SubFOp, handshake::SIToFPOp,
-            handshake::FPToSIOp, handshake::AbsFOp, handshake::CmpFOp>(
-          [&](auto) {
-            op->emitError() << "Float not supported";
-            return;
-          })
-      .Case<handshake::AddIOp, handshake::AndIOp, handshake::OrIOp,
-            handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
-            handshake::SubIOp, handshake::XOrIOp, handshake::MulIOp,
-            handshake::DivSIOp, handshake::DivUIOp>(
-          [&](auto) { moduleMap[op] = new ArithSubjectGraph(op); })
-      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
-        moduleMap[op] = new SelectSubjectGraph(op);
-      })
-      .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
-        moduleMap[op] = new CmpISubjectGraph(op);
-      })
-      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
-            handshake::TruncIOp, handshake::TruncFOp>(
-          [&](auto) { moduleMap[op] = new ExtTruncSubjectGraph(op); })
-      .Default([&](auto) { return; });
-}
-
 // SubjectGraphGenerator implementation
 SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
                                              StringRef blifFiles) {
   BaseSubjectGraph::setBaseBlifPath(blifFiles);
-  funcOp.walk(
-      [&](Operation *op) { (experimental::OperationDifferentiator(op)); });
+  std::vector<BaseSubjectGraph *> subjectGraphs;
 
-  for (auto &module : experimental::OperationDifferentiator::moduleMap) {
-    module.second->replaceOpsBySubjectGraph();
+  funcOp.walk([&](Operation *op) {
+    llvm::TypeSwitch<Operation *, void>(op)
+        .Case<handshake::InstanceOp>([&](handshake::InstanceOp instOp) {
+          // op->emitRemark("Instance Op");
+        })
+        .Case<handshake::ForkOp, handshake::LazyForkOp>(
+            [&](auto) { subjectGraphs.push_back(new ForkSubjectGraph(op)); })
+        .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
+          subjectGraphs.push_back(new MuxSubjectGraph(op));
+        })
+        .Case<handshake::ControlMergeOp>(
+            [&](handshake::ControlMergeOp cmergeOp) {
+              subjectGraphs.push_back(new ControlMergeSubjectGraph(op));
+            })
+        .Case<handshake::MergeOp>(
+            [&](auto) { subjectGraphs.push_back(new MergeSubjectGraph(op)); })
+        .Case<handshake::JoinOp>([&](auto) { op->emitRemark("Join Op"); })
+        .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
+          subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
+        })
+        .Case<handshake::BufferOp, handshake::SinkOp>(
+            [&](auto) { subjectGraphs.push_back(new BufferSubjectGraph(op)); })
+        .Case<handshake::ConditionalBranchOp>(
+            [&](handshake::ConditionalBranchOp cbrOp) {
+              subjectGraphs.push_back(new ConditionalBranchSubjectGraph(op));
+            })
+        .Case<handshake::SourceOp>(
+            [&](auto) { subjectGraphs.push_back(new SourceSubjectGraph(op)); })
+        .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+          subjectGraphs.push_back(new LoadSubjectGraph(op));
+        })
+        .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
+          subjectGraphs.push_back(new StoreSubjectGraph(op));
+        })
+        .Case<handshake::SharingWrapperOp>(
+            [&](handshake::SharingWrapperOp sharingWrapperOp) {
+              assert(false && "operation unsupported");
+            })
+        .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
+          subjectGraphs.push_back(new ConstantSubjectGraph(op));
+        })
+        .Case<handshake::AddFOp, handshake::DivFOp, handshake::MaximumFOp,
+              handshake::MinimumFOp, handshake::MulFOp, handshake::NegFOp,
+              handshake::NotOp, handshake::SubFOp, handshake::SIToFPOp,
+              handshake::FPToSIOp, handshake::AbsFOp, handshake::CmpFOp>(
+            [&](auto) {
+              op->emitError() << "Float not supported";
+              return;
+            })
+        .Case<handshake::AddIOp, handshake::AndIOp, handshake::OrIOp,
+              handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
+              handshake::SubIOp, handshake::XOrIOp, handshake::MulIOp,
+              handshake::DivSIOp, handshake::DivUIOp>(
+            [&](auto) { subjectGraphs.push_back(new ArithSubjectGraph(op)); })
+        .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
+          subjectGraphs.push_back(new SelectSubjectGraph(op));
+        })
+        .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpIOp) {
+          subjectGraphs.push_back(new CmpISubjectGraph(op));
+        })
+        .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
+              handshake::TruncIOp, handshake::TruncFOp>([&](auto) {
+          subjectGraphs.push_back(new ExtTruncSubjectGraph(op));
+        })
+        .Default([&](auto) { return; });
+  });
+
+  for (auto *module : subjectGraphs) {
+    module->replaceOpsBySubjectGraph();
   }
 }

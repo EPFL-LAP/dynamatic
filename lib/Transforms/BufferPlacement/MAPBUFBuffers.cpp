@@ -501,7 +501,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
     GRBVar &nodeVarOut = vars->tOut;
     std::optional<GRBVar> &nodeBufVar = vars->bufferVar;
 
-    if (node->isChannelEdgeNode()) {
+    if (node->isChannelEdge) {
       // If a Subject Graph Edge is also a DFG edge, then Gurobi variables for
       // it was already created in addChannelVars(). Here, we retrieve those
       // Gurobi variables by doing a search on the Gurobi variables. If found,
@@ -562,21 +562,23 @@ void MAPBUFBuffers::connectSubjectGraphs() {
 
   experimental::LogicNetwork *mergedBlif = new experimental::LogicNetwork();
 
-  mergedBlif->setModuleName("merged");
+  mergedBlif->moduleName = "merged";
 
   for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    experimental::LogicNetwork *blifModule = module.first->getBlifData();
-    for (auto &latch : blifModule->getLatches()) {
-      mergedBlif->addLatch(latch.first, latch.second);
-    }
+    experimental::LogicNetwork *blifModule = module.first->blifData;
+
     for (auto &node : blifModule->getNodesInOrder()) {
       mergedBlif->addNode(node);
+    }
+
+    for (auto &latch : blifModule->getLatches()) {
+      mergedBlif->addLatch(latch.first->name, latch.second->name);
     }
   }
 
   // Sort the nodes of the newly created Merged LogicNetwork in topological
   // order
-  mergedBlif->traverseNodes();
+  mergedBlif->generateTopologicalOrder();
   blifData = mergedBlif;
 }
 
@@ -585,7 +587,7 @@ void MAPBUFBuffers::addDelayPropagationConstraints(
   // Using cuts map to loop over subject graph edges, and adds delay
   // propagation constraints to the nodes that have cuts
   GRBVar &nodeVar = root->gurobiVars->tIn;
-  std::set<experimental::Node *> fanIns = root->getFanins();
+  std::set<experimental::Node *> fanIns = root->fanins;
 
   if (fanIns.size() == 1) {
     // If a node has single fanin, then it is not mapped to LUT. The
