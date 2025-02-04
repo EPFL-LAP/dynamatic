@@ -1,10 +1,10 @@
 [
   {
     "name": "handshake.fork",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE|datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.buffer",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p slots=NUM_SLOTS|datatype=\"DATA_TYPE\"|timing=\"TIMING\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p slots=NUM_SLOTS datatype=\"DATA_TYPE\" timing=\"TIMING\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
 ]

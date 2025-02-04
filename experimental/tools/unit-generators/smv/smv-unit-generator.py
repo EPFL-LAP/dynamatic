@@ -2,29 +2,30 @@ import argparse
 import sys
 import ast
 
-import generators.handshake as handshake
+import generators.handshake.fork as fork
+import generators.handshake.buffer as buffer
 
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "fork":
-      return handshake.generate_fork(name, parameters)
+      return fork.generate_fork(name, parameters)
     case "buffer":
-      return handshake.generate_buffer(name, parameters)
+      return buffer.generate_buffer(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
 
-def parse_parameters(param_string):
+def parse_parameters(param_list):
   try:
     param_dict = {}
-    for pair in param_string.split("|"):
+    for pair in param_list:
       key, value = pair.split("=")
       if value != "":
         param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
-    raise ValueError("Invalid parameter format. Use key=value,key=value,...")
+    raise ValueError("Invalid parameter format. Use key=value key=value,...")
 
 
 def main():
@@ -39,7 +40,8 @@ def main():
       "-p",
       "--parameters",
       required=True,
-      help="Set of parameters in key=value|key=value format",
+      nargs="+",
+      help="Set of parameters in key=value key=value format",
   )
 
   args = parser.parse_args()
