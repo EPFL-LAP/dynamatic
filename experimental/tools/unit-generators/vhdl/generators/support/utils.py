@@ -4,7 +4,7 @@ import re
 class VhdlScalarType:
 
   mlir_type: str
-  # Note: VHDL only require information on bitwidth and extra signals
+  # Note: VHDL only requires information on bitwidth and extra signals
   bitwidth: int
   extra_signals: dict[str, int] # key: name, value: bitwidth (todo)
 

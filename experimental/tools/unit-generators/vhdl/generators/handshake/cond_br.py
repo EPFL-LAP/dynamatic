@@ -47,7 +47,7 @@ architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
 begin
 
-join : entity work.{name}_join(arch)
+  join : entity work.{name}_join(arch)
     port map(
       -- input channels
       ins_valid(0) => data_valid,
@@ -165,6 +165,7 @@ end entity;
 architecture arch of {name} is
 begin
 
+  -- list of logics for supported extra signals
   {f"""
   trueOut_spec <= data_spec or condition_spec;
   falseOut_spec <= data_spec or condition_spec;
