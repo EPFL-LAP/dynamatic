@@ -36,9 +36,19 @@ module mem_controller_loadless #(
   output [               ADDR_TYPE - 1 : 0] storeAddr,
   output [               DATA_TYPE - 1 : 0] storeData
 );
-  // Internal Signals
+  // Terminology:
+  // Access ports    : circuit to memory_controller;
+  // Interface ports : memory_controller to memory_interface (e.g., BRAM/AXI);
+
+  // TODO: The size of this counter should be configurable
   wire [31 : 0] remainingStores;
-  wire [NUM_STORES - 1 : 0] storePorts_valid, storePorts_ready;
+  // Indicating the store interface port that there is a valid store request
+  // (currently not used).
+  wire [NUM_STORES - 1 : 0] interface_port_valid;
+  // Indicating a store port has both a valid data and a valid address.
+  wire [NUM_STORES - 1 : 0] store_access_port_complete_request;
+  // Indicating the store port is selected by the arbiter.
+  wire [NUM_STORES - 1 : 0] store_access_port_selected;
   wire allRequestsDone;
 
   // Local Parameter
@@ -48,6 +58,9 @@ module mem_controller_loadless #(
   assign loadEn   = 0;
   assign loadAddr = {ADDR_TYPE{1'b0}};
 
+  // A store request is complete if both address and data are valid.
+  assign store_access_port_complete_request = stAddr_valid & stData_valid;
+
   // Instantiate write memory arbiter
   write_memory_arbiter #(
     .ARBITER_SIZE(NUM_STORES),
@@ -56,19 +69,19 @@ module mem_controller_loadless #(
   ) write_arbiter (
     .rst           (rst),
     .clk           (clk),
-    .pValid        (stAddr_valid),
-    .ready         (storePorts_ready),
+    .pValid        (store_access_port_complete_request),
+    .ready         (store_access_port_selected),
     .address_in    (stAddr),
     .data_in       (stData),
     .nReady        ({NUM_STORES{1'b1}}),
-    .valid         (storePorts_valid),
+    .valid         (interface_port_valid),
     .write_enable  (storeEn),
     .write_address (storeAddr),
     .data_to_memory(storeData)
   );
 
-  assign stData_ready = storePorts_ready;
-  assign stAddr_ready = storePorts_ready;
+  assign stData_ready = store_access_port_selected;
+  assign stAddr_ready = store_access_port_selected;
   assign ctrl_ready   = {NUM_CONTROLS{1'b1}};
 
   integer          i;

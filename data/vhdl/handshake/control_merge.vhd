@@ -27,7 +27,7 @@ entity control_merge is
 end entity;
 
 architecture arch of control_merge is
-  signal index_internal : std_logic_vector(DATA_TYPE - 1 downto 0);
+  signal index_internal : std_logic_vector(INDEX_TYPE - 1 downto 0);
 begin
   control : entity work.control_merge_dataless
     generic map(
