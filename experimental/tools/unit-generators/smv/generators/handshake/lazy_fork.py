@@ -1,11 +1,14 @@
-from generators.support.utils import mlir_type_to_smv_type
+from generators.support.utils import SmvScalarType
 
 
 def generate_lazy_fork(name, params):
-  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-    return _generate_lazy_fork_dataless(name, params["size"])
+  size = params["size"]
+  data_type = SmvScalarType(params["data_type"])
+
+  if data_type.bitwidth == 0:
+    return _generate_lazy_fork_dataless(name, size)
   else:
-    return _generate_lazy_fork(name, params["size"], mlir_type_to_smv_type(params["data_type"]))
+    return _generate_lazy_fork(name, size, data_type)
 
 
 def _generate_lazy_fork_dataless(name, size):
@@ -35,6 +38,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
 
 if __name__ == "__main__":
-  print(generate_lazy_fork("test_lazy_fork_dataless", {"size": 4}))
+  print(generate_lazy_fork("test_lazy_fork_dataless", {
+        "size": 4, "data_type": "!handshake.control<>"}))
   print(generate_lazy_fork("test_lazy_fork", {
         "size": 2, "data_type": "!handshake.channel<i32>"}))

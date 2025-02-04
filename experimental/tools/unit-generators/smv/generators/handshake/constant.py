@@ -1,8 +1,11 @@
-from generators.support.utils import *
+from generators.support.utils import SmvScalarType
 
 
 def generate_constant(name, params):
-  return _generate_constant(name, params["value"], mlir_type_to_smv_type(params["data_type"]))
+  value = params["value"]
+  data_type = SmvScalarType(params["data_type"])
+
+  return _generate_constant(name, value, data_type)
 
 
 def _generate_constant(name, value, data_type):
@@ -10,9 +13,9 @@ def _generate_constant(name, value, data_type):
 MODULE {name}(ins_valid, outs_ready)
 
   // output
-  DEFINE ins_ready := {smv_format_constant(value, data_type)};
+  DEFINE ins_ready := outs_ready;
   DEFINE outs_valid := ins_valid;
-  DEFINE outs :=
+  DEFINE outs := {data_type.format_constant(value)};
 """
 
 

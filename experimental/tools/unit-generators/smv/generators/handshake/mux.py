@@ -1,11 +1,15 @@
 from generators.handshake.buffer import generate_buffer
+from generators.support.utils import SmvScalarType
 
 
 def generate_mux(name, params):
-  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-    return _generate_mux_dataless(name, params["size"])
+  size = params["size"]
+  data_type = SmvScalarType(params["data_type"])
+
+  if data_type.bitwidth == 0:
+    return _generate_mux_dataless(name, size)
   else:
-    return _generate_mux(name, params["size"], params["data_type"])
+    return _generate_mux(name, size, data_type)
 
 
 def _generate_mux_dataless(name, size):
@@ -23,7 +27,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index
   DEFINE index_ready := !index_valid | tehb_ins_valid & tehb_inner.ins_ready;
   DEFINE outs_valid := tehb_inner.outs_valid;
 
-{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1"})}
+{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.control<>"})}
 """
 
 
@@ -47,11 +51,12 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
   DEFINE outs_valid := tehb_inner.outs_valid;
   DEFINE outs := tehb_inner.outs;
 
-{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type})}
+{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
 """
 
 
 if __name__ == "__main__":
-  print(generate_mux("test_mux_dataless", {"size": 4}))
+  print(generate_mux("test_mux_dataless", {
+        "size": 4, "data_type": "!handshake.control<>"}))
   print(generate_mux("test_mux", {"size": 2,
         "data_type": "!handshake.channel<i32>"}))

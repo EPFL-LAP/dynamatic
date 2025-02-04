@@ -1,5 +1,11 @@
+from generators.support.utils import SmvScalarType
+
+
 def generate_store(name, params):
-  return _generate_store(name, params["data_type"], params["addr_type"])
+  data_type = SmvScalarType(params["data_type"])
+  addr_type = SmvScalarType(params["addr_type"])
+
+  return _generate_store(name, data_type, addr_type)
 
 
 def _generate_store(name, data_type, addr_type):

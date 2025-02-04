@@ -3,14 +3,17 @@ from generators.support.merge_notehb import (
 )
 from generators.handshake.buffer import generate_buffer
 from generators.handshake.fork import generate_fork
-from generators.support.utils import *
+from generators.support.utils import SmvScalarType
 
 
 def generate_control_merge(name, params):
-  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
-    return _generate_control_merge_dataless(name, params["size"])
+  size = params["size"]
+  data_type = SmvScalarType(params["data_type"])
+
+  if data_type.bitwidth == 0:
+    return _generate_control_merge_dataless(name, size)
   else:
-    return _generate_control_merge(name, params["size"], mlir_type_to_smv_type(params["data_type"]))
+    return _generate_control_merge(name, size, data_type)
 
 
 def _generate_control_merge_dataless(name, size):
@@ -34,7 +37,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.channel<i32>"})}
-{generate_fork(f"{name}__fork_datraless", {"size": 2})}
+{generate_fork(f"{name}__fork_datraless", {"size": 2, "data_type": "!handshake.control<>"})}
 """
 
 
@@ -45,7 +48,7 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
   DEFINE data := case
     {"\n    ".join([f"ins_valid_{n} : ins_{n};" for n in range(size)])}
-    TRUE: {smv_format_constant(0, data_type)};
+    TRUE: {data_type.format_constant(0)};
   esac;
 
   // output
@@ -60,6 +63,7 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
 
 
 if __name__ == "__main__":
-  print(generate_control_merge("test_control_merge_dataless", {"size": 4}))
+  print(generate_control_merge("test_control_merge_dataless",
+        {"size": 4, "data_type": "!handshake.control<>"}))
   print(generate_control_merge(
       "test_control_merge_fork", {"size": 2, "data_type": "!handshake.channel<i32>"}))

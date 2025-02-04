@@ -1,7 +1,7 @@
 [
   {
     "name": "handshake.br",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.buffer",
@@ -9,7 +9,7 @@
   },
   {
     "name": "handshake.cond_br",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.constant",
@@ -45,7 +45,7 @@
   },
   {
     "name": "handshake.sink",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.source",

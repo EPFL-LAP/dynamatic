@@ -1,5 +1,7 @@
 def generate_join(name, params):
-  return _generate_join(name, params["size"])
+  size = params["size"]
+
+  return _generate_join(name, size)
 
 
 def _generate_join(name, size):

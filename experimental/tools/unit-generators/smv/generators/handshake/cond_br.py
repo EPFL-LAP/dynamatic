@@ -1,12 +1,14 @@
 from generators.handshake.join import generate_join
-from generators.support.utils import mlir_type_to_smv_type
+from generators.support.utils import SmvScalarType
 
 
 def generate_cond_br(name, params):
-  if "data_type" not in params or params["data_type"] == "!handshake.control<>":
+  data_type = SmvScalarType(params["data_type"])
+
+  if data_type.bitwidth == 0:
     return _generate_cond_br_dataless(name)
   else:
-    return _generate_cond_br(name, mlir_type_to_smv_type(params["data_type"]))
+    return _generate_cond_br(name, data_type)
 
 
 def _generate_cond_br_dataless(name):
@@ -44,6 +46,7 @@ MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, false
 
 
 if __name__ == "__main__":
-  print(generate_cond_br("test_cond_br_dataless", {}))
+  print(generate_cond_br("test_cond_br_dataless",
+        {"data_type": "!handshake.control<>"}))
   print(generate_cond_br("test_cond_br", {
         "data_type": "!handshake.channel<i32>"}))
