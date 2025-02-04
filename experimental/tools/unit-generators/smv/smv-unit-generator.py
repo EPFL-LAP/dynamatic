@@ -76,7 +76,7 @@ def main():
       "-p",
       "--parameters",
       required=True,
-      nargs="+",
+      nargs="*",
       help="Set of parameters in key=value key=value format",
   )
 
