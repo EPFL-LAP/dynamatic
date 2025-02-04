@@ -55,10 +55,11 @@ def generate_code(name, mod_type, parameters):
 def parse_parameters(param_list):
   try:
     param_dict = {}
-    for pair in param_list:
-      key, value = pair.split("=")
-      if value != "":
-        param_dict[key.strip()] = ast.literal_eval(value.strip())
+    if param_list is not None:
+      for pair in param_list:
+        key, value = pair.split("=")
+        if value != "":
+          param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
     raise ValueError("Invalid parameter format. Use key=value key=value,...")
@@ -75,7 +76,7 @@ def main():
   parser.add_argument(
       "-p",
       "--parameters",
-      required=True,
+      required=False,
       nargs="*",
       help="Set of parameters in key=value key=value format",
   )

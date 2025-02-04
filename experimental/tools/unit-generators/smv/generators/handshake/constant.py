@@ -21,4 +21,4 @@ MODULE {name}(ins_valid, outs_ready)
 
 if __name__ == "__main__":
   print(generate_constant("test_constant", {
-        "value": 34, "data_type": "!handshake.channel<i32>"}))
+        "value": 42, "data_type": "!handshake.channel<i32>"}))
