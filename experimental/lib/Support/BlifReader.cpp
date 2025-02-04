@@ -10,14 +10,14 @@
 // structures.
 //
 //===----------------------------------------------------------------------===//
-
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+#include "experimental/Support/BlifReader.h"
+#include "gurobi_c++.h"
 #include <fstream>
 #include <queue>
 #include <set>
 #include <sstream>
 #include <vector>
-
-#include "experimental/Support/BlifReader.h"
 
 using namespace dynamatic::experimental;
 
@@ -446,3 +446,5 @@ void BlifWriter::writeToFile(LogicNetwork &network,
   file << ".end\n";
   file.close();
 }
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
