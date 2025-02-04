@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_elastic_fifo_inner(name, slots, data_type=None):
-  if data_type.bitwidth == 0:
+  if data_type is None:
     return _generate_elastic_fifo_inner_dataless(name, slots)
   else:
     return _generate_elastic_fifo_inner(name, slots, data_type)
@@ -17,19 +17,19 @@ MODULE {name}(ins_valid, outs_ready)
   VAR tail : 0..({slots - 1});
 
   DEFINE read_en := outs_ready & !empty;
-  DEFINE write_en := ins_valid and (!full or outs_ready)
+  DEFINE write_en := ins_valid and (!full or outs_ready);
 
   ASSIGN
   init(tail) := 0;
   next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots}" for n in range(slots)])}
+    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
     TRUE : tail;
   esac;
 
   ASSIGN
   init(head) := 0;
   next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots}" for n in range(slots)])}
+    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
     TRUE : head;
   esac;
 
@@ -73,25 +73,25 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR tail : 0..({slots - 1});
 
   DEFINE read_en := outs_ready & !empty;
-  DEFINE write_en := ins_valid and (!full or outs_ready)
+  DEFINE write_en := ins_valid and (!full or outs_ready);
 
   ASSIGN
   init(tail) := 0;
   next(tail) := case
-    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots}" for n in range(slots)])}
+    {"\n    ".join([f"write_en & (tail = {n}) : {(n + 1) % slots};" for n in range(slots)])}
     TRUE : tail;
   esac;
 
   ASSIGN
   init(head) := 0;
   next(head) := case
-    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots}" for n in range(slots)])}
+    {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
     TRUE : head;
   esac;
 
   {"\n  ".join([f"""ASSIGN
   init(mem_{n}) := {data_type.format_constant(0)};
-  next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n}""" for n in range(slots)])}
+  next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n};""" for n in range(slots)])}
 
   ASSIGN
   init(full) := FALSE;
