@@ -7,6 +7,16 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 """
 
+# todo: move to somewhere else (like utils.py)
+def generate_extra_signal_ports(ports, extra_signals):
+  return "    -- extra signal ports\n" + "\n".join([
+    "\n".join([
+      f"    {port}_{name} : {inout} std_logic_vector({bitwidth - 1} downto 0);"
+      for name, bitwidth in extra_signals.items()
+    ])
+    for port, inout in ports
+  ])
+
 def generate_cond_br(name, params):
   data_type = VhdlScalarType(params["data_type"])
 
@@ -131,66 +141,83 @@ entity {name} is
   port (
     clk : in std_logic;
     rst : in std_logic;
-    {f"data : in std_logic_vector({data_type.bitwidth - 1} downto 0);"
-      if data_type.is_channel() else ""}
+[POSSIBLE_DATA_PORTS]
+[EXTRA_SIGNAL_PORTS]
     data_valid : in std_logic;
     data_ready : out std_logic;
-    {"\n".join([f"data_{name} : in std_logic_vector({bitwidth - 1} downto 0);"
-      for name, bitwidth in data_type.extra_signals.items()])}
-
     condition : in std_logic_vector(0 downto 0);
     condition_valid : in std_logic;
     condition_ready : out std_logic
-    {"\n".join([f"condition_{name} : in std_logic_vector({bitwidth - 1} downto 0);"
-      for name, bitwidth in data_type.extra_signals.items()])}
-
-    {f"trueOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);"
-      if data_type.is_channel() else ""}
     trueOut_valid : out std_logic;
     trueOut_ready : in std_logic;
-    {"\n".join([f"trueOut_{name} : in std_logic_vector({bitwidth - 1} downto 0);"
-      for name, bitwidth in data_type.extra_signals.items()])}
-
-    {f"falseOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);"
-      if data_type.is_channel() else ""}
     falseOut_valid : out std_logic;
     falseOut_ready : in std_logic
-    {"\n".join([f"falseOut_{name} : in std_logic_vector({bitwidth - 1} downto 0);"
-      for name, bitwidth in data_type.extra_signals.items()])}
   );
 end entity;
 """
+
+  # Add data ports if the data type is a channel
+  if data_type.is_channel():
+    entity = entity.replace("[POSSIBLE_DATA_PORTS]\n", f"""
+    -- data ports
+    data : in std_logic_vector({data_type.bitwidth - 1} downto 0);
+    trueOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);
+    falseOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);
+""")
+  else:
+    entity = entity.replace("[POSSIBLE_DATA_PORTS]\n", "")
+
+  # Add extra signal ports
+  entity = entity.replace("[EXTRA_SIGNAL_PORTS]\n",
+    generate_extra_signal_ports([
+      ("data", "in"), ("condition", "in"),
+      ("trueOut", "out"), ("falseOut", "out")
+    ], data_type.extra_signals))
+
+  # todo: can be reusable among various unit generators
+  extra_signal_logics = {
+    "spec": """
+  trueOut_spec <= data_spec or condition_spec;
+  falseOut_spec <= data_spec or condition_spec;
+""" # todo: generate_normal_spec_logics(["trueOut", "falseOut"], ["data", "condition"])
+  }
 
   architecture = f"""
 architecture arch of {name} is
 begin
 
   -- list of logics for supported extra signals
-  {f"""
-  trueOut_spec <= data_spec or condition_spec;
-  falseOut_spec <= data_spec or condition_spec;
-  """ if "spec" in data_type.extra_signals else ""}
+[EXTRA_SIGNAL_LOGICS]
 
   inner : entity work.{name}_inner(arch)
     port map(
       clk => clk,
       rst => rst,
-      {f"data => data,"
-        if data_type.is_channel() else ""}
+[POSSIBLE_DATA_PORTS]
       data_valid => data_valid,
       data_ready => data_ready,
       condition => condition,
       condition_valid => condition_valid,
       condition_ready => condition_ready,
-      {f"trueOut => trueOut,"
-        if data_type.is_channel() else ""}
       trueOut_valid => trueOut_valid,
       trueOut_ready => trueOut_ready,
-      {f"falseOut => falseOut,"
-        if data_type.is_channel() else ""}
       falseOut_valid => falseOut_valid,
-      falseOut_ready => falseOut_ready,
+      falseOut_ready => falseOut_ready
     );
 """
+
+  if data_type.is_channel():
+    architecture = architecture.replace("[POSSIBLE_DATA_PORTS]\n", f"""
+      -- data ports
+      data => data,
+      trueOut => trueOut,
+      falseOut => falseOut,
+""")
+  else:
+    architecture = architecture.replace("[POSSIBLE_DATA_PORTS]\n", "")
+
+  architecture.replace("[EXTRA_SIGNAL_LOGICS]", "\n".join([
+    extra_signal_logics[name] for name in data_type.extra_signals
+  ]))
 
   return header + dependencies + entity + architecture
