@@ -132,6 +132,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
              << "Failed to find matching RTL component for external module";
     }
     // If match is not external, it must be freed when function returns
+    // we don't like this solution, feel free to propose a better one
     std::unique_ptr<RTLMatch> matchUniquePtr;
     if (extOp)
       externals[extOp] = match;
