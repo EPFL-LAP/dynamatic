@@ -19,6 +19,7 @@ import generators.handshake.source as source
 import generators.handshake.store as store
 
 import generators.arith.addi as addi
+import generators.arith.addf as addf
 import generators.arith.muli as muli
 
 
@@ -54,6 +55,8 @@ def generate_code(name, mod_type, parameters):
       return source.generate_source(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "addf":
+      return addf.generate_addf(name, parameters)
     case "addi":
       return addi.generate_addi(name, parameters)
     case "muli":
