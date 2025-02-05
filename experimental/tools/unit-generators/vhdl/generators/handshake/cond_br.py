@@ -21,7 +21,7 @@ def generate_cond_br(name, params):
   data_type = VhdlScalarType(params["data_type"])
 
   if data_type.has_extra_signals():
-    return _generate_cond_br_wrapper(name, data_type)
+    return _generate_cond_br_signal_manager(name, data_type)
   elif data_type.is_channel():
     return _generate_cond_br_dataless(name)
   else:

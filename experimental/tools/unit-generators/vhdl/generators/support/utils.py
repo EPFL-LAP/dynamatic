@@ -1,6 +1,5 @@
 import re
 
-# todo: change from class?
 class VhdlScalarType:
 
   mlir_type: str
