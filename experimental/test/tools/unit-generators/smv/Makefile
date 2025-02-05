@@ -18,7 +18,7 @@ endef
 
 test: handshake arith
 
-arith: addi muli
+arith: addf addi muli
 
 handshake: br buffer cond_br constant control_merge fork join lazy_fork load merge mux select sink source store
 
@@ -126,6 +126,10 @@ store:
 	@echo "Testing store..."
 	@python $(GENPATH)smv-unit-generator.py -n test_module -t store -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
 	@$(call run_nuxmv, 6)
+
+addf:
+	@echo "Generating addf..."
+	@python $(GENPATH)smv-unit-generator.py -n test_addf -t addf -p latency=12 data_type="\"!handshake.channel<i32>\"" $(OUT)
 
 addi:
 	@echo "Generating addi..."
