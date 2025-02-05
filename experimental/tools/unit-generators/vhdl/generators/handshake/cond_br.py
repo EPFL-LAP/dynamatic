@@ -166,11 +166,11 @@ end entity;
 """
 
   # Add extra signal ports
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n",
-    generate_extra_signal_ports([
-      ("data", "in"), ("condition", "in"),
-      ("trueOut", "out"), ("falseOut", "out")
-    ], data_type.extra_signals))
+  extra_signal_ports = generate_extra_signal_ports([
+    ("data", "in"), ("condition", "in"),
+    ("trueOut", "out"), ("falseOut", "out")
+  ], data_type.extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   for name in data_type.extra_signals:
     if name not in extra_signal_logics:
@@ -180,7 +180,7 @@ end entity;
 architecture arch of {name} is
 begin
 
-  -- list of logics for supported extra signals
+  -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGICS]
 
   inner : entity work.{name}_inner(arch)
@@ -231,11 +231,11 @@ end entity;
 """
 
   # Add extra signal ports
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n",
-    generate_extra_signal_ports([
-      ("data", "in"), ("condition", "in"),
-      ("trueOut", "out"), ("falseOut", "out")
-    ], data_type.extra_signals))
+  extra_signal_ports = generate_extra_signal_ports([
+    ("data", "in"), ("condition", "in"),
+    ("trueOut", "out"), ("falseOut", "out")
+  ], data_type.extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   for name in data_type.extra_signals:
     if name not in extra_signal_logics:
@@ -245,7 +245,7 @@ end entity;
 architecture arch of {name} is
 begin
 
-  -- list of logics for supported extra signals
+  -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGICS]
 
   inner : entity work.{name}_inner(arch)
