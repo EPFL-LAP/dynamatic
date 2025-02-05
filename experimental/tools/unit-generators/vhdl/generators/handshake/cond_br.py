@@ -133,11 +133,11 @@ end architecture;
   return header + dependencies + entity + architecture
 
 # todo: can be reusable among various unit generators
-extra_signal_logics = {
+extra_signal_logic = {
   "spec": """
   trueOut_spec <= data_spec or condition_spec;
   falseOut_spec <= data_spec or condition_spec;
-""" # todo: generate_normal_spec_logics(["trueOut", "falseOut"], ["data", "condition"])
+""" # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
 }
 
 def _generate_cond_br_signal_manager(name, data_type):
@@ -173,7 +173,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   for name in data_type.extra_signals:
-    if name not in extra_signal_logics:
+    if name not in extra_signal_logic:
       raise ValueError(f"Extra signal {name} is not supported")
 
   architecture = f"""
@@ -181,7 +181,7 @@ architecture arch of {name} is
 begin
 
   -- list of logic for supported extra signals
-  [EXTRA_SIGNAL_LOGICS]
+  [EXTRA_SIGNAL_LOGIC]
 
   inner : entity work.{name}_inner(arch)
     port map(
@@ -202,8 +202,8 @@ begin
     );
 """
 
-  architecture.replace("  [EXTRA_SIGNAL_LOGICS]", "\n".join([
-    extra_signal_logics[name] for name in data_type.extra_signals
+  architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+    extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
   return header + dependencies + entity + architecture
@@ -238,7 +238,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   for name in data_type.extra_signals:
-    if name not in extra_signal_logics:
+    if name not in extra_signal_logic:
       raise ValueError(f"Extra signal {name} is not supported")
 
   architecture = f"""
@@ -246,7 +246,7 @@ architecture arch of {name} is
 begin
 
   -- list of logic for supported extra signals
-  [EXTRA_SIGNAL_LOGICS]
+  [EXTRA_SIGNAL_LOGIC]
 
   inner : entity work.{name}_inner(arch)
     port map(
@@ -264,8 +264,8 @@ begin
     );
 """
 
-  architecture.replace("  [EXTRA_SIGNAL_LOGICS]", "\n".join([
-    extra_signal_logics[name] for name in data_type.extra_signals
+  architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+    extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
   return header + dependencies + entity + architecture
