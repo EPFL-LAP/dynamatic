@@ -148,7 +148,7 @@ entity {name} is
   port (
     clk : in std_logic;
     rst : in std_logic;
-[EXTRA_SIGNAL_PORTS]
+    [EXTRA_SIGNAL_PORTS]
     data : in std_logic_vector({data_type.bitwidth - 1} downto 0);
     data_valid : in std_logic;
     data_ready : out std_logic;
@@ -166,7 +166,7 @@ end entity;
 """
 
   # Add extra signal ports
-  entity = entity.replace("[EXTRA_SIGNAL_PORTS]\n",
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n",
     generate_extra_signal_ports([
       ("data", "in"), ("condition", "in"),
       ("trueOut", "out"), ("falseOut", "out")
@@ -181,7 +181,7 @@ architecture arch of {name} is
 begin
 
   -- list of logics for supported extra signals
-[EXTRA_SIGNAL_LOGICS]
+  [EXTRA_SIGNAL_LOGICS]
 
   inner : entity work.{name}_inner(arch)
     port map(
@@ -202,7 +202,7 @@ begin
     );
 """
 
-  architecture.replace("[EXTRA_SIGNAL_LOGICS]", "\n".join([
+  architecture.replace("  [EXTRA_SIGNAL_LOGICS]", "\n".join([
     extra_signal_logics[name] for name in data_type.extra_signals
   ]))
 
@@ -216,7 +216,7 @@ entity {name} is
   port (
     clk : in std_logic;
     rst : in std_logic;
-[EXTRA_SIGNAL_PORTS]
+    [EXTRA_SIGNAL_PORTS]
     data_valid : in std_logic;
     data_ready : out std_logic;
     condition : in std_logic_vector(0 downto 0);
@@ -231,7 +231,7 @@ end entity;
 """
 
   # Add extra signal ports
-  entity = entity.replace("[EXTRA_SIGNAL_PORTS]\n",
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n",
     generate_extra_signal_ports([
       ("data", "in"), ("condition", "in"),
       ("trueOut", "out"), ("falseOut", "out")
@@ -246,7 +246,7 @@ architecture arch of {name} is
 begin
 
   -- list of logics for supported extra signals
-[EXTRA_SIGNAL_LOGICS]
+  [EXTRA_SIGNAL_LOGICS]
 
   inner : entity work.{name}_inner(arch)
     port map(
@@ -264,7 +264,7 @@ begin
     );
 """
 
-  architecture.replace("[EXTRA_SIGNAL_LOGICS]", "\n".join([
+  architecture.replace("  [EXTRA_SIGNAL_LOGICS]", "\n".join([
     extra_signal_logics[name] for name in data_type.extra_signals
   ]))
 
