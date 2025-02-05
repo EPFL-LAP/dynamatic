@@ -182,6 +182,10 @@ end entity;
 """ # todo: generate_normal_spec_logics(["trueOut", "falseOut"], ["data", "condition"])
   }
 
+  for name in data_type.extra_signals:
+    if name not in extra_signal_logics:
+      raise ValueError(f"Extra signal {name} is not supported")
+
   architecture = f"""
 architecture arch of {name} is
 begin
