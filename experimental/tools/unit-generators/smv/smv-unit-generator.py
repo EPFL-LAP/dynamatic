@@ -13,6 +13,7 @@ import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.load as load
 import generators.handshake.merge as merge
 import generators.handshake.mux as mux
+import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
@@ -42,6 +43,8 @@ def generate_code(name, mod_type, parameters):
       return merge.generate_merge(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":

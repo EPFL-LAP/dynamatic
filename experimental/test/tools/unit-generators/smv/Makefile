@@ -12,7 +12,7 @@ test: handshake arith
 
 arith:
 
-handshake: br buffer cond_br constant control_merge fork join lazy_fork load merge mux sink source store
+handshake: br buffer cond_br constant control_merge fork join lazy_fork load merge mux select sink source store
 
 br:
 	@echo "Generating br..."
@@ -71,6 +71,10 @@ mux:
 	@echo "Generating mux..."
 	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
 	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+
+select:
+	@echo "Generating select..."
+	@python $(GENPATH)smv-unit-generator.py -n test_select -t select -p data_type="\"!handshake.channel<i32>\"" $(OUT)	
 
 sink:
 	@echo "Generating sink..."
