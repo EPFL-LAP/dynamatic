@@ -1,4 +1,3 @@
-from generators.support.utils import *
 from generators.handshake.buffer import generate_buffer
 
 
@@ -18,7 +17,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready = inner_oehb.ins_ready;
   DEFINE outs_valid = inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "D: 1, V: 1"})}
+  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>", "data_type": "!handshake.control<>"})}
 """
 
 
@@ -38,5 +37,5 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready = inner_oehb.ins_ready;
   DEFINE outs_valid = inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "D: 1, V: 1"})}
+  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>" , "data_type": "!handshake.control<>"})}
 """
