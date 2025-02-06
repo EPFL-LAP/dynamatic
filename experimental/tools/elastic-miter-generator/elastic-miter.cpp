@@ -31,14 +31,7 @@ namespace cl = llvm::cl;
 using namespace mlir;
 using namespace dynamatic::handshake;
 
-//     _____ _      _____    _____      _
-//    / ____| |    |_   _|  / ____|    | |
-//   | |    | |      | |   | (___   ___| |_ _   _ _ __
-//   | |    | |      | |    \___ \ / _ \ __| | | | '_ \
-//   | |____| |____ _| |_   ____) |  __/ |_| |_| | |_) |
-//    \_____|______|_____| |_____/ \___|\__|\__,_| .__/
-//                                               | |
-//                                               |_|
+// CLI Settings
 
 static cl::OptionCategory mainCategory("elastic-miter Options");
 
@@ -58,15 +51,6 @@ static cl::opt<std::string>
 static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
                                       cl::desc("Specify output directory"),
                                       cl::cat(mainCategory));
-
-//    ______ _           _   _             __  __ _ _
-//   |  ____| |         | | (_)           |  \/  (_) |
-//   | |__  | | __ _ ___| |_ _  ___ ______| \  / |_| |_ ___ _ __
-//   |  __| | |/ _` / __| __| |/ __|______| |\/| | | __/ _ \ '__|
-//   | |____| | (_| \__ \ |_| | (__       | |  | | | ||  __/ |
-//   |______|_|\__,_|___/\__|_|\___|      |_|  |_|_|\__\___|_|
-//
-//
 
 static void setHandshakeBB(OpBuilder &builder, Operation *op, int bb) {
   auto ui32 = IntegerType::get(builder.getContext(), 32,
@@ -123,7 +107,7 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
 }
 
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
-// The output interface names have EQ_ prefixed.
+// The result names have EQ_ prefixed.
 static FailureOr<std::pair<FuncOp, Block *>>
 buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
@@ -148,8 +132,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
     }
   }
 
-  // Create the argNames namedAttribute for the new miter funcOp, this is just a
-  // copy of the LHS argNames
+  // The inputs to the elastic-miter circuit are the same as the input signature
+  // of the LHS/RHS circuit. We assign them the same argument names as the LHS.
   auto argNamedAttr = builder.getNamedAttr("argNames", lhsFuncOp.getArgNames());
   // Create the resNames namedAttribute for the new miter funcOp, this is just a
   // copy of the LHS resNames with an added EQ_ prefix
@@ -159,6 +143,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   size_t nrOfResults = lhsFuncOp.getResultTypes().size();
   ChannelType i1ChannelType = ChannelType::get(builder.getI1Type());
 
+  // The outputs of the elastic miter are an EQ gate with a Boolean result
+  // for every primary output of the original circuits.
   // Create a vector with to replace all the output channels with type
   // !handshake.channel<i1>
   llvm::SmallVector<Type> outputTypes(nrOfResults, i1ChannelType);
@@ -272,6 +258,15 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   llvm::json::Array eqNames;
 
   Operation *nextLocation;
+
+  // Create the input side auxillary logic:
+  // Every primary input of the LHS/RHS circuits is connected to a fork, which
+  // splits the data for both sides under test. Both output sides of the fork
+  // are connected to a buffer. The output of the buffer is connected to a
+  // non-deterministic wire (ND wire), which models arbitrary backpressure from
+  // surrounding circuits. The output of the ND wire is then connected to the
+  // original input of the circuits. This completely decouples the operation of
+  // the two circuits.
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
     BlockArgument lhsArgs = lhsFuncOp.getArgument(i);
     BlockArgument rhsArgs = rhsFuncOp.getArgument(i);
@@ -331,7 +326,7 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
   if (lhsEndOpCount != 1 && rhsEndOpCount != 1) {
     llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
-                    "exactely one EndOp.\n";
+                    "exactly one EndOp.\n";
     return failure();
   }
 
@@ -339,10 +334,13 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   EndOp lhsEndOp = *lhsFuncOp.getOps<EndOp>().begin();
   EndOp rhsEndOp = *rhsFuncOp.getOps<EndOp>().begin();
 
-  // Create the output side auxillary logic. The output of the module is feed
-  // into a chain of a non-deterministic wire and a buffer to decouple the two
-  // sides.
-  // Then we add a cmpi to compare the results pairwise.
+  // Create the output side auxillary logic:
+  // Every output of the LHS/RHS circuits are connected to a non-derministic
+  // wire (ND wire), which models arbitrary backpressure from surrounding
+  // circuits. The output of the ND wire is connected to a buffer. This
+  // completely decouples the operation of the two circuits. The buffers then
+  // are connected pairwise to a comparator to check that the outputs are
+  // equivalent.
   llvm::SmallVector<Value> eqResults;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
