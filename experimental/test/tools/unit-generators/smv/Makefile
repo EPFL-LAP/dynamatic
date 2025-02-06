@@ -107,7 +107,8 @@ mux:
 
 select:
 	@echo "Testing select..."
-	@python $(GENPATH)smv-unit-generator.py -n test_select -t select -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t select -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 7)
 
 sink:
 	@echo "Testing sink..."
