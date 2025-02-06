@@ -12,6 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -22,7 +24,9 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include <filesystem>
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/InitAllDialects.h"
@@ -56,13 +60,13 @@ static void setHandshakeBB(OpBuilder &builder, Operation *op, int bb) {
   auto ui32 = IntegerType::get(builder.getContext(), 32,
                                IntegerType::SignednessSemantics::Unsigned);
   auto attr = IntegerAttr::get(ui32, bb);
-  op->setAttr("handshake.bb", attr);
+  op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, attr);
 }
 
 static void setHandshakeName(OpBuilder &builder, Operation *op,
                              const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
-  op->setAttr("handshake.name", nameAttr);
+  op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, nameAttr);
 }
 
 static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
@@ -75,13 +79,15 @@ static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
 // This avoids naming conflicts when merging two functions together.
 // Returns failure() when the operation doesn't already have a handshake.name
 static LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
-  StringAttr nameAttr = op.getAttrOfType<StringAttr>("handshake.name");
+  StringAttr nameAttr =
+      op.getAttrOfType<StringAttr>(dynamatic::NameAnalysis::ATTR_NAME);
   if (!nameAttr)
     return failure();
 
   std::string newName = prefix + nameAttr.getValue().str();
 
-  op.setAttr("handshake.name", StringAttr::get(op.getContext(), newName));
+  op.setAttr(dynamatic::NameAnalysis::ATTR_NAME,
+             StringAttr::get(op.getContext(), newName));
 
   return success();
 }
@@ -149,10 +155,67 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   // !handshake.channel<i1>
   llvm::SmallVector<Type> outputTypes(nrOfResults, i1ChannelType);
 
+  // The name of the new function is: elastic_miter_<LHS_NAME>_<RHS_NAME>
+  std::string miterName = "elastic_miter_" + lhsFuncOp.getNameAttr().str() +
+                          "_" + rhsFuncOp.getNameAttr().str();
+
   // Create the elastic-miter function
-  return buildNewFuncWithBlock(builder, "elastic-miter",
-                               lhsFuncOp.getArgumentTypes(), outputTypes,
-                               argNamedAttr, resNamedAttr);
+  return buildNewFuncWithBlock(builder, miterName, lhsFuncOp.getArgumentTypes(),
+                               outputTypes, argNamedAttr, resNamedAttr);
+}
+
+// Get the first and only non-external FuncOp from the module.
+// Additionally check some properites:
+// 1. The FuncOp is materialized (each Value is only used once).
+// 2. There are no memory interfaces
+// 3. Arguments  and results are all handshake.channel or handshake.control type
+static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
+  // We only support one function per module
+  FuncOp funcOp = nullptr;
+  for (auto op : module.getOps<FuncOp>()) {
+    if (op.isExternal())
+      continue;
+    if (funcOp) {
+      llvm::errs() << "We currently only support one non-external "
+                      "handshake function per module\n";
+      return failure();
+    }
+    funcOp = op;
+  }
+
+  if (funcOp) {
+    // Check that the FuncOp is materialized
+    if (failed(dynamatic::verifyIRMaterialized(funcOp))) {
+      llvm::errs() << dynamatic::ERR_NON_MATERIALIZED_FUNC;
+      return failure();
+    }
+  }
+
+  // Check that arguments are all handshake.channel or handshake.control type
+  for (Type ty : funcOp.getArgumentTypes()) {
+    if (!ty.isa<ChannelType, ControlType>()) {
+      llvm::errs() << "All arguments need to be of handshake.channel or "
+                      "handshake.control type\n";
+      return failure();
+    }
+  }
+
+  // Check that results are all handshake.channel or handshake.control type
+  for (Type ty : funcOp.getResultTypes()) {
+    if (!ty.isa<ChannelType, ControlType>()) {
+      llvm::errs() << "All results need to be of handshake.channel or "
+                      "handshake.control type\n";
+      return failure();
+    }
+  }
+
+  // Check that there are no memory interfaces
+  if (!funcOp.getOps<MemoryOpInterface>().empty()) {
+    llvm::errs()
+        << "There can be no Memory Interfaces as they are not elastic.";
+    return failure();
+  }
+  return funcOp;
 }
 
 static LogicalResult createFiles(StringRef outputDir, ModuleOp mod,
@@ -216,9 +279,17 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     return failure();
   }
 
-  // We know the module contains one FuncOp. So we can take take first element.
-  FuncOp lhsFuncOp = *lhsModule->getOps<FuncOp>().begin();
-  FuncOp rhsFuncOp = *rhsModule->getOps<FuncOp>().begin();
+  // Get the LHS FuncOp from the LHS module, also check the
+  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule.get());
+  if (failed(funcOrFailure))
+    return failure();
+  FuncOp lhsFuncOp = funcOrFailure.value();
+
+  // Get the RHS FuncOp from the RHS module
+  funcOrFailure = getModuleFuncOpAndCheck(rhsModule.get());
+  if (failed(funcOrFailure))
+    return failure();
+  FuncOp rhsFuncOp = funcOrFailure.value();
 
   OpBuilder builder(&context);
 
@@ -228,12 +299,12 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   }
 
   // Create a new FuncOp containing an entry Block
-  auto ret = buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp);
-  if (failed(ret))
+  auto pairOrFailure = buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp);
+  if (failed(pairOrFailure))
     return failure();
 
   // Unpack the returned FuncOp and entry Block
-  auto [newFuncOp, newBlock] = ret.value();
+  auto [newFuncOp, newBlock] = pairOrFailure.value();
 
   // Add the function to the module
   miterModule.push_back(newFuncOp);
@@ -263,10 +334,10 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   // Every primary input of the LHS/RHS circuits is connected to a fork, which
   // splits the data for both sides under test. Both output sides of the fork
   // are connected to a buffer. The output of the buffer is connected to a
-  // non-deterministic wire (ND wire), which models arbitrary backpressure from
-  // surrounding circuits. The output of the ND wire is then connected to the
-  // original input of the circuits. This completely decouples the operation of
-  // the two circuits.
+  // non-deterministic wire (ND wire), which models arbitrary backpressure
+  // from surrounding circuits. The output of the ND wire is then connected to
+  // the original input of the circuits. This completely decouples the
+  // operation of the two circuits.
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
     BlockArgument lhsArgs = lhsFuncOp.getArgument(i);
     BlockArgument rhsArgs = rhsFuncOp.getArgument(i);
@@ -307,16 +378,15 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     ndwireNames.push_back(std::move(lhsNdwName));
     ndwireNames.push_back(std::move(rhsNdwName));
 
-    // Use the newly created fork's output instead of the origial argument in
+    // Use the newly created fork's output instead of the original argument in
     // the lhsFuncOp's operations
-    for (Operation *op : llvm::make_early_inc_range(lhsArgs.getUsers())) {
+    for (Operation *op : llvm::make_early_inc_range(lhsArgs.getUsers()))
       op->replaceUsesOfWith(lhsArgs, lhsNDWireOp.getResult());
-    }
-    // Use the newly created fork's output instead of the origial argument in
+
+    // Use the newly created fork's output instead of the original argument in
     // the rhsFuncOp's operations
-    for (Operation *op : llvm::make_early_inc_range(rhsArgs.getUsers())) {
+    for (Operation *op : llvm::make_early_inc_range(rhsArgs.getUsers()))
       op->replaceUsesOfWith(rhsArgs, rhsNDWireOp.getResult());
-    }
   }
 
   size_t lhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
@@ -393,7 +463,8 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   EndOp newEndOp = builder.create<EndOp>(builder.getUnknownLoc(), eqResults);
   setHandshakeAttributes(builder, newEndOp, 3, "end");
 
-  // Delete old end operation, we can only have one end operation in a function
+  // Delete old end operation, we can only have one end operation in a
+  // function
   rhsEndOp.erase();
   lhsEndOp.erase();
 
@@ -429,8 +500,10 @@ int main(int argc, char **argv) {
       argc, argv,
       "Creates an elastic-miter module in the handshake dialect.\n"
       "Takes two MLIR files as input. The files need to contain exactely one "
-      "module each.\nEach module needs to contain exactely one handshake.func. "
-      "\nThe resulting miter MLIR file and JSON config file are placed in the "
+      "module each.\nEach module needs to contain exactely one "
+      "handshake.func. "
+      "\nThe resulting miter MLIR file and JSON config file are placed in "
+      "the "
       "specified output directory.");
 
   // Register the supported dynamatic dialects and create a context
