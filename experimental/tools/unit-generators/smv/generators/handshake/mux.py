@@ -5,57 +5,58 @@ from generators.support.utils import SmvScalarType
 def generate_mux(name, params):
   size = params["size"]
   data_type = SmvScalarType(params["data_type"])
+  select_type = SmvScalarType(params["select_type"])
 
   if data_type.bitwidth == 0:
-    return _generate_mux_dataless(name, size)
+    return _generate_mux_dataless(name, size, select_type)
   else:
-    return _generate_mux(name, size, data_type)
+    return _generate_mux(name, size, data_type, select_type)
 
 
-def _generate_mux_dataless(name, size):
+def _generate_mux_dataless(name, size, select_type):
   return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index_valid, outs_ready)
   VAR
-  inner_tehb : {name}__tehb(tehb_ins_valid, outs_ready);
+  inner_tehb : {name}__tehb_dataless(tehb_ins_valid, outs_ready);
 
   DEFINE
   tehb_ins_valid := case
-    {"\n    ".join([f"index = {n} : index_valid & ins_valid_{n};" for n in range(size)])}
+    {"\n    ".join([f"index = {select_type.format_constant(n)} : index_valid & ins_valid_{n};" for n in range(size)])}
     TRUE : FALSE;
   esac;
 
   // output
   DEFINE
-  {"\n  ".join([f"ins_ready_{n} := index = {n} & index_valid & tehb_inner.ins_ready & ins_valid_{n} | !ins_valid{n};" for n in range(size)])}
-  index_ready := !index_valid | tehb_ins_valid & tehb_inner.ins_ready;
-  outs_valid := tehb_inner.outs_valid;
+  {"\n  ".join([f"ins_ready_{n} := index = {select_type.format_constant(n)} & index_valid & inner_tehb.ins_ready & ins_valid_{n} | !ins_valid_{n};" for n in range(size)])}
+  index_ready := !index_valid | tehb_ins_valid & inner_tehb.ins_ready;
+  outs_valid := inner_tehb.outs_valid;
 
 {generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.control<>"})}
 """
 
 
-def _generate_mux(name, size, data_type):
+def _generate_mux(name, size, data_type, select_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}, ins_valid{n}" for n in range(size)])}, index, index_valid, outs_ready)
+MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, index, index_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
 
   DEFINE
   tehb_ins := case
-    {"\n    ".join([f"index = {n} & index_valid & ins_valid_{n} : ins_{n};" for n in range(size)])}
+    {"\n    ".join([f"index = {select_type.format_constant(n)} & index_valid & ins_valid_{n} : ins_{n};" for n in range(size)])}
     TRUE : ins_0;
   esac;
   tehb_ins_valid := case
-    {"\n    ".join([f"index = {n} : index_valid & ins_valid_{n} | !ins_valid{n};" for n in range(size)])}
+    {"\n    ".join([f"index = {select_type.format_constant(n)} : index_valid & ins_valid_{n} | !ins_valid_{n};" for n in range(size)])}
     TRUE : FALSE;
   esac;
 
   // output
   DEFINE
-  {"\n  ".join([f"ins_ready_{n} := index = {n} & index_valid & tehb_inner.ins_ready & ins_valid_{n} | !ins_valid{n};" for n in range(size)])}
-  index_ready := !index_valid | tehb_ins_valid & tehb_inner.ins_ready;
-  outs_valid := tehb_inner.outs_valid;
-  outs := tehb_inner.outs;
+  {"\n  ".join([f"ins_ready_{n} := index = {select_type.format_constant(n)} & index_valid & inner_tehb.ins_ready & ins_valid_{n} | !ins_valid_{n};" for n in range(size)])}
+  index_ready := !index_valid | tehb_ins_valid & inner_tehb.ins_ready;
+  outs_valid := inner_tehb.outs_valid;
+  outs := inner_tehb.outs;
 
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
 """
@@ -63,6 +64,6 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid{n}" for n in range(size)])}, inde
 
 if __name__ == "__main__":
   print(generate_mux("test_mux_dataless", {
-        "size": 4, "data_type": "!handshake.control<>"}))
+        "size": 4, "select_type": "!handshake.channel<i2>", "data_type": "!handshake.control<>"}))
   print(generate_mux("test_mux", {"size": 2,
-        "data_type": "!handshake.channel<i32>"}))
+        "select_type": "!handshake.channel<i1>", "data_type": "!handshake.channel<i32>"}))

@@ -100,9 +100,9 @@ merge:
 
 mux:
 	@echo "Testing mux..."
-	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@$(call run_nuxmv, 7)
-	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=2 select_type="\"!handshake.channel<i1>\"" data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 5)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=2 select_type="\"!handshake.channel<i1>\"" data_type="\"!handshake.channel<i1>\"" $(OUT)	
 	@$(call run_nuxmv, 7)
 
 select:
