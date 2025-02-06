@@ -14,21 +14,28 @@ def generate_extra_signal_ports(ports, extra_signals):
 def generate_addf(name, options):
   data_type = VhdlScalarType(options["data_type"])
 
-  if data_type.has_extra_signals():
-    return _generate_addf_signal_manager(name, options)
-  else:
-    return _generate_addf(name, options)
-
-def _generate_addf(name, options):
-  data_type = VhdlScalarType(options["data_type"])
   if data_type.bitwidth == 32:
-    return _generate_addf_single_precision(name)
+    is_double = False
   elif data_type.bitwidth == 64:
-    return _generate_addf_double_precision(name)
+    is_double = True
+  else:
+    raise ValueError(f"Unsupported bitwidth {data_type.bitwidth}")
 
-def _generate_addf_single_precision(name, options):
-  latency = 9
+  if data_type.has_extra_signals():
+    return _generate_addf_signal_manager(name, is_double)
+  else:
+    return _generate_addf(name)
 
+def _generate_addf(name, is_double, export_transfer=False):
+  if is_double:
+    return _generate_addf_single_precision(name, export_transfer)
+  else:
+    return _generate_addf_double_precision(name, export_transfer)
+
+def _get_latency(is_double):
+  return 12 if is_double else 9
+
+def _generate_addf_single_precision(name, export_transfer=False):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
@@ -36,8 +43,8 @@ def _generate_addf_single_precision(name, options):
   nfloat2ieee_name = f"{name}_nfloat2ieee"
   floating_point_adder_name = f"{name}_floating_point_adder"
   dependencies = generate_join(join_name, {"size": 2}) + \
-    generate_oehb(oehb_name, {"slots": 1}) + \
-    generate_delay_buffer(buff_name, {"slots": latency - 1}) + \
+    generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
+    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1}) + \
     generate_input_ieee_32bit(ieee2nfloat_name) + \
     generate_output_ieee_32bit(nfloat2ieee_name) + \
     generate_floating_point_adder(floating_point_adder_name)
@@ -141,7 +148,7 @@ begin
 end architecture;
 """
 
-  if "transfer" in options:
+  if export_transfer:
     entity = entity.replace("[POSSIBLE_TRANSFER]",
                             "transfer : out std_logic;")
     architecture = architecture.replace(
@@ -153,9 +160,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
-def _generate_addf_double_precision(name, options):
-  latency = 12
-
+def _generate_addf_double_precision(name, export_transfer=False):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
@@ -163,8 +168,8 @@ def _generate_addf_double_precision(name, options):
   nfloat2ieee_name = f"{name}_nfloat2ieee"
   floating_point_adder_name = f"{name}_floating_point_adder"
   dependencies = generate_join(join_name, {"size": 2}) + \
-    generate_oehb(oehb_name, {"slots": 1}) + \
-    generate_delay_buffer(buff_name, {"slots": latency - 1}) + \
+    generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
+    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1}) + \
     generate_input_ieee_64bit(ieee2nfloat_name) + \
     generate_output_ieee_64bit(nfloat2ieee_name) + \
     generate_floating_point_adder_64bit(floating_point_adder_name)
@@ -267,7 +272,7 @@ begin
 end architecture;
 """
 
-  if "transfer" in options:
+  if export_transfer:
     entity = entity.replace("[POSSIBLE_TRANSFER]",
                             "transfer : out std_logic;")
     architecture = architecture.replace(
@@ -279,17 +284,14 @@ end architecture;
 
   return dependencies + entity + architecture
 
-
-
-# todo: can be reusable among various unit generators
-
-def _generate_addf_signal_manager(name, options):
-  data_type = VhdlScalarType(options["data_type"])
-
+def _generate_addf_signal_manager(name, data_type, is_double):
   inner_name = f"{name}_inner"
-  dependencies = _generate_addf(name, options)
+  dependencies = _generate_addf(name, is_double, export_transfer=True)
+
   if "spec" in data_type.extra_signals:
-    dependencies += _generate_ofifo(f"{name}_spec_ofifo", {"slots": 3, "data_type": "!handshake.channel<i1>"})
+    dependencies += _generate_ofifo(f"{name}_spec_ofifo", {
+      "slots": _get_latency(is_double), # todo: correct?
+      "data_type": "!handshake.channel<i1>" })
 
   extra_signal_logic = {
     "spec": ("""
