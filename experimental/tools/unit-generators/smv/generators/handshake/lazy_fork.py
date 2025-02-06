@@ -16,7 +16,7 @@ def _generate_lazy_fork_dataless(name, size):
 MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
   DEFINE
-  all_ready = {" & ".join([f"outs_ready_{n}" for n in range(size)])};
+  all_ready := {" & ".join([f"outs_ready_{n}" for n in range(size)])};
 
   // output
   DEFINE
@@ -33,7 +33,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
   //output
   DEFINE
-  ins_ready = inner_lazy_fork.ins_ready;
+  ins_ready := inner_lazy_fork.ins_ready;
   {"\n  ".join([f"outs_valid_{n} := inner_lazy_fork.outs_valid_{n};" for n in range(size)])}
   {"\n  ".join([f"outs_{n} := ins;" for n in range(size)])}
 

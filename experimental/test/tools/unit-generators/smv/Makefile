@@ -80,8 +80,10 @@ join:
 
 lazy_fork:
 	@echo "Testing lazy_fork..."
-	@python $(GENPATH)smv-unit-generator.py -n test_lazy_fork_dataless -t lazy_fork -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_lazy_fork -t lazy_fork -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t lazy_fork -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 5)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t lazy_fork -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 4)
 
 load:
 	@echo "Testing load..."
