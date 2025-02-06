@@ -87,12 +87,15 @@ lazy_fork:
 
 load:
 	@echo "Testing load..."
-	@python $(GENPATH)smv-unit-generator.py -n test_load -t load -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t load -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
+	@$(call run_nuxmv, 6)
 
 merge:
 	@echo "Testing merge..."
-	@python $(GENPATH)smv-unit-generator.py -n test_merge -t merge -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_merge -t merge -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t merge -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 5)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t merge -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 5)
 
 mux:
 	@echo "Testing mux..."
