@@ -112,16 +112,20 @@ select:
 
 sink:
 	@echo "Testing sink..."
-	@python $(GENPATH)smv-unit-generator.py -n test_sink -t sink -p data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_sink -t sink -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t sink -p data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 1)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t sink -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 2)
 
 source:
 	@echo "Testing source..."
-	@python $(GENPATH)smv-unit-generator.py -n test_source -t source $(OUT)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t source $(OUT)
+	@$(call run_nuxmv, 1)
 
 store:
 	@echo "Testing store..."
-	@python $(GENPATH)smv-unit-generator.py -n test_store -t store -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t store -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
+	@$(call run_nuxmv, 6)
 
 
 clean:
