@@ -9,11 +9,11 @@ def _generate_join(name, size):
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
   DEFINE
-  all_valid = {" & ".join([f"ins_valid_{n}" for n in range(size)])};
+  all_valid := {" & ".join([f"ins_valid_{n}" for n in range(size)])};
 
   // output
   DEFINE
-  {"\n  ".join([f"ins_ready_{n} := outs_ready & {" & ".join([f"ins_valid_{m}" for m in range(size) if m != n])}" for n in range(size)])}
+  {"\n  ".join([f"ins_ready_{n} := outs_ready & {" & ".join([f"ins_valid_{m}" for m in range(size) if m != n])};" for n in range(size)])}
   outs_valid := all_valid;
 """
 

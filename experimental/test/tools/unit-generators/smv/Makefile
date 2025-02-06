@@ -50,8 +50,10 @@ buffer:
 
 cond_br:
 	@echo "Testing cond_br..."
-	@python $(GENPATH)smv-unit-generator.py -n test_cond_br_dataless -t cond_br -p data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_cond_br -t cond_br -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t cond_br -p data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 5)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t cond_br -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 6)
 
 constant:
 	@echo "Testing constant..."
@@ -69,7 +71,8 @@ fork:
 
 join:
 	@echo "Testing join..."
-	@python $(GENPATH)smv-unit-generator.py -n test_join -t join -p size=3 $(OUT)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t join -p size=3 $(OUT)
+	@$(call run_nuxmv, 4)
 
 lazy_fork:
 	@echo "Testing lazy_fork..."

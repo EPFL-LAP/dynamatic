@@ -24,8 +24,8 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
   DEFINE
   data_ready := inner_join.ins_ready_0;
   condition_ready := inner_join.ins_ready_1;
-  trueOut_valid := condition & inner_join.outs_valid_0;
-  falseOut_valid := !condition & inner_join.outs_valid_0;
+  trueOut_valid := condition & inner_join.outs_valid;
+  falseOut_valid := !condition & inner_join.outs_valid;
 
 {generate_join(f"{name}__join", {"size": 2})}
 """
@@ -35,7 +35,7 @@ def _generate_cond_br(name, data_type):
   return f"""
 MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
   VAR
-  inner_br : cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+  inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
 
   // output
   DEFINE
