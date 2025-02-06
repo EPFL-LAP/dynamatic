@@ -11,7 +11,7 @@ def generate_load(name, params):
 
 def _generate_load(name, data_type, addr_type):
   return f"""
-MODULE {name}(addr_in, addr_in_valid, addr_out_ready, data_from_mem, data_from_mem_valid, data_out_ready)
+MODULE {name}(addr_in, addr_in_valid, data_from_mem, data_from_mem_valid, addr_out_ready, data_out_ready)
   VAR inner_addr_tehb : {name}__addr_tehb(addr_in, addr_in_valid, addr_out_ready);
   VAR inner_data_tehb : {name}__data_tehb(data_from_mem, data_from_mem_valid, data_out_ready);
 

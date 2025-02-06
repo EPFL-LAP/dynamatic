@@ -32,7 +32,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
 def _generate_merge(name, size, data_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
+MODULE {name}({", ".join([f"ins_{n}, ins_valid{n}" for n in range(size)])}, outs_ready)
   VAR inner_tehb : {name}__tehb(inner_merge.outs, inner_merge.outs_valid, outs_ready);
   VAR inner_merge : {name}__merge_notehb({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, inner_tehb.ins_ready);
 

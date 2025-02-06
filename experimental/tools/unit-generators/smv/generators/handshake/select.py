@@ -10,7 +10,7 @@ def generate_select(name, params):
 def _generate_select(name, data_type):
   return f"""
 MODULE {name} (condition, condition_valid, true_value, true_value_valid, false_value, false_value_valid, result_ready)
-  VAR inner_antitoken : antitoken(false_value_valid, true_value_valid, g1, g0);
+  VAR inner_antitoken : antitoken__{name}(false_value_valid, true_value_valid, g1, g0);
 
   DEFINE ee := condition_valid & ((!condition & false_value_valid) or (condition & true_value_valid));
   DEFINE valid_internal := ee & !inner_antitoken.stop_valid;
