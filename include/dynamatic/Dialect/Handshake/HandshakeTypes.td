@@ -23,21 +23,16 @@ class Handshake_Type<string name, string typeMnemonic, list<Trait> traits = []>
   let mnemonic = typeMnemonic;
 }
 
-def ExtraSignals : TypeParameter<
-  "::llvm::ArrayRef<::dynamatic::handshake::ExtraSignal>", 
-  "An optional array of extra signals for a dataflow channel"> {
-  let allocator = [{
-    ::llvm::SmallVector<::dynamatic::handshake::ExtraSignal> tmpSignals;
-    for (const ::dynamatic::handshake::ExtraSignal &signal : $_self) {
-      ::dynamatic::handshake::ExtraSignal& tmp = tmpSignals.emplace_back(signal);
-      tmp.name = $_allocator.copyInto(tmp.name);
-    }
-    }] # "$_dst = $_allocator.copyInto(" # cppType # [{ (tmpSignals));
-  }];
-  let cppStorageType = "::llvm::SmallVector<::dynamatic::handshake::ExtraSignal::Storage>";
-  let comparator = cppType # "($_lhs) == " # cppType # "($_rhs)";
-  let defaultValue = cppType # "()";
-}
+def ExtraSignals : ArrayRefOfSelfAllocationParameter<"ExtraSignal", [{
+  This `TypeParameter` describes an array of `ExtraSignal` objects that a
+  `ChannelType` or `ControlType` value carries.
+  `ExtraSignal` contains data whose lifetime is not guaranteed, so this data must
+  be allocated into the MLIR context when constructing a `ChannelType` or
+  `ControlType`.
+  This type aliases `ArrayRefOfSelfAllocationParameter` to automatically invoke
+  `ExtraSignal::allocateInto` C++ function to perform that allocation process.
+  `ArrayRefParameter` cannot be used here, as it is strictly for value types.
+}]> {}
 
 def ControlType : Handshake_Type<"Control", "control", [
   DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
