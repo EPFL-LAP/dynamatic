@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include <filesystem>
+
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -24,12 +24,14 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
-#include <filesystem>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/InitAllDialects.h"
+#include "dynamatic/Support/CFG.h"
+#include "dynamatic/Transforms/HandshakeMaterialize.h"
 
 namespace cl = llvm::cl;
 using namespace mlir;
@@ -56,13 +58,6 @@ static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
                                       cl::desc("Specify output directory"),
                                       cl::cat(mainCategory));
 
-static void setHandshakeBB(OpBuilder &builder, Operation *op, int bb) {
-  auto ui32 = IntegerType::get(builder.getContext(), 32,
-                               IntegerType::SignednessSemantics::Unsigned);
-  auto attr = IntegerAttr::get(ui32, bb);
-  op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, attr);
-}
-
 static void setHandshakeName(OpBuilder &builder, Operation *op,
                              const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
@@ -71,7 +66,7 @@ static void setHandshakeName(OpBuilder &builder, Operation *op,
 
 static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
                                    const std::string &name) {
-  setHandshakeBB(builder, op, bb);
+  dynamatic::setBB(op, bb);
   setHandshakeName(builder, op, name);
 }
 
@@ -472,14 +467,14 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   Operation *previousOp = nextLocation;
   for (Operation &op : llvm::make_early_inc_range(lhsFuncOp.getOps())) {
     op.moveAfter(previousOp);
-    setHandshakeBB(builder, &op, 1);
+    dynamatic::setBB(&op, 1);
     previousOp = &op;
   }
 
   // Move operations from rhs to the new miter FuncOp and set the handshake.bb
   for (Operation &op : llvm::make_early_inc_range(rhsFuncOp.getOps())) {
     op.moveAfter(previousOp);
-    setHandshakeBB(builder, &op, 2);
+    dynamatic::setBB(&op, 2);
     previousOp = &op;
   }
 
