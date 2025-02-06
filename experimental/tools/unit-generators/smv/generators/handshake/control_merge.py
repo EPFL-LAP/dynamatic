@@ -9,14 +9,15 @@ from generators.support.utils import SmvScalarType
 def generate_control_merge(name, params):
   size = params["size"]
   data_type = SmvScalarType(params["data_type"])
+  index_type = SmvScalarType(params["index_type"])
 
   if data_type.bitwidth == 0:
-    return _generate_control_merge_dataless(name, size)
+    return _generate_control_merge_dataless(name, size, index_type)
   else:
-    return _generate_control_merge(name, size, data_type)
+    return _generate_control_merge(name, size, index_type, data_type)
 
 
-def _generate_control_merge_dataless(name, size):
+def _generate_control_merge_dataless(name, size, index_type):
   return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
   VAR
@@ -26,8 +27,8 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
 
   DEFINE
   index_in := case
-    {"\n    ".join([f"ins_valid_{n} = TRUE : {n};" for n in range(size)])}
-    TRUE: 0;
+    {"\n    ".join([f"ins_valid_{n} = TRUE : {index_type.format_constant(n)};" for n in range(size)])}
+    TRUE: {index_type.format_constant(0)};
   esac;
 
   // output
@@ -38,12 +39,12 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
   index := inner_tehb.outs;
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
-{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.channel<i32>"})}
+{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": index_type.mlir_type})}
 {generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": "!handshake.control<>"})}
 """
 
 
-def _generate_control_merge(name, size, data_type):
+def _generate_control_merge(name, size, index_type, data_type):
   return f"""
 MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, outs_ready, index_ready)
   VAR
@@ -63,12 +64,12 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, out
   outs := data;
   index := inner_control_merge.index;
 
-{_generate_control_merge_dataless(f"{name}__control_merge_dataless", size)}
+{_generate_control_merge_dataless(f"{name}__control_merge_dataless", size, index_type)}
 """
 
 
 if __name__ == "__main__":
   print(generate_control_merge("test_control_merge_dataless",
-        {"size": 4, "data_type": "!handshake.control<>"}))
+        {"size": 4, "index_type": "!handshake.channel<i32>", "data_type": "!handshake.control<>"}))
   print(generate_control_merge(
-      "test_control_merge_fork", {"size": 2, "data_type": "!handshake.channel<i32>"}))
+      "test_control_merge_fork", {"size": 2, "index_type": "!handshake.channel<i1>", "data_type": "!handshake.channel<i32>"}))

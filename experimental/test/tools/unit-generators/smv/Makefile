@@ -62,9 +62,10 @@ constant:
 
 control_merge:
 	@echo "Testing control_merge..."
-	@python $(GENPATH)smv-unit-generator.py -n test_module -t control_merge -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_module -t control_merge -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)
-	@if [ "$(NUXMV)" = "1" ]; then echo "control_merge nuXmv check skipped!"; fi
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t control_merge -p size=2 index_type="\"!handshake.channel<i1>\"" data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 4)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t control_merge -p size=2 index_type="\"!handshake.channel<i1>\"" data_type="\"!handshake.channel<i1>\"" $(OUT)
+	@$(call run_nuxmv, 6)
 
 fork:
 	@echo "Testing fork..."
@@ -99,8 +100,10 @@ merge:
 
 mux:
 	@echo "Testing mux..."
-	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 7)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t mux -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
+	@$(call run_nuxmv, 7)
 
 select:
 	@echo "Testing select..."
