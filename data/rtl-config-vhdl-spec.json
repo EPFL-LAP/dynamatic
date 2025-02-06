@@ -1,0 +1,6 @@
+[
+  {
+    "name": "handshake.cond_br",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  }
+]

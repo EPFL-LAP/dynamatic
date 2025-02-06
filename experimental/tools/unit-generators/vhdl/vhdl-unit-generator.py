@@ -1,6 +1,4 @@
 import argparse
-import sys
-import ast
 
 import generators.handshake.cond_br as cond_br
 
@@ -11,17 +9,9 @@ def generate_code(name, mod_type, parameters):
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
-def parse_parameters(param_list):
-  try:
-    param_dict = {}
-    for pair in param_list:
-      key, value = pair.split("=")
-      if value != "":
-        param_dict[key.strip()] = ast.literal_eval(value.strip())
-    return param_dict
-  except ValueError:
-    raise ValueError("Invalid parameter format. Use key=value key=value,...")
-
+def parse_key_value(key_value):
+  key, value = key_value.split("=")
+  return key, value
 
 def main():
   parser = argparse.ArgumentParser(description="SMV Generator Script")
@@ -34,6 +24,7 @@ def main():
   parser.add_argument(
       "-p",
       "--parameters",
+      type=parse_key_value,
       required=True,
       nargs="+",
       help="Set of parameters in key=value key=value format",
@@ -41,14 +32,10 @@ def main():
 
   args = parser.parse_args()
 
-  try:
-    parameters = parse_parameters(args.parameters)
-  except ValueError as e:
-    sys.stderr.write(f"Error parsing parameters: {e}")
-    sys.exit(1)
+  parameters = dict(args.parameters)
 
   # Printing parameters for diagnostic purposes
-  header = f"-- {args.name} : {args.type}({args.parameters})\n\n"
+  header = f"-- {args.name} : {args.type}({parameters})\n\n"
   print(header + generate_code(args.name, args.type, parameters))
 
 
