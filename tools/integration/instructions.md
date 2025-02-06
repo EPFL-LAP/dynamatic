@@ -89,6 +89,8 @@ the script will run tests whose source files are named `kernel_3mm_float.c` and 
 
 The file `ignored_tests.txt` in the main branch has a list of tests that are known to fail for various reasons, so it is recommended to use it when testing to avoid unnecessary running. Please note that the integration tests take quite a long time to run, so it is also recommended to use a custom list of tests to run to speed up testing when debugging.
 
+**Note:** It is possible to modify the `.dyn` file that is run by modifying the `SCRIPT_CONTENT` variable in `run_integration.py`. This is useful if you require, for example, running the integration tests with specific Dynamatic flags. This is just temporary, as in the future, a more robust way of running tests with various options will be added.
+
 ## GitHub Actions workflow
 
 In order to verify the compliance of contributions, an Actions workflow is set up for the purpose of integration testing. The workflow runs all integration tests (except the ones in `ignored_tests.txt`) when a pull request to the main branch is made. This does not apply to PRs marked as drafts, so if your PR is a draft, make sure to mark it as such to avoid running the workflow unnecessarily. Also, external contributors must receive approval to run the workflow on their PR due to security concerns. Please note that having the workflow successfully complete (i.e. pass all integration tests) is a necessary condition for having your PR approved.
