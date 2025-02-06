@@ -136,7 +136,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   DEFINE
   ins_ready := inner_tehb.ins_ready;
   outs_valid := inner_tehb.outs_valid;
-  outs := tehb_dataless.full ? data : ins;
+  outs := inner_tehb.full ? data : ins;
 
 {_generate_tehb_dataless(f"{name}__tehb_dataless")}
 """
@@ -165,7 +165,7 @@ def _generate_tfifo(name, slots, data_type):
   return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
-  inner_elastic_fifo : {name}__elastic_fifo_inner(fifo_valid, fifo_ready);
+  inner_elastic_fifo : {name}__elastic_fifo_inner(ins, fifo_valid, fifo_ready);
 
   DEFINE
   fifo_valid := ins_valid & (!outs_ready | inner_elastic_fifo.outs_valid);

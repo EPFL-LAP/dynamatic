@@ -19,7 +19,7 @@ MODULE {name}(ins_valid, outs_ready)
 
   DEFINE
   read_en := outs_ready & !empty;
-  write_en := ins_valid and (!full or outs_ready);
+  write_en := ins_valid & (!full | outs_ready);
 
   ASSIGN
   init(tail) := 0;
@@ -75,7 +75,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
   DEFINE
   read_en := outs_ready & !empty;
-  write_en := ins_valid and (!full or outs_ready);
+  write_en := ins_valid & (!full | outs_ready);
 
   ASSIGN
   init(tail) := 0;
