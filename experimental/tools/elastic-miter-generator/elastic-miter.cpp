@@ -218,8 +218,8 @@ static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   return funcOp;
 }
 
-static LogicalResult createFiles(StringRef outputDir, ModuleOp mod,
-                                 llvm::json::Object jsonObject) {
+static LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
+                                 ModuleOp mod, llvm::json::Object jsonObject) {
 
   std::error_code ec;
   OpPrintingFlags printingFlags;
@@ -232,7 +232,7 @@ static LogicalResult createFiles(StringRef outputDir, ModuleOp mod,
 
   // Create the the handshake miter file
   SmallString<128> outMLIRFile;
-  llvm::sys::path::append(outMLIRFile, outputDir, "handshake_miter.mlir");
+  llvm::sys::path::append(outMLIRFile, outputDir, mlirFilename);
   llvm::raw_fd_ostream fileStream(outMLIRFile, ec, llvm::sys::fs::OF_None);
 
   mod->print(fileStream, printingFlags);
@@ -519,5 +519,11 @@ int main(int argc, char **argv) {
   }
   auto [miterModule, json] = ret.value();
 
-  exit(failed(createFiles(outputDir, miterModule, json)));
+  std::string mlirFilename =
+      "elastic_miter_" +
+      std::filesystem::path(lhsFilenameArg.getValue()).stem().string() + "_" +
+      std::filesystem::path(rhsFilenameArg.getValue()).stem().string() +
+      ".mlir";
+
+  exit(failed(createFiles(outputDir, mlirFilename, miterModule, json)));
 }
