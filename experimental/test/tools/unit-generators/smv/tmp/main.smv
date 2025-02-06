@@ -1,0 +1,9 @@
+ #include "./module.smv"
+
+MODULE main
+  VAR
+  v0 : boolean;
+  v1 : boolean;
+  v2 : boolean;
+  dut : test_module(v0, v1, v2);
+

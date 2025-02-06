@@ -1,0 +1,33 @@
+// test_module : buffer(['slots=1', 'data_type="!handshake.channel<i1>"', 'timing="#handshake.timing< {R: 1}>"'])
+
+
+MODULE test_module(ins, ins_valid, outs_ready)
+  VAR
+  inner_tehb : test_module__tehb_dataless(ins_valid, outs_ready);
+  data : boolean;
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+
+  // output
+  DEFINE
+  ins_ready := inner_tehb.ins_ready;
+  outs_valid := inner_tehb.outs_valid;
+  outs := tehb_dataless.full ? data : ins;
+
+
+MODULE test_module__tehb_dataless(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+
+  ASSIGN
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
+
+  // output
+  DEFINE
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
+
+

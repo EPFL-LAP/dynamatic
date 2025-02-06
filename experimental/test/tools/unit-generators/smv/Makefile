@@ -1,11 +1,19 @@
 GENPATH ?= "../../../../tools/unit-generators/smv/"
-VERBOSE ?= 0
+NUXMVPAT ?= "../../../../../../nuXmv-2.0.0-Linux/bin/"
+NUXMV ?= 1
 
-ifeq ($(VERBOSE), 0)
+ifeq ($(NUXMV), 0)
 	OUT = 1> /dev/null
 else
-	OUT = 
+	OUT = 1> ./tmp/module.smv
 endif
+
+define run_nuxmv
+if [ "$(NUXMV)" = "1" ]; then \
+	python testbench-generator.py $(1) > ./tmp/main.smv; \
+	$(NUXMVPAT)nuXmv -source prove.cmd 1> /dev/null; \
+fi
+endef
 
 
 test: handshake arith
@@ -15,76 +23,90 @@ arith:
 handshake: br buffer cond_br constant control_merge fork join lazy_fork load merge mux select sink source store
 
 br:
-	@echo "Generating br..."
-	@python $(GENPATH)smv-unit-generator.py -n test_br_dataless -t br -p data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_br -t br -p data_type="\"!handshake.channel<i32>\"" $(OUT)
+	@echo "Testing br..."
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t br -p data_type="\"!handshake.control<>\"" $(OUT)
+	@$(call run_nuxmv, 2)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t br -p data_type="\"!handshake.channel<i1>\"" $(OUT)
+	@$(call run_nuxmv, 3)
 
 buffer:
-	@echo "Generating buffer..."
-	@python $(GENPATH)smv-unit-generator.py -n test_tehb_dataless -t buffer -p slots=1 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_tehb -t buffer -p slots=1 data_type="\"!handshake.channel<ui16>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_tfifo_dataless -t buffer -p slots=5 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_tfifo -t buffer -p slots=5 data_type="\"!handshake.channel<ui16>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_oehb_dataless -t buffer -p slots=1 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_oehb -t buffer -p slots=1 data_type="\"!handshake.channel<ui16>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_ofifo_dataless -t buffer -p slots=5 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_ofifo -t buffer -p slots=5 data_type="\"!handshake.channel<ui16>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
+	@echo "Testing buffer..."
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
+	@$(call run_nuxmv, 2)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type="\"!handshake.channel<i1>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
+	@$(call run_nuxmv, 3)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
+	@$(call run_nuxmv, 2)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type="\"!handshake.channel<i1>\"" timing="\"#handshake.timing< {R: 1}>\"" $(OUT)
+	@$(call run_nuxmv, 3)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
+	@$(call run_nuxmv, 2)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type="\"!handshake.channel<i1>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
+	@$(call run_nuxmv, 3)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type="\"!handshake.control<>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
+	@$(call run_nuxmv, 2)
+	@python $(GENPATH)smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type="\"!handshake.channel<i1>\"" timing="\"#handshake.timing< {R: 0}>\"" $(OUT)
+	@$(call run_nuxmv, 3)
 
 cond_br:
-	@echo "Generating cond_br..."
+	@echo "Testing cond_br..."
 	@python $(GENPATH)smv-unit-generator.py -n test_cond_br_dataless -t cond_br -p data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_cond_br -t cond_br -p data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_cond_br -t cond_br -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 constant:
-	@echo "Generating constant..."
+	@echo "Testing constant..."
 	@python $(GENPATH)smv-unit-generator.py -n test_constant -t constant -p value=42 data_type="\"!handshake.control<>\"" $(OUT)
 
 control_merge:
-	@echo "Generating control_merge..."
+	@echo "Testing control_merge..."
 	@python $(GENPATH)smv-unit-generator.py -n test_control_merge_dataless -t control_merge -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_control_merge -t control_merge -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_control_merge -t control_merge -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 fork:
-	@echo "Generating fork..."
+	@echo "Testing fork..."
 	@python $(GENPATH)smv-unit-generator.py -n test_fork_dataless -t fork -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_fork -t fork -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_fork -t fork -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 join:
-	@echo "Generating join..."
+	@echo "Testing join..."
 	@python $(GENPATH)smv-unit-generator.py -n test_join -t join -p size=3 $(OUT)
 
 lazy_fork:
-	@echo "Generating lazy_fork..."
+	@echo "Testing lazy_fork..."
 	@python $(GENPATH)smv-unit-generator.py -n test_lazy_fork_dataless -t lazy_fork -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_lazy_fork -t lazy_fork -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_lazy_fork -t lazy_fork -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 load:
-	@echo "Generating load..."
-	@python $(GENPATH)smv-unit-generator.py -n test_load -t load -p data_type="\"!handshake.channel<i16>\"" addr_type="\"!handshake.channel<i32>\"" $(OUT)
+	@echo "Testing load..."
+	@python $(GENPATH)smv-unit-generator.py -n test_load -t load -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
 
 merge:
-	@echo "Generating merge..."
+	@echo "Testing merge..."
 	@python $(GENPATH)smv-unit-generator.py -n test_merge -t merge -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_merge -t merge -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_merge -t merge -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 mux:
-	@echo "Generating mux..."
+	@echo "Testing mux..."
 	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=4 data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=2 data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_mux -t mux -p size=2 data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 select:
-	@echo "Generating select..."
-	@python $(GENPATH)smv-unit-generator.py -n test_select -t select -p data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@echo "Testing select..."
+	@python $(GENPATH)smv-unit-generator.py -n test_select -t select -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 sink:
-	@echo "Generating sink..."
+	@echo "Testing sink..."
 	@python $(GENPATH)smv-unit-generator.py -n test_sink -t sink -p data_type="\"!handshake.control<>\"" $(OUT)
-	@python $(GENPATH)smv-unit-generator.py -n test_sink -t sink -p data_type="\"!handshake.channel<i32>\"" $(OUT)	
+	@python $(GENPATH)smv-unit-generator.py -n test_sink -t sink -p data_type="\"!handshake.channel<i1>\"" $(OUT)	
 
 source:
-	@echo "Generating source..."
+	@echo "Testing source..."
 	@python $(GENPATH)smv-unit-generator.py -n test_source -t source $(OUT)
 
 store:
-	@echo "Generating store..."
-	@python $(GENPATH)smv-unit-generator.py -n test_store -t store -p data_type="\"!handshake.channel<i16>\"" addr_type="\"!handshake.channel<i32>\"" $(OUT)
+	@echo "Testing store..."
+	@python $(GENPATH)smv-unit-generator.py -n test_store -t store -p data_type="\"!handshake.channel<i1>\"" addr_type="\"!handshake.channel<i1>\"" $(OUT)
+
+
+clean:
+	rm tmp/*
