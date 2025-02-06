@@ -1,6 +1,11 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.logic import generate_and_n
 
+header = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+"""
+
 def generate_join(name, params):
   size = params["size"]
 
@@ -8,7 +13,7 @@ def generate_join(name, params):
   dependencies = generate_and_n(and_n_module_name, size)
 
   entity = f"""
-entity join is
+entity {name} is
   port (
     -- inputs
     ins_valid  : in std_logic_vector({size} - 1 downto 0);
@@ -17,11 +22,11 @@ entity join is
     outs_valid : out std_logic;
     ins_ready  : out std_logic_vector({size} - 1 downto 0)
   );
-end join;
+end entity;
 """
 
   architecture = f"""
-architecture arch of join is
+architecture arch of {name} is
   signal allValid : std_logic;
 begin
   allValidAndGate : entity work.{and_n_module_name} port map(ins_valid, allValid);
@@ -46,4 +51,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return dependencies + header + entity + architecture

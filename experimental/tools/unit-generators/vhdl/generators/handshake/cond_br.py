@@ -1,4 +1,5 @@
 from generators.support.utils import VhdlScalarType
+from generators.support.join import generate_join
 
 # todo: move to somewhere else (like utils.py)
 header = f"""
@@ -32,7 +33,7 @@ def generate_cond_br(name, params):
 
 def _generate_cond_br_dataless(name):
   # todo: generate_join is not implemented
-  dependencies = generate_join(f"{name}_join", {size: 2})
+  dependencies = generate_join(f"{name}_join", {"size": 2})
 
   entity = f"""
 entity {name} is
@@ -53,7 +54,7 @@ entity {name} is
     falseOut_ready : in  std_logic
   );
 end entity;
-  """
+"""
 
   architecture = f"""
 architecture arch of {name} is
@@ -76,9 +77,9 @@ begin
   falseOut_valid <= (not condition(0)) and branchInputs_valid;
   branch_ready   <= (falseOut_ready and not condition(0)) or (trueOut_ready and condition(0));
 end architecture;
-  """
+"""
 
-  return header + dependencies + entity + architecture
+  return dependencies + header + entity + architecture
 
 def _generate_cond_br(name, bitwidth):
   dependencies = _generate_cond_br_dataless(f"{name}_dataless")
@@ -105,7 +106,7 @@ entity {name} is
     falseOut_ready : in  std_logic
   );
 end entity;
-  """
+"""
 
   architecture = f"""
 architecture arch of {name} is
@@ -128,9 +129,9 @@ begin
   trueOut  <= data;
   falseOut <= data;
 end architecture;
-  """
+"""
 
-  return header + dependencies + entity + architecture
+  return dependencies + header + entity + architecture
 
 # todo: can be reusable among various unit generators
 extra_signal_logic = {
@@ -154,7 +155,7 @@ entity {name} is
     data_ready : out std_logic;
     condition : in std_logic_vector(0 downto 0);
     condition_valid : in std_logic;
-    condition_ready : out std_logic
+    condition_ready : out std_logic;
     trueOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);
     trueOut_valid : out std_logic;
     trueOut_ready : in std_logic;
@@ -172,9 +173,9 @@ end entity;
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-  for name in data_type.extra_signals:
-    if name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {name} is not supported")
+  for signal_name in data_type.extra_signals:
+    if signal_name not in extra_signal_logic:
+      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is
@@ -200,13 +201,14 @@ begin
       falseOut_valid => falseOut_valid,
       falseOut_ready => falseOut_ready
     );
+end architecture;
 """
 
-  architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
     extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
-  return header + dependencies + entity + architecture
+  return dependencies + header + entity + architecture
 
 def _generate_cond_br_signal_manager_dataless(name, data_type):
   dependencies = _generate_cond_br_dataless(f"{name}_inner")
@@ -221,7 +223,7 @@ entity {name} is
     data_ready : out std_logic;
     condition : in std_logic_vector(0 downto 0);
     condition_valid : in std_logic;
-    condition_ready : out std_logic
+    condition_ready : out std_logic;
     trueOut_valid : out std_logic;
     trueOut_ready : in std_logic;
     falseOut_valid : out std_logic;
@@ -237,9 +239,9 @@ end entity;
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-  for name in data_type.extra_signals:
-    if name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {name} is not supported")
+  for signal_name in data_type.extra_signals:
+    if signal_name not in extra_signal_logic:
+      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is
@@ -262,10 +264,22 @@ begin
       falseOut_valid => falseOut_valid,
       falseOut_ready => falseOut_ready
     );
+end architecture;
 """
 
-  architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
     extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
-  return header + dependencies + entity + architecture
+  return dependencies + header + entity + architecture
+
+if __name__ == "__main__":
+  print(generate_cond_br("test_cond_br_spec", {
+    "data_type": "!handshake.channel<i32>"
+  }))
+  print(generate_cond_br("test_cond_br_dataless_spec", {
+    "data_type": "!handshake.control<[spec: i1]>"
+  }))
+  print(generate_cond_br("test_cond_br_spec", {
+    "data_type": "!handshake.channel<i32, [spec: i1]>"
+  }))
