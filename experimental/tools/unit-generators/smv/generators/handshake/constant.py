@@ -13,9 +13,10 @@ def _generate_constant(name, value, data_type):
 MODULE {name}(ins_valid, outs_ready)
 
   // output
-  DEFINE ins_ready := outs_ready;
-  DEFINE outs_valid := ins_valid;
-  DEFINE outs := {data_type.format_constant(value)};
+  DEFINE
+  ins_ready := outs_ready;
+  outs_valid := ins_valid;
+  outs := {data_type.format_constant(value)};
 """
 
 

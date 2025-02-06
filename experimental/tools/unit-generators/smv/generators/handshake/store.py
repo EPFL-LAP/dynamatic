@@ -13,12 +13,13 @@ def _generate_store(name, data_type, addr_type):
 MODULE {name}(data_in, data_in_valid, addr_in, addr_in_valid, data_to_mem_ready, addr_out_ready)
 
   //output
-  DEFINE data_in_ready := data_to_mem_ready;
-  DEFINE addr_in_ready := addr_out_ready;
-  DEFINE data_to_mem := data_in;
-  DEFINE data_to_mem_valid := data_in_valid;
-  DEFINE addr_out := addr_in;
-  DEFINE addr_out_valid := addr_in_valid;
+  DEFINE
+  data_in_ready := data_to_mem_ready;
+  addr_in_ready := addr_out_ready;
+  data_to_mem := data_in;
+  data_to_mem_valid := data_in_valid;
+  addr_out := addr_in;
+  addr_out_valid := addr_in_valid;
 """
 
 

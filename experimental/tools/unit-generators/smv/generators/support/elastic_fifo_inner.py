@@ -11,13 +11,15 @@ def generate_elastic_fifo_inner(name, slots, data_type=None):
 def _generate_elastic_fifo_inner_dataless(name, slots):
   return f"""
 MODULE {name}(ins_valid, outs_ready)
-  VAR full : boolean;
-  VAR empty : boolean;
-  VAR head : 0..({slots - 1});
-  VAR tail : 0..({slots - 1});
+  VAR
+  full : boolean;
+  empty : boolean;
+  head : 0..({slots - 1});
+  tail : 0..({slots - 1});
 
-  DEFINE read_en := outs_ready & !empty;
-  DEFINE write_en := ins_valid and (!full or outs_ready);
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid and (!full or outs_ready);
 
   ASSIGN
   init(tail) := 0;
@@ -26,14 +28,12 @@ MODULE {name}(ins_valid, outs_ready)
     TRUE : tail;
   esac;
 
-  ASSIGN
   init(head) := 0;
   next(head) := case
     {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
     TRUE : head;
   esac;
 
-  ASSIGN
   init(full) := FALSE;
   next(full) := case
     write_en & !read_en : case
@@ -45,7 +45,6 @@ MODULE {name}(ins_valid, outs_ready)
     TRUE : full;
   esac;
 
-  ASSIGN
   init(empty) := TRUE;
   next(empty) := case
     !write_en & read_en : case
@@ -58,8 +57,9 @@ MODULE {name}(ins_valid, outs_ready)
   esac;
 
   // output
-  DEFINE ins_ready := !full & outs_ready;
-  DEFINE outs_valid := !empty;
+  DEFINE
+  ins_ready := !full & outs_ready;
+  outs_valid := !empty;
 """
 
 
@@ -67,13 +67,15 @@ def _generate_elastic_fifo_inner(name, slots, data_type):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   {"\n  ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}
-  VAR full : boolean;
-  VAR empty : boolean;
-  VAR head : 0..({slots - 1});
-  VAR tail : 0..({slots - 1});
+  VAR
+  full : boolean;
+  empty : boolean;
+  head : 0..({slots - 1});
+  tail : 0..({slots - 1});
 
-  DEFINE read_en := outs_ready & !empty;
-  DEFINE write_en := ins_valid and (!full or outs_ready);
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid and (!full or outs_ready);
 
   ASSIGN
   init(tail) := 0;
@@ -82,7 +84,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
     TRUE : tail;
   esac;
 
-  ASSIGN
   init(head) := 0;
   next(head) := case
     {"\n    ".join([f"read_en & (head = {n}) : {(n + 1) % slots};" for n in range(slots)])}
@@ -93,7 +94,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
   init(mem_{n}) := {data_type.format_constant(0)};
   next(mem_{n}) := write_en & (tail = {n}) ? ins : mem_{n};""" for n in range(slots)])}
 
-  ASSIGN
   init(full) := FALSE;
   next(full) := case
     write_en & !read_en : case
@@ -105,7 +105,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
     TRUE : full;
   esac;
 
-  ASSIGN
   init(empty) := TRUE;
   next(empty) := case
     !write_en & read_en : case
@@ -118,9 +117,10 @@ MODULE {name}(ins, ins_valid, outs_ready)
   esac;
 
   // output
-  DEFINE ins_ready := !full & outs_ready;
-  DEFINE outs_valid := !empty;
-  DEFINE outs := case
+  DEFINE
+  ins_ready := !full & outs_ready;
+  outs_valid := !empty;
+  outs := case
     {"\n    ".join([f"head = {n} : mem_{n};" for n in range(slots)])}
     TRUE : mem_0;
   esac;

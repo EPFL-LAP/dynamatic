@@ -3,7 +3,8 @@ def generate_source(name, params):
 MODULE {name}(outs_ready)
 
   // output
-  DEFINE outs_valid  := TRUE;
+  DEFINE
+  outs_valid  := TRUE;
 """
 
 
