@@ -21,7 +21,7 @@ MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
   DEFINE
   any_block_stop := {" | ".join([f"inner_reg_block_{n}.block_stop" for n in range(size)])};
-  backpressure := ins_valid and any_block_stop;
+  backpressure := ins_valid & any_block_stop;
 
   // output
   DEFINE
@@ -40,7 +40,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)
 
   //output
   DEFINE
-  ins_ready = inner_fork.ins_ready;
+  ins_ready := inner_fork.ins_ready;
   {"\n    ".join([f"outs_{n} := ins;" for n in range(size)])}
   {"\n    ".join([f"outs_valid_{n} := inner_fork.outs_valid_{n};" for n in range(size)])}
 
