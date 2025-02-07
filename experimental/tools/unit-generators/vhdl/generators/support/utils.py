@@ -66,3 +66,12 @@ class VhdlScalarType:
 
   def is_channel(self):
     return self.bitwidth > 0
+
+def generate_extra_signal_ports(ports, extra_signals):
+  return "    -- extra signal ports\n" + "\n".join([
+    "\n".join([
+      f"    {port}_{name} : {inout} std_logic_vector({bitwidth - 1} downto 0);"
+      for name, bitwidth in extra_signals.items()
+    ])
+    for port, inout in ports
+  ])

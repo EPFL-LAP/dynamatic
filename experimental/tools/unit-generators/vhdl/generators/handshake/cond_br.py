@@ -1,4 +1,4 @@
-from generators.support.utils import VhdlScalarType
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.join import generate_join
 
 # todo: move to somewhere else (like utils.py)
@@ -7,16 +7,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 """
-
-# todo: move to somewhere else (like utils.py)
-def generate_extra_signal_ports(ports, extra_signals):
-  return "    -- extra signal ports\n" + "\n".join([
-    "\n".join([
-      f"    {port}_{name} : {inout} std_logic_vector({bitwidth - 1} downto 0);"
-      for name, bitwidth in extra_signals.items()
-    ])
-    for port, inout in ports
-  ])
 
 def generate_cond_br(name, params):
   data_type = VhdlScalarType(params["data_type"])
