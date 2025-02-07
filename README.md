@@ -80,5 +80,3 @@ The following instructions can be used to setup Dynamatic from source. If you in
     cd build
     ninja check-dynamatic
     ```
-
-    _**Important note:** If Dynamatic is built in Release mode, one of the tests will crash (see [#164](https://github.com/EPFL-LAP/dynamatic/issues/164)), hence it is recommended to run these tests in the Debug build._

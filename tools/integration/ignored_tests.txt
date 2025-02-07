@@ -2,7 +2,6 @@ external_integration
 path_profiling
 admm
 covariance_float
-float_basic
 while_loop_2
 kmp
 correlation_float
@@ -13,4 +12,3 @@ covariance
 trisolv
 polyn_mult
 cnn
-matching_2

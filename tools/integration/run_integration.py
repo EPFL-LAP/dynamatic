@@ -7,6 +7,7 @@ import sys
 import shutil
 import subprocess
 import re
+from pathlib import Path
 
 
 class CLIHandler:
@@ -47,19 +48,23 @@ class CLIHandler:
         return self.parser.parse_args(args)
 
 
-INTEGRATION_FOLDER = "../../integration-test/"
-SCRIPT_CONTENT = """set-dynamatic-path ../..
+DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
+INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
+SCRIPT_CONTENT = \
+    f"set-dynamatic-path {DYNAMATIC_ROOT}" \
+    + """
 set-src {src_path}
 compile
 write-hdl
 simulate
 exit
 """
-DYN_FILE = "../../build/run_test.dyn"
+DYN_FILE = DYNAMATIC_ROOT / "build" / "run_test.dyn"
 
 # Note: Must use --exit-on-failure in order for run_command_with_timeout
 #       to be able to detect the status code properly
-DYNAMATIC_COMMAND = "../../bin/dynamatic --exit-on-failure --run {script_path}"
+DYNAMATIC_COMMAND = str(DYNAMATIC_ROOT / "bin" / "dynamatic") + \
+    " --exit-on-failure --run {script_path}"
 
 # Class to have different colors while writing in terminal
 
@@ -219,19 +224,28 @@ def main():
     cli = CLIHandler()
     args = cli.parse_args()  # Parse the CLI arguments
 
-    c_files = []
+    c_files = find_files_ext(INTEGRATION_FOLDER, ".c")
+    test_names = []
     if args.list:
         test_names = read_file(args.list).strip().split("\n")
-        c_files = [os.path.join(INTEGRATION_FOLDER, name, f"{
-                                name}.c") for name in test_names]
-    else:
-        c_files = find_files_ext(INTEGRATION_FOLDER, ".c")
+        filtered_c_files = []
+        for test in test_names:
+            found = False
+            for file in c_files:
+                if Path(file).name == test + ".c":
+                    filtered_c_files.append(file)
+                    found = True
+                    break
+
+            if not found:
+                color_print(f"[WARNING] Test '{test}' not found",
+                            TermColors.WARNING)
+
+        c_files = filtered_c_files
 
     ignored_tests = []
     if args.ignore:
-        test_names = read_file(args.ignore).strip().split("\n")
-        ignored_tests = [os.path.join(INTEGRATION_FOLDER, name, f"{
-                                      name}.c") for name in test_names]
+        ignored_tests = read_file(args.ignore).strip().split("\n")
 
     print("========= INTEGRATION TEST =========")
 
@@ -247,7 +261,7 @@ def main():
         out_dir = replace_filename_with(c_file, "out")
 
         # Check if test is supposed to be ignored
-        if c_file in ignored_tests:
+        if Path(c_file).name[:-2] in ignored_tests:
             ignored_cnt += 1
             color_print(f"[IGNORED] {c_file}", TermColors.OKGREEN)
             continue
@@ -261,22 +275,30 @@ def main():
 
         # Run test and output result
         if args.timeout:
-            result = run_command_with_timeout(DYNAMATIC_COMMAND.format(
-                script_path=DYN_FILE), timeout=int(args.timeout))
+            result = run_command_with_timeout(
+                DYNAMATIC_COMMAND.format(script_path=DYN_FILE),
+                timeout=int(args.timeout)
+            )
         else:
             result = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=DYN_FILE))
+                DYNAMATIC_COMMAND.format(script_path=DYN_FILE)
+            )
 
         if result == 0:
             sim_log_path = os.path.join(out_dir, "sim", "report.txt")
             try:
                 sim_time = get_sim_time(sim_log_path)
-                color_print(f"[PASS] {c_file} (simulation duration: {
-                            round(sim_time / 4)} cycles)", TermColors.OKGREEN)
+                color_print(
+                    f"[PASS] {c_file} (simulation duration: "
+                    f"{round(sim_time / 4)} cycles)",
+                    TermColors.OKGREEN
+                )
             except ValueError:
                 # This should never happen
                 color_print(
-                    f"[PASS] {c_file} (simulation duration: NOT FOUND)", TermColors.OKGREEN)
+                    f"[PASS] {c_file} (simulation duration: NOT FOUND)",
+                    TermColors.OKGREEN
+                )
 
             passed_cnt += 1
         elif result == 1:
@@ -286,8 +308,12 @@ def main():
 
         sys.stdout.flush()
 
-    print(f"** Integration testing finished: passed {passed_cnt}/{test_cnt} tests ({
-          100 * passed_cnt / test_cnt: .2f}% ), {ignored_cnt} ignored **")
+    print(
+        f"** Integration testing finished: "
+        f"passed {passed_cnt}/{test_cnt} tests "
+        f"({100 * passed_cnt / test_cnt: .2f}% ), "
+        f"{ignored_cnt} ignored **"
+    )
     if passed_cnt == test_cnt:
         sys.exit(0)
     else:

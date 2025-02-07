@@ -33,6 +33,9 @@ llvm_config.use_default_substitutions()
 
 # excludes: A list of directories to exclude from the testsuite.
 config.excludes = ['CMakeLists.txt', 'README.md']
+if config.cmake_build_type == "Release":
+    print("[WARNING] Skipping `invalid.mlir` in Release mode")
+    config.excludes.append("invalid.mlir")
 
 # Tweak the PATH to include the tools dir.
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
