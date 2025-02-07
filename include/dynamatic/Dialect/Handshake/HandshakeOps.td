@@ -340,7 +340,6 @@ def MuxOp : Handshake_Op<"mux", [
   VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"selectOperand">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -367,7 +366,7 @@ def MuxOp : Handshake_Op<"mux", [
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins IntChannelType:$selectOperand,
+  let arguments = (ins SimpleChannel:$selectOperand,
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
 
@@ -380,7 +379,6 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"index">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
@@ -401,7 +399,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
-  let results = (outs HandshakeType:$result, ChannelType:$index);
+  let results = (outs HandshakeType:$result, SimpleChannel:$index);
   
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
