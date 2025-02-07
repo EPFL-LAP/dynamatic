@@ -1,8 +1,17 @@
 # Extra Signals for Operations
 
-The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. We use MLIR's type verification tools to enforce rules for how extra signals are passed to and from operations. Since these rules differ from operation to operation, we describe them in this document.
+The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. To ensure this, we leverage MLIR's type verification tools, enforcing rules for how extra signals are passed to and from operations.
 
-## Operations Within a Basic Block
+This document is structured as follows:
+
+1. We first provide a visual overview of how these rules apply to each operation.
+2. We then explore the codebase—focusing on TableGen files—to see how these rules are implemented in practice.
+
+## 1. Operation-Specific Rules
+
+Since these rules differ from operation to operation, we describe them in this document.
+
+### Operations Within a Basic Block
 
 Here, operations are considered within a basic block if all their operands and results are used exclusively within that block. With a few exceptions, most operations within a basic block are required to have consistent extra signals across all their inputs and outputs.
 
@@ -14,11 +23,9 @@ This constraint is designed to reduce variability in these operations, simplifyi
 
 Note that the *values* of these extra signals do not necessarily need to match; their behavior depends on the specification of the extra signal. For instance, in the `addi` example, one input’s `spec` signal might hold the value `1`, while the other input’s `spec` signal could hold `0`. The RTL implementation of `addi` must account for and handle these cases appropriately.
 
-This constraint is enforced using the `AllTypesMatch` or `AllExtraSignalsMatch` type constraints for the operands of such operations.
-
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
-## MuxOp and CMergeOp
+### MuxOp and CMergeOp
 
 These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
 
@@ -36,21 +43,15 @@ As a result, the complete structure of a Mux or CMerge operation appears as foll
 
 <img alt="the IO of Mux and Cmerge" src="./Figures/ExtraSignalsForOperations/mux_cmerge.png" width="600" />
 
-The data output has spec: i1 and tag: i8 because some inputs have them, and nothing else.
+The data output has `spec: i1` and `tag: i8` because some inputs have them, and nothing else.
 
 The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must provide the value of the missing extra signal for the output.
-
-These rules are enforced using the following constraints:
-
-- `MergingExtraSignals`: Ensures the validity of extra signals across inputs and the data output.
-- `AllDataTypesMatchWithVariadic`: Ensures consistency of data types across inputs and the data output.
-- `IsSimpleHandshake`: Ensures that the selector operand/result does not include any extra signals.
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
 For additional examples, please refer to the unit tests.
 
-## MemPortOp (Load and Store)
+### MemPortOp (Load and Store)
 
 The `MemPortOp` operations, such as load and store, communicate directly with a memory controller or a load-store queue (LSQ). The ports connected to these operations must be simple, meaning they should not carry any extra signals.
 
@@ -72,15 +73,9 @@ For the store operation, the structure is:
 - The `addrResult` and `dataResult` ports, which interface with the memory controller, must also be simple.
 - The `addr` and `data` ports must have matching extra signals.
 
-These constraints are enforced using:
-
-- `AllExtraSignalsMatch`: Ensures that the extra signals match between the respective ports.
-- `IsSimpleHandshake`: Ensures that the ports connected to the memory controller do not carry extra signals.
-- `AllDataTypesMatch`: Ensures the data types of `addr`/`addrResult` and `data`/`dataResult` are consistent.
-
 This design decision was discussed in the issue [#214](https://github.com/EPFL-LAP/dynamatic/issues/214).
 
-## ConstantOp
+### ConstantOp
 
 While this operation falls under the category of "operations within a basic block," it’s worth highlighting due to the non-trivial way it handles control tokens with extra signals that trigger the emission of a constant value.
 
@@ -97,6 +92,137 @@ Upon review, we found it more effective to forward the extra signals from the in
 As a result, `ConstantOp` is considered constant only for its data, while its extra signal values remain variable.
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a conversation in Pull Request #197](https://github.com/EPFL-LAP/dynamatic/pull/197#discussion_r1885735050).
+
+## 2. Exploring the Implementation
+
+Next, we’ll take a closer look at how these rules are implemented. We’ll begin by introducing some fundamental concepts.
+
+### Operations
+
+**Operations** in the Handshake IR (such as `MergeOp` or `ConstantOp`) are defined declaratively in TableGen files (`HandshakeOps.td` or `HandshakeArithOps.td`).
+
+Each operation has **arguments**, which are categorized into operands, attributes, and properties. We discuss only **operands** here. Operands represent the inputs to the RTL here. For example, `ConditionalBranchOp` has two operands: one for the condition and one for the data.
+
+https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L457-L458
+
+Some operands are **variadic**, meaning they can have a variable number of inputs. For example, the data operand of `MuxOp` is variadic.
+
+https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L362-L363
+
+More on operation arguments: https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments
+
+Each operation also has **results**, which represent the outputs of the RTL here. For instance, `ConditionalBranchOp` has two results, corresponding to the "true" and "false" branches.
+
+https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L459-L460
+
+More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-results
+
+### Types
+
+You may notice that operands and results are often denoted by types like `HandshakeType` or `BoolChannel`. In Handshake IR, types specify the kind of RTL port.
+The base class of all types in the Handshake dialect is the **`HandshakeType`** class.
+
+Most variables in the IR are either `ChannelType` or `ControlType`.
+
+- **`ChannelType`** – Represents a data port with **data + valid + ready** signals.
+- **`ControlType`** – Represents a control port with **valid + ready** signals.
+
+These types are defined in `HandshakeTypes.td`.
+
+
+
+The actual operands have concrete **instances** of these types. For example, an operand of `AddIOp` (integer addition) has a `ChannelType`, meaning its actual type will be:
+
+- `!handshake.channel<i32>` (for 32-bit integers)
+- `!handshake.channel<i8>` (for 8-bit integers)
+
+Since `ChannelType` allows different data types, multiple type instances are possible.
+
+`BoolChannel` is a special case that only allows `!handshake.channel<i1>`.
+
+
+
+Some `HandshakeType` instances may include **extra signals** beyond `(data +) valid + ready`. For example:
+
+- `!handshake.channel<i32, [spec: i1]>`
+- `!handshake.control<[spec: i1, tag: i8]>`
+
+
+
+In some cases, we enforce that an operand is **without** extra signals. For this, we use **simple types**:
+
+- `SimpleHandshake`
+- `SimpleChannel`
+- `SimpleControl`
+
+For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
+
+https://github.com/EPFL-LAP/dynamatic/blob/28872676a0f3438e82c064242fac517059e22fc2/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L621-L624
+
+These ensure that the channel does not carry any additional signals.
+
+### Traits
+
+**Traits** are constraints applied to operations. They serve various purposes, but here we discuss their use for type validation.
+
+For example, In `CompareOp`, the **lhs/rhs operands** must have the same type instance (e.g., `!handshake.channel<i32>`). However, simply specifying `ChannelType` for each is not enough—without additional constraints, the operation could exist with mismatched types, like:
+
+- `lhs: !handshake.channel<i8>`
+- `rhs: !handshake.channel<i32>`
+
+To enforce type consistency, we apply the **`AllTypesMatch`** trait:
+
+https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L67-L69
+
+This ensures that both elements share the exact same type instance.
+
+
+
+MLIR provides `AllTypesMatch`, but we've introduced similar traits:
+
+- **`AllDataTypesMatch`** – Ignores differences in extra signals.
+- **`AllExtraSignalsMatch`** – Ensures the extra signals match, ignoring the data type (if exists).
+
+
+
+Traits are sometimes called **multi-entity constraints** because they enforce relationships across multiple operands or results.
+
+- In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
+
+More on constraints: https://mlir.llvm.org/docs/DefiningDialects/Operations/#constraints
+
+### Applying Traits to Operations
+
+Now, let's see how traits are applied to different operations to enforce extra signal consistency.
+
+#### Operations Within a Basic Block
+
+Most operations use the `AllTypesMatch` trait to ensure that extra signals remain consistent across all inputs and outputs. However, when operands and results have different data types—such as the condition (`i1`) and data input (variable type) in `ConditionalBranchOp`—the `AllExtraSignalsMatch` trait is applied instead.
+
+#### MuxOp and CMergeOp
+
+The following constraints ensure proper handling of extra signals:
+
+- `MergingExtraSignals` – Validates extra signal consistency across the data inputs and data output.
+- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and data output.
+
+Additionally, the `selector` port is of type `SimpleChannel`, as it does not carry extra signals.
+
+#### MemPortOp (Load and Store)
+
+The following constraints are enforced:
+
+- `AllExtraSignalsMatch` – Ensures extra signals match across corresponding ports.
+- `IsSimpleHandshake` – Ensures that ports connected to the memory controller do not carry extra signals.
+- `AllDataTypesMatch` – Maintains consistency between `addr`/`addrResult` and `data`/`dataResult` data types.
+
+### More Information
+
+The MLIR documentation can be complex, but it covers the key concepts well. You can check out the following links for more details:
+
+https://mlir.llvm.org/docs/DefiningDialects/Operations
+
+https://mlir.llvm.org/docs/DefiningDialects/AttributesAndTypes
 
 ## Note
 
