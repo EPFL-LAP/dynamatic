@@ -165,16 +165,16 @@ These ensure that the channel does not carry any additional signals.
 
 **Traits** are constraints applied to operations. They serve various purposes, but here we discuss their use for type validation.
 
-For example, In `ConditionalBranchOp`, the **data operand** and **trueOut/falseOut results** must have the same type instance (e.g., `!handshake.channel<i32>`). However, simply specifying `ChannelType` for each is not enough—without additional constraints, the operation could exist with mismatched types, like:
+For example, In `CompareOp`, the **lhs/rhs operands** must have the same type instance (e.g., `!handshake.channel<i32>`). However, simply specifying `ChannelType` for each is not enough—without additional constraints, the operation could exist with mismatched types, like:
 
-- `dataOperand: !handshake.channel<i8>`
-- `trueResult / falseResult: !handshake.channel<i32>`
+- `lhs: !handshake.channel<i8>`
+- `rhs: !handshake.channel<i32>`
 
 To enforce type consistency, we apply the **`AllTypesMatch`** trait:
 
-https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L436-L437
+https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L67-L69
 
-This ensures that all three elements share the exact same type instance.
+This ensures that both elements share the exact same type instance.
 
 
 
