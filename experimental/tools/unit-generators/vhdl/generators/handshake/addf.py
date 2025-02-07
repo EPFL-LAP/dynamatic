@@ -12,9 +12,9 @@ def generate_addf(name, options):
     raise ValueError(f"Unsupported bitwidth {data_type.bitwidth}")
 
   if data_type.has_extra_signals():
-    return _generate_addf_signal_manager(name, is_double)
+    return _generate_addf_signal_manager(name, data_type, is_double)
   else:
-    return _generate_addf(name)
+    return _generate_addf(name, is_double)
 
 def _generate_addf(name, is_double, export_transfer=False):
   if is_double:
@@ -296,7 +296,7 @@ def _generate_addf_signal_manager(name, data_type, is_double):
 """,
       # Second string is for the actual logic
       f"""
-    spec_inner(0) <= lhs_spec or rhs_spec;
+    spec_tfifo_in <= lhs_spec or rhs_spec;
     spec_tfifo : entity work.{name}_spec_ofifo(arch)
       port map(
         clk => clk,
