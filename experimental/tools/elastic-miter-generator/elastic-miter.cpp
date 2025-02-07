@@ -263,17 +263,6 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   if (!rhsModule)
     return failure();
 
-  size_t lhsFuncOpCount = std::distance(lhsModule->getOps<FuncOp>().begin(),
-                                        lhsModule->getOps<FuncOp>().end());
-  size_t rhsFuncOpCount = std::distance(rhsModule->getOps<FuncOp>().begin(),
-                                        rhsModule->getOps<FuncOp>().end());
-
-  if (lhsFuncOpCount != 1 && rhsFuncOpCount != 1) {
-    llvm::errs() << "The provided module is invalid. It needs to contain "
-                    "exactely one FuncOp.\n";
-    return failure();
-  }
-
   // Get the LHS FuncOp from the LHS module, also check the
   auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule.get());
   if (failed(funcOrFailure))
