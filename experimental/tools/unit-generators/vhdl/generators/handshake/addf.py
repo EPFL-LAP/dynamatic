@@ -33,7 +33,7 @@ def _generate_addf_single_precision(name, export_transfer=False):
   ieee2nfloat_name = f"{name}_ieee2nfloat"
   nfloat2ieee_name = f"{name}_nfloat2ieee"
   floating_point_adder_name = f"{name}_floating_point_adder"
-  dependencies = generate_join(join_name, {"size": 2}) + \
+  dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1}) + \
     generate_input_ieee_32bit(ieee2nfloat_name) + \
@@ -78,6 +78,7 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
+      [POSSIBLE_TRANSFER]
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
@@ -87,7 +88,6 @@ begin
       ins_ready(0) => lhs_ready,
       ins_ready(1) => rhs_ready
     );
-  [POSSIBLE_TRANSFER]
 
   oehb : entity work.{oehb_name}(arch)
     port map(
@@ -145,9 +145,9 @@ end architecture;
     # Transfer logic outside the join
     architecture = architecture.replace(
       "[POSSIBLE_TRANSFER]",
-      "transfer <= oehb_ready and join_valid;")
+      "transfer => transfer;")
   else:
-    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
+    entity = entity.replace("      [POSSIBLE_TRANSFER]\n", "")
     architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
 
   return dependencies + entity + architecture
@@ -159,7 +159,7 @@ def _generate_addf_double_precision(name, export_transfer=False):
   ieee2nfloat_name = f"{name}_ieee2nfloat"
   nfloat2ieee_name = f"{name}_nfloat2ieee"
   floating_point_adder_name = f"{name}_floating_point_adder"
-  dependencies = generate_join(join_name, {"size": 2}) + \
+  dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1}) + \
     generate_input_ieee_64bit(ieee2nfloat_name) + \
@@ -204,6 +204,7 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
+      [POSSIBLE_TRANSFER]
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
@@ -270,9 +271,9 @@ end architecture;
     # Transfer logic outside the join
     architecture = architecture.replace(
       "[POSSIBLE_TRANSFER]",
-      "transfer <= oehb_ready and join_valid;")
+      "transfer => transfer;")
   else:
-    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
+    entity = entity.replace("      [POSSIBLE_TRANSFER]\n", "")
     architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
 
   return dependencies + entity + architecture
