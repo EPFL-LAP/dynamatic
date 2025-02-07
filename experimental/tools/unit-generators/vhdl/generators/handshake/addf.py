@@ -1,7 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.handshake.join import generate_join
 
-# todo: move to somewhere else (like utils.py)
 def generate_addf(name, options):
   data_type = VhdlScalarType(options["data_type"])
 
