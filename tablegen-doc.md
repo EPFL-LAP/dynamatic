@@ -1,10 +1,8 @@
-I think TableGen files are unique, so you might not be familiar with them. I'll cover the basics here.
-
 ## Operations
 
 **Operations** in the Handshake IR (such as `MergeOp` or `ConstantOp`) are defined declaratively in TableGen files (`HandshakeOps.td` or `HandshakeArithOps.td`).
 
-Each operation has **arguments**, which are categorized into operands, attributes, and properties. However, only **operands** are relevant here. Operands represent the inputs to the RTL here. For example, `ConditionalBranchOp` has two operands: one for the condition and one for the data.
+Each operation has **arguments**, which are categorized into operands, attributes, and properties. We discuss only **operands** here. Operands represent the inputs to the RTL here. For example, `ConditionalBranchOp` has two operands: one for the condition and one for the data.
 
 https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L457-L458
 
@@ -23,13 +21,12 @@ More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operation
 ## Types
 
 You may notice that operands and results are often denoted by types like `HandshakeType` or `BoolChannel`. In Handshake IR, types specify the kind of RTL port.
+The base class of all types in the Handshake dialect is the **`HandshakeType`** class.
 
-There are two main types:
+Most variables in the IR are either `ChannelType` or `ControlType`.
 
 - **`ChannelType`** – Represents a data port with **data + valid + ready** signals.
 - **`ControlType`** – Represents a control port with **valid + ready** signals.
-
-We define **`HandshakeType`** as `ChannelType`+`ControlType`.
 
 These types are defined in `HandshakeTypes.td`.
 
@@ -53,25 +50,21 @@ Some `HandshakeType` instances may include **extra signals** beyond `(data +) va
 
 
 
-In some cases, we need an operand **without** extra signals. To enforce this, we use **simple types**:
+In some cases, we enforce that an operand is **without** extra signals. For this, we use **simple types**:
 
 - `SimpleHandshake`
 - `SimpleChannel`
 - `SimpleControl`
 
-These types also appear in this pull request. For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
+For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
 
 https://github.com/EPFL-LAP/dynamatic/blob/28872676a0f3438e82c064242fac517059e22fc2/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L621-L624
 
-These ensure that the type instance does not carry any additional signals beyond the basic ones.
+These ensure that the channel does not carry any additional signals.
 
 ## Traits
 
-**Traits** are constraints applied to operations. They serve various purposes, but here they primarily enforce rules on operand and result types.
-
-A key part of this pull request is the **implementation of certain traits** and their **application to operations**.
-
-
+**Traits** are constraints applied to operations. They serve various purposes, but here we discuss their use for type validation.
 
 For example, In `ConditionalBranchOp`, the **data operand** and **trueOut/falseOut results** must have the same type instance (e.g., `!handshake.channel<i32>`). However, simply specifying `ChannelType` for each is not enough—without additional constraints, the operation could exist with mismatched types, like:
 
@@ -95,7 +88,7 @@ MLIR provides `AllTypesMatch`, but we've introduced similar traits:
 
 Traits are sometimes called **multi-entity constraints** because they enforce relationships across multiple operands or results.
 
-- In contrast, types (or type constraints) are called **single-entity constraints** to enforce properties on individual elements.
+- In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
 
 More on constraints: https://mlir.llvm.org/docs/DefiningDialects/Operations/#constraints
 
