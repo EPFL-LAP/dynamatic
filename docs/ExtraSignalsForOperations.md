@@ -23,8 +23,6 @@ This constraint is designed to reduce variability in these operations, simplifyi
 
 Note that the *values* of these extra signals do not necessarily need to match; their behavior depends on the specification of the extra signal. For instance, in the `addi` example, one input’s `spec` signal might hold the value `1`, while the other input’s `spec` signal could hold `0`. The RTL implementation of `addi` must account for and handle these cases appropriately.
 
-This constraint is enforced using the `AllTypesMatch` or `AllExtraSignalsMatch` type constraints for the operands of such operations.
-
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
 ### MuxOp and CMergeOp
@@ -48,11 +46,6 @@ As a result, the complete structure of a Mux or CMerge operation appears as foll
 The data output has `spec: i1` and `tag: i8` because some inputs have them, and nothing else.
 
 The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must provide the value of the missing extra signal for the output.
-
-These rules are enforced using the following constraints:
-
-- `MergingExtraSignals`: Ensures the validity of extra signals across inputs and the data output.
-- `AllDataTypesMatchWithVariadic`: Ensures consistency of data types across inputs and the data output.
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
@@ -80,12 +73,6 @@ For the store operation, the structure is:
 - The `addrResult` and `dataResult` ports, which interface with the memory controller, must also be simple.
 - The `addr` and `data` ports must have matching extra signals.
 
-These constraints are enforced using:
-
-- `AllExtraSignalsMatch`: Ensures that the extra signals match between the respective ports.
-- `IsSimpleHandshake`: Ensures that the ports connected to the memory controller do not carry extra signals.
-- `AllDataTypesMatch`: Ensures the data types of `addr`/`addrResult` and `data`/`dataResult` are consistent.
-
 This design decision was discussed in the issue [#214](https://github.com/EPFL-LAP/dynamatic/issues/214).
 
 ### ConstantOp
@@ -106,9 +93,9 @@ As a result, `ConstantOp` is considered constant only for its data, while its ex
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a conversation in Pull Request #197](https://github.com/EPFL-LAP/dynamatic/pull/197#discussion_r1885735050).
 
-## 2. Dive into the implementation
+## 2. Exploring the Implementation
 
-Next, let's explore how these rules are implemented. To explain this, we'll start with explaining some basic concepts.
+Next, we’ll take a closer look at how these rules are implemented. We’ll begin by introducing some fundamental concepts.
 
 ### Operations
 
@@ -204,6 +191,31 @@ Traits are sometimes called **multi-entity constraints** because they enforce re
 
 More on constraints: https://mlir.llvm.org/docs/DefiningDialects/Operations/#constraints
 
+### Applying Traits to Operations
+
+Now, let's see how traits are applied to different operations to enforce extra signal consistency.
+
+#### Operations Within a Basic Block
+
+Most operations use the `AllTypesMatch` trait to ensure that extra signals remain consistent across all inputs and outputs. However, when operands and results have different data types—such as the condition (`i1`) and data input (variable type) in `ConditionalBranchOp`—the `AllExtraSignalsMatch` trait is applied instead.
+
+#### MuxOp and CMergeOp
+
+The following constraints ensure proper handling of extra signals:
+
+- `MergingExtraSignals` – Validates extra signal consistency across the data inputs and data output.
+- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and data output.
+
+Additionally, the `selector` port is of type `SimpleChannel`, as it does not carry extra signals.
+
+#### MemPortOp (Load and Store)
+
+The following constraints are enforced:
+
+- `AllExtraSignalsMatch` – Ensures extra signals match across corresponding ports.
+- `IsSimpleHandshake` – Ensures that ports connected to the memory controller do not carry extra signals.
+- `AllDataTypesMatch` – Maintains consistency between `addr`/`addrResult` and `data`/`dataResult` data types.
+
 ### More Information
 
 The MLIR documentation can be complex, but it covers the key concepts well. You can check out the following links for more details:
@@ -211,8 +223,6 @@ The MLIR documentation can be complex, but it covers the key concepts well. You 
 https://mlir.llvm.org/docs/DefiningDialects/Operations
 
 https://mlir.llvm.org/docs/DefiningDialects/AttributesAndTypes
-
-
 
 ## Note
 
