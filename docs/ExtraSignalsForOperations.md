@@ -1,8 +1,17 @@
 # Extra Signals for Operations
 
-The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. We use MLIR's type verification tools to enforce rules for how extra signals are passed to and from operations. Since these rules differ from operation to operation, we describe them in this document.
+The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. To ensure this, we leverage MLIR's type verification tools, enforcing rules for how extra signals are passed to and from operations.
 
-## Operations Within a Basic Block
+This document is structured as follows:
+
+1. We first provide a visual overview of how these rules apply to each operation.
+2. We then explore the codebase—focusing on TableGen files—to see how these rules are implemented in practice.
+
+## Operation-Specific Rules
+
+Since these rules differ from operation to operation, we describe them in this document.
+
+### Operations Within a Basic Block
 
 Here, operations are considered within a basic block if all their operands and results are used exclusively within that block. With a few exceptions, most operations within a basic block are required to have consistent extra signals across all their inputs and outputs.
 
@@ -18,7 +27,7 @@ This constraint is enforced using the `AllTypesMatch` or `AllExtraSignalsMatch` 
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
-## MuxOp and CMergeOp
+### MuxOp and CMergeOp
 
 These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
 
@@ -50,7 +59,7 @@ This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/d
 
 For additional examples, please refer to the unit tests.
 
-## MemPortOp (Load and Store)
+### MemPortOp (Load and Store)
 
 The `MemPortOp` operations, such as load and store, communicate directly with a memory controller or a load-store queue (LSQ). The ports connected to these operations must be simple, meaning they should not carry any extra signals.
 
@@ -80,7 +89,7 @@ These constraints are enforced using:
 
 This design decision was discussed in the issue [#214](https://github.com/EPFL-LAP/dynamatic/issues/214).
 
-## ConstantOp
+### ConstantOp
 
 While this operation falls under the category of "operations within a basic block," it’s worth highlighting due to the non-trivial way it handles control tokens with extra signals that trigger the emission of a constant value.
 
@@ -98,12 +107,12 @@ As a result, `ConstantOp` is considered constant only for its data, while its ex
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a conversation in Pull Request #197](https://github.com/EPFL-LAP/dynamatic/pull/197#discussion_r1885735050).
 
-## Note
+### Note
 
-### What Does "Same" Extra Signals Mean?
+#### What Does "Same" Extra Signals Mean?
 
 Comparing extra signals across handshake types is complex. In the IR, extra signals are written in a specific order, but essentially, the extra signals of a handshake type should be treated as a set, where the order doesn’t matter. For example, `[spec: i1, tag: i8]` and `[tag: i8, spec: i1]` should be handled identically. Currently, this comparison is not strictly enforced in the codebase, but this will be addressed in the future.
 
-### Upstream Extra Signals
+#### Upstream Extra Signals
 
 At present, upstream extra signals are not well handled. For example, the constraints for `MuxOp` and `CMergeOp` do not seem to account for upstream cases. This needs to be updated in the future when the need arises.
