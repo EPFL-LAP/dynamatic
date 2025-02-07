@@ -443,7 +443,8 @@ def BranchOp : Handshake_Op<"br", [
 }
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
