@@ -142,6 +142,7 @@ end architecture;
   if export_transfer:
     entity = entity.replace("[POSSIBLE_TRANSFER]",
                             "transfer : out std_logic;")
+    # Transfer logic outside the join
     architecture = architecture.replace(
       "[POSSIBLE_TRANSFER]",
       "transfer <= oehb_ready and join_valid;")
@@ -266,6 +267,7 @@ end architecture;
   if export_transfer:
     entity = entity.replace("[POSSIBLE_TRANSFER]",
                             "transfer : out std_logic;")
+    # Transfer logic outside the join
     architecture = architecture.replace(
       "[POSSIBLE_TRANSFER]",
       "transfer <= oehb_ready and join_valid;")
@@ -284,11 +286,16 @@ def _generate_addf_signal_manager(name, data_type, is_double):
       "slots": _get_latency(is_double), # todo: correct?
       "data_type": "!handshake.channel<i1>" })
 
+  # Now that the logic depends on the name, this dict is defined inside this function.
   extra_signal_logic = {
-    "spec": ("""
+    "spec": (
+      # First string is for the signal declaration
+      """
     signal spec_tfifo_in : std_logic_vector(0 downto 0);
     signal spec_tfifo_out : std_logic_vector(0 downto 0);
-  """, f"""
+""",
+      # Second string is for the actual logic
+      f"""
     spec_inner(0) <= lhs_spec or rhs_spec;
     spec_tfifo : entity work.{name}_spec_ofifo(arch)
       port map(
@@ -302,8 +309,12 @@ def _generate_addf_signal_manager(name, data_type, is_double):
         outs_ready => result_ready
       );
     result_spec <= spec_tfifo_out(0);
-  """)
+""")
   }
+
+  for signal_name in data_type.extra_signals:
+    if signal_name not in extra_signal_logic:
+      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   entity = f"""
 library ieee;
@@ -336,10 +347,6 @@ end entity;
     ("result", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  for signal_name in data_type.extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is
