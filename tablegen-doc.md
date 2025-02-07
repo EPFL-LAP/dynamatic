@@ -59,6 +59,10 @@ In some cases, we need an operand **without** extra signals. To enforce this, we
 - `SimpleChannel`
 - `SimpleControl`
 
+These types also appear in this pull request. For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
+
+https://github.com/EPFL-LAP/dynamatic/blob/28872676a0f3438e82c064242fac517059e22fc2/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L621-L624
+
 These ensure that the type instance does not carry any additional signals beyond the basic ones.
 
 ## Traits
