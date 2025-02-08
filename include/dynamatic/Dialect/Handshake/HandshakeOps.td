@@ -987,7 +987,8 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
-  SpeculationOpInterface, RemovingSpecTag<"dataIn", "dataOut">,
+  SpeculationOpInterface,
+  RemovingSpecTag<"dataIn", "dataOut">,
   // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
   // The builder is used in the HandshakeSpeculation pass.
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
@@ -1052,7 +1053,8 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatch<["trueResult", "falseResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
@@ -1076,8 +1078,14 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
-      type($tagFromOperand) `,` type($dataOperand)
+      type($tagFromOperand) `,` type($dataOperand) `,`
+      type($trueResult) `,` type($falseResult)
   }];
+  let builders = [OpBuilder<(ins "Value":$tagFromOperand, "Value":$dataOperand), [{
+    $_state.addOperands({tagFromOperand, dataOperand});
+    auto resultType = dataOperand.getType().cast<ChannelType>().withExtraSignal({});
+    $_state.addTypes({resultType, resultType});
+  }]>];
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
