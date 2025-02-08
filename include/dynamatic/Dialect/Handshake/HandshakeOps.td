@@ -909,6 +909,11 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside loops
     AddingSpecTag<"dataIn", "dataOut">.predicate // Outside loops
   ]>>,
+  IsSimpleHandshake<"saveCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsSimpleHandshake<"SCSaveCtrl">,
+  IsSimpleHandshake<"SCCommitCtrl">,
+  IsSimpleHandshake<"SCBranchCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
@@ -941,7 +946,6 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                       BoolChannel:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
 }
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [

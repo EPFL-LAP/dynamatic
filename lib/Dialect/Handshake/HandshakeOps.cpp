@@ -1669,27 +1669,6 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   return success();
 }
 
-LogicalResult SpeculatorOp::verify() {
-  // Type refBoolType = getSaveCtrl().getType();
-  // if (refBoolType != getCommitCtrl().getType() ||
-  //     refBoolType != getSCBranchCtrl().getType()) {
-  //   return emitError() << "expected $saveCtrl, $commitCtrl, and $SCBranchCtrl
-  //   "
-  //                         "to have the same type, but got "
-  //                      << refBoolType << ", " << getCommitCtrl().getType()
-  //                      << ", and " << getSCBranchCtrl().getType();
-  // }
-
-  // if (getSCSaveCtrl().getType() != getSCCommitCtrl().getType()) {
-  //   return emitError() << "expected $SCSaveCtrl and $SCCommitCtrl to have the
-  //   "
-  //                         "same type, but got "
-  //                      << getSCSaveCtrl().getType() << " and "
-  //                      << getSCCommitCtrl().getType();
-  // }
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // SpecCommitOp
 //===----------------------------------------------------------------------===//
