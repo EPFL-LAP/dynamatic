@@ -391,19 +391,28 @@ public:
         if (port.name == "clk" || port.name == "rst")
           continue;
         if (port.dir == hw::ModulePort::Direction::Input) {
-          if (operandIdx >= op->getNumOperands())
+          if (operandIdx >= op->getNumOperands()) {
+            // The number of operands is different
             return false;
-          if (port.type != op->getOperand(operandIdx).getType())
+          }
+          if (port.type != op->getOperand(operandIdx).getType()) {
+            // The operand's type at operandIdx is different
             return false;
+          }
           operandIdx++;
         } else if (port.dir == hw::ModulePort::Direction::Output) {
-          if (resultIdx >= op->getNumResults())
+          if (resultIdx >= op->getNumResults()) {
+            // The number of results is different
             return false;
-          if (port.type != op->getResult(resultIdx).getType())
+          }
+          if (port.type != op->getResult(resultIdx).getType()) {
+            // The result's type at resultIdx is different
             return false;
+          }
           resultIdx++;
         } else {
-          llvm_unreachable("unsupported port direction");
+          // Inout ports are not used
+          llvm_unreachable("Inout ports shouldn't be used");
           return false;
         }
       }
