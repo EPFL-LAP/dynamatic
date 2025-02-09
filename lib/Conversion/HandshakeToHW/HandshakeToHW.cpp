@@ -357,11 +357,13 @@ public:
     // operation
     auto externalModules = modOp.getOps<hw::HWModuleExternOp>();
     auto extModOp = llvm::find_if(externalModules, [&](auto extModOp) {
+      // 1. hw.name (e.g., handshake.fork) must match
       auto nameAttr =
           extModOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME);
       if (!nameAttr || nameAttr != opName)
         return false;
 
+      // 2. hw.parameters (a dict with DATA_TYPE, FIFO_DEPTH, etc.) must match
       auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
           RTL_PARAMETERS_ATTR_NAME);
       if (!paramsAttr)
@@ -375,6 +377,13 @@ public:
           return false;
       }
 
+      // 3. The module's ports must match the operation's inputs and outputs
+      // The module's port order is guaranteed to match the operation's inputs
+      // and outputs (excluding clk and rst).
+      // See ConvertToHWInstance<T>::matchAndRewrite or
+      // ConvertMemInterface::matchAndRewrite.
+      // Note: This equality check allows removing the DATA_TYPE parameter from
+      // hw.parameters (checked above).
       unsigned int operandIdx = 0;
       unsigned int resultIdx = 0;
       auto modType = mlir::cast<hw::HWModuleExternOp>(extModOp).getModuleType();
