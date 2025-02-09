@@ -81,6 +81,7 @@ private:
   /// Place the SaveCommit operations and the control path
   LogicalResult prepareAndPlaceSaveCommits();
 
+  /// Place the Buffer operations
   LogicalResult placeBuffers();
 };
 } // namespace
@@ -137,6 +138,27 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // Note: srcOpResult.replaceAllUsesExcept cannot be used here
     // because the uses of srcOpResult may include a newly created
     // operand for the speculator enable signal.
+    operand->set(newOp.getResult());
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::placeBuffers() {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  for (OpOperand *operand : placements.getPlacements<handshake::BufferOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // Create a new BufferOp
+    builder.setInsertionPoint(dstOp);
+    handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
+        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
+    inheritBB(dstOp, newOp);
+
+    // Connect the new BufferOp to dstOp
     operand->set(newOp.getResult());
   }
 
@@ -520,46 +542,6 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   return success();
 }
 
-LogicalResult HandshakeSpeculationPass::placeBuffers() {
-  std::cerr << "start buffer placement\n";
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  for (OpOperand *operand : placements.getPlacements<handshake::BufferOp>()) {
-    Operation *dstOp = operand->getOwner();
-    dstOp->dump();
-    Value srcOpResult = operand->get();
-
-    builder.setInsertionPoint(dstOp);
-    handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
-        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
-    inheritBB(dstOp, newOp);
-
-    operand->set(newOp.getResult());
-  }
-
-  // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-  // unsigned opIdx = 1;
-  // Operation *op = nameAnalysis.getOp("control_merge1");
-  // if (!op) {
-  //   std::cerr << "op not found\n";
-  //   return failure();
-  // }
-  // builder.setInsertionPoint(op);
-  // Operation *prevOp = op;
-  // Value prevValue = op->getOperand(opIdx);
-  // for (int i = 0; i < 15; i++) {
-  //   handshake::BufferOp bufOp = builder.create<handshake::BufferOp>(
-  //       prevOp->getLoc(), prevValue, TimingInfo::oehb(), 4);
-  //   inheritBB(op, bufOp);
-  //   prevOp = bufOp;
-  //   prevValue = bufOp.getResult();
-  // }
-  // op->setOperand(opIdx, prevValue);
-
-  return success();
-}
-
 void HandshakeSpeculationPass::runDynamaticPass() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
@@ -593,6 +575,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(routeCommitControl()))
     return signalPassFailure();
 
+  // Place Buffer operations
   if (failed(placeBuffers()))
     return signalPassFailure();
 }

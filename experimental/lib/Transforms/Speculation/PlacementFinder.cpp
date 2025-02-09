@@ -35,9 +35,11 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
 }
 
 void PlacementFinder::clearPlacements() {
-  OpOperand &specPos = placements.getSpeculatorPlacement();
-  auto buffers = this->placements.getPlacements<handshake::BufferOp>();
-  this->placements = SpeculationPlacements(specPos, buffers);
+  // Speculator and buffer positions are manually set
+  OpOperand &specPosition = placements.getSpeculatorPlacement();
+  llvm::DenseSet<OpOperand *> bufferPositions =
+      this->placements.getPlacements<handshake::BufferOp>();
+  this->placements = SpeculationPlacements(specPosition, bufferPositions);
 }
 
 //===----------------------------------------------------------------------===//
@@ -373,6 +375,7 @@ LogicalResult PlacementFinder::findPlacements() {
   clearPlacements();
 
   return failure(failed(findSavePositions()) || failed(findCommitPositions()));
-  // return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
+  // return failure(failed(findSavePositions()) || failed(findCommitPositions())
+  // ||
   //                failed(findSaveCommitPositions()));
 }
