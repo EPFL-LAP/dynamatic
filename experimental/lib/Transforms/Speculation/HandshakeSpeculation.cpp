@@ -12,6 +12,7 @@
 
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -69,6 +70,9 @@ private:
 
   /// Place the SaveCommit operations and the control path
   LogicalResult prepareAndPlaceSaveCommits();
+
+  /// Place the Buffer operations
+  LogicalResult placeBuffers();
 };
 } // namespace
 
@@ -98,6 +102,27 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // (d) If we apply replaceAllUsesExcept to the value referenced by the
     // save-commit unit, the speculator will also be placed after the
     // save-commit unit, which is undesirable.
+    operand->set(newOp.getResult());
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::placeBuffers() {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  for (OpOperand *operand : placements.getPlacements<handshake::BufferOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // Create a new BufferOp
+    builder.setInsertionPoint(dstOp);
+    handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
+        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
+    inheritBB(dstOp, newOp);
+
+    // Connect the new BufferOp to dstOp
     operand->set(newOp.getResult());
   }
 
@@ -486,6 +511,10 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // After placing all speculative units, route the commit control signals
   if (failed(routeCommitControl()))
+    return signalPassFailure();
+
+  // Place Buffer operations
+  if (failed(placeBuffers()))
     return signalPassFailure();
 }
 
