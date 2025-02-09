@@ -500,11 +500,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp>(
-          [&](auto) {
-            // Bitwidth
-            addType("DATA_TYPE", op->getOperand(0));
-          })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
+            handshake::NDWireOp>([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
@@ -1730,6 +1730,7 @@ public:
     patterns.insert<ConvertFunc, ConvertMemInterface>(typeConverter, ctx,
                                                       lowerState);
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
+                    ConvertToHWInstance<handshake::NDWireOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
                     ConvertToHWInstance<handshake::MergeOp>,
