@@ -357,11 +357,14 @@ public:
     // operation
     auto externalModules = modOp.getOps<hw::HWModuleExternOp>();
     auto extModOp = llvm::find_if(externalModules, [&](auto extModOp) {
+      // 1. hw.name (e.g., handshake.fork) must match
       auto nameAttr =
           extModOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME);
       if (!nameAttr || nameAttr != opName)
         return false;
 
+      // 2. hw.parameters (a dictionary containing DATA_TYPE, FIFO_DEPTH, etc.)
+      // must match
       auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
           RTL_PARAMETERS_ATTR_NAME);
       if (!paramsAttr)
@@ -374,6 +377,47 @@ public:
         if (!modParam || param.getValue() != modParam->getValue())
           return false;
       }
+
+      // 3. The module's ports must match the operation's inputs and outputs
+      // The module's port order is guaranteed to match the operation's inputs
+      // and outputs (excluding clk and rst).
+      // See ConvertToHWInstance<T>::matchAndRewrite or
+      // ConvertMemInterface::matchAndRewrite.
+      // Note: This equality check implies we can remove the DATA_TYPE parameter
+      // from hw.parameters (checked above).
+      unsigned int operandIdx = 0;
+      unsigned int resultIdx = 0;
+      auto modType = mlir::cast<hw::HWModuleExternOp>(extModOp).getModuleType();
+      for (const hw::ModulePort &port : modType.getPorts()) {
+        if (port.name == "clk" || port.name == "rst")
+          continue;
+        if (port.dir == hw::ModulePort::Direction::Input) {
+          if (operandIdx >= op->getNumOperands()) {
+            // The number of operands is different
+            return false;
+          }
+          if (port.type != op->getOperand(operandIdx).getType()) {
+            // The operand's type at operandIdx is different
+            return false;
+          }
+          operandIdx++;
+        } else if (port.dir == hw::ModulePort::Direction::Output) {
+          if (resultIdx >= op->getNumResults()) {
+            // The number of results is different
+            return false;
+          }
+          if (port.type != op->getResult(resultIdx).getType()) {
+            // The result's type at resultIdx is different
+            return false;
+          }
+          resultIdx++;
+        } else {
+          // Inout ports are not used
+          llvm_unreachable("Inout ports shouldn't be used");
+          return false;
+        }
+      }
+
       return true;
     });
     if (extModOp != externalModules.end())
