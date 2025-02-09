@@ -673,7 +673,11 @@ static LogicalResult updateTypesRecursive(MLIRContext &ctx,
     return success();
   }
 
-  // StoreOp is not inside the speculative region
+  if (isa<handshake::StoreOp>(op)) {
+    op->emitError("StoreOp should not be within the speculative region");
+    return failure();
+  }
+
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     if (isTraversalDown) {
       for (auto &operand : loadOp->getOpResult(1).getUses()) {
