@@ -382,8 +382,8 @@ public:
       // and outputs (excluding clk and rst).
       // See ConvertToHWInstance<T>::matchAndRewrite or
       // ConvertMemInterface::matchAndRewrite.
-      // Note: This equality check allows removing the DATA_TYPE parameter from
-      // hw.parameters (checked above).
+      // Note: This equality check implies we can remove the DATA_TYPE parameter
+      // from hw.parameters (checked above).
       unsigned int operandIdx = 0;
       unsigned int resultIdx = 0;
       auto modType = mlir::cast<hw::HWModuleExternOp>(extModOp).getModuleType();
