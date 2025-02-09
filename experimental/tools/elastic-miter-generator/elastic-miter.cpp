@@ -37,6 +37,14 @@ namespace cl = llvm::cl;
 using namespace mlir;
 using namespace dynamatic::handshake;
 
+// Instead of keeping the original BB for the LHS/RHS circuit, the BB is used to
+// organize the different part of the miter circuit. The BBs can therefore not
+// be used for any control-flow analysis.
+static constexpr unsigned int BB_IN = 0;  // Input auxillary logic
+static constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
+static constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
+static constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+
 // CLI Settings
 
 static cl::OptionCategory mainCategory("elastic-miter Options");
@@ -334,23 +342,23 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
     ForkOp forkOp = builder.create<ForkOp>(newFuncOp.getLoc(), miterArgs, 2);
-    setHandshakeAttributes(builder, forkOp, 0, forkName);
+    setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
     BufferOp lhsBufferOp =
-        builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[0],
+        builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[BB_IN],
                                  TimingInfo::oehb(), bufferSlots);
     BufferOp rhsBufferOp =
         builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[1],
                                  TimingInfo::oehb(), bufferSlots);
-    setHandshakeAttributes(builder, lhsBufferOp, 0, lhsBufName);
-    setHandshakeAttributes(builder, rhsBufferOp, 0, rhsBufName);
+    setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
+    setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
 
     NDWireOp lhsNDWireOp =
         builder.create<NDWireOp>(forkOp.getLoc(), lhsBufferOp.getResult());
     NDWireOp rhsNDWireOp =
         builder.create<NDWireOp>(forkOp.getLoc(), rhsBufferOp.getResult());
-    setHandshakeAttributes(builder, lhsNDWireOp, 0, lhsNdwName);
-    setHandshakeAttributes(builder, rhsNDWireOp, 0, rhsNdwName);
+    setHandshakeAttributes(builder, lhsNDWireOp, BB_IN, lhsNdwName);
+    setHandshakeAttributes(builder, rhsNDWireOp, BB_IN, rhsNdwName);
 
     nextLocation = rhsNDWireOp;
 
@@ -414,8 +422,8 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     rhsEndNDWireOp =
         builder.create<NDWireOp>(nextLocation->getLoc(), rhsResult);
 
-    setHandshakeAttributes(builder, lhsEndNDWireOp, 3, lhsNDwName);
-    setHandshakeAttributes(builder, rhsEndNDWireOp, 3, rhsNDwName);
+    setHandshakeAttributes(builder, lhsEndNDWireOp, BB_OUT, lhsNDwName);
+    setHandshakeAttributes(builder, rhsEndNDWireOp, BB_OUT, rhsNDwName);
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), lhsEndNDWireOp.getResult(), TimingInfo::oehb(),
@@ -423,13 +431,13 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     BufferOp rhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), rhsEndNDWireOp.getResult(), TimingInfo::oehb(),
         bufferSlots);
-    setHandshakeAttributes(builder, lhsEndBufferOp, 3, lhsBufName);
-    setHandshakeAttributes(builder, rhsEndBufferOp, 3, rhsBufName);
+    setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
+    setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
     CmpIOp compOp = builder.create<CmpIOp>(
         builder.getUnknownLoc(), CmpIPredicate::eq, lhsEndBufferOp.getResult(),
         rhsEndBufferOp.getResult());
-    setHandshakeAttributes(builder, compOp, 3, eqName);
+    setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
 
     llvm::json::Array outputBufferPair;
     outputBufferPair.push_back(lhsBufName);
@@ -445,7 +453,7 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   }
 
   EndOp newEndOp = builder.create<EndOp>(builder.getUnknownLoc(), eqResults);
-  setHandshakeAttributes(builder, newEndOp, 3, "end");
+  setHandshakeAttributes(builder, newEndOp, BB_OUT, "end");
 
   // Delete old end operation, we can only have one end operation in a
   // function
@@ -456,14 +464,14 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   Operation *previousOp = nextLocation;
   for (Operation &op : llvm::make_early_inc_range(lhsFuncOp.getOps())) {
     op.moveAfter(previousOp);
-    dynamatic::setBB(&op, 1);
+    dynamatic::setBB(&op, BB_LHS);
     previousOp = &op;
   }
 
   // Move operations from rhs to the new miter FuncOp and set the handshake.bb
   for (Operation &op : llvm::make_early_inc_range(rhsFuncOp.getOps())) {
     op.moveAfter(previousOp);
-    dynamatic::setBB(&op, 2);
+    dynamatic::setBB(&op, BB_RHS);
     previousOp = &op;
   }
 
