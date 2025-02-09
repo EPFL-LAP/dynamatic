@@ -475,10 +475,28 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     previousOp = &op;
   }
 
+  llvm::json::Array resNames;
+  for (Attribute attr : lhsFuncOp.getResNames()) {
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    if (strAttr) {
+      resNames.push_back("EQ_" + strAttr.getValue().str());
+    }
+  }
+  llvm::json::Array argNames;
+  for (Attribute attr : lhsFuncOp.getArgNames()) {
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    if (strAttr) {
+      argNames.push_back(strAttr.getValue().str());
+    }
+  }
+
+  // TODO what do we actually need here?
   // Create a new jsonObject and put all required names into it
   llvm::json::Object jsonObject = *new llvm::json::Object;
   jsonObject["input_buffers"] = std::move(inputBufferNames);
   jsonObject["output_buffers"] = std::move(outputBufferNames);
+  jsonObject["arguments"] = std::move(argNames);
+  jsonObject["results"] = std::move(resNames);
   jsonObject["ndwires"] = std::move(ndwireNames);
   jsonObject["eq"] = std::move(eqNames);
 
