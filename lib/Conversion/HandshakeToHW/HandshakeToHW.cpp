@@ -363,7 +363,8 @@ public:
       if (!nameAttr || nameAttr != opName)
         return false;
 
-      // 2. hw.parameters (a dict with DATA_TYPE, FIFO_DEPTH, etc.) must match
+      // 2. hw.parameters (a dictionary containing DATA_TYPE, FIFO_DEPTH, etc.)
+      // must match
       auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
           RTL_PARAMETERS_ATTR_NAME);
       if (!paramsAttr)
