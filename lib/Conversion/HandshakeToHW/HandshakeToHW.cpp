@@ -374,6 +374,31 @@ public:
         if (!modParam || param.getValue() != modParam->getValue())
           return false;
       }
+
+      unsigned int operandIdx = 0;
+      unsigned int resultIdx = 0;
+      auto modType = mlir::cast<hw::HWModuleExternOp>(extModOp).getModuleType();
+      for (const hw::ModulePort &port : modType.getPorts()) {
+        if (port.name == "clk" || port.name == "rst")
+          continue;
+        if (port.dir == hw::ModulePort::Direction::Input) {
+          if (operandIdx >= op->getNumOperands())
+            return false;
+          if (port.type != op->getOperand(operandIdx).getType())
+            return false;
+          operandIdx++;
+        } else if (port.dir == hw::ModulePort::Direction::Output) {
+          if (resultIdx >= op->getNumResults())
+            return false;
+          if (port.type != op->getResult(resultIdx).getType())
+            return false;
+          resultIdx++;
+        } else {
+          llvm_unreachable("unsupported port direction");
+          return false;
+        }
+      }
+
       return true;
     });
     if (extModOp != externalModules.end())
