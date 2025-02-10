@@ -85,4 +85,33 @@ test_generator -t source
 echo -e "\nTesting store..."
 test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
+echo -e "\nTesting addf..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t addf -p data_type='"!handshake.channel<f32>"' latency=9 > $OUT
+check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t addf -p data_type='"!handshake.channel<f64>"' latency=12 > $OUT
+check_smv_syntax ./module.smv
+
+echo -e "\nTesting addi..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t addi -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
+check_smv_syntax ./module.smv
+
+echo -e "\nTesting cmpi..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"eq"'  > $OUT
+check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"slt"'  > $OUT
+check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"'  > $OUT
+echo "Skipping test"
+# check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"'  > $OUT
+echo "Skipping test"
+# check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"'  > $OUT
+check_smv_syntax ./module.smv
+
+echo -e "\nTesting muli..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
+check_smv_syntax ./module.smv
+
+
 rm $OUT

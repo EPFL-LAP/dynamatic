@@ -5,14 +5,14 @@ from generators.support.utils import SmvScalarType
 def generate_cmpi(name, params):
   predicate = params["predicate"]
   symbol = get_symbol_from_predicate(predicate)
-  type = get_type_from_predicate(predicate)
+  sign = get_sign_from_predicate(predicate)
   latency = params["latency"]
   data_type = SmvScalarType(params["data_type"])
 
-  if data_type == type:
+  if sign is None or data_type.smv_type.split()[0] == sign:
     return _generate_cmpi(name, latency, symbol, data_type)
   else:
-    modifier = type.split()[0]
+    modifier = sign
     return _generate_cmpi_cast(name, latency, symbol, modifier, data_type)
 
 
@@ -64,13 +64,13 @@ def get_symbol_from_predicate(pred):
       raise ValueError(f"Predicate {pred} not known")
 
 
-def get_type_from_predicate(pred):
+def get_sign_from_predicate(pred):
   match pred:
     case "eq" | "neq":
       return None
     case "slt" | "sle" | "sgt" | "sge":
-      return "signed word"
+      return "signed"
     case "ult" | "ule" | "ugt" | "uge":
-      return "unsigned word"
+      return "unsigned"
     case _:
       raise ValueError(f"Predicate {pred} not known")
