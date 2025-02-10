@@ -25,6 +25,7 @@ import generators.arith.cmpi as cmpi
 import generators.arith.divf as divf
 import generators.arith.divsi as divsi
 import generators.arith.divui as divui
+import generators.arith.maximumf as maximumf
 import generators.arith.muli as muli
 
 
@@ -74,6 +75,8 @@ def generate_code(name, mod_type, parameters):
       return divsi.generate_divsi(name, parameters)
     case "divui":
       return divui.generate_divui(name, parameters)
+    case "maximumf":
+      return maximumf.generate_maximumf(name, parameters)
     case "muli":
       return muli.generate_muli(name, parameters)
     case _:
