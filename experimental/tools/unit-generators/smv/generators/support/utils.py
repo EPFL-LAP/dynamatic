@@ -12,6 +12,7 @@ class SmvScalarType:
 
   mlir_type: str
   bitwidth: int
+  floating_point: bool
   signed: bool
   smv_type: str
 
@@ -23,20 +24,27 @@ class SmvScalarType:
     self.mlir_type = mlir_type
 
     control_pattern = "!handshake.control<>"
-    channel_pattern = r"^!handshake\.channel<([u]?i)(\d+)>$"
+    channel_pattern = r"^!handshake\.channel<([u]?i|f)(\d+)>$"
     match = re.match(channel_pattern, mlir_type)
 
     if mlir_type == control_pattern:
       self.bitwidth = 0
     elif match:
-      self.signed = not match.group(1).startswith("u")
+      type_prefix = match.group(1)
       self.bitwidth = int(match.group(2))
-      if self.bitwidth == 1:
-        self.smv_type = "boolean"
-      elif self.signed:
-        self.smv_type = f"signed word [{self.bitwidth}]"
+      if type_prefix == "f":
+        self.floating_point = True
+        if self.bitwidth != 32 and self.bitwidth != 64:
+          raise ValueError(f"Bitwidth {self.bitwidth} is not supported for floats")
+        self.smv_type = "real"
       else:
-        self.smv_type = f"unsigned word [{self.bitwidth}]"
+        self.signed = not type_prefix.startswith("u")
+        if self.bitwidth == 1:
+          self.smv_type = "boolean"
+        elif self.signed:
+          self.smv_type = f"signed word [{self.bitwidth}]"
+        else:
+          self.smv_type = f"unsigned word [{self.bitwidth}]"
     else:
       raise ValueError(f"Type {mlir_type} doesn't correspond to any SMV type")
 
