@@ -109,6 +109,12 @@ echo "Skipping test"
 python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"'  > $OUT
 check_smv_syntax ./module.smv
 
+echo -e "\nTesting divf..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=29 > $OUT
+check_smv_syntax ./module.smv
+python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=36 > $OUT
+check_smv_syntax ./module.smv
+
 echo -e "\nTesting muli..."
 python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
 check_smv_syntax ./module.smv
