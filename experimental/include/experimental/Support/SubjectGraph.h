@@ -44,63 +44,88 @@ struct ChannelSignals {
 /// Base class for all subject graphs. This class represents the subject graph
 /// of an Operation in MLIR.
 /// Each BaseSubjectGraph maintains information about:
-/// - The Operation it represents
-/// - Input/output connections to other Operations and subject graphs
+/// - Input/output connections to other modules and subject graphs
 /// - Signal routing for handshake protocols (data, valid, ready signals)
-/// - Path information for associated BLIF (Berkeley Logic Interchange Format)
-/// file
+/// - Path information for BLIF (Berkeley Logic Interchange Format) file
+/// generation
 /// - Unique naming and module type identification
-/// - Blackbox status
-///
 class BaseSubjectGraph {
 protected:
-  Operation *op; // holds the Operation that the subject graph represents
-  // hold the input/output Operations and corresponding result numbers
-  std::vector<Operation *> inputModules;
-  std::vector<Operation *> outputModules;
-  DenseMap<Operation *, unsigned int> inputModuleToResNum;
-  DenseMap<Operation *, unsigned int> outputModuleToResNum;
+  // Operation that the SubjectGraph is based on
+  Operation *op;
 
-  std::vector<BaseSubjectGraph *> inputSubjectGraphs;
-  std::vector<BaseSubjectGraph *> outputSubjectGraphs;
-  DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
-  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
-
-  std::string fullPath;
+  // moduleType is used to generate the path to the BLIF file
   std::string moduleType;
+  // uniqueName is used to generate unique names for the nodes in the BLIF file
   std::string uniqueName;
+  // isBlackbox is used to determine if the module is a blackbox module
   bool isBlackbox = false;
 
-  void assignSignals(ChannelSignals &signals, Node *node,
-                     const std::string &nodeName);
+  // Helper function to connect the input nodes of the current module
+  // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
                                BaseSubjectGraph *moduleBeforeSubjectGraph);
 
 public:
   BaseSubjectGraph();
+  // Constructor for a SubjectGraph based on an Operation
   BaseSubjectGraph(Operation *op);
-  BaseSubjectGraph(Operation *before, Operation *after);
 
+  // Vectors and Maps to hold the input and output modules and SubjectGraphs.
+  // All of this is necessary to connect the SubjectGraphs.
+  // (input/output)Modules and ToResNum is populated the first time the
+  // SubjectGraph is created.
+  std::vector<Operation *> inputModules;
+  std::vector<Operation *> outputModules;
+  DenseMap<Operation *, unsigned int> inputModuleToResNum;
+  DenseMap<Operation *, unsigned int> outputModuleToResNum;
+
+  // These vectors and maps are populated after all of the SubjectGraphs are
+  // created and while they are being connected. The position of a SubjectGraph
+  // in the vector does not correspond to its Result Number. The position in the
+  // vector is used to retrieve the Input/Output types such as data, address,
+  // index etc. and Result Number is used to find which SubjectGraph to connect
+  // to. An Operation might have multiple outputs, so it is
+  // important to find the correct channel and input module.
+  std::vector<BaseSubjectGraph *> inputSubjectGraphs;
+  std::vector<BaseSubjectGraph *> outputSubjectGraphs;
+  DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
+  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
+
+  // A map from Operations to their corresponding BaseSubjectGraphs
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
-  static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
+
+  // A vector of all BaseSubjectGraphs. This is not a subset of the Values of
+  // moduleMap, since not all of the SubjectGraphs are created from Operations.
+  static inline std::vector<BaseSubjectGraph *> subjectGraphVector;
+
+  // Holds the path to the directory of BLIF files
   static inline std::string baseBlifPath;
+
+  // Holds the path to the BLIF file this subject graph is based on
+  std::string fullPath;
+
+  // Pointer to the LogicNetwork object that represents the BLIF file
   LogicNetwork *blifData;
 
-  void replaceOpsBySubjectGraph();
+  void appendVarsToPath(std::initializer_list<unsigned int> inputs);
+
+  // Gets the MLIR Result Number between two SubjectGraphs
   static unsigned int getChannelNumber(BaseSubjectGraph *first,
                                        BaseSubjectGraph *second);
-  static void changeOutput(BaseSubjectGraph *graph, BaseSubjectGraph *newOutput,
-                           BaseSubjectGraph *oldOutput);
-  static void changeInput(BaseSubjectGraph *graph, BaseSubjectGraph *newInput,
-                          BaseSubjectGraph *oldInput);
-  void appendVarsToPath(std::initializer_list<unsigned int> inputs);
-  static void setBaseBlifPath(llvm::StringRef path) {
-    baseBlifPath = path.str();
-  }
+
+  // Populates inputSubjectGraphs and outputSubjectGraphs after all of the
+  // SubjectGraphs are created
+  void replaceOpsBySubjectGraph();
 
   virtual ~BaseSubjectGraph() = default;
+
+  // Each Subject Graph implements its own connectInputNodes() function.
+  // Retrieves the output nodes of its input module, and connects the nodes.
   virtual void connectInputNodes() = 0;
-  virtual ChannelSignals &returnOutputNodes(unsigned int) = 0;
+  // Returns the output nodes associated with a specific channel number (MLIR
+  // Result Number)
+  virtual ChannelSignals &returnOutputNodes(unsigned int resultNumber) = 0;
 };
 
 class ArithSubjectGraph : public BaseSubjectGraph {
@@ -111,18 +136,6 @@ private:
 
 public:
   ArithSubjectGraph(Operation *op);
-  void connectInputNodes() override;
-  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
-};
-
-class CmpISubjectGraph : public BaseSubjectGraph {
-private:
-  unsigned int dataWidth = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
-  ChannelSignals outputNodes;
-
-public:
-  CmpISubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
@@ -314,9 +327,12 @@ public:
   BufferSubjectGraph(Operation *op1, Operation *op2, std::string bufferType);
   BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
                      std::string bufferType);
+
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
 
+  // Inserts a pair of OEHB and TEHB buffers between two operations. Used to cut
+  // loopbacks.
   static BufferPair createBuffers(Operation *inputOp, Operation *outputOp) {
     // Create OEHB buffer using the temporary string
     BufferSubjectGraph *oehb = new BufferSubjectGraph(
@@ -328,8 +344,14 @@ public:
 
     return BufferPair(oehb, tehb);
   }
+
+  void insertBuffer(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);
+  void initBuffer();
 };
 
+// SubjectGraphGenerator class generates the Subject Graphs for the given
+// FuncOp. Iterates through Ops and calls the appropriate SubjectGraph
+// constructor.
 class SubjectGraphGenerator {
 public:
   SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);

@@ -556,16 +556,16 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
 }
 
 void MAPBUFBuffers::connectSubjectGraphs() {
-  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    module.first->connectInputNodes();
+  for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
+    module->connectInputNodes();
   }
 
   experimental::LogicNetwork *mergedBlif = new experimental::LogicNetwork();
 
   mergedBlif->moduleName = "merged";
 
-  for (auto &module : experimental::BaseSubjectGraph::subjectGraphMap) {
-    experimental::LogicNetwork *blifModule = module.first->blifData;
+  for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
+    experimental::LogicNetwork *blifModule = module->blifData;
 
     for (auto &node : blifModule->getNodesInOrder()) {
       mergedBlif->addNode(node);
