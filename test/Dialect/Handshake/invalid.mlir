@@ -187,6 +187,34 @@ handshake.func @invalidSourceAndConstantWithExtraSignal(%ctrl : !handshake.contr
 
 // -----
 
+handshake.func @invalidMuxWithDifferentDataTypesOutput(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>,
+    %data1 : !handshake.channel<i32>,
+    %data2 : !handshake.channel<i32, [e1: i2]>,
+    %data3 : !handshake.channel<i32, [e3: i6]>,
+    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that the operands inside the variadic name and result should all have the same type}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i1, [e1: i2, e3: i6, e2: i4]>
+  end %ctrl : !handshake.control<>
+}
+
+// -----
+
+handshake.func @invalidMuxWithDifferentDataTypesVariadic(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>,
+    %data1 : !handshake.channel<i32>,
+    %data2 : !handshake.channel<i32, [e1: i2]>,
+    %data3 : !handshake.channel<i32, [e3: i6]>,
+    %data4 : !handshake.channel<i1, [e1: i2, e2: i4]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that the operands inside the variadic name and result should all have the same type}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i1, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>
+  end %ctrl : !handshake.control<>
+}
+
+// -----
+
 handshake.func @invalidMuxWithMoreExtraSignal(
     %ctrl : !handshake.control<>,
     %sel : !handshake.channel<i2>,
