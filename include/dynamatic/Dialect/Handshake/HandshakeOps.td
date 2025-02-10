@@ -306,6 +306,8 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure,
+  // SameOperandsAndResultsType is a built-in variant of AllTypesMatch with useful
+  // builder behavior, supporting variadic operands.
   // MergeOp imposes this constraint to enforce that all the data types and
   // extra signals of operands and results match, while MuxOp and CMergeOp only
   // require that the data types match.
