@@ -46,16 +46,14 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.oehb(arch) generic map(1)
+  oehb : entity work.oehb_dataless(arch)
     port map(
       clk => clk,
       rst => rst,
       ins_valid => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      ins_ready => oehb_ready,
-      ins(0) => '0',
-      outs => open
+      ins_ready => oehb_ready
     );
 
   rhs_neg <= not rhs(32 - 1) & rhs(32 - 2 downto 0);

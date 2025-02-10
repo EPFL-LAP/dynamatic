@@ -43,7 +43,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.oehb(arch) generic map (1)
+  oehb : entity work.oehb(arch)
     port map(
       clk        => clk,
       rst        => rst,
@@ -51,9 +51,7 @@ begin
       outs_ready => result_ready,
       outs_valid => result_valid,
       --outputs
-      ins_ready => oehb_ready,
-      ins(0)    => '0',
-      outs   => open
+      ins_ready => oehb_ready
     );
   buff : entity work.delay_buffer(arch) generic map(latency - 1)
   port map(
