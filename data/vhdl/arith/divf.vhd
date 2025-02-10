@@ -50,7 +50,6 @@ begin
       ins_valid  => buff_valid,
       outs_ready => result_ready,
       outs_valid => result_valid,
-      --outputs
       ins_ready => oehb_ready
     );
   buff : entity work.delay_buffer(arch) generic map(latency - 1)
