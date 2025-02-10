@@ -83,13 +83,13 @@ While this operation falls under the category of "operations within a basic bloc
 
 <img alt="the IO of Constant" src="./Figures/ExtraSignalsForOperations/constant.png" width="300" />
 
-However, how are the extra signals of the input handled?
+To ensure consistency for succeeding operations, `ConstantOp` must generate an output with extra signals. For example, if an adder expects a `spec` tag, the preceding `ConstantOp` must provide one.
 
-Since control tokens can now carry extra signals, it’s natural that a control token with extra signals would trigger the `ConstantOp`.
+However, since control tokens can now carry extra signals, a control token with extra signals may trigger `ConstantOp` (e.g., in some cases, a token from the basic block's control network is used).
 
-Upon review, we found it more effective to forward the extra signals from the input directly to the output token, rather than discarding them and hardcoding constant extra signal values in the operation.
+Therefore, we decided to forward the extra signals from the control input directly to the output token, rather than discarding them and hardcoding constant extra signal values in `ConstantOp`.
 
-As a result, `ConstantOp` is considered constant only for its data, while its extra signal values remain variable.
+In other words, `ConstantOp `does not generate extra signals itself—this responsibility typically falls to a dedicated `SourceOp`, which supplies the control token for the succeeding `ConstantOp`. The values of these extra signals depend on the specific signals being propagated and are not discussed here.
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a conversation in Pull Request #197](https://github.com/EPFL-LAP/dynamatic/pull/197#discussion_r1885735050).
 
