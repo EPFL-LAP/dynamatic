@@ -17,38 +17,40 @@ ninja
 exit_on_fail "Failed to build miter module generator"
 cd ..
 
-MOD="c"
+MOD="z"
 F_HANDSHAKE_MITER="$COMP_DIR/ndwirererd_${MOD}_lhs.mlir"
 
-build/bin/ndwirerer --lhs=$REWRITES/${MOD}_rhs.mlir -o $COMP_DIR
-exit_on_fail "Failed to create miter module"
 
-
-"bin/export-dot" $F_HANDSHAKE_MITER "--edge-style=spline" > $DOT
+"bin/export-dot" $REWRITES/${MOD}_lhs.mlir "--edge-style=spline" > $DOT
 exit_on_fail "Failed to convert to dot"
 dot -Tpng $DOT > $COMP_DIR/visual.png
 
 python3 "../dot2smv/dot2smv" $DOT
 exit_on_fail "Failed to convert to SMV"
 
+# TODO ...
 mv $(dirname $DOT)/model.smv $(dirname $DOT)/${MOD}_lhs.smv
 
-python3 experimental/tools/ndwirerer/create_state_wrapper.py --inf --json="experimental/tools/elastic-miter-generator/out/comp/elastic-miter-config.json"> experimental/tools/ndwirerer/out/comp/main_inf.smv
+python3 experimental/tools/ndwirerer/create_state_wrapper.py --inf --mlir=$REWRITES/${MOD}_lhs.mlir > experimental/tools/ndwirerer/out/comp/main_inf.smv
 exit_on_fail "Failed to create SMV main file"
+
+nuXmv -source $COMP_DIR/prove_inf.cmd > "$OUT_DIR/inf_states.txt"
+exit_on_fail "Failed to analyise reachable states with infinite tokens."
 
 N=1
 while [ true ]; do
   echo "Checking $N tokens."
-  python3 experimental/tools/ndwirerer/create_state_wrapper.py -N $N --json="experimental/tools/elastic-miter-generator/out/comp/elastic-miter-config.json"> experimental/tools/ndwirerer/out/comp/main_$N.smv
+  python3 experimental/tools/ndwirerer/create_state_wrapper.py -N $N --mlir="$(dirname $DOT)/${MOD}_lhs.smv"> experimental/tools/ndwirerer/out/comp/main_$N.smv
   exit_on_fail "Failed to create SMV main file"
 
-  nuXmv -source $COMP_DIR/prove_inf.cmd > "$OUT_DIR/inf_states.txt"
   # TODO we need to automatically create prove_$N.cmd
   nuXmv -source $COMP_DIR/prove_$N.cmd > "$OUT_DIR/$N_states.txt"
+  exit_on_fail "Failed to analyise reachable states with $N tokens."
 
-  python3 experimental/tools/ndwirerer/get_states.py "$OUT_DIR/inf_states.txt" "$OUT_DIR/$N_states.txt"
+  nr_of_differences=$(python3 experimental/tools/ndwirerer/get_states.py "$OUT_DIR/inf_states.txt" "$OUT_DIR/$N_states.txt")
 
-  if [[ $? -ne 0 ]]; then
+
+  if [[ $nr_of_differences -ne 0 ]]; then
     ((N++))
   else 
     echo $N

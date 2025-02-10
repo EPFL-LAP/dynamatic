@@ -11,14 +11,14 @@ parser = argparse.ArgumentParser(
 parser.add_argument("inf")
 parser.add_argument("fin")
 
+args = parser.parse_args()
 
 
-# TODO use argparser
-with open("experimental/tools/ndwirerer/out/inf_states.txt") as f:
+with open(args.inf) as f:
   inf = f.readlines()
 
-with open("experimental/tools/ndwirerer/out/2_states.txt") as f:
-  three = f.readlines()
+with open(args.fin) as f:
+  fin = f.readlines()
 
 state = 0
 states_inf = {}
@@ -42,7 +42,7 @@ del states_inf[state]
 
 state = 0
 states_3 = {}
-for line in three:
+for line in fin:
   # print(line)
   line = line.strip()
   if "-------" in line:
