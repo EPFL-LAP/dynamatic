@@ -17,9 +17,9 @@ def generate_cond_br(name, params):
     else:
       return _generate_cond_br_signal_manager_dataless(name, data_type)
   elif data_type.is_channel():
-    return _generate_cond_br_dataless(name)
-  else:
     return _generate_cond_br(name, data_type.bitwidth)
+  else:
+    return _generate_cond_br_dataless(name)
 
 def _generate_cond_br_dataless(name):
   # todo: generate_join is not implemented
