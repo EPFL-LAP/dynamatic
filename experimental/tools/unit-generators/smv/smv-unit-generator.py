@@ -29,6 +29,7 @@ import generators.arith.maximumf as maximumf
 import generators.arith.minimumf as minimumf
 import generators.arith.muli as muli
 import generators.arith.mulf as mulf
+import generators.arith.ori as ori
 
 
 def generate_code(name, mod_type, parameters):
@@ -85,6 +86,8 @@ def generate_code(name, mod_type, parameters):
       return mulf.generate_mulf(name, parameters)
     case "muli":
       return muli.generate_muli(name, parameters)
+    case "ori":
+      return ori.generate_ori(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
