@@ -20,6 +20,7 @@ import generators.handshake.store as store
 
 import generators.arith.addf as addf
 import generators.arith.addi as addi
+import generators.arith.andi as andi
 import generators.arith.cmpi as cmpi
 import generators.arith.muli as muli
 
@@ -60,6 +61,8 @@ def generate_code(name, mod_type, parameters):
       return addf.generate_addf(name, parameters)
     case "addi":
       return addi.generate_addi(name, parameters)
+    case "andi":
+      return andi.generate_andi(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
     case "muli":
