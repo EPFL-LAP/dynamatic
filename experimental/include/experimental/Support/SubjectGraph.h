@@ -34,22 +34,28 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
+/// Struct that holds the different types of signals that a channel can have
 struct ChannelSignals {
   std::vector<Node *> dataSignals;
   Node *validSignal;
   Node *readySignal;
 };
 
+/// Base class for all subject graphs. This class represents the subject graph
+/// of an Operation in MLIR.
+/// Each BaseSubjectGraph maintains information about:
+/// - The Operation it represents
+/// - Input/output connections to other Operations and subject graphs
+/// - Signal routing for handshake protocols (data, valid, ready signals)
+/// - Path information for associated BLIF (Berkeley Logic Interchange Format)
+/// file
+/// - Unique naming and module type identification
+/// - Blackbox status
+///
 class BaseSubjectGraph {
-public:
-  static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
-  static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
-  static inline std::string baseBlifPath;
-  LogicNetwork *blifData;
-
 protected:
-  bool isBlackbox = false;
-  Operation *op;
+  Operation *op; // holds the Operation that the subject graph represents
+  // hold the input/output Operations and corresponding result numbers
   std::vector<Operation *> inputModules;
   std::vector<Operation *> outputModules;
   DenseMap<Operation *, unsigned int> inputModuleToResNum;
@@ -63,6 +69,7 @@ protected:
   std::string fullPath;
   std::string moduleType;
   std::string uniqueName;
+  bool isBlackbox = false;
 
   void assignSignals(ChannelSignals &signals, Node *node,
                      const std::string &nodeName);
@@ -73,6 +80,11 @@ public:
   BaseSubjectGraph();
   BaseSubjectGraph(Operation *op);
   BaseSubjectGraph(Operation *before, Operation *after);
+
+  static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
+  static inline DenseMap<BaseSubjectGraph *, Operation *> subjectGraphMap;
+  static inline std::string baseBlifPath;
+  LogicNetwork *blifData;
 
   void replaceOpsBySubjectGraph();
   static unsigned int getChannelNumber(BaseSubjectGraph *first,
