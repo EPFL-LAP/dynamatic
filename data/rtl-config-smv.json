@@ -120,6 +120,22 @@
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p latency=0 data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
+    "name": "handshake.cmpi",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p latency=0 predicate=\"PREDICATE\" data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.divf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
+    ],
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME latency=36 datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.divf",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME latency=29 datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+
+  {
     "name": "handshake.muli",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p latency=4 data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
