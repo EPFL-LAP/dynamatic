@@ -43,7 +43,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.oehb(arch)
+  oehb : entity work.oehb_dataless(arch)
     port map(
       clk        => clk,
       rst        => rst,

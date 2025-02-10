@@ -49,7 +49,7 @@ module divf #(
     .valid_out(buff_valid)
   );
 
-  oehb  oehb_lhs (
+  oehb_dataless  oehb_lhs (
     .clk(clk),
     .rst(rst),
     .ins_valid(buff_valid),
