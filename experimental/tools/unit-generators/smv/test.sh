@@ -143,5 +143,9 @@ echo -e "\nTesting muli..."
 python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
 check_smv_syntax ./module.smv
 
+echo -e "\nTesting ori..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t ori -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
+check_smv_syntax ./module.smv
+
 
 rm $OUT
