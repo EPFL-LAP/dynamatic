@@ -447,10 +447,6 @@ LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
   return success();
 }
 
-SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
-  return {getTrueValue(), getFalseValue(), getResult()};
-}
-
 //===----------------------------------------------------------------------===//
 // ReshapableChannelsInterface
 //===----------------------------------------------------------------------===//
