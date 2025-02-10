@@ -127,12 +127,16 @@ echo -e "\nTesting divui..."
 python ${GENPATH}smv-unit-generator.py -n test_module -t divui -p data_type='"!handshake.channel<i32>"' latency=35 > $OUT
 check_smv_syntax ./module.smv
 
-echo -e "\nTesting muli..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
-check_smv_syntax ./module.smv
-
 echo -e "\nTesting maximumf..."
 python ${GENPATH}smv-unit-generator.py -n test_module -t maximumf -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
+check_smv_syntax ./module.smv
+
+echo -e "\nTesting minimumf..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t minimumf -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
+check_smv_syntax ./module.smv
+
+echo -e "\nTesting muli..."
+python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
 check_smv_syntax ./module.smv
 
 
