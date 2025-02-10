@@ -65,7 +65,7 @@ def parse_parameters(param_list):
           param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
-    raise ValueError("Invalid parameter format. Use key=value key=value,...")
+    raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
