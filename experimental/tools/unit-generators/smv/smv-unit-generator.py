@@ -28,6 +28,7 @@ import generators.arith.divui as divui
 import generators.arith.maximumf as maximumf
 import generators.arith.minimumf as minimumf
 import generators.arith.muli as muli
+import generators.arith.mulf as mulf
 
 
 def generate_code(name, mod_type, parameters):
@@ -80,6 +81,8 @@ def generate_code(name, mod_type, parameters):
       return maximumf.generate_maximumf(name, parameters)
     case "minimumf":
       return minimumf.generate_minimumf(name, parameters)
+    case "mulf":
+      return mulf.generate_mulf(name, parameters)
     case "muli":
       return muli.generate_muli(name, parameters)
     case _:
