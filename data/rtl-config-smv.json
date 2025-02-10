@@ -102,7 +102,14 @@
   },
   {
     "name": "handshake.addf",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p latency=12 datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
+    ],
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME latency=12 datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+  },
+  {
+    "name": "handshake.addf",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME latency=9 datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.addi",

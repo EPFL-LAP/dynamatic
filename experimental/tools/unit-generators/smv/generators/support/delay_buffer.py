@@ -14,8 +14,8 @@ MODULE {name}(ins_valid, outs_ready)
   VAR inner_oehb : {name}__oehb_dataless(ins, ins_valid, outs_ready);
 
   // output
-  DEFINE ins_ready = inner_oehb.ins_ready;
-  DEFINE outs_valid = inner_oehb.outs_valid;
+  DEFINE ins_ready := inner_oehb.ins_ready;
+  DEFINE outs_valid := inner_oehb.outs_valid;
 
   {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>", "data_type": "!handshake.control<>"})}
 """
@@ -34,8 +34,8 @@ MODULE {name}(ins_valid, outs_ready)
 """ for n in range(latency - 1)])}
 
   // output
-  DEFINE ins_ready = inner_oehb.ins_ready;
-  DEFINE outs_valid = inner_oehb.outs_valid;
+  DEFINE ins_ready := inner_oehb.ins_ready;
+  DEFINE outs_valid := inner_oehb.outs_valid;
 
   {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>", "data_type": "!handshake.control<>"})}
 """
