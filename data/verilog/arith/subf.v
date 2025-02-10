@@ -20,8 +20,6 @@ module subf #(
   //assert(DATA_TYPE == 32) else $fatal("subf currently only supports 32-bit operands");
 
   wire join_valid, oehb_ready, buff_valid;
-  wire constant_zero = 1'b0;
-  wire open_value;
 
   // subf is the same as addf, but we flip the sign bit of rhs
   wire [DATA_TYPE - 1 : 0] rhs_neg;

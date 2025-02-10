@@ -19,8 +19,6 @@ module mulf #(
 
   //assert(DATA_TYPE == 32) else $fatal("mulf currently only supports 32-bit inputs");
 
-  wire constant_zero = 1'b0;
-  wire open_value;
   wire join_valid;
   wire buff_valid, oehb_ready;
 
