@@ -69,8 +69,7 @@ begin
       data_from_memory => loadData
     );
 
-    ldData_valid => ldDone_valid;
-    ldData_ready => ldDone_ready;
+    ldDone_valid <= ldData_valid;
 
   -- NOTE: (lucas-rami) In addition to making sure there are no stores pending,
   -- we should also check that there are no loads pending as well. To achieve 

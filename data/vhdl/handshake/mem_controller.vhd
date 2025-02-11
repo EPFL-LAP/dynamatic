@@ -88,6 +88,8 @@ begin
       stData         => stData,
       stData_valid   => stData_valid,
       stData_ready   => stData_ready,
+      stDone_valid   => stDone_valid,
+      stDone_ready   => stDone_ready,
       loadData       => dropLoadData,
       loadEn         => dropLoadEn,
       loadAddr       => dropLoadAddr,
@@ -115,4 +117,16 @@ begin
       read_address     => loadAddr,
       data_from_memory => loadData
     );
+
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      for i in 0 to NUM_LOADS - 1 loop
+        if ldDone_ready(i) = '1' then
+          ldDone_valid(i) <= ldData_valid(i);
+        end if;
+      end loop;
+    end if;
+  end process;
+
 end architecture;

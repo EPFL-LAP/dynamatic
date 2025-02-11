@@ -378,6 +378,57 @@ void WriteModData::writeSignalDeclarations(
   };
 
   for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
+    if (valueAndName.second.find("unbundle") != std::string::npos ||
+    valueAndName.second.find("bundle") != std::string::npos){
+        
+
+        llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<ChannelType>([&](ChannelType channelType) {
+          llvm::errs() << "channel!";
+          llvm::errs() << "iiiiiiiii " << valueAndName.first << " ------- " << valueAndName.second << "\n";
+          writeDeclaration(
+              getInternalSignalName(valueAndName.second, SignalType::DATA),
+              channelType.getDataBitWidth() - 1, os);
+          addValidReady(valueAndName.second);
+          addExtraSignals(valueAndName.second, channelType.getExtraSignals());
+        })
+        .Case<ControlType>([&](auto type) {
+          llvm::errs() << "control!";
+          llvm::errs() << "iiiiiiiii " << valueAndName.first << " ------- " << valueAndName.second << "\n";
+          addValidReady(valueAndName.second);
+          addExtraSignals(valueAndName.second, type.getExtraSignals());
+        })
+        .Case<IntegerType>([&](IntegerType intType) {
+          llvm::errs() << "int!";
+          llvm::errs() << "iiiiiiiii " << valueAndName.first << " ------- " << valueAndName.second << "\n";
+          
+          // std::string str =  valueAndName.first;
+          // std::string lastNumber = "";
+          // bool inNumber = false;
+
+          // for (int i = str.length() - 1; i >= 0; --i) {
+          // if (isdigit(str[i])) {
+          //     lastNumber = str[i] + lastNumber;
+          //     inNumber = true;
+          // } else if (inNumber) {
+          //     break; // Stop when we exit a number
+          // }
+
+          // std::stoi(lastNumber)
+          if (!getRawType(intType).has_value()){
+            writeDeclaration(valueAndName.second, 0, os);
+            llvm::errs() << "ajab : " << valueAndName.second << "\n";
+          }
+
+          else
+            writeDeclaration(valueAndName.second, getRawType(intType), os);
+          llvm::errs() << "hi: " << getRawType(intType) << "\n";
+        });
+
+      continue;
+
+    }
+
     llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
         .Case<ChannelType>([&](ChannelType channelType) {
           writeDeclaration(
@@ -518,6 +569,7 @@ LogicalResult RTLWriter::createInternalSignals(WriteModData &data) const {
   return success();
 }
 
+//rouzbeh
 void RTLWriter::constructIOMappings(
     hw::InstanceOp instOp, hw::HWModuleLike modOp,
     const FGetValueName &getValueName,
@@ -526,6 +578,8 @@ void RTLWriter::constructIOMappings(
     if (instOp.getModuleName().contains("unbundle")){
       llvm::errs() << instOp.getModuleName() << "9999 ------\n";
     }
+
+
   auto addValidAndReady = [&](StringRef port, StringRef signal) -> void {
     mappings[getTypedSignalName(port, SignalType::VALID)].push_back(
         getInternalSignalName(signal, SignalType::VALID));
@@ -541,6 +595,29 @@ void RTLWriter::constructIOMappings(
   };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
+    if (instOp.getModuleName().contains("unbundle") ||
+    instOp.getModuleName().contains("bundle")){
+      llvm::errs() << "befarma: " << portType << port << signal << "\n"; 
+      size_t idx = port.rfind("_");
+      if (idx != std::string::npos)
+        port = port.substr(0, idx);
+
+      llvm::TypeSwitch<Type, void>(portType)
+        .Case<ChannelType>([&](ChannelType channelType) {
+          mappings[{port.str(), false}].push_back(getInternalSignalName(signal, SignalType::DATA));
+          mappings[{port.str()+ "_valid", false}].push_back(getInternalSignalName(signal, SignalType::VALID));
+          mappings[{port.str()+ "_ready", false}].push_back(getInternalSignalName(signal, SignalType::READY));  
+        })
+        .Case<ControlType>([&](auto type) {
+          mappings[{port.str()+ "_valid", false}].push_back(getInternalSignalName(signal, SignalType::VALID));
+          mappings[{port.str()+ "_ready", false}].push_back(getInternalSignalName(signal, SignalType::READY));  
+        })
+        .Case<IntegerType>([&](IntegerType intType) {
+          mappings[getSignalName(port)].push_back(signal.str());
+        }); 
+      
+      return;
+    }
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) {
           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(
@@ -561,7 +638,8 @@ void RTLWriter::constructIOMappings(
 
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
   for (auto [oprd, portAttr] : ins){
-    if (instOp.getModuleName().contains("unbundle")){
+    if (instOp.getModuleName().contains("unbundle") ||
+    instOp.getModuleName().contains("bundle")){
       llvm::errs() << "888" << oprd << "-" << portAttr << "\n";
     }
     addPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
@@ -591,8 +669,7 @@ void RTLWriter::fillIOMappings(hw::InstanceOp instOp,
       llvm::errs() << match.component << "*******------\n";
     }
 
-    //ajib
-
+    //rouzbeh
     FGetTypedSignalName getTypedSignalName = [&](auto port, auto type) -> Port {
       return match.component->getRTLPortName(port, type, ::hdl);
     };
@@ -759,7 +836,7 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
         return;
       }
 
-
+      //rouzbeh
       ArrayRef<std::string> signals(signalNames);
       for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
         os << port.first << "(" << idx << ") => " << sig << ",\n";
@@ -775,10 +852,10 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
     if (moduleName == "unbundle"){
       llvm::errs() << instOp << "\n";
-      for (auto [a, b] : mappings){
-        llvm::errs() << "- " << a.first << "- " << a.second  << "-\n";
-        for (auto c : b)
-          llvm::errs() << "* " << c << "\n";
+      for (auto &[port, signalNames] : mappings) {
+        llvm::errs() << "name: " << port.first << "is vec:" << port.second  << "-\n";
+        for (auto signal : signalNames)
+          llvm::errs() << "should connect to  " << signal << "\n";
       }
     }
     writeIOMap(mappings, writePortMap, os);

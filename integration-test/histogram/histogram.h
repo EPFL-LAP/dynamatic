@@ -5,7 +5,7 @@ typedef int in_int_t;
 typedef float in_float_t;
 typedef float inout_float_t;
 
-void histogram(in_int_t feature[1000], in_float_t weight[1000],
-               inout_float_t hist[1000], in_int_t n);
+void histogram(in_int_t feature[10], in_float_t weight[10],
+               inout_float_t hist[10], in_int_t n);
 
 #endif // HISTOGRAM_HISTOGRAM_H

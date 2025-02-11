@@ -30,7 +30,7 @@ entity load is
     doneFromMem_ready  : out std_logic;
     -- done to circuit channel
     doneOut_valid : out std_logic;
-    doneOut_ready : in  std_logic;
+    doneOut_ready : in  std_logic
   );
 end entity;
 
@@ -67,22 +67,10 @@ begin
       -- output channel
       outs       => dataOut,
       outs_valid => dataOut_valid,
-      outs_ready => doneOut_ready;
+      outs_ready => dataOut_ready
     );
 
-    done_tehb : entity work.tehb(arch)
-    generic map(
-      DATA_TYPE => 0
-    )
-    port map(
-      clk => clk,
-      rst => rst,
-      -- input channel
-      ins_valid => doneFromMem_valid,
-      ins_ready => doneFromMem_ready,
-      -- output channel
-      outs_valid => doneOut_valid,
-      outs_ready => doneOut_ready;
-    );
+    doneOut_valid <= doneFromMem_valid;
+    doneFromMem_ready <= doneOut_ready;
   
 end architecture;

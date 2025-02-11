@@ -134,6 +134,7 @@ static ChannelVal getMinimalValue(ChannelVal val, ExtType *ext = nullptr) {
 // "single data input data-forwarders" (i.e., Handshake operations which forward
 // one their single "data input" to one of their outputs).
 static ChannelVal backtrack(ChannelVal val) {
+  llvm::errs() << "here: " << val << "\n";
   VisitedOps visitedOps;
   while (Operation *defOp = val.getDefiningOp()) {
     // Stop when reaching an operation that was already backtracked through
@@ -145,6 +146,9 @@ static ChannelVal backtrack(ChannelVal val) {
       val = cast<ChannelVal>(defOp->getOperand(0));
     if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
       val = cast<ChannelVal>(condOp.getDataOperand());
+    else if (dyn_cast<handshake::ControlMergeOp>(defOp)){
+      return val;
+    }
     else if (auto mergeLikeOp =
                  dyn_cast<handshake::MergeLikeOpInterface>(defOp)) {
       if (auto dataOpr = mergeLikeOp.getDataOperands(); dataOpr.size() == 1)

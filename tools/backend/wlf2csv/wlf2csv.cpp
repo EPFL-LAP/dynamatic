@@ -114,7 +114,10 @@ struct ChannelState {
     if (partlyUndef)
       return dataString;
 
-    auto channelType = cast<handshake::ChannelType>(type);
+    llvm::errs() << "hi: " << type;
+    auto channelType = dyn_cast<handshake::ChannelType>(type);
+    if (!channelType)
+      return "undef";
     auto dataType = channelType.getDataType();
     if (auto intType = dyn_cast<IntegerType>(dataType)) {
       APInt intVal(data.size(), dataString, 2);

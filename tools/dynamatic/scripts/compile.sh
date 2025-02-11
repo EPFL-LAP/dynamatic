@@ -123,6 +123,7 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
   --handshake-insert-skippable-seq \
   --handshake-replace-memory-interfaces \
   --handshake-minimize-cst-width \
+  --handshake-optimize-bitwidths \
   --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \

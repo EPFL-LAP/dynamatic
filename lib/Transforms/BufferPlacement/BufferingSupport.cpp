@@ -164,7 +164,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       return channel.consumer->emitError() << ss.str();
     }
 
-    llvm::errs() << "***** " << "\n";
+    // llvm::errs() << "***** " << "\n";
     // Increase the minimum number of slots if internal buffers are present, and
     // check for satisfiability
     channel.addInternalBuffers(timingDB);
@@ -215,7 +215,7 @@ llvm::errs() << "------------------------404 \n";
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
-      llvm::errs() << "[*] " << idx << res << "\n";
+      // llvm::errs() << "[*] " << idx << res << "\n";
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel))){
 

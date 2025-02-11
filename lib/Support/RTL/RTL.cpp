@@ -521,6 +521,7 @@ bool RTLComponent::portNameIsIndexed(StringRef portName, StringRef &baseName,
   return false;
 }
 
+//rouzbeh
 std::pair<std::string, bool>
 RTLComponent::getRTLPortName(StringRef mlirPortName, HDL hdl) const {
   std::string remappedName = portRemap(mlirPortName);

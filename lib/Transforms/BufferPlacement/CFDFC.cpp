@@ -200,14 +200,19 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     // Add the unit and valid outgoing channels to the CFDFC
     units.insert(&op);
     for (OpResult res : op.getResults()) {
+      llvm::errs() << "dtis: " << res << "\n";
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
              "value must have unique user");
 
       // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
       unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
+      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value()){
+        llvm::errs() << "moshkel: " << res << "\n\n";
+        llvm::errs() << "yadegari" << *(*(res.getUsers().begin())) << "\n\n";
         continue;
+      }
+
       else
         dstBB = *optBB;
 
