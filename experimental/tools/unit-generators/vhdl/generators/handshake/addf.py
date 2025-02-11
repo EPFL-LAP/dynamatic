@@ -29,21 +29,21 @@ def generate_addf(name, options, out_directory):
   else:
     return _generate_addf(name, is_double)
 
-def _generate_addf(name, is_double, export_transfer=False):
+def _generate_addf(name, is_double):
   if is_double:
-    return _generate_addf_double_precision(name, export_transfer)
+    return _generate_addf_double_precision(name)
   else:
-    return _generate_addf_single_precision(name, export_transfer)
+    return _generate_addf_single_precision(name)
 
 def _get_latency(is_double):
   return 12 if is_double else 9 # todo
 
-def _generate_addf_single_precision(name, export_transfer=False):
+def _generate_addf_single_precision(name):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
+  dependencies = generate_join(join_name, {"size": 2}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1})
 
@@ -55,7 +55,6 @@ use ieee.numeric_std.all;
 -- Entity of addf_single_precision
 entity {name} is
   port (
-    [POSSIBLE_TRANSFER]
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
@@ -87,7 +86,6 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
-      [POSSIBLE_TRANSFER]
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
@@ -148,25 +146,14 @@ begin
 end architecture;
 """
 
-  if export_transfer:
-    entity = entity.replace("[POSSIBLE_TRANSFER]",
-                            "transfer : out std_logic;")
-    # Transfer logic outside the join
-    architecture = architecture.replace(
-      "[POSSIBLE_TRANSFER]",
-      "transfer => transfer,")
-  else:
-    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
-    architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
-
   return dependencies + entity + architecture
 
-def _generate_addf_double_precision(name, export_transfer=False):
+def _generate_addf_double_precision(name):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
+  dependencies = generate_join(join_name, {"size": 2}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -178,7 +165,6 @@ use ieee.numeric_std.all;
 -- Entity of addf_double_precision
 entity {name} is
   port (
-    [POSSIBLE_TRANSFER]
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
@@ -210,7 +196,6 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
-      [POSSIBLE_TRANSFER]
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
@@ -271,23 +256,12 @@ begin
 end architecture;
 """
 
-  if export_transfer:
-    entity = entity.replace("[POSSIBLE_TRANSFER]",
-                            "transfer : out std_logic;")
-    # Transfer logic outside the join
-    architecture = architecture.replace(
-      "[POSSIBLE_TRANSFER]",
-      "transfer => transfer;")
-  else:
-    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
-    architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
-
   return dependencies + entity + architecture
 
 def _generate_addf_signal_manager(name, data_type, is_double):
   inner_name = f"{name}_inner"
 
-  dependencies = _generate_addf(inner_name, is_double, export_transfer=True)
+  dependencies = _generate_addf(inner_name, is_double)
 
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
@@ -363,6 +337,7 @@ architecture arch of {name} is
   signal transfer : std_logic;
   [EXTRA_SIGNAL_SIGNAL_DECLS]
 begin
+  transfer <= lhs_valid and lhs_ready;
 
   -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGIC]
