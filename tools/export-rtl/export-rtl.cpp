@@ -151,7 +151,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
         return failure();
     }
 
-    // Include PORT_TYPES parameter to the serialized parameters
+    // Include PORT_TYPES parameter in the serialized parameters
     if (extOp)
       match->registerPortTypesParameter(extOp);
 
