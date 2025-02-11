@@ -83,7 +83,8 @@ static cl::list<std::string>
 
 namespace {
 
-using FGenDep = std::function<LogicalResult(const RTLRequest &)>;
+using FGenComp =
+    std::function<LogicalResult(const RTLRequest &, hw::HWModuleExternOp)>;
 
 /// Aggregates information useful during RTL export. This is to avoid passing
 /// many arguments to a bunch of functions.
@@ -121,23 +122,17 @@ struct ExportInfo {
 LogicalResult ExportInfo::concretizeExternalModules() {
   std::set<std::string> modules;
 
-  auto hasExtraSignal = [&](hw::HWModuleExternOp extOp) {
-    for (Type type : extOp.getModuleType().getPortTypes()) {
-      if (auto extraSignalsType = type.dyn_cast<ExtraSignalsTypeInterface>()) {
-        return extraSignalsType.getNumExtraSignals() > 0;
-      }
-    }
-    return false;
-  };
-
-  FGenDep concretizeDependency =
-      [&](const RTLRequest &request) -> LogicalResult {
+  FGenComp concretizeComponent =
+      [&](const RTLRequest &request,
+          hw::HWModuleExternOp extOp) -> LogicalResult {
     // Try to find a matching component
     RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
     }
+    if (extOp)
+      externals[extOp] = match;
 
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
@@ -147,68 +142,17 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     // First generate dependencies recursively...
     for (StringRef dep : match->component->getDependencies()) {
       RTLDependencyRequest dependencyRequest(dep, request.loc);
-      if (failed(concretizeDependency(dependencyRequest)))
+      if (failed(concretizeComponent(dependencyRequest, nullptr)))
         return failure();
     }
 
     // ...then generate the component itself
-    LogicalResult concretizeResult =
-        match->concretize(request, dynamaticPath, outputPath);
-
-    delete match;
-    return concretizeResult;
+    return match->concretize(request, dynamaticPath, outputPath);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
     RTLRequestFromHWModule request(extOp);
-    // Try to find a matching component
-    RTLMatch *match = config.getMatchingComponent(request);
-    if (!match) {
-      return emitError(request.loc)
-             << "Failed to find matching RTL component for external module";
-    }
-    bool isMatchRegistered = false;
-    if (hasExtraSignal(extOp)) {
-      // Need signal manager
-      RTLSignalManagerRequest signalManagerRequest(request.loc);
-      RTLMatch *signalManagerMatch =
-          config.getMatchingComponent(signalManagerRequest);
-      if (!signalManagerMatch) {
-        return emitError(request.loc)
-               << "Failed to find matching RTL component for signal manager";
-      }
-      externals[extOp] = signalManagerMatch;
-
-      assert(signalManagerMatch->component->getDependencies().size() == 0 &&
-             "Signal manager should not have dependencies");
-
-      // Concretize only if this signal manager is new
-      StringRef concreteModName = signalManagerMatch->getConcreteModuleName();
-      if (auto [_, isNew] = modules.insert(concreteModName.str()); isNew) {
-        if (failed(signalManagerMatch->concretize(request, dynamaticPath,
-                                                  outputPath)))
-          return failure();
-      }
-    } else {
-      externals[extOp] = match;
-      isMatchRegistered = true;
-    }
-    // No need to concretize and check dependencies if a module with the same
-    // name already exists
-    StringRef concreteModName = match->getConcreteModuleName();
-    if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew) {
-      if (isMatchRegistered)
-        delete match;
-
-      continue;
-    }
-    for (StringRef dep : match->component->getDependencies()) {
-      RTLDependencyRequest dependencyRequest(dep, request.loc);
-      if (failed(concretizeDependency(dependencyRequest)))
-        return failure();
-    }
-
-    if (failed(match->concretize(request, dynamaticPath, outputPath)))
+    if (failed(concretizeComponent(request, extOp)))
       return failure();
   }
   return success();
