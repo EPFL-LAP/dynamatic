@@ -1,7 +1,13 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
-from generators.handshake.join import generate_join
+import os
+import shutil
 
-def generate_addf(name, options):
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.join import generate_join
+from generators.support.delay_buffer import generate_delay_buffer
+from generators.handshake.oehb import generate_oehb
+from generators.handshake.ofifo import generate_ofifo
+
+def generate_addf(name, options, out_directory):
   data_type = VhdlScalarType(options["data_type"])
 
   if data_type.bitwidth == 32:
@@ -11,6 +17,13 @@ def generate_addf(name, options):
   else:
     raise ValueError(f"Unsupported bitwidth {data_type.bitwidth}")
 
+  # TODO: There might be a better way to resolve the external dependency
+  # Copy the external dependency file to the output directory
+  external_dependency = os.path.join(os.path.dirname(__file__),
+                                     "external/flopoco_ip_cores.vhd")
+  # File is overwritten if it already exists
+  shutil.copy(external_dependency, out_directory)
+
   if data_type.has_extra_signals():
     return _generate_addf_signal_manager(name, data_type, is_double)
   else:
@@ -18,32 +31,28 @@ def generate_addf(name, options):
 
 def _generate_addf(name, is_double, export_transfer=False):
   if is_double:
-    return _generate_addf_single_precision(name, export_transfer)
-  else:
     return _generate_addf_double_precision(name, export_transfer)
+  else:
+    return _generate_addf_single_precision(name, export_transfer)
 
 def _get_latency(is_double):
-  return 12 if is_double else 9
+  return 12 if is_double else 9 # todo
 
 def _generate_addf_single_precision(name, export_transfer=False):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
-  ieee2nfloat_name = f"{name}_ieee2nfloat"
-  nfloat2ieee_name = f"{name}_nfloat2ieee"
-  floating_point_adder_name = f"{name}_floating_point_adder"
+
   dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
-    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1}) + \
-    generate_input_ieee_32bit(ieee2nfloat_name) + \
-    generate_output_ieee_32bit(nfloat2ieee_name) + \
-    generate_floating_point_adder(floating_point_adder_name)
+    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1})
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of addf_single_precision
 entity {name} is
   port (
     [POSSIBLE_TRANSFER]
@@ -65,6 +74,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of addf_single_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
   signal buff_valid, oehb_ready : std_logic;
@@ -109,25 +119,25 @@ begin
       buff_valid
     );
 
-  ieee2nfloat_lhs: entity work.{ieee2nfloat_name}(arch)
+  ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)
     port map (
         X => lhs,
         R => ip_lhs
     );
 
-  ieee2nfloat_rhs: entity work.{ieee2nfloat_name}(arch)
+  ieee2nfloat_rhs: entity work.InputIEEE_32bit(arch)
     port map (
         X => rhs,
         R => ip_rhs
     );
 
-  nfloat2ieee_result : entity work.{nfloat2ieee_name}(arch)
+  nfloat2ieee_result : entity work.OutputIEEE_32bit(arch)
     port map (
         X => ip_result,
         R => result
     );
 
-  ip : entity work.{floating_point_adder_name}(arch)
+  ip : entity work.FloatingPointAdder(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,
@@ -144,9 +154,9 @@ end architecture;
     # Transfer logic outside the join
     architecture = architecture.replace(
       "[POSSIBLE_TRANSFER]",
-      "transfer => transfer;")
+      "transfer => transfer,")
   else:
-    entity = entity.replace("      [POSSIBLE_TRANSFER]\n", "")
+    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
     architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
 
   return dependencies + entity + architecture
@@ -155,21 +165,17 @@ def _generate_addf_double_precision(name, export_transfer=False):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
-  ieee2nfloat_name = f"{name}_ieee2nfloat"
-  nfloat2ieee_name = f"{name}_nfloat2ieee"
-  floating_point_adder_name = f"{name}_floating_point_adder"
+
   dependencies = generate_join(join_name, {"size": 2, "transfer": export_transfer}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
-    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1}) + \
-    generate_input_ieee_64bit(ieee2nfloat_name) + \
-    generate_output_ieee_64bit(nfloat2ieee_name) + \
-    generate_floating_point_adder_64bit(floating_point_adder_name)
+    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1})
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of addf_double_precision
 entity {name} is
   port (
     [POSSIBLE_TRANSFER]
@@ -191,6 +197,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of addf_double_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
   signal buff_valid, oehb_ready : std_logic;
@@ -235,25 +242,25 @@ begin
       buff_valid
     );
 
-  ieee2nfloat_lhs: entity work.{ieee2nfloat_name}(arch)
+  ieee2nfloat_lhs: entity work.InputIEEE_64bit(arch)
     port map (
         X => lhs,
         R => ip_lhs
     );
 
-  ieee2nfloat_rhs: entity work.{ieee2nfloat_name}(arch)
+  ieee2nfloat_rhs: entity work.InputIEEE_64bit(arch)
     port map (
         X => rhs,
         R => ip_rhs
     );
 
-  nfloat2ieee_result : entity work.{nfloat2ieee_name}(arch)
+  nfloat2ieee_result : entity work.OutputIEEE_64bit(arch)
     port map (
         X => ip_result,
         R => result
     );
 
-  ip : entity work.{floating_point_adder_name}(arch)
+  ip : entity work.FPAdd_64bit(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,
@@ -272,17 +279,18 @@ end architecture;
       "[POSSIBLE_TRANSFER]",
       "transfer => transfer;")
   else:
-    entity = entity.replace("      [POSSIBLE_TRANSFER]\n", "")
+    entity = entity.replace("    [POSSIBLE_TRANSFER]\n", "")
     architecture = architecture.replace("  [POSSIBLE_TRANSFER]\n", "")
 
   return dependencies + entity + architecture
 
 def _generate_addf_signal_manager(name, data_type, is_double):
   inner_name = f"{name}_inner"
-  dependencies = _generate_addf(name, is_double, export_transfer=True)
+
+  dependencies = _generate_addf(inner_name, is_double, export_transfer=True)
 
   if "spec" in data_type.extra_signals:
-    dependencies += _generate_ofifo(f"{name}_spec_ofifo", {
+    dependencies += generate_ofifo(f"{name}_spec_ofifo", {
       "slots": _get_latency(is_double), # todo: correct?
       "data_type": "!handshake.channel<i1>" })
 
@@ -321,6 +329,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of addf signal manager
 entity {name} is
   port (
     [EXTRA_SIGNAL_PORTS]
@@ -349,6 +358,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
+-- Architecture of addf signal manager
 architecture arch of {name} is
   signal transfer : std_logic;
   [EXTRA_SIGNAL_SIGNAL_DECLS]
@@ -384,3 +394,8 @@ end architecture;
     ]))
 
   return dependencies + entity + architecture
+
+if __name__ == "__main__":
+  print(generate_addf("addf", {
+    "data_type": "!handshake.channel<i32, [spec: i1]>"
+  }, "out/"))
