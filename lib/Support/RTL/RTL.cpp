@@ -244,7 +244,8 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   std::string portTypesValue;
   llvm::raw_string_ostream portTypes(portTypesValue);
 
-  portTypes << "{"; // Start of the JSON object
+  // Wrap in single quotes for easier passing as a generator argument.
+  portTypes << "'{"; // Start of the JSON object
 
   bool first = true;
   for (const hw::ModulePort &port : modOp.getModuleType().getPorts()) {
@@ -261,7 +262,7 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
     port.type.print(portTypes);
     portTypes << "\"";
   }
-  portTypes << "}"; // End of the JSON object
+  portTypes << "}'"; // End of the JSON object
 
   // Register PORT_TYPES parameter
   serializedParams["PORT_TYPES"] = portTypes.str();
