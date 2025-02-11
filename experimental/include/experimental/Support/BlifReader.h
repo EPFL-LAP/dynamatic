@@ -18,6 +18,7 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
+#include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <set>
@@ -91,6 +92,36 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
+  // Connects two nodes by setting the pointer of current node to the previous
+  // node. This function is used to merge different LogicNetwork objects. Input
+  // node of one LogicNetwork object is connected to the output node of
+  // LogicNetwork object that comes before it.
+  static void connectNodes(Node *currentNode, Node *previousNode) {
+    for (auto *node : currentNode->fanouts) {
+      previousNode->addFanout(node);
+    }
+
+    // Connected nodes are no more input/output nodes in a BLIF file.
+    currentNode->setIOChannel();
+    previousNode->setIOChannel();
+
+    if (previousNode->isBlackboxOutput) {
+      previousNode->isInput = true;
+    }
+
+    for (auto &fanout : currentNode->fanouts) {
+      fanout->fanins.erase(currentNode);
+      fanout->fanins.insert(previousNode);
+    }
+
+    // Reverse the naming for ready signals
+    if (previousNode->name.find("ready") != std::string::npos) {
+      previousNode->name = currentNode->name;
+    }
+
+    currentNode = previousNode;
+  }
+
   // Configures the node based on the type of I/O node.
   void configureIONode(const std::string &type);
 
@@ -102,6 +133,10 @@ public:
             isBlackboxOutput);
   }
   bool isPrimaryOutput() const { return (isOutput || isLatchInput); }
+
+  // Used to merge I/O nodes. I/O is set false and isChannelEdge is set to true
+  // so that the node can be considered as a dataflow graph edge.
+  void setIOChannel();
 
   std::string str() const { return name; }
 
@@ -236,4 +271,3 @@ public:
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
-

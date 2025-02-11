@@ -10,6 +10,7 @@
 // structures.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "experimental/Support/BlifReader.h"
 #include "gurobi_c++.h"
@@ -18,6 +19,8 @@
 #include <set>
 #include <sstream>
 #include <vector>
+
+#include "experimental/Support/BlifReader.h"
 
 using namespace dynamatic::experimental;
 
@@ -38,6 +41,12 @@ void Node::configureConstantNode() {
     llvm::errs() << "Unknown constant value: " << function << "\n";
   }
 }
+
+void Node::setIOChannel() {
+  isInput = false;
+  isOutput = false;
+  isChannelEdge = true;
+};
 
 void LogicNetwork::addConstantNode(const std::vector<std::string> &nodes,
                                    const std::string &function) {
