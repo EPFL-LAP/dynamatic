@@ -1,0 +1,316 @@
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+
+def generate_tfifo(name, params):
+  data_type = VhdlScalarType(params["data_type"])
+
+  if data_type.has_extra_signals():
+    if data_type.is_channel():
+      return _generate_tfifo_signal_manager(name, params["size"], data_type)
+    else:
+      return _generate_tfifo_signal_manager_dataless(name, params["size"], data_type)
+  elif data_type.is_channel():
+    return _generate_tfifo(name, params["size"], data_type.bitwidth)
+  else:
+    return _generate_tfifo_dataless(name, params["size"])
+
+def generate_elastic_fifo_inner(name, params):
+  return "" # todo
+
+def generate_elastic_fifo_inner_dataless(name, params):
+  return "" # todo
+
+def _generate_tfifo(name, size, bitwidth):
+  fifo_inner_name = f"{name}_fifo"
+  dependencies = generate_elastic_fifo_inner(fifo_inner_name, {
+    "size": size,
+    "bitwidth": bitwidth
+  })
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk, rst : in std_logic;
+    -- input channel
+    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
+    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
+end entity;
+"""
+
+  architecture = f"""
+architecture arch of {name} is
+  signal mux_sel                  : std_logic;
+  signal fifo_valid, fifo_ready   : std_logic;
+  signal fifo_pvalid, fifo_nready : std_logic;
+  signal fifo_in, fifo_out        : std_logic_vector({bitwidth} - 1 downto 0);
+begin
+
+  process (mux_sel, fifo_out, ins) is
+  begin
+    if (mux_sel = '1') then
+      outs <= fifo_out;
+    else
+      outs <= ins;
+    end if;
+  end process;
+
+  outs_valid  <= ins_valid or fifo_valid;
+  ins_ready   <= fifo_ready or outs_ready;
+  fifo_pvalid <= ins_valid and (not outs_ready or fifo_valid);
+  mux_sel     <= fifo_valid;
+
+  fifo_nready <= outs_ready;
+  fifo_in     <= ins;
+
+  fifo : entity work.{fifo_inner_name}(arch)
+    port map(
+      -- inputs
+      clk        => clk,
+      rst        => rst,
+      ins        => fifo_in,
+      ins_valid  => fifo_pvalid,
+      outs_ready => fifo_nready,
+      -- outputs
+      outs       => fifo_out,
+      outs_valid => fifo_valid,
+      ins_ready  => fifo_ready
+    );
+end architecture;
+"""
+
+  return dependencies + entity + architecture
+
+def _generate_tfifo_dataless(name, size):
+  fifo_inner_name = f"{name}_fifo"
+  dependencies = generate_elastic_fifo_inner_dataless(fifo_inner_name, {
+    "size": size
+  })
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk, rst : in std_logic;
+    -- input channel
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
+end entity;
+"""
+
+  architecture = f"""
+architecture arch of {name} is
+  signal mux_sel                  : std_logic;
+  signal fifo_valid, fifo_ready   : std_logic;
+  signal fifo_pvalid, fifo_nready : std_logic;
+begin
+  outs_valid  <= ins_valid or fifo_valid;
+  ins_ready   <= fifo_ready or outs_ready;
+  fifo_pvalid <= ins_valid and (not outs_ready or fifo_valid);
+  mux_sel     <= fifo_valid;
+  fifo_nready <= outs_ready;
+
+  fifo : entity work.{fifo_inner_name}(arch) generic map (NUM_SLOTS)
+    port map(
+      -- inputs
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => fifo_pvalid,
+      outs_ready => fifo_nready,
+      -- outputs
+      outs_valid => fifo_valid,
+      ins_ready  => fifo_ready
+    );
+end architecture;
+"""
+
+  return dependencies + entity + architecture
+
+def _generate_tfifo_signal_manager(name, size, data_type):
+  bitwidth = data_type.bitwidth
+
+  extra_signal_bit_map = {}
+  occupied_bits = bitwidth
+  for signal_name, signal_bitwidth in data_type.extra_signals.items():
+    extra_signal_bit_map[signal_name] = (
+      occupied_bits + signal_bitwidth - 1,
+      occupied_bits
+    )
+    occupied_bits += signal_bitwidth
+
+  full_bitwidth = occupied_bits
+
+  dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk, rst : in std_logic;
+    [EXTRA_SIGNAL_PORTS]
+    -- input channel
+    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
+    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
+end entity;
+"""
+
+  # Add extra signal ports
+  extra_signal_ports = generate_extra_signal_ports([
+    ("ins", "in"), ("outs", "out")
+  ], data_type.extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+
+  architecture = f"""
+architecture arch of {name} is
+  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+  signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+begin
+  [EXTRA_SIGNAL_LOGIC]
+
+  inner : entity work.{name}_inner(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins_inner,
+      ins_valid => ins_valid,
+      ins_ready => ins_ready,
+      outs => outs_inner,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
+end architecture;
+"""
+
+  ins_inner = ["ins"] + [
+    "ins_" + name for name in data_type.extra_signals
+  ]
+  ins_inner.reverse()
+  ins_conversion = f"  ins_inner <= {" & ".join(ins_inner)}\n"
+
+  outs_inner = [
+    f"  outs <= outs_inner({bitwidth} - 1 downto 0)"
+  ]
+  for name in data_type.extra_signals:
+    msb, lsb = extra_signal_bit_map[name]
+    outs_inner.append(f"  outs_{name} <= outs_inner({msb} downto {lsb})")
+  outs_conversion = "\n".join(outs_inner)
+
+  architecture = architecture.replace(
+    "  [EXTRA_SIGNAL_LOGIC]",
+    ins_conversion + outs_conversion
+  )
+
+  return dependencies + entity + architecture
+
+def _generate_tfifo_signal_manager_dataless(name, size, data_type):
+  extra_signal_bit_map = {}
+  occupied_bits = 0
+  for signal_name, signal_bitwidth in data_type.extra_signals.items():
+    extra_signal_bit_map[signal_name] = (
+      occupied_bits + signal_bitwidth - 1,
+      occupied_bits
+    )
+    occupied_bits += signal_bitwidth
+
+  full_bitwidth = occupied_bits
+
+  dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk, rst : in std_logic;
+    [EXTRA_SIGNAL_PORTS]
+    -- input channel
+    ins_valid : in  std_logic;
+    ins_ready : out std_logic;
+    -- output channel
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
+end entity;
+"""
+
+  # Add extra signal ports
+  extra_signal_ports = generate_extra_signal_ports([
+    ("ins", "in"), ("outs", "out")
+  ], data_type.extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+
+  architecture = f"""
+architecture arch of {name} is
+  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+  signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+begin
+  [EXTRA_SIGNAL_LOGIC]
+
+  inner : entity work.{name}_inner(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins_inner,
+      ins_valid => ins_valid,
+      ins_ready => ins_ready,
+      outs => outs_inner,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
+end architecture;
+"""
+
+  ins_inner = [
+    "ins_" + name for name in data_type.extra_signals
+  ]
+  ins_inner.reverse()
+  ins_conversion = f"  ins_inner <= {" & ".join(ins_inner)}\n"
+
+  outs_inner = []
+  for name in data_type.extra_signals:
+    msb, lsb = extra_signal_bit_map[name]
+    outs_inner.append(f"  outs_{name} <= outs_inner({msb} downto {lsb})")
+  outs_conversion = "\n".join(outs_inner)
+
+  architecture = architecture.replace(
+    "  [EXTRA_SIGNAL_LOGIC]",
+    ins_conversion + outs_conversion
+  )
+
+  return dependencies + entity + architecture
+
+if __name__ == "__main__":
+  print(generate_tfifo("tfifo", {
+    "size": 16,
+    "data_type": "!handshake.channel<i32, [spec: i1, tag: i8]>"
+  }))
+  print(generate_tfifo("tfifo", {
+    "size": 16,
+    "data_type": "!handshake.control<[spec: i1, tag: i8]>"
+  }))
