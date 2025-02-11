@@ -151,6 +151,12 @@ static inline void parseOperationPlacements(
 //       "operation-name": "buffer10",
 //       "operand-idx": 0
 //     }
+//   ],
+//  "buffers": [
+//     {
+//       "operation-name": "extsi1",
+//       "operand-idx": 0
+//     }
 //   ]
 // }
 static bool parseJSON(
@@ -213,14 +219,12 @@ static LogicalResult getOpPlacements(
     placements.addSaveCommit(*dstOpOperand);
   }
 
-  // Add Save-Commit Operations position
+  // Add Buffer Operations position
   for (PlacementOperand &p : specNameMap["buffers"]) {
     if (failed(getPlacementOps(p)))
       return failure();
     placements.addBuffer(*dstOpOperand);
   }
-
-  placements.getPlacements<handshake::BufferOp>();
 
   return success();
 }

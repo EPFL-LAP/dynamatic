@@ -16,13 +16,11 @@ module antitokens (
   wire reg_in0, reg_in1;
   reg reg_out0, reg_out1;
 
-  always @(posedge reset) begin
-    reg_out0 <= 1'b0;
-    reg_out1 <= 1'b0;
-  end
-
   always @(posedge clk) begin
-    if ( !reset ) begin
+    if (reset) begin
+      reg_out0 <= 1'b0;
+      reg_out1 <= 1'b0;
+    end else begin
       reg_out0 <= reg_in0;
       reg_out1 <= reg_in1;
     end

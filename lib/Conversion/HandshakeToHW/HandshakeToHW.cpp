@@ -363,7 +363,8 @@ public:
       if (!nameAttr || nameAttr != opName)
         return false;
 
-      // 2. hw.parameters (a dict with DATA_TYPE, FIFO_DEPTH, etc.) must match
+      // 2. hw.parameters (a dictionary containing DATA_TYPE, FIFO_DEPTH, etc.)
+      // must match
       auto paramsAttr = extModOp->template getAttrOfType<DictionaryAttr>(
           RTL_PARAMETERS_ATTR_NAME);
       if (!paramsAttr)
@@ -382,8 +383,8 @@ public:
       // and outputs (excluding clk and rst).
       // See ConvertToHWInstance<T>::matchAndRewrite or
       // ConvertMemInterface::matchAndRewrite.
-      // Note: This equality check allows removing the DATA_TYPE parameter from
-      // hw.parameters (checked above).
+      // Note: This equality check implies we can remove the DATA_TYPE parameter
+      // from hw.parameters (checked above).
       unsigned int operandIdx = 0;
       unsigned int resultIdx = 0;
       auto modType = mlir::cast<hw::HWModuleExternOp>(extModOp).getModuleType();
@@ -391,19 +392,28 @@ public:
         if (port.name == "clk" || port.name == "rst")
           continue;
         if (port.dir == hw::ModulePort::Direction::Input) {
-          if (operandIdx >= op->getNumOperands())
+          if (operandIdx >= op->getNumOperands()) {
+            // The number of operands is different
             return false;
-          if (port.type != op->getOperand(operandIdx).getType())
+          }
+          if (port.type != op->getOperand(operandIdx).getType()) {
+            // The operand's type at operandIdx is different
             return false;
+          }
           operandIdx++;
         } else if (port.dir == hw::ModulePort::Direction::Output) {
-          if (resultIdx >= op->getNumResults())
+          if (resultIdx >= op->getNumResults()) {
+            // The number of results is different
             return false;
-          if (port.type != op->getResult(resultIdx).getType())
+          }
+          if (port.type != op->getResult(resultIdx).getType()) {
+            // The result's type at resultIdx is different
             return false;
+          }
           resultIdx++;
         } else {
-          llvm_unreachable("unsupported port direction");
+          // Inout ports are not used
+          llvm_unreachable("Inout ports shouldn't be used");
           return false;
         }
       }
@@ -534,11 +544,11 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp>(
-          [&](auto) {
-            // Bitwidth
-            addType("DATA_TYPE", op->getOperand(0));
-          })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
+            handshake::NDWireOp>([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
             // Bitwidth
@@ -1778,6 +1788,7 @@ public:
     patterns.insert<ConvertFunc, ConvertMemInterface>(typeConverter, ctx,
                                                       lowerState);
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
+                    ConvertToHWInstance<handshake::NDWireOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
                     ConvertToHWInstance<handshake::MergeOp>,

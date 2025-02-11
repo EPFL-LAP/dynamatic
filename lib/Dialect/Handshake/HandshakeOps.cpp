@@ -222,6 +222,15 @@ void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
   return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
 }
+
+//===----------------------------------------------------------------------===//
+// NDWireOp
+//===----------------------------------------------------------------------===//
+
+std::pair<handshake::ChannelType, bool> NDWireOp::getReshapableChannelType() {
+  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
+}
+
 //===----------------------------------------------------------------------===//
 // MergeOp
 //===----------------------------------------------------------------------===//

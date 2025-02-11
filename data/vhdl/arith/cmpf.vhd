@@ -104,16 +104,14 @@ architecture arch of cmpf_double_precision is
   signal ip_rhs : std_logic_vector(64 + 1 downto 0);
 begin
 
- oehb : entity work.oehb(arch) generic map(1)
+ oehb : entity work.oehb_dataless(arch)
   port map(
     clk        => clk,
     rst        => rst,
     ins_valid  => buff_valid,
     outs_ready => result_ready,
     outs_valid => result_valid,
-    ins_ready  => oehb_ready,
-    ins(0)     => '0',
-    outs    => open
+    ins_ready  => oehb_ready
   );
   join_inputs : entity work.join(arch) generic map(2)
     port map(
