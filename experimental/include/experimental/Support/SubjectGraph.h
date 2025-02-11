@@ -56,8 +56,10 @@ protected:
 
   // moduleType is used to generate the path to the BLIF file
   std::string moduleType;
+
   // uniqueName is used to generate unique names for the nodes in the BLIF file
   std::string uniqueName;
+
   // isBlackbox is used to determine if the module is a blackbox module
   bool isBlackbox = false;
 
@@ -99,16 +101,11 @@ public:
   // moduleMap, since not all of the SubjectGraphs are created from Operations.
   static inline std::vector<BaseSubjectGraph *> subjectGraphVector;
 
-  // Holds the path to the directory of BLIF files
-  static inline std::string baseBlifPath;
-
   // Holds the path to the BLIF file this subject graph is based on
   std::string fullPath;
 
   // Pointer to the LogicNetwork object that represents the BLIF file
   LogicNetwork *blifData;
-
-  void appendVarsToPath(std::initializer_list<unsigned int> inputs);
 
   // Gets the MLIR Result Number between two SubjectGraphs
   static unsigned int getChannelNumber(BaseSubjectGraph *first,
@@ -127,6 +124,11 @@ public:
   // Result Number)
   virtual ChannelSignals &returnOutputNodes(unsigned int resultNumber) = 0;
 };
+
+/// Below is class definitions of Subject Graph for supported modules. Each
+/// class has its own definitions for connectInputNodes() and
+/// returnOutputNodes() functions. The variables and the functions of the
+/// classes are specialized to its hardware description.
 
 class ArithSubjectGraph : public BaseSubjectGraph {
 private:
@@ -297,15 +299,6 @@ public:
 };
 
 enum class BufferType { OEHB, TEHB };
-class BufferSubjectGraph;
-
-struct BufferPair {
-  BufferSubjectGraph *oehb;
-  BufferSubjectGraph *tehb;
-
-  BufferPair() : oehb(nullptr), tehb(nullptr) {}
-  BufferPair(BufferSubjectGraph *o, BufferSubjectGraph *t) : oehb(o), tehb(t) {}
-};
 
 class BufferSubjectGraph : public BaseSubjectGraph {
 private:
@@ -333,7 +326,7 @@ public:
 
   // Inserts a pair of OEHB and TEHB buffers between two operations. Used to cut
   // loopbacks.
-  static BufferPair createBuffers(Operation *inputOp, Operation *outputOp) {
+  static void createBuffers(Operation *inputOp, Operation *outputOp) {
     // Create OEHB buffer using the temporary string
     BufferSubjectGraph *oehb = new BufferSubjectGraph(
         inputOp, outputOp, getBufferTypeName(BufferType::OEHB));
@@ -341,8 +334,6 @@ public:
     // Create TEHB buffer that connects to OEHB
     BufferSubjectGraph *tehb = new BufferSubjectGraph(
         oehb, outputOp, getBufferTypeName(BufferType::TEHB));
-
-    return BufferPair(oehb, tehb);
   }
 
   void insertBuffer(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);

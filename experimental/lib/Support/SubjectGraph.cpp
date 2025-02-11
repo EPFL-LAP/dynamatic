@@ -35,6 +35,9 @@
 
 using namespace dynamatic::experimental;
 
+// Holds the path to the directory of BLIF files
+static inline std::string baseBlifPath;
+
 BaseSubjectGraph::BaseSubjectGraph() = default;
 
 BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
@@ -61,7 +64,7 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
   }
 
   moduleType = op->getName().getStringRef();
-  // Erase the dialect name from the name
+  // Erase the dialect name from the moduleType
   size_t dotPosition = moduleType.find('.');
   if (dotPosition != std::string::npos) {
     moduleType = moduleType.substr(dotPosition + 1);
@@ -154,40 +157,30 @@ void changeIO(BaseSubjectGraph *newIO, BaseSubjectGraph *prevIO,
   }
 }
 
-void BaseSubjectGraph::appendVarsToPath(
-    std::initializer_list<unsigned int> inputs) {
-  fullPath = baseBlifPath + "/" + moduleType + "/";
+// Appends the list and module type to the basepath to get the full path of blif
+// file
+std::string appendVarsToPath(std::initializer_list<unsigned int> inputs,
+                             std::string &moduleType) {
+  std::string fullPath = baseBlifPath + "/" + moduleType + "/";
   for (int input : inputs) {
     fullPath += std::to_string(input) + "/";
   }
   fullPath += moduleType + ".blif";
+  return fullPath;
 }
 
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
-            handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
-            handshake::MulIOp, handshake::DivSIOp, handshake::DivUIOp>(
-          [&](auto) {
-            dataWidth = handshake::getHandshakeTypeBitWidth(
-                op->getOperand(0).getType());
-            appendVarsToPath({dataWidth});
-            // Ops are mapped to DSP blocks if the bitwidth is greater than 4
-            if ((dataWidth > 4) && (llvm::isa<handshake::CmpIOp>(op) ||
-                                    llvm::isa<handshake::AddIOp>(op) ||
-                                    llvm::isa<handshake::SubIOp>(op) ||
-                                    llvm::isa<handshake::MulIOp>(op) ||
-                                    llvm::isa<handshake::DivSIOp>(op) ||
-                                    llvm::isa<handshake::DivUIOp>(op))) {
-              isBlackbox = true;
-            }
-          })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+  fullPath = appendVarsToPath({dataWidth}, moduleType);
+  // Ops are mapped to DSP slices if the bitwidth is greater than 4
+  if ((dataWidth > 4) &&
+      (llvm::isa<handshake::CmpIOp>(op) || llvm::isa<handshake::AddIOp>(op) ||
+       llvm::isa<handshake::SubIOp>(op) || llvm::isa<handshake::MulIOp>(op) ||
+       llvm::isa<handshake::DivSIOp>(op) ||
+       llvm::isa<handshake::DivUIOp>(op))) {
+    isBlackbox = true;
+  }
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -224,36 +217,17 @@ ArithSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // ForkSubjectGraph implementation
 ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::ForkOp>([&](auto) {
-        size = op->getNumResults();
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+  size = op->getNumResults();
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
-        if (dataWidth == 0) {
-          moduleType += "_dataless";
-          appendVarsToPath({size});
-        } else {
-          moduleType += "_type";
-          appendVarsToPath({size, dataWidth});
-        }
-      })
-      .Case<handshake::LazyForkOp>([&](auto) {
-        size = op->getNumResults();
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-
-        if (dataWidth == 0) {
-          moduleType += "_dataless";
-          appendVarsToPath({size});
-        } else {
-          appendVarsToPath({size, dataWidth});
-        }
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  if (dataWidth == 0) {
+    moduleType += "_dataless";
+    fullPath = appendVarsToPath({size}, moduleType);
+  } else {
+    llvm::TypeSwitch<Operation *, void>(op).Case<handshake::ForkOp>(
+        [&](auto) { moduleType += "_type"; });
+    fullPath = appendVarsToPath({size, dataWidth}, moduleType);
+  }
 
   auto generateNewNameRV =
       [](const std::string &nodeName) -> std::pair<std::string, unsigned int> {
@@ -331,20 +305,13 @@ ChannelSignals &ForkSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // MuxSubjectGraph implementation
 MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-        size = muxOp.getDataOperands().size();
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
-        selectType = handshake::getHandshakeTypeBitWidth(
-            muxOp.getSelectOperand().getType());
+  auto muxOp = llvm::dyn_cast<handshake::MuxOp>(op);
+  size = muxOp.getDataOperands().size();
+  dataWidth = handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
+  selectType =
+      handshake::getHandshakeTypeBitWidth(muxOp.getSelectOperand().getType());
 
-        appendVarsToPath({size, dataWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  fullPath = appendVarsToPath({size, dataWidth}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -389,24 +356,18 @@ ChannelSignals &MuxSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 // ControlMergeSubjectGraph implementation
 ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
-        size = cmergeOp.getDataOperands().size();
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(cmergeOp.getResult().getType());
-        indexType =
-            handshake::getHandshakeTypeBitWidth(cmergeOp.getIndex().getType());
-        if (dataWidth == 0) {
-          moduleType += "_dataless";
-          appendVarsToPath({size, indexType});
-        } else {
-          assert(false && "ControlMerge with data width not supported");
-        }
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  auto cmergeOp = llvm::dyn_cast<handshake::ControlMergeOp>(op);
+  size = cmergeOp.getDataOperands().size();
+  dataWidth =
+      handshake::getHandshakeTypeBitWidth(cmergeOp.getResult().getType());
+  indexType =
+      handshake::getHandshakeTypeBitWidth(cmergeOp.getIndex().getType());
+  if (dataWidth == 0) {
+    moduleType += "_dataless";
+    fullPath = appendVarsToPath({size, indexType}, moduleType);
+  } else {
+    assert(false && "Not supported");
+  }
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -454,23 +415,15 @@ ControlMergeSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 // ConditionalBranchSubjectGraph implementation
 ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::ConditionalBranchOp>(
-          [&](handshake::ConditionalBranchOp cbrOp) {
-            dataWidth = handshake::getHandshakeTypeBitWidth(
-                cbrOp.getDataOperand().getType());
-            if (dataWidth == 0) {
-              moduleType += "_dataless";
-              appendVarsToPath({});
-            } else {
-              appendVarsToPath({dataWidth});
-            }
-          })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
-
+  auto cbrOp = llvm::dyn_cast<handshake::ConditionalBranchOp>(op);
+  dataWidth =
+      handshake::getHandshakeTypeBitWidth(cbrOp.getDataOperand().getType());
+  if (dataWidth == 0) {
+    moduleType += "_dataless";
+    fullPath = appendVarsToPath({}, moduleType);
+  } else {
+    fullPath = appendVarsToPath({dataWidth}, moduleType);
+  }
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
 
@@ -504,12 +457,7 @@ ConditionalBranchSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // SourceSubjectGraph implementation
 SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::SourceOp>([&](auto) { appendVarsToPath({}); })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  fullPath = appendVarsToPath({}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -535,18 +483,12 @@ ChannelSignals &SourceSubjectGraph::returnOutputNodes(unsigned int) {
 
 // LoadSubjectGraph implementation
 LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        dataWidth = handshake::getHandshakeTypeBitWidth(
-            loadOp.getDataInput().getType());
-        addrType = handshake::getHandshakeTypeBitWidth(
-            loadOp.getAddressInput().getType());
-        appendVarsToPath({addrType, dataWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  auto loadOp = llvm::dyn_cast<handshake::LoadOp>(op);
+  dataWidth =
+      handshake::getHandshakeTypeBitWidth(loadOp.getDataInput().getType());
+  addrType =
+      handshake::getHandshakeTypeBitWidth(loadOp.getAddressInput().getType());
+  fullPath = appendVarsToPath({addrType, dataWidth}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -577,19 +519,13 @@ ChannelSignals &LoadSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // StoreSubjectGraph implementation
 StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
-        dataWidth = handshake::getHandshakeTypeBitWidth(
-            storeOp.getDataInput().getType());
-        addrType = handshake::getHandshakeTypeBitWidth(
-            storeOp.getAddressInput().getType());
+  auto storeOp = llvm::dyn_cast<handshake::StoreOp>(op);
+  dataWidth =
+      handshake::getHandshakeTypeBitWidth(storeOp.getDataInput().getType());
+  addrType =
+      handshake::getHandshakeTypeBitWidth(storeOp.getAddressInput().getType());
 
-        appendVarsToPath({addrType, dataWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  fullPath = appendVarsToPath({addrType, dataWidth}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -621,23 +557,16 @@ ChannelSignals &StoreSubjectGraph::returnOutputNodes(unsigned int) {
 // ConstantSubjectGraph implementation
 ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
-        handshake::ChannelType cstType = cstOp.getResult().getType();
-        unsigned bitwidth = cstType.getDataBitWidth();
-        dataWidth = bitwidth;
-        appendVarsToPath({dataWidth});
+  auto cstOp = llvm::dyn_cast<handshake::ConstantOp>(op);
+  handshake::ChannelType cstType = cstOp.getResult().getType();
+  unsigned bitwidth = cstType.getDataBitWidth();
+  dataWidth = bitwidth;
+  fullPath = appendVarsToPath({dataWidth}, moduleType);
 
-        if (bitwidth > 64) {
-          cstOp.emitError() << "Constant value has bitwidth " << bitwidth
-                            << ", but we only support up to 64.";
-          return;
-        }
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  if (bitwidth > 64) {
+    cstOp.emitError() << "Not supported";
+    return;
+  }
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -673,11 +602,7 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
             handshake::getHandshakeTypeBitWidth(extOp.getOperand().getType());
         outputWidth =
             handshake::getHandshakeTypeBitWidth(extOp.getResult().getType());
-        appendVarsToPath({inputWidth, outputWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
+        fullPath = appendVarsToPath({inputWidth, outputWidth}, moduleType);
       });
 
   experimental::BlifParser parser;
@@ -708,16 +633,10 @@ ExtTruncSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // SelectSubjectGraph implementation
 SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::SelectOp>([&](auto selectOp) {
-        dataWidth = handshake::getHandshakeTypeBitWidth(
-            selectOp->getOperand(1).getType());
-        appendVarsToPath({dataWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  auto selectOp = llvm::dyn_cast<handshake::SelectOp>(op);
+  dataWidth =
+      handshake::getHandshakeTypeBitWidth(selectOp->getOperand(1).getType());
+  fullPath = appendVarsToPath({dataWidth}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -754,17 +673,11 @@ SelectSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 }
 
 MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::MergeOp>([&](auto mergeOp) {
-        size = mergeOp.getDataOperands().size();
-        dataWidth = handshake::getHandshakeTypeBitWidth(
-            mergeOp.getDataOperands()[0].getType());
-        appendVarsToPath({size, dataWidth});
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  auto mergeOp = llvm::dyn_cast<handshake::MergeOp>(op);
+  size = mergeOp.getDataOperands().size();
+  dataWidth = handshake::getHandshakeTypeBitWidth(
+      mergeOp.getDataOperands()[0].getType());
+  fullPath = appendVarsToPath({size, dataWidth}, moduleType);
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -809,21 +722,13 @@ ChannelSignals &MergeSubjectGraph::returnOutputNodes(unsigned int) {
 // BranchSinkSubjectGraph implementation
 BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        if (dataWidth == 0) {
-          moduleType += "_dataless";
-          appendVarsToPath({});
-        } else {
-          appendVarsToPath({dataWidth});
-        }
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+  if (dataWidth == 0) {
+    moduleType += "_dataless";
+    fullPath = appendVarsToPath({}, moduleType);
+  } else {
+    fullPath = appendVarsToPath({dataWidth}, moduleType);
+  }
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
@@ -856,9 +761,9 @@ ChannelSignals &BranchSinkSubjectGraph::returnOutputNodes(unsigned int) {
 void BufferSubjectGraph::initBuffer() {
   if (dataWidth == 0) {
     moduleType += "_dataless";
-    appendVarsToPath({});
+    fullPath = appendVarsToPath({}, moduleType);
   } else {
-    appendVarsToPath({dataWidth});
+    fullPath = appendVarsToPath({dataWidth}, moduleType);
   }
 
   experimental::BlifParser parser;
@@ -881,29 +786,20 @@ void BufferSubjectGraph::initBuffer() {
 
 // BufferSubjectGraph implementations
 BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  llvm::TypeSwitch<Operation *, void>(op)
-      .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
-        auto params =
-            bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+  auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op);
+  auto params =
+      bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+  auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
 
-        if (auto timing =
-                dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-          handshake::TimingInfo info = timing.getInfo();
-          if (info == handshake::TimingInfo::oehb())
-            moduleType = "oehb";
-          if (info == handshake::TimingInfo::tehb())
-            moduleType = "tehb";
-        }
+  if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+    handshake::TimingInfo info = timing.getInfo();
+    if (info == handshake::TimingInfo::oehb())
+      moduleType = "oehb";
+    if (info == handshake::TimingInfo::tehb())
+      moduleType = "tehb";
+  }
 
-        dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-      })
-      .Default([&](auto) {
-        assert(false && "Operation does not match any supported type");
-        return;
-      });
-
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
   initBuffer();
 }
 
@@ -965,14 +861,11 @@ ChannelSignals &BufferSubjectGraph::returnOutputNodes(unsigned int) {
 // SubjectGraphGenerator implementation
 SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
                                              StringRef blifFiles) {
-  BaseSubjectGraph::baseBlifPath = blifFiles;
+  baseBlifPath = blifFiles;
   std::vector<BaseSubjectGraph *> subjectGraphs;
 
   funcOp.walk([&](Operation *op) {
     llvm::TypeSwitch<Operation *, void>(op)
-        .Case<handshake::InstanceOp>([&](handshake::InstanceOp instOp) {
-          op->emitRemark("Instance Op");
-        })
         .Case<handshake::ForkOp, handshake::LazyForkOp>(
             [&](auto) { subjectGraphs.push_back(new ForkSubjectGraph(op)); })
         .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
@@ -984,7 +877,6 @@ SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
             })
         .Case<handshake::MergeOp>(
             [&](auto) { subjectGraphs.push_back(new MergeSubjectGraph(op)); })
-        .Case<handshake::JoinOp>([&](auto) { op->emitRemark("Join Op"); })
         .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
           subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
         })
@@ -1002,21 +894,9 @@ SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
         .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
           subjectGraphs.push_back(new StoreSubjectGraph(op));
         })
-        .Case<handshake::SharingWrapperOp>(
-            [&](handshake::SharingWrapperOp sharingWrapperOp) {
-              op->emitError() << "Not supported";
-            })
         .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
           subjectGraphs.push_back(new ConstantSubjectGraph(op));
         })
-        .Case<handshake::AddFOp, handshake::DivFOp, handshake::MaximumFOp,
-              handshake::MinimumFOp, handshake::MulFOp, handshake::NegFOp,
-              handshake::NotOp, handshake::SubFOp, handshake::SIToFPOp,
-              handshake::FPToSIOp, handshake::AbsFOp, handshake::CmpFOp>(
-            [&](auto) {
-              op->emitError() << "Float not supported";
-              return;
-            })
         .Case<handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
               handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
               handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
