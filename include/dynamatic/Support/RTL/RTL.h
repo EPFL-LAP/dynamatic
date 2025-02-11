@@ -91,7 +91,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(std::move(other.name)), type(std::move(other.type)) {};
+      : name(std::move(other.name)), type(std::move(other.type)){};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = std::move(other.name);
@@ -156,7 +156,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()) {};
+      : state(state), serialized(serial.str()){};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -169,7 +169,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc) {};
+  RTLRequest(Location loc) : loc(loc){};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.
@@ -292,9 +292,9 @@ public:
   /// Registers PORT_TYPES parameter, which includes the types of all ports
   /// (operands and results) of the original operation. This parameter is passed
   /// to the RTL generator to help it generate the correct port types.
-  /// e.g., {"lhs": "!handshake.channel<i32, [spec: i1]>",
+  /// e.g., '{"lhs": "!handshake.channel<i32, [spec: i1]>",
   // "rhs": "!handshake.channel<i32, [spec: i1]>",
-  // "result": "!handshake.channel<i1, [spec: i1]>"}
+  // "result": "!handshake.channel<i1, [spec: i1]>"}'
   void registerPortTypesParameter(hw::HWModuleExternOp &modOp);
 
   /// Attempts to concretize the matched RTL component using the original RTL
