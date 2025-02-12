@@ -1,2 +1,4 @@
 def generate_merge(name, params):
-  return "" # todo
+  data_type = params["data_type"]
+  size = params["size"]
+

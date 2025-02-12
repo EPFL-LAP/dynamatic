@@ -1,13 +1,18 @@
 import argparse
+import ast
 
 import generators.handshake.cond_br as cond_br
+import generators.handshake.mux as mux
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
+    case "mux":
+      return mux.generate_mux(name, parameters)
     case _:
-      raise ValueError(f"Module type {mod_type} not found")
+      return f"Module type {mod_type} not found"
+      # raise ValueError(f"Module type {mod_type} not found")
 
 def parse_key_value(key_value):
   key, value = key_value.split("=")
@@ -25,8 +30,8 @@ def main():
       "-p",
       "--parameters",
       type=parse_key_value,
-      required=True,
-      nargs="+",
+      nargs="*",
+      default=[],
       help="Set of parameters in key=value key=value format",
   )
 
