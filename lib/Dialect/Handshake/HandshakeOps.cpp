@@ -220,6 +220,14 @@ std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
 }
 
 //===----------------------------------------------------------------------===//
+// InitOp
+//===----------------------------------------------------------------------===//
+
+std::pair<handshake::ChannelType, bool> InitOp::getReshapableChannelType() {
+  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
+}
+
+//===----------------------------------------------------------------------===//
 // NDWireOp
 //===----------------------------------------------------------------------===//
 

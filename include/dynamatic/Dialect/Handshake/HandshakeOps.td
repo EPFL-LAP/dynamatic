@@ -242,6 +242,33 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 }
 
+def InitOp : Handshake_Op<"init", [
+  HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
+]> {
+  let summary = "init operation";
+  let description = [{
+    Represents a single-slot buffer which initially already contains a token. 
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let builders = [OpBuilder<
+    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
+         "std::optional<unsigned>":$numSlots)>
+  ];
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
 def NDWireOp : Handshake_Op<"ndwire", [
   HasClock, SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
