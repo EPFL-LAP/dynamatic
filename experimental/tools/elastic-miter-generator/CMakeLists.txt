@@ -2,15 +2,16 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_llvm_tool(ndwirerer
-  ndwirerer.cpp
+add_llvm_tool(elastic-miter
+  elastic-miter.cpp
+  GetSequenceLength.cpp
   ElasticMiterFabricGeneration.cpp
   GetStates.cpp
   CreateStateWrapper.cpp
 )
 
-llvm_update_compile_flags(ndwirerer)
-target_link_libraries(ndwirerer
+llvm_update_compile_flags(elastic-miter)
+target_link_libraries(elastic-miter
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf

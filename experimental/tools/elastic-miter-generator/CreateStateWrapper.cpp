@@ -1,6 +1,11 @@
 #include "mlir/IR/Attributes.h"
+
+#include <fstream>
 #include <iostream>
 #include <llvm/ADT/StringSet.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Support/JSON.h>
+#include <llvm/Support/raw_ostream.h>
 #include <sstream>
 #include <string>
 
@@ -35,14 +40,18 @@ std::string createMiterCall(const SmallVector<std::string> &args,
   return miter.str();
 }
 
-FailureOr<std::string> createStateWrapper(const std::string &smv, ModuleOp mlir,
-                                          int n = 0, bool inf = false) {
+FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
+                                                   bool inf = false) {
 
   auto failOrFuncOp = dynamatic::experimental::getModuleFuncOpAndCheck(mlir);
   if (failed(failOrFuncOp))
     return failure();
 
   FuncOp funcOp = failOrFuncOp.value();
+
+  std::string funcName = funcOp.getNameAttr().str();
+  // TODO maybe do this properly
+  funcName = "model";
 
   SmallVector<std::string> argNames;
   for (Attribute attr : funcOp.getArgNames()) {
@@ -57,7 +66,7 @@ FailureOr<std::string> createStateWrapper(const std::string &smv, ModuleOp mlir,
   }
 
   std::ostringstream wrapper;
-  wrapper << "#include \"" << smv << "\"\n";
+  wrapper << "#include \"" << funcName << ".smv\"\n";
   wrapper << "\n#ifndef BOOL_INPUT\n#define BOOL_INPUT\n";
   wrapper << "MODULE bool_input(nReady0, max_tokens)\n"
              "    VAR dataOut0 : boolean;\n"
@@ -116,5 +125,143 @@ FailureOr<std::string> createStateWrapper(const std::string &smv, ModuleOp mlir,
   }
 
   return wrapper.str();
+}
+
+FailureOr<std::string> createMiterWrapper(size_t bufferSize) {
+  std::ifstream file("experimental/tools/elastic-miter-generator/out/comp/"
+                     "elastic-miter-config.json");
+  if (!file) {
+    llvm::errs() << "Config JSON file not found\n";
+    return failure();
+  }
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  file.close();
+
+  llvm::Expected<llvm::json::Value> jsonValue = llvm::json::parse(buffer.str());
+  if (!jsonValue) {
+    llvm::errs() << "Failed parsing JSON\n";
+    return failure();
+  }
+
+  llvm::json::Object *config = jsonValue->getAsObject();
+  if (!config) {
+    llvm::errs() << "Failed parsing JSON\n";
+    return failure();
+  }
+
+  std::string output;
+  output += "#include \"model.smv\"\n\n";
+  output += "#ifndef BOOL_INPUT\n"
+            "#define BOOL_INPUT\n"
+            "MODULE bool_input(nReady0, max_tokens)\n"
+            "  VAR dataOut0 : boolean;\n"
+            "  VAR counter : 0..31;\n"
+            "  ASSIGN\n"
+            "    init(counter) := 0;\n"
+            "    next(counter) := case\n"
+            "      nReady0 & counter < max_tokens : counter + 1;\n"
+            "      TRUE : counter;\n"
+            "    esac;\n"
+            "\n"
+            "  -- bool_input persistent\n"
+            "  ASSIGN\n"
+            "    next(dataOut0) := case\n"
+            "      valid0 & !nReady0 : dataOut0;\n"
+            "      TRUE : {TRUE, FALSE};\n"
+            "    esac;\n"
+            "\n"
+            "  DEFINE valid0 := counter < max_tokens;\n"
+            "#endif // BOOL_INPUT\n"
+            "\n"
+            "MODULE main\n";
+
+  if (auto *args = config->getArray("arguments")) {
+    for (size_t i = 0; i < args->size(); ++i) {
+      output += "VAR seq_generator" + std::to_string(i) +
+                " : bool_input(miter." +
+                (*args)[i].getAsString().value_or("").str() + "_ready, " +
+                std::to_string(bufferSize) + ");\n";
+    }
+  } else {
+    llvm::errs() << "No arguments in JSON\n";
+    return failure();
+  }
+  output += "\n";
+
+  output += "VAR miter : elastic_miter(";
+  if (auto *args = config->getArray("arguments")) {
+    for (size_t i = 0; i < args->size(); ++i) {
+      if (i > 0)
+        output += ", ";
+      output += "seq_generator" + std::to_string(i) +
+                ".dataOut0, seq_generator" + std::to_string(i) + ".valid0";
+    }
+  }
+  output += ", ";
+  if (auto *res = config->getArray("results")) {
+    for (size_t i = 0; i < res->size(); ++i) {
+      if (i > 0)
+        output += ", ";
+      output += "sink" + std::to_string(i) + ".ready0";
+    }
+  } else {
+    llvm::errs() << "No results in JSON\n";
+    return failure();
+  }
+  output += ");\n\n";
+
+  output += "-- TODO make sure we have sink_1_0\n";
+  if (auto *res = config->getArray("results")) {
+    for (size_t i = 0; i < res->size(); ++i) {
+      output += "VAR sink" + std::to_string(i) + " : sink_1_0(miter." +
+                (*res)[i].getAsString().value_or("").str() + "_out, miter." +
+                (*res)[i].getAsString().value_or("").str() + "_valid);\n";
+    }
+  }
+  output += "\n";
+
+  if (auto *res = config->getArray("results")) {
+    for (const auto &result : *res) {
+      std::string resStr = result.getAsString().value_or("").str();
+      output += "CTLSPEC AG (miter." + resStr + "_valid -> miter." + resStr +
+                "_out)\n";
+    }
+  }
+  output += "\n";
+
+  std::string outputProp;
+  if (auto *outBufs = config->getArray("output_buffers")) {
+    for (const auto &bufArray : *outBufs) {
+      if (auto *bufList = bufArray.getAsArray()) {
+        for (const auto &buf : *bufList) {
+          outputProp +=
+              "miter." + buf.getAsString().value_or("").str() + ".num = 0 & ";
+        }
+      }
+    }
+  }
+  if (!outputProp.empty())
+    outputProp = outputProp.substr(0, outputProp.size() - 3);
+
+  std::string inputProp;
+  if (auto *inBufs = config->getArray("input_buffers")) {
+    for (const auto &bufPair : *inBufs) {
+      if (auto *pair = bufPair.getAsArray()) {
+        inputProp += "miter." + (*pair)[0].getAsString().value_or("").str() +
+                     ".num = miter." +
+                     (*pair)[1].getAsString().value_or("").str() + ".num & ";
+      }
+    }
+  }
+  if (!inputProp.empty())
+    inputProp = inputProp.substr(0, inputProp.size() - 3);
+
+  std::string finalBufferProp =
+      "AF (AG (" + inputProp + " & " + outputProp + "))";
+  output += "CTLSPEC " + finalBufferProp + "\n";
+
+  return output;
 }
 } // namespace dynamatic::experimental

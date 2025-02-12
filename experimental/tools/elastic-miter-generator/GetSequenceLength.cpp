@@ -1,9 +1,9 @@
-#include "../experimental/tools/elastic-miter-generator/CreateStateWrapper.h"
+#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/GetStates.h"
-#include "dynamatic/InitAllDialects.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
-#include "llvm/Support/InitLLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,36 +13,37 @@
 using namespace mlir;
 using namespace llvm;
 
+namespace dynamatic::experimental {
+
 // TODO ...
 const std::string OUT_DIR = "experimental/tools/elastic-miter-generator/out";
 const std::string COMP_DIR = OUT_DIR + "/comp";
 const std::string DOT = COMP_DIR + "/miter.dot";
 const std::string REWRITES =
     "experimental/test/tools/elastic-miter-generator/rewrites";
-const std::string MOD = "z";
 
-void exitOnFail(int ret, const std::string &message) {
-  if (ret != 0) {
-    std::cerr << message << std::endl;
-    exit(1);
-  }
-}
-
+// TODO proper output handling...
 int runNuXmv(const std::string &cmd, const std::string &stdoutFile) {
   std::string command = "nuXmv -source " + cmd + " > " + stdoutFile;
   return system(command.c_str());
 }
 
-FailureOr<std::string> handshake2smv(const std::string &mlir,
-                                     bool png = false) {
-  std::string cmd = "bin/export-dot " + mlir + " --edge-style=spline > " + DOT;
+LogicalResult handshake2smv(const std::string &mlirFilename, bool png = false) {
+  std::string cmd =
+      "bin/export-dot " + mlirFilename + " --edge-style=spline > " + DOT;
   int ret = system(cmd.c_str());
-  exitOnFail(ret, "Failed to convert to dot");
+  if (ret != 0) {
+    llvm::errs() << "Failed to convert to dot\n";
+    return failure();
+  }
 
   if (png) {
     cmd = "dot -Tpng " + DOT + " -o " + COMP_DIR + "/visual.png";
     ret = system(cmd.c_str());
-    exitOnFail(ret, "Failed to convert to PNG");
+    if (ret != 0) {
+      llvm::errs() << "Failed to convert to PNG\n";
+      return failure();
+    }
   }
 
   cmd = "python3 ../dot2smv/dot2smv " + DOT;
@@ -52,27 +53,18 @@ FailureOr<std::string> handshake2smv(const std::string &mlir,
     return failure();
   }
 
-  std::filesystem::rename(
-      std::filesystem::path(COMP_DIR + "/model.smv"),
-      std::filesystem::path(COMP_DIR + "/" + MOD + "_lhs.smv"));
-  return COMP_DIR + "/" + MOD + "_lhs.smv";
+  return success();
 }
 
-int main(int argc, char **argv) {
-  llvm::InitLLVM y(argc, argv);
+FailureOr<size_t> getSequenceLength(MLIRContext &context,
+                                    const std::string &mlirFile) {
 
-  DialectRegistry registry;
-  dynamatic::registerAllDialects(registry);
-  MLIRContext context(registry);
-
-  auto failOrDstSmv = handshake2smv(REWRITES + "/" + MOD + "_lhs.mlir", true);
+  // TODO type
+  auto failOrDstSmv = handshake2smv(mlirFile, true);
   if (failed(failOrDstSmv))
-    return 1;
+    return failure();
 
-  std::string dstSmv = failOrDstSmv.value();
-
-  OwningOpRef<ModuleOp> modRef =
-      parseSourceFile<ModuleOp>(REWRITES + "/" + MOD + "_lhs.mlir", &context);
+  OwningOpRef<ModuleOp> modRef = parseSourceFile<ModuleOp>(mlirFile, &context);
 
   ModuleOp mod = modRef.release();
 
@@ -80,9 +72,9 @@ int main(int argc, char **argv) {
   // # TODO we should probably just pass the filename
   // Create state wrapper for infinite tokens
   auto failOrInfWrapper =
-      dynamatic::experimental::createStateWrapper("z_lhs.smv", mod, 0, true);
+      dynamatic::experimental::createReachableStateWrapper(mod, 0, true);
   if (failed(failOrInfWrapper))
-    return 1;
+    return failure();
 
   std::string infWrapper = failOrInfWrapper.value();
 
@@ -92,15 +84,18 @@ int main(int argc, char **argv) {
 
   // Run nuXmv for infinite tokens
   int ret = runNuXmv(COMP_DIR + "/prove_inf.cmd", OUT_DIR + "/inf_states.txt");
-  exitOnFail(ret, "Failed to analyze reachable states with infinite tokens.");
+  if (ret != 0) {
+    llvm::errs()
+        << "Failed to analyze reachable states with infinite tokens.\n";
+    return failure();
+  }
 
   int n = 1;
   while (true) {
     llvm::outs() << "Checking " << n << " tokens.\n";
 
-    // TODO use correct name
     auto failOrFinWrapper =
-        dynamatic::experimental::createStateWrapper("z_lhs.smv", mod, n, false);
+        dynamatic::experimental::createReachableStateWrapper(mod, n, false);
     if (failed(failOrFinWrapper))
       return 1;
 
@@ -113,8 +108,11 @@ int main(int argc, char **argv) {
     // TODO automatically create cmd file
     ret = runNuXmv(COMP_DIR + "/prove_" + std::to_string(n) + ".cmd",
                    OUT_DIR + "/" + std::to_string(n) + "_states.txt");
-    exitOnFail(ret, "Failed to analyze reachable states with " +
-                        std::to_string(n) + " tokens.");
+    if (ret != 0) {
+      llvm::errs() << "Failed to analyze reachable states with"
+                   << std::to_string(n) + " tokens.";
+      return failure();
+    }
 
     // Check state differences
     int nrOfDifferences = dynamatic::experimental::getStates(
@@ -128,4 +126,6 @@ int main(int argc, char **argv) {
       break;
     }
   }
+  return n;
 }
+} // namespace dynamatic::experimental

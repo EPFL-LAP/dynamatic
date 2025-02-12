@@ -20,20 +20,5 @@ cd ..
 
 MOD="a"
 
-build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $COMP_DIR --bufferSlots 1
+build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $COMP_DIR
 exit_on_fail "Failed to create miter module"
-
-"bin/export-dot" $F_HANDSHAKE_MITER "--edge-style=spline" > $DOT
-exit_on_fail "Failed to convert to dot"
-dot -Tpng $DOT > $COMP_DIR/visual.png
-
-python3 "../dot2smv/dot2smv" $DOT
-exit_on_fail "Failed to convert to SMV"
-
-# python3 experimental/tools/elastic-miter-generator/export-property-svm.py > experimental/tools/elastic-miter-generator/out/comp/add_props.cmd
-# exit_on_fail "Failed to create properties"
-
-python3 experimental/tools/elastic-miter-generator/create_smv_wrapper.py > experimental/tools/elastic-miter-generator/out/comp/main.smv
-exit_on_fail "Failed to create SMV main file"
-
-nuXmv -source $COMP_DIR/prove.cmd
