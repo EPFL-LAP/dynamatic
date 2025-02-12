@@ -24,7 +24,7 @@
 #include "llvm/Support/InitLLVM.h"
 
 // TODO rename to CreateWrappers.h
-#include "../experimental/tools/elastic-miter-generator/CreateStateWrapper.h"
+#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "../experimental/tools/elastic-miter-generator/GetSequenceLength.h"
 
