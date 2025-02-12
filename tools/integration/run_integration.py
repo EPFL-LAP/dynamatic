@@ -66,7 +66,8 @@ exit
 DYNAMATIC_COMMAND = str(DYNAMATIC_ROOT / "bin" / "dynamatic") + \
     " --exit-on-failure --run {script_path}"
 
-# Class to have different colors while writing in terminal
+# Worker count of process pool executor
+WORKER_COUNT = 16
 
 
 class TermColors:
@@ -309,26 +310,45 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    for idx, c_file in enumerate(c_files):
-        # Check if test is supposed to be ignored
-        if Path(c_file).name[:-2] in ignored_tests:
-            ignored_cnt += 1
-            color_print(f"[IGNORED] {c_file}", TermColors.OKGREEN)
-            continue
+    with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+        processes = []
+        for idx, c_file in enumerate(c_files):
+            # Check if test is supposed to be ignored
+            name = Path(c_file).name[:-2]
+            if name in ignored_tests:
+                ignored_cnt += 1
+                color_print(f"[IGNORED] {name}", TermColors.OKGREEN)
+                continue
 
-        # One more test to handle
-        test_cnt += 1
+            # One more test to handle
+            test_cnt += 1
 
-        # Run the test
-        result = run_test(c_file, idx, args.timeout)
+            # Run the test
+            # result = run_test(c_file, idx, args.timeout)
+            processes.append(
+                executor.submit(
+                    run_test,
+                    c_file, idx, args.timeout
+                )
+            )
 
-        if result["status"] == "pass":
-            color_print(result["msg"], TermColors.OKGREEN)
-            passed_cnt += 1
-        elif result["status"] == "fail":
-            color_print(result["msg"], TermColors.FAIL)
-        else:
-            color_print(result["msg"], TermColors.WARNING)
+            color_print(
+                f"[INFO] Submitted {name} for execution",
+                TermColors.OKBLUE
+            )
+            sys.stdout.flush()
+
+        for p in processes:
+            result = p.result()
+            if result["status"] == "pass":
+                color_print(result["msg"], TermColors.OKGREEN)
+                passed_cnt += 1
+            elif result["status"] == "fail":
+                color_print(result["msg"], TermColors.FAIL)
+            else:
+                color_print(result["msg"], TermColors.WARNING)
+
+            sys.stdout.flush()
 
     print(
         f"** Integration testing finished: "
