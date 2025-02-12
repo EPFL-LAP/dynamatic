@@ -5,23 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements the elastic-miter tool, it creates an elastic miter
-// circuit, which can later be used to formally verify equivalence of two
-// handshake circuits.
-//
-//===----------------------------------------------------------------------===//
-
-#include <filesystem>
 
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 
@@ -29,51 +19,30 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/InitAllDialects.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-namespace cl = llvm::cl;
 using namespace mlir;
 using namespace dynamatic::handshake;
+
+namespace dynamatic::experimental {
 
 // Instead of keeping the original BB for the LHS/RHS circuit, the BB is used to
 // organize the different part of the miter circuit. The BBs can therefore not
 // be used for any control-flow analysis.
-static constexpr unsigned int BB_IN = 0;  // Input auxillary logic
-static constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
-static constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
-static constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+constexpr unsigned int BB_IN = 0;  // Input auxillary logic
+constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
+constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
+constexpr unsigned int BB_OUT = 3; // Output auxillary logic
 
-// CLI Settings
-
-static cl::OptionCategory mainCategory("elastic-miter Options");
-
-static cl::opt<size_t>
-    nrOfBufferSlots("bufferSlots", cl::Prefix, cl::Required,
-                    cl::desc("Specify the number of required buffers."),
-                    cl::cat(mainCategory));
-static cl::opt<std::string>
-    lhsFilenameArg("lhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the left-hand side (LHS) input file"),
-                   cl::cat(mainCategory));
-static cl::opt<std::string>
-    rhsFilenameArg("rhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the right-hand side (RHS) input file"),
-                   cl::cat(mainCategory));
-
-static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
-                                      cl::desc("Specify output directory"),
-                                      cl::cat(mainCategory));
-
-static void setHandshakeName(OpBuilder &builder, Operation *op,
-                             const std::string &name) {
+void setHandshakeName(OpBuilder &builder, Operation *op,
+                      const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
   op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, nameAttr);
 }
 
-static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
-                                   const std::string &name) {
+void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
+                            const std::string &name) {
   dynamatic::setBB(op, bb);
   setHandshakeName(builder, op, name);
 }
@@ -81,7 +50,7 @@ static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
 // Add a prefix to the handshake.name attribute of an operation.
 // This avoids naming conflicts when merging two functions together.
 // Returns failure() when the operation doesn't already have a handshake.name
-static LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
+LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
   StringAttr nameAttr =
       op.getAttrOfType<StringAttr>(dynamatic::NameAnalysis::ATTR_NAME);
   if (!nameAttr)
@@ -95,7 +64,7 @@ static LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
   return success();
 }
 
-static FailureOr<std::pair<FuncOp, Block *>>
+FailureOr<std::pair<FuncOp, Block *>>
 buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
                       ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
                       NamedAttribute argNamedAttr,
@@ -117,7 +86,7 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
 
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
 // The result names have EQ_ prefixed.
-static FailureOr<std::pair<FuncOp, Block *>>
+FailureOr<std::pair<FuncOp, Block *>>
 buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
   // Check equality of interfaces
@@ -172,7 +141,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   // We only support one function per module
   FuncOp funcOp = nullptr;
   for (auto op : module.getOps<FuncOp>()) {
@@ -221,8 +190,8 @@ static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   return funcOp;
 }
 
-static LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
-                                 ModuleOp mod, llvm::json::Object jsonObject) {
+LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
+                          ModuleOp mod, llvm::json::Object jsonObject) {
 
   std::error_code ec;
   OpPrintingFlags printingFlags;
@@ -258,7 +227,7 @@ static LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
 // This creates an elastic-miter module given the path to two MLIR files. The
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
-static FailureOr<std::pair<ModuleOp, llvm::json::Object>>
+FailureOr<std::pair<ModuleOp, llvm::json::Object>>
 createElasticMiter(MLIRContext &context, StringRef lhsFilename,
                    StringRef rhsFilename, size_t bufferSlots) {
 
@@ -502,38 +471,4 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
   return std::make_pair(miterModule, jsonObject);
 }
-
-int main(int argc, char **argv) {
-  llvm::InitLLVM y(argc, argv);
-
-  cl::ParseCommandLineOptions(
-      argc, argv,
-      "Creates an elastic-miter module in the handshake dialect.\n"
-      "Takes two MLIR files as input. The files need to contain exactely one "
-      "module each.\nEach module needs to contain exactely one "
-      "handshake.func. "
-      "\nThe resulting miter MLIR file and JSON config file are placed in "
-      "the "
-      "specified output directory.");
-
-  // Register the supported dynamatic dialects and create a context
-  DialectRegistry registry;
-  dynamatic::registerAllDialects(registry);
-  MLIRContext context(registry);
-
-  auto ret = createElasticMiter(context, lhsFilenameArg, rhsFilenameArg,
-                                nrOfBufferSlots);
-  if (failed(ret)) {
-    llvm::errs() << "Failed to create elastic-miter module.\n";
-    return 1;
-  }
-  auto [miterModule, json] = ret.value();
-
-  std::string mlirFilename =
-      "elastic_miter_" +
-      std::filesystem::path(lhsFilenameArg.getValue()).stem().string() + "_" +
-      std::filesystem::path(rhsFilenameArg.getValue()).stem().string() +
-      ".mlir";
-
-  exit(failed(createFiles(outputDir, mlirFilename, miterModule, json)));
-}
+} // namespace dynamatic::experimental
