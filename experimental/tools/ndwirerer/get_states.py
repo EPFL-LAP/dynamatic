@@ -2,26 +2,23 @@ def get_state_set(file):
   with open(file) as f:
     text = f.readlines()
 
-  current_state = 0
-  states = {}
+  current_state = None
+  states = set()
   for line in text:
     line = line.strip()
     if "-------" in line:
-      if current_state > 0:
-        states[current_state] = "\n".join(states[current_state])
-      current_state += 1
-      states[current_state] = []
+      if current_state is not None:
+        states.add(current_state)
+      current_state = ""
       continue
-    if current_state == 0:
+    if current_state is None:
       continue
     if not line.startswith("miter."):
       continue
-    states[current_state].append(line)
+    current_state += line + "\n"
 
-  del states[current_state]
-  return set(states.values())
+  return states
 
-# TODO cache inf state, maybe needs to be class to be clean
 def get_states(inf_file, fin_file):
   
   set_fin = get_state_set(fin_file)
