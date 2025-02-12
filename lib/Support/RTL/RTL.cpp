@@ -12,6 +12,7 @@
 
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
+#include "dynamatic/Dialect/HW/HWTypes.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
@@ -22,6 +23,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <fstream>
 #include <regex>
@@ -90,8 +92,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
-      };
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -236,6 +237,35 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
     values.insert({param->getName(), valueIt->second});
   }
   return values;
+}
+
+void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
+  // Prepare a string stream to serialize the port types
+  std::string portTypesValue;
+  llvm::raw_string_ostream portTypes(portTypesValue);
+
+  // Wrap in single quotes for easier passing as a generator argument.
+  portTypes << "'{"; // Start of the JSON object
+
+  bool first = true;
+  for (const hw::ModulePort &port : modOp.getModuleType().getPorts()) {
+    // Skip the clock and reset ports
+    if (port.name == "clk" || port.name == "rst")
+      continue;
+
+    if (!first)
+      portTypes << ", ";
+    first = false;
+
+    portTypes << "\"" << port.name.str() << "\": \"";
+    // TODO: Escape "" in the port type (if needed)
+    port.type.print(portTypes);
+    portTypes << "\"";
+  }
+  portTypes << "}'"; // End of the JSON object
+
+  // Register PORT_TYPES parameter
+  serializedParams["PORT_TYPES"] = portTypes.str();
 }
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
