@@ -1,4 +1,4 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_exp, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
 
 def generate_tfifo(name, params):
   data_type = VhdlScalarType(params["data_type"])
@@ -144,16 +144,10 @@ end architecture;
 def _generate_tfifo_signal_manager(name, size, data_type):
   bitwidth = data_type.bitwidth
 
-  extra_signal_bit_map = {}
-  occupied_bits = bitwidth
+  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
   for signal_name, signal_bitwidth in data_type.extra_signals.items():
-    extra_signal_bit_map[signal_name] = (
-      occupied_bits + signal_bitwidth - 1,
-      occupied_bits
-    )
-    occupied_bits += signal_bitwidth
-
-  full_bitwidth = occupied_bits
+    extra_signal_mapping.add(signal_name, signal_bitwidth)
+  full_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
 
@@ -205,19 +199,8 @@ begin
 end architecture;
 """
 
-  ins_inner = ["ins"] + [
-    "ins_" + name for name in data_type.extra_signals
-  ]
-  ins_inner.reverse()
-  ins_conversion = f"  ins_inner <= {" & ".join(ins_inner)}\n"
-
-  outs_inner = [
-    f"  outs <= outs_inner({bitwidth} - 1 downto 0)"
-  ]
-  for name in data_type.extra_signals:
-    msb, lsb = extra_signal_bit_map[name]
-    outs_inner.append(f"  outs_{name} <= outs_inner({msb} downto {lsb})")
-  outs_conversion = "\n".join(outs_inner)
+  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp("ins", extra_signal_mapping)}\n"
+  outs_conversion = generate_outs_concat_statement("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
@@ -227,16 +210,11 @@ end architecture;
   return dependencies + entity + architecture
 
 def _generate_tfifo_signal_manager_dataless(name, size, data_type):
-  extra_signal_bit_map = {}
-  occupied_bits = 0
+  extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in data_type.extra_signals.items():
-    extra_signal_bit_map[signal_name] = (
-      occupied_bits + signal_bitwidth - 1,
-      occupied_bits
-    )
-    occupied_bits += signal_bitwidth
+    extra_signal_mapping.add(signal_name, signal_bitwidth)
 
-  full_bitwidth = occupied_bits
+  full_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
 
@@ -286,17 +264,8 @@ begin
 end architecture;
 """
 
-  ins_inner = [
-    "ins_" + name for name in data_type.extra_signals
-  ]
-  ins_inner.reverse()
-  ins_conversion = f"  ins_inner <= {" & ".join(ins_inner)}\n"
-
-  outs_inner = []
-  for name in data_type.extra_signals:
-    msb, lsb = extra_signal_bit_map[name]
-    outs_inner.append(f"  outs_{name} <= outs_inner({msb} downto {lsb})")
-  outs_conversion = "\n".join(outs_inner)
+  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp_dataless("ins", extra_signal_mapping)}\n"
+  outs_conversion = generate_outs_concat_statement_dataless("outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
