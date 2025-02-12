@@ -30,6 +30,13 @@ dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   return logicBBs;
 }
 
+void dynamatic::setBB(Operation *op, int bb) {
+  auto ui32 = IntegerType::get(op->getContext(), 32,
+                               IntegerType::SignednessSemantics::Unsigned);
+  auto attr = IntegerAttr::get(ui32, bb);
+  op->setAttr(BB_ATTR_NAME, attr);
+}
+
 bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
   if (auto bb = srcOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)) {
     dstOp->setAttr(BB_ATTR_NAME, bb);

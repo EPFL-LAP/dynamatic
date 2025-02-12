@@ -68,10 +68,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
                       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>];
 
   let extraClassDeclaration = [{
-    // Add an entry block to an empty function, and set up the block arguments
-    // to match the signature of the function.
-    Block *addEntryBlock();
-
     /// Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
 
