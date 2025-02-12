@@ -52,16 +52,14 @@ begin
       buff_valid
     );
 
-  oehb : entity work.oehb(arch) generic map(1)
+  oehb : entity work.oehb_dataless(arch)
   port map(
     clk        => clk,
     rst        => rst,
     ins_valid  => buff_valid,
     outs_ready => result_ready,
     outs_valid => result_valid,
-    ins_ready  => oehb_ready,
-    ins(0)     => '0',
-    outs    => open
+    ins_ready  => oehb_ready
   );
 
   ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)

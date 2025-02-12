@@ -21,8 +21,6 @@ module addf #(
   //assert(DATA_TYPE == 32) else $error("addf currently only supports 32-bit floating point operands");
   
   wire join_valid, oehb_ready, buff_valid;
-  wire constant_zero = 1'b0;
-  wire open_value;
 
   // intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
   wire [ DATA_TYPE + 1 :0] ip_lhs, ip_rhs;
@@ -50,15 +48,11 @@ module addf #(
     .valid_out(buff_valid)
   );
 
-  oehb #(
-    .DATA_TYPE(1)
-  ) oehb_lhs (
+  oehb_dataless oehb_lhs (
     .clk(clk),
     .rst(rst),
-    .ins(constant_zero),
     .ins_valid(buff_valid),
     .ins_ready(oehb_ready),
-    .outs(open_value),
     .outs_valid(result_valid),
     .outs_ready(result_ready)
   );
