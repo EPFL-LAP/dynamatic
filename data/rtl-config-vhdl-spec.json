@@ -1,185 +1,188 @@
 [
   {
     "name": "handshake.addf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t addf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.addi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"$DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t addi -p data_type=\"$DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.andi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t andi -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.cmpf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" predicate=\"PREDICATE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t cmpf -p data_type=\"DATA_TYPE\" predicate=\"PREDICATE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.cmpi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" predicate=\"PREDICATE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t cmpi -p data_type=\"DATA_TYPE\" predicate=\"PREDICATE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.divf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t divf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.divsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t divsi -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.divui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t divui -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.extsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p input_type=\"INPUT_TYPE\" output_type=\"OUTPUT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t extsi -p input_type=\"INPUT_TYPE\" output_type=\"OUTPUT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.extui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p input_type=\"INPUT_TYPE\" output_type=\"OUTPUT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t extui -p input_type=\"INPUT_TYPE\" output_type=\"OUTPUT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.maximumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t maximumf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.minimumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t minimumf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.mulf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mulf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.muli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t muli -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.negf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t negf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.ori",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t ori -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.select",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t select -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.shli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t shli -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.shrsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t shrsi -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.shrui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t shrui -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.subf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t subf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.subi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t subi -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.trunci",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t trunci -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.truncf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t truncf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.xori",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t xori -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.sitofp",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t sitofp -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.fptosi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t fptosi -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.absf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t absf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.extf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t extf -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.buffer",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p num_slots=NUM_SLOTS data_type=\"DATA_TYPE\" timing=TIMING >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t buffer -p num_slots=NUM_SLOTS data_type=\"DATA_TYPE\" timing=TIMING >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.ndwire",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t ndwire -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.fork",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t fork -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.lazy_fork",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t lazy_fork -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.sink",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t sink -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.mux",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" select_type=\"SELECT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mux -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.control_merge",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" index_type=\"INDEX_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t control_merge -p size=SIZE data_type=\"DATA_TYPE\" index_type=\"INDEX_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.merge",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t merge -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.br",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t br -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.cond_br",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t TYPE_NAME -p data_type=\"$DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t cond_br -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.source",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t source >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.constant",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p value=VALUE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t constant -p value=VALUE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.load",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t load -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.store",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t store -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.mem_controller",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p num_controls=NUM_CONTROLS num_loads=NUM_LOADS num_stores=NUM_STORES data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_controller -p num_controls=NUM_CONTROLS num_loads=NUM_LOADS num_stores=NUM_STORES data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.lsq",
@@ -212,34 +215,34 @@
   },
   {
     "name": "handshake.join",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t join -p size=SIZE >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.not",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t not -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.speculator",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" fifo_depth=FIFO_DEPTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculator -p data_type=\"DATA_TYPE\" fifo_depth=FIFO_DEPTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.spec_commit",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_commit -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.spec_save",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_save -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.spec_save_commit",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" fifo_depth=FIFO_DEPTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_save_commit -p data_type=\"DATA_TYPE\" fifo_depth=FIFO_DEPTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "handshake.speculating_branch",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" spec_tag_data_type=\"SPEC_TAG_DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculating_branch -p data_type=\"DATA_TYPE\" spec_tag_data_type=\"SPEC_TAG_DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
   },
   {
     "name": "mem_to_bram",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_width=DATA_WIDTH addr_width=ADDR_WIDTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_to_bram -p data_width=DATA_WIDTH addr_width=ADDR_WIDTH >> $OUTPUT_DIR/$MODULE_NAME.smv"
   }
 ]
