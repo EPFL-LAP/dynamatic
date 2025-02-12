@@ -38,9 +38,6 @@ MODULE bool_input(nReady0, max_tokens)
 MODULE main
 """
 )
-# TODO remove
-config["arguments"] = ["D", "C"]
-config["results"] = ["T", "EF"]
 
 for i, arg in enumerate(config["arguments"]):
   print(f"VAR seq_generator{i} : bool_input(miter.{arg}_ready, {buffer_size});")
@@ -63,9 +60,12 @@ create_miter_call(config["arguments"], config["results"])
 # TODO
 print("-- TODO make sure we have sink_1_0")
 for i, res in enumerate(config["results"]):
-  print(f"VAR sink{i} : sink_1_0(miter.{res}, miter.{res}_valid);")
+  print(f"VAR sink{i} : sink_1_0(miter.{res}_out, miter.{res}_valid);")
 
 print()
+
+# TODO remove
+exit()
 
 
 def create_eq_properties(results):

@@ -23,8 +23,6 @@ MOD="a"
 build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $COMP_DIR --bufferSlots 1
 exit_on_fail "Failed to create miter module"
 
-F_HANDSHAKE_MITER="$REWRITES/${MOD}_lhs.mlir"
-
 "bin/export-dot" $F_HANDSHAKE_MITER "--edge-style=spline" > $DOT
 exit_on_fail "Failed to convert to dot"
 dot -Tpng $DOT > $COMP_DIR/visual.png

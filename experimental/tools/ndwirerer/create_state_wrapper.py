@@ -1,5 +1,7 @@
 import re
 import os
+import argparse
+from textwrap import dedent
 
 
 def create_miter_call(arg, res):
@@ -11,10 +13,11 @@ def create_miter_call(arg, res):
   return miter
 
 
+# TODO clean this up with MLIR/SMV
 def create_state_wrapper(smv, mlir, N=0, inf=False):
 
   wrapper = ""
-  assert((N == 0 and inf) or (N != 0 and not inf), "Either inf must be set or N>0.")
+  # assert((N == 0 and inf) or (N != 0 and not inf), "Either inf must be set or N>0.")
 
   with open(mlir) as f:
     mlir = f.read()
@@ -37,7 +40,7 @@ def create_state_wrapper(smv, mlir, N=0, inf=False):
 
   # TODO proper include
   wrapper += (f'#include "{os.path.basename(smv)}"\n')
-  wrapper += \
+  wrapper += dedent(
   """
   #ifndef BOOL_INPUT
   #define BOOL_INPUT
@@ -58,6 +61,7 @@ def create_state_wrapper(smv, mlir, N=0, inf=False):
       TRUE : {TRUE, FALSE};
     esac;
     DEFINE valid0 := counter < max_tokens;
+
   MODULE bool_input_inf(nReady0)
     VAR dataOut0 : boolean;
     
@@ -72,26 +76,43 @@ def create_state_wrapper(smv, mlir, N=0, inf=False):
 
   MODULE main
   """
+  )
 
 
   for i, arg in enumerate(arg_names):
     if inf:
-      wrapper += (f"VAR seq_generator{i} : bool_input_inf(in_ndw{i}.ready0);\n")
+      wrapper += (f"  VAR seq_generator{i} : bool_input_inf(in_ndw{i}.ready0);\n")
     else:
-      wrapper += (f"VAR seq_generator{i} : bool_input(in_ndw{i}.ready0, {buffer_size});\n")
+      wrapper += (f"  VAR seq_generator{i} : bool_input(in_ndw{i}.ready0, {buffer_size});\n")
 
-    wrapper += (f"VAR in_ndw{i} : ndw_1_1(seq_generator{i}.dataOut0, seq_generator{i}.valid0, miter.{arg}_ready);\n")
+    wrapper += (f"  VAR in_ndw{i} : ndw_1_1(seq_generator{i}.dataOut0, seq_generator{i}.valid0, miter.{arg}_ready);\n")
     # print(f"VAR seq_generator{i} : entry_0_1(miter.{arg}_ready);")
 
   wrapper += "\n"
-
-
-  wrapper += create_miter_call(arg_names, res_names)
+  wrapper += "  " + create_miter_call(arg_names, res_names)
+  wrapper += "\n"
 
   # TODO
-  wrapper += ("-- TODO make sure we have sink_1_0\n")
+  wrapper += ("  -- TODO make sure we have sink_1_0\n")
   for i, res in enumerate(res_names):
-    wrapper += (f"VAR out_ndw{i} : ndw_1_1(miter.{res}_out, miter.{res}_valid, sink{i}.ready0);\n")
-    wrapper += (f"VAR sink{i} : sink_1_0(out_ndw{i}.dataOut0, out_ndw{i}.valid0);\n")
+    wrapper += (f"  VAR out_ndw{i} : ndw_1_1(miter.{res}_out, miter.{res}_valid, sink{i}.ready0);\n")
+    wrapper += (f"  VAR sink{i} : sink_1_0(out_ndw{i}.dataOut0, out_ndw{i}.valid0);\n")
 
   return wrapper
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(
+                    prog='StateWrapper',
+                    description='TODO What the program does',
+                    epilog='TODO Text at the bottom of help')
+
+  parser.add_argument("--mlir")
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument("-N", type=int)
+  group.add_argument("--inf", action="store_true")
+
+  args = parser.parse_args()
+
+  # TODO check this works properly with N and inf
+  # TODO add SMV
+  print(create_state_wrapper("", args.mlir, args.N, args.inf))
