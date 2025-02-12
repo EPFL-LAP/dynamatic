@@ -28,5 +28,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: 
           name: integration-report
-          path: integration-test/*/out/sim/report.txt
+          path: |
+            integration-test/*/out/sim/report.txt
+            integration-test/*/out/dynamatic_*.txt
 
