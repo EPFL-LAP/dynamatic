@@ -23,4 +23,10 @@ jobs:
         run: | 
           cd tools/integration
           python3 run_integration.py --ignore ignored_tests.txt
+          cd ../..
+
+      - uses: actions/upload-artifact@v4
+        with: 
+          name: integration-report
+          path: integration-test/*/out/sim/report.txt
 
