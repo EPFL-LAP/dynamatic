@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import re
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 
 class CLIHandler:
@@ -59,7 +60,6 @@ write-hdl
 simulate
 exit
 """
-DYN_FILE = DYNAMATIC_ROOT / "build" / "run_test.dyn"
 
 # Note: Must use --exit-on-failure in order for run_command_with_timeout
 #       to be able to detect the status code properly
@@ -217,6 +217,62 @@ def get_sim_time(log_path):
         raise ValueError("Log file does not contain simulation time!")
 
 
+def run_test(c_file, idx, timeout):
+    # Write .dyn script with appropriate source file name
+    dyn_file = DYNAMATIC_ROOT / "build" / f"test_{idx}.dyn"
+    write_string_to_file(SCRIPT_CONTENT.format(src_path=c_file), dyn_file)
+
+    # Get out dir name
+    out_dir = replace_filename_with(c_file, "out")
+
+    # Remove previous out directory
+    if os.path.isdir(out_dir):
+        shutil.rmtree(out_dir)
+
+    # Run test and output result
+    if timeout:
+        exit_code = run_command_with_timeout(
+            DYNAMATIC_COMMAND.format(script_path=dyn_file),
+            timeout=int(timeout)
+        )
+    else:
+        exit_code = run_command_with_timeout(
+            DYNAMATIC_COMMAND.format(script_path=dyn_file)
+        )
+
+    name = Path(c_file).name[:-2]
+    if exit_code == 0:
+        sim_log_path = os.path.join(out_dir, "sim", "report.txt")
+        try:
+            sim_time = get_sim_time(sim_log_path)
+            return {
+                "id": idx,
+                "msg": f"[PASS] {name} (simulation duration: "
+                f"{round(sim_time / 4)} cycles)",
+                "status": "pass"
+            }
+        except ValueError:
+            # This should never happen
+            return {
+                "id": idx,
+                "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
+                "status": "pass"
+            }
+
+    elif exit_code == 1:
+        return {
+            "id": idx,
+            "msg": f"[FAIL] {c_file}",
+            "status": "fail"
+        }
+    else:
+        return {
+            "id": idx,
+            "msg": f"[TIMEOUT] {c_file}",
+            "status": "timeout"
+        }
+
+
 def main():
     """
     Entry point for the script.
@@ -253,13 +309,7 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    for c_file in c_files:
-        # Write .dyn script with appropriate source file name
-        write_string_to_file(SCRIPT_CONTENT.format(src_path=c_file), DYN_FILE)
-
-        # Get out dir name
-        out_dir = replace_filename_with(c_file, "out")
-
+    for idx, c_file in enumerate(c_files):
         # Check if test is supposed to be ignored
         if Path(c_file).name[:-2] in ignored_tests:
             ignored_cnt += 1
@@ -269,44 +319,16 @@ def main():
         # One more test to handle
         test_cnt += 1
 
-        # Remove previous out directory
-        if os.path.isdir(out_dir):
-            shutil.rmtree(out_dir)
+        # Run the test
+        result = run_test(c_file, idx, args.timeout)
 
-        # Run test and output result
-        if args.timeout:
-            result = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=DYN_FILE),
-                timeout=int(args.timeout)
-            )
-        else:
-            result = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=DYN_FILE)
-            )
-
-        if result == 0:
-            sim_log_path = os.path.join(out_dir, "sim", "report.txt")
-            try:
-                sim_time = get_sim_time(sim_log_path)
-                color_print(
-                    f"[PASS] {c_file} (simulation duration: "
-                    f"{round(sim_time / 4)} cycles)",
-                    TermColors.OKGREEN
-                )
-            except ValueError:
-                # This should never happen
-                color_print(
-                    f"[PASS] {c_file} (simulation duration: NOT FOUND)",
-                    TermColors.OKGREEN
-                )
-
+        if result["status"] == "pass":
+            color_print(result["msg"], TermColors.OKGREEN)
             passed_cnt += 1
-        elif result == 1:
-            color_print(f"[FAIL] {c_file}", TermColors.FAIL)
+        elif result["status"] == "fail":
+            color_print(result["msg"], TermColors.FAIL)
         else:
-            color_print(f"[TIMEOUT] {c_file}", TermColors.WARNING)
-
-        sys.stdout.flush()
+            color_print(result["msg"], TermColors.WARNING)
 
     print(
         f"** Integration testing finished: "
