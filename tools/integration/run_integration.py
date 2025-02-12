@@ -136,13 +136,15 @@ def read_file(file_path):
         return file.read()
 
 
-def run_command_with_timeout(command, timeout=500):
+def run_command_with_timeout(command, timeout=500, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     """
     Runs a command with a time limit for execution.
 
     Arguments:
     `command` -- Shell command to be executed
     `timeout` -- Execution time limit
+    `stdout`  -- File to redirect stdout to
+    `stderr`  -- File to redirect stderr to
 
     Returns: An integer representing the execution result
     0 -- if process completed without errors
@@ -155,8 +157,8 @@ def run_command_with_timeout(command, timeout=500):
             shell=True,
             timeout=timeout,
             check=True,
-            stdout=subprocess.PIPE,  # Suppress standard output
-            stderr=subprocess.PIPE,  # Suppress standard error
+            stdout=stdout,
+            stderr=stderr
         )
         return 0
     except subprocess.CalledProcessError:
@@ -227,48 +229,56 @@ def run_test(c_file, idx, timeout):
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
 
-    # Run test and output result
-    if timeout:
-        exit_code = run_command_with_timeout(
-            DYNAMATIC_COMMAND.format(script_path=dyn_file),
-            timeout=int(timeout)
-        )
-    else:
-        exit_code = run_command_with_timeout(
-            DYNAMATIC_COMMAND.format(script_path=dyn_file)
-        )
+    Path(out_dir).mkdir()
 
-    name = Path(c_file).name[:-2]
-    if exit_code == 0:
-        sim_log_path = os.path.join(out_dir, "sim", "report.txt")
-        try:
-            sim_time = get_sim_time(sim_log_path)
+    with open(Path(out_dir) / "dynamatic_out.txt", "w") as stdout, \
+            open(Path(out_dir) / "dynamatic_err.txt", "w") as stderr:
+        # Run test and output result
+        if timeout:
+            exit_code = run_command_with_timeout(
+                DYNAMATIC_COMMAND.format(script_path=dyn_file),
+                timeout=int(timeout),
+                stdout=stdout,
+                stderr=stderr
+            )
+        else:
+            exit_code = run_command_with_timeout(
+                DYNAMATIC_COMMAND.format(script_path=dyn_file),
+                stdout=stdout,
+                stderr=stderr
+            )
+
+        name = Path(c_file).name[:-2]
+        if exit_code == 0:
+            sim_log_path = os.path.join(out_dir, "sim", "report.txt")
+            try:
+                sim_time = get_sim_time(sim_log_path)
+                return {
+                    "id": idx,
+                    "msg": f"[PASS] {name} (simulation duration: "
+                    f"{round(sim_time / 4)} cycles)",
+                    "status": "pass"
+                }
+            except ValueError:
+                # This should never happen
+                return {
+                    "id": idx,
+                    "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
+                    "status": "pass"
+                }
+
+        elif exit_code == 1:
             return {
                 "id": idx,
-                "msg": f"[PASS] {name} (simulation duration: "
-                f"{round(sim_time / 4)} cycles)",
-                "status": "pass"
+                "msg": f"[FAIL] {c_file}",
+                "status": "fail"
             }
-        except ValueError:
-            # This should never happen
+        else:
             return {
                 "id": idx,
-                "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
-                "status": "pass"
+                "msg": f"[TIMEOUT] {c_file}",
+                "status": "timeout"
             }
-
-    elif exit_code == 1:
-        return {
-            "id": idx,
-            "msg": f"[FAIL] {c_file}",
-            "status": "fail"
-        }
-    else:
-        return {
-            "id": idx,
-            "msg": f"[TIMEOUT] {c_file}",
-            "status": "timeout"
-        }
 
 
 def main():
