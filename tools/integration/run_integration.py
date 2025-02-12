@@ -66,9 +66,6 @@ exit
 DYNAMATIC_COMMAND = str(DYNAMATIC_ROOT / "bin" / "dynamatic") + \
     " --exit-on-failure --run {script_path}"
 
-# Worker count of process pool executor
-WORKER_COUNT = 16
-
 
 class TermColors:
     """
@@ -310,7 +307,7 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    with ProcessPoolExecutor(max_workers=WORKER_COUNT) as executor:
+    with ProcessPoolExecutor() as executor:
         processes = []
         for idx, c_file in enumerate(c_files):
             # Check if test is supposed to be ignored
