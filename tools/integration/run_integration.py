@@ -217,9 +217,24 @@ def get_sim_time(log_path):
         raise ValueError("Log file does not contain simulation time!")
 
 
-def run_test(c_file, idx, timeout):
+def run_test(c_file, id, timeout):
+    """
+    Runs the specified integration test.
+
+    Arguments:
+    `c_file`   -- Path to .c source file of integration test.
+    `id`       -- Index used to identify the test.
+    `timeout`  -- Timeout in seconds for running the test.
+
+    Returns:
+    Dictionary with the following keys:
+    `id`      -- Index of the test that was given as argument.
+    `msg`     -- Message indicating the result of the test.
+    `status`  -- One of 'pass', `fail` or `timeout`.
+    """
+
     # Write .dyn script with appropriate source file name
-    dyn_file = DYNAMATIC_ROOT / "build" / f"test_{idx}.dyn"
+    dyn_file = DYNAMATIC_ROOT / "build" / f"test_{id}.dyn"
     write_string_to_file(SCRIPT_CONTENT.format(src_path=c_file), dyn_file)
 
     # Get out dir name
@@ -247,7 +262,7 @@ def run_test(c_file, idx, timeout):
             try:
                 sim_time = get_sim_time(sim_log_path)
                 return {
-                    "id": idx,
+                    "id": id,
                     "msg": f"[PASS] {name} (simulation duration: "
                     f"{round(sim_time / 4)} cycles)",
                     "status": "pass"
@@ -255,21 +270,21 @@ def run_test(c_file, idx, timeout):
             except ValueError:
                 # This should never happen
                 return {
-                    "id": idx,
+                    "id": id,
                     "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
                     "status": "pass"
                 }
 
         elif exit_code == 1:
             return {
-                "id": idx,
-                "msg": f"[FAIL] {c_file}",
+                "id": id,
+                "msg": f"[FAIL] {name}",
                 "status": "fail"
             }
         else:
             return {
-                "id": idx,
-                "msg": f"[TIMEOUT] {c_file}",
+                "id": id,
+                "msg": f"[TIMEOUT] {name}",
                 "status": "timeout"
             }
 
