@@ -315,8 +315,8 @@ static unsigned convertToInclusiveArrayBound(IntegerType intType) {
 }
 
 /// Returns the type's inclusive array bound.
-static unsigned convertToInclusiveArrayBound(ChannelType intType) {
-  return intType.getDataBitWidth() - 1;
+static unsigned convertToInclusiveArrayBound(ChannelType channelType) {
+  return channelType.getDataBitWidth() - 1;
 }
 
 /// Returns the type's "raw" RTL type.
