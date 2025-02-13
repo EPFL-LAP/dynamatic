@@ -290,3 +290,33 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
   }
   return deserial.exhausted(RESERVED_KEYS);
 }
+
+std::string RTLTimingType::serialize(Attribute attr) {
+  auto timingAttr = dyn_cast_if_present<handshake::TimingAttr>(attr);
+  if (!timingAttr)
+    return "";
+
+  handshake::TimingInfo info = timingAttr.getInfo();
+  std::stringstream ss;
+
+  // Wrap in single quotes for easier passing as a generator argument.
+  ss << "'{"; // Start of the Python dictionary format
+  ss << "\"data_latency\": ";
+  if (auto latency = info.getLatency(SignalType::DATA))
+    ss << *latency;
+  else
+    ss << "None";
+  ss << ", \"valid_latency\": ";
+  if (auto latency = info.getLatency(SignalType::VALID))
+    ss << *latency;
+  else
+    ss << "None";
+  ss << ", \"ready_latency\": ";
+  if (auto latency = info.getLatency(SignalType::READY))
+    ss << *latency;
+  else
+    ss << "None";
+  ss << "}'"; // End of the Python dictionary format
+
+  return ss.str();
+}
