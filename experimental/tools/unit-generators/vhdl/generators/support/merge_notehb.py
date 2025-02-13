@@ -112,4 +112,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+  return dependencies + entity + architecture

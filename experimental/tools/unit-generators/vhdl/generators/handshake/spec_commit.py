@@ -69,7 +69,7 @@ entity {name} is
     -- inputs
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
-    ins_spec_tag : in std_logic;
+    ins_spec : in std_logic_vector(0 downto 0);
     ctrl : in std_logic_vector(0 downto 0);
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
@@ -130,7 +130,7 @@ fifo_disc: entity work.{fifo_disc_name}(arch)
     outs_ready => fifo_disc_outs_ready
   );
 
-branch_in_condition(0) <= ins_spec_tag;
+branch_in_condition <= ins_spec;
 branch_in: entity work.{cond_br_name}(arch)
   port map (
     clk => clk,
@@ -197,8 +197,6 @@ merge_out: entity work.{merge_name}(arch)
     outs_ready => outs_ready
   );
 
-  outs_spec_tag <= '0';
-
 end architecture;
 """
 
@@ -220,7 +218,7 @@ entity {name} is
     clk, rst : in std_logic;
     -- inputs
     ins_valid : in std_logic;
-    ins_spec_tag : in std_logic;
+    ins_spec : in std_logic_vector(0 downto 0);
     ctrl : in std_logic_vector(0 downto 0);
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
@@ -244,14 +242,12 @@ begin
       rst => rst,
       ins => ins_inner,
       ins_valid => ins_valid,
-      ins_spec_tag => ins_spec_tag,
+      ins_spec => ins_spec,
       ctrl => ctrl,
       ctrl_valid => ctrl_valid,
-      ctrl_spec_tag => ctrl_spec_tag,
       outs_ready => outs_ready,
       outs => outs_inner,
       outs_valid => outs_valid,
-      outs_spec_tag => outs_spec_tag,
       ins_ready => ins_ready,
       ctrl_ready => ctrl_ready
     );
