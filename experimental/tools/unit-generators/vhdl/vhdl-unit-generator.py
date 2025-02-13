@@ -3,6 +3,7 @@ import argparse
 import generators.handshake.cond_br as cond_br
 import generators.handshake.fork as fork
 import generators.handshake.mux as mux
+import generators.handshake.spec_commit as spec_commit
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -12,6 +13,8 @@ def generate_code(name, mod_type, parameters):
       return fork.generate_fork(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
+    case "spec_commit":
+      return spec_commit.generate_spec_commit(name, parameters)
     case _:
       return f"Module type {mod_type} not found"
       # raise ValueError(f"Module type {mod_type} not found")

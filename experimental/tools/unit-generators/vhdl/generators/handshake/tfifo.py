@@ -1,7 +1,11 @@
+import ast
+
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_exp, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
+from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_tfifo(name, params):
-  data_type = VhdlScalarType(params["data_type"])
+  port_types = ast.literal_eval(params["port_types"])
+  data_type = VhdlScalarType(port_types["ins"])
 
   if data_type.has_extra_signals():
     if data_type.is_channel():
@@ -13,24 +17,16 @@ def generate_tfifo(name, params):
   else:
     return _generate_tfifo_dataless(name, params["size"])
 
-def generate_elastic_fifo_inner(name, params):
-  return "" # todo
-
-def generate_elastic_fifo_inner_dataless(name, params):
-  return "" # todo
-
 def _generate_tfifo(name, size, bitwidth):
   fifo_inner_name = f"{name}_fifo"
-  dependencies = generate_elastic_fifo_inner(fifo_inner_name, {
-    "size": size,
-    "bitwidth": bitwidth
-  })
+  dependencies = generate_elastic_fifo_inner(fifo_inner_name, size, bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of tfifo
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -47,6 +43,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of tfifo
 architecture arch of {name} is
   signal mux_sel                  : std_logic;
   signal fifo_valid, fifo_ready   : std_logic;
@@ -91,15 +88,14 @@ end architecture;
 
 def _generate_tfifo_dataless(name, size):
   fifo_inner_name = f"{name}_fifo"
-  dependencies = generate_elastic_fifo_inner_dataless(fifo_inner_name, {
-    "size": size
-  })
+  dependencies = generate_elastic_fifo_inner(fifo_inner_name, size)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of tfifo_dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -114,6 +110,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of tfifo_dataless
 architecture arch of {name} is
   signal mux_sel                  : std_logic;
   signal fifo_valid, fifo_ready   : std_logic;
@@ -156,6 +153,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of tfifo signal manager
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -179,6 +177,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
+-- Architecture of tfifo signal manager
 architecture arch of {name} is
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
@@ -223,6 +222,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of tfifo signal manager dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -244,6 +244,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
+-- Architecture of tfifo signal manager dataless
 architecture arch of {name} is
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);

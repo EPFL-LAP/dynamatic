@@ -230,7 +230,7 @@
   },
   {
     "name": "handshake.spec_commit",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_commit -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_commit -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.spec_save",
