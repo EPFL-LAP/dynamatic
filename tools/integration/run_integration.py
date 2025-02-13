@@ -336,6 +336,10 @@ def main():
     if args.workers:
         workers = int(args.workers)
 
+    # ProcessPoolExecutor creates subprocesses and not threads, and as such,
+    # is not limited by Python's Global Interpreter Lock.
+    # Hence, it allows the full performance gain from parallelism to be achieved,
+    # unlike ThreadPoolExecutor, which would not make execution any faster whatsoever.
     with ProcessPoolExecutor(max_workers=workers) as executor:
         # Note: _max_workers is a private variable, as indicated by the underscore.
         # However, we access it to get the number of workers used, since the default
