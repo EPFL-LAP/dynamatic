@@ -1,15 +1,77 @@
-def generate_merge_notehb(name, inputs, bitwidth):
+from generators.support.array import generate_2d_array
+
+def generate_merge_notehb(name, inputs, bitwidth=0):
+  if bitwidth == 0:
+    return _generate_merge_notehb_dataless(name, inputs)
+  else:
+    return _generate_merge_notehb(name, inputs, bitwidth)
+
+def _generate_merge_notehb_dataless(name, inputs):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+
+-- Entity of merge_notehb_dataless
+entity {name} is
+  port (
+    clk, rst : in std_logic;
+    -- input channels
+    ins_valid : in  std_logic_vector({inputs} - 1 downto 0);
+    ins_ready : out std_logic_vector({inputs} - 1 downto 0);
+    -- output channel
+    outs_valid : out std_logic;
+    outs_ready : in  std_logic
+  );
+end entity;
+"""
+
+  architecture = f"""
+-- Architecture of merge_notehb_dataless
+architecture arch of merge_notehb_dataless is
+begin
+  process (ins_valid, outs_ready)
+    variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector({inputs} - 1 downto 0);
+  begin
+    tmp_valid_out := '0';
+    tmp_ready_out := (others => '0');
+
+    for i in 0 to ({inputs} - 1) loop
+      if (ins_valid(i) = '1') then
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
+      end if;
+    end loop;
+
+    outs_valid <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
+  end process;
+
+end architecture;
+"""
+
+  return entity + architecture
+
+
+def _generate_merge_notehb(name, inputs, bitwidth):
+  array_name = f"{name}_array"
+
+  dependencies = generate_2d_array(array_name, inputs, bitwidth)
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.{array_name}.all;
 
 -- Entity of merge_notehb
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  array({inputs} - 1 downto 0) of ({bitwidth} - 1 downto 0);
+    ins       : in  {array_name};
     ins_valid : in  std_logic_vector({inputs} - 1 downto 0);
     ins_ready : out std_logic_vector({inputs} - 1 downto 0);
     -- output channel
