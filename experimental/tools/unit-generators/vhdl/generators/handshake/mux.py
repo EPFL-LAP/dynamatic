@@ -1,6 +1,6 @@
 import ast
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.array import generate_2d_array
 from generators.handshake.tehb import generate_tehb
 
@@ -281,9 +281,10 @@ end architecture;
 
   ins_conversions = []
   for i in range(size):
-    ins_conversions.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f"ins_{i}", extra_signal_mapping)} & ins({i});")
+    ins_conversions.append(f"  ins_inner({i})({bitwidth} - 1 downto 0) <= ins({i});")
+    ins_conversions.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
 
-  outs_conversions = generate_outs_concat_statement("outs", "outs_inner", extra_signal_mapping, bitwidth)
+  outs_conversions = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
@@ -383,9 +384,9 @@ end architecture;
 
   ins_conversions = []
   for i in range(size):
-    ins_conversions.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f"ins_{i}", extra_signal_mapping)};")
+    ins_conversions.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
 
-  outs_conversions = generate_outs_concat_statement_dataless("outs", "outs_inner", extra_signal_mapping)
+  outs_conversions = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",

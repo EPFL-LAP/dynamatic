@@ -1,6 +1,6 @@
 import ast
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_exp, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_tfifo(name, params):
@@ -198,8 +198,8 @@ begin
 end architecture;
 """
 
-  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp("ins", extra_signal_mapping)}\n"
-  outs_conversion = generate_outs_concat_statement("outs", "outs_inner", extra_signal_mapping, bitwidth)
+  ins_conversion = generate_ins_concat_statements("ins", "ins_inner", extra_signal_mapping, bitwidth)
+  outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
@@ -265,8 +265,8 @@ begin
 end architecture;
 """
 
-  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp_dataless("ins", extra_signal_mapping)}\n"
-  outs_conversion = generate_outs_concat_statement_dataless("outs", "outs_inner", extra_signal_mapping)
+  ins_conversion = generate_ins_concat_statements_dataless("ins", "ins_inner", extra_signal_mapping)
+  outs_conversion = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
