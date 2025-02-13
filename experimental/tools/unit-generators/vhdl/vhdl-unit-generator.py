@@ -1,13 +1,15 @@
 import argparse
-import ast
 
 import generators.handshake.cond_br as cond_br
+import generators.handshake.fork as fork
 import generators.handshake.mux as mux
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
+    case "fork":
+      return fork.generate_fork(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
     case _:
