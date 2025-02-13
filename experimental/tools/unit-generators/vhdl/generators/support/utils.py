@@ -93,9 +93,11 @@ class ExtraSignalMapping:
   def to_extra_signals(self) -> dict[str, int]:
     return {name: msb - lsb + 1 for name, (msb, lsb) in self.mapping}
 
-def generate_ins_concat_statements(in_name: str, in_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2) -> str:
+def generate_ins_concat_statements(in_name: str, in_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2, custom_data_name=None) -> str:
   indent_str = " " * indent
-  return f"{indent_str}{in_inner_name}({bitwidth - 1} downto 0) <= {in_name};\n" + \
+  if custom_data_name is None:
+    custom_data_name = in_name
+  return f"{indent_str}{in_inner_name}({bitwidth - 1} downto 0) <= {custom_data_name};\n" + \
     generate_ins_concat_statements_dataless(in_name, in_inner_name, extra_signal_mapping, indent)
 
 def generate_ins_concat_statements_dataless(in_name: str, in_inner_name: str, extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
@@ -104,7 +106,7 @@ def generate_ins_concat_statements_dataless(in_name: str, in_inner_name: str, ex
     f"{indent_str}{in_inner_name}({msb} downto {lsb}) <= {in_name}_{name};" for name, (msb, lsb) in extra_signal_mapping.mapping
   ])
 
-def generate_outs_concat_statements(out_name: str, out_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2) -> str:
+def generate_outs_concat_statements(out_name: str, out_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2, custom_data_name=None) -> str:
   """
   Generates the output signal concatenation statement.
   out_name: The name of the output signal. (e.g., "outs")
@@ -116,7 +118,9 @@ def generate_outs_concat_statements(out_name: str, out_inner_name: str, extra_si
   outs_tag <= outs_inner(40 downto 33)
   """
   indent_str = " " * indent
-  return f"{indent_str}{out_name} <= {out_inner_name}({bitwidth - 1} downto 0);\n" + \
+  if custom_data_name is None:
+    custom_data_name = out_name
+  return f"{indent_str}{custom_data_name} <= {out_inner_name}({bitwidth - 1} downto 0);\n" + \
     generate_outs_concat_statements_dataless(out_name, out_inner_name, extra_signal_mapping, indent)
 
 def generate_outs_concat_statements_dataless(out_name: str, out_inner_name: str, extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
