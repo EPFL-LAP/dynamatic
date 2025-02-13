@@ -1,6 +1,6 @@
 import ast
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_exp, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.logic import generate_or_n
 from generators.support.eager_fork_register_block import generate_eager_fork_register_block
 from generators.support.array import generate_2d_array
@@ -206,15 +206,15 @@ begin
 end architecture;
 """
 
-  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp("ins", extra_signal_mapping)};\n"
+  ins_conversion = generate_ins_concat_statements("ins", "ins_inner", extra_signal_mapping, bitwidth)
   outs_conversion = []
   for i in range(size):
     outs_conversion.append(f"  outs({i}) <= outs_inner({i})({bitwidth} - 1 downto 0);")
-    outs_conversion.append(generate_outs_concat_statement_dataless(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
+    outs_conversion.append(generate_outs_concat_statements_dataless(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + "\n".join(outs_conversion)
+    ins_conversion + "\n" + "\n".join(outs_conversion)
   )
 
   return dependencies + entity + architecture
@@ -280,10 +280,10 @@ begin
 end architecture;
 """
 
-  ins_conversion = f"  ins_inner <= {generate_ins_concat_exp_dataless("ins", extra_signal_mapping)};\n"
+  ins_conversion = generate_ins_concat_statements_dataless("ins", "ins_inner", extra_signal_mapping)
   outs_conversion = []
   for i in range(size):
-    outs_conversion.append(generate_outs_concat_statement_dataless(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
+    outs_conversion.append(generate_outs_concat_statements_dataless(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",

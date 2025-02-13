@@ -1,7 +1,7 @@
 import ast
 
 from generators.support.array import generate_2d_array
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_exp, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
@@ -224,8 +224,9 @@ end architecture;
 
   ins_conversion = []
   for i in range(size):
-    ins_conversion.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f'ins_{i}', extra_signal_mapping)} & ins({i});")
-  outs_conversion = generate_outs_concat_statement("outs", "outs_inner", extra_signal_mapping, bitwidth)
+    ins_conversion.append(f"  ins_inner({i})({bitwidth} - 1 downto 0) <= ins({i});")
+    ins_conversion.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
+  outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
@@ -298,8 +299,8 @@ end architecture;
 
   ins_conversion = []
   for i in range(size):
-    ins_conversion.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f'ins_{i}', extra_signal_mapping)};")
-  outs_conversion = generate_outs_concat_statement_dataless("outs", "outs_inner", extra_signal_mapping)
+    ins_conversion.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
+  outs_conversion = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
