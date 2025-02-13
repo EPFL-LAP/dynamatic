@@ -7,6 +7,8 @@ import generators.handshake.spec_commit as spec_commit
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
+    case "buffer":
+      return ""
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "fork":

@@ -206,9 +206,7 @@ end architecture;
 def _generate_tehb_signal_manager_dataless(name, ins_type):
   inner_name = f"{name}_inner"
 
-  bitwidth = 0
-
-  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
+  extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in ins_type.extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
