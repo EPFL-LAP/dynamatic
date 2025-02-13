@@ -345,6 +345,7 @@ create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
 create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
 create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
 create_symlink ../build/bin/dynamatic
+create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-rtl
