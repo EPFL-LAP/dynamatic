@@ -199,7 +199,10 @@ def analyze_delay_muxes(component_name, output_port, transactions):
         print(f"\tFirst transaction @ {data_extracted[TRANSACTION][0]}")
         print(f"\tLast  transaction @ {data_extracted[TRANSACTION][-1]}")
         print(
-            f"\tII approx = {(data_extracted[TRANSACTION][-1] - data_extracted[TRANSACTION][0] + 1) / len(data_extracted[TRANSACTION])}"
+            f"\tII approx         = {(data_extracted[TRANSACTION][-1] - data_extracted[TRANSACTION][0] + 1) / len(data_extracted[TRANSACTION])}"
+        )
+        print(
+            f"\tThroughput approx = {1/((data_extracted[TRANSACTION][-1] - data_extracted[TRANSACTION][0] + 1) / len(data_extracted[TRANSACTION]))}"
         )
 
 

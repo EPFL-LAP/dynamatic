@@ -1,10 +1,9 @@
 import json
 
 import matplotlib.pyplot as plt
-import numpy as np
 from scipy.stats import gmean
 
-json_data = """
+json_data_slices = """
 [
     {"kernel_name": "binary_searcy", "slice_ratio": 0.58, "time_ratio": 0.46, "va":"", "ha":"left"},
     {"kernel_name": "fir", "slice_ratio": 0.91, "time_ratio": 0.99, "va":"", "ha":""},
@@ -14,7 +13,7 @@ json_data = """
     {"kernel_name": "kernel_2mm", "slice_ratio": 1.04, "time_ratio": 0.89, "va":"", "ha":"left"},
     {"kernel_name": "kernel_3mm", "slice_ratio": 1.10, "time_ratio": 0.73, "va":"", "ha":""},
     {"kernel_name": "matvec", "slice_ratio": 1.12, "time_ratio": 1.11, "va":"", "ha":""},
-    {"kernel_name": "sobel", "slice_ratio": 0.54, "time_ratio": 0.48, "va":"", "ha":""},
+    {"kernel_name": "sobel", "slice_ratio": 0.54, "time_ratio": 0.48, "va":"bottom", "ha":"left"},
     {"kernel_name": "spmv", "slice_ratio": 0.65, "time_ratio": 0.35, "va":"", "ha":""},
     {"kernel_name": "atax", "slice_ratio": 1.01, "time_ratio": 0.61, "va":"", "ha":"left"},
     {"kernel_name": "bigc", "slice_ratio": 1.01, "time_ratio": 0.92, "va":"bottom", "ha":"left"},
@@ -23,7 +22,7 @@ json_data = """
 """
 
 # Load JSON data
-data = json.loads(json_data)
+data = json.loads(json_data_slices)
 
 # Extract values
 kernel_names = [item["kernel_name"] for item in data]
@@ -42,7 +41,7 @@ plt.grid(color="lightgray", linestyle="--", linewidth=0.5, alpha=0.7)
 plt.scatter(
     x_values,
     y_values,
-    color="green",
+    color="red",
     label="Fast Token Delviery + Straight To The Queue",
 )
 
@@ -58,7 +57,7 @@ for i, name in enumerate(kernel_names):
     )
 
 # Plot reference FPGA point
-plt.scatter([1.0], [1.0], color="blue", label="Main Dyanamtic")
+plt.scatter([1.0], [1.0], color="blue", label="Main Dynamtic")
 plt.axvline(x=1.0, linestyle="dashed", color="black", linewidth=0.8)
 plt.axhline(y=1.0, linestyle="dashed", color="black", linewidth=0.8)
 
@@ -79,9 +78,14 @@ plt.text(
 
 
 # Labels and title
-plt.xlabel("Area (Slices), Normalized", fontsize=15)
+obj = "SLICES"
+text_pic = f"Area ({obj}), Normalized"
+plt.xlabel(text_pic, fontsize=15)
 plt.ylabel("Execution time (CCs * Tck), Normalized", fontsize=15)
-plt.title("Performance Comparison of Benchmarks With Respect To Baseline", fontsize=18)
+plt.title(
+    f"Area ({obj}) Performance Comparison of Benchmarks With Respect To Baseline",
+    fontsize=18,
+)
 plt.legend(fontsize=12)
 
 # Save as high-quality JPEG
