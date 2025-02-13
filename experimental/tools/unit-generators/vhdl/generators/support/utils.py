@@ -67,7 +67,7 @@ class VhdlScalarType:
   def is_channel(self):
     return self.bitwidth > 0
 
-def generate_extra_signal_ports(ports, extra_signals):
+def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dict[str, int]) -> str:
   return "    -- extra signal ports\n" + "\n".join([
     "\n".join([
       f"    {port}_{name} : {inout} std_logic_vector({bitwidth - 1} downto 0);"
@@ -90,6 +90,8 @@ class ExtraSignalMapping:
     return name in [name for name, _ in self.mapping]
   def get(self, name: str):
     return self.mapping[[name for name, _ in self.mapping].index(name)]
+  def to_extra_signals(self) -> dict[str, int]:
+    return {name: msb - lsb + 1 for name, (msb, lsb) in self.mapping}
 
 def generate_ins_concat_exp(in_name: str, extra_signal_mapping: ExtraSignalMapping) -> str:
   """
@@ -107,9 +109,11 @@ def generate_ins_concat_exp_dataless(in_name: str, extra_signal_mapping: ExtraSi
   extra_signals: An ExtraSignalMapping object.
   e.g., "ins_tag & ins_spec"
   """
-  return ' & '.join([
+  terms = [
     in_name + "_" + name for name, _ in extra_signal_mapping.mapping
-  ].reverse())
+  ]
+  terms.reverse()
+  return ' & '.join(terms)
 
 def generate_outs_concat_statement(out_name: str, out_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2) -> str:
   """
@@ -138,7 +142,7 @@ def generate_outs_concat_statement_dataless(out_name: str, out_inner_name: str, 
   """
   indent_str = " " * indent
   return "\n".join([
-    f"{indent_str}{out_name}_{name} <= {out_inner_name}({msb} downto {lsb})" for name, (msb, lsb) in extra_signal_mapping.mapping
+    f"{indent_str}{out_name}_{name} <= {out_inner_name}({msb} downto {lsb});" for name, (msb, lsb) in extra_signal_mapping.mapping
   ])
 
 def generate_extra_signal_concat_logic(ins: tuple[str, str], outs: list[tuple[str, str]], bit_map: tuple[dict[str, tuple[int, int]]]) -> str:
@@ -155,3 +159,43 @@ def generate_extra_signal_concat_logic(ins: tuple[str, str], outs: list[tuple[st
   for name, (msb, lsb) in bit_map[0].items():
     outs_logic.append(f"  outs_inner({msb} downto {lsb}) <= {name}")
   return "\n".join(ins_logic + outs_logic)
+
+# For merge-like signal managers (mux and cmerge)
+
+def generate_lacking_extra_signal_decls(ins_name: str, ins_types: list[VhdlScalarType], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
+  """
+  Generates the declarations for extra signals that are not present in the input signals.
+  ins_name: The name of the input signal. (e.g., "ins")
+  ins_types: A list of VhdlScalarType objects.
+  extra_signal_mapping: An ExtraSignalMapping object.
+  """
+  indent_str = " " * indent
+  decls = []
+  extra_signals_union = extra_signal_mapping.to_extra_signals().items()
+  for i, ins_type in enumerate(ins_types):
+    for name, bitwidth in extra_signals_union:
+      if name not in ins_type.extra_signals:
+        decls.append(f"{indent_str}signal {ins_name}_{i}_{name} : std_logic_vector({bitwidth - 1} downto 0);")
+  return "\n".join(decls)
+
+
+extra_signal_default_values = {
+  "spec": "'0'",
+}
+
+def generate_lacking_extra_signal_assignments(ins_name: str, ins_types: list[VhdlScalarType], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
+  """
+  Generates the assignments for extra signals that are not present in the input signals.
+  ins_name: The name of the input signal. (e.g., "ins")
+  ins_types: A list of VhdlScalarType objects.
+  extra_signal_mapping: An ExtraSignalMapping object.
+  """
+  indent_str = " " * indent
+  assignments = []
+  extra_signals_union = extra_signal_mapping.to_extra_signals().items()
+  for i, ins_type in enumerate(ins_types):
+    for name, bitwidth in extra_signals_union:
+      if name not in ins_type.extra_signals:
+        assignments.append(f"{indent_str}{ins_name}_{i}_{name} <= {extra_signal_default_values[name]};")
+  return "\n".join(assignments)
+
