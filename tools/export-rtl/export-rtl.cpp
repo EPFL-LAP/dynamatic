@@ -380,7 +380,7 @@ void WriteModData::writeSignalDeclarations(
                              ArrayRef<ExtraSignal> extraSignals) -> void {
     for (const ExtraSignal &extra : extraSignals) {
       writeDeclaration(getExtraSignalName(name, extra),
-                       getRawType(cast<IntegerType>(extra.type)), os);
+                       cast<IntegerType>(extra.type).getWidth() - 1, os);
     }
   };
 
@@ -457,7 +457,7 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
       std::vector<IOPort> &portsDir = extra.downstream ? down : up;
       IntegerType ty = cast<IntegerType>(extra.type);
       portsDir.emplace_back(getExtraSignalName(portName, extra),
-                            getRawType(ty));
+                            ty.getWidth() - 1);
     }
   };
 
