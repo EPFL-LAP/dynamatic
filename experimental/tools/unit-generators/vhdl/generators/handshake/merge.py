@@ -224,8 +224,7 @@ end architecture;
 
   ins_conversion = []
   for i in range(size):
-    ins_conversion.append(f"  ins_inner({i})({bitwidth} - 1 downto 0) <= ins({i});")
-    ins_conversion.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
+    ins_conversion.append(generate_ins_concat_statements(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, custom_data_name=f"ins({i})"))
   outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
