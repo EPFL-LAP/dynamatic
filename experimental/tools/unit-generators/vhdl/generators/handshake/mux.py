@@ -1,6 +1,6 @@
 import ast
 
-from generators.support.utils import VhdlScalarType
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_exp_dataless, generate_outs_concat_statement, generate_outs_concat_statement_dataless
 from generators.support.array import generate_2d_array
 from generators.handshake.tehb import generate_tehb
 
@@ -196,22 +196,16 @@ def _generate_mux_signal_manager(name, size, port_types):
   bitwidth = outs_type.bitwidth
   index_bitwidth = index_type.bitwidth
 
-  extra_signal_bit_map = {}
-  occupied_bits = bitwidth
+  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
   for i in range(size):
     ins_i_name = f"ins_{i}"
     ins_i_type = VhdlScalarType(port_types[ins_i_name])
     ins_types.append(ins_i_type)
 
     for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
-      if signal_name not in extra_signal_bit_map:
-        extra_signal_bit_map[signal_name] = (
-          occupied_bits + signal_bitwidth - 1,
-          occupied_bits
-        )
-        occupied_bits += signal_bitwidth
-
-  full_bitwidth = occupied_bits
+      if not extra_signal_mapping.has(signal_name):
+        extra_signal_mapping.add(signal_name, signal_bitwidth)
+  full_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth) + \
     generate_2d_array(array_name, size, bitwidth) + \
@@ -246,23 +240,18 @@ end entity;
 """
 
   # Add extra signal ports
-  extra_signal_ports = []
+  extra_signal_port_decls = []
   for i in range(size):
-    for signal_name, signal_bitwidth in ins_types[i].extra_signals.items():
-      extra_signal_ports.append(
-        f"ins_{i}_{signal_name} : in std_logic_vector({signal_bitwidth - 1} downto 0);"
-      )
-  for signal_name, (msb, lsb) in extra_signal_bit_map.items():
-    extra_signal_ports.append(
-      f"outs_{signal_name} : out std_logic_vector({msb - lsb} downto {0});"
-    )
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_ports))
+    extra_signal_port_decls.append(generate_extra_signal_ports([(f"ins_{i}", "in")], ins_types[i].extra_signals))
+  extra_signal_port_decls.append(generate_extra_signal_ports([("outs", "out")], extra_signal_mapping.to_extra_signals()))
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of mux signal manager
 architecture arch of {name} is
   signal ins_inner : {array_fullwidth_name};
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+  [LACKING_EXTRA_SIGNAL_DECLS]
 begin
   [EXTRA_SIGNAL_LOGIC]
 
@@ -283,32 +272,23 @@ begin
 end architecture;
 """
 
-  default_values = {
-    "spec": "'0'",
-  }
+  architecture = architecture.replace(
+    "  [LACKING_EXTRA_SIGNAL_DECLS]",
+    generate_lacking_extra_signal_decls("ins", ins_types, extra_signal_mapping)
+  )
+
+  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments("ins", ins_types, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
-    ins_inner = ["ins"]
-    for signal_name in extra_signal_bit_map.keys():
-      if signal_name in ins_types[i].extra_signals:
-        ins_inner.append(f"ins_{i}_{signal_name}")
-      else:
-        ins_inner.append(default_values[signal_name])
-    ins_inner.reverse()
-    ins_conversions.append(f"  ins_inner({i}) <= {" & ".join(ins_inner)};")
+    ins_conversions.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f"ins_{i}", extra_signal_mapping)} & ins({i});")
 
-  outs_conversions = [
-    f"  outs <= outs_inner({bitwidth} - 1 downto 0);"
-  ]
-  for signal_name, (msb, lsb) in extra_signal_bit_map.items():
-    outs_conversions.append(
-      f"  outs_{signal_name} <= outs_inner({msb} downto {lsb});"
-    )
+  outs_conversions = generate_outs_concat_statement("outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
-    "\n".join(ins_conversions + outs_conversions)
+    lacking_extra_signal_assignments + "\n" + \
+    "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 
   return dependencies + entity + architecture
@@ -320,25 +300,18 @@ def _generate_mux_signal_manager_dataless(name, size, port_types):
   ins_types = []
   index_type = VhdlScalarType(port_types["index"])
 
-  bitwidth = 0
   index_bitwidth = index_type.bitwidth
 
-  extra_signal_bit_map = {}
-  occupied_bits = bitwidth
+  extra_signal_mapping = ExtraSignalMapping()
   for i in range(size):
     ins_i_name = f"ins_{i}"
     ins_i_type = VhdlScalarType(port_types[ins_i_name])
     ins_types.append(ins_i_type)
 
     for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
-      if signal_name not in extra_signal_bit_map:
-        extra_signal_bit_map[signal_name] = (
-          occupied_bits + signal_bitwidth - 1,
-          occupied_bits
-        )
-        occupied_bits += signal_bitwidth
-
-  full_bitwidth = occupied_bits
+      if not extra_signal_mapping.has(signal_name):
+        extra_signal_mapping.add(signal_name, signal_bitwidth)
+  full_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth) + \
     generate_2d_array(array_name, size, full_bitwidth)
@@ -369,23 +342,18 @@ end entity;
 """
 
   # Add extra signal ports
-  extra_signal_ports = []
+  extra_signal_port_decls = []
   for i in range(size):
-    for signal_name, signal_bitwidth in ins_types[i].extra_signals.items():
-      extra_signal_ports.append(
-        f"ins_{i}_{signal_name} : in std_logic_vector({signal_bitwidth - 1} downto 0);"
-      )
-  for signal_name, (msb, lsb) in extra_signal_bit_map.items():
-    extra_signal_ports.append(
-      f"outs_{signal_name} : out std_logic_vector({msb - lsb} downto {0});"
-    )
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_ports))
+    extra_signal_port_decls.append(generate_extra_signal_ports([(f"ins_{i}", "in")], ins_types[i].extra_signals))
+  extra_signal_port_decls.append(generate_extra_signal_ports([("outs", "out")], extra_signal_mapping.to_extra_signals()))
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of mux signal manager
 architecture arch of {name} is
   signal ins_inner : {array_name};
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
+  [LACKING_EXTRA_SIGNAL_DECLS]
 begin
   [EXTRA_SIGNAL_LOGIC]
 
@@ -406,30 +374,23 @@ begin
 end architecture;
 """
 
-  default_values = {
-    "spec": "'0'",
-  }
+  architecture = architecture.replace(
+    "  [LACKING_EXTRA_SIGNAL_DECLS]",
+    generate_lacking_extra_signal_decls("ins", ins_types, extra_signal_mapping)
+  )
+
+  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments("ins", ins_types, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
-    ins_inner = []
-    for signal_name in extra_signal_bit_map.keys():
-      if signal_name in ins_types[i].extra_signals:
-        ins_inner.append(f"ins_{i}_{signal_name}")
-      else:
-        ins_inner.append(default_values[signal_name])
-    ins_inner.reverse()
-    ins_conversions.append(f"  ins_inner({i}) <= {" & ".join(ins_inner)};")
+    ins_conversions.append(f"  ins_inner({i}) <= {generate_ins_concat_exp_dataless(f"ins_{i}", extra_signal_mapping)};")
 
-  outs_conversions = []
-  for signal_name, (msb, lsb) in extra_signal_bit_map.items():
-    outs_conversions.append(
-      f"  outs_{signal_name} <= outs_inner({msb} downto {lsb});"
-    )
+  outs_conversions = generate_outs_concat_statement_dataless("outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
     "  [EXTRA_SIGNAL_LOGIC]",
-    "\n".join(ins_conversions + outs_conversions)
+    lacking_extra_signal_assignments + "\n" + \
+    "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 
   return dependencies + entity + architecture
