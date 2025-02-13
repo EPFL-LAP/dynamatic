@@ -337,6 +337,11 @@ def main():
         workers = int(args.workers)
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
+        # Note: _max_workers is a private variable, as indicated by the underscore.
+        # However, we access it to get the number of workers used, since the default
+        # number (which is used when the ctor is called with max_workers=None) is
+        # os.cpu_count() or os.process_cpu_count(), depending on the Python version.
+        # This is "cheating", but is independent of the Python version.
         color_print(
             f"[INFO] Running with {executor._max_workers} worker(s).",
             TermColors.OKBLUE
