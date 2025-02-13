@@ -136,7 +136,7 @@ def read_file(file_path):
         return file.read()
 
 
-def run_command_with_timeout(command, timeout=500, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def run_command_with_timeout(command, timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     """
     Runs a command with a time limit for execution.
 
@@ -234,19 +234,12 @@ def run_test(c_file, idx, timeout):
     with open(Path(out_dir) / "dynamatic_out.txt", "w") as stdout, \
             open(Path(out_dir) / "dynamatic_err.txt", "w") as stderr:
         # Run test and output result
-        if timeout:
-            exit_code = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=dyn_file),
-                timeout=int(timeout),
-                stdout=stdout,
-                stderr=stderr
-            )
-        else:
-            exit_code = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=dyn_file),
-                stdout=stdout,
-                stderr=stderr
-            )
+        exit_code = run_command_with_timeout(
+            DYNAMATIC_COMMAND.format(script_path=dyn_file),
+            timeout=timeout,
+            stdout=stdout,
+            stderr=stderr
+        )
 
         name = Path(c_file).name[:-2]
         if exit_code == 0:
@@ -287,6 +280,9 @@ def main():
     """
     cli = CLIHandler()
     args = cli.parse_args()  # Parse the CLI arguments
+
+    # If timeout is not given, use default of 500 seconds
+    timeout = int(args.timeout or 500)
 
     c_files = find_files_ext(INTEGRATION_FOLDER, ".c")
     test_names = []
@@ -331,11 +327,10 @@ def main():
             test_cnt += 1
 
             # Run the test
-            # result = run_test(c_file, idx, args.timeout)
             processes.append(
                 executor.submit(
                     run_test,
-                    c_file, idx, args.timeout
+                    c_file, idx, timeout
                 )
             )
 
