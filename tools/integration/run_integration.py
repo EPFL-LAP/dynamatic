@@ -36,6 +36,10 @@ class CLIHandler:
             "-t", "--timeout",
             help="Custom timeout value for a single test. If not given, 500 seconds is used."
         )
+        self.parser.add_argument(
+            "-w", "--workers",
+            help="Number of workers to run in parallel for testing. Default is os.cpu_count()."
+        )
 
     def parse_args(self, args=None):
         """
@@ -328,7 +332,16 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    with ProcessPoolExecutor() as executor:
+    workers = None
+    if args.workers:
+        workers = int(args.workers)
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        color_print(
+            f"[INFO] Running with {executor._max_workers} worker(s).",
+            TermColors.OKBLUE
+        )
+
         processes = []
         for idx, c_file in enumerate(c_files):
             # Check if test is supposed to be ignored
