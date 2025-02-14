@@ -3,6 +3,7 @@ import argparse
 import generators.handshake.addi as addi
 import generators.handshake.addf as addf
 import generators.handshake.buffer as buffer
+import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
 import generators.handshake.fork as fork
 import generators.handshake.mux as mux
@@ -16,6 +17,8 @@ def generate_code(name, mod_type, parameters):
       return addf.generate_addf(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
+    case "cmpi":
+      return cmpi.generate_cmpi(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "fork":
