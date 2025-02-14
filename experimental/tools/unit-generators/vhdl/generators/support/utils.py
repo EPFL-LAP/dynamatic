@@ -68,6 +68,8 @@ class VhdlScalarType:
     return self.bitwidth > 0
 
 def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dict[str, int]) -> str:
+  if not extra_signals:
+    return ""
   return "    -- extra signal ports\n" + "\n".join([
     "\n".join([
       f"    {port}_{name} : {inout} std_logic_vector({bitwidth - 1} downto 0);"
