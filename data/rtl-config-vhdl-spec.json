@@ -271,6 +271,6 @@
   },
   {
     "name": "mem_to_bram",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_to_bram -p data_width=DATA_WIDTH addr_width=ADDR_WIDTH >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_to_bram -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   }
 ]

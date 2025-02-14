@@ -22,6 +22,7 @@ import generators.handshake.speculating_branch as speculating_branch
 import generators.handshake.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
+import generators.support.mem_to_bram as mem_to_bram
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -69,6 +70,8 @@ def generate_code(name, mod_type, parameters):
       return store.generate_store(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
+    case "mem_to_bram":
+      return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:
       return f"Module type {mod_type} not found"
       # raise ValueError(f"Module type {mod_type} not found")
