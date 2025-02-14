@@ -273,8 +273,8 @@ struct RTLTimingType : public RTLType::Model<RTLTimingType, TimingConstraints> {
   static constexpr llvm::StringLiteral ID = "timing", LATENCY = "-lat";
 
   /// Serializes timing information into a string.
-  /// The output format is a Python-style dictionary with single quotes.
-  /// E.g., '{"data_latency": None, "valid_latency": None, "ready_latency": 1}'
+  /// The output format is the TimingAttr assembly format with single quotes.
+  /// E.g., '#handshake<timing {R: 1}>'
   static std::string serialize(mlir::Attribute attr);
 };
 
