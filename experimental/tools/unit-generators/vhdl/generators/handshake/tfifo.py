@@ -1,6 +1,7 @@
 import ast
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+from generators.support.utils import VhdlScalarType
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_tfifo(name, params):
@@ -139,141 +140,10 @@ end architecture;
   return dependencies + entity + architecture
 
 def _generate_tfifo_signal_manager(name, size, data_type):
-  bitwidth = data_type.bitwidth
-
-  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
-  for signal_name, signal_bitwidth in data_type.extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_bitwidth)
-  full_bitwidth = extra_signal_mapping.total_bitwidth
-
-  dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of tfifo signal manager
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
-    -- input channel
-    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
-    ins_valid : in  std_logic;
-    ins_ready : out std_logic;
-    -- output channel
-    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
-    outs_valid : out std_logic;
-    outs_ready : in  std_logic
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-    ("ins", "in"), ("outs", "out")
-  ], data_type.extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of tfifo signal manager
-architecture arch of {name} is
-  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-begin
-  [EXTRA_SIGNAL_LOGIC]
-
-  inner : entity work.{name}_inner(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ins_inner,
-      ins_valid => ins_valid,
-      ins_ready => ins_ready,
-      outs => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
-end architecture;
-"""
-
-  ins_conversion = generate_ins_concat_statements("ins", "ins_inner", extra_signal_mapping, bitwidth)
-  outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
-
-  architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + outs_conversion
-  )
-
-  return dependencies + entity + architecture
+  return generate_buffer_like_signal_manager_full(name, size, data_type, _generate_tfifo)
 
 def _generate_tfifo_signal_manager_dataless(name, size, data_type):
-  extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_bitwidth in data_type.extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_bitwidth)
-
-  full_bitwidth = extra_signal_mapping.total_bitwidth
-
-  dependencies = _generate_tfifo(f"{name}_inner", size, full_bitwidth)
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of tfifo signal manager dataless
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
-    -- input channel
-    ins_valid : in  std_logic;
-    ins_ready : out std_logic;
-    -- output channel
-    outs_valid : out std_logic;
-    outs_ready : in  std_logic
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-    ("ins", "in"), ("outs", "out")
-  ], data_type.extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of tfifo signal manager dataless
-architecture arch of {name} is
-  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-begin
-  [EXTRA_SIGNAL_LOGIC]
-
-  inner : entity work.{name}_inner(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ins_inner,
-      ins_valid => ins_valid,
-      ins_ready => ins_ready,
-      outs => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
-end architecture;
-"""
-
-  ins_conversion = generate_ins_concat_statements_dataless("ins", "ins_inner", extra_signal_mapping)
-  outs_conversion = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
-
-  architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + outs_conversion
-  )
-
-  return dependencies + entity + architecture
+  return generate_buffer_like_signal_manager_dataless_full(name, size, data_type, _generate_tfifo)
 
 if __name__ == "__main__":
   print(generate_tfifo("tfifo", {

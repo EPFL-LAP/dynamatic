@@ -1,6 +1,7 @@
 import ast
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import VhdlScalarType
+from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.support.join import generate_join
 
 def generate_cmpi(name, params):
@@ -94,3 +95,10 @@ begin
   result(0) <= '1' when ({modifier}(lhs) {comparator} {modifier}(rhs)) else '0';
 end architecture;
 """
+
+  return dependencies + entity + architecture
+
+def _generate_cmpi_signal_manager(name, predicate, data_type):
+  def _generate_inner(name, in_bitwidth, _):
+    return _generate_cmpi(name, predicate, in_bitwidth)
+  return generate_binary_no_latency_signal_manager_full(name, data_type, VhdlScalarType("!handshake.channel<i1>"), _generate_inner)
