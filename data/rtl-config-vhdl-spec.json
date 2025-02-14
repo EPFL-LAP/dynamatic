@@ -155,7 +155,10 @@
   },
   {
     "name": "handshake.control_merge",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t control_merge -p size=SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t control_merge -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.merge",
