@@ -12,6 +12,7 @@ import generators.handshake.fork as fork
 import generators.handshake.load as load
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
+import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.spec_commit as spec_commit
 
@@ -41,6 +42,8 @@ def generate_code(name, mod_type, parameters):
       return mem_controller.generate_mem_controller(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
+    case "muli":
+      return muli.generate_muli(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
     case "spec_commit":
