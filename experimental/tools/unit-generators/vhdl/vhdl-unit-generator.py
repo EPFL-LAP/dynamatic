@@ -15,6 +15,7 @@ import generators.handshake.merge as merge
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.sink as sink
+import generators.handshake.source as source
 import generators.handshake.spec_commit as spec_commit
 
 def generate_code(name, mod_type, parameters):
@@ -49,6 +50,8 @@ def generate_code(name, mod_type, parameters):
       return mux.generate_mux(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
+    case "source":
+      return source.generate_source(name, parameters)
     case "spec_commit":
       return spec_commit.generate_spec_commit(name, parameters)
     case _:

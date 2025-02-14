@@ -180,7 +180,7 @@
   },
   {
     "name": "handshake.source",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t source >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t source -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.constant",
