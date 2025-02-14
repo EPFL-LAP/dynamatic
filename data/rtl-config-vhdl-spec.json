@@ -245,7 +245,10 @@
   },
   {
     "name": "handshake.speculator",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculator -p data_type=\"DATA_TYPE\" fifo_depth=FIFO_DEPTH >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "parameters": [
+      { "name": "FIFO_DEPTH", "type": "unsigned" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculator -p fifo_depth=$FIFO_DEPTH port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.spec_commit",
