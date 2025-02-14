@@ -21,6 +21,7 @@ import generators.handshake.spec_save_commit as spec_save_commit
 import generators.handshake.speculating_branch as speculating_branch
 import generators.handshake.speculator as speculator
 import generators.handshake.store as store
+import generators.handshake.trunci as trunci
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -66,6 +67,8 @@ def generate_code(name, mod_type, parameters):
       return speculator.generate_speculator(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "trunci":
+      return trunci.generate_trunci(name, parameters)
     case _:
       return f"Module type {mod_type} not found"
       # raise ValueError(f"Module type {mod_type} not found")
