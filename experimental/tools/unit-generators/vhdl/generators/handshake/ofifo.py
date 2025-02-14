@@ -14,9 +14,9 @@ def generate_ofifo(name, params):
     else:
       return _generate_ofifo_signal_manager_dataless(name, params["size"], data_type)
   elif data_type.is_channel():
-    return _generate_ofifo(name, params["size"], data_type.bitwidth)
+    return _generate_ofifo(name, params["num_slots"], data_type.bitwidth)
   else:
-    return _generate_ofifo_dataless(name, params["size"])
+    return _generate_ofifo_dataless(name, params["num_slots"])
 
 def _generate_ofifo(name, size, bitwidth):
   tehb_name = f"{name}_tehb"

@@ -25,7 +25,7 @@ def _generate_spec_commit(name, bitwidth):
 
   dependencies = \
     generate_tfifo(fifo_disc_name, {
-      "size": 1,
+      "num_slots": 1,
       "port_types": str({
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
@@ -40,7 +40,7 @@ def _generate_spec_commit(name, bitwidth):
       })
     }) + \
     generate_tfifo(buff_name, {
-      "size": 1,
+      "num_slots": 1,
       "port_types": str({
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>"

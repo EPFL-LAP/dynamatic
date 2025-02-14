@@ -6,11 +6,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 """
 
-def generate_join(name, params):
-  size = params["size"]
-  return _generate_join(name, size)
-
-def _generate_join(name, size):
+def generate_join(name, size):
   and_n_module_name = f"{name}_and_n"
   dependencies = generate_and_n(and_n_module_name, size)
 
