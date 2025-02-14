@@ -36,7 +36,7 @@
   },
   {
     "name": "handshake.extsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t extsi -p input_type=\"INPUT_TYPE\" output_type=\"OUTPUT_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t extsi -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.extui",

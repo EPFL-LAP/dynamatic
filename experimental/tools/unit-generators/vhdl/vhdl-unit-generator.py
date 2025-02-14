@@ -7,6 +7,7 @@ import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
+import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
 import generators.handshake.mux as mux
 import generators.handshake.spec_commit as spec_commit
@@ -27,6 +28,8 @@ def generate_code(name, mod_type, parameters):
       return constant.generate_constant(name, parameters)
     case "control_merge":
       return control_merge.generate_control_merge(name, parameters)
+    case "extsi":
+      return extsi.generate_extsi(name, parameters)
     case "fork":
       return fork.generate_fork(name, parameters)
     case "mux":
