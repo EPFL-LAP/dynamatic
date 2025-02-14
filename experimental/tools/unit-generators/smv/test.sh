@@ -1,21 +1,24 @@
 #!/bin/bash
 
 GENPATH=${GENPATH:-"./"}
-NUXMVPAT=${NUXMVPAT:-"../../../../../nuXmv-2.0.0-Linux/bin/"}
 NUXMV=${NUXMV:-1}
 
-if [[ $NUXMV -eq 0 ]]; then
-  OUT="/dev/null"
-else
-  OUT="./module.smv"
-fi
+test_generator () {
+  GENERATOR_CALL="python3 ${GENPATH}smv-unit-generator.py -n test_module"
+  PARAMS=$1
 
-check_smv_syntax () {
+  if [[ $NUXMV -eq 0 ]]; then
+    OUT="/dev/null"
+  else
+    OUT="module.smv"
+  fi
+
+  $GENERATOR_CALL $@ > $OUT
+
   if [[ $NUXMV -eq 1 ]]; then
-    MODEL=$1
-    ${NUXMVPAT}nuXmv -pre cpp -source <(echo "set on_failure_script_quits; read_model -i $MODEL; quit") > /dev/null
+    nuXmv -pre cpp -source <(echo "set on_failure_script_quits; read_model -i $OUT; quit") > /dev/null
     if [ $? != 0 ]; then
-      echo "Syntax checking failed for smv file $MODEL! Exiting.."
+      echo "Syntax checking failed for smv file $OUT! Exiting.."
       exit 1
     else
       echo "Passed!"
@@ -23,95 +26,64 @@ check_smv_syntax () {
   fi
 }
 
-
 echo "Testing br..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t br -p data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t br -p data_type='"!handshake.channel<i16>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t br -p data_type='"!handshake.control<>"'
+test_generator -t br -p data_type='"!handshake.channel<i16>"'
 
 echo -e "\nTesting buffer..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type='"!handshake.control<>"' timing='"#handshake.timing< {R: 1}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing< {R: 1}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type='"!handshake.control<>"' timing='"#handshake.timing< {R: 1}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing< {R: 1}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type='"!handshake.control<>"' timing='"#handshake.timing< {R: 0}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=1 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing< {R: 0}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type='"!handshake.control<>"' timing='"#handshake.timing< {R: 0}>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t buffer -p slots=5 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing< {R: 0}>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t buffer -p slots=1 data_type='"!handshake.control<>"' timing='"#handshake.timing<{R:1}>"'
+test_generator -t buffer -p slots=1 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing<{R:1}>"'
+test_generator -t buffer -p slots=5 data_type='"!handshake.control<>"' timing='"#handshake.timing<{R:1}>"'
+test_generator -t buffer -p slots=5 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing<{R:1}>"'
+test_generator -t buffer -p slots=1 data_type='"!handshake.control<>"' timing='"#handshake.timing<{R:0}>"'
+test_generator -t buffer -p slots=1 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing<{R:0}>"'
+test_generator -t buffer -p slots=5 data_type='"!handshake.control<>"' timing='"#handshake.timing<{R:0}>"'
+test_generator -t buffer -p slots=5 data_type='"!handshake.channel<i16>"' timing='"#handshake.timing<{R:0}>"'
 
 echo -e "\nTesting cond_br..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t cond_br -p data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t cond_br -p data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t cond_br -p data_type='"!handshake.control<>"'
+test_generator -t cond_br -p data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting constant..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t constant -p value=42 data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t constant -p value=42 data_type='"!handshake.control<>"'
 
 echo -e "\nTesting control_merge..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t control_merge -p size=2 index_type='"!handshake.channel<i16>"' data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t control_merge -p size=2 index_type='"!handshake.channel<i16>"' data_type='"!handshake.channel<i16>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t control_merge -p size=2 index_type='"!handshake.channel<i16>"' data_type='"!handshake.control<>"'
+test_generator -t control_merge -p size=2 index_type='"!handshake.channel<i16>"' data_type='"!handshake.channel<i16>"'
 
 echo -e "\nTesting fork..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t fork -p size=4 data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t fork -p size=2 data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t fork -p size=4 data_type='"!handshake.control<>"'
+test_generator -t fork -p size=2 data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting join..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t join -p size=3 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t join -p size=3
 
 echo -e "\nTesting lazy_fork..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t lazy_fork -p size=4 data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t lazy_fork -p size=2 data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t lazy_fork -p size=4 data_type='"!handshake.control<>"'
+test_generator -t lazy_fork -p size=2 data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting load..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t load -p data_type='"!handshake.channel<i16>"' addr_type='"!handshake.channel<i16>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t load -p data_type='"!handshake.channel<i16>"' addr_type='"!handshake.channel<i16>"'
 
 echo -e "\nTesting merge..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t merge -p size=4 data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t merge -p size=2 data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t merge -p size=4 data_type='"!handshake.control<>"'
+test_generator -t merge -p size=2 data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting mux..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t mux -p size=2 select_type='"!handshake.channel<i16>"' data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t mux -p size=2 select_type='"!handshake.channel<i16>"' data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t mux -p size=2 select_type='"!handshake.channel<i16>"' data_type='"!handshake.control<>"'
+test_generator -t mux -p size=2 select_type='"!handshake.channel<i16>"' data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting select..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t select -p data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t select -p data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting sink..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t sink -p data_type='"!handshake.control<>"' > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t sink -p data_type='"!handshake.channel<i16>"' > $OUT	
-check_smv_syntax ./module.smv
+test_generator -t sink -p data_type='"!handshake.control<>"'
+test_generator -t sink -p data_type='"!handshake.channel<i16>"'	
 
 echo -e "\nTesting source..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t source > $OUT
-check_smv_syntax ./module.smv
+test_generator -t source
 
 echo -e "\nTesting store..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t store -p data_type='"!handshake.channel<i16>"' addr_type='"!handshake.channel<i16>"' > $OUT
-check_smv_syntax ./module.smv
+test_generator -t store -p data_type='"!handshake.channel<i16>"' addr_type='"!handshake.channel<i16>"'
 
-rm ./module.smv
+rm $OUT
