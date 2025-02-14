@@ -9,6 +9,7 @@ import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
+import generators.handshake.load as load
 import generators.handshake.mux as mux
 import generators.handshake.spec_commit as spec_commit
 
@@ -32,6 +33,8 @@ def generate_code(name, mod_type, parameters):
       return extsi.generate_extsi(name, parameters)
     case "fork":
       return fork.generate_fork(name, parameters)
+    case "load":
+      return load.generate_load(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
     case "spec_commit":
