@@ -178,7 +178,10 @@
   },
   {
     "name": "handshake.constant",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t constant -p value=VALUE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "parameters": [
+      { "name": "VALUE", "type": "string" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t constant -p value=$VALUE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "handshake.load",
