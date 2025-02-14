@@ -43,7 +43,7 @@ def _generate_addf_single_precision(name):
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2}) + \
+  dependencies = generate_join(join_name, 2) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1})
 
@@ -153,7 +153,7 @@ def _generate_addf_double_precision(name):
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2}) + \
+  dependencies = generate_join(join_name, 2) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -265,8 +265,12 @@ def _generate_addf_signal_manager(name, data_type, is_double):
 
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
-      "slots": _get_latency(is_double), # todo: correct?
-      "data_type": "!handshake.channel<i1>" })
+      "num_slots": _get_latency(is_double), # todo: correct?
+      "port_types": str({
+        "ins": "!handshake.channel<i1>",
+        "outs": "!handshake.channel<i1>"
+      })
+    })
 
   # Now that the logic depends on the name, this dict is defined inside this function.
   extra_signal_logic = {

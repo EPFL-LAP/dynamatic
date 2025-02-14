@@ -194,8 +194,6 @@ end architecture;
 def _generate_oehb_signal_manager_dataless(name, data_type):
   inner_name = f"{name}_inner"
 
-  full_bitwidth = data_type.total_bitwidth
-
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in data_type.extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)

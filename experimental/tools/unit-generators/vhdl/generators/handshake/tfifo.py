@@ -9,13 +9,13 @@ def generate_tfifo(name, params):
 
   if data_type.has_extra_signals():
     if data_type.is_channel():
-      return _generate_tfifo_signal_manager(name, params["size"], data_type)
+      return _generate_tfifo_signal_manager(name, params["num_slots"], data_type)
     else:
-      return _generate_tfifo_signal_manager_dataless(name, params["size"], data_type)
+      return _generate_tfifo_signal_manager_dataless(name, params["num_slots"], data_type)
   elif data_type.is_channel():
-    return _generate_tfifo(name, params["size"], data_type.bitwidth)
+    return _generate_tfifo(name, params["num_slots"], data_type.bitwidth)
   else:
-    return _generate_tfifo_dataless(name, params["size"])
+    return _generate_tfifo_dataless(name, params["num_slots"])
 
 def _generate_tfifo(name, size, bitwidth):
   fifo_inner_name = f"{name}_fifo"
@@ -277,10 +277,10 @@ end architecture;
 
 if __name__ == "__main__":
   print(generate_tfifo("tfifo", {
-    "size": 16,
+    "num_slots": 16,
     "data_type": "!handshake.channel<i32, [spec: i1, tag: i8]>"
   }))
   print(generate_tfifo("tfifo", {
-    "size": 16,
+    "num_slots": 16,
     "data_type": "!handshake.control<[spec: i1, tag: i8]>"
   }))

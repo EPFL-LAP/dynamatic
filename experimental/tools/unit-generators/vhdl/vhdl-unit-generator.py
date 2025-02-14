@@ -1,5 +1,8 @@
 import argparse
 
+import generators.handshake.addi as addi
+import generators.handshake.addf as addf
+import generators.handshake.buffer as buffer
 import generators.handshake.cond_br as cond_br
 import generators.handshake.fork as fork
 import generators.handshake.mux as mux
@@ -7,8 +10,12 @@ import generators.handshake.spec_commit as spec_commit
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
+    case "addi":
+      return addi.generate_addi(name, parameters)
+    case "addf":
+      return addf.generate_addf(name, parameters)
     case "buffer":
-      return ""
+      return buffer.generate_buffer(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "fork":
