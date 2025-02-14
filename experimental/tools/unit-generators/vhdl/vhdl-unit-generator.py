@@ -18,6 +18,7 @@ import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.spec_commit as spec_commit
 import generators.handshake.spec_save_commit as spec_save_commit
+import generators.handshake.speculating_branch as speculating_branch
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -57,6 +58,8 @@ def generate_code(name, mod_type, parameters):
       return spec_commit.generate_spec_commit(name, parameters)
     case "spec_save_commit":
       return spec_save_commit.generate_spec_save_commit(name, parameters)
+    case "speculating_branch":
+      return speculating_branch.generate_speculating_branch(name, parameters)
     case _:
       return f"Module type {mod_type} not found"
       # raise ValueError(f"Module type {mod_type} not found")

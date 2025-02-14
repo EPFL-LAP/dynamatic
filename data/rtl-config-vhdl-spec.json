@@ -264,7 +264,7 @@
   },
   {
     "name": "handshake.speculating_branch",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculating_branch -p data_type=\"DATA_TYPE\" spec_tag_data_type=\"SPEC_TAG_DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculating_branch -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
   },
   {
     "name": "mem_to_bram",
