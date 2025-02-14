@@ -27,14 +27,14 @@ entity {name} is
     -- inputs
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
-    ins_spec_tag : in std_logic;
+    ins_spec : in std_logic;
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
     -- outputs
     outs : out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
-    outs_spec_tag : out std_logic;
+    outs_spec : out std_logic;
     ins_ready : out std_logic;
     ctrl_ready : out std_logic
   );
@@ -72,7 +72,7 @@ architecture arch of spec_save_commit is
     signal bypass : std_logic;
 
 begin
-    specdataInArray <= ins_spec_tag & ins;
+    specdataInArray <= ins_spec & ins;
 
     ins_ready <= not Full;
     outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
@@ -134,14 +134,14 @@ output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
         if PassEn = '1' then
             if bypass = '1' then
                 outs <=  specdataInArray({bitwidth} - 1 downto 0);
-                outs_spec_tag <= specdataInArray({bitwidth}+1 - 1);
+                outs_spec <= specdataInArray({bitwidth}+1 - 1);
             else
                 outs <=  Memory(Curr)({bitwidth} - 1 downto 0);
-                outs_spec_tag <= Memory(Curr)({bitwidth}+1 - 1);
+                outs_spec <= Memory(Curr)({bitwidth}+1 - 1);
             end if;
         else
             outs <=  Memory(Head)({bitwidth} - 1 downto 0);
-            outs_spec_tag <= '0';
+            outs_spec <= '0';
         end if;
     end process;
 
@@ -360,14 +360,14 @@ entity {name} is
     -- inputs
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
-    ins_spec_tag : in std_logic;
+    ins_spec : in std_logic;
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
     -- outputs
     outs : out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
-    outs_spec_tag : out std_logic;
+    outs_spec : out std_logic;
     ins_ready : out std_logic;
     ctrl_ready : out std_logic
   );
@@ -398,13 +398,13 @@ begin
       rst => rst,
       ins => ins,
       ins_valid => ins_valid,
-      ins_spec_tag => ins_spec_tag,
+      ins_spec => ins_spec,
       ctrl => ctrl_inner,
       ctrl_valid => ctrl_valid_inner,
       outs_ready => outs_ready,
       outs => outs,
       outs_valid => outs_valid,
-      outs_spec_tag => outs_spec_tag,
+      outs_spec => outs_spec,
       ins_ready => ins_ready,
       ctrl_ready => ctrl_ready_inner
     );
@@ -430,13 +430,13 @@ entity {name} is
     clk, rst : in std_logic;
     -- inputs
     ins_valid : in std_logic;
-    ins_spec_tag : in std_logic;
+    ins_spec : in std_logic;
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
     -- outputs
     outs_valid : out std_logic;
-    outs_spec_tag : out std_logic;
+    outs_spec : out std_logic;
     ins_ready : out std_logic;
     ctrl_ready : out std_logic
   );
@@ -456,14 +456,14 @@ begin
       rst => rst,
       ins => ins_inner,
       ins_valid => ins_valid,
-      ins_spec_tag => ins_spec_tag,
+      ins_spec => ins_spec,
       ctrl => ctrl,
       ctrl_valid => ctrl_valid,
-      ctrl_spec_tag => ctrl_spec_tag,
+      ctrl_spec => ctrl_spec,
       outs => outs_inner,
       outs_ready => outs_ready,
       outs_valid => outs_valid,
-      outs_spec_tag => outs_spec_tag,
+      outs_spec => outs_spec,
       ins_ready => ins_ready,
       ctrl_ready => ctrl_ready
     );
