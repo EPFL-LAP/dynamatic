@@ -16,6 +16,7 @@
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -292,31 +293,13 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
 }
 
 std::string RTLTimingType::serialize(Attribute attr) {
-  auto timingAttr = dyn_cast_if_present<handshake::TimingAttr>(attr);
-  if (!timingAttr)
-    return "";
-
-  handshake::TimingInfo info = timingAttr.getInfo();
-  std::stringstream ss;
+  std::string serializedDataStorage;
+  llvm::raw_string_ostream serializedData(serializedDataStorage);
 
   // Wrap in single quotes for easier passing as a generator argument.
-  ss << "'{"; // Start of the Python dictionary format
-  ss << "\"data_latency\": ";
-  if (auto latency = info.getLatency(SignalType::DATA))
-    ss << *latency;
-  else
-    ss << "None";
-  ss << ", \"valid_latency\": ";
-  if (auto latency = info.getLatency(SignalType::VALID))
-    ss << *latency;
-  else
-    ss << "None";
-  ss << ", \"ready_latency\": ";
-  if (auto latency = info.getLatency(SignalType::READY))
-    ss << *latency;
-  else
-    ss << "None";
-  ss << "}'"; // End of the Python dictionary format
+  serializedData << "'";
+  attr.print(serializedData);
+  serializedData << "'";
 
-  return ss.str();
+  return serializedData.str();
 }
