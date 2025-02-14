@@ -34,10 +34,15 @@ class CLIHandler:
         )
         self.parser.add_argument(
             "-t", "--timeout",
-            help="Custom timeout value for a single test. If not given, 500 seconds is used."
+            nargs="?",
+            type=int,
+            default=500,
+            help="Custom timeout value for a single test. Default is 500 seconds."
         )
         self.parser.add_argument(
             "-w", "--workers",
+            nargs="?",
+            type=int,
             help="Number of workers to run in parallel for testing. Default is os.cpu_count()."
         )
 
@@ -300,9 +305,6 @@ def main():
     cli = CLIHandler()
     args = cli.parse_args()  # Parse the CLI arguments
 
-    # If timeout is not given, use default of 500 seconds
-    timeout = int(args.timeout or 500)
-
     c_files = find_files_ext(INTEGRATION_FOLDER, ".c")
     test_names = []
     if args.list:
@@ -332,15 +334,11 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    workers = None
-    if args.workers:
-        workers = int(args.workers)
-
     # ProcessPoolExecutor creates subprocesses and not threads, and as such,
     # is not limited by Python's Global Interpreter Lock.
     # Hence, it allows the full performance gain from parallelism to be achieved,
     # unlike ThreadPoolExecutor, which would not make execution any faster whatsoever.
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ProcessPoolExecutor(max_workers=args.workers) as executor:
         # Note: _max_workers is a private variable, as indicated by the underscore.
         # However, we access it to get the number of workers used, since the default
         # number (which is used when the ctor is called with max_workers=None) is
@@ -367,7 +365,7 @@ def main():
             processes.append(
                 executor.submit(
                     run_test,
-                    c_file, idx, timeout
+                    c_file, idx, args.timeout
                 )
             )
 
