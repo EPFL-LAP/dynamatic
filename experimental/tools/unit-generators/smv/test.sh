@@ -133,6 +133,9 @@ test_generator -t mulf -p data_type='"!handshake.channel<f32>"' latency=4
 echo -e "\nTesting muli..."
 test_generator -t muli -p data_type='"!handshake.channel<i32>"' latency=4
 
+echo -e "\nTesting negf..."
+test_generator -t negf -p data_type='"!handshake.channel<f32>"' latency=0
+
 echo -e "\nTesting ori..."
 test_generator -t ori -p data_type='"!handshake.channel<i32>"' latency=0
 
