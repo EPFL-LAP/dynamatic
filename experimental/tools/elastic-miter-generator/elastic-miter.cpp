@@ -46,9 +46,9 @@ static cl::opt<std::string>
                    cl::desc("Specify the right-hand side (RHS) input file"),
                    cl::cat(mainCategory));
 
-static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
-                                      cl::desc("Specify output directory"),
-                                      cl::cat(mainCategory));
+static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
+                                         cl::desc("Specify output directory"),
+                                         cl::cat(mainCategory));
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -60,34 +60,42 @@ int main(int argc, char **argv) {
       "module each.\nEach module needs to contain exactely one "
       "handshake.func. "
       "\nThe resulting miter MLIR file and JSON config file are placed in "
-      "the "
-      "specified output directory.");
+      "the specified output directory.");
 
   // Register the supported dynamatic dialects and create a context
   DialectRegistry registry;
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
 
+  std::filesystem::path lhsPath = lhsFilenameArg.getValue();
+  std::filesystem::path rhsPath = rhsFilenameArg.getValue();
+  std::filesystem::path outputDir = outputDirArg.getValue();
+
+  // Create the outputDir if it doesn't exist
+  std::filesystem::create_directories(outputDir);
+
   // Find out needed number of tokens
-  auto failOrLHSseqLen =
-      dynamatic::experimental::getSequenceLength(context, lhsFilenameArg);
+  auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
+      context, lhsPath, outputDir / "lhs_reachability");
   if (failed(failOrLHSseqLen))
     return 1;
 
+  // TODO remove
   llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n ";
 
-  auto failOrRHSseqLen =
-      dynamatic::experimental::getSequenceLength(context, rhsFilenameArg);
+  auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
+      context, rhsPath, outputDir / "rhs_reachability");
   if (failed(failOrRHSseqLen))
     return 1;
 
+  // TODO remove
   llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n ";
 
   size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
   // Create Miter module with needed N
   auto failOrMlirPath = dynamatic::experimental::createMiterFabric(
-      context, lhsFilenameArg, rhsFilenameArg, outputDir, n);
+      context, lhsPath, rhsPath, outputDir.string(), n);
   if (failed(failOrMlirPath)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return 1;
@@ -102,18 +110,26 @@ int main(int argc, char **argv) {
   auto smvPath = failOrSmvPath.value();
 
   // TODO ...
-  std::filesystem::path wrapperPath = outputDir + "/main.smv";
+  std::filesystem::path wrapperPath = outputDir / "main.smv";
 
-  auto fail = dynamatic::experimental::createMiterWrapper(wrapperPath, n);
+  // TODO json
+  auto fail = dynamatic::experimental::createMiterWrapper(
+      wrapperPath,
+      "experimental/tools/elastic-miter-generator/out/comp/"
+      "elastic-miter-config.json",
+      smvPath.filename(), n);
   if (failed(fail))
     return 1;
 
-  // TODO use this when creating prove.cmd
-  std::string output = outputDir + "/result.txt";
+  std::filesystem::path output = outputDir / "result.txt";
+  std::string command = "check_ctlspec -o " + output.string();
+  LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
+      outputDir / "prove.cmd", outputDir / "main.smv", command);
+  if (failed(cmdFail))
+    return 1;
+
   // Run equivalence checking
-  dynamatic::experimental::runNuXmv(
-      "experimental/tools/elastic-miter-generator/out/comp/prove.cmd",
-      "/dev/null");
+  dynamatic::experimental::runNuXmv(outputDir / "prove.cmd", "/dev/null");
 
   bool equivalent = true;
   std::string line;

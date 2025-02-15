@@ -130,9 +130,10 @@ FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
 }
 
 LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
+                                 const std::filesystem::path &jsonPath,
+                                 const std::string &modelSmvName,
                                  size_t nrOfTokens) {
-  std::ifstream file("experimental/tools/elastic-miter-generator/out/comp/"
-                     "elastic-miter-config.json");
+  std::ifstream file(jsonPath);
   if (!file) {
     llvm::errs() << "Config JSON file not found\n";
     return failure();
@@ -155,7 +156,7 @@ LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
   }
 
   std::string output;
-  output += "#include \"model.smv\"\n\n";
+  output += "#include \"" + modelSmvName + "\"\n";
   output += "#ifndef BOOL_INPUT\n"
             "#define BOOL_INPUT\n"
             "MODULE bool_input(nReady0, max_tokens)\n"

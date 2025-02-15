@@ -55,16 +55,20 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp);
 // 3. Arguments  and results are all handshake.channel or handshake.control type
 FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module);
 
-LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
-                          ModuleOp mod, llvm::json::Object jsonObject);
+LogicalResult createFiles(const std::filesystem::path &outputDir,
+                          StringRef mlirFilename, ModuleOp mod,
+                          llvm::json::Object jsonObject);
 
-// This creates an elastic-miter module given the path to two MLIR files. The
-// files need to contain exactely one module each. Each module needs to contain
-// exactely one handshake.func.
-FailureOr<std::filesystem::path> createMiterFabric(MLIRContext &context,
-                                                   StringRef lhsFilename,
-                                                   StringRef rhsFilename,
-                                                   StringRef outputDir,
-                                                   size_t bufferSlots);
+FailureOr<std::pair<ModuleOp, llvm::json::Object>>
+createReachabilityCircuit(MLIRContext &context, StringRef filename);
+
+// TODO This creates an elastic-miter module given the path to two MLIR files.
+// The files need to contain exactely one module each. Each module needs to
+// contain exactely one handshake.func.
+FailureOr<std::filesystem::path>
+createMiterFabric(MLIRContext &context,
+                  const std::filesystem::path &lhsFilename,
+                  const std::filesystem::path &rhsFilename,
+                  const std::filesystem::path &outputDir, size_t bufferSlots);
 
 } // namespace dynamatic::experimental

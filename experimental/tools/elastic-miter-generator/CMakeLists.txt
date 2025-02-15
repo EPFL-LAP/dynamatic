@@ -8,7 +8,6 @@ add_llvm_tool(elastic-miter
   ElasticMiterFabricGeneration.cpp
   GetStates.cpp
   CreateWrappers.cpp
-  AddNDWire.cpp
 )
 
 llvm_update_compile_flags(elastic-miter)
