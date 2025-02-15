@@ -2,17 +2,17 @@ from generators.support.binary_op_handshake_manager import generate_binary_op_ha
 from generators.support.utils import SmvScalarType
 
 
-def generate_shrsi(name, params):
+def generate_shrui(name, params):
   latency = params["latency"]
   data_type = SmvScalarType(params["data_type"])
 
-  if data_type.signed:
-    return _generate_shrsi(name, latency, data_type)
+  if not data_type.signed:
+    return _generate_shrui(name, latency, data_type)
   else:
-    return _generate_shrsi_cast(name, latency, data_type)
+    return _generate_shrui_cast(name, latency, data_type)
 
 
-def _generate_shrsi(name, latency, data_type):
+def _generate_shrui(name, latency, data_type):
   return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
@@ -26,7 +26,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
 """
 
-def _generate_shrsi_cast(name, latency, data_type):
+def _generate_shrui_cast(name, latency, data_type):
   return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
@@ -35,7 +35,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
   DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
   DEFINE outs_valid := inner_handshake_manager.outs_valid;
-  DEFINE outs := signed(lhs) >> rhs;
+  DEFINE outs := unsigned(lhs) >> rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
 """
