@@ -195,11 +195,11 @@ def _generate_muli_signal_manager(name, data_type):
         clk => clk,
         rst => rst,
         ins => spec_tfifo_in,
-        ins_valid => transfer,
+        ins_valid => transfer_in,
         ins_ready => open,
         outs => spec_tfifo_out,
         outs_valid => open,
-        outs_ready => result_ready
+        outs_ready => transfer_out
       );
     result_spec <= spec_tfifo_out;
 """)
@@ -245,10 +245,11 @@ end entity;
   architecture = f"""
 -- Architecture of muli signal manager
 architecture arch of {name} is
-  signal transfer : std_logic;
+  signal transfer_in, transfer_out : std_logic;
   [EXTRA_SIGNAL_SIGNAL_DECLS]
 begin
-  transfer <= lhs_valid and lhs_ready;
+  transfer_in <= lhs_valid and lhs_ready;
+  transfer_out <= result_valid and result_ready;
 
   -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGIC]
