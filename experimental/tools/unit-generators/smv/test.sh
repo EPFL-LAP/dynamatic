@@ -142,5 +142,9 @@ test_generator -t ori -p data_type='"!handshake.channel<i32>"' latency=0
 echo -e "\nTesting shli..."
 test_generator -t shli -p data_type='"!handshake.channel<i32>"' latency=0
 
+echo -e "\nTesting shrsi..."
+test_generator -t shrsi -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t shrsi -p data_type='"!handshake.channel<ui32>"' latency=0
+
 
 rm $OUT
