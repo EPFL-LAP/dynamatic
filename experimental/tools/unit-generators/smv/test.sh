@@ -12,7 +12,7 @@ test_generator () {
   GENERATOR_CALL="python3 ${GENPATH}smv-unit-generator.py -n test_module -o $OUT"
   PARAMS=$1
 
-  $GENERATOR_CALL $@ > $OUT
+  $GENERATOR_CALL $@
 
   if [[ $NUXMV -eq 1 ]]; then
     nuXmv -pre cpp -source <(echo "set on_failure_script_quits; read_model -i $OUT; quit") > /dev/null
@@ -86,66 +86,46 @@ echo -e "\nTesting store..."
 test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
 echo -e "\nTesting addf..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t addf -p data_type='"!handshake.channel<f32>"' latency=9 > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t addf -p data_type='"!handshake.channel<f64>"' latency=12 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t addf -p data_type='"!handshake.channel<f32>"' latency=9
+test_generator -t addf -p data_type='"!handshake.channel<f64>"' latency=12
 
 echo -e "\nTesting addi..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t addi -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t addi -p data_type='"!handshake.channel<i32>"' latency=0
 
 echo -e "\nTesting andi..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t andi -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t andi -p data_type='"!handshake.channel<i32>"' latency=0
 
 echo -e "\nTesting cmpi..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"eq"'  > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"slt"'  > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"'  > $OUT
-echo "Skipping test"
-# check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"'  > $OUT
-echo "Skipping test"
-# check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"'  > $OUT
-check_smv_syntax ./module.smv
+test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"eq"' 
+test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"slt"' 
+test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"' 
+test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
+test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
 
 echo -e "\nTesting divf..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t divf -p data_type='"!handshake.channel<f32>"' latency=29 > $OUT
-check_smv_syntax ./module.smv
-python ${GENPATH}smv-unit-generator.py -n test_module -t divf -p data_type='"!handshake.channel<f64>"' latency=36 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t divf -p data_type='"!handshake.channel<f32>"' latency=29
+test_generator -t divf -p data_type='"!handshake.channel<f64>"' latency=36
 
 echo -e "\nTesting divsi..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t divsi -p data_type='"!handshake.channel<i32>"' latency=35 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t divsi -p data_type='"!handshake.channel<i32>"' latency=35
 
 echo -e "\nTesting divui..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t divui -p data_type='"!handshake.channel<i32>"' latency=35 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t divui -p data_type='"!handshake.channel<i32>"' latency=35
 
 echo -e "\nTesting maximumf..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t maximumf -p data_type='"!handshake.channel<f32>"' latency=0 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t maximumf -p data_type='"!handshake.channel<f32>"' latency=0
 
 echo -e "\nTesting minimumf..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t minimumf -p data_type='"!handshake.channel<f32>"' latency=0 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t minimumf -p data_type='"!handshake.channel<f32>"' latency=0
 
 echo -e "\nTesting mulf..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t mulf -p data_type='"!handshake.channel<f32>"' latency=4 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t mulf -p data_type='"!handshake.channel<f32>"' latency=4
 
 echo -e "\nTesting muli..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t muli -p data_type='"!handshake.channel<i32>"' latency=4 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t muli -p data_type='"!handshake.channel<i32>"' latency=4
 
 echo -e "\nTesting ori..."
-python ${GENPATH}smv-unit-generator.py -n test_module -t ori -p data_type='"!handshake.channel<i32>"' latency=0 > $OUT
-check_smv_syntax ./module.smv
+test_generator -t ori -p data_type='"!handshake.channel<i32>"' latency=0
 
 
 rm $OUT
