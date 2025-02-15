@@ -34,6 +34,7 @@ import generators.arith.muli as muli
 import generators.arith.mulf as mulf
 import generators.arith.negf as negf
 import generators.arith.ori as ori
+import generators.arith.shli as shli
 
 
 def generate_code(name, mod_type, parameters):
@@ -100,6 +101,8 @@ def generate_code(name, mod_type, parameters):
       return negf.generate_negf(name, parameters)
     case "ori":
       return ori.generate_ori(name, parameters)
+    case "shli":
+      return shli.generate_shli(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
