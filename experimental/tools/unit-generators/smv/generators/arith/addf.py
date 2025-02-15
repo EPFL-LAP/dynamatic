@@ -18,7 +18,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
   DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
   DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
   DEFINE outs_valid := inner_handshake_manager.outs_valid;
-  DEFINE outs := lhs + rhs;
+  DEFINE outs := lhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
 """
