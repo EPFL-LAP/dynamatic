@@ -18,7 +18,7 @@ def generate_cmpi(name, params):
 
 def _generate_cmpi(name, latency, symbol, data_type):
   return f"""
-MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
+MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
 
   // output
@@ -33,7 +33,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
 
 def _generate_cmpi_cast(name, latency, symbol, modifier, data_type):
   return f"""
-MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
+MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
 
   // output
