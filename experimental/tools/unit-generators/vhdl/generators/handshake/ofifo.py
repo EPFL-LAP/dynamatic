@@ -54,7 +54,7 @@ end entity;
 
   architecture = f"""
 -- Architecture of ofifo
-architecture arch of ofifo is
+architecture arch of {name} is
   signal tehb_valid, tehb_ready     : std_logic;
   signal fifo_valid, fifo_ready     : std_logic;
   signal tehb_dataOut, fifo_dataOut : std_logic_vector({bitwidth} - 1 downto 0);

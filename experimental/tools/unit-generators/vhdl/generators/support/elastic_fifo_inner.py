@@ -169,7 +169,7 @@ end entity;
 
   architecture = f"""
 -- Architecture of elastic_fifo_inner
-architecture arch of elastic_fifo_inner is
+architecture arch of {name} is
 
   signal ReadEn     : std_logic := '0';
   signal WriteEn    : std_logic := '0';

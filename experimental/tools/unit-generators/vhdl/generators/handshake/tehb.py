@@ -38,6 +38,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of tehb_dataless
 architecture arch of {name} is
   signal fullReg, outputValid : std_logic;
 begin

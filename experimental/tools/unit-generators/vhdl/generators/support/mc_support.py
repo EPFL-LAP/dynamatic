@@ -1,20 +1,15 @@
-from generators.support.array import generate_2d_array
-
 def generate_read_address_mux(name, arbiter_size, addr_bitwidth):
-  array_name = f"{name}_array"
-
-  dependencies = generate_2d_array(array_name, arbiter_size, addr_bitwidth)
-
   entity = f"""
+library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of read_address_mux
 entity {name} is
   port (
     sel      : in  std_logic_vector({arbiter_size} - 1 downto 0);
-    addr_in  : in  {array_name};
+    addr_in  : in  data_array({arbiter_size} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     addr_out : out std_logic_vector({addr_bitwidth} - 1 downto 0)
   );
 end entity;
@@ -38,7 +33,7 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return entity + architecture
 
 def generate_read_address_ready(name, arbiter_size):
   entity = f"""
@@ -69,15 +64,11 @@ end architecture;
   return entity + architecture
 
 def generate_read_data_signals(name, arbiter_size, data_bitwidth):
-  array_name = f"{name}_array"
-
-  dependencies = generate_2d_array(array_name, arbiter_size, data_bitwidth)
-
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of read_data_signals
 entity {name} is
@@ -86,7 +77,7 @@ entity {name} is
     clk       : in  std_logic;
     sel       : in  std_logic_vector({arbiter_size} - 1 downto 0);
     read_data : in  std_logic_vector({data_bitwidth} - 1 downto 0);
-    out_data  : out {array_name};
+    out_data  : out data_array({arbiter_size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     valid     : out std_logic_vector({arbiter_size} - 1 downto 0);
     nReady    : in  std_logic_vector({arbiter_size} - 1 downto 0)
   );
@@ -97,7 +88,7 @@ end entity;
 -- Architecture of read_data_signals
 architecture arch of {name} is
   signal sel_prev : std_logic_vector({arbiter_size} - 1 downto 0);
-  signal out_reg  : {array_name};
+  signal out_reg  : data_array({arbiter_size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
 begin
 
   process (clk) is
@@ -156,7 +147,7 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return entity + architecture
 
 def generate_read_priority(name, arbiter_size):
   entity = f"""
@@ -199,23 +190,18 @@ def generate_read_memory_arbiter(name, arbiter_size=2, addr_bitwidth=32, data_bi
   addressing_name = f"{name}_addressing"
   addressReady_name = f"{name}_addressReady"
   data_name = f"{name}_data"
-  array_data_name = f"{name}_array_data"
-  array_addr_name = f"{name}_array_addr"
 
   dependencies = \
     generate_read_priority(priority_name, arbiter_size) + \
     generate_read_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
     generate_read_address_ready(addressReady_name, arbiter_size) + \
-    generate_read_data_signals(data_name, arbiter_size, data_bitwidth) + \
-    generate_2d_array(array_data_name, arbiter_size, data_bitwidth) + \
-    generate_2d_array(array_addr_name, arbiter_size, addr_bitwidth)
+    generate_read_data_signals(data_name, arbiter_size, data_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_data_name}.all;
-use work.{array_addr_name}.all;
+use work.types.all;
 
 -- Entity of read_memory_arbiter
 entity {name} is
@@ -225,11 +211,11 @@ entity {name} is
     --- interface to previous
     pValid     : in  std_logic_vector({arbiter_size} - 1 downto 0); -- read requests
     ready      : out std_logic_vector({arbiter_size} - 1 downto 0); -- ready to process read
-    address_in : in  {array_addr_name};
+    address_in : in  data_array({arbiter_size} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     ---interface to next
     nReady   : in  std_logic_vector({arbiter_size} - 1 downto 0); -- next component can accept data
     valid    : out std_logic_vector({arbiter_size} - 1 downto 0); -- sending data to next component
-    data_out : out {array_data_name}; -- data to next components
+    data_out : out data_array({arbiter_size} - 1 downto 0)({data_bitwidth} - 1 downto 0); -- data to next components
 
     ---interface to memory
     read_enable      : out std_logic;
@@ -294,10 +280,6 @@ end architecture;
   return dependencies + entity + architecture
 
 def generate_write_address_mux(name, arbiter_size, addr_bitwidth):
-  array_name = f"{name}_array"
-
-  dependencies = generate_2d_array(array_name, arbiter_size, addr_bitwidth)
-
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -308,7 +290,7 @@ use work.types.all;
 entity {name} is
   port (
     sel      : in  std_logic_vector({arbiter_size} - 1 downto 0);
-    addr_in  : in  {array_name};
+    addr_in  : in  data_array({arbiter_size} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     addr_out : out std_logic_vector({addr_bitwidth} - 1 downto 0)
   );
 end entity;
@@ -332,7 +314,7 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return entity + architecture
 
 def generate_write_address_ready(name, arbiter_size):
   entity = f"""
@@ -367,10 +349,6 @@ end architecture;
   return entity + architecture
 
 def generate_write_data_signals(name, arbiter_size, data_bitwidth):
-  array_name = f"{name}_array"
-
-  dependencies = generate_2d_array(array_name, arbiter_size, data_bitwidth)
-
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -384,7 +362,7 @@ entity {name} is
     clk        : in  std_logic;
     sel        : in  std_logic_vector({arbiter_size} - 1 downto 0);
     write_data : out std_logic_vector({data_bitwidth} - 1 downto 0);
-    in_data    : in  {array_name};
+    in_data    : in  data_array({arbiter_size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     valid      : out std_logic_vector({arbiter_size} - 1 downto 0)
   );
 
@@ -427,7 +405,7 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return entity + architecture
 
 def generate_write_priority(name, arbiter_size):
   entity = f"""
@@ -474,23 +452,18 @@ def generate_write_memory_arbiter(name, arbiter_size=2, addr_bitwidth=32, data_b
   addressing_name = f"{name}_addressing"
   addressReady_name = f"{name}_addressReady"
   data_name = f"{name}_data"
-  array_data_name = f"{name}_array_data"
-  array_addr_name = f"{name}_array_addr"
 
   dependencies = \
     generate_write_priority(priority_name, arbiter_size) + \
     generate_write_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
     generate_write_address_ready(addressReady_name, arbiter_size) + \
-    generate_write_data_signals(data_name, arbiter_size, data_bitwidth) + \
-    generate_2d_array(array_data_name, arbiter_size, data_bitwidth) + \
-    generate_2d_array(array_addr_name, arbiter_size, addr_bitwidth)
+    generate_write_data_signals(data_name, arbiter_size, data_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_data_name}.all;
-use work.{array_addr_name}.all;
+use work.types.all;
 
 -- Entity of write_memory_arbiter
 entity {name} is
@@ -500,8 +473,8 @@ entity {name} is
     --- interface to previous
     pValid     : in  std_logic_vector({arbiter_size} - 1 downto 0); --write requests
     ready      : out std_logic_vector({arbiter_size} - 1 downto 0); -- ready
-    address_in : in  {array_addr_name};
-    data_in    : in  {array_data_name}; -- data from previous that want to write
+    address_in : in  data_array({arbiter_size} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
+    data_in    : in  data_array({arbiter_size} - 1 downto 0)({data_bitwidth} - 1 downto 0); -- data from previous that want to write
 
     ---interface to next
     nReady : in  std_logic_vector({arbiter_size} - 1 downto 0); -- next component can continue after write

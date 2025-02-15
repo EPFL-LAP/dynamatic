@@ -1,7 +1,6 @@
 import ast
 
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-from generators.support.array import generate_2d_array
 from generators.handshake.tehb import generate_tehb
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
@@ -123,23 +122,21 @@ end architecture;
 
 def _generate_control_merge(name, size, index_bitwidth, data_bitwidth):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
 
-  dependencies = _generate_control_merge_dataless(inner_name, size, index_bitwidth) + \
-    generate_2d_array(array_name, size, data_bitwidth)
+  dependencies = _generate_control_merge_dataless(inner_name, size, index_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of control_merge
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- data output channel
@@ -181,8 +178,6 @@ end architecture;
 
 def _generate_control_merge_signal_manager(name, size, port_types):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
-  array_fullwidth_name = f"{name}_array_fullwidth"
 
   outs_type = VhdlScalarType(port_types["outs"])
   ins_types = []
@@ -202,16 +197,13 @@ def _generate_control_merge_signal_manager(name, size, port_types):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_control_merge(inner_name, size, index_bitwidth, full_bitwidth) + \
-    generate_2d_array(array_name, size, bitwidth) + \
-    generate_2d_array(array_fullwidth_name, size, bitwidth)
+  dependencies = _generate_control_merge(inner_name, size, index_bitwidth, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
-use work.{array_fullwidth_name}.all;
+use work.types.all;
 
 -- Entity of control merge signal manager
 entity {name} is
@@ -219,17 +211,17 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- data input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
-    -- index input channel
-    index       : in  std_logic_vector({index_bitwidth} - 1 downto 0);
-    index_valid : in  std_logic;
-    index_ready : out std_logic;
     -- output channel
     outs       : out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
-    outs_ready : in  std_logic
+    outs_ready : in  std_logic;
+    -- index output channel
+    index       : out std_logic_vector({index_bitwidth} - 1 downto 0);
+    index_valid : out std_logic;
+    index_ready : in  std_logic
   );
 end entity;
 """
@@ -244,7 +236,7 @@ end entity;
   architecture = f"""
 -- Architecture of control merge signal manager
 architecture arch of {name} is
-  signal ins_inner : {array_fullwidth_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
 begin
@@ -290,7 +282,6 @@ end architecture;
 
 def _generate_control_merge_signal_manager_dataless(name, size, port_types):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
 
   ins_types = []
   index_type = VhdlScalarType(port_types["index"])
@@ -308,14 +299,13 @@ def _generate_control_merge_signal_manager_dataless(name, size, port_types):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_control_merge(inner_name, size, index_bitwidth, full_bitwidth) + \
-    generate_2d_array(array_name, size, full_bitwidth)
+  dependencies = _generate_control_merge(inner_name, size, index_bitwidth, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of control merge signal manager dataless
 entity {name} is
@@ -325,13 +315,13 @@ entity {name} is
     -- data input channels
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
-    -- index input channel
-    index       : in  std_logic_vector({index_bitwidth} - 1 downto 0);
-    index_valid : in  std_logic;
-    index_ready : out std_logic;
     -- output channel
     outs_valid : out std_logic;
-    outs_ready : in  std_logic
+    outs_ready : in  std_logic;
+    -- index output channel
+    index       : out std_logic_vector({index_bitwidth} - 1 downto 0);
+    index_valid : out std_logic;
+    index_ready : in  std_logic
   );
 end entity;
 """
@@ -346,7 +336,7 @@ end entity;
   architecture = f"""
 -- Architecture of control merge signal manager
 architecture arch of {name} is
-  signal ins_inner : {array_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
 begin

@@ -1,7 +1,6 @@
 import ast
 
 from generators.support.mc_support import generate_write_memory_arbiter, generate_mc_control
-from generators.support.array import generate_2d_array
 
 def generate_mem_controller_loadless(name, params):
   num_controls = int(params["num_controls"])
@@ -12,23 +11,15 @@ def generate_mem_controller_loadless(name, params):
 
   write_arbiter_name = f"{name}_write_arbiter"
   control_name = f"{name}_control"
-  data_array_name = f"{name}_data_array"
-  addr_array_name = f"{name}_addr_array"
-  ctrl_array_name = f"{name}_ctrl_array"
 
   dependencies = generate_mc_control(control_name) + \
-    generate_write_memory_arbiter(write_arbiter_name, num_stores, addr_bitwidth, data_bitwidth) + \
-    generate_2d_array(data_array_name, num_stores, data_bitwidth) + \
-    generate_2d_array(addr_array_name, num_stores, addr_bitwidth) + \
-    generate_2d_array(ctrl_array_name, num_controls, 32)
+    generate_write_memory_arbiter(write_arbiter_name, num_stores, addr_bitwidth, data_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{data_array_name}.all;
-use work.{addr_array_name}.all;
-use work.{ctrl_array_name}.all;
+use work.types.all;
 
 -- Entity of mem_controller_loadless
 entity {name} is
@@ -44,15 +35,15 @@ entity {name} is
     ctrlEnd_valid : in  std_logic;
     ctrlEnd_ready : out std_logic;
     -- control input channels
-    ctrl       : in  {ctrl_array_name};
+    ctrl       : in  data_array({num_controls} - 1 downto 0)(32 - 1 downto 0);
     ctrl_valid : in  std_logic_vector({num_controls} - 1 downto 0);
     ctrl_ready : out std_logic_vector({num_controls} - 1 downto 0);
     -- store address input channels
-    stAddr       : in  {addr_array_name};
+    stAddr       : in  data_array({num_stores} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     stAddr_valid : in  std_logic_vector({num_stores} - 1 downto 0);
     stAddr_ready : out std_logic_vector({num_stores} - 1 downto 0);
     -- store data input channels
-    stData       : in  {data_array_name};
+    stData       : in  data_array({num_stores} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     stData_valid : in  std_logic_vector({num_stores} - 1 downto 0);
     stData_ready : out std_logic_vector({num_stores} - 1 downto 0);
     -- interface to dual-port BRAM

@@ -34,12 +34,12 @@ entity {name} is
     -- data input channel
     data       : in  std_logic_vector({data_bitwidth} - 1 downto 0);
     data_valid : in  std_logic;
-    data_spec : in std_logic;
+    data_spec : in std_logic_vector(0 downto 0);
     data_ready : out std_logic;
     -- spec_tag_data used for condition
     spec_tag_data       : in  std_logic_vector({spec_tag_data_bitwidth} - 1 downto 0);
     spec_tag_data_valid : in  std_logic;
-    spec_tag_data_spec : in std_logic;
+    spec_tag_data_spec : in std_logic_vector(0 downto 0);
     spec_tag_data_ready : out std_logic;
     -- true output channel
     trueOut       : out std_logic_vector({data_bitwidth} - 1 downto 0);
@@ -59,7 +59,7 @@ architecture arch of {name} is
   signal cond_br_condition : std_logic_vector(0 downto 0);
 begin
 
-  cond_br_condition(0) <= spec_tag_data_spec;
+  cond_br_condition <= spec_tag_data_spec;
   cond_br : entity work.{inner_name}(arch)
     port map (
       clk => clk,
@@ -121,12 +121,12 @@ entity {name} is
     -- data input channel
     data       : in  std_logic_vector({data_bitwidth} - 1 downto 0);
     data_valid : in  std_logic;
-    data_spec : in std_logic;
+    data_spec : in std_logic_vector(0 downto 0);
     data_ready : out std_logic;
     -- spec_tag_data used for condition
     spec_tag_data       : in  std_logic_vector({spec_tag_data_bitwidth} - 1 downto 0);
     spec_tag_data_valid : in  std_logic;
-    spec_tag_data_spec : in std_logic;
+    spec_tag_data_spec : in std_logic_vector(0 downto 0);
     spec_tag_data_ready : out std_logic;
     -- true output channel
     trueOut       : out std_logic_vector({data_bitwidth} - 1 downto 0);
@@ -145,11 +145,11 @@ end entity;
 architecture arch of {name} is
   signal data_inner : std_logic_vector({data_bitwidth} - 1 downto 0);
   signal data_valid_inner : std_logic;
-  signal data_spec_inner : std_logic;
+  signal data_spec_inner : std_logic_vector(0 downto 0);
   signal data_ready_inner : std_logic;
   signal spec_tag_data_inner : std_logic_vector({spec_tag_data_bitwidth} - 1 downto 0);
   signal spec_tag_data_valid_inner : std_logic;
-  signal spec_tag_data_spec_inner : std_logic;
+  signal spec_tag_data_spec_inner : std_logic_vector(0 downto 0);
   signal spec_tag_data_ready_inner : std_logic;
 begin
 

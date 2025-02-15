@@ -1,7 +1,6 @@
 import ast
 
 from generators.support.utils import VhdlScalarType
-from generators.support.array import generate_2d_array
 from generators.handshake.tfifo import generate_tfifo
 from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.merge import generate_merge
@@ -21,7 +20,6 @@ def _generate_spec_commit(name, bitwidth):
   cond_br_name = f"{name}_cond_br"
   buff_name = f"{name}_buff"
   merge_name = f"{name}_merge"
-  array_name = f"{name}_array"
 
   dependencies = \
     generate_tfifo(fifo_disc_name, {
@@ -53,14 +51,13 @@ def _generate_spec_commit(name, bitwidth):
         "ins_1": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>"
       })
-    }) + \
-    generate_2d_array(array_name, 2, bitwidth)
+    })
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of spec_commit
 entity {name} is
@@ -110,7 +107,7 @@ signal branch_disc_falseOut : std_logic_vector({bitwidth} - 1 downto 0);
 signal branch_disc_falseOut_valid : std_logic;
 signal branch_disc_falseOut_ready : std_logic;
 
-signal merge_ins : {array_name};
+signal merge_ins : data_array(1 downto 0)({bitwidth} - 1 downto 0);
 signal merge_ins_valid : std_logic_vector(1 downto 0);
 signal merge_ins_ready : std_logic_vector(1 downto 0);
 
@@ -231,7 +228,8 @@ end entity;
 """
 
   architecture = f"""
-architecture arch of spec_commit_dataless_with_tag is
+-- Architecture of spec_commit_dataless
+architecture arch of {name} is
   signal ins_inner : std_logic_vector(0 downto 0);
   signal outs_inner : std_logic_vector(0 downto 0);
 begin

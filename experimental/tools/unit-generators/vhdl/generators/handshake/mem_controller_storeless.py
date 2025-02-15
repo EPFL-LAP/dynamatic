@@ -1,7 +1,6 @@
 import ast
 
 from generators.support.mc_support import generate_read_memory_arbiter, generate_mc_control
-from generators.support.array import generate_2d_array
 
 def generate_mem_controller_storeless(name, params):
   num_loads = int(params["num_loads"])
@@ -11,20 +10,15 @@ def generate_mem_controller_storeless(name, params):
 
   read_arbiter_name = f"{name}_read_arbiter"
   control_name = f"{name}_control"
-  data_array_name = f"{name}_data_array"
-  addr_array_name = f"{name}_addr_array"
 
   dependencies = generate_mc_control(control_name) + \
-    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth) + \
-    generate_2d_array(data_array_name, num_loads, data_bitwidth) + \
-    generate_2d_array(addr_array_name, num_loads, addr_bitwidth)
+    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{data_array_name}.all;
-use work.{addr_array_name}.all;
+use work.types.all;
 
 -- Entity of mem_controller_storeless
 entity {name} is
@@ -40,11 +34,11 @@ entity {name} is
     ctrlEnd_valid : in  std_logic;
     ctrlEnd_ready : out std_logic;
     -- load address input channels
-    ldAddr       : in  {addr_array_name};
+    ldAddr       : in  data_array({num_loads} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     ldAddr_valid : in  std_logic_vector({num_loads} - 1 downto 0);
     ldAddr_ready : out std_logic_vector({num_loads} - 1 downto 0);
     -- load data output channels
-    ldData       : out {data_array_name};
+    ldData       : out data_array({num_loads} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ldData_valid : out std_logic_vector({num_loads} - 1 downto 0);
     ldData_ready : in  std_logic_vector({num_loads} - 1 downto 0);
     -- interface to dual-port BRAM

@@ -1,6 +1,5 @@
 import ast
 
-from generators.support.array import generate_2d_array
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
@@ -84,7 +83,6 @@ end architecture;
 def _generate_merge(name, size, bitwidth):
   inner_name = f"{name}_inner"
   tehb_name = f"{name}_tehb"
-  array_name = f"{name}_array"
 
   dependencies = generate_merge_notehb(inner_name, size, bitwidth) + \
     generate_tehb(tehb_name, {
@@ -92,21 +90,20 @@ def _generate_merge(name, size, bitwidth):
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<{bitwidth}>"
       })
-    }) + \
-    generate_2d_array(array_name, size, bitwidth)
+    })
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of merge
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- output channel
@@ -155,8 +152,6 @@ end architecture;
 
 def _generate_merge_signal_manager(name, size, data_type):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
-  array_inner_name = f"{name}_array_inner"
 
   bitwidth = data_type.bitwidth
 
@@ -165,16 +160,13 @@ def _generate_merge_signal_manager(name, size, data_type):
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_merge(inner_name, size, full_bitwidth) + \
-    generate_2d_array(array_name, size, bitwidth) + \
-    generate_2d_array(array_inner_name, size, full_bitwidth)
+  dependencies = _generate_merge(inner_name, size, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
-use work.{array_inner_name}.all;
+use work.types.all;
 
 -- Entity of merge signal manager
 entity {name} is
@@ -182,7 +174,7 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- output channel
@@ -203,7 +195,7 @@ end entity;
   architecture = f"""
 -- Architecture of merge signal manager
 architecture arch of {name} is
-  signal ins_inner : {array_inner_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
   [EXTRA_SIGNAL_LOGIC]
@@ -236,21 +228,19 @@ end architecture;
 
 def _generate_merge_signal_manager_dataless(name, size, data_type):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
 
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in data_type.extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_merge(inner_name, size, full_bitwidth) + \
-    generate_2d_array(array_name, size, full_bitwidth)
+  dependencies = _generate_merge(inner_name, size, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of merge signal manager dataless
 entity {name} is
@@ -277,7 +267,7 @@ end entity;
   architecture = f"""
 -- Architecture of merge signal manager dataless
 architecture arch of {name} is
-  signal ins_inner : {array_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
   [EXTRA_SIGNAL_LOGIC]

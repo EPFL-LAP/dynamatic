@@ -1,5 +1,3 @@
-from generators.support.array import generate_2d_array
-
 def generate_merge_notehb(name, inputs, bitwidth=0):
   if bitwidth == 0:
     return _generate_merge_notehb_dataless(name, inputs)
@@ -28,7 +26,7 @@ end entity;
 
   architecture = f"""
 -- Architecture of merge_notehb_dataless
-architecture arch of merge_notehb_dataless is
+architecture arch of {name} is
 begin
   process (ins_valid, outs_ready)
     variable tmp_valid_out : std_logic;
@@ -56,22 +54,18 @@ end architecture;
 
 
 def _generate_merge_notehb(name, inputs, bitwidth):
-  array_name = f"{name}_array"
-
-  dependencies = generate_2d_array(array_name, inputs, bitwidth)
-
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of merge_notehb
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({inputs} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({inputs} - 1 downto 0);
     ins_ready : out std_logic_vector({inputs} - 1 downto 0);
     -- output channel
@@ -112,4 +106,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return entity + architecture

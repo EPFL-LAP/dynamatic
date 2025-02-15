@@ -88,7 +88,7 @@ end entity;
 
   architecture = f"""
 -- Architecture of oehb
-architecture arch of oehb is
+architecture arch of {name} is
   signal regEn, inputReady : std_logic;
 begin
 
