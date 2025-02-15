@@ -206,7 +206,7 @@ Most operations use the `AllTypesMatch` trait to ensure that extra signals remai
 The following constraints ensure proper handling of extra signals:
 
 - `MergingExtraSignals` – Validates extra signal consistency across the data inputs and data output.
-- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and data output.
+- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and variadic data output.
 
 Additionally, the `selector` port is of type `SimpleChannel`, as it does not carry extra signals.
 
