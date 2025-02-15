@@ -1,62 +1,62 @@
 [
   {
     "name": "handshake.br",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.buffer",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p slots=NUM_SLOTS data_type=\"DATA_TYPE\" timing=TIMING >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p slots=$NUM_SLOTS data_type=\"$DATA_TYPE\" timing=$TIMING"
   },
   {
     "name": "handshake.cond_br",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.constant",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p value=VALUE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p value=$VALUE data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.control_merge",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE index_type=\"INDEX_TYPE\" data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE index_type=\"$INDEX_TYPE\" data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.fork",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.join",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE"
   },
   {
     "name": "handshake.lazy_fork",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.load",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\" addr_type=\"$ADDR_TYPE\""
   },
   {
     "name": "handshake.merge",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.mux",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE select_type=\"SELECT_TYPE\" data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p size=$SIZE select_type=\"$SELECT_TYPE\" data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.select",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.sink",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\""
   },
   {
     "name": "handshake.source",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p"
   },
   {
     "name": "handshake.store",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p data_type=\"DATA_TYPE\" addr_type=\"ADDR_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p data_type=\"$DATA_TYPE\" addr_type=\"$ADDR_TYPE\""
   }
 ]

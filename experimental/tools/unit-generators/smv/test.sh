@@ -4,14 +4,13 @@ GENPATH=${GENPATH:-"./"}
 NUXMV=${NUXMV:-1}
 
 test_generator () {
-  GENERATOR_CALL="python3 ${GENPATH}smv-unit-generator.py -n test_module"
-  PARAMS=$1
-
   if [[ $NUXMV -eq 0 ]]; then
     OUT="/dev/null"
   else
     OUT="module.smv"
   fi
+  GENERATOR_CALL="python3 ${GENPATH}smv-unit-generator.py -n test_module -o $OUT"
+  PARAMS=$1
 
   $GENERATOR_CALL $@ > $OUT
 
