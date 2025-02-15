@@ -11,7 +11,7 @@ def generate_ori(name, params):
 
 def _generate_ori(name, latency, data_type):
   return f"""
-MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
+MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
 
   // output
