@@ -226,6 +226,81 @@ LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
   return success();
 }
 
+static FailureOr<OwningOpRef<ModuleOp>>
+createReachabilityCircuit(MLIRContext &context, StringRef filename) {
+
+  OwningOpRef<ModuleOp> mod = parseSourceFile<ModuleOp>(filename, &context);
+  if (!mod)
+    return failure();
+
+  // Get the FuncOp from the module, also check some needed properties
+  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get());
+  if (failed(funcOrFailure))
+    return failure();
+  FuncOp funcOp = funcOrFailure.value();
+
+  OpBuilder builder(&context);
+
+  for (Block &block : funcOp.getBlocks()) {
+    builder.setInsertionPointToStart(&block);
+  }
+
+  // Create the input side auxillary logic:
+  // Every primary input of the LHS/RHS circuits is connected to a ND wire.
+  // The output of the ND wire is then connected to the original input of the
+  // circuit.
+  for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
+    BlockArgument args = funcOp.getArgument(i);
+
+    std::string ndwName = "in_ndw_" + funcOp.getArgName(i).str();
+
+    NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), args);
+    setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
+
+    // Use the newly created NDwire's output instead of the original argument in
+    // the funcOp's operations
+    for (Operation *op : llvm::make_early_inc_range(args.getUsers())) {
+      if (op != ndWireOp)
+        op->replaceUsesOfWith(args, ndWireOp.getResult());
+    }
+  }
+
+  size_t endOpCount = std::distance(funcOp.getOps<EndOp>().begin(),
+                                    funcOp.getOps<EndOp>().end());
+
+  if (endOpCount != 1) {
+    llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
+                    "exactly one EndOp.\n";
+    return failure();
+  }
+
+  // GetEndOp, after checking there is only one EndOp
+  EndOp endOp = *funcOp.getOps<EndOp>().begin();
+
+  // Create the output side auxillary logic:
+  // Every output of the LHS/RHS circuits is connected to a non-derministic
+  // wire (ND wire). The output of the ND wire is connected to the respective
+  // primary output.
+  llvm::SmallVector<Value> eqResults;
+  for (unsigned i = 0; i < endOp.getOperands().size(); ++i) {
+    Value result = endOp.getOperand(i);
+
+    std::string ndwName = "out_ndw_" + funcOp.getResName(i).str();
+
+    NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
+    setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
+
+    // Use the newly created NDwire's output instead of the original argument in
+    // the FuncOp's operations
+    for (Operation *op : llvm::make_early_inc_range(result.getUsers())) {
+      if (op != endNDWireOp)
+        op->replaceUsesOfWith(result, endNDWireOp.getResult());
+    }
+  }
+
+  return mod;
+}
+
 // This creates an elastic-miter module given the path to two MLIR files. The
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
