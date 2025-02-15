@@ -1,7 +1,6 @@
 
 #include "mlir/IR/BuiltinOps.h"
 #include <filesystem>
-#include <llvm/ADT/StringSet.h>
 #include <string>
 
 using namespace mlir;

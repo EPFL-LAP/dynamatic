@@ -139,7 +139,6 @@ LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
     }
   }
 
-  std::string output;
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + "\"\n";
   wrapper << "#ifndef BOOL_INPUT\n"
@@ -191,7 +190,7 @@ LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
                                    resNames);
 
   std::ofstream mainFile(wrapperPath);
-  mainFile << output;
+  mainFile << wrapper.str();
   mainFile.close();
 
   return success();

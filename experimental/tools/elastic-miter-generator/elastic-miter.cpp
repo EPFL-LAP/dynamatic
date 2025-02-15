@@ -26,6 +26,7 @@
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "../experimental/tools/elastic-miter-generator/GetSequenceLength.h"
+#include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
 
 #include "dynamatic/InitAllDialects.h"
 

@@ -562,13 +562,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 }
 
 FailureOr<std::filesystem::path>
-createMiterFabric(MLIRContext &context,
-                  const std::filesystem::path &lhsFilename,
-                  const std::filesystem::path &rhsFilename,
+createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
+                  const std::filesystem::path &rhsPath,
                   const std::filesystem::path &outputDir, size_t bufferSlots) {
 
   OwningOpRef<ModuleOp> lhsModuleRef =
-      parseSourceFile<ModuleOp>(lhsFilename.string(), &context);
+      parseSourceFile<ModuleOp>(lhsPath.string(), &context);
   if (!lhsModuleRef) {
     llvm::errs() << "Failed to load LHS module.\n";
     return failure();
@@ -576,7 +575,7 @@ createMiterFabric(MLIRContext &context,
   ModuleOp lhsModule = lhsModuleRef.get();
 
   OwningOpRef<ModuleOp> rhsModuleRef =
-      parseSourceFile<ModuleOp>(rhsFilename.string(), &context);
+      parseSourceFile<ModuleOp>(rhsPath.string(), &context);
   if (!rhsModuleRef) {
     llvm::errs() << "Failed to load RHS module.\n";
     return failure();
