@@ -2,11 +2,22 @@ from generators.handshake.buffer import generate_buffer
 
 
 def generate_delay_buffer(name, latency):
-  if latency == 1:
+  if latency == 0:
+    _generate_no_lat_delay_buffer(name)
+  elif latency == 1:
     return _generate_single_delay_buffer(name)
   else:
     return _generate_delay_buffer(name, latency)
 
+
+def _generate_no_lat_delay_buffer(name):
+  return f"""
+MODULE {name}(ins_valid, outs_ready)
+
+  // output
+  DEFINE ins_ready := outs_ready;
+  DEFINE outs_valid := ins_valid;
+"""
 
 def _generate_single_delay_buffer(name):
   return f"""
