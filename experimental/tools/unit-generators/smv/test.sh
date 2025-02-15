@@ -85,6 +85,9 @@ test_generator -t source
 echo -e "\nTesting store..."
 test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
+echo -e "\nTesting absf..."
+test_generator -t absf -p data_type='"!handshake.channel<f32>"' latency=0
+
 echo -e "\nTesting addf..."
 test_generator -t addf -p data_type='"!handshake.channel<f32>"' latency=9
 test_generator -t addf -p data_type='"!handshake.channel<f64>"' latency=12
