@@ -1,5 +1,6 @@
 #include "mlir/IR/Attributes.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <llvm/ADT/StringSet.h>
@@ -12,6 +13,7 @@
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "mlir/Support/LogicalResult.h"
 
 using namespace mlir;
 
@@ -127,7 +129,8 @@ FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
   return wrapper.str();
 }
 
-FailureOr<std::string> createMiterWrapper(size_t bufferSize) {
+LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
+                                 size_t nrOfTokens) {
   std::ifstream file("experimental/tools/elastic-miter-generator/out/comp/"
                      "elastic-miter-config.json");
   if (!file) {
@@ -182,7 +185,7 @@ FailureOr<std::string> createMiterWrapper(size_t bufferSize) {
       output += "VAR seq_generator" + std::to_string(i) +
                 " : bool_input(miter." +
                 (*args)[i].getAsString().value_or("").str() + "_ready, " +
-                std::to_string(bufferSize) + ");\n";
+                std::to_string(nrOfTokens) + ");\n";
     }
   } else {
     llvm::errs() << "No arguments in JSON\n";
@@ -262,6 +265,10 @@ FailureOr<std::string> createMiterWrapper(size_t bufferSize) {
       "AF (AG (" + inputProp + " & " + outputProp + "))";
   output += "CTLSPEC " + finalBufferProp + "\n";
 
-  return output;
+  std::ofstream mainFile(wrapperPath);
+  mainFile << output;
+  mainFile.close();
+
+  return success();
 }
 } // namespace dynamatic::experimental

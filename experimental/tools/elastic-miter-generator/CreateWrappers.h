@@ -1,5 +1,6 @@
 
 #include "mlir/IR/BuiltinOps.h"
+#include <filesystem>
 #include <llvm/ADT/StringSet.h>
 #include <string>
 
@@ -13,6 +14,7 @@ std::string createMiterCall(const SmallVector<std::string> &args,
 FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
                                                    bool inf = false);
 
-FailureOr<std::string> createMiterWrapper(size_t bufferSize);
+LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
+                                 size_t nrOfTokens);
 
 } // namespace dynamatic::experimental

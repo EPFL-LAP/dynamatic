@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/JSON.h"
+#include <filesystem>
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -60,8 +61,10 @@ LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
 // This creates an elastic-miter module given the path to two MLIR files. The
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
-FailureOr<std::pair<ModuleOp, llvm::json::Object>>
-createElasticMiter(MLIRContext &context, StringRef lhsFilename,
-                   StringRef rhsFilename, size_t bufferSlots);
+FailureOr<std::filesystem::path> createMiterFabric(MLIRContext &context,
+                                                   StringRef lhsFilename,
+                                                   StringRef rhsFilename,
+                                                   StringRef outputDir,
+                                                   size_t bufferSlots);
 
 } // namespace dynamatic::experimental

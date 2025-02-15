@@ -28,9 +28,12 @@ int runNuXmv(const std::string &cmd, const std::string &stdoutFile) {
   return system(command.c_str());
 }
 
-LogicalResult handshake2smv(const std::string &mlirFilename, bool png = false) {
-  std::string cmd =
-      "bin/export-dot " + mlirFilename + " --edge-style=spline > " + DOT;
+FailureOr<std::filesystem::path>
+handshake2smv(const std::filesystem::path &mlirPath, bool png = false) {
+
+  std::filesystem::path dotFile = mlirPath.parent_path() / "miter.dot";
+  std::string cmd = "bin/export-dot " + mlirPath.string() +
+                    " --edge-style=spline > " + dotFile.string();
   int ret = system(cmd.c_str());
   if (ret != 0) {
     llvm::errs() << "Failed to convert to dot\n";
@@ -38,7 +41,8 @@ LogicalResult handshake2smv(const std::string &mlirFilename, bool png = false) {
   }
 
   if (png) {
-    cmd = "dot -Tpng " + DOT + " -o " + COMP_DIR + "/visual.png";
+    std::filesystem::path pngFile = mlirPath.parent_path() / "miter.png";
+    cmd = "dot -Tpng " + DOT + " -o " + pngFile.string();
     ret = system(cmd.c_str());
     if (ret != 0) {
       llvm::errs() << "Failed to convert to PNG\n";
@@ -46,14 +50,17 @@ LogicalResult handshake2smv(const std::string &mlirFilename, bool png = false) {
     }
   }
 
-  cmd = "python3 ../dot2smv/dot2smv " + DOT;
+  // The current implementation of dot2smv uses the hardcoded name "model.smv"
+  // in the dotfile's directory.
+  std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
+  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string();
   ret = system(cmd.c_str());
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();
   }
 
-  return success();
+  return smvFile;
 }
 
 FailureOr<size_t> getSequenceLength(MLIRContext &context,

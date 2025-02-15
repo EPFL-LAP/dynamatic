@@ -23,7 +23,6 @@
 
 #include "llvm/Support/InitLLVM.h"
 
-// TODO rename to CreateWrappers.h
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "../experimental/tools/elastic-miter-generator/GetSequenceLength.h"
@@ -69,8 +68,7 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
 
-  // Find out needed N
-  // TODO we should now pass the module instead of the file
+  // Find out needed number of tokens
   auto failOrLHSseqLen =
       dynamatic::experimental::getSequenceLength(context, lhsFilenameArg);
   if (failed(failOrLHSseqLen))
@@ -88,39 +86,28 @@ int main(int argc, char **argv) {
   size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
   // Create Miter module with needed N
-  // TODO wrap this function with the content of the old main function
-  // TODO we should now pass the module instead of the file
-  auto ret = dynamatic::experimental::createElasticMiter(
-      context, lhsFilenameArg, rhsFilenameArg, n);
-  if (failed(ret)) {
+  auto failOrMlirPath = dynamatic::experimental::createMiterFabric(
+      context, lhsFilenameArg, rhsFilenameArg, outputDir, n);
+  if (failed(failOrMlirPath)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return 1;
   }
-  auto [miterModule, json] = ret.value();
+  auto mlirPath = failOrMlirPath.value();
 
-  // TODO this should be based on funcOp names
-  std::string mlirFilename =
-      "elastic_miter_" +
-      std::filesystem::path(lhsFilenameArg.getValue()).stem().string() + "_" +
-      std::filesystem::path(rhsFilenameArg.getValue()).stem().string() +
-      ".mlir";
-  // TODO also integrate in wrapper
-  dynamatic::experimental::createFiles(outputDir, mlirFilename, miterModule,
-                                       json);
+  auto failOrSmvPath = dynamatic::experimental::handshake2smv(mlirPath, false);
+  if (failed(failOrSmvPath)) {
+    llvm::errs() << "Failed to convert miter module to SMV.\n";
+    return 1;
+  }
+  auto smvPath = failOrSmvPath.value();
 
   // TODO ...
-  auto fail = dynamatic::experimental::handshake2smv(
-      outputDir + "/" + mlirFilename, false);
+  std::filesystem::path wrapperPath = outputDir + "/main.smv";
 
-  auto failOrWrapper = dynamatic::experimental::createMiterWrapper(n);
-  if (failed(failOrWrapper))
+  auto fail = dynamatic::experimental::createMiterWrapper(wrapperPath, n);
+  if (failed(fail))
     return 1;
 
-  std::string wrapper = failOrWrapper.value();
-
-  std::ofstream mainFile(outputDir + "/main.smv");
-  mainFile << wrapper;
-  mainFile.close();
   // TODO use this when creating prove.cmd
   std::string output = outputDir + "/result.txt";
   // Run equivalence checking
@@ -128,14 +115,16 @@ int main(int argc, char **argv) {
       "experimental/tools/elastic-miter-generator/out/comp/prove.cmd",
       "/dev/null");
 
-  // TODO check if it includes "is false"
+  bool equivalent = true;
   std::string line;
   std::ifstream result(output);
   while (getline(result, line)) {
     llvm::outs() << line << "\n";
+    if (line.find("is false") != std::string::npos) {
+      equivalent = false;
+    }
   }
   result.close();
 
-  // TODO ...
-  exit(failed(success()));
+  exit(!equivalent);
 }

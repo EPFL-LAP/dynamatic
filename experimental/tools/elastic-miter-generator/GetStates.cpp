@@ -3,9 +3,23 @@
 #include <fstream>
 #include <llvm/ADT/StringSet.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dynamatic::experimental {
+
+std::string stripString(const std::string &string) {
+  std::string newString = string;
+  size_t start = newString.find_first_not_of(" \t\n\r\f\v");
+  if (start == std::string::npos) {
+    newString.clear(); // The string contains only whitespace
+  } else {
+    // Trim leading and trailing spaces
+    size_t end = newString.find_last_not_of(" \t\n\r\f\v");
+    newString = newString.substr(start, end - start + 1);
+  }
+  return newString;
+}
 
 // TODO handle too many states to print
 std::vector<std::string> getStateSet(const std::string &filename) {
@@ -15,16 +29,7 @@ std::vector<std::string> getStateSet(const std::string &filename) {
   bool recording = false;
 
   while (std::getline(file, line)) {
-
-    // TODO put in function
-    size_t start = line.find_first_not_of(" \t\n\r\f\v");
-    if (start == std::string::npos) {
-      line.clear(); // The string contains only whitespace
-    } else {
-      // Trim leading and trailing spaces
-      size_t end = line.find_last_not_of(" \t\n\r\f\v");
-      line = line.substr(start, end - start + 1);
-    }
+    line = stripString(line);
 
     if (line.find("-------") != std::string::npos) {
       if (!currentState.empty()) {

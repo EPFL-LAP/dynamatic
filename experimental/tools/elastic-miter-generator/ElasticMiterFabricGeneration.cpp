@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
@@ -14,6 +15,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include <filesystem>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -228,26 +230,17 @@ LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, llvm::json::Object>>
-createElasticMiter(MLIRContext &context, StringRef lhsFilename,
-                   StringRef rhsFilename, size_t bufferSlots) {
-
-  OwningOpRef<ModuleOp> lhsModule =
-      parseSourceFile<ModuleOp>(lhsFilename, &context);
-  if (!lhsModule)
-    return failure();
-  OwningOpRef<ModuleOp> rhsModule =
-      parseSourceFile<ModuleOp>(rhsFilename, &context);
-  if (!rhsModule)
-    return failure();
+createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
+                   size_t bufferSlots) {
 
   // Get the LHS FuncOp from the LHS module, also check the
-  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule.get());
+  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
   if (failed(funcOrFailure))
     return failure();
   FuncOp lhsFuncOp = funcOrFailure.value();
 
   // Get the RHS FuncOp from the RHS module
-  funcOrFailure = getModuleFuncOpAndCheck(rhsModule.get());
+  funcOrFailure = getModuleFuncOpAndCheck(rhsModule);
   if (failed(funcOrFailure))
     return failure();
   FuncOp rhsFuncOp = funcOrFailure.value();
@@ -468,7 +461,50 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   jsonObject["results"] = std::move(resNames);
   jsonObject["ndwires"] = std::move(ndwireNames);
   jsonObject["eq"] = std::move(eqNames);
+  jsonObject["lhsFuncName"] = lhsFuncOp.getNameAttr().str();
+  jsonObject["rhsFuncName"] = rhsFuncOp.getNameAttr().str();
 
   return std::make_pair(miterModule, jsonObject);
 }
+
+FailureOr<std::filesystem::path> createMiterFabric(MLIRContext &context,
+                                                   StringRef lhsFilename,
+                                                   StringRef rhsFilename,
+                                                   StringRef outputDir,
+                                                   size_t bufferSlots) {
+
+  OwningOpRef<ModuleOp> lhsModuleRef =
+      parseSourceFile<ModuleOp>(lhsFilename, &context);
+  if (!lhsModuleRef) {
+    llvm::errs() << "Failed to load LHS module.\n";
+    return failure();
+  }
+  ModuleOp lhsModule = lhsModuleRef.get();
+
+  OwningOpRef<ModuleOp> rhsModuleRef =
+      parseSourceFile<ModuleOp>(rhsFilename, &context);
+  if (!rhsModuleRef) {
+    llvm::errs() << "Failed to load RHS module.\n";
+    return failure();
+  }
+  ModuleOp rhsModule = rhsModuleRef.get();
+
+  auto ret = createElasticMiter(context, lhsModule, rhsModule, bufferSlots);
+  if (failed(ret)) {
+    llvm::errs() << "Failed to create elastic-miter module.\n";
+    return failure();
+  }
+  auto [miterModule, json] = ret.value();
+
+  std::string mlirFilename = "elastic_miter_" +
+                             json["lhsFuncName"].getAsString()->str() + "_" +
+                             json["lhsFuncName"].getAsString()->str() + ".mlir";
+
+  if (failed(createFiles(outputDir, mlirFilename, miterModule, json))) {
+    llvm::errs() << "Failed to write miter files.\n";
+    return failure();
+  }
+  return std::filesystem::path(outputDir.str()) / mlirFilename;
+}
+
 } // namespace dynamatic::experimental
