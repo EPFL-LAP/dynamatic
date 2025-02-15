@@ -46,7 +46,7 @@ def _get_sign_from_predicate(pred):
 def _generate_cmpi(name, predicate, bitwidth):
   join_name = f"{name}_join"
 
-  dependencies = generate_join(name, 2)
+  dependencies = generate_join(join_name, 2)
 
   entity = f"""
 library ieee;
@@ -80,7 +80,7 @@ end entity;
 -- Architecture of cmpi
 architecture arch of {name} is
 begin
-  join_inputs : entity work.join(arch) generic map(2)
+  join_inputs : entity work.{join_name}(arch)
     port map(
       -- inputs
       ins_valid(0) => lhs_valid,
@@ -99,6 +99,6 @@ end architecture;
   return dependencies + entity + architecture
 
 def _generate_cmpi_signal_manager(name, predicate, data_type):
-  def _generate_inner(name, in_bitwidth, _):
-    return _generate_cmpi(name, predicate, in_bitwidth)
+  def _generate_inner(inner_name, in_bitwidth, _):
+    return _generate_cmpi(inner_name, predicate, in_bitwidth)
   return generate_binary_no_latency_signal_manager_full(name, data_type, VhdlScalarType("!handshake.channel<i1>"), _generate_inner)

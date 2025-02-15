@@ -1,6 +1,5 @@
 import ast
 
-from generators.support.array import generate_2d_array
 from generators.support.mc_support import generate_read_memory_arbiter
 from generators.handshake.mem_controller_loadless import generate_mem_controller_loadless
 from generators.handshake.mem_controller_storeless import generate_mem_controller_storeless
@@ -21,11 +20,6 @@ def generate_mem_controller(name, params):
 def _generate_mem_controller(name, params):
   loadless_name = f"{name}_loadless"
   read_arbiter_name = f"{name}_read_arbiter"
-  ctrl_array_name = f"{name}_ctrl_array"
-  load_addr_array_name = f"{name}_load_addr_array"
-  load_data_array_name = f"{name}_load_data_array"
-  store_addr_array_name = f"{name}_store_addr_array"
-  store_data_array_name = f"{name}_store_data_array"
 
   num_controls = int(params["num_controls"])
   num_loads = int(params["num_loads"])
@@ -35,22 +29,13 @@ def _generate_mem_controller(name, params):
   addr_bitwidth = int(port_types["loadAddr"][1:])
 
   dependencies = generate_mem_controller_loadless(loadless_name, params) + \
-    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth) + \
-    generate_2d_array(ctrl_array_name, num_controls, 32) + \
-    generate_2d_array(load_addr_array_name, num_loads, addr_bitwidth) + \
-    generate_2d_array(load_data_array_name, num_loads, data_bitwidth) + \
-    generate_2d_array(store_addr_array_name, num_stores, addr_bitwidth) + \
-    generate_2d_array(store_data_array_name, num_stores, data_bitwidth)
+    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{ctrl_array_name}.all;
-use work.{load_addr_array_name}.all;
-use work.{load_data_array_name}.all;
-use work.{store_addr_array_name}.all;
-use work.{store_data_array_name}.all;
+use work.types.all;
 
 -- Entity of mem_controller
 entity {name} is
@@ -66,23 +51,23 @@ entity {name} is
     ctrlEnd_valid : in  std_logic;
     ctrlEnd_ready : out std_logic;
     -- control input channels
-    ctrl       : in  {ctrl_array_name};
+    ctrl       : in  data_array({num_controls} - 1 downto 0)(32 - 1 downto 0);
     ctrl_valid : in  std_logic_vector({num_controls} - 1 downto 0);
     ctrl_ready : out std_logic_vector({num_controls} - 1 downto 0);
     -- load address input channels
-    ldAddr       : in  {load_addr_array_name};
+    ldAddr       : in  data_array({num_loads} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     ldAddr_valid : in  std_logic_vector({num_loads} - 1 downto 0);
     ldAddr_ready : out std_logic_vector({num_loads} - 1 downto 0);
     -- load data output channels
-    ldData       : out {load_data_array_name};
+    ldData       : out data_array({num_loads} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ldData_valid : out std_logic_vector({num_loads} - 1 downto 0);
     ldData_ready : in  std_logic_vector({num_loads} - 1 downto 0);
     -- store address input channels
-    stAddr       : in  {store_addr_array_name};
+    stAddr       : in  data_array({num_stores} - 1 downto 0)({addr_bitwidth} - 1 downto 0);
     stAddr_valid : in  std_logic_vector({num_stores} - 1 downto 0);
     stAddr_ready : out std_logic_vector({num_stores} - 1 downto 0);
     -- store data input channels
-    stData       : in  {store_data_array_name};
+    stData       : in  data_array({num_stores} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     stData_valid : in  std_logic_vector({num_stores} - 1 downto 0);
     stData_ready : out std_logic_vector({num_stores} - 1 downto 0);
     -- interface to dual-port BRAM

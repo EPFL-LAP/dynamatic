@@ -24,7 +24,7 @@ entity {name} is
 
     ins : in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in std_logic;
-    ins_spec : in std_logic;
+    ins_spec : in std_logic_vector(0 downto 0);
     ins_ready : out std_logic;
 
     predict_ins : in std_logic_vector({bitwidth} - 1 downto 0);
@@ -36,7 +36,7 @@ entity {name} is
     fifo_ins_ready : out std_logic;
 
     outs : out std_logic_vector({bitwidth} - 1 downto 0);
-    outs_spec : out std_logic;
+    outs_spec : out std_logic_vector(0 downto 0);
 
     fifo_outs : out std_logic_vector({bitwidth} - 1 downto 0);
     fifo_outs_valid : out std_logic;
@@ -165,7 +165,7 @@ state_proc : process (clk)
                             State <= KILL1;
                         end if;
                     when KILL1 =>
-                        if (DatapV = '1' and ins_spec = '0') then
+                        if (DatapV = '1' and ins_spec = "0") then
                             if (FifoNotEmpty = '0') then
                                 State <= PASS;
                             else
@@ -181,19 +181,19 @@ state_proc : process (clk)
                         end if;
 
                     when KILL3 =>
-                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = '1')) and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
+                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = "1")) and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
                             State <= KILL_SPEC;
-                        elsif (DatapV = '1' and ins_spec = '0' and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
+                        elsif (DatapV = '1' and ins_spec = "0" and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
                             State <= SPEC;
-                        elsif (DatapV = '1' and ins_spec = '0') then
+                        elsif (DatapV = '1' and ins_spec = "0") then
                             State <= PASS;
                         end if;
                     when KILL_SPEC =>
-                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = '1')) and ControlnR = '1') then
+                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = "1")) and ControlnR = '1') then
                             State <= KILL3;
-                        elsif (DatapV = '1' and ins_spec = '0' and ControlnR = '0') then
+                        elsif (DatapV = '1' and ins_spec = "0" and ControlnR = '0') then
                             State <= SPEC;
-                        elsif (DatapV = '1' and ins_spec = '0' and ControlnR = '1') then
+                        elsif (DatapV = '1' and ins_spec = "0" and ControlnR = '1') then
                             State <= PASS;
                         end if;
                 end case;
@@ -206,7 +206,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
     begin
 
         outs <= ins;
-        outs_spec <= '0';
+        outs_spec <= "0";
         fifo_outs <= predict_ins;
         ControlInternal <= CONTROL_SPEC;
 
@@ -228,18 +228,18 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                     ControlV <= '1';
                     ControlInternal <= CONTROL_SPEC;
                     outs <= predict_ins;
-                    outs_spec <= '1';
+                    outs_spec <= "1";
                     FifoV <= '1';
                 elsif (DatapV = '1' and FifoNotEmpty = '0') then
                     ControlV <= '1';
                     ControlInternal <= CONTROL_NO_CMP;
                     outs <= ins;
-                    outs_spec <= '0';
+                    outs_spec <= "0";
                 elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
                     ControlV <= '1';
                     ControlInternal <= CONTROL_CORRECT_SPEC;
                     outs <= predict_ins;
-                    outs_spec <= '1';
+                    outs_spec <= "1";
                     FifoV <= '1';
                 elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
                     ControlV <= '1';
@@ -248,7 +248,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                     ControlV <= '1';
                     ControlInternal <= CONTROL_RESEND;
                     outs <= ins;
-                    outs_spec <= '0';
+                    outs_spec <= "0";
                 else
                     ControlV <= '0';
                 end if;
@@ -263,7 +263,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_SPEC;
 
                 outs <= predict_ins;
-                outs_spec <= '1';
+                outs_spec <= "1";
 
             when NO_CMP =>
                 DataR <= ControlnR;
@@ -275,7 +275,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_NO_CMP;
 
                 outs <= ins;
-                outs_spec <= '0';
+                outs_spec <= "0";
 
             when CMP_CORRECT =>
                 DataR <= ControlnR;
@@ -296,10 +296,10 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_RESEND;
 
                 outs <= ins;
-                outs_spec <= '0';
+                outs_spec <= "0";
 
             when KILL1 =>
-                DataR <= DatapV and ins_spec;
+                DataR <= DatapV and ins_spec(0);
                 FifoR <= ControlnR;
                 PredictR<= '0';
                 ControlV <= FifoNotEmpty;
@@ -317,7 +317,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_KILL;
 
             when KILL3 =>
-                DataR <= DatapV and ins_spec;
+                DataR <= DatapV and ins_spec(0);
                 PredictR <= ControlnR;
                 FifoR <= '0';
                 ControlV <= PredictpV and FifoNotFull;
@@ -326,10 +326,10 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_SPEC;
 
                 outs <= predict_ins;
-                outs_spec <= '1';
+                outs_spec <= "1";
 
             when KILL_SPEC =>
-                DataR <= DatapV and ins_spec;
+                DataR <= DatapV and ins_spec(0);
                 PredictR <= ControlnR;
                 FifoR <= '0';
                 ControlV <= '1';
@@ -338,7 +338,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 ControlInternal <= CONTROL_SPEC;
 
                 outs <= predict_ins;
-                outs_spec <= '1';
+                outs_spec <= "1";
 
         end case;
 
@@ -921,6 +921,7 @@ def _generate_speculator_inner(name, bitwidth, fifo_depth):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
+use work.types.all;
 
 -- Entity of speculator
 entity {name} is
@@ -929,7 +930,7 @@ entity {name} is
     -- inputs
     ins: in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid: in std_logic;
-    ins_spec: in std_logic;
+    ins_spec: in std_logic_vector(0 downto 0);
     ins_ready: out std_logic;
     -- enable is dataless (control token)
     enable_valid: in std_logic;
@@ -937,7 +938,7 @@ entity {name} is
     -- outputs
     outs: out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid: out std_logic;
-    outs_spec: out std_logic;
+    outs_spec: out std_logic_vector(0 downto 0);
     outs_ready: in std_logic;
     -- control signals
     ctrl_save: out std_logic_vector(0 downto 0);
@@ -962,8 +963,7 @@ end entity;
   architecture = f"""
 -- Architecture of speculator
 architecture arch of {name} is
-type data_fork_array is array (1 downto 0) of std_logic_vector({bitwidth} - 1 downto 0);
-signal fork_data_outs : data_fork_array;
+signal fork_data_outs : data_array(1 downto 0)({bitwidth} - 1 downto 0);
 signal fork_data_outs_valid : std_logic_vector(1 downto 0);
 signal fork_data_outs_0_spec : std_logic_vector(0 downto 0);
 signal fork_data_outs_ready : std_logic_vector(1 downto 0);
@@ -984,8 +984,7 @@ signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
 signal predFifo_data_out_valid : std_logic;
 signal predFifo_data_out_ready : std_logic;
 
-type control_fork_array is array (4 downto 0) of std_logic_vector(2 downto 0);
-signal fork_control_outs : control_fork_array;
+signal fork_control_outs : data_array(4 downto 0)(2 downto 0);
 signal fork_control_outs_valid : std_logic_vector(4 downto 0);
 signal fork_control_outs_ready : std_logic_vector(4 downto 0);
 begin
@@ -1199,10 +1198,10 @@ entity {name} is
     -- inputs
     ins: in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid: in std_logic;
-    ins_spec: in std_logic;
+    ins_spec: in std_logic_vector(0 downto 0);
     -- enable is dataless (control token)
     enable_valid: in std_logic;
-    enable_spec: in std_logic;
+    enable_spec: in std_logic_vector(0 downto 0);
     outs_ready: in std_logic;
     ctrl_save_ready: in std_logic;
     ctrl_commit_ready: in std_logic;
@@ -1212,7 +1211,7 @@ entity {name} is
     -- outputs
     outs: out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid: out std_logic;
-    outs_spec: out std_logic;
+    outs_spec: out std_logic_vector(0 downto 0);
     ctrl_save: out std_logic_vector(0 downto 0);
     ctrl_save_valid: out std_logic;
     ctrl_commit: out std_logic_vector(0 downto 0);
@@ -1234,7 +1233,7 @@ end entity;
 architecture arch of {name} is
   signal outs_inner: std_logic_vector({bitwidth} - 1 downto 0);
   signal outs_valid_inner: std_logic;
-  signal outs_spec_inner: std_logic;
+  signal outs_spec_inner: std_logic_vector(0 downto 0);
   signal outs_ready_inner: std_logic;
 
   signal ctrl_save_inner: std_logic_vector(0 downto 0);

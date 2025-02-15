@@ -294,7 +294,7 @@ def _generate_addf_signal_manager(name, data_type, is_double):
         outs_valid => open,
         outs_ready => result_ready
       );
-    result_spec <= spec_tfifo_out(0);
+    result_spec <= spec_tfifo_out;
 """)
   }
 

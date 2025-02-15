@@ -1,4 +1,6 @@
 import re
+import os
+import shutil
 
 def parse_extra_signals(extra_signals: str) -> dict[str, int]:
   """
@@ -175,7 +177,7 @@ def generate_lacking_extra_signal_decls(ins_name: str, ins_types: list[VhdlScala
 
 
 extra_signal_default_values = {
-  "spec": "'0'",
+  "spec": "\"0\"",
 }
 
 def generate_lacking_extra_signal_assignments(ins_name: str, ins_types: list[VhdlScalarType], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
@@ -194,3 +196,6 @@ def generate_lacking_extra_signal_assignments(ins_name: str, ins_types: list[Vhd
         assignments.append(f"{indent_str}{ins_name}_{i}_{name} <= {extra_signal_default_values[name]};")
   return "\n".join(assignments)
 
+def copy_types(output_dir: str):
+  types_path = os.path.join(os.path.dirname(__file__), "types.vhd")
+  shutil.copy(types_path, output_dir)

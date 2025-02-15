@@ -1,7 +1,6 @@
 import ast
 
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-from generators.support.array import generate_2d_array
 from generators.handshake.tehb import generate_tehb
 
 def generate_mux(name, params):
@@ -22,28 +21,27 @@ def generate_mux(name, params):
 
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
-  array_name = f"{name}_array"
 
   dependencies = generate_tehb(tehb_name, {
     "port_types": str({
       "ins": f"!handshake.channel<i{data_bitwidth}>",
       "outs": f"!handshake.channel<i{data_bitwidth}>",
     })
-  }) + generate_2d_array(array_name, size, data_bitwidth)
+  })
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of mux
 entity {name} is
   port (
     clk, rst : in std_logic;
     -- data input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- index input channel
@@ -186,8 +184,6 @@ end architecture;
 
 def _generate_mux_signal_manager(name, size, port_types):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
-  array_fullwidth_name = f"{name}_array_fullwidth"
 
   outs_type = VhdlScalarType(port_types["outs"])
   ins_types = []
@@ -207,16 +203,13 @@ def _generate_mux_signal_manager(name, size, port_types):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth) + \
-    generate_2d_array(array_name, size, bitwidth) + \
-    generate_2d_array(array_fullwidth_name, size, bitwidth)
+  dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
-use work.{array_fullwidth_name}.all;
+use work.types.all;
 
 -- Entity of mux signal manager
 entity {name} is
@@ -224,7 +217,7 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- data input channels
-    ins       : in  {array_name};
+    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- index input channel
@@ -249,7 +242,7 @@ end entity;
   architecture = f"""
 -- Architecture of mux signal manager
 architecture arch of {name} is
-  signal ins_inner : {array_fullwidth_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
 begin
@@ -295,7 +288,6 @@ end architecture;
 
 def _generate_mux_signal_manager_dataless(name, size, port_types):
   inner_name = f"{name}_inner"
-  array_name = f"{name}_array"
 
   ins_types = []
   index_type = VhdlScalarType(port_types["index"])
@@ -313,14 +305,13 @@ def _generate_mux_signal_manager_dataless(name, size, port_types):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth) + \
-    generate_2d_array(array_name, size, full_bitwidth)
+  dependencies = _generate_mux(inner_name, size, index_bitwidth, full_bitwidth)
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.{array_name}.all;
+use work.types.all;
 
 -- Entity of mux signal manager dataless
 entity {name} is
@@ -351,7 +342,7 @@ end entity;
   architecture = f"""
 -- Architecture of mux signal manager
 architecture arch of {name} is
-  signal ins_inner : {array_name};
+  signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
 begin
