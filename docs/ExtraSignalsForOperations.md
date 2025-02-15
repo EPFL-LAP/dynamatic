@@ -115,6 +115,8 @@ Each operation also has **results**, which represent the outputs of the RTL here
 
 https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L459-L460
 
+Just like operands, some results are variadic (e.g., outputs of `ForkOp`).
+
 More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-results
 
 ### Types
