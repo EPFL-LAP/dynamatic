@@ -115,6 +115,9 @@ test_generator -t divsi -p data_type='"!handshake.channel<i32>"' latency=35
 echo -e "\nTesting divui..."
 test_generator -t divui -p data_type='"!handshake.channel<i32>"' latency=35
 
+echo -e "\nTesting extf..."
+test_generator -t extf -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<f64>"' latency=35
+
 echo -e "\nTesting maximumf..."
 test_generator -t maximumf -p data_type='"!handshake.channel<f32>"' latency=0
 
