@@ -7,7 +7,7 @@ from generators.support.join import generate_join
 def generate_cmpi(name, params):
   port_types = ast.literal_eval(params["port_types"])
   predicate = params["predicate"]
-  data_type = VhdlScalarType(port_types["result"])
+  data_type = VhdlScalarType(port_types["lhs"])
 
   if data_type.has_extra_signals():
     return _generate_cmpi_signal_manager(name, predicate, data_type)

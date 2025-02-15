@@ -497,27 +497,27 @@ architecture arch of {name} is
 
 begin
 
-  priority : entity work.write_priority
+  priority : entity work.{priority_name}
     port map(
       req          => pValid,
       data_ready   => nReady,
       priority_out => priorityOut
     );
 
-  addressing : entity work.write_address_mux
+  addressing : entity work.{addressing_name}
     port map(
       sel      => priorityOut,
       addr_in  => address_in,
       addr_out => write_address
     );
 
-  addressReady : entity work.write_address_ready
+  addressReady : entity work.{addressReady_name}
     port map(
       sel    => priorityOut,
       nReady => nReady,
       ready  => ready
     );
-  data : entity work.write_data_signals
+  data : entity work.{data_name}
     port map(
       rst        => rst,
       clk        => clk,

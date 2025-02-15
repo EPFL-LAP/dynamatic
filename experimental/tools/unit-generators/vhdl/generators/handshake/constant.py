@@ -5,7 +5,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 def generate_constant(name, params):
   port_types = ast.literal_eval(params["port_types"])
   data_type = VhdlScalarType(port_types["outs"])
-  value = int(params["value"])
+  value = params["value"]
 
   if data_type.has_extra_signals():
     return _generate_constant_signal_manager(name, value, data_type)
