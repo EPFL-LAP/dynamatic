@@ -116,7 +116,10 @@ echo -e "\nTesting divui..."
 test_generator -t divui -p data_type='"!handshake.channel<i32>"' latency=35
 
 echo -e "\nTesting extf..."
-test_generator -t extf -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<f64>"' latency=35
+test_generator -t extf -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<f64>"' latency=0
+
+echo -e "\nTesting fptosi..."
+test_generator -t extf -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<i34>"' latency=5
 
 echo -e "\nTesting maximumf..."
 test_generator -t maximumf -p data_type='"!handshake.channel<f32>"' latency=0

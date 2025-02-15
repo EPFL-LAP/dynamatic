@@ -27,6 +27,7 @@ import generators.arith.divf as divf
 import generators.arith.divsi as divsi
 import generators.arith.divui as divui
 import generators.arith.extf as extf
+import generators.arith.fptosi as fptosi
 import generators.arith.maximumf as maximumf
 import generators.arith.minimumf as minimumf
 import generators.arith.muli as muli
@@ -84,6 +85,8 @@ def generate_code(name, mod_type, parameters):
       return divui.generate_divui(name, parameters)
     case "extf":
       return extf.generate_extf(name, parameters)
+    case "fptosi":
+      return fptosi.generate_fptosi(name, parameters)
     case "maximumf":
       return maximumf.generate_maximumf(name, parameters)
     case "minimumf":
