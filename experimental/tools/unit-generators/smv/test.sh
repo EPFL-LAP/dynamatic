@@ -166,5 +166,8 @@ test_generator -t subi -p data_type='"!handshake.channel<i32>"' latency=0
 echo -e "\nTesting truncf..."
 test_generator -t truncf -p input_type='"!handshake.channel<f64>"' output_type='"!handshake.channel<f32>"' latency=0
 
+echo -e "\nTesting xori..."
+test_generator -t xori -p data_type='"!handshake.channel<i32>"' latency=0
+
 
 rm $OUT
