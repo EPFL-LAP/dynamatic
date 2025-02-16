@@ -163,4 +163,8 @@ test_generator -t subf -p data_type='"!handshake.channel<f64>"' latency=12
 echo -e "\nTesting subi..."
 test_generator -t subi -p data_type='"!handshake.channel<i32>"' latency=0
 
+echo -e "\nTesting truncf..."
+test_generator -t truncf -p input_type='"!handshake.channel<f64>"' output_type='"!handshake.channel<f32>"' latency=0
+
+
 rm $OUT
