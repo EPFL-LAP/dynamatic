@@ -1,10 +1,10 @@
 from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_subi(name, params):
-  latency = params["latency"]
-  data_type = SmvScalarType(params["data_type"])
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   return _generate_subi(name, latency, data_type)
 

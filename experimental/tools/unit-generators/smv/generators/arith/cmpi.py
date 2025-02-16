@@ -1,13 +1,13 @@
 from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_cmpi(name, params):
-  predicate = params["predicate"]
+  predicate = params[ATTR_PREDICATE]
   symbol = get_symbol_from_predicate(predicate)
   sign = get_sign_from_predicate(predicate)
-  latency = params["latency"]
-  data_type = SmvScalarType(params["data_type"])
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   if sign is None or data_type.smv_type.split()[0] == sign:
     return _generate_cmpi(name, latency, symbol, data_type)
