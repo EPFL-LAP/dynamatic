@@ -208,5 +208,9 @@
   {
     "name": "handshake.subf",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=9 data_type=\"$DATA_TYPE\""
+  },
+  {
+    "name": "handshake.subi",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME -p latency=0 data_type=\"$DATA_TYPE\""
   }
 ]
