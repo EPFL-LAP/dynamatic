@@ -7,9 +7,9 @@ from generators.support.utils import *
 
 
 def generate_control_merge(name, params):
-  size = params["size"]
-  data_type = SmvScalarType(params["data_type"])
-  index_type = SmvScalarType(params["index_type"])
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  index_type = SmvScalarType(params[ATTR_INDEX_TYPE])
 
   if data_type.bitwidth == 0:
     return _generate_control_merge_dataless(name, size, index_type)

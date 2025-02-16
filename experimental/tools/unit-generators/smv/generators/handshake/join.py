@@ -1,5 +1,8 @@
+from generators.support.utils import *
+
+
 def generate_join(name, params):
-  size = params["size"]
+  size = params[ATTR_SIZE]
 
   return _generate_join(name, size)
 

@@ -1,9 +1,9 @@
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_constant(name, params):
-  value = params["value"]
-  data_type = SmvScalarType(params["data_type"])
+  value = params[ATTR_VALUE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   return _generate_constant(name, value, data_type)
 

@@ -1,8 +1,8 @@
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_select(name, params):
-  data_type = SmvScalarType(params["data_type"])
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   return _generate_select(name, data_type)
 

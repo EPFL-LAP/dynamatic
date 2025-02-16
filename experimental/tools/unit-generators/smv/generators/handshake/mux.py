@@ -3,9 +3,9 @@ from generators.support.utils import *
 
 
 def generate_mux(name, params):
-  size = params["size"]
-  data_type = SmvScalarType(params["data_type"])
-  select_type = SmvScalarType(params["select_type"])
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  select_type = SmvScalarType(params[ATTR_SELECT_TYPE])
 
   if data_type.bitwidth == 0:
     return _generate_mux_dataless(name, size, select_type)

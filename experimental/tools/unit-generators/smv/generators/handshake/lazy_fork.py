@@ -1,9 +1,9 @@
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_lazy_fork(name, params):
-  size = params["size"]
-  data_type = SmvScalarType(params["data_type"])
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   if data_type.bitwidth == 0:
     return _generate_lazy_fork_dataless(name, size)

@@ -3,16 +3,16 @@ from generators.support.utils import *
 
 
 def generate_buffer(name, params):
-  match_r = re.search(r"R: (\d+)", params["timing"])
+  match_r = re.search(r"R: (\d+)", params[ATTR_TIMING])
   timing_r = False if not match_r else bool(match_r[0])
-  match_d = re.search(r"D: (\d+)", params["timing"])
+  match_d = re.search(r"D: (\d+)", params[ATTR_TIMING])
   timing_d = False if not match_d else bool(match_d[0])
-  match_v = re.search(r"V: (\d+)", params["timing"])
+  match_v = re.search(r"V: (\d+)", params[ATTR_TIMING])
   timing_v = False if not match_v else bool(match_v[0])
   transparent = timing_r and not (timing_d or timing_v)
 
-  slots = params["slots"] if "slots" in params else 1
-  data_type = SmvScalarType(params["data_type"])
+  slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   if transparent and slots > 1 and data_type.bitwidth == 0:
     return _generate_tfifo_dataless(name, slots)

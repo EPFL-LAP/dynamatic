@@ -1,9 +1,9 @@
 from generators.handshake.join import generate_join
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_cond_br(name, params):
-  data_type = SmvScalarType(params["data_type"])
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   if data_type.bitwidth == 0:
     return _generate_cond_br_dataless(name)

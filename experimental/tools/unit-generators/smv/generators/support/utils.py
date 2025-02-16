@@ -1,7 +1,13 @@
 import re
 
-
-
+ATTR_DATA_TYPE = "data_type"
+ATTR_ADDR_TYPE = "addr_type"
+ATTR_SELECT_TYPE = "select_type"
+ATTR_INDEX_TYPE = "index_type"
+ATTR_TIMING = "timing"
+ATTR_SIZE = "size"
+ATTR_SLOTS = "slots"
+ATTR_VALUE = "value"
 
 class SmvScalarType:
 

@@ -1,10 +1,10 @@
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 from generators.handshake.buffer import generate_buffer
 
 
 def generate_load(name, params):
-  data_type = SmvScalarType(params["data_type"])
-  addr_type = SmvScalarType(params["addr_type"])
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  addr_type = SmvScalarType(params[ATTR_ADDR_TYPE])
 
   return _generate_load(name, data_type, addr_type)
 
