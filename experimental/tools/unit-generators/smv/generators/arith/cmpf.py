@@ -1,12 +1,12 @@
 from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_cmpf(name, params):
-  predicate = params["predicate"]
+  predicate = params[ATTR_PREDICATE]
   symbol = get_symbol_from_predicate(predicate)
-  latency = params["latency"]
-  data_type = SmvScalarType(params["data_type"])
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   return _generate_cmpf(name, latency, symbol, data_type)
 

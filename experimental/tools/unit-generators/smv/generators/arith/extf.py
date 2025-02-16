@@ -1,11 +1,11 @@
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_extf(name, params):
-  latency = params["latency"]
-  input_type = SmvScalarType(params["input_type"])
-  output_type = SmvScalarType(params["output_type"])
+  latency = params[ATTR_LATENCY]
+  input_type = SmvScalarType(params[ATTR_INPUT_TYPE])
+  output_type = SmvScalarType(params[ATTR_OUTPUT_TYPE])
 
   return _generate_extf(name, latency, input_type, output_type)
 
