@@ -1,10 +1,10 @@
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_negf(name, params):
-  latency = params["latency"]
-  data_type = SmvScalarType(params["data_type"])
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
   return _generate_negf(name, latency, data_type)
 
