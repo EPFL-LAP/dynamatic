@@ -156,5 +156,8 @@ test_generator -t shrui -p data_type='"!handshake.channel<ii32>"' latency=0
 echo -e "\nTesting sitofp..."
 test_generator -t sitofp -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<f32>"' latency=5
 
+echo -e "\nTesting subf..."
+test_generator -t subf -p data_type='"!handshake.channel<f32>"' latency=9
+test_generator -t subf -p data_type='"!handshake.channel<f64>"' latency=12
 
 rm $OUT
