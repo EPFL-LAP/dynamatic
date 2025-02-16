@@ -121,6 +121,9 @@ test_generator -t divui -p data_type='"!handshake.channel<i32>"' latency=35
 echo -e "\nTesting extf..."
 test_generator -t extf -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<f64>"' latency=0
 
+echo -e "\nTesting extsi..."
+test_generator -t extsi -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<i64>"' latency=0
+
 echo -e "\nTesting extui..."
 test_generator -t extui -p input_type='"!handshake.channel<ui32>"' output_type='"!handshake.channel<ui64>"' latency=0
 
