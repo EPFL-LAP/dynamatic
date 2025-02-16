@@ -91,7 +91,7 @@ def generate_code(name, mod_type, parameters):
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
     case "cmpf":
-      return cmpi.generate_cmpf(name, parameters)
+      return cmpf.generate_cmpf(name, parameters)
     case "divf":
       return divf.generate_divf(name, parameters)
     case "divsi":
