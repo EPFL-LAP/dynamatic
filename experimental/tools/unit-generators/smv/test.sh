@@ -105,6 +105,9 @@ test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predic
 test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
 test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
 
+echo -e "\nTesting cmpf..."
+test_generator -t cmpf -p data_type='"!handshake.channel<f32>"' latency=0 predicate='"oeq"' 
+
 echo -e "\nTesting divf..."
 test_generator -t divf -p data_type='"!handshake.channel<f32>"' latency=29
 test_generator -t divf -p data_type='"!handshake.channel<f64>"' latency=36

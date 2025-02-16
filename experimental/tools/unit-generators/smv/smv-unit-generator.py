@@ -23,6 +23,7 @@ import generators.arith.addf as addf
 import generators.arith.addi as addi
 import generators.arith.andi as andi
 import generators.arith.cmpi as cmpi
+import generators.arith.cmpf as cmpf
 import generators.arith.divf as divf
 import generators.arith.divsi as divsi
 import generators.arith.divui as divui
@@ -81,6 +82,8 @@ def generate_code(name, mod_type, parameters):
       return andi.generate_andi(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
+    case "cmpf":
+      return cmpi.generate_cmpf(name, parameters)
     case "divf":
       return divf.generate_divf(name, parameters)
     case "divsi":
