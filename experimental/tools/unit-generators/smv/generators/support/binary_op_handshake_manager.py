@@ -1,4 +1,5 @@
 from generators.support.delay_buffer import generate_delay_buffer
+from generators.support.arith_op_headers import generate_unanary_op_header
 from generators.handshake.join import generate_join
 
 
