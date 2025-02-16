@@ -1,4 +1,5 @@
 from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
+from generators.support.arith_op_headers import generate_binary_op_header
 from generators.support.utils import *
 
 
@@ -14,13 +15,7 @@ def generate_shrui(name, params):
 
 def _generate_shrui(name, latency, data_type):
   return f"""
-MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
-  VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
-
-  // output
-  DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
-  DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
-  DEFINE outs_valid := inner_handshake_manager.outs_valid;
+{generate_binary_op_header(name)}
   DEFINE outs := lhs >> rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
@@ -28,13 +23,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
 
 def _generate_shrui_cast(name, latency, data_type):
   return f"""
-MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
-  VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
-
-  // output
-  DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
-  DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
-  DEFINE outs_valid := inner_handshake_manager.outs_valid;
+{generate_binary_op_header(name)}
   DEFINE outs := unsigned(lhs) >> rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
