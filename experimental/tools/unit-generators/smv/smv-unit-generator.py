@@ -42,6 +42,7 @@ import generators.arith.sitofp as sitofp
 import generators.arith.subf as subf
 import generators.arith.subi as subi
 import generators.arith.truncf as truncf
+import generators.arith.xori as xori
 
 
 def generate_code(name, mod_type, parameters):
@@ -124,6 +125,8 @@ def generate_code(name, mod_type, parameters):
       return subi.generate_subi(name, parameters)
     case "truncf":
       return truncf.generate_truncf(name, parameters)
+    case "xori":
+      return xori.generate_xori(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
