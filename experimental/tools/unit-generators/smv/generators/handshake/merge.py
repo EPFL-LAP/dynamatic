@@ -48,10 +48,3 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, out
 {generate_merge_notehb(f"{name}__merge_notehb", size, data_type)}
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
 """
-
-
-if __name__ == "__main__":
-  print(generate_merge("test_merge_dataless", {
-        "size": 4, "data_type": "!handshake.control<>"}))
-  print(generate_merge("test_merge", {
-        "size": 2, "data_type": "!handshake.channel<i32>"}))

@@ -6,7 +6,3 @@ MODULE {name}(outs_ready)
   DEFINE
   outs_valid  := TRUE;
 """
-
-
-if __name__ == "__main__":
-  print(generate_source("test_source", {}))

@@ -28,9 +28,3 @@ MODULE {name}(ins, ins_valid)
   DEFINE
   ins_ready  :=  TRUE;
 """
-
-
-if __name__ == "__main__":
-  print(generate_sink("test_sink_dataless", {
-        "data_type": "!handshake.control<>"}))
-  print(generate_sink("test_sink", {"data_type": "!handshake.channel<i32>"}))

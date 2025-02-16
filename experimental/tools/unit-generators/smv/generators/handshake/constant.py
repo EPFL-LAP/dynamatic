@@ -18,8 +18,3 @@ MODULE {name}(ins_valid, outs_ready)
   outs_valid := ins_valid;
   outs := {data_type.format_constant(value)};
 """
-
-
-if __name__ == "__main__":
-  print(generate_constant("test_constant", {
-        "value": 42, "data_type": "!handshake.channel<i32>"}))

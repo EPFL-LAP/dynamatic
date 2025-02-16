@@ -28,8 +28,3 @@ MODULE {name}(addr_in, addr_in_valid, data_from_mem, data_from_mem_valid, addr_o
 {generate_buffer(f"{name}__addr_tehb", {"slots": 1, "timing": "R: 1", "data_type": addr_type.mlir_type})}
 {generate_buffer(f"{name}__data_tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
 """
-
-
-if __name__ == "__main__":
-  print(generate_load("test_load", {
-        "data_type": "!handshake.channel<i32>", "addr_type": "!handshake.channel<i32>"}))

@@ -66,10 +66,3 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, out
 
 {_generate_control_merge_dataless(f"{name}__control_merge_dataless", size, index_type)}
 """
-
-
-if __name__ == "__main__":
-  print(generate_control_merge("test_control_merge_dataless",
-        {"size": 4, "index_type": "!handshake.channel<i32>", "data_type": "!handshake.control<>"}))
-  print(generate_control_merge(
-      "test_control_merge_fork", {"size": 2, "index_type": "!handshake.channel<i1>", "data_type": "!handshake.channel<i32>"}))

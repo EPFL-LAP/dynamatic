@@ -49,8 +49,3 @@ MODULE antitoken__{name} (ins_valid_0, ins_valid_1, generate_at_0, generate_at_1
   kill_0 := generate_at_0 | reg_out_0;
   kill_1 := generate_at_1 | reg_out_1;
 """
-
-
-if __name__ == "__main__":
-  print(_generate_select("test_select", {
-        "data_type": "!handshake.channel<i32>"}))

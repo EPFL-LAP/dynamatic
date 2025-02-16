@@ -31,8 +31,3 @@ MODULE {name}(ins, ins_valid, outs_ready)
   outs_valid :=  ins_valid;
   ins_ready  :=  outs_ready;
 """
-
-
-if __name__ == "__main__":
-  print(generate_br("test_br_dataless", {"data_type": "!handshake.control<>"}))
-  print(generate_br("test_br", {"data_type": "!handshake.channel<i32>"}))

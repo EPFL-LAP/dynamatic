@@ -21,8 +21,3 @@ MODULE {name}(data_in, data_in_valid, addr_in, addr_in_valid, data_to_mem_ready,
   addr_out := addr_in;
   addr_out_valid := addr_in_valid;
 """
-
-
-if __name__ == "__main__":
-  print(generate_store("test_store", {
-        "data_type": "!handshake.channel<i32>", "addr_type": "!handshake.channel<i32>"}))
