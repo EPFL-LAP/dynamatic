@@ -155,6 +155,10 @@
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=0 input_type=\"$INPUT_TYPE\" output_type=\"$OUTPUT_TYPE\""
   },
   {
+    "name": "handshake.extsi",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=0 input_type=\"$INPUT_TYPE\" output_type=\"$OUTPUT_TYPE\""
+  },
+  {
     "name": "handshake.extui",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=0 input_type=\"$INPUT_TYPE\" output_type=\"$OUTPUT_TYPE\""
   },
