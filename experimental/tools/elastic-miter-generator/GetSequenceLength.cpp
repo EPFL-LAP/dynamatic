@@ -9,6 +9,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include <any>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -34,14 +35,14 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     llvm::errs() << "Failed to create reachability module.\n";
     return failure();
   }
-  auto [miterModule, json] = ret.value();
+  auto [miterModule, config] = ret.value();
 
-  std::string mlirFilename =
-      "elastic_miter_" + json["funcName"].getAsString()->str() + ".mlir";
+  std::string mlirFilename = "elastic_miter_" +
+                             std::any_cast<std::string>(config["funcName"]) +
+                             ".mlir";
   std::filesystem::path mlirPath = outputDir / mlirFilename;
 
-  // TODO ...
-  if (failed(createFiles(outputDir, mlirFilename, miterModule, json))) {
+  if (failed(createMlirFile(outputDir, mlirFilename, miterModule))) {
     llvm::errs() << "Failed to write miter files.\n";
     return failure();
   }
@@ -51,10 +52,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   auto dstSmv = failOrDstSmv.value();
 
-  // TODO json
-  auto fail = dynamatic::experimental::createMiterWrapper(
-      outputDir / "main_inf.smv", outputDir / "elastic-miter-config.json",
-      dstSmv.filename(), 0);
+  auto fail = dynamatic::experimental::createWrapper(outputDir / "main_inf.smv",
+                                                     config, dstSmv.stem(), 0);
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -83,9 +82,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     std::filesystem::path wrapperPath =
         outputDir / ("main_" + std::to_string(n) + ".smv");
 
-    auto fail = dynamatic::experimental::createMiterWrapper(
-        wrapperPath, outputDir / "elastic-miter-config.json", dstSmv.filename(),
-        0);
+    auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
+                                                       dstSmv.stem(), 0);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << n
                    << " token reachability wrapper.\n";

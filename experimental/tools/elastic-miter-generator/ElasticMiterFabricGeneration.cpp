@@ -12,10 +12,14 @@
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
+#include <any>
 #include <filesystem>
+#include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -211,7 +215,6 @@ LogicalResult createFiles(const std::filesystem::path &outputDir,
   fileStream.close();
 
   // Create the JSON config file
-  SmallString<128> outJsonFile;
   std::filesystem::path jsonPath = outputDir / "elastic-miter-config.json";
   llvm::raw_fd_ostream jsonFileStream(jsonPath.string(), ec,
                                       llvm::sys::fs::OF_None);
@@ -225,7 +228,27 @@ LogicalResult createFiles(const std::filesystem::path &outputDir,
   return success();
 }
 
-FailureOr<std::pair<ModuleOp, llvm::json::Object>>
+LogicalResult createMlirFile(const std::filesystem::path &outputDir,
+                             StringRef mlirFilename, ModuleOp mod) {
+
+  std::error_code ec;
+  OpPrintingFlags printingFlags;
+
+  // Create the output directory
+  std::filesystem::create_directories(outputDir);
+
+  // Create the the handshake miter file
+  std::filesystem::path mlirPath = outputDir / mlirFilename.str();
+  llvm::raw_fd_ostream fileStream(mlirPath.string(), ec,
+                                  llvm::sys::fs::OF_None);
+
+  mod->print(fileStream, printingFlags);
+  fileStream.close();
+
+  return success();
+}
+
+FailureOr<std::pair<ModuleOp, llvm::StringMap<std::any>>>
 createReachabilityCircuit(MLIRContext &context, StringRef filename) {
 
   OwningOpRef<ModuleOp> mod = parseSourceFile<ModuleOp>(filename, &context);
@@ -297,14 +320,14 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
     }
   }
 
-  llvm::json::Array resNames;
+  SmallVector<std::string> resNames;
   for (Attribute attr : funcOp.getResNames()) {
     auto strAttr = attr.dyn_cast<StringAttr>();
     if (strAttr) {
       resNames.push_back(strAttr.getValue().str());
     }
   }
-  llvm::json::Array argNames;
+  SmallVector<std::string> argNames;
   for (Attribute attr : funcOp.getArgNames()) {
     auto strAttr = attr.dyn_cast<StringAttr>();
     if (strAttr) {
@@ -312,18 +335,23 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
     }
   }
 
-  llvm::json::Object jsonObject = *new llvm::json::Object;
-  jsonObject["arguments"] = std::move(argNames);
-  jsonObject["results"] = std::move(resNames);
-  jsonObject["funcName"] = funcOp.getNameAttr().str();
+  // llvm::json::Object jsonObject = *new llvm::json::Object;
+  // jsonObject["arguments"] = llvm::json::Array(argNames);
+  // jsonObject["results"] = llvm::json::Array(resNames);
+  // jsonObject["funcName"] = funcOp.getNameAttr().str();
 
-  return std::make_pair(mod.release(), jsonObject);
+  llvm::StringMap<std::any> config;
+  config["arguments"] = argNames;
+  config["results"] = resNames;
+  config["funcName"] = funcOp.getNameAttr().str();
+
+  return std::make_pair(mod.release(), config);
 }
 
 // This creates an elastic-miter module given the path to two MLIR files. The
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
-FailureOr<std::pair<ModuleOp, llvm::json::Object>>
+FailureOr<std::pair<ModuleOp, llvm::StringMap<std::any>>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                    size_t bufferSlots) {
 
@@ -371,10 +399,10 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   builder.setInsertionPointToStart(newBlock);
 
   // We need to keep track of the names to add them to the JSON config file
-  llvm::json::Array inputBufferNames;
-  llvm::json::Array outputBufferNames;
-  llvm::json::Array ndwireNames;
-  llvm::json::Array eqNames;
+  llvm::SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs;
+  llvm::SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs;
+  llvm::SmallVector<std::string> ndwireNames;
+  llvm::SmallVector<std::string> eqNames;
 
   Operation *nextLocation;
 
@@ -418,13 +446,10 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     nextLocation = rhsNDWireOp;
 
-    llvm::json::Array inputBufferPair;
-    inputBufferPair.push_back(lhsBufName);
-    inputBufferPair.push_back(rhsBufName);
-    inputBufferNames.push_back(std::move(inputBufferPair));
+    inputBufferNamePairs.push_back(std::make_pair(lhsBufName, rhsBufName));
 
-    ndwireNames.push_back(std::move(lhsNdwName));
-    ndwireNames.push_back(std::move(rhsNdwName));
+    ndwireNames.push_back(lhsNdwName);
+    ndwireNames.push_back(rhsNdwName);
 
     // Use the newly created fork's output instead of the original argument in
     // the lhsFuncOp's operations
@@ -495,15 +520,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
         rhsEndBufferOp.getResult());
     setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
 
-    llvm::json::Array outputBufferPair;
-    outputBufferPair.push_back(lhsBufName);
-    outputBufferPair.push_back(rhsBufName);
-    outputBufferNames.push_back(std::move(outputBufferPair));
+    outputBufferNamePairs.push_back(std::make_pair(lhsBufName, rhsBufName));
 
-    ndwireNames.push_back(std::move(lhsNDwName));
-    ndwireNames.push_back(std::move(rhsNDwName));
+    ndwireNames.push_back(lhsNDwName);
+    ndwireNames.push_back(rhsNDwName);
 
-    eqNames.push_back(std::move(eqName));
+    eqNames.push_back(eqName);
 
     eqResults.push_back(compOp.getResult());
   }
@@ -548,20 +570,30 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   // TODO what do we actually need here?
   // Create a new jsonObject and put all required names into it
-  llvm::json::Object jsonObject = *new llvm::json::Object;
-  jsonObject["input_buffers"] = std::move(inputBufferNames);
-  jsonObject["output_buffers"] = std::move(outputBufferNames);
-  jsonObject["arguments"] = std::move(argNames);
-  jsonObject["results"] = std::move(resNames);
-  jsonObject["ndwires"] = std::move(ndwireNames);
-  jsonObject["eq"] = std::move(eqNames);
-  jsonObject["lhsFuncName"] = lhsFuncOp.getNameAttr().str();
-  jsonObject["rhsFuncName"] = rhsFuncOp.getNameAttr().str();
+  // llvm::json::Object jsonObject = *new llvm::json::Object;
+  // jsonObject["input_buffers"] = llvm::json::Array(inputBufferNamePairs);
+  // jsonObject["output_buffers"] = llvm::json::Array(outputBufferNamePairs);
+  // jsonObject["arguments"] = llvm::json::Array(argNames);
+  // jsonObject["results"] = llvm::json::Array(resNames);
+  // jsonObject["ndwires"] = llvm::json::Array(ndwireNames);
+  // jsonObject["eq"] = llvm::json::Array(eqNames);
+  // jsonObject["lhsFuncName"] = lhsFuncOp.getNameAttr().str();
+  // jsonObject["rhsFuncName"] = rhsFuncOp.getNameAttr().str();
 
-  return std::make_pair(miterModule, jsonObject);
+  llvm::StringMap<std::any> config;
+  config["input_buffers"] = inputBufferNamePairs;
+  config["output_buffers"] = outputBufferNamePairs;
+  config["arguments"] = argNames;
+  config["results"] = resNames;
+  config["ndwires"] = ndwireNames;
+  config["eq"] = eqNames;
+  config["lhsFuncName"] = lhsFuncOp.getNameAttr().str();
+  config["rhsFuncName"] = rhsFuncOp.getNameAttr().str();
+
+  return std::make_pair(miterModule, config);
 }
 
-FailureOr<std::filesystem::path>
+FailureOr<std::pair<std::filesystem::path, llvm::StringMap<std::any>>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens) {
@@ -587,17 +619,17 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();
   }
-  auto [miterModule, json] = ret.value();
+  auto [miterModule, config] = ret.value();
 
-  std::string mlirFilename = "elastic_miter_" +
-                             json["lhsFuncName"].getAsString()->str() + "_" +
-                             json["lhsFuncName"].getAsString()->str() + ".mlir";
+  std::string mlirFilename =
+      "elastic_miter_" + std::any_cast<std::string>(config["lhsFuncName"]) +
+      "_" + std::any_cast<std::string>(config["rhsFuncName"]) + ".mlir";
 
-  if (failed(createFiles(outputDir, mlirFilename, miterModule, json))) {
-    llvm::errs() << "Failed to write miter files.\n";
+  if (failed(createMlirFile(outputDir, mlirFilename, miterModule))) {
+    llvm::errs() << "Failed to write MLIR miter file.\n";
     return failure();
   }
-  return outputDir / mlirFilename;
+  return std::make_pair(outputDir / mlirFilename, config);
 }
 
 } // namespace dynamatic::experimental

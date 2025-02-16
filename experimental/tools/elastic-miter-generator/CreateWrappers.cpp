@@ -1,5 +1,6 @@
 #include "mlir/IR/Attributes.h"
 
+#include <any>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/StringMap.h"
 
 using namespace mlir;
 
@@ -70,7 +72,6 @@ std::string createSinks(const std::string &moduleName,
                         const SmallVector<std::string> &resNames,
                         size_t nrOfTokens) {
   std::ostringstream sinks;
-  // TODO ...
   sinks << "  -- TODO make sure we have sink_1_0\n";
   for (size_t i = 0; i < resNames.size(); ++i) {
     sinks << "  VAR sink" << i << " : sink_1_0(" << moduleName << "."
@@ -81,19 +82,21 @@ std::string createSinks(const std::string &moduleName,
 }
 
 std::string createMiterProperties(
+    const std::string &moduleName,
     const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
-    const SmallVector<std::string> &outputBuffers,
+    const SmallVector<std::pair<std::string, std::string>> &outputBuffers,
     const SmallVector<std::string> &results) {
   std::ostringstream properties;
 
   for (const auto &result : results) {
-    properties << "CTLSPEC AG (miter." + result + "_valid -> miter." + result +
-                      "_out)\n";
+    properties << "CTLSPEC AG (" << moduleName << "." + result + "_valid -> "
+               << moduleName << "." + result + "_out)\n";
   }
 
   std::string outputProp;
   for (const auto &buffer : outputBuffers) {
-    outputProp += "miter." + buffer + ".num = 0 & ";
+    outputProp += moduleName + "." + buffer.first + ".num = 0 & ";
+    outputProp += moduleName + "." + buffer.second + ".num = 0 & ";
   }
 
   if (!outputProp.empty())
@@ -101,8 +104,8 @@ std::string createMiterProperties(
 
   std::string inputProp;
   for (const auto &bufferPair : inputBuffers) {
-    inputProp += "miter." + bufferPair.first + ".num = miter." +
-                 bufferPair.second + ".num & ";
+    inputProp += moduleName + "." + bufferPair.first + ".num = " + moduleName +
+                 "." + bufferPair.second + ".num & ";
   }
 
   if (!inputProp.empty())
@@ -115,67 +118,83 @@ std::string createMiterProperties(
   return properties.str();
 }
 
-// TODO make this cleaner
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            const std::filesystem::path &jsonPath,
+                            llvm::StringMap<std::any> config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties) {
-  std::ifstream file(jsonPath);
-  if (!file) {
-    llvm::errs() << "Config JSON file not found\n";
-    return failure();
-  }
+  // TODO remove
+  // std::ifstream file(jsonPath);
+  // if (!file) {
+  //   llvm::errs() << "Config JSON file not found\n";
+  //   return failure();
+  // }
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  file.close();
+  // std::stringstream buffer;
+  // buffer << file.rdbuf();
+  // file.close();
 
-  llvm::Expected<llvm::json::Value> jsonValue = llvm::json::parse(buffer.str());
-  if (!jsonValue) {
-    llvm::errs() << "Failed parsing JSON\n";
-    return failure();
-  }
+  // llvm::Expected<llvm::json::Value> jsonValue =
+  // llvm::json::parse(buffer.str()); if (!jsonValue) {
+  //   llvm::errs() << "Failed parsing JSON\n";
+  //   return failure();
+  // }
 
-  llvm::json::Object *config = jsonValue->getAsObject();
-  if (!config) {
-    llvm::errs() << "Failed parsing JSON\n";
-    return failure();
-  }
+  // llvm::json::Object *config = jsonValue->getAsObject();
+  // if (!config) {
+  //   llvm::errs() << "Failed parsing JSON\n";
+  //   return failure();
+  // }
 
-  SmallVector<std::string> argNames;
-  if (auto *args = config->getArray("arguments")) {
-    for (const auto &arg : *args) {
-      argNames.push_back(arg.getAsString()->str());
-    }
-  }
+  // SmallVector<std::string> argNames;
+  // if (auto *args = config->getArray("arguments")) {
+  //   for (const auto &arg : *args) {
+  //     argNames.push_back(arg.getAsString()->str());
+  //   }
+  // }
 
-  SmallVector<std::string> resNames;
-  if (auto *args = config->getArray("results")) {
-    for (const auto &arg : *args) {
-      resNames.push_back(arg.getAsString()->str());
-    }
-  }
+  // SmallVector<std::string> resNames;
+  // if (auto *args = config->getArray("results")) {
+  //   for (const auto &arg : *args) {
+  //     resNames.push_back(arg.getAsString()->str());
+  //   }
+  // }
 
-  SmallVector<std::string> outputBufferNames;
-  if (auto *args = config->getArray("output_buffers")) {
-    for (const auto &arg : *args) {
-      outputBufferNames.push_back(arg.getAsString()->str());
-    }
-  }
+  // SmallVector<std::string> outputBufferNames;
+  // if (auto *args = config->getArray("output_buffers")) {
+  //   for (const auto &arg : *args) {
+  //     outputBufferNames.push_back(arg.getAsString()->str());
+  //   }
+  // }
 
-  SmallVector<std::pair<std::string, std::string>> inputBufferNames;
-  std::string inputProp;
-  if (auto *inBufs = config->getArray("input_buffers")) {
-    for (const auto &bufPair : *inBufs) {
-      if (auto *pair = bufPair.getAsArray()) {
-        inputBufferNames.push_back(std::make_pair(
-            (*pair)[0].getAsString()->str(), (*pair)[1].getAsString()->str()));
-      }
-    }
-  }
+  // SmallVector<std::pair<std::string, std::string>> inputBufferNames;
+  // std::string inputProp;
+  // if (auto *inBufs = config->getArray("input_buffers")) {
+  //   for (const auto &bufPair : *inBufs) {
+  //     if (auto *pair = bufPair.getAsArray()) {
+  //       inputBufferNames.push_back(std::make_pair(
+  //           (*pair)[0].getAsString()->str(),
+  //           (*pair)[1].getAsString()->str()));
+  //     }
+  //   }
+  // }
+
+  SmallVector<std::string> argNames =
+      std::any_cast<SmallVector<std::string>>(config["arguments"]);
+
+  SmallVector<std::string> resNames =
+      std::any_cast<SmallVector<std::string>>(config["results"]);
+
+  SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs =
+      std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
+          config["output_buffers"]);
+
+  SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs =
+      std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
+          config["input_buffers"]);
+  ;
 
   std::ostringstream wrapper;
-  wrapper << "#include \"" + modelSmvName + "\"\n";
+  wrapper << "#include \"" + modelSmvName + ".smv\"\n";
   wrapper << BOOL_INPUT;
   wrapper << BOOL_INPUT_INF;
 
@@ -192,8 +211,8 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
   wrapper << "\n";
 
   if (includeProperties) {
-    wrapper << createMiterProperties(inputBufferNames, outputBufferNames,
-                                     resNames);
+    wrapper << createMiterProperties(modelSmvName, inputBufferNamePairs,
+                                     outputBufferNamePairs, resNames);
   }
 
   std::ofstream mainFile(wrapperPath);

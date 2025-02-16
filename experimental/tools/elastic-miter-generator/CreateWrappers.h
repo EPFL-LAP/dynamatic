@@ -1,5 +1,6 @@
 
 #include "mlir/IR/BuiltinOps.h"
+#include <any>
 #include <filesystem>
 #include <string>
 
@@ -15,7 +16,7 @@ FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
                                                    bool inf = false);
 
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            const std::filesystem::path &jsonPath,
+                            const llvm::StringMap<std::any> &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties = false);
 

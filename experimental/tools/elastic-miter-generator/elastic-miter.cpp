@@ -97,13 +97,13 @@ int main(int argc, char **argv) {
   size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
   // Create Miter module with needed N
-  auto failOrMlirPath = dynamatic::experimental::createMiterFabric(
+  auto failOrPair = dynamatic::experimental::createMiterFabric(
       context, lhsPath, rhsPath, outputDir.string(), n);
-  if (failed(failOrMlirPath)) {
+  if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return 1;
   }
-  auto mlirPath = failOrMlirPath.value();
+  auto [mlirPath, config] = failOrPair.value();
 
   auto failOrSmvPath = dynamatic::experimental::handshake2smv(mlirPath, false);
   if (failed(failOrSmvPath)) {
@@ -114,11 +114,9 @@ int main(int argc, char **argv) {
 
   // TODO ...
   std::filesystem::path wrapperPath = outputDir / "main.smv";
-  std::filesystem::path jsonPath = outputDir / "elastic-miter-config.json";
 
-  // TODO json
-  auto fail = dynamatic::experimental::createWrapper(
-      wrapperPath, jsonPath, smvPath.filename(), n, true);
+  auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
+                                                     smvPath.stem(), n, true);
   if (failed(fail))
     return 1;
 
