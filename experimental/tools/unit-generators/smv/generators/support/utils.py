@@ -1,6 +1,8 @@
 import re
 
 
+
+
 class SmvScalarType:
 
   mlir_type: str
@@ -44,3 +46,6 @@ class SmvScalarType:
 
   def __str__(self):
     return f"{self.smv_type}"
+
+
+HANSHAKE_CONTROL_TYPE = SmvScalarType("!handshake.control<>")

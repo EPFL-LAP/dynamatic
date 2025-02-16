@@ -3,7 +3,7 @@ from generators.support.merge_notehb import (
 )
 from generators.handshake.buffer import generate_buffer
 from generators.handshake.fork import generate_fork
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_control_merge(name, params):
@@ -40,7 +40,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", size)}
 {generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": index_type.mlir_type})}
-{generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": "!handshake.control<>"})}
+{generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": HANSHAKE_CONTROL_TYPE})}
 """
 
 

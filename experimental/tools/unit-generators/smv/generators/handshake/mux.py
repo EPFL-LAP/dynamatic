@@ -1,5 +1,5 @@
 from generators.handshake.buffer import generate_buffer
-from generators.support.utils import SmvScalarType
+from generators.support.utils import *
 
 
 def generate_mux(name, params):
@@ -31,7 +31,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, index, index
   index_ready := !index_valid | tehb_ins_valid & inner_tehb.ins_ready;
   outs_valid := inner_tehb.outs_valid;
 
-{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1", "data_type": "!handshake.control<>"})}
+{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1", "data_type": HANSHAKE_CONTROL_TYPE})}
 """
 
 
