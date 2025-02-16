@@ -1,4 +1,5 @@
 from generators.support.delay_buffer import generate_delay_buffer
+from generators.support.arith_op_headers import generate_unanary_op_header
 from generators.support.utils import *
 
 
@@ -11,12 +12,7 @@ def generate_absf(name, params):
 
 def _generate_absf(name, latency, data_type):
   return f"""
-MODULE {name}(ins, ins_valid, outs_ready)
-  VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
-
-  // output
-  DEFINE ins_ready := inner_delay_buffer.ins_ready;
-  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+{generate_unanary_op_header(name)}
   DEFINE outs := ins;
   
   {generate_delay_buffer(f"{name}__delay_buffer", latency)}
