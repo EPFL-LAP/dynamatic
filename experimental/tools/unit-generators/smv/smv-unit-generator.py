@@ -38,6 +38,7 @@ import generators.arith.ori as ori
 import generators.arith.shli as shli
 import generators.arith.shrsi as shrsi
 import generators.arith.shrui as shrui
+import generators.arith.sitofp as sitofp
 
 
 def generate_code(name, mod_type, parameters):
@@ -112,6 +113,8 @@ def generate_code(name, mod_type, parameters):
       return shrsi.generate_shrsi(name, parameters)
     case "shrui":
       return shrui.generate_shrui(name, parameters)
+    case "sitofp":
+      return sitofp.generate_sitofp(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
