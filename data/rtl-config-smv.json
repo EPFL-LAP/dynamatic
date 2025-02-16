@@ -197,5 +197,16 @@
   {
     "name": "handshake.sitofp",
     "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=5 input_type=\"$INPUT_TYPE\" output_type=\"$OUTPUT_TYPE\""
+  },
+  {
+    "name": "handshake.subf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
+    ],
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=12 data_type=\"$DATA_TYPE\""
+  },
+  {
+    "name": "handshake.subf",
+    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t $TYPE_NAME latency=9 data_type=\"$DATA_TYPE\""
   }
 ]
