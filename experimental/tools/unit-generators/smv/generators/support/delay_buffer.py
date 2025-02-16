@@ -3,7 +3,7 @@ from generators.handshake.buffer import generate_buffer
 
 def generate_delay_buffer(name, latency):
   if latency == 0:
-    _generate_no_lat_delay_buffer(name)
+    return _generate_no_lat_delay_buffer(name)
   elif latency == 1:
     return _generate_single_delay_buffer(name)
   else:

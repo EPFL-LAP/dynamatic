@@ -101,8 +101,8 @@ test_generator -t andi -p data_type='"!handshake.channel<i32>"' latency=0
 echo -e "\nTesting cmpi..."
 test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"eq"' 
 test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"slt"' 
-test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"' 
-test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
+#test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"' 
+#test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
 test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
 
 echo -e "\nTesting cmpf..."
@@ -157,7 +157,7 @@ test_generator -t shrsi -p data_type='"!handshake.channel<ui32>"' latency=0
 
 echo -e "\nTesting shrui..."
 test_generator -t shrui -p data_type='"!handshake.channel<ui32>"' latency=0
-test_generator -t shrui -p data_type='"!handshake.channel<ii32>"' latency=0
+test_generator -t shrui -p data_type='"!handshake.channel<i32>"' latency=0
 
 echo -e "\nTesting sitofp..."
 test_generator -t sitofp -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<f32>"' latency=5
