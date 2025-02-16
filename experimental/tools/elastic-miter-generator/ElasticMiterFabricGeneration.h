@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO
+// This file implements a generator for an elastic-miter circuit.
 //
 //===----------------------------------------------------------------------===//
 
@@ -59,16 +59,25 @@ LogicalResult createFiles(const std::filesystem::path &outputDir,
                           StringRef mlirFilename, ModuleOp mod,
                           llvm::json::Object jsonObject);
 
+// This creates an elastic-miter module given the path to two MLIR files. The
+// files need to contain exactely one module each. Each module needs to contain
+// exactely one handshake.func.
+FailureOr<std::pair<ModuleOp, llvm::json::Object>>
+createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
+                   size_t bufferSlots);
+
+// Creates a reachability circuit. Essentially ND wires are put at all in- and
+// outputs of the circuit. Additionally creates a json config file with the name
+// of the funcOp, and its argument and results.
 FailureOr<std::pair<ModuleOp, llvm::json::Object>>
 createReachabilityCircuit(MLIRContext &context, StringRef filename);
 
-// TODO This creates an elastic-miter module given the path to two MLIR files.
-// The files need to contain exactely one module each. Each module needs to
-// contain exactely one handshake.func.
+// This creates an elastic-miter MLIR module and a JSON config file given the
+// path to two MLIR files. The input files need to contain exactly one module
+// each. Each module needs to contain exactely one handshake.func.
 FailureOr<std::filesystem::path>
-createMiterFabric(MLIRContext &context,
-                  const std::filesystem::path &lhsFilename,
-                  const std::filesystem::path &rhsFilename,
-                  const std::filesystem::path &outputDir, size_t bufferSlots);
+createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
+                  const std::filesystem::path &rhsPath,
+                  const std::filesystem::path &outputDir, size_t nrOfTokens);
 
 } // namespace dynamatic::experimental

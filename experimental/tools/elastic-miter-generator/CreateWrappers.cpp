@@ -1,5 +1,6 @@
 #include "mlir/IR/Attributes.h"
 
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -11,6 +12,7 @@
 #include <string>
 #include <utility>
 
+#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -20,29 +22,62 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
-// TODO pass names of in and output
-std::string createMiterCall(const SmallVector<std::string> &args,
-                            const SmallVector<std::string> &res) {
-  std::ostringstream miter;
-  miter << "VAR miter : elastic_miter(";
+// TODO pass names of in and output and name
+std::string createModuleCall(const std::string &moduleName,
+                             const SmallVector<std::string> &argNames,
+                             const SmallVector<std::string> &resNames) {
+  std::ostringstream call;
+  // TODO does this work?
+  call << "VAR " << moduleName << " : " << moduleName << "(";
 
-  for (size_t i = 0; i < args.size(); ++i) {
+  for (size_t i = 0; i < argNames.size(); ++i) {
     if (i > 0)
-      miter << ", ";
-    miter << "seq_generator" << i << ".dataOut0, seq_generator" << i
-          << ".valid0";
+      call << ", ";
+    call << "seq_generator" << i << ".dataOut0, seq_generator" << i
+         << ".valid0";
   }
 
-  miter << ", ";
+  call << ", ";
 
-  for (size_t i = 0; i < res.size(); ++i) {
+  for (size_t i = 0; i < resNames.size(); ++i) {
     if (i > 0)
-      miter << ", ";
-    miter << "sink" << i << ".ready0";
+      call << ", ";
+    call << "sink" << i << ".ready0";
   }
 
-  miter << ");\n";
-  return miter.str();
+  call << ");\n";
+  return call.str();
+}
+
+std::string createSequenceGenerators(const std::string &moduleName,
+                                     const SmallVector<std::string> &argNames,
+                                     size_t nrOfTokens) {
+  std::ostringstream sequenceGenerators;
+  for (size_t i = 0; i < argNames.size(); ++i) {
+    if (nrOfTokens == 0) {
+      sequenceGenerators << "  VAR seq_generator" << i << " : bool_input_inf("
+                         << moduleName << "." << i << "_ready);\n";
+    } else {
+      sequenceGenerators << "  VAR seq_generator" << i << " : bool_input("
+                         << moduleName << "." << i << "_ready, " << nrOfTokens
+                         << ");\n";
+    }
+  }
+  return sequenceGenerators.str();
+}
+
+std::string createSinks(const std::string &moduleName,
+                        const SmallVector<std::string> &resNames,
+                        size_t nrOfTokens) {
+  std::ostringstream sinks;
+  // TODO ...
+  sinks << "  -- TODO make sure we have sink_1_0\n";
+  for (size_t i = 0; i < resNames.size(); ++i) {
+    sinks << "  VAR sink" << i << " : sink_1_0(" << moduleName << "."
+          << resNames[i] << "_out, " << moduleName << "." << resNames[i]
+          << "_valid);\n";
+  }
+  return sinks.str();
 }
 
 std::string createMiterProperties(
@@ -81,10 +116,10 @@ std::string createMiterProperties(
 }
 
 // TODO make this cleaner
-LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
-                                 const std::filesystem::path &jsonPath,
-                                 const std::string &modelSmvName,
-                                 size_t nrOfTokens) {
+LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
+                            const std::filesystem::path &jsonPath,
+                            const std::string &modelSmvName, size_t nrOfTokens,
+                            bool includeProperties) {
   std::ifstream file(jsonPath);
   if (!file) {
     llvm::errs() << "Config JSON file not found\n";
@@ -141,53 +176,25 @@ LogicalResult createMiterWrapper(const std::filesystem::path &wrapperPath,
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + "\"\n";
-  wrapper << "#ifndef BOOL_INPUT\n"
-             "#define BOOL_INPUT\n"
-             "MODULE bool_input(nReady0, max_tokens)\n"
-             "  VAR dataOut0 : boolean;\n"
-             "  VAR counter : 0..31;\n"
-             "  ASSIGN\n"
-             "    init(counter) := 0;\n"
-             "    next(counter) := case\n"
-             "      nReady0 & counter < max_tokens : counter + 1;\n"
-             "      TRUE : counter;\n"
-             "    esac;\n"
-             "\n"
-             "  -- bool_input persistent\n"
-             "  ASSIGN\n"
-             "    next(dataOut0) := case\n"
-             "      valid0 & !nReady0 : dataOut0;\n"
-             "      TRUE : {TRUE, FALSE};\n"
-             "    esac;\n"
-             "\n"
-             "  DEFINE valid0 := counter < max_tokens;\n"
-             "#endif // BOOL_INPUT\n"
-             "\n"
-             "MODULE main\n";
+  wrapper << BOOL_INPUT;
+  wrapper << BOOL_INPUT_INF;
 
-  for (size_t i = 0; i < argNames.size(); ++i) {
-    if (nrOfTokens == 0) {
-      wrapper << "  VAR seq_generator" << i << " : bool_input_inf(miter." << i
-              << "_ready);\n";
-    } else {
-      wrapper << "  VAR seq_generator" << i << " : bool_input(miter." << i
-              << "_ready, " << nrOfTokens << ");\n";
-    }
-  }
-  wrapper << "\n";
-
-  wrapper << "\n  " << createMiterCall(argNames, resNames) << "\n";
-  wrapper << "  -- TODO make sure we have sink_1_0\n";
-
-  for (size_t i = 0; i < resNames.size(); ++i) {
-    wrapper << "  VAR sink" << i << " : sink_1_0(miter." << resNames[i]
-            << "_out, miter." << resNames[i] << "_valid);\n";
-  }
+  wrapper << "MODULE main\n";
 
   wrapper << "\n";
 
-  wrapper << createMiterProperties(inputBufferNames, outputBufferNames,
-                                   resNames);
+  wrapper << createSequenceGenerators(modelSmvName, argNames, nrOfTokens);
+
+  wrapper << createModuleCall(modelSmvName, argNames, resNames) << "\n";
+
+  wrapper << createSinks(modelSmvName, resNames, nrOfTokens);
+
+  wrapper << "\n";
+
+  if (includeProperties) {
+    wrapper << createMiterProperties(inputBufferNames, outputBufferNames,
+                                     resNames);
+  }
 
   std::ofstream mainFile(wrapperPath);
   mainFile << wrapper.str();

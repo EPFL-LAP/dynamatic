@@ -564,7 +564,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 FailureOr<std::filesystem::path>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
-                  const std::filesystem::path &outputDir, size_t bufferSlots) {
+                  const std::filesystem::path &outputDir, size_t nrOfTokens) {
 
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
@@ -582,7 +582,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   }
   ModuleOp rhsModule = rhsModuleRef.get();
 
-  auto ret = createElasticMiter(context, lhsModule, rhsModule, bufferSlots);
+  auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();

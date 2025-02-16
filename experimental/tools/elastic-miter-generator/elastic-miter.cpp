@@ -56,7 +56,9 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "TODO Creates an elastic-miter module in the handshake dialect.\n"
+      "Checks the equivalence of two dynamic circuits in the handshake "
+      "dialect. At the end it will output whether the circuits are "
+      "latency-insensitive equivalent."
       "Takes two MLIR files as input. The files need to contain exactely one "
       "module each.\nEach module needs to contain exactely one "
       "handshake.func. "
@@ -112,16 +114,16 @@ int main(int argc, char **argv) {
 
   // TODO ...
   std::filesystem::path wrapperPath = outputDir / "main.smv";
+  std::filesystem::path jsonPath = outputDir / "elastic-miter-config.json";
 
   // TODO json
-  auto fail = dynamatic::experimental::createMiterWrapper(
-      wrapperPath,
-      "experimental/tools/elastic-miter-generator/out/comp/"
-      "elastic-miter-config.json",
-      smvPath.filename(), n);
+  auto fail = dynamatic::experimental::createWrapper(
+      wrapperPath, jsonPath, smvPath.filename(), n, true);
   if (failed(fail))
     return 1;
 
+  // Put the output of the CTLSPEC check into results.txt. Later we read from
+  // that file to check whether all the CTL properties pass.
   std::filesystem::path output = outputDir / "result.txt";
   std::string command = "check_ctlspec -o " + output.string();
   LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
@@ -136,12 +138,14 @@ int main(int argc, char **argv) {
   std::string line;
   std::ifstream result(output);
   while (getline(result, line)) {
+    // TODO remove
     llvm::outs() << line << "\n";
     if (line.find("is false") != std::string::npos) {
       equivalent = false;
     }
   }
   result.close();
+  // TODO print?
 
   exit(!equivalent);
 }
