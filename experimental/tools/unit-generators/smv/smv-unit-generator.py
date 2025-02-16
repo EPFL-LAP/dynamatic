@@ -41,6 +41,7 @@ import generators.arith.shrui as shrui
 import generators.arith.sitofp as sitofp
 import generators.arith.subf as subf
 import generators.arith.subi as subi
+import generators.arith.truncf as truncf
 
 
 def generate_code(name, mod_type, parameters):
@@ -121,6 +122,8 @@ def generate_code(name, mod_type, parameters):
       return subf.generate_subf(name, parameters)
     case "subi":
       return subi.generate_subi(name, parameters)
+    case "truncf":
+      return truncf.generate_truncf(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
