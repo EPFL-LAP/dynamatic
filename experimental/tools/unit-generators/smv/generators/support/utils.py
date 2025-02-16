@@ -6,6 +6,8 @@ ATTR_SIZE = "size"
 ATTR_SLOTS = "slots"
 ATTR_VALUE = "value"
 ATTR_PORT_TYPES = "port_types"
+ATTR_LATENCY = "latency"
+ATTR_PREDICATE = "predicate"
 
 
 class SmvScalarType:
