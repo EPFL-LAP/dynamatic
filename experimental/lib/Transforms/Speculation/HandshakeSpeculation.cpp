@@ -576,6 +576,9 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     MLIRContext &ctx, OpOperand &opOperand, bool isDownstream,
     llvm::DenseSet<Operation *> &visited, int depth) {
 
+  if (failed(addSpecTagToValue(opOperand.get())))
+    return failure();
+
   Operation *op;
 
   // Traversal may be either upstream or downstream
@@ -615,8 +618,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     if (isDownstream) {
       // Continue traversal to the dataOut
       for (auto &operand : saveCommitOp.getDataOut().getUses()) {
-        if (failed(addSpecTagToValue(operand.get())))
-          return failure();
         if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
                                                    depth + 1)))
           return failure();
@@ -625,8 +626,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Continue traversal to the dataIn, skipping the controlIn
       // because control signals are not tagged
       auto &operand = saveCommitOp->getOpOperand(0);
-      if (failed(addSpecTagToValue(operand.get())))
-        return failure();
       if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
                                                  depth + 1)))
         return failure();
@@ -649,11 +648,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     return failure();
   }
 
-  if (auto speculatorOp = dyn_cast<handshake::SpeculatorOp>(op)) {
-    // Stop the traversal at the speculator
-    return success();
-  }
-
   if (isa<handshake::StoreOp>(op)) {
     op->emitError("StoreOp should not be within the speculative region");
     return failure();
@@ -664,8 +658,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Continue traversal to dataOut, skipping ports connected to the memory
       // controller.
       for (auto &operand : loadOp->getOpResult(1).getUses()) {
-        if (failed(addSpecTagToValue(operand.get())))
-          return failure();
         if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
                                                    depth + 1)))
           return failure();
@@ -674,8 +666,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Continue traversal to addrIn, skipping ports connected to the memory
       // controller.
       auto &operand = loadOp->getOpOperand(0);
-      if (failed(addSpecTagToValue(operand.get())))
-        return failure();
       if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
                                                  depth + 1)))
         return failure();
@@ -685,11 +675,14 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
   }
 
   if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
+    if (!isDownstream) {
+      // Stop the upstream traversal at ControlMergeOp or MuxOp
+      return success();
+    }
+
     // Only perform traversal to the dataResult
     MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
     for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addSpecTagToValue(operand.get())))
-        return failure();
       if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
                                                  depth + 1)))
         return failure();
@@ -705,8 +698,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     // Skip the operand that is the same as the current operand
     if (isDownstream && &operand == &opOperand)
       continue;
-    if (failed(addSpecTagToValue(operand.get())))
-      return failure();
     if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
                                                depth + 1)))
       return failure();
@@ -718,8 +709,6 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Skip the operand that is the same as the current operand
       if (!isDownstream && &operand == &opOperand)
         continue;
-      if (failed(addSpecTagToValue(operand.get())))
-        return failure();
       if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
                                                  depth + 1)))
         return failure();
@@ -731,6 +720,11 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
 
 LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   llvm::DenseSet<Operation *> visited;
+  visited.insert(specOp);
+
+  // For the speculator, perform downstream traversal to only dataOut, skipping
+  // control signals. The upstream dataIn will be handled by the recursive
+  // traversal.
   for (OpOperand &opOperand : specOp.getDataOut().getUses()) {
     if (failed(addSpecTagToSpecRegionRecursive(getContext(), opOperand, true,
                                                visited, 0)))
