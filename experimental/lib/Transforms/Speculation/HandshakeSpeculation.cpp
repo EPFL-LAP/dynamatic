@@ -74,7 +74,7 @@ private:
   /// Place the Buffer operations
   LogicalResult placeBuffers();
 
-  /// Add the speculative tag to the operand/result types in the speculative
+  /// Add spec tag to the operand/result types in the speculative
   /// region.
   LogicalResult addSpecTagToSpecRegion();
 };
@@ -524,7 +524,7 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
   }
 
   if (!op) {
-    // As long as the algorithm treverses inside the speculative region,
+    // As long as the algorithm traverses inside the speculative region,
     // all operands should have an owner and defining operation.
     return failure();
   }
@@ -699,9 +699,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(routeCommitControl()))
     return signalPassFailure();
 
-  // After completing placement of the speculator and commit units, update the
-  // types to include the speculative tag. Since type-checking occurs after this
-  // pass, skipping this update would result in an error.
+  // After placement and routing, add the spec tag to operands/results in the
+  // speculative region. Skipping this update would lead to a type verification
+  // error, as type-checking happens after the pass.
   if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 
