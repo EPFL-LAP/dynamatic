@@ -15,5 +15,5 @@ def _generate_muli(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := lhs * rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
 """
