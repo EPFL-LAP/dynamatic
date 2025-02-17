@@ -132,13 +132,3 @@ end architecture;
 """
 
   return dependencies + entity + architecture
-
-if __name__ == "__main__":
-  print(generate_tfifo("tfifo", {
-    "num_slots": 16,
-    "data_type": "!handshake.channel<i32, [spec: i1, tag: i8]>"
-  }))
-  print(generate_tfifo("tfifo", {
-    "num_slots": 16,
-    "data_type": "!handshake.control<[spec: i1, tag: i8]>"
-  }))
