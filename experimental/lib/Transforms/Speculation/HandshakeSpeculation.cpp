@@ -25,6 +25,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include <string>
 
 using namespace llvm::sys;
@@ -494,12 +495,14 @@ static LogicalResult addSpecTagToValue(Value value) {
 
   // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
   // or ControlType).
-  if (auto extraSignalsType =
+  if (auto valueType =
           value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
     // Skip if the spec tag was already added during the algorithm.
-    if (!extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      value.setType(extraSignalsType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    if (!valueType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      llvm::SmallVector<ExtraSignal> newExtraSignals(
+          valueType.getExtraSignals());
+      newExtraSignals.emplace_back(EXTRA_BIT_SPEC, builder.getIntegerType(1));
+      value.setType(valueType.copyWithExtraSignals(newExtraSignals));
     }
     return success();
   }
