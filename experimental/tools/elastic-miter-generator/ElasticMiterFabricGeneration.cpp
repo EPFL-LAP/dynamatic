@@ -426,7 +426,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     std::string lhsNdwName = "lhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
-    ForkOp forkOp = builder.create<ForkOp>(newFuncOp.getLoc(), miterArgs, 2);
+    LazyForkOp forkOp =
+        builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArgs, 2);
     setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
     BufferOp lhsBufferOp =
