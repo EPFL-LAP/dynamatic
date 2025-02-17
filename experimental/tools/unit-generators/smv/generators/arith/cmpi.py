@@ -22,7 +22,7 @@ def _generate_cmpi(name, latency, symbol, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := lhs {symbol} rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
 """
 
 
@@ -31,7 +31,7 @@ def _generate_cmpi_cast(name, latency, symbol, modifier, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := ({modifier})lhs {symbol} ({modifier})rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
 """
 
 

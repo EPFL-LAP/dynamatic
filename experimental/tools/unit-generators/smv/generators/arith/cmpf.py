@@ -12,14 +12,14 @@ def generate_cmpf(name, params):
   return _generate_cmpf(name, latency, symbol, data_type)
 
 
-
 def _generate_cmpf(name, latency, symbol, data_type):
   return f"""
 {generate_binary_op_header(name)}
   DEFINE outs := {{TRUE, FALSE}};
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
 """
+
 
 def get_symbol_from_predicate(pred):
   match pred:
