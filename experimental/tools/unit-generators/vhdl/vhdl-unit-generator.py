@@ -16,10 +16,6 @@ import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.sink as sink
 import generators.handshake.source as source
-import generators.handshake.spec_commit as spec_commit
-import generators.handshake.spec_save_commit as spec_save_commit
-import generators.handshake.speculating_branch as speculating_branch
-import generators.handshake.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
@@ -58,14 +54,6 @@ def generate_code(name, mod_type, parameters):
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
-    case "spec_commit":
-      return spec_commit.generate_spec_commit(name, parameters)
-    case "spec_save_commit":
-      return spec_save_commit.generate_spec_save_commit(name, parameters)
-    case "speculating_branch":
-      return speculating_branch.generate_speculating_branch(name, parameters)
-    case "speculator":
-      return speculator.generate_speculator(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
     case "trunci":
