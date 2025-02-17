@@ -228,12 +228,18 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let builders = [OpBuilder<
     (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-         "std::optional<unsigned>":$numSlots)>
+         "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
   ];
 
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING";
+                                           TIMING_ATTR_NAME = "TIMING",
+                                           BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
+    
+    static constexpr ::llvm::StringLiteral DV_TYPE="DV", R_TYPE="R", 
+                                            T_TYPE="T", DVE_TYPE="DVE",
+                                            DVR_TYPE="DVR";
+    
   }];
 
   let assemblyFormat = [{

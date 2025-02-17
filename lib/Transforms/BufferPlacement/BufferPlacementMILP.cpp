@@ -552,9 +552,12 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << "- Buffering constraints: " << propsStr.str() << "\n";
     os << "- MILP decision: " << numSlotsToPlace << " "
        << (placeOpaque ? "opaque" : "transparent") << " slot(s)\n";
-    os << "- Placement decision: " << result.numTrans
-       << " transparent slot(s) and " << result.numOpaque
-       << " opaque slot(s)\n";
+    os << "- Placement decision: \n" << result.numSlotDV
+       << " OB slot(s)\n" << result.numSlotR
+       << " TB slot(s)\n" << result.numSlotDVE
+       << " DVFIFO slot(s)\n" << result.numSlotT
+       << " TranspFIFO slot(s)\n" << result.numSlotDVR
+       << " DVR slot(s)\n";
     os.unindent();
     os << "\n";
   }

@@ -222,7 +222,31 @@ TimingInfo TimingInfo::oehb() {
 }
 
 TimingInfo TimingInfo::tehb() {
-  return TimingInfo().setLatency(SignalType::READY, 1);
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 1);
+}
+
+TimingInfo TimingInfo::dvfifo() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::tfifo() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::dvr() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 1);
 }
 
 bool dynamatic::handshake::operator==(const TimingInfo &lhs,

@@ -55,6 +55,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
+    // placeOpaque == 1 means cut D, V, R; placeOpaque == 0 means cut nothing.
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
@@ -67,18 +68,36 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       unsigned actualMinOpaque = std::max(1U, props.minOpaque);
       if (props.maxTrans.has_value() &&
           (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numTrans = props.maxTrans.value();
-        result.numOpaque = numSlotsToPlace - result.numTrans;
+        result.numSlotR = props.maxTrans.value();
+        result.numSlotDV = numSlotsToPlace - result.numSlotR;
       } else {
-        result.numOpaque = actualMinOpaque;
-        result.numTrans = numSlotsToPlace - result.numOpaque;
+        result.numSlotDV = actualMinOpaque;
+        result.numSlotR = numSlotsToPlace - result.numSlotDV;
       }
     } else {
       // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      result.numSlotDV = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
+
+    // Remap to general buffer types.
+    if (result.numSlotDV == 1){
+      result.numSlotDV = 1;
+    } else if (result.numSlotDV == 2){
+      result.numSlotDV = 1;
+      result.numSlotR = 1;
+    } else if (result.numSlotDV > 2){
+      result.numSlotDVE = result.numSlotDV - 1;
+      result.numSlotR = 1;
+      result.numSlotDV = 0;
+    }
+
+    if (result.numSlotR > 1){
+      result.numSlotT = result.numSlotR;
+      result.numSlotR = 0;
+    }
+
     placement[channel] = result;
   }
 
