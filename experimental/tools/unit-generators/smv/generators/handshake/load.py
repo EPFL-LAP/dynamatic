@@ -25,6 +25,6 @@ MODULE {name}(addr_in, addr_in_valid, data_from_mem, data_from_mem_valid, addr_o
   data_out := inner_data_tehb.outs;
   data_out_valid := inner_data_tehb.outs_valid;
 
-{generate_buffer(f"{name}__addr_tehb", {"slots": 1, "timing": "R: 1", "data_type": addr_type.mlir_type})}
-{generate_buffer(f"{name}__data_tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
+{generate_buffer(f"{name}__addr_tehb", TEHB_BUFFER_PARAMS(addr_type))}
+{generate_buffer(f"{name}__data_tehb", TEHB_BUFFER_PARAMS(data_type))}
 """

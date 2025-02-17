@@ -56,3 +56,6 @@ class SmvScalarType:
 
 
 HANSHAKE_CONTROL_TYPE = SmvScalarType("!handshake.control<>")
+
+def TEHB_BUFFER_PARAMS(data_type):
+  return f'{{"slots": 1, "timing": "R: 1", "data_type": {data_type}.mlir_type}}'

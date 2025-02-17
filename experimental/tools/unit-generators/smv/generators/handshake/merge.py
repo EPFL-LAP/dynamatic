@@ -28,7 +28,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
   outs_valid := inner_tehb.outs_valid;
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", {"size": size, "data_type": HANSHAKE_CONTROL_TYPE.mlir_type})}
-{generate_buffer(f"{name}__tehb_dataless", {"slots": 1, "timing": "R: 1", "data_type": HANSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_buffer(f"{name}__tehb_dataless", TEHB_BUFFER_PARAMS(HANSHAKE_CONTROL_TYPE))}
 """
 
 
@@ -46,5 +46,5 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, out
   outs_valid := inner_tehb.outs_valid;
 
 {generate_merge_notehb(f"{name}__merge_notehb", {"size": size, "data_type": data_type.mlir_type})}
-{generate_buffer(f"{name}__tehb", {"slots": 1, "timing": "R: 1", "data_type": data_type.mlir_type})}
+{generate_buffer(f"{name}__tehb", TEHB_BUFFER_PARAMS(data_type))}
 """
