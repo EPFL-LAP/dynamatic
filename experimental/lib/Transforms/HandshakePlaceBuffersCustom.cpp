@@ -27,6 +27,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -75,16 +76,28 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
     handshake::TimingInfo timing;
+    StringRef bufferType;
     if (type == "oehb") {
       timing = handshake::TimingInfo::oehb();
+      bufferType = handshake::BufferOp::DV_TYPE;
     } else if (type == "tehb") {
       timing = handshake::TimingInfo::tehb();
+      bufferType = handshake::BufferOp::R_TYPE;
+    } else if (type == "dvfifo") {
+      timing = handshake::TimingInfo::dvfifo();
+      bufferType = handshake::BufferOp::DVE_TYPE;
+    } else if (type == "tfifo") {
+      timing = handshake::TimingInfo::tfifo();
+      bufferType = handshake::BufferOp::T_TYPE;
+    } else if (type == "dvr") {
+      timing = handshake::TimingInfo::dvr();
+      bufferType = handshake::BufferOp::DVR_TYPE;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots);
+                                                     timing, slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
