@@ -9,6 +9,7 @@ ATTR_SIZE = "size"
 ATTR_SLOTS = "slots"
 ATTR_VALUE = "value"
 
+
 class SmvScalarType:
 
   mlir_type: str
