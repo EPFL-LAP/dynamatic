@@ -1,7 +1,10 @@
 from generators.handshake.buffer import generate_buffer
+from generators.support.utils import *
 
 
-def generate_delay_buffer(name, latency):
+def generate_delay_buffer(name, params):
+  latency = params[ATTR_LATENCY]
+
   if latency == 0:
     return _generate_no_lat_delay_buffer(name)
   elif latency == 1:
@@ -18,6 +21,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := outs_ready;
   DEFINE outs_valid := ins_valid;
 """
+
 
 def _generate_single_delay_buffer(name):
   return f"""

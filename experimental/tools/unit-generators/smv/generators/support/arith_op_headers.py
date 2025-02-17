@@ -9,6 +9,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   DEFINE outs_valid := inner_handshake_manager.outs_valid;
 """
 
+
 def generate_unanary_op_header(name):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
