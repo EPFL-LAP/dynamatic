@@ -17,7 +17,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "experimental/Transforms/Speculation/NewPlacementFinder.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -28,9 +27,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
-#include <iostream>
 #include <list>
-#include <queue>
 #include <string>
 
 using namespace llvm::sys;
@@ -87,12 +84,11 @@ private:
   /// Place the Buffer operations
   LogicalResult placeBuffers();
 
-  /// Update the types to include the speculative tag
-  LogicalResult updateTypes();
+  /// Add the speculative tag to the operand/result types in the speculative
+  /// region.
+  LogicalResult addSpecTagToSpecRegion();
 };
 } // namespace
-
-const std::string EXTRA_BIT_SPEC = "spec";
 
 template <>
 LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
@@ -556,81 +552,83 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   return success();
 }
 
-static LogicalResult markTypeOfValueWithSpecTag(Value value) {
+const std::string EXTRA_BIT_SPEC = "spec";
+
+static LogicalResult addSpecTagToValue(Value value) {
   OpBuilder builder(value.getContext());
 
+  // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
+  // or ControlType).
   if (auto extraSignalsType =
           value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
+    // Skip if the spec tag was already added during the algorithm.
     if (!extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
       value.setType(extraSignalsType.addExtraSignal(
           ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
     }
     return success();
   }
-  value.dump();
   value.getDefiningOp()->emitError("Unexpected type");
   return failure();
 }
 
-static LogicalResult updateTypesRecursive(MLIRContext &ctx,
-                                          OpOperand &opOperand,
-                                          bool isTraversalDown,
-                                          llvm::DenseSet<Operation *> &visited,
-                                          int depth) {
+static LogicalResult addSpecTagToSpecRegionRecursive(
+    MLIRContext &ctx, OpOperand &opOperand, bool isDownstream,
+    llvm::DenseSet<Operation *> &visited, int depth) {
+
   Operation *op;
-  if (isTraversalDown) {
+
+  // Traversal may be either upstream or downstream
+  if (isDownstream) {
+    // Owner is the consumer of the operand
     op = opOperand.getOwner();
   } else {
+    // DefiningOp is the producer of the operand
     op = opOperand.get().getDefiningOp();
   }
+
   if (!op) {
-    opOperand.getOwner()->emitError("Operation does not have a BB.");
+    // As long as the algorithm treverses inside the speculative region,
+    // all operands should have an owner and defining operation.
     return failure();
   }
+
   if (visited.contains(op))
     return success();
-
   visited.insert(op);
-
-  std::cerr << "depth: " << depth << "\n";
-  op->dump();
-  if (isTraversalDown) {
-    std::cerr << "downstream\n";
-  } else {
-    std::cerr << "upstream\n";
-  }
-  // auto operand = opOperand.get().getType();
-  // operand.dump();
-  // std::cerr << "pointer: " << operand.getImpl() << "\n";
 
   // Exceptional cases
   if (isa<handshake::SpecCommitOp>(op)) {
-    if (isTraversalDown) {
+    if (isDownstream) {
       // Stop the traversal at the commit unit
       return success();
     }
 
-    // Something went wrong because the commit unit is reached from outside
-    // the speculative region
+    // The upstream stream shouldn't reach the commit unit,
+    // as that would indicate it originated outside the speculative region.
     op->emitError("SpecCommitOp should not be reached from "
                   "outside the speculative region");
     return failure();
   }
 
   if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
-    if (isTraversalDown) {
+    if (isDownstream) {
+      // Continue traversal to the dataOut
       for (auto &operand : saveCommitOp.getDataOut().getUses()) {
-        if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        if (failed(addSpecTagToValue(operand.get())))
           return failure();
-        if (failed(
-                updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+        if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
+                                                   depth + 1)))
           return failure();
       }
     } else {
+      // Continue traversal to the dataIn, skipping the controlIn
+      // because control signals are not tagged
       auto &operand = saveCommitOp->getOpOperand(0);
-      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      if (failed(addSpecTagToValue(operand.get())))
         return failure();
-      if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
+                                                 depth + 1)))
         return failure();
     }
 
@@ -638,13 +636,14 @@ static LogicalResult updateTypesRecursive(MLIRContext &ctx,
   }
 
   if (auto speculatingBranchOp = dyn_cast<handshake::SpeculatingBranchOp>(op)) {
-    if (isTraversalDown) {
+    if (isDownstream) {
       // Stop the traversal at the speculating branch
       return success();
     }
 
-    // Something went wrong because the speculating branch is reached from
-    // outside the speculative region
+    // The upstream stream shouldn't reach the commit unit,
+    // as that would indicate it originated the control signal network, which is
+    // not tagged
     op->emitError("SpeculatingBranchOp should not be reached from "
                   "outside the speculative region");
     return failure();
@@ -661,19 +660,24 @@ static LogicalResult updateTypesRecursive(MLIRContext &ctx,
   }
 
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    if (isTraversalDown) {
+    if (isDownstream) {
+      // Continue traversal to dataOut, skipping ports connected to the memory
+      // controller.
       for (auto &operand : loadOp->getOpResult(1).getUses()) {
-        if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        if (failed(addSpecTagToValue(operand.get())))
           return failure();
-        if (failed(
-                updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+        if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
+                                                   depth + 1)))
           return failure();
       }
     } else {
+      // Continue traversal to addrIn, skipping ports connected to the memory
+      // controller.
       auto &operand = loadOp->getOpOperand(0);
-      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      if (failed(addSpecTagToValue(operand.get())))
         return failure();
-      if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
+                                                 depth + 1)))
         return failure();
     }
 
@@ -684,33 +688,40 @@ static LogicalResult updateTypesRecursive(MLIRContext &ctx,
     // Only perform traversal to the dataResult
     MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
     for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      if (failed(addSpecTagToValue(operand.get())))
         return failure();
-      if (failed(updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
+                                                 depth + 1)))
         return failure();
     }
 
     return success();
   }
 
+  // General case
+
   // Upstream traversal
   for (auto &operand : op->getOpOperands()) {
-    if (isTraversalDown && &operand == &opOperand)
+    // Skip the operand that is the same as the current operand
+    if (isDownstream && &operand == &opOperand)
       continue;
-    if (failed(markTypeOfValueWithSpecTag(operand.get())))
+    if (failed(addSpecTagToValue(operand.get())))
       return failure();
-    if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+    if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
+                                               depth + 1)))
       return failure();
   }
 
   // Downstream traversal
   for (auto result : op->getResults()) {
     for (auto &operand : result.getUses()) {
-      if (!isTraversalDown && &operand == &opOperand)
+      // Skip the operand that is the same as the current operand
+      if (!isDownstream && &operand == &opOperand)
         continue;
-      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      if (failed(addSpecTagToValue(operand.get())))
         return failure();
-      if (failed(updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
+                                                 depth + 1)))
         return failure();
     }
   }
@@ -718,11 +729,11 @@ static LogicalResult updateTypesRecursive(MLIRContext &ctx,
   return success();
 }
 
-LogicalResult HandshakeSpeculationPass::updateTypes() {
-  std::cerr << "start updating types\n";
+LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   llvm::DenseSet<Operation *> visited;
   for (OpOperand &opOperand : specOp.getDataOut().getUses()) {
-    if (failed(updateTypesRecursive(getContext(), opOperand, true, visited, 0)))
+    if (failed(addSpecTagToSpecRegionRecursive(getContext(), opOperand, true,
+                                               visited, 0)))
       return failure();
   }
   return success();
@@ -768,7 +779,7 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // After completing placement of the speculator and commit units, update the
   // types to include the speculative tag. Since type-checking occurs after this
   // pass, skipping this update would result in an error.
-  if (failed(updateTypes()))
+  if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 }
 
