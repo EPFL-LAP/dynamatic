@@ -19,6 +19,7 @@
 #include "llvm/Support/Path.h"
 #include <any>
 #include <filesystem>
+#include <string>
 #include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
@@ -553,14 +554,14 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     previousOp = &op;
   }
 
-  llvm::json::Array resNames;
+  SmallVector<std::string> resNames;
   for (Attribute attr : lhsFuncOp.getResNames()) {
     auto strAttr = attr.dyn_cast<StringAttr>();
     if (strAttr) {
       resNames.push_back("EQ_" + strAttr.getValue().str());
     }
   }
-  llvm::json::Array argNames;
+  SmallVector<std::string> argNames;
   for (Attribute attr : lhsFuncOp.getArgNames()) {
     auto strAttr = attr.dyn_cast<StringAttr>();
     if (strAttr) {

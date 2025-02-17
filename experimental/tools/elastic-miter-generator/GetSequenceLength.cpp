@@ -47,13 +47,14 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
-  auto failOrDstSmv = handshake2smv(mlirFile, true);
+  auto failOrDstSmv = handshake2smv(mlirFile, outputDir, true);
   if (failed(failOrDstSmv))
     return failure();
   auto dstSmv = failOrDstSmv.value();
 
+  // Currently handshake2smv only supports "model" as the model's name
   auto fail = dynamatic::experimental::createWrapper(outputDir / "main_inf.smv",
-                                                     config, dstSmv.stem(), 0);
+                                                     config, "model", 0);
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -82,8 +83,9 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     std::filesystem::path wrapperPath =
         outputDir / ("main_" + std::to_string(n) + ".smv");
 
-    auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
-                                                       dstSmv.stem(), 0);
+    // Currently handshake2smv only supports "model" as the model's name
+    auto fail =
+        dynamatic::experimental::createWrapper(wrapperPath, config, "model", 0);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << n
                    << " token reachability wrapper.\n";
@@ -113,7 +115,6 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     if (nrOfDifferences != 0) {
       n++;
     } else {
-      std::cout << n << std::endl;
       break;
     }
   }

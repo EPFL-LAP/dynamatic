@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
     return 1;
 
   // TODO remove
-  llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n ";
+  llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n";
 
   auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
       context, outputDir / "rhs_reachability", lhsPath);
@@ -92,20 +92,25 @@ int main(int argc, char **argv) {
     return 1;
 
   // TODO remove
-  llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n ";
+  llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n";
 
   size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
+  std::filesystem::path miterDir = outputDir / "miter";
+  // Create the miterDir if it doesn't exist
+  std::filesystem::create_directories(miterDir);
+
   // Create Miter module with needed N
   auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, outputDir.string(), n);
+      context, lhsPath, rhsPath, miterDir.string(), n);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return 1;
   }
   auto [mlirPath, config] = failOrPair.value();
 
-  auto failOrSmvPath = dynamatic::experimental::handshake2smv(mlirPath, false);
+  auto failOrSmvPath =
+      dynamatic::experimental::handshake2smv(mlirPath, miterDir, false);
   if (failed(failOrSmvPath)) {
     llvm::errs() << "Failed to convert miter module to SMV.\n";
     return 1;
@@ -113,28 +118,29 @@ int main(int argc, char **argv) {
   auto smvPath = failOrSmvPath.value();
 
   // TODO ...
-  std::filesystem::path wrapperPath = outputDir / "main.smv";
+  std::filesystem::path wrapperPath = miterDir / "main.smv";
 
+  // Currently handshake2smv only supports "model" as the model's name
   auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
-                                                     smvPath.stem(), n, true);
+                                                     "model", n, true);
   if (failed(fail))
     return 1;
 
   // Put the output of the CTLSPEC check into results.txt. Later we read from
   // that file to check whether all the CTL properties pass.
-  std::filesystem::path output = outputDir / "result.txt";
-  std::string command = "check_ctlspec -o " + output.string();
+  std::filesystem::path resultTxtPath = miterDir / "result.txt";
+  std::string command = "check_ctlspec -o " + resultTxtPath.string();
   LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
-      outputDir / "prove.cmd", outputDir / "main.smv", command);
+      miterDir / "prove.cmd", miterDir / "main.smv", command);
   if (failed(cmdFail))
     return 1;
 
   // Run equivalence checking
-  dynamatic::experimental::runNuXmv(outputDir / "prove.cmd", "/dev/null");
+  dynamatic::experimental::runNuXmv(miterDir / "prove.cmd", "/dev/null");
 
   bool equivalent = true;
   std::string line;
-  std::ifstream result(output);
+  std::ifstream result(resultTxtPath);
   while (getline(result, line)) {
     // TODO remove
     llvm::outs() << line << "\n";

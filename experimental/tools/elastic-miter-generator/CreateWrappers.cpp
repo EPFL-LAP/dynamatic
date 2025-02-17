@@ -15,8 +15,6 @@
 
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -30,7 +28,7 @@ std::string createModuleCall(const std::string &moduleName,
                              const SmallVector<std::string> &resNames) {
   std::ostringstream call;
   // TODO does this work?
-  call << "VAR " << moduleName << " : " << moduleName << "(";
+  call << "  VAR " << moduleName << " : " << moduleName << "(";
 
   for (size_t i = 0; i < argNames.size(); ++i) {
     if (i > 0)
@@ -58,11 +56,11 @@ std::string createSequenceGenerators(const std::string &moduleName,
   for (size_t i = 0; i < argNames.size(); ++i) {
     if (nrOfTokens == 0) {
       sequenceGenerators << "  VAR seq_generator" << i << " : bool_input_inf("
-                         << moduleName << "." << i << "_ready);\n";
+                         << moduleName << "." << argNames[i] << "_ready);\n";
     } else {
       sequenceGenerators << "  VAR seq_generator" << i << " : bool_input("
-                         << moduleName << "." << i << "_ready, " << nrOfTokens
-                         << ");\n";
+                         << moduleName << "." << argNames[i] << "_ready, "
+                         << nrOfTokens << ");\n";
     }
   }
   return sequenceGenerators.str();
@@ -178,20 +176,59 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
   //   }
   // }
 
-  SmallVector<std::string> argNames =
-      std::any_cast<SmallVector<std::string>>(config["arguments"]);
+  // for (auto key : config.keys()) {
+  //   llvm::outs() << key.str() << "\n";
+  // }
 
-  SmallVector<std::string> resNames =
-      std::any_cast<SmallVector<std::string>>(config["results"]);
+  SmallVector<std::string> argNames;
+  // Test if "arguments" exists in config and is of the correct type
+  if (config.contains("arguments") &&
+      std::any_cast<SmallVector<std::string>>(&config["arguments"])) {
+    argNames = std::any_cast<SmallVector<std::string>>(config["arguments"]);
+  } else {
+    llvm::errs() << "\"arguments\" not in config.\n";
+    return failure();
+  }
 
-  SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs =
+  // Test if "results" exists in config and is of the correct type
+  SmallVector<std::string> resNames;
+  if (config.contains("results") &&
+      std::any_cast<SmallVector<std::string>>(&config["results"])) {
+    resNames = std::any_cast<SmallVector<std::string>>(config["results"]);
+
+  } else {
+    llvm::errs() << "\"results\" not in config.\n";
+    return failure();
+  }
+
+  // Test if "output_buffers" exists in config and is of the correct type.
+  // If includeProperties is not set this is not required
+  SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs;
+  if (includeProperties && config.contains("output_buffers") &&
       std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-          config["output_buffers"]);
+          &config["output_buffers"])) {
+    outputBufferNamePairs =
+        std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
+            config["output_buffers"]);
+  } else if (includeProperties) {
+    llvm::errs() << "\"output_buffers\" not in config.\n";
+    return failure();
+  }
 
-  SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs =
+  // Test if "input_buffers" exists in config and is of the correct type.
+  // If includeProperties is not set this is not required
+  SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs;
+  if (includeProperties && config.contains("input_buffers") &&
       std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-          config["input_buffers"]);
-  ;
+          &config["input_buffers"])) {
+    inputBufferNamePairs =
+        std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
+            config["input_buffers"]);
+
+  } else if (includeProperties) {
+    llvm::errs() << "\"input_buffers\" not in config.\n";
+    return failure();
+  }
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";

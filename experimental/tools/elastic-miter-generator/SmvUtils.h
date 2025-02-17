@@ -17,6 +17,7 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
 int runNuXmv(const std::string &cmd, const std::string &stdoutFile);
 
 FailureOr<std::filesystem::path>
-handshake2smv(const std::filesystem::path &mlirPath, bool png = false);
+handshake2smv(const std::filesystem::path &mlirPath,
+              const std::filesystem::path &outputDir, bool png = false);
 
 } // namespace dynamatic::experimental

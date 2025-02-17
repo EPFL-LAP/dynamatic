@@ -16,7 +16,7 @@ FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
                                                    bool inf = false);
 
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            const llvm::StringMap<std::any> &config,
+                            llvm::StringMap<std::any> config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties = false);
 

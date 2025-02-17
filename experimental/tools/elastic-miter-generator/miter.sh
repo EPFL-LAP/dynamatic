@@ -20,5 +20,5 @@ cd ..
 
 MOD="a"
 
-build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $COMP_DIR
+build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $OUT_DIR
 exit_on_fail "Failed to create miter module"

@@ -23,25 +23,25 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                             const std::filesystem::path &smvPath,
                             const std::string &additionalCommands) {
 
-  std::string command = "set verbose_level 0;"
-                        "set pp_list cpp;"
-                        "set counter_examples 0;"
-                        "set dynamic_reorder 1;"
-                        "set on_failure_script_quits;"
-                        "set reorder_method sift;"
-                        "set enable_sexp2bdd_caching 0;"
-                        "set bdd_static_order_heuristics basic;"
-                        "set cone_of_influence;"
-                        "set use_coi_size_sorting 1;"
+  std::string command = "set verbose_level 0;\n"
+                        "set pp_list cpp;\n"
+                        "set counter_examples 0;\n"
+                        "set dynamic_reorder 1;\n"
+                        "set on_failure_script_quits;\n"
+                        "set reorder_method sift;\n"
+                        "set enable_sexp2bdd_caching 0;\n"
+                        "set bdd_static_order_heuristics basic;\n"
+                        "set cone_of_influence;\n"
+                        "set use_coi_size_sorting 1;\n"
                         "read_model -i" +
                         smvPath.string() + ";\n" +
-                        "flatten_hierarchy;"
-                        "encode_variables;"
-                        "build_flat_model;"
-                        "build_model - f;" +
+                        "flatten_hierarchy;\n"
+                        "encode_variables;\n"
+                        "build_flat_model;\n"
+                        "build_model -f;\n" +
                         additionalCommands + "\n" +
-                        "time;"
-                        "quit;";
+                        "time;\n"
+                        "quit;\n";
   std::ofstream mainFile(cmdPath);
   mainFile << command;
   mainFile.close();
@@ -55,9 +55,11 @@ int runNuXmv(const std::string &cmd, const std::string &stdoutFile) {
 }
 
 FailureOr<std::filesystem::path>
-handshake2smv(const std::filesystem::path &mlirPath, bool png = false) {
+handshake2smv(const std::filesystem::path &mlirPath,
+              const std::filesystem::path &outputDir, bool png = false) {
 
-  std::filesystem::path dotFile = mlirPath.parent_path() / "miter.dot";
+  std::filesystem::path dotFile = outputDir / "miter.dot";
+
   std::string cmd = "bin/export-dot " + mlirPath.string() +
                     " --edge-style=spline > " + dotFile.string();
   int ret = system(cmd.c_str());
@@ -67,8 +69,9 @@ handshake2smv(const std::filesystem::path &mlirPath, bool png = false) {
   }
 
   if (png) {
-    std::filesystem::path pngFile = mlirPath.parent_path() / "miter.png";
-    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
+    std::filesystem::path pngFile = outputDir / "miter.png";
+    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string() +
+          " > /dev/null";
     ret = system(cmd.c_str());
     if (ret != 0) {
       llvm::errs() << "Failed to convert to PNG\n";
@@ -79,7 +82,7 @@ handshake2smv(const std::filesystem::path &mlirPath, bool png = false) {
   // The current implementation of dot2smv uses the hardcoded name "model.smv"
   // in the dotfile's directory.
   std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
-  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string();
+  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string() + " > /dev/null";
   ret = system(cmd.c_str());
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
