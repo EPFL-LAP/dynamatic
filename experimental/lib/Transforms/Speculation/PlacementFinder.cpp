@@ -20,7 +20,6 @@
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 using namespace dynamatic;
