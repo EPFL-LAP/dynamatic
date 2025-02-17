@@ -73,6 +73,9 @@ private:
 
   /// Place the Buffer operations
   LogicalResult placeBuffers();
+
+  /// Update the types to include the speculative tag
+  LogicalResult updateTypes();
 };
 } // namespace
 
@@ -481,6 +484,180 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   return success();
 }
 
+const std::string EXTRA_BIT_SPEC = "spec";
+
+static LogicalResult markTypeOfValueWithSpecTag(Value value) {
+  OpBuilder builder(value.getContext());
+
+  if (auto extraSignalsType =
+          value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
+    if (!extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      value.setType(extraSignalsType.addExtraSignal(
+          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    }
+    return success();
+  }
+  value.dump();
+  value.getDefiningOp()->emitError("Unexpected type");
+  return failure();
+}
+
+static LogicalResult updateTypesRecursive(MLIRContext &ctx,
+                                          OpOperand &opOperand,
+                                          bool isTraversalDown,
+                                          llvm::DenseSet<Operation *> &visited,
+                                          int depth) {
+  Operation *op;
+  if (isTraversalDown) {
+    op = opOperand.getOwner();
+  } else {
+    op = opOperand.get().getDefiningOp();
+  }
+  if (!op) {
+    opOperand.getOwner()->emitError("Operation does not have a BB.");
+    return failure();
+  }
+  if (visited.contains(op))
+    return success();
+
+  visited.insert(op);
+
+  std::cerr << "depth: " << depth << "\n";
+  op->dump();
+  if (isTraversalDown) {
+    std::cerr << "downstream\n";
+  } else {
+    std::cerr << "upstream\n";
+  }
+  // auto operand = opOperand.get().getType();
+  // operand.dump();
+  // std::cerr << "pointer: " << operand.getImpl() << "\n";
+
+  // Exceptional cases
+  if (isa<handshake::SpecCommitOp>(op)) {
+    if (isTraversalDown) {
+      // Stop the traversal at the commit unit
+      return success();
+    }
+
+    // Something went wrong because the commit unit is reached from outside
+    // the speculative region
+    op->emitError("SpecCommitOp should not be reached from "
+                  "outside the speculative region");
+    return failure();
+  }
+
+  if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
+    if (isTraversalDown) {
+      for (auto &operand : saveCommitOp.getDataOut().getUses()) {
+        if (failed(markTypeOfValueWithSpecTag(operand.get())))
+          return failure();
+        if (failed(
+                updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+          return failure();
+      }
+    } else {
+      auto &operand = saveCommitOp->getOpOperand(0);
+      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        return failure();
+      if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+        return failure();
+    }
+
+    return success();
+  }
+
+  if (auto speculatingBranchOp = dyn_cast<handshake::SpeculatingBranchOp>(op)) {
+    if (isTraversalDown) {
+      // Stop the traversal at the speculating branch
+      return success();
+    }
+
+    // Something went wrong because the speculating branch is reached from
+    // outside the speculative region
+    op->emitError("SpeculatingBranchOp should not be reached from "
+                  "outside the speculative region");
+    return failure();
+  }
+
+  if (auto speculatorOp = dyn_cast<handshake::SpeculatorOp>(op)) {
+    // Stop the traversal at the speculator
+    return success();
+  }
+
+  if (isa<handshake::StoreOp>(op)) {
+    op->emitError("StoreOp should not be within the speculative region");
+    return failure();
+  }
+
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+    if (isTraversalDown) {
+      for (auto &operand : loadOp->getOpResult(1).getUses()) {
+        if (failed(markTypeOfValueWithSpecTag(operand.get())))
+          return failure();
+        if (failed(
+                updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+          return failure();
+      }
+    } else {
+      auto &operand = loadOp->getOpOperand(0);
+      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        return failure();
+      if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+        return failure();
+    }
+
+    return success();
+  }
+
+  if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
+    // Only perform traversal to the dataResult
+    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
+    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
+      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        return failure();
+      if (failed(updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+        return failure();
+    }
+
+    return success();
+  }
+
+  // Upstream traversal
+  for (auto &operand : op->getOpOperands()) {
+    if (isTraversalDown && &operand == &opOperand)
+      continue;
+    if (failed(markTypeOfValueWithSpecTag(operand.get())))
+      return failure();
+    if (failed(updateTypesRecursive(ctx, operand, false, visited, depth + 1)))
+      return failure();
+  }
+
+  // Downstream traversal
+  for (auto result : op->getResults()) {
+    for (auto &operand : result.getUses()) {
+      if (!isTraversalDown && &operand == &opOperand)
+        continue;
+      if (failed(markTypeOfValueWithSpecTag(operand.get())))
+        return failure();
+      if (failed(updateTypesRecursive(ctx, operand, true, visited, depth + 1)))
+        return failure();
+    }
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::updateTypes() {
+  std::cerr << "start updating types\n";
+  llvm::DenseSet<Operation *> visited;
+  for (OpOperand &opOperand : specOp.getDataOut().getUses()) {
+    if (failed(updateTypesRecursive(getContext(), opOperand, true, visited, 0)))
+      return failure();
+  }
+  return success();
+}
+
 void HandshakeSpeculationPass::runDynamaticPass() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
@@ -512,6 +689,12 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // After placing all speculative units, route the commit control signals
   if (failed(routeCommitControl()))
+    return signalPassFailure();
+
+  // After completing placement of the speculator and commit units, update the
+  // types to include the speculative tag. Since type-checking occurs after this
+  // pass, skipping this update would result in an error.
+  if (failed(updateTypes()))
     return signalPassFailure();
 
   // Place Buffer operations
