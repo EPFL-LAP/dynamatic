@@ -1,5 +1,11 @@
-def generate_merge_notehb(name, size, data_type=None):
-  if data_type is None:
+from generators.support.utils import *
+
+
+def generate_merge_notehb(name, params):
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+
+  if data_type.bitwidth == 0:
     return _generate_merge_notehb_dataless(name, size)
   else:
     return _generate_merge_notehb(name, size, data_type)

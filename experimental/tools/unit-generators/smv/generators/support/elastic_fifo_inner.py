@@ -1,8 +1,11 @@
 from generators.support.utils import *
 
 
-def generate_elastic_fifo_inner(name, slots, data_type=None):
-  if data_type is None:
+def generate_elastic_fifo_inner(name, params):
+  slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+
+  if data_type.bitwidth == 0:
     return _generate_elastic_fifo_inner_dataless(name, slots)
   else:
     return _generate_elastic_fifo_inner(name, slots, data_type)
