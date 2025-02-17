@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n";
 
   auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "rhs_reachability", lhsPath);
+      context, outputDir / "rhs_reachability", rhsPath);
   if (failed(failOrRHSseqLen))
     return 1;
 
