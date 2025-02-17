@@ -140,16 +140,12 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // A commit is needed in front of store operations
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::MemoryControllerOp>(succOp)) {
-        if (dstOpOperand.getOperandNumber() == 2 &&
-            !isa<handshake::LoadOp>(currOp)) {
-          // dstOpOperand is the control operand of the memory controller,
-          // indicating the number of stores.
-          // A commit is needed on this operand
-          placements.addCommit(dstOpOperand);
-        } else if (dstOpOperand.get().getType().isa<handshake::ControlType>()) {
-          // dstOperand is the ctrlEnd operand of the memory controller,
-          // signaling that no more requests are coming. A commit is needed on
-          // this operand
+        if (!isa<handshake::LoadOp>(currOp) &&
+            !isa<handshake::StoreOp>(currOp)) {
+          // dstOpOperand is the ctrl operand of the memory controller,
+          // indicating the number of stores, or ctrlEnd operator, indicating
+          // that no more requests are coming.
+          // A commit is needed on these operands
           placements.addCommit(dstOpOperand);
         }
         // Stop traversal early when reaching a memory controller to prevent
