@@ -29,7 +29,7 @@ IO_GEN_BIN="$SIM_DIR/C_SRC/$KERNEL_NAME-io-gen"
 
 # Shortcuts
 HDL_DIR="$OUTPUT_DIR/hdl"
-CLANGXX_BIN="clang++"
+CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 HLS_VERIFIER_BIN="$DYNAMATIC_DIR/bin/hls-verifier"
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
 
