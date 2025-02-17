@@ -91,23 +91,25 @@ std::string createMiterProperties(
                << moduleName << "." + result + "_out)\n";
   }
 
-  std::string outputProp;
-  for (const auto &buffer : outputBuffers) {
-    outputProp += moduleName + "." + buffer.first + ".num = 0 & ";
-    outputProp += moduleName + "." + buffer.second + ".num = 0 & ";
-  }
-
-  if (!outputProp.empty())
-    outputProp = outputProp.substr(0, outputProp.size() - 3);
-
   std::string inputProp;
   for (const auto &bufferPair : inputBuffers) {
-    inputProp += moduleName + "." + bufferPair.first + ".num = " + moduleName +
-                 "." + bufferPair.second + ".num & ";
+    inputProp += "(" + moduleName + "." + bufferPair.first +
+                 ".num = " + moduleName + "." + bufferPair.second + ".num) & ";
   }
 
+  // Remove the final " & "
   if (!inputProp.empty())
     inputProp = inputProp.substr(0, inputProp.size() - 3);
+
+  std::string outputProp;
+  for (const auto &buffer : outputBuffers) {
+    outputProp += "(" + moduleName + "." + buffer.first + ".num = 0) & ";
+    outputProp += "(" + moduleName + "." + buffer.second + ".num = 0) & ";
+  }
+
+  // Remove the final " & "
+  if (!outputProp.empty())
+    outputProp = outputProp.substr(0, outputProp.size() - 3);
 
   std::string finalBufferProp =
       "AF (AG (" + inputProp + " & " + outputProp + "))";
