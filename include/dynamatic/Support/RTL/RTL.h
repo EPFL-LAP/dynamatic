@@ -292,9 +292,9 @@ public:
   /// Registers PORT_TYPES parameter, which includes the types of all ports
   /// (operands and results) of the original operation. This parameter is passed
   /// to the RTL generator to help it generate the correct port types.
-  /// e.g., {"lhs": "!handshake.channel<i32, [spec: i1]>",
+  /// e.g., '{"lhs": "!handshake.channel<i32, [spec: i1]>",
   // "rhs": "!handshake.channel<i32, [spec: i1]>",
-  // "result": "!handshake.channel<i1, [spec: i1]>"}
+  // "result": "!handshake.channel<i1, [spec: i1]>"}'
   void registerPortTypesParameter(hw::HWModuleExternOp &modOp);
 
   /// Attempts to concretize the matched RTL component using the original RTL

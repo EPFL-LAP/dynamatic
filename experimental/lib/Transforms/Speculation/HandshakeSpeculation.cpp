@@ -26,6 +26,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include <list>
 #include <string>
@@ -84,8 +85,10 @@ private:
   /// Place the Buffer operations
   LogicalResult placeBuffers();
 
-  /// Add the speculative tag to the operand/result types in the speculative
-  /// region.
+  /// Adds a spec tag to the operand/result types in the speculative region.
+  /// Traverses both upstream and downstream within the region, starting from
+  /// the speculator. Upstream traversal is required to cover SourceOp and
+  /// ConstantOp.
   LogicalResult addSpecTagToSpecRegion();
 };
 } // namespace
@@ -559,12 +562,14 @@ static LogicalResult addSpecTagToValue(Value value) {
 
   // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
   // or ControlType).
-  if (auto extraSignalsType =
+  if (auto valueType =
           value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
     // Skip if the spec tag was already added during the algorithm.
-    if (!extraSignalsType.hasExtraSignal(EXTRA_BIT_SPEC)) {
-      value.setType(extraSignalsType.addExtraSignal(
-          ExtraSignal(EXTRA_BIT_SPEC, builder.getIntegerType(1))));
+    if (!valueType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      llvm::SmallVector<ExtraSignal> newExtraSignals(
+          valueType.getExtraSignals());
+      newExtraSignals.emplace_back(EXTRA_BIT_SPEC, builder.getIntegerType(1));
+      value.setType(valueType.copyWithExtraSignals(newExtraSignals));
     }
     return success();
   }
@@ -572,9 +577,10 @@ static LogicalResult addSpecTagToValue(Value value) {
   return failure();
 }
 
-static LogicalResult addSpecTagToSpecRegionRecursive(
-    MLIRContext &ctx, OpOperand &opOperand, bool isDownstream,
-    llvm::DenseSet<Operation *> &visited, int depth) {
+static LogicalResult
+addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
+                                bool isDownstream,
+                                llvm::DenseSet<Operation *> &visited) {
 
   if (failed(addSpecTagToValue(opOperand.get())))
     return failure();
@@ -591,7 +597,7 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
   }
 
   if (!op) {
-    // As long as the algorithm treverses inside the speculative region,
+    // As long as the algorithm traverses inside the speculative region,
     // all operands should have an owner and defining operation.
     return failure();
   }
@@ -618,16 +624,15 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     if (isDownstream) {
       // Continue traversal to the dataOut
       for (auto &operand : saveCommitOp.getDataOut().getUses()) {
-        if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
-                                                   depth + 1)))
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
           return failure();
       }
     } else {
       // Continue traversal to the dataIn, skipping the controlIn
       // because control signals are not tagged
       auto &operand = saveCommitOp->getOpOperand(0);
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
-                                                 depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited)))
         return failure();
     }
 
@@ -658,16 +663,15 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Continue traversal to dataOut, skipping ports connected to the memory
       // controller.
       for (auto &operand : loadOp->getOpResult(1).getUses()) {
-        if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
-                                                   depth + 1)))
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
           return failure();
       }
     } else {
       // Continue traversal to addrIn, skipping ports connected to the memory
       // controller.
       auto &operand = loadOp->getOpOperand(0);
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
-                                                 depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited)))
         return failure();
     }
 
@@ -683,8 +687,7 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     // Only perform traversal to the dataResult
     MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
     for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
-                                                 depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
         return failure();
     }
 
@@ -698,8 +701,7 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
     // Skip the operand that is the same as the current operand
     if (isDownstream && &operand == &opOperand)
       continue;
-    if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited,
-                                               depth + 1)))
+    if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited)))
       return failure();
   }
 
@@ -709,8 +711,7 @@ static LogicalResult addSpecTagToSpecRegionRecursive(
       // Skip the operand that is the same as the current operand
       if (!isDownstream && &operand == &opOperand)
         continue;
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited,
-                                                 depth + 1)))
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
         return failure();
     }
   }
@@ -727,7 +728,7 @@ LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   // traversal.
   for (OpOperand &opOperand : specOp.getDataOut().getUses()) {
     if (failed(addSpecTagToSpecRegionRecursive(getContext(), opOperand, true,
-                                               visited, 0)))
+                                               visited)))
       return failure();
   }
   return success();
@@ -764,6 +765,12 @@ void HandshakeSpeculationPass::runDynamaticPass() {
 
   // After placing all speculative units, route the commit control signals
   if (failed(routeCommitControl()))
+    return signalPassFailure();
+
+  // After placement and routing, add the spec tag to operands/results in the
+  // speculative region. Skipping this update would lead to a type verification
+  // error, as type-checking happens after the pass.
+  if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 
   // Place Buffer operations

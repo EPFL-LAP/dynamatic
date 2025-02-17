@@ -1,6 +1,6 @@
 # Extra Signals for Operations
 
-The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. To ensure this, we leverage MLIR's type verification tools, enforcing rules for how extra signals are passed to and from operations.
+The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. To ensure this, we leverage MLIR's type verification tools, enforcing rules for how extra signals are passed to and from operations. Rather than thinking of the type verification as fundamental, rigid limits on how extra signals may exist in the circuit, these rules are used to catch unintended consequences of algorithms or optimizations. The specifics of how each unit is verified come from how the unit is generated: if unit generation would fail, verification should also.
 
 This document is structured as follows:
 
@@ -83,13 +83,13 @@ While this operation falls under the category of "operations within a basic bloc
 
 <img alt="the IO of Constant" src="./Figures/ExtraSignalsForOperations/constant.png" width="300" />
 
-However, how are the extra signals of the input handled?
+To ensure consistency for succeeding operations, `ConstantOp` must generate an output with extra signals. For example, if an adder expects a `spec` tag, the preceding `ConstantOp` must provide one.
 
-Since control tokens can now carry extra signals, it’s natural that a control token with extra signals would trigger the `ConstantOp`.
+However, since control tokens can now carry extra signals, a control token with extra signals may trigger `ConstantOp` (e.g., in some cases, a token from the basic block's control network is used).
 
-Upon review, we found it more effective to forward the extra signals from the input directly to the output token, rather than discarding them and hardcoding constant extra signal values in the operation.
+Therefore, we decided to forward the extra signals from the control input directly to the output token, rather than discarding them and hardcoding constant extra signal values in `ConstantOp`.
 
-As a result, `ConstantOp` is considered constant only for its data, while its extra signal values remain variable.
+In other words, `ConstantOp `does not generate extra signals itself—this responsibility typically falls to a dedicated `SourceOp`, which supplies the control token for the succeeding `ConstantOp`. The values of these extra signals depend on the specific signals being propagated and are not discussed here.
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a conversation in Pull Request #197](https://github.com/EPFL-LAP/dynamatic/pull/197#discussion_r1885735050).
 
@@ -114,6 +114,8 @@ More on operation arguments: https://mlir.llvm.org/docs/DefiningDialects/Operati
 Each operation also has **results**, which represent the outputs of the RTL here. For instance, `ConditionalBranchOp` has two results, corresponding to the "true" and "false" branches.
 
 https://github.com/EPFL-LAP/dynamatic/blob/32df72b2255767c843ec4f251508b5a6179901b1/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L459-L460
+
+Just like operands, some results are variadic (e.g., outputs of `ForkOp`).
 
 More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-results
 
@@ -204,7 +206,7 @@ Most operations use the `AllTypesMatch` trait to ensure that extra signals remai
 The following constraints ensure proper handling of extra signals:
 
 - `MergingExtraSignals` – Validates extra signal consistency across the data inputs and data output.
-- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and data output.
+- `AllDataTypesMatchWithVariadic` – Ensures uniform data types across the data inputs and variadic data output.
 
 Additionally, the `selector` port is of type `SimpleChannel`, as it does not carry extra signals.
 

@@ -68,10 +68,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
                       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>];
 
   let extraClassDeclaration = [{
-    // Add an entry block to an empty function, and set up the block arguments
-    // to match the signature of the function.
-    Block *addEntryBlock();
-
     /// Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
 
@@ -323,6 +319,8 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 
 def MergeOp : Handshake_Op<"merge", [
   Pure,
+  // SameOperandsAndResultsType is a built-in variant of AllTypesMatch with useful
+  // builder behavior, supporting variadic operands.
   // MergeOp imposes this constraint to enforce that all the data types and
   // extra signals of operands and results match, while MuxOp and CMergeOp only
   // require that the data types match.
