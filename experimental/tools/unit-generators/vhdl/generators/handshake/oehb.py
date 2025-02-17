@@ -1,18 +1,12 @@
 import ast
 
 from generators.support.utils import VhdlScalarType
-from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
 
 def generate_oehb(name, params):
   port_types = ast.literal_eval(params["port_types"])
   data_type = VhdlScalarType(port_types["ins"])
 
-  if data_type.has_extra_signals():
-    if data_type.is_channel():
-      return _generate_oehb_signal_manager(name, data_type)
-    else:
-      return _generate_oehb_signal_manager_dataless(name, data_type)
-  elif data_type.is_channel():
+  if data_type.is_channel():
     return _generate_oehb(name, data_type.bitwidth)
   else:
     return _generate_oehb_dataless(name)
@@ -119,9 +113,3 @@ end architecture;
 """
 
   return dependencies + entity + architecture
-
-def _generate_oehb_signal_manager(name, data_type):
-  return generate_buffer_like_signal_manager(name, data_type, _generate_oehb)
-
-def _generate_oehb_signal_manager_dataless(name, data_type):
-  return generate_buffer_like_signal_manager_dataless(name, data_type, _generate_oehb)
