@@ -1666,8 +1666,10 @@ LogicalResult SpeculatorOp::inferReturnTypes(
     inferredReturnTypes.push_back(dataInType);
   } else {
     // Otherwise, add the spec bit to the dataIn type (outside loops)
-    inferredReturnTypes.push_back(dataInType.addExtraSignal(
-        ExtraSignal(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1))));
+    SmallVector<ExtraSignal> newExtraSignals(dataInType.getExtraSignals());
+    newExtraSignals.emplace_back(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1));
+    inferredReturnTypes.push_back(
+        dataInType.copyWithExtraSignals(newExtraSignals));
   }
 
   inferredReturnTypes.push_back(ctrlType);
@@ -1691,8 +1693,14 @@ LogicalResult SpecCommitOp::inferReturnTypes(
   OpBuilder builder(context);
 
   auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
+  SmallVector<ExtraSignal> newExtraSignals;
+  for (const ExtraSignal &signal : dataInType.getExtraSignals()) {
+    if (signal.name != EXTRA_SIGNAL_SPEC) {
+      newExtraSignals.push_back(signal);
+    }
+  }
   inferredReturnTypes.push_back(
-      dataInType.removeExtraSignal(EXTRA_SIGNAL_SPEC));
+      dataInType.copyWithExtraSignals(newExtraSignals));
 
   return success();
 }
