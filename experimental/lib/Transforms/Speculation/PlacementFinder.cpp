@@ -20,6 +20,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -140,7 +141,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::MemoryControllerOp>(succOp)) {
         if (dstOpOperand.getOperandNumber() == 2 &&
-            !isa<handshake::MCLoadOp>(currOp)) {
+            !isa<handshake::LoadOp>(currOp)) {
           // dstOpOperand is the control operand of the memory controller,
           // indicating the number of stores.
           // A commit is needed on this operand
