@@ -9,7 +9,6 @@ import generators.handshake.control_merge as control_merge
 import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
 import generators.handshake.load as load
-import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
@@ -17,7 +16,6 @@ import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
-import generators.support.mem_to_bram as mem_to_bram
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -39,8 +37,6 @@ def generate_code(name, mod_type, parameters):
       return fork.generate_fork(name, parameters)
     case "load":
       return load.generate_load(name, parameters)
-    case "mem_controller":
-      return mem_controller.generate_mem_controller(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
     case "muli":
@@ -55,8 +51,6 @@ def generate_code(name, mod_type, parameters):
       return store.generate_store(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
-    case "mem_to_bram":
-      return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:
       return f"Module type {mod_type} not found"
       # raise ValueError(f"Module type {mod_type} not found")
