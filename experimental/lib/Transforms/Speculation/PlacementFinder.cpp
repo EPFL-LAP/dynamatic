@@ -147,13 +147,10 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         // A commit is needed in front of the end/exit operation
         placements.addCommit(dstOpOperand);
       } else if (isa<handshake::MemoryControllerOp>(succOp)) {
-        if (dstOpOperand.getOperandNumber() == 2 &&
+        if (!isa<handshake::MCStoreOp>(currOp) &&
             !isa<handshake::MCLoadOp>(currOp)) {
           // A commit is needed in front of the memory controller
           // On the operand indicating the number of stores
-          placements.addCommit(dstOpOperand);
-        } else if (dstOpOperand.get().getType().isa<handshake::ControlType>()) {
-          // End signal
           placements.addCommit(dstOpOperand);
         }
         // Exceptionally stop the traversal
