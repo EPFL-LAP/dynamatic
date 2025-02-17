@@ -74,8 +74,10 @@ private:
   /// Place the Buffer operations
   LogicalResult placeBuffers();
 
-  /// Add spec tag to the operand/result types in the speculative
-  /// region.
+  /// Adds a spec tag to the operand/result types in the speculative region.
+  /// Traverses both upstream and downstream within the region, starting from
+  /// the speculator. Upstream traversal is required to cover SourceOp and
+  /// ConstantOp.
   LogicalResult addSpecTagToSpecRegion();
 };
 } // namespace
