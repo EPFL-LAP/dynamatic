@@ -1,9 +1,11 @@
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.arith_op_headers import generate_unanary_op_header
 from generators.handshake.join import generate_join
+from generators.support.utils import *
 
 
-def generate_binary_op_handshake_manager(name, latency):
+def generate_binary_op_handshake_manager(name, params):
+  latency = params[ATTR_LATENCY]
+
   if latency == 0:
     return _generate_handshake_manager_no_lat(name)
   else:
@@ -36,5 +38,5 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   DEFINE outs_valid := inner_delay_buffer.outs_valid;
   
   {generate_join(f"{name}__join", {"size": 2})}
-  {generate_delay_buffer(f"{name}__delay_buffer", latency)}
+  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
 """

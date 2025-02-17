@@ -15,5 +15,5 @@ def _generate_minimumf(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := lhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", latency)}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
 """

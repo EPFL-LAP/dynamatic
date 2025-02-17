@@ -15,5 +15,5 @@ def _generate_absf(name, latency, data_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := ins;
   
-  {generate_delay_buffer(f"{name}__delay_buffer", latency)}
+  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
 """

@@ -37,7 +37,8 @@ class SmvScalarType:
       if type_prefix == "f":
         self.floating_point = True
         if self.bitwidth != 32 and self.bitwidth != 64:
-          raise ValueError(f"Bitwidth {self.bitwidth} is not supported for floats")
+          raise ValueError(
+              f"Bitwidth {self.bitwidth} is not supported for floats")
         self.smv_type = f"unsigned word [{self.bitwidth}]"
       else:
         self.signed = not type_prefix.startswith("u")
