@@ -1,4 +1,4 @@
-# Extra Signals for Operations
+# Extra Signals Type Verification
 
 The concept of extra signals has been introduced into the Handshake TypeSystem, as detailed [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TypeSystem.md). This feature allows both channel types and control types to carry additional information, such as spec bits or tags. Each operation must handle the extra signals of its inputs and outputs appropriately. To ensure this, we leverage MLIR's type verification tools, enforcing rules for how extra signals are passed to and from operations. Rather than thinking of the type verification as fundamental, rigid limits on how extra signals may exist in the circuit, these rules are used to catch unintended consequences of algorithms or optimizations. The specifics of how each unit is verified come from how the unit is generated: if unit generation would fail, verification should also.
 
