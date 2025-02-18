@@ -19,7 +19,9 @@ To further specify the meaning of "consistent extra signals across all their inp
 
 <img alt="the IO of addi" src="./Figures/ExtraSignalsForOperations/addi.png" width="300" />
 
-This constraint is designed to reduce variability in these operations, simplifying the RTL generation process.
+This is enforced for the following reasons:
+- To reduce variability in these operations, simplifying RTL generation.
+- To impose a built-in constraint: we aim to enforce the `AllTypesMatch` trait (discussed later) as much as possible. This special built-in trait simplifies the IR format (under the [declarative assembly format](https://mlir.llvm.org/docs/DefiningDialects/Operations/#declarative-assembly-format)), [enables a simpler builder](https://mlir.llvm.org/docs/DefiningDialects/Operations/#builder-methods).
 
 Note that the *values* of these extra signals do not necessarily need to match; their behavior depends on the specification of the extra signal. For instance, in the `addi` example, one input’s `spec` signal might hold the value `1`, while the other input’s `spec` signal could hold `0`. The RTL implementation of `addi` must account for and handle these cases appropriately.
 
