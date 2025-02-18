@@ -27,8 +27,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Casting.h"
-#include <list>
 #include <string>
 
 using namespace llvm::sys;
@@ -39,12 +37,6 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
 namespace {
-// The list to record the branches that need to be replicated
-// Value: The value whose spec tag is used
-// handshake::ConditionalBranchOp: The branch to replicate
-// unsigned: The direction of the branch to follow
-typedef std::list<std::tuple<Value, handshake::ConditionalBranchOp, unsigned>>
-    CommitBranchList;
 
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
@@ -89,6 +81,8 @@ private:
   /// Traverses both upstream and downstream within the region, starting from
   /// the speculator. Upstream traversal is required to cover SourceOp and
   /// ConstantOp.
+  /// See the documentation for more details:
+  /// docs/Speculation/AddingSpecTagsToSpecRegion.md
   LogicalResult addSpecTagToSpecRegion();
 };
 } // namespace
