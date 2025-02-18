@@ -73,7 +73,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         result.numSlotR = props.minTrans;
       }
       // All remaining slots are opaque
-      result. = numSlotsToPlace - result.numSlotR;
+      result.numSlotDV = numSlotsToPlace - result.numSlotR;
     } else {
       // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
       // transparent
