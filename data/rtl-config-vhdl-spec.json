@@ -136,7 +136,8 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t fork -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t fork -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.lazy_fork",
@@ -151,21 +152,24 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mux -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mux -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.control_merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t control_merge -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t control_merge -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t merge -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t merge -p size=$SIZE port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.br",
@@ -204,7 +208,8 @@
       { "name": "NUM_LOADS", "type": "unsigned" },
       { "name": "NUM_STORES", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.lsq",
@@ -248,11 +253,13 @@
     "parameters": [
       { "name": "FIFO_DEPTH", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculator -p fifo_depth=$FIFO_DEPTH port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t speculator -p fifo_depth=$FIFO_DEPTH port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.spec_commit",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_commit -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t spec_commit -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd",
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.spec_save",
@@ -272,5 +279,8 @@
   {
     "name": "mem_to_bram",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -t mem_to_bram -p port_types=$PORT_TYPES >> $OUTPUT_DIR/$MODULE_NAME.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   }
 ]
