@@ -555,21 +555,9 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     builder.setInsertionPoint(opDst);
 
     Value bufferIn = channel;
-    auto placeBuffer = [&](const TimingInfo &timing, unsigned numSlots) {
+    auto placeBuffer = [&](const TimingInfo &timing, const StringRef &bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
-
-      StringRef bufferType;
-      if (timing == TimingInfo::oehb())
-        bufferType = BufferOp::DV_TYPE;
-      else if (timing == TimingInfo::tehb())
-        bufferType = BufferOp::R_TYPE;
-      else if (timing == TimingInfo::dvfifo())
-        bufferType = BufferOp::DVE_TYPE;
-      else if (timing == TimingInfo::tfifo())
-        bufferType = BufferOp::T_TYPE;
-      else if (timing == TimingInfo::dvr())
-        bufferType = BufferOp::DVR_TYPE;
 
       auto bufOp = builder.create<handshake::BufferOp>(
           bufferIn.getLoc(), bufferIn, timing, numSlots, bufferType);
@@ -582,17 +570,17 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.opaqueBeforeTrans) {
-      placeBuffer(TimingInfo::dvr(), placeRes.numSlotDVR);
-      placeBuffer(TimingInfo::oehb(), placeRes.numSlotDV);
-      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotDVE);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotT);
-      placeBuffer(TimingInfo::tehb(), placeRes.numSlotR);
+      placeBuffer(TimingInfo::dvr(), BufferOp::DVR_TYPE, placeRes.numSlotDVR);
+      placeBuffer(TimingInfo::oehb(), BufferOp::DV_TYPE, placeRes.numSlotDV);
+      placeBuffer(TimingInfo::dvfifo(), BufferOp::DVE_TYPE, placeRes.numSlotDVE);
+      placeBuffer(TimingInfo::tfifo(), BufferOp::T_TYPE, placeRes.numSlotT);
+      placeBuffer(TimingInfo::tehb(), BufferOp::R_TYPE, placeRes.numSlotR);
     } else {
-      placeBuffer(TimingInfo::tehb(), placeRes.numSlotR);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotT);
-      placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotDVE);
-      placeBuffer(TimingInfo::oehb(), placeRes.numSlotDV);
-      placeBuffer(TimingInfo::dvr(), placeRes.numSlotDVR);
+      placeBuffer(TimingInfo::tehb(), BufferOp::R_TYPE, placeRes.numSlotR);
+      placeBuffer(TimingInfo::tfifo(), BufferOp::T_TYPE, placeRes.numSlotT);
+      placeBuffer(TimingInfo::dvfifo(), BufferOp::DVE_TYPE, placeRes.numSlotDVE);
+      placeBuffer(TimingInfo::oehb(), BufferOp::DV_TYPE, placeRes.numSlotDV);
+      placeBuffer(TimingInfo::dvr(), BufferOp::DVR_TYPE, placeRes.numSlotDVR);
     }
   }
 }
