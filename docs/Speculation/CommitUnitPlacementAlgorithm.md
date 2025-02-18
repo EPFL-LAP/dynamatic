@@ -10,7 +10,7 @@ Note that commit units are **not** placed for LoadOp.
 
 ## Commit Units for MemoryControllerOp
 
-MemoryControllerOp is more complex, as we want to place commit units for some operands but not for others. Here's how we place them:
+MemoryControllerOp is a bit complex, as we want to place commit units for some operands but not for others. Here's how we place them:
 
 <img alt="MC Commit Unit Placement" src="./Figures/CommitUnitPlacementAlgorithm.png" width="600" />
 
@@ -33,11 +33,14 @@ Commit units are **not** placed for the two ports communicating with the LoadOp 
 
 ## How to Place Commit Units for MemoryControllerOp
 
-Currently, the MemoryControllerOp specification doesn’t allow us to directly identify the `ctrlEnd` port. Instead, we rely on the rationale of **whether these ports are connected to a LoadOp or StoreOp**.
+Our algorithm is designed so that when it visits a `MemoryControllerOp`, it should place a commit unit. Specifically, at a `LoadOp`, we skip traversing the results connected to the memory controller.
 
-You may wonder whether commit units can be placed on the `memStart`/`memEnd` ports. These ports are external and are not traversed by the algorithm, so they are not considered.
+How does this ensure correct placement?
 
-
+- Ports connected to a `LoadOp` are not traversed due to the skip mentioned above.
+- Ports connected to a `StoreOp` are also not traversed because the traversal stops at the `StoreOp`.
+- External ports are never traversed.
+- The `ctrl` and `ctrlEnd` ports are traversed if they originate from the speculative region and require a commit unit.
 
 ## Future Work
 
