@@ -237,8 +237,8 @@ def BufferOp : Handshake_Op<"buffer", [
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
     
     static constexpr ::llvm::StringLiteral DV_TYPE="DV", R_TYPE="R", 
-                                            T_TYPE="T", DVE_TYPE="DVE",
-                                            DVR_TYPE="DVR";
+                                           T_TYPE="T", DVE_TYPE="DVE",
+                                           DVR_TYPE="DVR";
     
   }];
 

@@ -585,14 +585,14 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       placeBuffer(TimingInfo::dvr(), placeRes.numSlotDVR);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotDV);
       placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotDVE);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numT);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotT);
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotR);
     } else {
       placeBuffer(TimingInfo::tehb(), placeRes.numSlotR);
-      placeBuffer(TimingInfo::tfifo(), placeRes.numT);
+      placeBuffer(TimingInfo::tfifo(), placeRes.numSlotT);
       placeBuffer(TimingInfo::dvfifo(), placeRes.numSlotDVE);
       placeBuffer(TimingInfo::oehb(), placeRes.numSlotDV);
-      placeBuffer(TimingInfo::dvr(), placeRes.numDVR);
+      placeBuffer(TimingInfo::dvr(), placeRes.numSlotDVR);
     }
   }
 }

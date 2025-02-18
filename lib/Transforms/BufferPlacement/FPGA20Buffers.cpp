@@ -76,7 +76,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       }
     } else {
       // All slots should be transparent
-      result.numSlotDV = numSlotsToPlace;
+      result.numSlotR = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
