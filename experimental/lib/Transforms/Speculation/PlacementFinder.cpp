@@ -123,7 +123,6 @@ LogicalResult PlacementFinder::findSavePositions() {
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
-  auto [_, isNewOp] = visited.insert(currOp);
 
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
@@ -131,20 +130,28 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // consecutive Commit-Save units.
     placements.addSaveCommit(currOpOperand);
     placements.eraseSave(currOpOperand);
+    // Stop traversal since all commit units must be reachable from the
+    // speculator without passing through a save commit.
     return;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
+    // A Commit is needed in front of these units
     placements.addCommit(currOpOperand);
+    // Stop traversal.
     return;
   }
+
+  auto [_, isNewOp] = visited.insert(currOp);
 
   // End traversal if currOp is already in visited set
   if (!isNewOp)
     return;
 
   if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
+    // Continue traversal only the data result of the LoadOp, skipping results
+    // connected to the memory controller.
     for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
       findCommitsTraversal(visited, dstOpOperand);
     }
