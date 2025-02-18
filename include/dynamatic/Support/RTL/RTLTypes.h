@@ -272,9 +272,10 @@ struct RTLDataflowType
 struct RTLTimingType : public RTLType::Model<RTLTimingType, TimingConstraints> {
   static constexpr llvm::StringLiteral ID = "timing", LATENCY = "-lat";
 
-  /// There is no implementation for serializing the timing type to a string;
-  /// this always returns the "timing" string.
-  static std::string serialize(mlir::Attribute attr) { return ID.str(); }
+  /// Serializes timing information into a string.
+  /// The output format is the TimingAttr assembly format with single quotes.
+  /// E.g., '#handshake<timing {R: 1}>'
+  static std::string serialize(mlir::Attribute attr);
 };
 
 } // namespace dynamatic
