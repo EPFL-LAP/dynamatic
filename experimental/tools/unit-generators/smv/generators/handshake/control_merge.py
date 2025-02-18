@@ -38,9 +38,9 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
   index_valid := inner_fork.outs_valid_1;
   index := inner_tehb.outs;
 
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {"size": size, "data_type": HANSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_merge_notehb(f"{name}__merge_notehb_dataless", {"size": size, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
 {generate_buffer(f"{name}__tehb", TEHB_BUFFER_PARAMS(index_type))}
-{generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": HANSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
 
 
