@@ -79,6 +79,8 @@ private:
   /// Traverses both upstream and downstream within the region, starting from
   /// the speculator. Upstream traversal is required to cover SourceOp and
   /// ConstantOp.
+  /// See the documentation for more details:
+  /// docs/Speculation/AddingSpecTagsToSpecRegion.md
   LogicalResult addSpecTagToSpecRegion();
 };
 } // namespace
