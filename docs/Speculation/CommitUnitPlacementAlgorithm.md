@@ -14,13 +14,13 @@ MemoryControllerOp is a bit complex, as we want to place commit units for some o
 
 <img alt="MC Commit Unit Placement" src="./Figures/CommitUnitPlacementAlgorithm.png" width="600" />
 
-When a memory controller communicates with a LoadOp, four ports of the memory controller are used:
+When a memory controller communicates with a LoadOp, five ports of the memory controller are used:
 
 - Two ports for receiving the address from the LoadOp and sending data to the LoadOp
 - `memStart`/`memEnd` ports, which communicate with external components to signal the start and end of memory region access (see [here](https://github.com/EPFL-LAP/dynamatic/blob/dev/shundroid/doc-small-update/docs/Specs/CircuitInterface.md#memory-controls))
 - The `ctrlEnd` port, which receives signals from the control network, indicating that no more requests are incoming.
 
-When the memory controller communicates with a StoreOp, five ports are involved:
+When the memory controller communicates with a StoreOp, six ports are involved:
 
 - Two ports for receiving the address and data from the StoreOp
 - `memStart`/`memEnd` (as with LoadOp)
