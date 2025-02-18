@@ -51,7 +51,7 @@ private:
 
   /// DFS traversal to find the paths that need Commit units
   void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                            Operation *currOp);
+                            OpOperand &currOpOperand);
 
   /// Check arcs between BBs to determine if extra commits are needed to solve
   /// out-of-order tokens
