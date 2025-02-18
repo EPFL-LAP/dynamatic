@@ -47,6 +47,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+const std::string EXTRA_SIGNAL_SPEC = "spec";
+
 static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
   return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
     if ((ty = handshake::detail::jointHandshakeTypeParser(parser)))
@@ -624,7 +626,6 @@ LogicalResult ConstantOp::inferReturnTypes(
   // - extra signals matching the input control type
   inferredReturnTypes.push_back(handshake::ChannelType::get(
       attr.getType(), controlType.getExtraSignals()));
-
   return success();
 }
 
@@ -1613,34 +1614,39 @@ LogicalResult EndOp::verify() {
 ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand enable, dataIn;
   Type dataType;
+  Type enableType;
   SmallVector<Type> uniqueResTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
   if (parser.parseLSquare() || parser.parseOperand(enable) ||
       parser.parseRSquare() || parser.parseOperand(dataIn) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
+      parser.parseType(dataType) || parser.parseComma() ||
+      parser.parseType(enableType) || parser.parseArrowTypeList(uniqueResTypes))
     return failure();
+
   if (uniqueResTypes.size() != 3)
     return failure();
 
   Type ctrlType = uniqueResTypes[1];
   Type wideCtrlType = uniqueResTypes[2];
+
+  // dataOut, saveCtrl, commitCtrl, SCSaveCtrl, SCCommitCtrl, SCBranchCtrl
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
+  return parser.resolveOperands({dataIn, enable}, {dataType, enableType},
+                                allOperandLoc, result.operands);
 }
 
 void SpeculatorOp::print(OpAsmPrinter &p) {
   p << " [" << getEnable() << "] " << getDataIn() << " ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
-    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
-    << ")";
+  p << " : " << getDataIn().getType() << ", " << getEnable().getType();
+  p << " -> (";
+  p << getDataOut().getType() << ", " << getSaveCtrl().getType() << ", "
+    << getSCSaveCtrl().getType();
+  p << ")";
 }
 
 LogicalResult SpeculatorOp::inferReturnTypes(
@@ -1649,11 +1655,23 @@ LogicalResult SpeculatorOp::inferReturnTypes(
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
 
-  inferredReturnTypes.push_back(operands.front().getType());
-
   OpBuilder builder(context);
   ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
   ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
+
+  auto dataInType =
+      dyn_cast<ExtraSignalsTypeInterface>(operands.front().getType());
+  if (dataInType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
+    // If dataIn already has the spec bit, just push it through (inside loops)
+    inferredReturnTypes.push_back(dataInType);
+  } else {
+    // Otherwise, add the spec bit to the dataIn type (outside loops)
+    SmallVector<ExtraSignal> newExtraSignals(dataInType.getExtraSignals());
+    newExtraSignals.emplace_back(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1));
+    inferredReturnTypes.push_back(
+        dataInType.copyWithExtraSignals(newExtraSignals));
+  }
+
   inferredReturnTypes.push_back(ctrlType);
   inferredReturnTypes.push_back(ctrlType);
   inferredReturnTypes.push_back(wideControlType);
@@ -1662,22 +1680,28 @@ LogicalResult SpeculatorOp::inferReturnTypes(
   return success();
 }
 
-LogicalResult SpeculatorOp::verify() {
-  Type refBoolType = getSaveCtrl().getType();
-  if (refBoolType != getCommitCtrl().getType() ||
-      refBoolType != getSCBranchCtrl().getType()) {
-    return emitError() << "expected $saveCtrl, $commitCtrl, and $SCBranchCtrl "
-                          "to have the same type, but got "
-                       << refBoolType << ", " << getCommitCtrl().getType()
-                       << ", and " << getSCBranchCtrl().getType();
-  }
+//===----------------------------------------------------------------------===//
+// SpecCommitOp
+//===----------------------------------------------------------------------===//
 
-  if (getSCSaveCtrl().getType() != getSCCommitCtrl().getType()) {
-    return emitError() << "expected $SCSaveCtrl and $SCCommitCtrl to have the "
-                          "same type, but got "
-                       << getSCSaveCtrl().getType() << " and "
-                       << getSCCommitCtrl().getType();
+LogicalResult SpecCommitOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    mlir::RegionRange regions,
+    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
+
+  OpBuilder builder(context);
+
+  auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
+  SmallVector<ExtraSignal> newExtraSignals;
+  for (const ExtraSignal &signal : dataInType.getExtraSignals()) {
+    if (signal.name != EXTRA_SIGNAL_SPEC) {
+      newExtraSignals.push_back(signal);
+    }
   }
+  inferredReturnTypes.push_back(
+      dataInType.copyWithExtraSignals(newExtraSignals));
+
   return success();
 }
 

@@ -82,8 +82,8 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
-      "::mlir::Type":$dataType, 
-      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
+      "::mlir::Type":$dataType,
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras),
       [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
@@ -106,7 +106,13 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
     ChannelType withDataType(Type newDataType) {
       return ChannelType::get(newDataType, getExtraSignals());
     }
-    
+
+    /// Returns a channel type with identical data type but a potentially
+    /// different extra signals.
+    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
+      return ChannelType::get(getDataType(), newExtraSignals);
+    }
+
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
@@ -344,6 +350,77 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
 class VariadicHasElement<string variadic> : PredOpTrait<
   "the variadic " # variadic # " should have at least one element",
   CPred<"!$" # variadic # ".empty()">
+>;
+
+// Multi-entity constraints for spec tags
+
+// Predicate to verify if the given type has a valid spec tag as an extra signal.
+class HasSpecTag<string type> : CPred<
+  [{
+    ([&](std::optional<ExtraSignal> getExtraSignalResult) {
+      if (!getExtraSignalResult.has_value()) {
+        // There is no extra signal called "spec"
+        return false;
+      }
+
+      ExtraSignal signal = getExtraSignalResult.value();
+
+      // The signal should be a 1-bit integer downstream signal.
+      if (!signal.downstream)
+        return false;
+      if (!signal.type.isInteger(1))
+        return false;
+
+      return true;
+    })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
+  }] # type # ").getExtraSignal(\"spec\"))"
+>;
+
+// Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
+class AddingSpecTag<string a, string b> : PredOpTrait<
+  b # " should be the type of " # a # " with spec tag",
+  And<[
+    AllDataTypesMatch<[a, b]>.predicate,
+    Neg<HasSpecTag<"$" # a # ".getType()">>,
+    HasSpecTag<"$" # b # ".getType()">
+    // TODO: Add a constraint to ensure that no other extra bits are added to `b`.
+  ]>
+>;
+
+// Multi-entity constraint ensuring that the type of `b` matches the type of `a` without a spec tag.
+class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
+
+// Multi-entity constraint ensuring that if at least one of the `input` has a spec tag,
+// then all of the `output` should have a spec tag.
+// This verification is also done in the verifier of MergeLikeOpInterface
+class PropagatingSpecTag<list<string> inputs, list<string> outputs> : PredOpTrait<
+  "if at least one of the inputs has a spec tag, then all of the outputs should have a spec tag",
+  Or<[
+    And<[
+      Or<!foreach(
+        input, // variable name
+        inputs,
+        HasSpecTag<"$" # input # ".getType()">
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        HasSpecTag<"$" # output # ".getType()">
+      )>
+    ]>,
+    And<[
+      And<!foreach(
+        input, // variable name
+        inputs,
+        Neg<HasSpecTag<"$" # input # ".getType()">>
+      )>,
+      And<!foreach(
+        output, // variable name
+        outputs,
+        Neg<HasSpecTag<"$" # output # ".getType()">>
+      )>
+    ]>
+  ]>
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

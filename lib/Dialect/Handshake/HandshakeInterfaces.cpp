@@ -136,6 +136,16 @@ std::string handshake::ConditionalBranchOp::getResultName(unsigned idx) {
   return idx == ConditionalBranchOp::trueIndex ? "trueOut" : "falseOut";
 }
 
+std::string handshake::SpeculatingBranchOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return idx == 0 ? "spec_tag_data" : "data";
+}
+
+std::string handshake::SpeculatingBranchOp::getResultName(unsigned idx) {
+  assert(idx < getNumResults() && "index too high");
+  return idx == SpeculatingBranchOp::trueIndex ? "trueOut" : "falseOut";
+}
+
 std::string handshake::ConstantOp::getOperandName(unsigned idx) {
   assert(idx == 0 && "index too high");
   return "ctrl";
@@ -162,6 +172,29 @@ std::string handshake::SelectOp::getOperandName(unsigned idx) {
 std::string handshake::SelectOp::getResultName(unsigned idx) {
   assert(idx == 0 && "index too high");
   return "result";
+}
+
+std::string handshake::SpeculatorOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return idx == 0 ? "ins" : "enable";
+}
+
+std::string handshake::SpeculatorOp::getResultName(unsigned idx) {
+  assert(idx < getNumResults() && "index too high");
+  switch (idx) {
+  case 0:
+    return "outs";
+  case 1:
+    return "ctrl_save";
+  case 2:
+    return "ctrl_commit";
+  case 3:
+    return "ctrl_sc_save";
+  case 4:
+    return "ctrl_sc_commit";
+  default:
+    return "ctrl_sc_branch";
+  }
 }
 
 /// Load/Store base signal names common to all memory interfaces
@@ -361,61 +394,6 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   if (MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getCtrlEnd();
   return cast<TypedValue<ControlType>>(getOperands().back());
-}
-
-//===----------------------------------------------------------------------===//
-// SameExtraSignalsInterface
-//===----------------------------------------------------------------------===//
-
-namespace {
-using ChannelVal = TypedValue<handshake::ChannelType>;
-} // namespace
-
-static inline ChannelVal toChannel(Value val) { return cast<ChannelVal>(val); }
-
-static void insertChannels(ValueRange values,
-                           SmallVectorImpl<ChannelVal> &channels) {
-  for (Value val : values) {
-    if (auto channelVal = dyn_cast<ChannelVal>(val))
-      channels.push_back(channelVal);
-  }
-}
-
-SmallVector<ChannelVal>
-dynamatic::handshake::detail::getChannelsWithSameExtraSignals(Operation *op) {
-  SmallVector<ChannelVal> channels;
-  insertChannels(op->getOperands(), channels);
-  insertChannels(op->getResults(), channels);
-  return channels;
-}
-
-LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
-    Operation *op, ArrayRef<ChannelVal> channels) {
-  std::optional<ArrayRef<ExtraSignal>> refExtras;
-
-  for (TypedValue<ChannelType> chan : channels) {
-    if (!refExtras) {
-      refExtras = chan.getType().getExtraSignals();
-      continue;
-    }
-    ArrayRef<ExtraSignal> extras = chan.getType().getExtraSignals();
-    if (refExtras->size() != extras.size())
-      return op->emitError() << "incompatible number of extra signals "
-                                "between two operand/result channel types";
-    auto signalsZip = llvm::zip(*refExtras, extras);
-    for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
-      auto &[refSig, sig] = signals;
-      if (refSig != sig)
-        return op->emitError()
-               << "different " << idx
-               << "-th extra signal between two operand/result channel types";
-    }
-  }
-  return success();
-}
-
-SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
-  return {getTrueValue(), getFalseValue(), getResult()};
 }
 
 //===----------------------------------------------------------------------===//

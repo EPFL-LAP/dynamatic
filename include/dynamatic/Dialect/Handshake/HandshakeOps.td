@@ -588,8 +588,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
-    Each `MemoryControllerOp` represents an interface to an externally defined 
-    unidimensional memory (i.e., it interfaces a memref input to a Handshake 
+    Each `MemoryControllerOp` represents an interface to an externally defined
+    unidimensional memory (i.e., it interfaces a memref input to a Handshake
     function). It receives control signals from each basic block containing
     store operations referencing the wrapped memref; the formers are fed to the
     operation through constants indicating the number of stores the basic block
@@ -602,7 +602,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     Additionally, the `connectedBlocks` attribute contains the ordered list of
     basic blocks (referenced by their unique IDs) that communicate with the
     controller. Every load/store operation is required to be tagged with the ID
-    of a basic block present in this list.  
+    of a basic block present in this list.
 
     Optionally, a memory controller may act as a middle-person between an LSQ
     and the external memory.
@@ -619,7 +619,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          signals described above.
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
-         through the LSQ. 
+         through the LSQ.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -639,7 +639,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
-                                 "ArrayRef<unsigned>":$blocks, 
+                                 "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
   let hasVerifier = 1;
 
@@ -919,18 +919,28 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataIn", "dataOut"]>,
+  // Constraint on the dataIn/dataOut relationship
+  PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
+    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside loops
+    AddingSpecTag<"dataIn", "dataOut">.predicate // Outside loops
+  ]>>,
+  IsSimpleHandshake<"saveCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsSimpleHandshake<"SCSaveCtrl">,
+  IsSimpleHandshake<"SCCommitCtrl">,
+  IsSimpleHandshake<"SCBranchCtrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
     The speculator produces speculative tokens when real data has
-    not yet arrived. The speculator is also responsible for deciding 
+    not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
     It needs to send control tokens to save units and commit units
     ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while 
+    signals are needed. $SCSaveCtrl is connected directly, while
     $SCCommitCtrl replicates the branches that $dataOut
     follows and might not reach a save-commit. $SCBranchCtrl is needed
     in the replicated branches to discard the latter signal.
@@ -945,22 +955,33 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
   let results = (outs HandshakeType:$dataOut,
-                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
+                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl,
                       IntSizedChannel<3>:$SCSaveCtrl,
-                      IntSizedChannel<3>:$SCCommitCtrl, 
+                      IntSizedChannel<3>:$SCCommitCtrl,
                       BoolChannel:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
 }
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
   }];
 }
 
@@ -984,17 +1005,24 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   }];
 }
 
-def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
+def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface,
+  RemovingSpecTag<"dataIn", "dataOut">,
+  // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
+  // The builder is used in the HandshakeSpeculation pass.
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
-    Commit units are used to mark the end of the speculation region. 
-    Commit units are used to stall speculative tokens until they receive 
-    the decision from the speculator. In case the speculation is correct, 
-    the speculative tokens are converted into non-speculative tokens and 
-    passed on to the rest of the circuit. 
-    Otherwise, the speculative tokens are discarded. 
+    Commit units are used to mark the end of the speculation region.
+    Commit units are used to stall speculative tokens until they receive
+    the decision from the speculator. In case the speculation is correct,
+    the speculative tokens are converted into non-speculative tokens and
+    passed on to the rest of the circuit.
+    Otherwise, the speculative tokens are discarded.
 
-    Any non-speculative token can pass through the commit units 
+    Any non-speculative token can pass through the commit units
     without any stall.
 
     Example:
@@ -1004,6 +1032,25 @@ def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
     ```
   }];
 
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  // While type($dataOut) can be inferred due to the inferReturnTypes,
+  // we chose to explicitly specify it in the IR for better clarity and understandability.
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
@@ -1025,7 +1072,9 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatch<["trueResult", "falseResult"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1048,7 +1097,17 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
-      type($tagFromOperand) `,` type($dataOperand)
+      type($tagFromOperand) `,` type($dataOperand) `,`
+      type($trueResult) `,` type($falseResult)
+  }];
+  let builders = [OpBuilder<(ins "Value":$tagFromOperand, "Value":$dataOperand), [{
+    $_state.addOperands({tagFromOperand, dataOperand});
+    auto resultType = dataOperand.getType().cast<ChannelType>().withExtraSignal({});
+    $_state.addTypes({resultType, resultType});
+  }]>];
+  let extraClassDeclaration = [{
+    // These are the indices into the dests list.
+    enum { trueIndex = 0, falseIndex = 1 };
   }];
 }
 
