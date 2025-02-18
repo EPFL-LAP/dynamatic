@@ -24,7 +24,7 @@ The algorithm follows these steps:
 
 3. Another downstream traversal reaches `cmerge`, `addi`, `save_commit`, and eventually `cond_br` again. Since `cond_br` is already visited, **traversal stops there**.
 
-4. **Upstream traversal** is applied from `addi` to `constant` and `source`, ensuring spec tags are added to their operands due to `AllTypesMatch` enforcement in `addi`.
+4. **Upstream traversal** is applied from `addi` to `constant` and `source`, ensuring that spec tags are added to these operands, as `addi` enforces [consistent extra signals across all their inputs and outputs](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/ExtraSignalsTypeVerification.md#operations-within-a-basic-block).
 
 5. **Upstream traversal is skipped for `cmerge` and `mux`**, since some of their operands originate outside the speculative region. All internal edges are covered by downstream traversal.
 
