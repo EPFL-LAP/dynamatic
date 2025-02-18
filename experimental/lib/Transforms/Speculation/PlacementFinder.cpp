@@ -117,9 +117,6 @@ LogicalResult PlacementFinder::findSavePositions() {
 // Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
-// Recursively traverse the IR in a DFS way to find the placements of Commit
-// units. A commit unit before (1) an exit unit; (2) a store unit; (3) a save
-// unit if speculative tokens can reach them. Updates the `placements`
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
