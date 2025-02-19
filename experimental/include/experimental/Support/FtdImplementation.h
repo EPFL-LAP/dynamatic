@@ -1,4 +1,4 @@
-//===- FtdImplementation.h --- FTD conversion support -----------*- C++ -*-===//
+//===- FtdImplementation.h --- Main FTD Algorithm ---------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_SUPPORT_FTD_SUPPORT_H
-#define DYNAMATIC_SUPPORT_FTD_SUPPORT_H
+#ifndef DYNAMATIC_SUPPORT_FTD_IMPLEMENTATION_H
+#define DYNAMATIC_SUPPORT_FTD_IMPLEMENTATION_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
@@ -85,4 +85,4 @@ LogicalResult createPhiNetworkDeps(
 }; // namespace experimental
 }; // namespace dynamatic
 
-#endif // DYNAMATIC_SUPPORT_FTD_SUPPORT_H
+#endif // DYNAMATIC_SUPPORT_FTD_IMPLEMENTATION_H

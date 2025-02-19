@@ -1,4 +1,4 @@
-//===- FtdImplementation.h   - FTD conversion support ------------*- C++-*-===//
+//===- FtdImplementation.cpp --- Main FTD Algorithm -------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -84,7 +84,7 @@ static DenseMap<Block *, DenseSet<Block *>>
 getDominanceFrontier(Region &region) {
 
   // This algorithm comes from the following paper:
-  // Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “AS imple, Fast
+  // Cooper, Keith D., Timothy J. Harvey and Ken Kennedy. “A Simple, Fast
   // Dominance Algorithm.” (1999).
 
   DenseMap<Block *, DenseSet<Block *>> result;
@@ -263,21 +263,21 @@ static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
   return blockCond;
 }
 
-/// Run the cryton algorithm to determine, give a set of values, in which blocks
+/// Run the Cytron algorithm to determine, give a set of values, in which blocks
 /// should we add a merge in order for those values to be merged
 static DenseSet<Block *>
 runCrytonAlgorithm(Region &funcRegion, DenseMap<Block *, Value> &inputBlocks) {
   // Get dominance frontier
   auto dominanceFrontier = getDominanceFrontier(funcRegion);
 
-  // Temporary data structures to run the Cryton algorithm for phi positioning
+  // Temporary data structures to run the Cytron algorithm for phi positioning
   DenseMap<Block *, bool> work;
   DenseMap<Block *, bool> hasAlready;
   SmallVector<Block *> w;
 
   DenseSet<Block *> result;
 
-  // Initialize data structures to run the Cryton algorithm
+  // Initialize data structures to run the Cytron algorithm
   for (auto &bb : funcRegion.getBlocks()) {
     work.insert({&bb, false});
     hasAlready.insert({&bb, false});
@@ -631,10 +631,10 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
 
-/// Startin from a boolean expresssion which is a single variable (either direct
-/// or complect) return its corresponding circuit equivalent. This means, either
-/// we obtain the output of the operation determinig the condition, or we add a
-/// `not` to complement.
+/// Starting from a boolean expression which is a single variable (either
+/// direct or complement) return its corresponding circuit equivalent. This
+/// means, either we obtain the output of the operation determining the
+/// condition, or we add a `not` to complement.
 static Value boolVariableToCircuit(PatternRewriter &rewriter,
                                    experimental::boolean::BoolExpression *expr,
                                    Block *block, const ftd::BlockIndexing &bi) {
@@ -643,7 +643,7 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   // `~c0`).
   SingleCond *singleCond = static_cast<SingleCond *>(expr);
 
-  // Use the BlockIndexing to access the block correspndoing to such condition
+  // Use the BlockIndexing to access the block corresponding to such condition
   // and access its terminator to determine the condition.
   auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
   if (!conditionOpt.has_value()) {
@@ -785,7 +785,7 @@ static Value addSuppressionInLoop(PatternRewriter &rewriter, CFGLoop *loop,
     // cofactors
     BDD *bdd = buildBDD(fLoopExit, cofactorList);
 
-    // Convert the boolean expression obtained through bdd to a circuit
+    // Convert the boolean expression obtained through BDD to a circuit
     Value branchCond = bddToCircuit(rewriter, bdd, loopExit, bi);
 
     Operation *loopTerminator = loopExit->getTerminator();
@@ -898,9 +898,9 @@ static void insertDirectSuppression(
         consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
         connection);
 
-    // Take into account the possiblity of a mux to get the condition input also
-    // as data input. In this case, a branch needs to be created, but only the
-    // corresponding data input is affected. The conditions below take into
+    // Take into account the possibility of a mux to get the condition input
+    // also as data input. In this case, a branch needs to be created, but only
+    // the corresponding data input is affected. The conditions below take into
     // account this possibility.
     for (auto &use : connection.getUses()) {
       if (use.getOwner() != consumer)
@@ -936,7 +936,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   Block *producerBlock = operand.getParentBlock();
 
   // If the consumer and the producer are in the same block without the
-  // consumer being a multiplxer skip because no delivery is needed
+  // consumer being a multiplexer skip because no delivery is needed
   if (consumerBlock == producerBlock &&
       !llvm::isa<handshake::MuxOp>(consumerOp))
     return;
@@ -953,8 +953,6 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         producerOp->hasAttr(FTD_INIT_MERGE))
       return;
 
-    // TODO: Group the conditions of memory and the conditions of Branches
-    // in 1 function?
     // Skip if either the producer of the consumer are
     // related to memory operations, or if the consumer is a conditional
     // branch
@@ -976,7 +974,7 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
     // The next step is to identify the relationship between the producer
     // and consumer in hand: Are they in the same loop or at different
-    // loop levels? Are they connected through a bwd edge?
+    // loop levels? Are they connected through a backward edge?
 
     // Set true if the producer is in a loop which does not contains
     // the consumer
@@ -1036,8 +1034,8 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     }
   }
 
-  // Handle the suppression in all the other cases (inlcuding the operand being
-  // a function arguement)
+  // Handle the suppression in all the other cases (including the operand being
+  // a function argument)
   insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 }
 
@@ -1077,9 +1075,9 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   using namespace experimental::gsa;
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
-  // analysis pass. A GAMMA function is translated into a multiplxer driven by
+  // analysis pass. A GAMMA function is translated into a multiplexer driven by
   // single control signal and fed by two operands; a MU function is
-  // translated into a multiplxer driven by an init (it is currently
+  // translated into a multiplexer driven by an init (it is currently
   // implemented as a Merge fed by a constant triggered from Start once and
   // from the loop condition thereafter). The input of one of these functions
   // might be another GSA function, and it's possible that the function was
@@ -1111,17 +1109,13 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   // Maps the index of each GSA function to each real operation
   DenseMap<unsigned, Operation *> gsaList;
 
-  // For each block excluding the first one, which has no gsa
+  // For each block excluding the first one, which has no GSA
   for (Block &block : llvm::drop_begin(region)) {
 
     // For each GSA function
     ArrayRef<Gate *> phis = gsa.getGatesPerBlock(&block);
     for (Gate *phi : phis) {
 
-      // TODO: No point of this skipping if we have a guarantee that the
-      // phi->gsaGateFunction is exclusively either MuGate or GammaGate...
-      // Skip if it's an SSA phi that has more than 2 inputs (not yet broken
-      // down to multiple GSA gates)
       if (phi->gsaGateFunction == PhiGate)
         continue;
 
@@ -1195,7 +1189,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
       // When a single input gamma is encountered, a mux is inserted as a
       // placeholder to perform the gamma/mu allocation flow. In the end,
-      // these muxes are erased from the IR
+      // these multiplexers are erased from the IR
       if (nullOperand >= 0) {
         operands[0] = operands[1 - nullOperand];
         operands[1] = operands[1 - nullOperand];
@@ -1278,7 +1272,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
   OpBuilder builder(ctx);
 
   // Create a backedge for the start value, to be sued during the merges to
-  // muxes conversion
+  // multiplexers conversion
   BackedgeBuilder edgeBuilderStart(builder, funcOp.getRegion().getLoc());
   Backedge startValueBackedge = edgeBuilderStart.get(startValue.getType());
 
