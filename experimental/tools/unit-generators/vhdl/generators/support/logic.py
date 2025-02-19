@@ -1,12 +1,10 @@
-header = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-"""
-
 def generate_and_n(name, params):
   size = params["size"]
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+
 -- Entity of and_n
 entity {name} is
   port (
@@ -27,12 +25,15 @@ begin
 end architecture;
 """
 
-  return header + entity + architecture
+  return entity + architecture
 
 def generate_or_n(name, params):
   size = params["size"]
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+
 -- Entity of or_n
 entity {name} is
   port (
@@ -53,4 +54,4 @@ begin
 end architecture;
 """
 
-  return header + entity + architecture
+  return entity + architecture

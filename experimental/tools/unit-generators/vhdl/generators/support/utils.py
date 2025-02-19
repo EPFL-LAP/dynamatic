@@ -1,6 +1,4 @@
 import re
-import os
-import shutil
 
 def parse_extra_signals(extra_signals: str) -> dict[str, int]:
   """

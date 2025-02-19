@@ -27,7 +27,6 @@ def _get_symbol_from_predicate(pred):
     case _:
       raise ValueError(f"Predicate {pred} not known")
 
-
 def _get_sign_from_predicate(pred):
   match pred:
     case "eq" | "neq":

@@ -3,13 +3,6 @@ import ast
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
-# todo: move to somewhere else (like utils.py)
-header = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-"""
-
 def generate_cond_br(name, params):
   port_types = ast.literal_eval(params["port_types"])
   data_type = VhdlScalarType(port_types["data"])
@@ -20,10 +13,16 @@ def generate_cond_br(name, params):
     return _generate_cond_br_dataless(name)
 
 def _generate_cond_br_dataless(name):
-  # todo: generate_join is not implemented
-  dependencies = generate_join(f"{name}_join", {"size": 2})
+  join_name = f"{name}_join"
+
+  dependencies = generate_join(join_name, {"size": 2})
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+-- Entity of cond_br_dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -45,11 +44,12 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br_dataless
 architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
 begin
 
-  join : entity work.{name}_join(arch)
+  join : entity work.{join_name}(arch)
     port map(
       -- input channels
       ins_valid(0) => data_valid,
@@ -67,12 +67,19 @@ begin
 end architecture;
 """
 
-  return dependencies + header + entity + architecture
+  return dependencies + entity + architecture
 
 def _generate_cond_br(name, bitwidth):
-  dependencies = _generate_cond_br_dataless(f"{name}_dataless")
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br_dataless(inner_name)
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+-- Entity of cond_br
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -97,9 +104,10 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br
 architecture arch of {name} is
 begin
-  control : entity work.{name}_dataless
+  control : entity work.{inner_name}
     port map(
       clk             => clk,
       rst             => rst,
@@ -119,4 +127,4 @@ begin
 end architecture;
 """
 
-  return dependencies + header + entity + architecture
+  return dependencies + entity + architecture
