@@ -14,7 +14,8 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                             const std::filesystem::path &smvPath,
                             const std::string &additionalCommands);
 
-int runNuXmv(const std::string &cmd, const std::string &stdoutFile);
+int runNuXmv(const std::filesystem::path &cmdPath,
+             const std::filesystem::path &stdoutFile);
 
 FailureOr<std::filesystem::path>
 handshake2smv(const std::filesystem::path &mlirPath,

@@ -1,6 +1,9 @@
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "../experimental/tools/elastic-miter-generator/GetStates.h"
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
@@ -8,11 +11,9 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <string>
+
+#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
+#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -39,7 +40,7 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                         "encode_variables;\n"
                         "build_flat_model;\n"
                         "build_model -f;\n" +
-                        additionalCommands + "\n" +
+                        additionalCommands + ";\n" +
                         "time;\n"
                         "quit;\n";
   std::ofstream mainFile(cmdPath);
@@ -49,8 +50,10 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
 }
 
 // TODO proper output handling...
-int runNuXmv(const std::string &cmd, const std::string &stdoutFile) {
-  std::string command = "nuXmv -source " + cmd + " > " + stdoutFile;
+int runNuXmv(const std::filesystem::path &cmdPath,
+             const std::filesystem::path &stdoutFile) {
+  std::string command =
+      "nuXmv -source " + cmdPath.string() + " > " + stdoutFile.string();
   return system(command.c_str());
 }
 
@@ -58,7 +61,7 @@ FailureOr<std::filesystem::path>
 handshake2smv(const std::filesystem::path &mlirPath,
               const std::filesystem::path &outputDir, bool png = false) {
 
-  std::filesystem::path dotFile = outputDir / "miter.dot";
+  std::filesystem::path dotFile = outputDir / "model.dot";
 
   std::string cmd = "bin/export-dot " + mlirPath.string() +
                     " --edge-style=spline > " + dotFile.string();
@@ -69,7 +72,7 @@ handshake2smv(const std::filesystem::path &mlirPath,
   }
 
   if (png) {
-    std::filesystem::path pngFile = outputDir / "miter.png";
+    std::filesystem::path pngFile = outputDir / "model.png";
     cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string() +
           " > /dev/null";
     ret = system(cmd.c_str());

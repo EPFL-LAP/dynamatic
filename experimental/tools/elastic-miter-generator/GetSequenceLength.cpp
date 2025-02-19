@@ -1,20 +1,16 @@
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "../experimental/tools/elastic-miter-generator/GetStates.h"
-#include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/Path.h"
 #include <any>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <string>
+
+#include "mlir/Parser/Parser.h"
+#include "mlir/Support/LogicalResult.h"
+#include <llvm/ADT/StringSet.h>
+
+#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
+#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
+#include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -126,17 +122,17 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
   }
   auto [miterModule, config] = ret.value();
 
-  std::string mlirFilename = "elastic_miter_" +
-                             std::any_cast<std::string>(config["funcName"]) +
-                             ".mlir";
-  std::filesystem::path mlirPath = outputDir / mlirFilename;
+  std::string ndWireMlirFilename =
+      "elastic_miter_" + std::any_cast<std::string>(config["funcName"]) +
+      ".mlir";
+  std::filesystem::path ndWireMlirPath = outputDir / ndWireMlirFilename;
 
-  if (failed(createMlirFile(outputDir, mlirFilename, miterModule))) {
+  if (failed(createMlirFile(outputDir, ndWireMlirFilename, miterModule))) {
     llvm::errs() << "Failed to write miter files.\n";
     return failure();
   }
 
-  auto failOrDstSmv = handshake2smv(mlirFile, outputDir, true);
+  auto failOrDstSmv = handshake2smv(ndWireMlirPath, outputDir, true);
   if (failed(failOrDstSmv))
     return failure();
   auto dstSmv = failOrDstSmv.value();
@@ -156,8 +152,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
 
   // Run nuXmv for infinite tokens
-  int nuxmvRet = runNuXmv(outputDir.string() + "/reachability_inf.cmd",
-                          outputDir.string() + "/inf_states.txt");
+  int nuxmvRet = runNuXmv(outputDir / "reachability_inf.cmd",
+                          outputDir / "inf_states.txt");
   if (nuxmvRet != 0) {
     llvm::errs()
         << "Failed to analyze reachable states with infinite tokens.\n";
@@ -174,7 +170,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
     // Currently handshake2smv only supports "model" as the model's name
     auto fail =
-        dynamatic::experimental::createWrapper(wrapperPath, config, "model", 0);
+        dynamatic::experimental::createWrapper(wrapperPath, config, "model", n);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << n
                    << " token reachability wrapper.\n";
@@ -187,9 +183,9 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     if (failed(cmdFail))
       return failure();
 
-    nuxmvRet = runNuXmv(
-        outputDir.string() + "/reachability_" + std::to_string(n) + ".cmd",
-        outputDir.string() + "/" + std::to_string(n) + "_states.txt");
+    nuxmvRet =
+        runNuXmv(outputDir / ("reachability_" + std::to_string(n) + ".cmd"),
+                 outputDir.string() + "/" + std::to_string(n) + "_states.txt");
     if (nuxmvRet != 0) {
       llvm::errs() << "Failed to analyze reachable states with"
                    << std::to_string(n) + " tokens.";
@@ -197,9 +193,10 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     }
 
     // Check state differences
-    int nrOfDifferences = dynamatic::experimental::getStates(
+    // Currently handshake2smv only supports "model" as the model's name
+    int nrOfDifferences = dynamatic::experimental::compareReachableStates(
         outputDir.string() + "/inf_states.txt",
-        outputDir.string() + "/" + std::to_string(n) + "_states.txt");
+        outputDir.string() + "/" + std::to_string(n) + "_states.txt", "model");
 
     if (nrOfDifferences != 0) {
       n++;

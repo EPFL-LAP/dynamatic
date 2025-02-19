@@ -21,14 +21,13 @@
 #include <fstream>
 #include <string>
 
+#include "dynamatic/InitAllDialects.h"
 #include "llvm/Support/InitLLVM.h"
 
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "../experimental/tools/elastic-miter-generator/GetSequenceLength.h"
 #include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
-
-#include "dynamatic/InitAllDialects.h"
 
 namespace cl = llvm::cl;
 using namespace mlir;
@@ -110,7 +109,7 @@ int main(int argc, char **argv) {
   auto [mlirPath, config] = failOrPair.value();
 
   auto failOrSmvPath =
-      dynamatic::experimental::handshake2smv(mlirPath, miterDir, false);
+      dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
   if (failed(failOrSmvPath)) {
     llvm::errs() << "Failed to convert miter module to SMV.\n";
     return 1;
@@ -120,6 +119,7 @@ int main(int argc, char **argv) {
   // TODO ...
   std::filesystem::path wrapperPath = miterDir / "main.smv";
 
+  // Create wrapper (main) for the elastic-miter
   // Currently handshake2smv only supports "model" as the model's name
   auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
                                                      "model", n, true);
@@ -129,14 +129,16 @@ int main(int argc, char **argv) {
   // Put the output of the CTLSPEC check into results.txt. Later we read from
   // that file to check whether all the CTL properties pass.
   std::filesystem::path resultTxtPath = miterDir / "result.txt";
-  std::string command = "check_ctlspec -o " + resultTxtPath.string();
+  std::string miterCommand = "check_invar -s forward;\n"
+                             "show_traces -a -p 4 -o ~/trace.xml;\n"
+                             "check_ctlspec;\n";
   LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
-      miterDir / "prove.cmd", miterDir / "main.smv", command);
+      miterDir / "prove.cmd", miterDir / "main.smv", miterCommand);
   if (failed(cmdFail))
     return 1;
 
   // Run equivalence checking
-  dynamatic::experimental::runNuXmv(miterDir / "prove.cmd", "/dev/null");
+  dynamatic::experimental::runNuXmv(miterDir / "prove.cmd", resultTxtPath);
 
   bool equivalent = true;
   std::string line;

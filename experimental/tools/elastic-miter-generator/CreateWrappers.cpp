@@ -13,10 +13,10 @@
 #include <string>
 #include <utility>
 
+#include "llvm/ADT/StringMap.h"
+
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/StringMap.h"
 
 using namespace mlir;
 
@@ -33,8 +33,8 @@ std::string createModuleCall(const std::string &moduleName,
   for (size_t i = 0; i < argNames.size(); ++i) {
     if (i > 0)
       call << ", ";
-    call << "seq_generator" << i << ".dataOut0, seq_generator" << i
-         << ".valid0";
+    call << "seq_generator_" << argNames[i] << ".dataOut0, seq_generator_"
+         << argNames[i] << ".valid0";
   }
 
   call << ", ";
@@ -42,7 +42,7 @@ std::string createModuleCall(const std::string &moduleName,
   for (size_t i = 0; i < resNames.size(); ++i) {
     if (i > 0)
       call << ", ";
-    call << "sink" << i << ".ready0";
+    call << "sink_" << resNames[i] << ".ready0";
   }
 
   call << ");\n";
@@ -55,12 +55,13 @@ std::string createSequenceGenerators(const std::string &moduleName,
   std::ostringstream sequenceGenerators;
   for (size_t i = 0; i < argNames.size(); ++i) {
     if (nrOfTokens == 0) {
-      sequenceGenerators << "  VAR seq_generator" << i << " : bool_input_inf("
-                         << moduleName << "." << argNames[i] << "_ready);\n";
+      sequenceGenerators << "  VAR seq_generator_" << argNames[i]
+                         << " : bool_input_inf(" << moduleName << "."
+                         << argNames[i] << "_ready);\n";
     } else {
-      sequenceGenerators << "  VAR seq_generator" << i << " : bool_input("
-                         << moduleName << "." << argNames[i] << "_ready, "
-                         << nrOfTokens << ");\n";
+      sequenceGenerators << "  VAR seq_generator_" << argNames[i]
+                         << " : bool_input(" << moduleName << "." << argNames[i]
+                         << "_ready, " << nrOfTokens << ");\n";
     }
   }
   return sequenceGenerators.str();
@@ -72,7 +73,7 @@ std::string createSinks(const std::string &moduleName,
   std::ostringstream sinks;
   sinks << "  -- TODO make sure we have sink_1_0\n";
   for (size_t i = 0; i < resNames.size(); ++i) {
-    sinks << "  VAR sink" << i << " : sink_1_0(" << moduleName << "."
+    sinks << "  VAR sink_" << resNames[i] << " : sink_1_0(" << moduleName << "."
           << resNames[i] << "_out, " << moduleName << "." << resNames[i]
           << "_valid);\n";
   }
@@ -87,7 +88,7 @@ std::string createMiterProperties(
   std::ostringstream properties;
 
   for (const auto &result : results) {
-    properties << "CTLSPEC AG (" << moduleName << "." + result + "_valid -> "
+    properties << "INVARSPEC (" << moduleName << "." + result + "_valid -> "
                << moduleName << "." + result + "_out)\n";
   }
 
@@ -122,65 +123,6 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                             llvm::StringMap<std::any> config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties) {
-  // TODO remove
-  // std::ifstream file(jsonPath);
-  // if (!file) {
-  //   llvm::errs() << "Config JSON file not found\n";
-  //   return failure();
-  // }
-
-  // std::stringstream buffer;
-  // buffer << file.rdbuf();
-  // file.close();
-
-  // llvm::Expected<llvm::json::Value> jsonValue =
-  // llvm::json::parse(buffer.str()); if (!jsonValue) {
-  //   llvm::errs() << "Failed parsing JSON\n";
-  //   return failure();
-  // }
-
-  // llvm::json::Object *config = jsonValue->getAsObject();
-  // if (!config) {
-  //   llvm::errs() << "Failed parsing JSON\n";
-  //   return failure();
-  // }
-
-  // SmallVector<std::string> argNames;
-  // if (auto *args = config->getArray("arguments")) {
-  //   for (const auto &arg : *args) {
-  //     argNames.push_back(arg.getAsString()->str());
-  //   }
-  // }
-
-  // SmallVector<std::string> resNames;
-  // if (auto *args = config->getArray("results")) {
-  //   for (const auto &arg : *args) {
-  //     resNames.push_back(arg.getAsString()->str());
-  //   }
-  // }
-
-  // SmallVector<std::string> outputBufferNames;
-  // if (auto *args = config->getArray("output_buffers")) {
-  //   for (const auto &arg : *args) {
-  //     outputBufferNames.push_back(arg.getAsString()->str());
-  //   }
-  // }
-
-  // SmallVector<std::pair<std::string, std::string>> inputBufferNames;
-  // std::string inputProp;
-  // if (auto *inBufs = config->getArray("input_buffers")) {
-  //   for (const auto &bufPair : *inBufs) {
-  //     if (auto *pair = bufPair.getAsArray()) {
-  //       inputBufferNames.push_back(std::make_pair(
-  //           (*pair)[0].getAsString()->str(),
-  //           (*pair)[1].getAsString()->str()));
-  //     }
-  //   }
-  // }
-
-  // for (auto key : config.keys()) {
-  //   llvm::outs() << key.str() << "\n";
-  // }
 
   SmallVector<std::string> argNames;
   // Test if "arguments" exists in config and is of the correct type

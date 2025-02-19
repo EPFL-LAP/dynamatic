@@ -587,8 +587,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   config["output_buffers"] = outputBufferNamePairs;
   config["arguments"] = argNames;
   config["results"] = resNames;
-  config["ndwires"] = ndwireNames;
-  config["eq"] = eqNames;
+  // config["ndwires"] = ndwireNames;
+  // config["eq"] = eqNames;
   config["lhsFuncName"] = lhsFuncOp.getNameAttr().str();
   config["rhsFuncName"] = rhsFuncOp.getNameAttr().str();
 

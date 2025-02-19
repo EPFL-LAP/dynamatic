@@ -43,9 +43,7 @@ const std::string BOOL_INPUT =
     "  DEFINE valid0 := counter < max_tokens;\n"
     "#endif // BOOL_INPUT\n\n";
 
-const std::string BOOL_INPUT_INF = "#ifndef BOOL_INPUT_INF\n"
-                                   "#define BOOL_INPUT_INF\n"
-                                   "MODULE bool_input_inf(nReady0)\n"
+const std::string BOOL_INPUT_INF = "MODULE bool_input_inf(nReady0)\n"
                                    "    VAR dataOut0 : boolean;\n"
                                    "    \n"
                                    "    -- bool_input persistent\n"
@@ -54,7 +52,5 @@ const std::string BOOL_INPUT_INF = "#ifndef BOOL_INPUT_INF\n"
                                    "      valid0 & !nReady0 : dataOut0;\n"
                                    "      TRUE : {TRUE, FALSE};\n"
                                    "    esac;\n"
-                                   "    DEFINE valid0 := TRUE;\n"
-                                   "#endif // BOOL_INPUT_INF\n\n";
-
+                                   "    DEFINE valid0 := TRUE;\n";
 } // namespace dynamatic::experimental
