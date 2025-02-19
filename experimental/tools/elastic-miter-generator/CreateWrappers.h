@@ -1,6 +1,6 @@
 
-#include "mlir/IR/BuiltinOps.h"
-#include <any>
+#include "ElasticMiterFabricGeneration.h"
+#include "dynamatic/Support/LLVM.h"
 #include <filesystem>
 #include <string>
 
@@ -8,15 +8,16 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
-std::string createModuleCall(const std::string &moduleName,
-                             const SmallVector<std::string> &argNames,
-                             const SmallVector<std::string> &resNames);
+std::string
+createModuleCall(const std::string &moduleName,
+                 const SmallVector<std::string> &argNames,
+                 const SmallVector<std::pair<std::string, Type>> &results);
 
 FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
                                                    bool inf = false);
 
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            llvm::StringMap<std::any> config,
+                            const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties = false);
 

@@ -4,13 +4,13 @@
 #include <fstream>
 #include <string>
 
+#include "CreateWrappers.h"
+#include "ElasticMiterFabricGeneration.h"
+#include "SmvUtils.h"
+
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include <llvm/ADT/StringSet.h>
-
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -123,8 +123,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
   auto [miterModule, config] = ret.value();
 
   std::string ndWireMlirFilename =
-      "elastic_miter_" + std::any_cast<std::string>(config["funcName"]) +
-      ".mlir";
+      "elastic_miter_" + std::any_cast<std::string>(config.funcName) + ".mlir";
   std::filesystem::path ndWireMlirPath = outputDir / ndWireMlirFilename;
 
   if (failed(createMlirFile(outputDir, ndWireMlirFilename, miterModule))) {
@@ -132,7 +131,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
-  auto failOrDstSmv = handshake2smv(ndWireMlirPath, outputDir, true);
+  auto failOrDstSmv =
+      dynamatic::experimental::handshake2smv(ndWireMlirPath, outputDir, true);
   if (failed(failOrDstSmv))
     return failure();
   auto dstSmv = failOrDstSmv.value();

@@ -1,6 +1,3 @@
-#include "mlir/IR/Attributes.h"
-
-#include <any>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -13,69 +10,78 @@
 #include <string>
 #include <utility>
 
-#include "llvm/ADT/StringMap.h"
-
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
 using namespace mlir;
 
 namespace dynamatic::experimental {
 
 // TODO pass names of in and output and name
-std::string createModuleCall(const std::string &moduleName,
-                             const SmallVector<std::string> &argNames,
-                             const SmallVector<std::string> &resNames) {
+std::string
+createModuleCall(const std::string &moduleName,
+                 const SmallVector<std::pair<std::string, Type>> &arguments,
+                 const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream call;
   // TODO does this work?
   call << "  VAR " << moduleName << " : " << moduleName << "(";
 
-  for (size_t i = 0; i < argNames.size(); ++i) {
+  for (size_t i = 0; i < arguments.size(); ++i) {
     if (i > 0)
       call << ", ";
-    call << "seq_generator_" << argNames[i] << ".dataOut0, seq_generator_"
-         << argNames[i] << ".valid0";
+    // The current handshake2smv conversion also puts dataOut when it is of type
+    // control
+    if (false && arguments[i].second.isa<handshake::ControlType>()) {
+      call << "seq_generator_" << arguments[i].first << ".valid0";
+    } else {
+      call << "seq_generator_" << arguments[i].first
+           << ".dataOut0, seq_generator_" << arguments[i].first << ".valid0";
+    }
   }
 
   call << ", ";
 
-  for (size_t i = 0; i < resNames.size(); ++i) {
+  for (size_t i = 0; i < results.size(); ++i) {
     if (i > 0)
       call << ", ";
-    call << "sink_" << resNames[i] << ".ready0";
+    call << "sink_" << results[i].first << ".ready0";
   }
 
   call << ");\n";
   return call.str();
 }
 
-std::string createSequenceGenerators(const std::string &moduleName,
-                                     const SmallVector<std::string> &argNames,
-                                     size_t nrOfTokens) {
+std::string createSequenceGenerators(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments,
+    size_t nrOfTokens) {
   std::ostringstream sequenceGenerators;
-  for (size_t i = 0; i < argNames.size(); ++i) {
+  for (const auto &argument : arguments) {
     if (nrOfTokens == 0) {
-      sequenceGenerators << "  VAR seq_generator_" << argNames[i]
+      sequenceGenerators << "  VAR seq_generator_" << argument.first
                          << " : bool_input_inf(" << moduleName << "."
-                         << argNames[i] << "_ready);\n";
+                         << argument.first << "_ready);\n";
     } else {
-      sequenceGenerators << "  VAR seq_generator_" << argNames[i]
-                         << " : bool_input(" << moduleName << "." << argNames[i]
-                         << "_ready, " << nrOfTokens << ");\n";
+      sequenceGenerators << "  VAR seq_generator_" << argument.first
+                         << " : bool_input(" << moduleName << "."
+                         << argument.first << "_ready, " << nrOfTokens
+                         << ");\n";
     }
   }
   return sequenceGenerators.str();
 }
 
-std::string createSinks(const std::string &moduleName,
-                        const SmallVector<std::string> &resNames,
-                        size_t nrOfTokens) {
+std::string
+createSinks(const std::string &moduleName,
+            const SmallVector<std::pair<std::string, Type>> &results,
+            size_t nrOfTokens) {
   std::ostringstream sinks;
   sinks << "  -- TODO make sure we have sink_1_0\n";
-  for (size_t i = 0; i < resNames.size(); ++i) {
-    sinks << "  VAR sink_" << resNames[i] << " : sink_1_0(" << moduleName << "."
-          << resNames[i] << "_out, " << moduleName << "." << resNames[i]
-          << "_valid);\n";
+  for (size_t i = 0; i < results.size(); ++i) {
+    sinks << "  VAR sink_" << results[i].first << " : sink_1_0(" << moduleName
+          << "." << results[i].first << "_out, " << moduleName << "."
+          << results[i].first << "_valid);\n";
   }
   return sinks.str();
 }
@@ -84,12 +90,14 @@ std::string createMiterProperties(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
     const SmallVector<std::pair<std::string, std::string>> &outputBuffers,
-    const SmallVector<std::string> &results) {
+    const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream properties;
 
   for (const auto &result : results) {
-    properties << "INVARSPEC (" << moduleName << "." + result + "_valid -> "
-               << moduleName << "." + result + "_out)\n";
+    if (result.second.isa<handshake::ChannelType>())
+      properties << "INVARSPEC (" << moduleName
+                 << "." + result.first + "_valid -> " << moduleName
+                 << "." + result.first + "_out)\n";
   }
 
   std::string inputProp;
@@ -120,59 +128,9 @@ std::string createMiterProperties(
 }
 
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            llvm::StringMap<std::any> config,
+                            const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties) {
-
-  SmallVector<std::string> argNames;
-  // Test if "arguments" exists in config and is of the correct type
-  if (config.contains("arguments") &&
-      std::any_cast<SmallVector<std::string>>(&config["arguments"])) {
-    argNames = std::any_cast<SmallVector<std::string>>(config["arguments"]);
-  } else {
-    llvm::errs() << "\"arguments\" not in config.\n";
-    return failure();
-  }
-
-  // Test if "results" exists in config and is of the correct type
-  SmallVector<std::string> resNames;
-  if (config.contains("results") &&
-      std::any_cast<SmallVector<std::string>>(&config["results"])) {
-    resNames = std::any_cast<SmallVector<std::string>>(config["results"]);
-
-  } else {
-    llvm::errs() << "\"results\" not in config.\n";
-    return failure();
-  }
-
-  // Test if "output_buffers" exists in config and is of the correct type.
-  // If includeProperties is not set this is not required
-  SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs;
-  if (includeProperties && config.contains("output_buffers") &&
-      std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-          &config["output_buffers"])) {
-    outputBufferNamePairs =
-        std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-            config["output_buffers"]);
-  } else if (includeProperties) {
-    llvm::errs() << "\"output_buffers\" not in config.\n";
-    return failure();
-  }
-
-  // Test if "input_buffers" exists in config and is of the correct type.
-  // If includeProperties is not set this is not required
-  SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs;
-  if (includeProperties && config.contains("input_buffers") &&
-      std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-          &config["input_buffers"])) {
-    inputBufferNamePairs =
-        std::any_cast<SmallVector<std::pair<std::string, std::string>>>(
-            config["input_buffers"]);
-
-  } else if (includeProperties) {
-    llvm::errs() << "\"input_buffers\" not in config.\n";
-    return failure();
-  }
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
@@ -183,17 +141,19 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
 
   wrapper << "\n";
 
-  wrapper << createSequenceGenerators(modelSmvName, argNames, nrOfTokens);
+  wrapper << createSequenceGenerators(modelSmvName, config.arguments,
+                                      nrOfTokens);
 
-  wrapper << createModuleCall(modelSmvName, argNames, resNames) << "\n";
+  wrapper << createModuleCall(modelSmvName, config.arguments, config.results)
+          << "\n";
 
-  wrapper << createSinks(modelSmvName, resNames, nrOfTokens);
+  wrapper << createSinks(modelSmvName, config.results, nrOfTokens);
 
   wrapper << "\n";
 
   if (includeProperties) {
-    wrapper << createMiterProperties(modelSmvName, inputBufferNamePairs,
-                                     outputBufferNamePairs, resNames);
+    wrapper << createMiterProperties(modelSmvName, config.inputBuffers,
+                                     config.outputBuffers, config.results);
   }
 
   std::ofstream mainFile(wrapperPath);

@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_EXPERIMENTAL_ELATIC_MITER_FABRIC_GENERATION_H
+#define DYNAMATIC_EXPERIMENTAL_ELATIC_MITER_FABRIC_GENERATION_H
+
 #include "llvm/Support/JSON.h"
-#include <any>
 #include <filesystem>
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -28,6 +30,18 @@ constexpr unsigned int BB_IN = 0;  // Input auxillary logic
 constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
 constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
 constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+
+struct ElasticMiterConfig {
+  SmallVector<std::pair<std::string, std::string>> inputBuffers;
+  SmallVector<std::pair<std::string, std::string>> outputBuffers;
+  SmallVector<std::pair<std::string, Type>> arguments;
+  SmallVector<std::pair<std::string, Type>> results;
+  SmallVector<std::string> ndwires;
+  SmallVector<std::string> eq;
+  std::string funcName;
+  std::string lhsFuncName;
+  std::string rhsFuncName;
+};
 
 void setHandshakeName(OpBuilder &builder, Operation *op);
 
@@ -66,22 +80,24 @@ LogicalResult createMlirFile(const std::filesystem::path &outputDir,
 // This creates an elastic-miter module given the path to two MLIR files.
 // The files need to contain exactely one module each. Each module needs to
 // contain exactely one handshake.func.
-FailureOr<std::pair<ModuleOp, llvm::StringMap<std::any>>>
+FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                    size_t bufferSlots);
 
 // Creates a reachability circuit. Essentially ND wires are put at all in- and
 // outputs of the circuit. Additionally creates a json config file with the name
 // of the funcOp, and its argument and results.
-FailureOr<std::pair<ModuleOp, llvm::StringMap<std::any>>>
+FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createReachabilityCircuit(MLIRContext &context, StringRef filename);
 
 // This creates an elastic-miter MLIR module and a JSON config file given the
 // path to two MLIR files. The input files need to contain exactly one module
 // each. Each module needs to contain exactely one handshake.func.
-FailureOr<std::pair<std::filesystem::path, llvm::StringMap<std::any>>>
+FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens);
 
 } // namespace dynamatic::experimental
+
+#endif

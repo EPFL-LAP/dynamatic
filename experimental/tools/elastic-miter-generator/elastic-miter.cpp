@@ -15,7 +15,6 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
-#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -130,7 +129,7 @@ int main(int argc, char **argv) {
   // that file to check whether all the CTL properties pass.
   std::filesystem::path resultTxtPath = miterDir / "result.txt";
   std::string miterCommand = "check_invar -s forward;\n"
-                             "show_traces -a -p 4 -o ~/trace.xml;\n"
+                             "show_traces -a -p 4 -o trace.xml;\n"
                              "check_ctlspec;\n";
   LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
       miterDir / "prove.cmd", miterDir / "main.smv", miterCommand);
