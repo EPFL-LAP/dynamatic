@@ -6,7 +6,6 @@ add_llvm_tool(elastic-miter
   elastic-miter.cpp
   GetSequenceLength.cpp
   ElasticMiterFabricGeneration.cpp
-  GetStates.cpp
   CreateWrappers.cpp
   SmvUtils.cpp
 )

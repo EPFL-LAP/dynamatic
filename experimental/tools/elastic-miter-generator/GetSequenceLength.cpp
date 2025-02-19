@@ -21,6 +21,95 @@ using namespace llvm;
 
 namespace dynamatic::experimental {
 
+static std::string stripString(const std::string &string) {
+  std::string newString = string;
+  size_t start = newString.find_first_not_of(" \t\n\r\f\v");
+  if (start == std::string::npos) {
+    newString.clear(); // The string contains only whitespace
+  } else {
+    // Trim leading and trailing spaces
+    size_t end = newString.find_last_not_of(" \t\n\r\f\v");
+    newString = newString.substr(start, end - start + 1);
+  }
+  return newString;
+}
+
+// TODO handle too many states to print
+static std::vector<std::string> getStateSet(const std::string &filename,
+                                            const std::string &modelName) {
+  std::ifstream file(filename);
+  std::vector<std::string> states;
+  std::string line, currentState;
+  bool recording = false;
+
+  while (std::getline(file, line)) {
+    line = stripString(line);
+
+    if (line.find("warning: the states are more than") != std::string::npos) {
+      // TODO
+    }
+    if (line.find("-------") != std::string::npos) {
+      if (!currentState.empty()) {
+        states.push_back(currentState);
+      }
+      currentState.clear();
+      recording = true;
+      continue;
+    }
+
+    if (!recording)
+      continue;
+    // Skip if it doesn't start with "miter."
+    if (line.rfind(modelName + ".", 0) != 0) {
+      continue;
+    }
+    currentState += line + "\n";
+  }
+
+  if (!currentState.empty()) {
+    states.push_back(currentState);
+  }
+
+  return states;
+}
+
+int compareReachableStates(const std::string &infFile,
+                           const std::string &finFile,
+                           const std::string &modelName) {
+  std::vector<std::string> finVector = getStateSet(finFile, modelName);
+  std::vector<std::string> infVector = getStateSet(infFile, modelName);
+
+  // TODO use StringSet directly
+  llvm::StringSet<> setFin;
+  llvm::StringSet<> setInf;
+  for (const auto &entry : finVector) {
+    setFin.insert(entry);
+  }
+  for (const auto &entry : infVector) {
+    setInf.insert(entry);
+  }
+
+  // llvm::outs() << setInf.size() << "\n";
+  // llvm::outs() << setFin.size() << "\n";
+
+  // for (auto &a : setInf) {
+  //   llvm::outs() << a.getKey() << "\n";
+  // }
+  // llvm::outs() << "-----------\n";
+  // for (auto &a : setFin) {
+  //   llvm::outs() << a.getKey() << "\n";
+  // }
+
+  int diffCount = 0;
+  for (const auto &entry : infVector) {
+    if (std::find(finVector.begin(), finVector.end(), entry) ==
+        finVector.end()) {
+      diffCount++;
+    }
+  }
+  return diffCount;
+}
+
 FailureOr<size_t> getSequenceLength(MLIRContext &context,
                                     const std::filesystem::path &outputDir,
                                     const std::string &mlirFile) {
