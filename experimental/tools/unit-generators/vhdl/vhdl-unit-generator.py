@@ -3,7 +3,6 @@ import argparse
 import generators.handshake.addi as addi
 import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
-import generators.handshake.constant as constant
 import generators.handshake.fork as fork
 
 def generate_code(name, mod_type, parameters):
@@ -14,8 +13,6 @@ def generate_code(name, mod_type, parameters):
       return cmpi.generate_cmpi(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
-    case "constant":
-      return constant.generate_constant(name, parameters)
     case "fork":
       return fork.generate_fork(name, parameters)
     case _:
