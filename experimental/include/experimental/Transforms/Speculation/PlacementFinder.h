@@ -49,9 +49,11 @@ private:
   /// findCommitsBetweenBBs
   LogicalResult findCommitPositions();
 
-  /// DFS traversal to find the paths that need Commit units
+  /// Recursively traverse the IR in a DFS way to find the placements of commit
+  /// units. See the documentation for more details:
+  /// docs/Speculation/CommitUnitPlacementAlgorithm.md
   void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                            Operation *currOp);
+                            OpOperand &currOpOperand);
 
   /// Check arcs between BBs to determine if extra commits are needed to solve
   /// out-of-order tokens
