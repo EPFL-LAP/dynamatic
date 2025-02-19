@@ -40,3 +40,44 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   {generate_join(f"{name}__join", {"size": 2})}
   {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
 """
+
+
+def generate_binary_op_header(name):
+  return f"""
+MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
+  VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
+
+  // output
+  DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
+  DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
+  DEFINE outs_valid := inner_handshake_manager.outs_valid;
+"""
+
+
+def generate_unanary_op_header(name):
+  return f"""
+MODULE {name}(ins, ins_valid, outs_ready)
+  VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
+
+  // output
+  DEFINE ins_ready := inner_delay_buffer.ins_ready;
+  DEFINE outs_valid := inner_delay_buffer.outs_valid;
+"""
+
+
+def generate_abstract_binary_op(name, latency, data_type):
+  return f"""
+{generate_binary_op_header(name)}
+  DEFINE outs := {data_type.format_constant(0)};
+  
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+"""
+
+
+def generate_abstract_unary_op(name, latency, data_type):
+  return f"""
+{generate_unanary_op_header(name)}
+  DEFINE outs := {data_type.format_constant(0)};
+  
+  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
+"""

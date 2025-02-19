@@ -1,5 +1,4 @@
-from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
-from generators.support.arith_op_headers import generate_binary_op_header
+from generators.support.arith_utils import *
 from generators.support.utils import *
 
 
