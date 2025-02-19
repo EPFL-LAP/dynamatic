@@ -106,9 +106,10 @@ test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predic
 #test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"' 
 #test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
 test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
+test_generator -t cmpi --abstract-data -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
 
 echo -e "\nTesting cmpf..."
-test_generator -t cmpf -p data_type='"!handshake.channel<f32>"' latency=0 predicate='"oeq"' 
+test_generator -t cmpf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0 predicate='"oeq"' 
 
 echo -e "\nTesting divf..."
 test_generator -t divf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=29
