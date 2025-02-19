@@ -8,8 +8,8 @@ from generators.support.utils import *
 
 def generate_control_merge(name, params):
   size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
-  index_type = SmvScalarType(params[ATTR_INDEX_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  index_type = SmvScalarType(params[ATTR_PORT_TYPES]["index"])
 
   if data_type.bitwidth == 0:
     return _generate_control_merge_dataless(name, size, index_type)
@@ -38,9 +38,9 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready, 
   index_valid := inner_fork.outs_valid_1;
   index := inner_tehb.outs;
 
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {"size": size, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 {generate_buffer(f"{name}__tehb", TEHB_BUFFER_PARAMS(index_type))}
-{generate_fork(f"{name}__fork_dataless", {"size": 2, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_fork(f"{name}__fork_dataless", {ATTR_SIZE: 2, ATTR_PORT_TYPES: {"ins": HANDSHAKE_CONTROL_TYPE.mlir_type}})}
 """
 
 

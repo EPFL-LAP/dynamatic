@@ -12,7 +12,7 @@ def generate_buffer(name, params):
   transparent = timing_r and not (timing_d or timing_v)
 
   slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
 
   if transparent and slots > 1 and data_type.bitwidth == 0:
     return _generate_tfifo_dataless(name, slots)
@@ -88,7 +88,7 @@ MODULE {name} (ins_valid, outs_ready)
   outs_valid := inner_elastic_fifo.outs_valid;
 
 {_generate_tehb_dataless(f"{name}__tehb_dataless")}
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {"slots": slots, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
 
 
@@ -106,7 +106,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   outs := inner_elastic_fifo.outs;
 
 {_generate_tehb(f"{name}__tehb_dataless", data_type)}
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {"slots": slots, "data_type": data_type.mlir_type})}
+{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_DATA_TYPE: data_type.mlir_type})}
 """
 
 
@@ -163,7 +163,7 @@ MODULE {name} (ins_valid, outs_ready)
   ins_ready := inner_elastic_fifo.ins_ready | outs_ready;
   outs_valid := ins_valid | inner_elastic_fifo.outs_valid;
 
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {"slots": slots, "data_type": HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner_dataless", {ATTR_SLOTS: slots, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
 
 
@@ -183,5 +183,5 @@ MODULE {name} (ins, ins_valid, outs_ready)
   outs_valid := ins_valid | inner_elastic_fifo.outs_valid;
   outs := inner_elastic_fifo.outs_valid ? inner_elastic_fifo.outs : ins;
 
-{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner", {"slots": slots, "data_type": data_type.mlir_type})}
+{generate_elastic_fifo_inner(f"{name}__elastic_fifo_inner", {ATTR_SLOTS: slots, ATTR_DATA_TYPE: data_type.mlir_type})}
 """

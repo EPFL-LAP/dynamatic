@@ -3,7 +3,7 @@ from generators.support.utils import *
 
 
 def generate_cond_br(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data"])
 
   if data_type.bitwidth == 0:
     return _generate_cond_br_dataless(name)
@@ -27,7 +27,7 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
   trueOut_valid := condition & inner_join.outs_valid;
   falseOut_valid := !condition & inner_join.outs_valid;
 
-{generate_join(f"{name}__join", {"size": 2})}
+{generate_join(f"{name}__join", {ATTR_SIZE: 2})}
 """
 
 

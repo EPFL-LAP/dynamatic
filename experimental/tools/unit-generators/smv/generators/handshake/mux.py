@@ -4,8 +4,8 @@ from generators.support.utils import *
 
 def generate_mux(name, params):
   size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
-  select_type = SmvScalarType(params[ATTR_SELECT_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  select_type = SmvScalarType(params[ATTR_PORT_TYPES]["index"])
 
   if data_type.bitwidth == 0:
     return _generate_mux_dataless(name, size, select_type)

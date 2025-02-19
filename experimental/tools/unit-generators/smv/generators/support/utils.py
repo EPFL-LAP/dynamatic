@@ -1,13 +1,11 @@
 import re
 
 ATTR_DATA_TYPE = "data_type"
-ATTR_ADDR_TYPE = "addr_type"
-ATTR_SELECT_TYPE = "select_type"
-ATTR_INDEX_TYPE = "index_type"
 ATTR_TIMING = "timing"
 ATTR_SIZE = "size"
 ATTR_SLOTS = "slots"
 ATTR_VALUE = "value"
+ATTR_PORT_TYPES = "port_types"
 
 
 class SmvScalarType:
@@ -58,4 +56,4 @@ class SmvScalarType:
 HANDSHAKE_CONTROL_TYPE = SmvScalarType("!handshake.control<>")
 
 def TEHB_BUFFER_PARAMS(data_type):
-  return f'{{"slots": 1, "timing": "R: 1", "data_type": {data_type}.mlir_type}}'
+  return {ATTR_SLOTS: 1, ATTR_TIMING: "R: 1", ATTR_PORT_TYPES: {"outs": data_type.mlir_type}}

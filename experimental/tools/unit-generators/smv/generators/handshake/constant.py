@@ -3,7 +3,7 @@ from generators.support.utils import *
 
 def generate_constant(name, params):
   value = params[ATTR_VALUE]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
 
   return _generate_constant(name, value, data_type)
 

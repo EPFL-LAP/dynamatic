@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_select(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
 
   return _generate_select(name, data_type)
 
