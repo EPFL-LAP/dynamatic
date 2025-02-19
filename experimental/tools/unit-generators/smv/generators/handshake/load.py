@@ -3,8 +3,8 @@ from generators.handshake.buffer import generate_buffer
 
 
 def generate_load(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data_out"])
-  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addr_in"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["dataOut"])
+  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addrIn"])
 
   return _generate_load(name, data_type, addr_type)
 
