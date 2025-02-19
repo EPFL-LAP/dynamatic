@@ -4,7 +4,7 @@ from generators.support.utils import *
 
 def generate_divf(name, params):
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
