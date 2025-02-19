@@ -20,7 +20,7 @@ def _generate_fork_dataless(name, size):
   array_name = f"{name}_array"
 
   dependencies = \
-    generate_or_n(or_n_name, size) + \
+    generate_or_n(or_n_name, {"size": size}) + \
     generate_eager_fork_register_block(regblock_name)
 
   entity = f"""

@@ -3,7 +3,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 """
 
-def generate_and_n(name, size):
+def generate_and_n(name, params):
+  size = params["size"]
+
   entity = f"""
 -- Entity of and_n
 entity {name} is
@@ -27,7 +29,9 @@ end architecture;
 
   return header + entity + architecture
 
-def generate_or_n(name, size):
+def generate_or_n(name, params):
+  size = params["size"]
+
   entity = f"""
 -- Entity of or_n
 entity {name} is
