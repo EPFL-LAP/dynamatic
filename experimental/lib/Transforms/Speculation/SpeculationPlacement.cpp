@@ -46,6 +46,10 @@ void SpeculationPlacements::addSaveCommit(OpOperand &dstOpOperand) {
   this->saveCommits.insert(&dstOpOperand);
 }
 
+void SpeculationPlacements::addBuffer(OpOperand &dstOpOperand) {
+  this->buffers.insert(&dstOpOperand);
+}
+
 bool SpeculationPlacements::containsCommit(OpOperand &dstOpOperand) {
   return this->commits.contains(&dstOpOperand);
 }
@@ -86,6 +90,12 @@ template <>
 const llvm::DenseSet<OpOperand *> &
 SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
+}
+
+template <>
+const llvm::DenseSet<OpOperand *> &
+SpeculationPlacements::getPlacements<handshake::BufferOp>() {
+  return this->buffers;
 }
 
 static inline void parseSpeculatorPlacement(
@@ -141,6 +151,12 @@ static inline void parseOperationPlacements(
 //       "operation-name": "buffer10",
 //       "operand-idx": 0
 //     }
+//   ],
+//  "buffers": [
+//     {
+//       "operation-name": "extsi1",
+//       "operand-idx": 0
+//     }
 //   ]
 // }
 static bool parseJSON(
@@ -154,6 +170,7 @@ static bool parseJSON(
   parseOperationPlacements("saves", placements, components);
   parseOperationPlacements("commits", placements, components);
   parseOperationPlacements("save-commits", placements, components);
+  parseOperationPlacements("buffers", placements, components);
   return true;
 }
 
@@ -200,6 +217,13 @@ static LogicalResult getOpPlacements(
     if (failed(getPlacementOps(p)))
       return failure();
     placements.addSaveCommit(*dstOpOperand);
+  }
+
+  // Add Buffer Operations position
+  for (PlacementOperand &p : specNameMap["buffers"]) {
+    if (failed(getPlacementOps(p)))
+      return failure();
+    placements.addBuffer(*dstOpOperand);
   }
 
   return success();

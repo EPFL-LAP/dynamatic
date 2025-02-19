@@ -50,6 +50,9 @@ struct LogicBBs {
 /// attribute of each operation.
 LogicBBs getLogicBBs(handshake::FuncOp funcOp);
 
+// Move the operation to a different BB
+void setBB(Operation *op, int bb);
+
 /// If the source operation belongs to a logical BB, makes the destination
 /// operation part of the same BB and returns true; otherwise return false.
 bool inheritBB(Operation *srcOp, Operation *dstOp);

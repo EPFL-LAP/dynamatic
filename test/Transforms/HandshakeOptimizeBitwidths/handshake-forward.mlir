@@ -69,7 +69,7 @@ handshake.func @branchFW(%arg0: !handshake.channel<i16>, %start: !handshake.cont
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i8>, %[[VAL_1:.*]]: !handshake.channel<i16>,
 // CHECK-SAME:                             %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.channel<i8>) attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0", "out1"]} {
 // CHECK:           %[[VAL_3:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i16>
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = control_merge %[[VAL_3]], %[[VAL_1]]  : <i16>, <i1>
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = control_merge [%[[VAL_3]], %[[VAL_1]]]  : [<i16>, <i16>] to <i16>, <i1>
 // CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_4]] : <i16> to <i32>
 // CHECK:           %[[VAL_7:.*]] = extui %[[VAL_5]] : <i1> to <i8>
 // CHECK:           end %[[VAL_6]], %[[VAL_7]] : <i32>, <i8>
@@ -77,7 +77,7 @@ handshake.func @branchFW(%arg0: !handshake.channel<i16>, %start: !handshake.cont
 handshake.func @cmergeFW(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i8>) {
   %ext0 = extsi %arg0 : <i8> to <i32>
   %ext1 = extsi %arg1 : <i16> to <i32>
-  %merge, %index = control_merge %ext0, %ext1 : <i32>, <i8>
+  %merge, %index = control_merge [%ext0, %ext1] : [<i32>, <i32>] to <i32>, <i8>
   end %merge, %index : <i32>, <i8>
 }
 
@@ -88,14 +88,14 @@ handshake.func @cmergeFW(%arg0: !handshake.channel<i8>, %arg1: !handshake.channe
 // CHECK-SAME:                          %[[VAL_3:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "index", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i16>
 // CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_2]] {handshake.bb = 0 : ui32} : <i8> to <i1>
-// CHECK:           %[[VAL_6:.*]] = mux %[[VAL_5]] {{\[}}%[[VAL_4]], %[[VAL_1]]] : <i1>, <i16>
+// CHECK:           %[[VAL_6:.*]] = mux %[[VAL_5]] {{\[}}%[[VAL_4]], %[[VAL_1]]] : <i1>, [<i16>, <i16>] to <i16>
 // CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_6]] : <i16> to <i32>
 // CHECK:           end %[[VAL_7]] : <i32>
 // CHECK:         }
 handshake.func @muxFW(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %index: !handshake.channel<i8>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ext0 = extsi %arg0 : <i8> to <i32>
   %ext1 = extsi %arg1 : <i16> to <i32>
-  %mux = mux %index [%ext0, %ext1] : <i8>, <i32>
+  %mux = mux %index [%ext0, %ext1] : <i8>, [<i32>, <i32>] to <i32>
   end %mux : <i32>
 }
 

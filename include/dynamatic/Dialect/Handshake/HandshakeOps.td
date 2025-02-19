@@ -68,10 +68,6 @@ def FuncOp : Op<Handshake_Dialect, "func", [
                       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>];
 
   let extraClassDeclaration = [{
-    // Add an entry block to an empty function, and set up the block arguments
-    // to match the signature of the function.
-    Block *addEntryBlock();
-
     /// Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
 
@@ -246,6 +242,23 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 }
 
+def NDWireOp : Handshake_Op<"ndwire", [
+  HasClock, SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
   Handshake_Op<mnemonic, traits # [
     Pure, HasClock, SameOperandsAndResultType,
@@ -305,7 +318,14 @@ def LazyForkOp : Handshake_ForkOp<"lazy_fork"> {
 }
 
 def MergeOp : Handshake_Op<"merge", [
-  Pure, SameOperandsAndResultType,
+  Pure,
+  // SameOperandsAndResultsType is a built-in variant of AllTypesMatch with useful
+  // builder behavior, supporting variadic operands.
+  // MergeOp imposes this constraint to enforce that all the data types and
+  // extra signals of operands and results match, while MuxOp and CMergeOp only
+  // require that the data types match.
+  SameOperandsAndResultType,
+  VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
@@ -332,11 +352,13 @@ def MergeOp : Handshake_Op<"merge", [
 
 def MuxOp : Handshake_Op<"mux", [
   Pure,
+  VariadicHasElement<"dataOperands">,
+  MergingExtraSignals<"dataOperands", "result">,
+  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "mux operation";
@@ -359,7 +381,7 @@ def MuxOp : Handshake_Op<"mux", [
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins IntChannelType:$selectOperand,
+  let arguments = (ins SimpleChannel:$selectOperand,
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
 
@@ -369,9 +391,11 @@ def MuxOp : Handshake_Op<"mux", [
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
+  VariadicHasElement<"dataOperands">,
+  MergingExtraSignals<"dataOperands", "result">,
+  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
-  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
 ]> {
   let summary = "control merge operation";
@@ -390,7 +414,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
-  let results = (outs HandshakeType:$result, ChannelType:$index);
+  let results = (outs HandshakeType:$result, SimpleChannel:$index);
   
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
@@ -435,6 +459,7 @@ def BranchOp : Handshake_Op<"br", [
 
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
   AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
@@ -606,8 +631,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
   // The memory controller does not accept ControlTypes with extra signals.
   // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
-  // (at least in speculative execution scenarios)
-  // TODO: Discuss the change of ChannelTypes to SimpleChannels
+  // See the issue #214.
   let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
                        Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
@@ -739,22 +763,52 @@ def LSQOp : Handshake_Op<"lsq", [
 // Memory ports
 //===----------------------------------------------------------------------===//
 
-class Handshake_MemPortOp<string mnemonic> :
-  Handshake_Op<mnemonic, [
+class Handshake_MemPortOp<
+    string mnemonic, list<Trait> customTraits, list<OpBuilder> customBuilders> :
+  Handshake_Op<mnemonic, customTraits # [
     MemPortOpInterface,
-    AllTypesMatch<["address", "addressResult"]>,
-    AllTypesMatch<["data", "dataResult"]>,
+    AllDataTypesMatch<["address", "addressResult"]>,
+    AllDataTypesMatch<["data", "dataResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+
+  let builders = customBuilders # [
+    // Unless otherwise specified, addressResult/dataResult type is the same as
+    // address/data type.
+    OpBuilder<(ins "::mlir::Value":$address, "::mlir::Value":$data), [{
+      $_state.addOperands({address, data});
+      // Specify {addressResult type, dataResult type}
+      $_state.addTypes({address.getType(), data.getType()});
+    }]>,
+  ];
+
   let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    `[` $address `]` $data attr-dict `:` type($address)`,` type($data) `,`
+    type($addressResult) `,` type($dataResult)
   }];
 }
 
-def LoadOp : Handshake_MemPortOp<"load"> {
+def LoadOp : Handshake_MemPortOp<"load", [
+  AllExtraSignalsMatch<["address", "dataResult"]>,
+  // In LoadOp, addressResult and data are connected to a memory controller.
+  IsSimpleHandshake<"addressResult">,
+  IsSimpleHandshake<"data">
+], [
+  // TODO: Please add comments on why this builder is necessary
+  OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
+    // Address (data operand needs to be added later)
+    // TODO: Please describe to us when and where the data operand is added
+    $_state.addOperands(address);
+
+    // Data and address results
+    $_state.types.push_back(address.getType());
+    $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+      memrefType.getElementType()));
+  }]>
+]> {
   let summary = "load port for memory interface";
   let description = [{
     Represents a load memory port which sends load requests to a memory
@@ -778,18 +832,6 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     ```
   }];
 
-  let builders = [
-    OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
-      // Address (data operand needs to be added later)
-      $_state.addOperands(address);
-
-      // Data and address results
-      $_state.types.push_back(address.getType());
-      $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
-        memrefType.getElementType()));
-    }]>
-  ];
-
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
@@ -803,7 +845,12 @@ def LoadOp : Handshake_MemPortOp<"load"> {
   }];
 }
 
-def StoreOp : Handshake_MemPortOp<"store"> {
+def StoreOp : Handshake_MemPortOp<"store", [
+  AllExtraSignalsMatch<["address", "data"]>,
+  // In StoreOp, addressResult and dataResult are connected to a memory controller.
+  IsSimpleHandshake<"addressResult">,
+  IsSimpleHandshake<"dataResult">
+], []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
     Represents a store memory port which sends store requests to a memory

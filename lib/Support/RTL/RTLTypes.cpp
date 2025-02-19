@@ -16,6 +16,7 @@
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -289,4 +290,16 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
     cons.latencies.at(type).deserialize(deserial, key);
   }
   return deserial.exhausted(RESERVED_KEYS);
+}
+
+std::string RTLTimingType::serialize(Attribute attr) {
+  std::string serializedDataStorage;
+  llvm::raw_string_ostream serializedData(serializedDataStorage);
+
+  // Wrap in single quotes for easier passing as a generator argument.
+  serializedData << "'";
+  attr.print(serializedData);
+  serializedData << "'";
+
+  return serializedData.str();
 }
