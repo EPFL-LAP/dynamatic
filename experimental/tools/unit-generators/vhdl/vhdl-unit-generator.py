@@ -16,15 +16,14 @@ def generate_code(name, mod_type, parameters):
     case "fork":
       return fork.generate_fork(name, parameters)
     case _:
-      return f"Module type {mod_type} not found"
-      # raise ValueError(f"Module type {mod_type} not found")
+      raise ValueError(f"Module type {mod_type} not found")
 
 def parse_key_value(key_value):
   key, value = key_value.split("=")
   return key, value
 
 def main():
-  parser = argparse.ArgumentParser(description="SMV Generator Script")
+  parser = argparse.ArgumentParser(description="VHDL Generator Script")
   parser.add_argument(
       "-n", "--name", required=True, help="Name of the generated module"
   )
