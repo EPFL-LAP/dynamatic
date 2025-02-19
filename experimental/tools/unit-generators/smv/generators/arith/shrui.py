@@ -20,7 +20,7 @@ def _generate_shrui(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := lhs >> rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
 
 
@@ -29,5 +29,5 @@ def _generate_shrui_cast(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := unsigned(lhs) >> rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
