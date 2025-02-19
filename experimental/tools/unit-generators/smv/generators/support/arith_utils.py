@@ -38,7 +38,7 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   DEFINE outs_valid := inner_delay_buffer.outs_valid;
   
   {generate_join(f"{name}__join", {"size": 2})}
-  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
+  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
 """
 
 
@@ -70,7 +70,7 @@ def generate_abstract_binary_op(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := {data_type.format_constant(0)};
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
 
 
@@ -79,5 +79,5 @@ def generate_abstract_unary_op(name, latency, data_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := {data_type.format_constant(0)};
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
+  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
 """

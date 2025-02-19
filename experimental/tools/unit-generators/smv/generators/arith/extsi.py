@@ -20,5 +20,5 @@ def _generate_extsi(name, latency, input_type, output_type):
 {generate_unanary_op_header(name)}
   DEFINE outs := extend(ins, {output_type.bitwidth - input_type.bitwidth});
   
-  {generate_delay_buffer(f"{name}__delay_buffer", {"latency": latency})}
+  {generate_delay_buffer(f"{name}__delay_buffer", {ATTR_LATENCY: latency})}
 """
