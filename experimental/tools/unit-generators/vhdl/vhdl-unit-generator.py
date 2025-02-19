@@ -75,8 +75,7 @@ def generate_code(name, mod_type, parameters):
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:
-      return f"Module type {mod_type} not found"
-      # raise ValueError(f"Module type {mod_type} not found")
+      raise ValueError(f"Module type {mod_type} not found")
 
 def parse_parameters(param_list):
   try:
@@ -90,7 +89,7 @@ def parse_parameters(param_list):
     raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 def main():
-  parser = argparse.ArgumentParser(description="SMV Generator Script")
+  parser = argparse.ArgumentParser(description="VHDL Generator Script")
   parser.add_argument(
       "-n", "--name", required=True, help="Name of the generated module"
   )
