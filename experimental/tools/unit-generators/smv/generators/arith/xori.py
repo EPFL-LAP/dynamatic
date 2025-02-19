@@ -18,5 +18,5 @@ def _generate_xori(name, latency, data_type):
 {generate_binary_op_header(name)}
   DEFINE outs := lhs xor rhs;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
