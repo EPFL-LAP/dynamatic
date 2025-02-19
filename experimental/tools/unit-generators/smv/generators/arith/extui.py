@@ -1,5 +1,5 @@
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.arith_op_headers import generate_unanary_op_header
+from generators.support.arith_utils import *
 from generators.support.utils import *
 
 
@@ -7,8 +7,12 @@ def generate_extui(name, params):
   latency = params[ATTR_LATENCY]
   input_type = SmvScalarType(params[ATTR_INPUT_TYPE])
   output_type = SmvScalarType(params[ATTR_OUTPUT_TYPE])
+  abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  return _generate_extui(name, latency, input_type, output_type)
+  if abstract_data:
+    return generate_abstract_binary_op(name, latency, output_type)
+  else:
+    return _generate_extui(name, latency, input_type, output_type)
 
 
 def _generate_extui(name, latency, input_type, output_type):
