@@ -1,6 +1,7 @@
 import argparse
 import sys
 import ast
+from generators.support.utils import *
 
 import generators.handshake.br as br
 import generators.handshake.buffer as buffer
@@ -165,6 +166,11 @@ def main():
       "-t", "--type", required=True, help="Type of the generated module"
   )
   parser.add_argument(
+      "--abstract-data",
+      action="store_true",
+      help="Enable abstract data mode",
+  )
+  parser.add_argument(
       "-p",
       "--parameters",
       required=False,
@@ -179,6 +185,8 @@ def main():
   except ValueError as e:
     sys.stderr.write(f"Error parsing parameters: {e}")
     sys.exit(1)
+
+  parameters[ATTR_ABSTRACT_DATA] = args.abstract_data
 
   # Printing parameters for diagnostic purposes
   header = f"// {args.name} : {args.type}({args.parameters})\n\n"
