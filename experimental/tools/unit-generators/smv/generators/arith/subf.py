@@ -1,19 +1,13 @@
-from generators.support.binary_op_handshake_manager import generate_binary_op_handshake_manager
-from generators.support.arith_op_headers import generate_binary_op_header
+from generators.support.arith_utils import generate_abstract_binary_op
 from generators.support.utils import *
 
 
 def generate_subf(name, params):
   latency = params[ATTR_LATENCY]
   data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  return _generate_subf(name, latency, data_type)
-
-
-def _generate_subf(name, latency, data_type):
-  return f"""
-{generate_binary_op_header(name)}
-  DEFINE outs := lhs;
-  
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
-"""
+  if abstract_data:
+    return generate_abstract_binary_op(name, latency, data_type)
+  else:
+    raise ValueError("Floating point operations support abstract data only")
