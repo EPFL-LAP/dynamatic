@@ -4,7 +4,7 @@ from generators.support.arith_utils import *
 
 def generate_undeterministic_comparator(name, params):
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["lhs"])
 
   return _generate_undeterministic_comparator(name, latency, data_type)
 
@@ -25,5 +25,5 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   DEFINE outs_valid := inner_handshake_manager.outs_valid;
   DEFINE outs := rand;
   
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
+  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """

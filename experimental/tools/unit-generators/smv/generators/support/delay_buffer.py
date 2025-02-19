@@ -32,7 +32,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>", "data_type": "!handshake.control<>"})}
+  {generate_buffer(f"{name}__oehb_dataless", OEHB_BUFFER_PARAMS(HANDSHAKE_CONTROL_TYPE))}
 """
 
 
@@ -52,5 +52,5 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", {"slots": 1, "timing": "#handshake.timing< {{D: 1, V: 1}}>", "data_type": "!handshake.control<>"})}
+  {generate_buffer(f"{name}__oehb_dataless", OEHB_BUFFER_PARAMS(HANDSHAKE_CONTROL_TYPE))}
 """

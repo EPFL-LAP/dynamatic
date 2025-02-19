@@ -86,114 +86,114 @@ echo -e "\nTesting store..."
 test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
 echo -e "\nTesting absf..."
-test_generator -t absf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0
+test_generator -t absf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=0
 
 echo -e "\nTesting addf..."
-test_generator -t addf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=9
-test_generator -t addf --abstract-data -p data_type='"!handshake.channel<f64>"' latency=12
+test_generator -t addf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=9
+test_generator -t addf --abstract-data -p port_types='{"outs":"!handshake.channel<f64>"}' latency=12
 
 echo -e "\nTesting addi..."
-test_generator -t addi -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t addi --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t addi -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t addi --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting andi..."
-test_generator -t andi -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t andi --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t andi -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t andi --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting cmpi..."
-test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"eq"' 
-test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"slt"' 
-#test_generator -t cmpi -p data_type='"!handshake.channel<i32>"' latency=0 predicate='"ult"' 
-#test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"sge"' 
-test_generator -t cmpi -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
-test_generator -t cmpi --abstract-data -p data_type='"!handshake.channel<ui32>"' latency=0 predicate='"uge"' 
+test_generator -t cmpi -p port_types='{"lhs":"!handshake.channel<i32>"}' latency=0 predicate='"eq"' 
+test_generator -t cmpi -p port_types='{"lhs":"!handshake.channel<i32>"}' latency=0 predicate='"slt"' 
+#test_generator -t cmpi -p port_types='{"lhs":"!handshake.channel<i32>"}' latency=0 predicate='"ult"' 
+#test_generator -t cmpi -p port_types='{"lhs":"!handshake.channel<ui32>"}' latency=0 predicate='"sge"' 
+test_generator -t cmpi -p port_types='{"lhs":"!handshake.channel<ui32>"}' latency=0 predicate='"uge"' 
+test_generator -t cmpi --abstract-data -p port_types='{"lhs":"!handshake.channel<ui32>"}' latency=0 predicate='"uge"' 
 
 echo -e "\nTesting cmpf..."
-test_generator -t cmpf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0 predicate='"oeq"' 
+test_generator -t cmpf --abstract-data -p port_types='{"lhs":"!handshake.channel<f32>"}' latency=0 predicate='"oeq"' 
 
 echo -e "\nTesting divf..."
-test_generator -t divf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=29
-test_generator -t divf --abstract-data -p data_type='"!handshake.channel<f64>"' latency=36
+test_generator -t divf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=29
+test_generator -t divf --abstract-data -p port_types='{"outs":"!handshake.channel<f64>"}' latency=36
 
 echo -e "\nTesting divsi..."
-test_generator -t divsi -p data_type='"!handshake.channel<i32>"' latency=35
-test_generator -t divsi --abstract-data -p data_type='"!handshake.channel<i32>"' latency=35
+test_generator -t divsi -p port_types='{"outs":"!handshake.channel<i32>"}' latency=35
+test_generator -t divsi --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=35
 
 echo -e "\nTesting divui..."
-test_generator -t divui -p data_type='"!handshake.channel<i32>"' latency=35
-test_generator -t divui --abstract-data -p data_type='"!handshake.channel<i32>"' latency=35
+test_generator -t divui -p port_types='{"outs":"!handshake.channel<i32>"}' latency=35
+test_generator -t divui --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=35
 
 echo -e "\nTesting extf..."
-test_generator -t extf --abstract-data -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<f64>"' latency=0
+test_generator -t extf --abstract-data -p port_types='{"ins":"!handshake.channel<f32>","outs":"!handshake.channel<f64>"}' latency=0
 
 echo -e "\nTesting extsi..."
-test_generator -t extsi -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<i64>"' latency=0
-test_generator -t extsi --abstract-data -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<i64>"' latency=0
+test_generator -t extsi -p port_types='{"ins":"!handshake.channel<i32>","outs":"!handshake.channel<i64>"}' latency=0
+test_generator -t extsi --abstract-data -p port_types='{"ins":"!handshake.channel<i32>","outs":"!handshake.channel<i64>"}' latency=0
 
 echo -e "\nTesting extui..."
-test_generator -t extui -p input_type='"!handshake.channel<ui32>"' output_type='"!handshake.channel<ui64>"' latency=0
-test_generator -t extui --abstract-data -p input_type='"!handshake.channel<ui32>"' output_type='"!handshake.channel<ui64>"' latency=0
+test_generator -t extui -p port_types='{"ins":"!handshake.channel<ui32>","outs":"!handshake.channel<ui64>"}' latency=0
+test_generator -t extui --abstract-data -p port_types='{"ins":"!handshake.channel<ui32>","outs":"!handshake.channel<ui64>"}' latency=0
 
 echo -e "\nTesting fptosi..."
-test_generator -t fptosi --abstract-data -p input_type='"!handshake.channel<f32>"' output_type='"!handshake.channel<i32>"' latency=5
+test_generator -t fptosi --abstract-data -p port_types='{"ins":"!handshake.channel<f32>","outs":"!handshake.channel<i32>"}' latency=5
 
 echo -e "\nTesting maximumf..."
-test_generator -t maximumf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0
+test_generator -t maximumf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=0
 
 echo -e "\nTesting minimumf..."
-test_generator -t minimumf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0
+test_generator -t minimumf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=0
 
 echo -e "\nTesting mulf..."
-test_generator -t mulf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=4
+test_generator -t mulf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=4
 
 echo -e "\nTesting muli..."
-test_generator -t muli -p data_type='"!handshake.channel<i32>"' latency=4
-test_generator -t muli --abstract-data -p data_type='"!handshake.channel<i32>"' latency=4
+test_generator -t muli -p port_types='{"outs":"!handshake.channel<i32>"}' latency=4
+test_generator -t muli --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=4
 
 echo -e "\nTesting negf..."
-test_generator -t negf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=0
+test_generator -t negf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=0
 
 echo -e "\nTesting ori..."
-test_generator -t ori -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t ori --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t ori -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t ori --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting shli..."
-test_generator -t shli -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t shli --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t shli -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t shli --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting shrsi..."
-test_generator -t shrsi -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t shrsi -p data_type='"!handshake.channel<ui32>"' latency=0
-test_generator -t shrsi --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t shrsi --abstract-data -p data_type='"!handshake.channel<ui32>"' latency=0
+test_generator -t shrsi -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t shrsi -p port_types='{"outs":"!handshake.channel<ui32>"}' latency=0
+test_generator -t shrsi --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t shrsi --abstract-data -p port_types='{"outs":"!handshake.channel<ui32>"}' latency=0
 
 echo -e "\nTesting shrui..."
-test_generator -t shrui -p data_type='"!handshake.channel<ui32>"' latency=0
-test_generator -t shrui -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t shrui --abstract-data -p data_type='"!handshake.channel<ui32>"' latency=0
-test_generator -t shrui --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t shrui -p port_types='{"outs":"!handshake.channel<ui32>"}' latency=0
+test_generator -t shrui -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t shrui --abstract-data -p port_types='{"outs":"!handshake.channel<ui32>"}' latency=0
+test_generator -t shrui --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting sitofp..."
-test_generator -t sitofp --abstract-data -p input_type='"!handshake.channel<i32>"' output_type='"!handshake.channel<f32>"' latency=5
+test_generator -t sitofp --abstract-data -p port_types='{"ins":"!handshake.channel<i32>","outs":"!handshake.channel<f32>"}' latency=5
 
 echo -e "\nTesting subf..."
-test_generator -t subf --abstract-data -p data_type='"!handshake.channel<f32>"' latency=9
-test_generator -t subf --abstract-data -p data_type='"!handshake.channel<f64>"' latency=12
+test_generator -t subf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=9
+test_generator -t subf --abstract-data -p port_types='{"outs":"!handshake.channel<f64>"}' latency=12
 
 echo -e "\nTesting subi..."
-test_generator -t subi -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t subi --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t subi -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t subi --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting truncf..."
-test_generator -t truncf --abstract-data -p input_type='"!handshake.channel<f64>"' output_type='"!handshake.channel<f32>"' latency=0
+test_generator -t truncf --abstract-data -p port_types='{"ins":"!handshake.channel<f64>","outs":"!handshake.channel<f32>"}' latency=0
 
 echo -e "\nTesting trunci..."
-test_generator -t trunci -p input_type='"!handshake.channel<i64>"' output_type='"!handshake.channel<i32>"' latency=0
-test_generator -t trunci --abstract-data -p input_type='"!handshake.channel<i64>"' output_type='"!handshake.channel<i32>"' latency=0
+test_generator -t trunci -p port_types='{"ins":"!handshake.channel<i64>","outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t trunci --abstract-data -p port_types='{"ins":"!handshake.channel<i64>","outs":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting xori..."
-test_generator -t xori -p data_type='"!handshake.channel<i32>"' latency=0
-test_generator -t xori --abstract-data -p data_type='"!handshake.channel<i32>"' latency=0
+test_generator -t xori -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t xori --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
 
 
 rm $OUT
