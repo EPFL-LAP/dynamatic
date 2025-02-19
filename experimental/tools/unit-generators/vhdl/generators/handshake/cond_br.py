@@ -24,7 +24,7 @@ def generate_cond_br(name, params):
 
 def _generate_cond_br_dataless(name):
   # todo: generate_join is not implemented
-  dependencies = generate_join(f"{name}_join", 2)
+  dependencies = generate_join(f"{name}_join", {"size": 2})
 
   entity = f"""
 entity {name} is

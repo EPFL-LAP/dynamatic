@@ -44,7 +44,7 @@ def _get_sign_from_predicate(pred):
 def _generate_cmpi(name, predicate, bitwidth):
   join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, 2)
+  dependencies = generate_join(join_name, {"size": 2})
 
   entity = f"""
 library ieee;

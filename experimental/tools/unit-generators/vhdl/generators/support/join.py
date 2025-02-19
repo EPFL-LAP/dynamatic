@@ -6,9 +6,11 @@ library ieee;
 use ieee.std_logic_1164.all;
 """
 
-def generate_join(name, size):
+def generate_join(name, params):
+  size = params["size"]
+
   and_n_module_name = f"{name}_and_n"
-  dependencies = generate_and_n(and_n_module_name, size)
+  dependencies = generate_and_n(and_n_module_name, {"size": size})
 
   entity = f"""
 entity {name} is

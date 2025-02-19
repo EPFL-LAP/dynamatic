@@ -14,7 +14,7 @@ def generate_addi(name, params):
 def _generate_addi(name, bitwidth):
   join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, 2)
+  dependencies = generate_join(join_name, {"size": 2})
 
   entity = f"""
 library ieee;
