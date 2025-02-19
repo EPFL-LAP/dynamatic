@@ -1,4 +1,4 @@
-from generators.support.arith_utils import *
+from generators.support.undeterministic_comparator import generate_undeterministic_comparator
 from generators.support.utils import *
 
 
@@ -7,17 +7,12 @@ def generate_cmpf(name, params):
   symbol = get_symbol_from_predicate(predicate)
   latency = params[ATTR_LATENCY]
   data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  return _generate_cmpf(name, latency, symbol, data_type)
-
-
-def _generate_cmpf(name, latency, symbol, data_type):
-  return f"""
-{generate_binary_op_header(name)}
-  DEFINE outs := {{TRUE, FALSE}};
-  
-  {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {"latency": latency})}
-"""
+  if abstract_data:
+    return generate_undeterministic_comparator(name, params)
+  else:
+    raise ValueError("Floating point operations support abstract data only")
 
 
 def get_symbol_from_predicate(pred):
