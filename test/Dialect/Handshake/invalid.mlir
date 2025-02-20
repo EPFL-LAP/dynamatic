@@ -264,3 +264,33 @@ handshake.func @invalidMuxWithNoDataInputs(
   %data = mux %sel [] : <i2>, [] to <i32>
   end %ctrl : !handshake.control<>
 }
+
+// -----
+
+handshake.func @invalidSpecCommitWithDifferentExtraSignals(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that all of {dataIn, dataOut} should have the same extra signals except for spec}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>, !handshake.channel<i32>, <i1>
+  end
+}
+
+// -----
+
+handshake.func @invalidSpecCommitWithInvalidSpec(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i2]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that should have a valid spec tag as an extra signal}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i2]>, !handshake.channel<i32, [a: i1]>, <i1>
+  end
+}
+
+// -----
+
+handshake.func @invalidSpecCommitWithDataOutSpec(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that shouldn't have a spec tag as an extra signal}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>, !handshake.channel<i32, [a: i1, spec: i2]>, <i1>
+  end
+}
