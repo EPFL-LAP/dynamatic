@@ -9,23 +9,23 @@ def generate_select(name, params):
 
 def _generate_select(name, data_type):
   return f"""
-MODULE {name} (condition, condition_valid, true_value, true_value_valid, false_value, false_value_valid, result_ready)
+MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValue, falseValue_valid, result_ready)
   VAR
   inner_antitoken : antitoken__{name}(false_value_valid, true_value_valid, g1, g0);
 
   DEFINE
-  ee := condition_valid & ((!condition & false_value_valid) | (condition & true_value_valid));
+  ee := condition_valid & ((!condition & falseValue_valid) | (condition & trueValue_valid));
   valid_internal := ee & !inner_antitoken.stop_valid;
-  g0 := !true_value_valid & valid_internal & result_ready;
-  g1 := !false_value_valid & valid_internal & result_ready;
+  g0 := !trueValue_valid & valid_internal & result_ready;
+  g1 := !falseValue_valid & valid_internal & result_ready;
 
   // output
   DEFINE
-  true_value_ready := !true_value_valid | (valid_internal & result_ready) | inner_antitoken.kill_0;
-  false_value_ready := !false_value_valid | (valid_internal & result_ready) | inner_antitoken.kill_1;
+  trueValue_ready := !trueValue_valid | (valid_internal & result_ready) | inner_antitoken.kill_0;
+  falseValue_ready := !falseValue_valid | (valid_internal & result_ready) | inner_antitoken.kill_1;
   condition_ready := !condition_valid | (valid_internal & result_ready);
   result_valid := valid_internal;
-  result := condition ? true_value : false_value;
+  result := condition ? trueValue : falseValue;
 
 
 MODULE antitoken__{name} (ins_valid_0, ins_valid_1, generate_at_0, generate_at_1)

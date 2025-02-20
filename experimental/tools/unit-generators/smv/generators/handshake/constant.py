@@ -10,11 +10,11 @@ def generate_constant(name, params):
 
 def _generate_constant(name, value, data_type):
   return f"""
-MODULE {name}(ins_valid, outs_ready)
+MODULE {name}(ctrl_valid, outs_ready)
 
   // output
   DEFINE
-  ins_ready := outs_ready;
-  outs_valid := ins_valid;
+  ctrl_ready := outs_ready;
+  outs_valid := ctrl_valid;
   outs := {data_type.format_constant(value)};
 """
