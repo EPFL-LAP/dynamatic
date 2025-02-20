@@ -919,7 +919,13 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
+  // Speculator is currently used only within loops.
   AllTypesMatch<["dataIn", "dataOut"]>,
+  IsSimpleHandshake<"saveCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsSimpleHandshake<"SCSaveCtrl">,
+  IsSimpleHandshake<"SCCommitCtrl">,
+  IsSimpleHandshake<"SCBranchCtrl">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -984,7 +990,16 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   }];
 }
 
-def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
+def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
+  // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
+  // The builder is used in the HandshakeSpeculation pass.
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
     Commit units are used to mark the end of the speculation region. 
@@ -1025,7 +1040,13 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand","trueResult", "falseResult"]>,
+  HasSpecTag<"tagFromOperand">,
+  HasSpecTag<"dataOperand">,
+  LacksSpecTag<"trueResult">,
+  LacksSpecTag<"falseResult">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
