@@ -962,7 +962,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
   SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">,
+  IsSimpleHandshake<"ctrl">
 ]> {
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
@@ -999,8 +999,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   IsSimpleHandshake<"ctrl">,
   // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
   // The builder is used in the HandshakeSpeculation pass.
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1017,10 +1016,16 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     Example:
 
     ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11, [spec: i1]>, !handshake.channel<i11>, !handshake.channel<i1>
     ```
   }];
 
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
@@ -1047,8 +1052,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasSpecTag<"tagFromOperand">,
   HasSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
-  LacksSpecTag<"falseResult">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  LacksSpecTag<"falseResult">
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1063,7 +1067,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     Example:
     ```mlir
     %trueResult, %falseResult = speculating_branch[%tagFromOperand]
-      %dataOperand : !handshake.channel<i1>, !handshake.channel<i32>
+      %dataOperand : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32, [spec: i1]>,
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
@@ -1071,8 +1076,14 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
-      type($tagFromOperand) `,` type($dataOperand)
+      type($tagFromOperand) `,` type($dataOperand) `,`
+      type($trueResult) `,` type($falseResult)
   }];
+  let builders = [OpBuilder<(ins "Value":$tagFromOperand, "Value":$dataOperand), [{
+    $_state.addOperands({tagFromOperand, dataOperand});
+    auto resultType = dataOperand.getType().cast<ChannelType>().copyWithExtraSignals({});
+    $_state.addTypes({resultType, resultType});
+  }]>];
 }
 
 //===----------------------------------------------------------------------===//
