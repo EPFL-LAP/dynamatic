@@ -366,10 +366,10 @@ class VariadicHasElement<string variadic> : PredOpTrait<
   CPred<"!$" # variadic # ".empty()">
 >;
 
-// Multi-entity constraints for spec tags
+// Constraints for spec tags
 
 // Predicate to verify if the given type has a valid spec tag as an extra signal.
-class HasSpecTag<string type> : CPred<
+class HasSpecTagPred<string operand> : CPred<
   [{
     ([&](std::optional<ExtraSignal> getExtraSignalResult) {
       if (!getExtraSignalResult.has_value()) {
@@ -387,54 +387,17 @@ class HasSpecTag<string type> : CPred<
 
       return true;
     })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
-  }] # type # ").getExtraSignal(\"spec\"))"
+  $}] # operand # ".getType()).getExtraSignal(\"spec\"))"
 >;
 
-// Multi-entity constraint ensuring that the type of `b` matches the type of `a` with a spec tag.
-class AddingSpecTag<string a, string b> : PredOpTrait<
-  b # " should be the type of " # a # " with spec tag",
-  And<[
-    AllDataTypesMatch<[a, b]>.predicate,
-    Neg<HasSpecTag<"$" # a # ".getType()">>,
-    HasSpecTag<"$" # b # ".getType()">
-    // TODO: Add a constraint to ensure that no other extra bits are added to `b`.
-  ]>
+class HasSpecTag<string operand> : PredOpTrait<
+  "should have a valid spec tag as an extra signal",
+  HasSpecTagPred<operand>
 >;
 
-// Multi-entity constraint ensuring that the type of `b` matches the type of `a` without a spec tag.
-class RemovingSpecTag<string a, string b> : AddingSpecTag<b, a>;
-
-// Multi-entity constraint ensuring that if at least one of the `input` has a spec tag,
-// then all of the `output` should have a spec tag.
-// This verification is also done in the verifier of MergeLikeOpInterface
-class PropagatingSpecTag<list<string> inputs, list<string> outputs> : PredOpTrait<
-  "if at least one of the inputs has a spec tag, then all of the outputs should have a spec tag",
-  Or<[
-    And<[
-      Or<!foreach(
-        input, // variable name
-        inputs,
-        HasSpecTag<"$" # input # ".getType()">
-      )>,
-      And<!foreach(
-        output, // variable name
-        outputs,
-        HasSpecTag<"$" # output # ".getType()">
-      )>
-    ]>,
-    And<[
-      And<!foreach(
-        input, // variable name
-        inputs,
-        Neg<HasSpecTag<"$" # input # ".getType()">>
-      )>,
-      And<!foreach(
-        output, // variable name
-        outputs,
-        Neg<HasSpecTag<"$" # output # ".getType()">>
-      )>
-    ]>
-  ]>
+class LacksSpecTag<string operand> : PredOpTrait<
+  "shouldn't have a spec tag as an extra signal",
+  Neg<HasSpecTagPred<operand>>
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
