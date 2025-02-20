@@ -291,6 +291,20 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+def HandshakeManualBuffers : DynamaticPass<"handshake-manual-buffers"> {
+  let summary =
+    "Manually places buffers in dataflow circuits for correctness and performance.";
+  let description = [{
+    Places buffers inside Handshake functions to ensure functional correctness
+    and meet performance targets. This pass enables manual placement of buffers,
+    specified in the json file.
+  }];
+  let constructor = "dynamatic::buffer::createHandshakeManualBuffers()";
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the positions for buffers">];
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
