@@ -961,7 +961,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
+  IsSimpleHandshake<"ctrl">,
 ]> {
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
@@ -995,6 +996,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">,
   // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
   // The builder is used in the HandshakeSpeculation pass.
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
