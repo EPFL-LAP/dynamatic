@@ -360,4 +360,38 @@ class VariadicHasElement<string variadic> : PredOpTrait<
   CPred<"!$" # variadic # ".empty()">
 >;
 
+// Constraints for spec tags
+
+// Predicate to verify if the given type has a valid spec tag as an extra signal.
+class HasSpecTagPred<string operand> : CPred<
+  [{
+    ([&](std::optional<ExtraSignal> getExtraSignalResult) {
+      if (!getExtraSignalResult.has_value()) {
+        // There is no extra signal called "spec"
+        return false;
+      }
+
+      ExtraSignal signal = getExtraSignalResult.value();
+
+      // The signal should be a 1-bit integer downstream signal.
+      if (!signal.downstream)
+        return false;
+      if (!signal.type.isInteger(1))
+        return false;
+
+      return true;
+    })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
+  $}] # operand # ".getType()).getExtraSignal(\"spec\"))"
+>;
+
+class HasSpecTag<string operand> : PredOpTrait<
+  "should have a valid spec tag as an extra signal",
+  HasSpecTagPred<operand>
+>;
+
+class LacksSpecTag<string operand> : PredOpTrait<
+  "shouldn't have a spec tag as an extra signal",
+  Neg<HasSpecTagPred<operand>>
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
