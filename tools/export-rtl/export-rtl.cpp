@@ -50,6 +50,7 @@
 #include <set>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 
 using namespace llvm;
@@ -81,6 +82,29 @@ static cl::opt<HDL>
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
                cl::desc("<RTL configuration files...>"), cl::cat(mainCategory));
+
+namespace llvm {
+/// Represents a component's port; its name and a boolean indicating whether
+/// the port is part of a vector in RTL.
+using Port = std::pair<std::string, bool>;
+
+Port EMPTY_KEY = {"EMPTY_KEY", false};
+Port TOMBSTONE_KEY = {"TOMBSTONE_KEY", false};
+
+template <>
+struct DenseMapInfo<Port> {
+  static inline Port getEmptyKey() { return EMPTY_KEY; }
+
+  static inline Port getTombstoneKey() { return TOMBSTONE_KEY; }
+
+  static unsigned getHashValue(const Port &p) {
+    return std::hash<std::string>{}(p.first) ^
+           (static_cast<unsigned>(p.second) << 1);
+  }
+
+  static bool isEqual(const Port &LHS, const Port &RHS) { return LHS == RHS; }
+};
+} // namespace llvm
 
 namespace {
 
@@ -251,7 +275,7 @@ public:
   /// Associates every port of a component to internal signal names that should
   /// connect to it.
   // llvm::MapVector
-  using IOMap = std::map<Port, SmallVector<std::string>>;
+  using IOMap = llvm::MapVector<Port, SmallVector<std::string>>;
 
   /// Suffixes for specfic signal types.
   static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
