@@ -997,8 +997,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
-  // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
-  // The builder is used in the HandshakeSpeculation pass.
+  // Use InferTypeOpInterface to generate a builder that infers the return type.
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
