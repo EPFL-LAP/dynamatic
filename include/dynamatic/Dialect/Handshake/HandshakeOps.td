@@ -919,11 +919,8 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  // Constraint on the dataIn/dataOut relationship
-  PredOpTrait<"Speculator dataIn / dataOut relationship", Or<[
-    AllTypesMatch<["dataIn", "dataOut"]>.predicate, // Inside loops
-    AddingSpecTag<"dataIn", "dataOut">.predicate // Outside loops
-  ]>>,
+  // Speculator is currently used only within loops.
+  AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsSimpleHandshake<"SCSaveCtrl">,
@@ -1007,7 +1004,9 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface,
-  RemovingSpecTag<"dataIn", "dataOut">,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
   // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
   // The builder is used in the HandshakeSpeculation pass.
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
@@ -1073,7 +1072,11 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
-  AllExtraSignalsMatch<["trueResult", "falseResult"]>,
+  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand","trueResult", "falseResult"]>,
+  HasSpecTag<"tagFromOperand">,
+  HasSpecTag<"dataOperand">,
+  LacksSpecTag<"trueResult">,
+  LacksSpecTag<"falseResult">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
