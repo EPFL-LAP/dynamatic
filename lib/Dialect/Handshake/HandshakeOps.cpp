@@ -1694,14 +1694,16 @@ LogicalResult SpecCommitOp::inferReturnTypes(
   OpBuilder builder(context);
 
   auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
-  SmallVector<ExtraSignal> newExtraSignals;
+
+  SmallVector<ExtraSignal> extraSignalsForDataOut;
   for (const ExtraSignal &signal : dataInType.getExtraSignals()) {
+    // Add all extra signals except for spec
     if (signal.name != "spec") {
-      newExtraSignals.push_back(signal);
+      extraSignalsForDataOut.push_back(signal);
     }
   }
   inferredReturnTypes.push_back(
-      dataInType.copyWithExtraSignals(newExtraSignals));
+      dataInType.copyWithExtraSignals(extraSignalsForDataOut));
 
   return success();
 }

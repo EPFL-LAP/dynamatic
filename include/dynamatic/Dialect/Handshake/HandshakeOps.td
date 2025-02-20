@@ -1048,7 +1048,7 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
-  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand","trueResult", "falseResult"]>,
+  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
   HasSpecTag<"tagFromOperand">,
   HasSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
