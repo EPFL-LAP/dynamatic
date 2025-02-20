@@ -62,7 +62,7 @@ test_generator -t lazy_fork -p size=4 port_types='{"ins":"!handshake.control<>"}
 test_generator -t lazy_fork -p size=2 port_types='{"ins":"!handshake.channel<i16>"}'
 
 echo -e "\nTesting load..."
-test_generator -t load -p port_types='{"data_out":"!handshake.channel<i16>","addr_in":"!handshake.channel<i16>"}'
+test_generator -t load -p port_types='{"dataOut":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
 echo -e "\nTesting merge..."
 test_generator -t merge -p size=4 port_types='{"outs":"!handshake.control<>"}'
@@ -83,6 +83,6 @@ echo -e "\nTesting source..."
 test_generator -t source
 
 echo -e "\nTesting store..."
-test_generator -t store -p port_types='{"data_in":"!handshake.channel<i16>","addr_in":"!handshake.channel<i16>"}'
+test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
 rm $OUT
