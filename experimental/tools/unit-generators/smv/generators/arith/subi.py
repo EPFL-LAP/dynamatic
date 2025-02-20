@@ -4,7 +4,7 @@ from generators.support.utils import *
 
 def generate_subi(name, params):
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
@@ -16,7 +16,7 @@ def generate_subi(name, params):
 def _generate_subi(name, latency, data_type):
   return f"""
 {generate_binary_op_header(name)}
-  DEFINE outs := lhs - rhs;
+  DEFINE result := lhs - rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
