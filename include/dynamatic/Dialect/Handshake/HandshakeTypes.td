@@ -273,6 +273,20 @@ class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredO
   }] # "($" # variadic # ", $" # nonvariadic # ")">
 >;
 
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
+/// signals, except for any signal with the given `except` name.
+class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
+  "all of {" # !interleave(names, ", ") # "} should have the same extra " #
+  "signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
+  "\", {" # !interleave(!foreach(
+    name, // variable name
+    names,
+    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getExtraSignals()"
+  ), ", ") # "})">
+>;
+
 /// Constraint to ensure an input/output is of SimpleControl/Channel type.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " should be of SimpleControl or SimpleChannel type",

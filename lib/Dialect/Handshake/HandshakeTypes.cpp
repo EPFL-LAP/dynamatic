@@ -353,6 +353,58 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
          lhs.downstream == rhs.downstream;
 }
 
+bool dynamatic::handshake::doesExtraSignalsMatchExcept(
+    const llvm::StringRef &except,
+    std::initializer_list<const llvm::ArrayRef<ExtraSignal>>
+        extraSignalArrays) {
+
+  // If there are fewer than two arrays, they are trivially considered matching.
+  if (extraSignalArrays.size() < 2)
+    return true;
+
+  // Use the first array as the reference for comparison.
+  ArrayRef<ExtraSignal> head = *extraSignalArrays.begin();
+  size_t headSize = head.size();
+
+  // Compare the reference array against all other arrays.
+  for (const auto *it = extraSignalArrays.begin() + 1;
+       it != extraSignalArrays.end(); ++it) {
+
+    ArrayRef<ExtraSignal> current = *it;
+    size_t currentSize = current.size();
+
+    // Use two indices to traverse both arrays while skipping the `except`
+    // signal.
+    size_t i = 0;
+    size_t j = 0;
+
+    while (i < headSize || j < currentSize) {
+      // Skip elements in `head` with the excluded name.
+      if (i < headSize && head[i].name == except) {
+        i++;
+        continue;
+      }
+      // Skip elements in `current` with the excluded name.
+      if (j < currentSize && current[j].name == except) {
+        j++;
+        continue;
+      }
+
+      // If one array is fully traversed but the other isn't, they differ.
+      if (i >= headSize || j >= currentSize)
+        return false;
+
+      // If corresponding signals don't match, the arrays are different.
+      if (head[i] != current[j])
+        return false;
+
+      i++;
+      j++;
+    }
+  }
+  return true;
+}
+
 ExtraSignal ExtraSignal::allocateInto(mlir::TypeStorageAllocator &alloc) const {
   return ExtraSignal(alloc.copyInto(name), type, downstream);
 }
