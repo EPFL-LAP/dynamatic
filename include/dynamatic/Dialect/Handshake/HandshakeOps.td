@@ -993,6 +993,7 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface,
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
