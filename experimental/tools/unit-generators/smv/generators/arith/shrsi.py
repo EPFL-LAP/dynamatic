@@ -4,7 +4,7 @@ from generators.support.utils import *
 
 def generate_shrsi(name, params):
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
@@ -18,7 +18,7 @@ def generate_shrsi(name, params):
 def _generate_shrsi(name, latency, data_type):
   return f"""
 {generate_binary_op_header(name)}
-  DEFINE outs := lhs >> rhs;
+  DEFINE result := lhs >> rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
@@ -27,7 +27,7 @@ def _generate_shrsi(name, latency, data_type):
 def _generate_shrsi_cast(name, latency, data_type):
   return f"""
 {generate_binary_op_header(name)}
-  DEFINE outs := signed(lhs) >> rhs;
+  DEFINE result := signed(lhs) >> rhs;
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
