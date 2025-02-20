@@ -78,18 +78,89 @@ createSinks(const std::string &moduleName,
             size_t nrOfTokens) {
   std::ostringstream sinks;
   sinks << "  -- TODO make sure we have sink_1_0\n";
-  for (size_t i = 0; i < results.size(); ++i) {
-    sinks << "  VAR sink_" << results[i].first << " : sink_1_0(" << moduleName
-          << "." << results[i].first << "_out, " << moduleName << "."
-          << results[i].first << "_valid);\n";
+  for (const auto &result : results) {
+    sinks << "  VAR sink_" << result.first << " : sink_1_0(" << moduleName
+          << "." << result.first << "_out, " << moduleName << "."
+          << result.first << "_valid);\n";
   }
   return sinks.str();
+}
+
+std::string createSeqContraintAplusBequalC(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
+    size_t seqB, size_t seqC) {
+
+  std::ostringstream seqConstraint;
+  std::string aSeqName = "seq_generator_" + arguments[seqA].first;
+  std::string bSeqName = "seq_generator_" + arguments[seqB].first;
+  std::string cSeqName = "seq_generator_" + arguments[seqC].first;
+  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
+  seqConstraint << "INVAR (" << aSeqName << ".exact_tokens + " << bSeqName
+                << ".exact_tokens = " << cSeqName << ".exact_tokens);\n";
+
+  return seqConstraint.str();
+}
+
+std::string createSeqContraintAequalB(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
+    size_t seqB) {
+
+  std::ostringstream seqConstraint;
+  std::string aSeqName = "seq_generator_" + arguments[seqA].first;
+  std::string bSeqName = "seq_generator_" + arguments[seqB].first;
+  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
+  seqConstraint << "INVAR (" << aSeqName << ".exact_tokens = " << bSeqName
+                << ".exact_tokens);\n";
+
+  return seqConstraint.str();
+}
+
+std::string createSeqContraintLoop(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
+    size_t seqB, bool lastFalse) {
+
+  std::ostringstream seqConstraint;
+  std::string falseTokenCounter = arguments[seqB].first + "_false_token_cnt";
+  std::string falseTokenSeqName = "seq_generator_" + arguments[seqB].first;
+  std::string otherSeqName = "seq_generator_" + arguments[seqA].first;
+  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
+  seqConstraint << "VAR " << falseTokenCounter << " : 0..31;\n"
+                << "ASSIGN init(" << falseTokenCounter << ") := 0;\n"
+                << "ASSIGN next(" << falseTokenCounter << ") := case\n"
+                << "  " << falseTokenSeqName << ".valid0 & "
+                << falseTokenSeqName << ".nReady0 & (" << falseTokenSeqName
+                << ".dataOut0 = FALSE) & (" << falseTokenCounter << " < "
+                << otherSeqName << ".exact_tokens) : (" << falseTokenCounter
+                << " + 1);\n"
+                << "  TRUE : " << falseTokenCounter << ";\n"
+                << "esac;\n"
+                << "INVAR (((" << otherSeqName << ".exact_tokens - "
+                << falseTokenCounter << ") = (" << falseTokenSeqName
+                << ".exact_tokens - " << falseTokenSeqName << ".counter)) & (("
+                << otherSeqName << ".exact_tokens - " << falseTokenCounter
+                << ") >= 1) ) -> " << falseTokenSeqName
+                << ".dataOut0 = FALSE;\n"
+                << "INVAR (((" << otherSeqName << ".exact_tokens - "
+                << falseTokenCounter << ") = " << lastFalse << " ) & (("
+                << falseTokenSeqName << ".exact_tokens - " << falseTokenSeqName
+                << ".counter) >= " << 1 + lastFalse << ")) -> ("
+                << falseTokenSeqName << ".dataOut0 = TRUE);\n"
+                << "INVAR (" << falseTokenSeqName
+                << ".exact_tokens >= " << otherSeqName << ".exact_tokens);\n"
+                << "INVAR (" << otherSeqName << ".exact_tokens = 0) -> ("
+                << falseTokenSeqName << ".exact_tokens = 0);\n";
+
+  return seqConstraint.str();
 }
 
 std::string createMiterProperties(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
     const SmallVector<std::pair<std::string, std::string>> &outputBuffers,
+    const SmallVector<std::pair<std::string, Type>> &arguments,
     const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream properties;
 
@@ -124,6 +195,10 @@ std::string createMiterProperties(
       "AF (AG (" + inputProp + " & " + outputProp + "))";
   properties << "CTLSPEC " + finalBufferProp + "\n";
 
+  properties << "\n";
+
+  // properties << createSeqContraintLoop(moduleName, arguments, 0, 1, true);
+
   return properties.str();
 }
 
@@ -153,7 +228,8 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
 
   if (includeProperties) {
     wrapper << createMiterProperties(modelSmvName, config.inputBuffers,
-                                     config.outputBuffers, config.results);
+                                     config.outputBuffers, config.arguments,
+                                     config.results);
   }
 
   std::ofstream mainFile(wrapperPath);
