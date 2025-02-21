@@ -77,10 +77,7 @@ public:
 
   /// Check if there is a save in the given OpOperand edge
   bool containsSave(OpOperand &dstOpOperand);
-
-  /// Check if there is a commit in the given OpOperand edge
   bool containsCommit(OpOperand &dstOpOperand);
-
   /// Check if there is a save-commit in the given OpOperand edge
   bool containsSaveCommit(OpOperand &dstOpOperand);
 

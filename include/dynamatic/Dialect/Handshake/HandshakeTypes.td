@@ -82,8 +82,8 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
-      "::mlir::Type":$dataType, 
-      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
+      "::mlir::Type":$dataType,
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras),
       [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
@@ -106,7 +106,13 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
     ChannelType withDataType(Type newDataType) {
       return ChannelType::get(newDataType, getExtraSignals());
     }
-    
+
+    /// Returns a channel type with identical data type but a potentially
+    /// different extra signals.
+    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
+      return ChannelType::get(getDataType(), newExtraSignals);
+    }
+
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {
@@ -178,6 +184,20 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 >;
 
 def BoolChannel : IntSizedChannel<1>;
+
+/// Ensures an operand/result is of ChannelType carrying IntegerType data of the
+/// specified width.
+class IsIntSizedChannel<int width, string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data of width " # width,
+  CPred<
+    "::mlir::isa<::dynamatic::handshake::ChannelType>($"
+    # name # ".getType()) &&"
+    "::mlir::isa<::mlir::IntegerType>("
+    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+    ".getDataType()) &&"
+    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+    ".getDataBitWidth() == " # width>
+>;
 
 def SimpleControl : Type<
   HasNumExtras<0>,
@@ -267,6 +287,21 @@ class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredO
   }] # "($" # variadic # ", $" # nonvariadic # ")">
 >;
 
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
+/// signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
+  "all of {" # !interleave(names, ", ") # "} should have the same extra " #
+  "signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
+  "\", {" # !interleave(!foreach(
+    name, // variable name
+    names,
+    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getExtraSignals()"
+  ), ", ") # "})">
+>;
+
 /// Constraint to ensure an input/output is of SimpleControl/Channel type.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " should be of SimpleControl or SimpleChannel type",
@@ -344,6 +379,36 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
 class VariadicHasElement<string variadic> : PredOpTrait<
   "the variadic " # variadic # " should have at least one element",
   CPred<"!$" # variadic # ".empty()">
+>;
+
+// Constraints for spec tags
+
+class HasSpecTag<string operand> : PredOpTrait<
+  "should have a valid spec tag as an extra signal",
+  CPred<[{
+    ([&](std::optional<ExtraSignal> getExtraSignalResult) {
+      if (!getExtraSignalResult.has_value()) {
+        // There is no extra signal called "spec"
+        return false;
+      }
+
+      ExtraSignal signal = getExtraSignalResult.value();
+
+      // The signal should be a 1-bit integer downstream signal.
+      if (!signal.downstream)
+        return false;
+      if (!signal.type.isInteger(1))
+        return false;
+
+      return true;
+    })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
+  $}] # operand # ".getType()).getExtraSignal(\"spec\"))">
+>;
+
+class LacksSpecTag<string operand> : PredOpTrait<
+  "shouldn't have a spec tag as an extra signal",
+  CPred<"!::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" #
+  operand # ".getType()).hasExtraSignal(\"spec\")">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
