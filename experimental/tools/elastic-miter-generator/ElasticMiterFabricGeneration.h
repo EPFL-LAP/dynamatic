@@ -33,10 +33,11 @@ constexpr unsigned int BB_OUT = 3; // Output auxillary logic
 
 struct ElasticMiterConfig {
   SmallVector<std::pair<std::string, std::string>> inputBuffers;
+  SmallVector<std::pair<std::string, std::string>> inputNDWires;
   SmallVector<std::pair<std::string, std::string>> outputBuffers;
+  SmallVector<std::pair<std::string, std::string>> outputNDWires;
   SmallVector<std::pair<std::string, Type>> arguments;
   SmallVector<std::pair<std::string, Type>> results;
-  SmallVector<std::string> ndwires;
   SmallVector<std::string> eq;
   std::string funcName;
   std::string lhsFuncName;

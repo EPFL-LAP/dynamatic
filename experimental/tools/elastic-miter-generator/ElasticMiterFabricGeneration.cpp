@@ -270,7 +270,12 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
   for (Block &block : funcOp.getBlocks()) {
     builder.setInsertionPointToStart(&block);
   }
-  SmallVector<std::pair<std::string, Type>> arguments;
+
+  // Create the config
+  ElasticMiterConfig config;
+  config.funcName = funcOp.getNameAttr().str();
+
+
   // Create the input side auxillary logic:
   // Every primary input of the LHS/RHS circuits is connected to a ND wire.
   // The output of the ND wire is then connected to the original input of the
@@ -292,7 +297,7 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
 
     Attribute attr = funcOp.getArgNames()[i];
     auto strAttr = attr.dyn_cast<StringAttr>();
-    arguments.push_back(
+    config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), arg.getType()));
   }
 
@@ -308,7 +313,6 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
   // GetEndOp, after checking there is only one EndOp
   EndOp endOp = *funcOp.getOps<EndOp>().begin();
 
-  SmallVector<std::pair<std::string, Type>> results;
   // Create the output side auxillary logic:
   // Every output of the LHS/RHS circuits is connected to a non-derministic
   // wire (ND wire). The output of the ND wire is connected to the respective
@@ -329,14 +333,9 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
     }
     Attribute attr = funcOp.getResNames()[i];
     auto strAttr = attr.dyn_cast<StringAttr>();
-    results.push_back(
+    config.results.push_back(
         std::make_pair(strAttr.getValue().str(), result.getType()));
   }
-
-  ElasticMiterConfig config;
-  config.arguments = arguments;
-  config.results = results;
-  config.funcName = funcOp.getNameAttr().str();
 
   return std::make_pair(mod.release(), config);
 }
@@ -391,15 +390,12 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   builder.setInsertionPointToStart(newBlock);
 
-  // We need to keep track of the names to add them to the JSON config file
-  llvm::SmallVector<std::pair<std::string, std::string>> inputBufferNamePairs;
-  llvm::SmallVector<std::pair<std::string, std::string>> outputBufferNamePairs;
-  llvm::SmallVector<std::string> ndwireNames;
-  llvm::SmallVector<std::string> eqNames;
+  // Create the config
+  ElasticMiterConfig config;
+  config.lhsFuncName = lhsFuncOp.getNameAttr().str();
+  config.rhsFuncName = rhsFuncOp.getNameAttr().str();
 
   Operation *nextLocation;
-
-  SmallVector<std::pair<std::string, Type>> arguments;
 
   // Create the input side auxillary logic:
   // Every primary input of the LHS/RHS circuits is connected to a fork, which
@@ -442,10 +438,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     nextLocation = rhsNDWireOp;
 
-    inputBufferNamePairs.push_back(std::make_pair(lhsBufName, rhsBufName));
-
-    ndwireNames.push_back(lhsNdwName);
-    ndwireNames.push_back(rhsNdwName);
+    config.inputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
+    config.inputNDWires.push_back(std::make_pair(lhsNdwName, rhsNdwName));
 
     // Use the newly created fork's output instead of the original argument in
     // the lhsFuncOp's operations
@@ -459,7 +453,7 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     Attribute attr = lhsFuncOp.getArgNames()[i];
     auto strAttr = attr.dyn_cast<StringAttr>();
-    arguments.push_back(
+    config.arguments.push_back(
         std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
   }
 
@@ -485,7 +479,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // completely decouples the operation of the two circuits. The buffers then
   // are connected pairwise to a comparator to check that the outputs are
   // equivalent.
-  SmallVector<std::pair<std::string, Type>> results;
   llvm::SmallVector<Value> miterResultValues;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
@@ -532,17 +525,15 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       miterResultValues.push_back(compOp.getResult());
     }
 
-    outputBufferNamePairs.push_back(std::make_pair(lhsBufName, rhsBufName));
+    config.outputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
+    config.outputNDWires.push_back(std::make_pair(lhsNDwName, rhsNDwName));
 
-    ndwireNames.push_back(lhsNDwName);
-    ndwireNames.push_back(rhsNDwName);
-
-    eqNames.push_back(eqName);
+    config.eq.push_back(eqName);
 
     Attribute attr = lhsFuncOp.getResNames()[i];
     auto strAttr = attr.dyn_cast<StringAttr>();
     // The result name is prefixed with EQ_
-    results.push_back(
+    config.results.push_back(
         std::make_pair("EQ_" + strAttr.getValue().str(), lhsResult.getType()));
   }
 
@@ -577,16 +568,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       argNames.push_back(strAttr.getValue().str());
     }
   }
-
-  ElasticMiterConfig config;
-  config.inputBuffers = inputBufferNamePairs;
-  config.outputBuffers = outputBufferNamePairs;
-  config.arguments = arguments;
-  config.results = results;
-  config.ndwires = ndwireNames;
-  config.eq = eqNames;
-  config.lhsFuncName = lhsFuncOp.getNameAttr().str();
-  config.rhsFuncName = rhsFuncOp.getNameAttr().str();
 
   return std::make_pair(miterModule, config);
 }

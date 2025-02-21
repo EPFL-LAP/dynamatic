@@ -156,10 +156,69 @@ std::string createSeqContraintLoop(
   return seqConstraint.str();
 }
 
+std::string createTokenLimiter(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments,
+    const SmallVector<std::pair<std::string, std::string>> &inputNDWires,
+    const SmallVector<std::pair<std::string, std::string>> &outputNDWires,
+    size_t inputSeq, size_t outputSeq, size_t limit) {
+
+  std::ostringstream tokenLimitConstraint;
+
+  for (std::string side : {"lhs", "rhs"}) {
+
+    std::string limiterVarName =
+        side + "_" + arguments[inputSeq].first + "_active_tokens";
+    std::string tokenLimitDef =
+        arguments[inputSeq].first + "_active_token_limit";
+
+    std::string inputNDWireName;
+    std::string outputNDWireName;
+    if (side == "lhs") {
+      inputNDWireName = moduleName + "." + inputNDWires[inputSeq].first;
+      outputNDWireName = moduleName + "." + outputNDWires[outputSeq].first;
+    } else {
+      inputNDWireName = moduleName + "." + inputNDWires[inputSeq].second;
+      outputNDWireName = moduleName + "." + outputNDWires[outputSeq].second;
+    }
+
+    std::string inputTokenCondition =
+        inputNDWireName + ".valid0 & " + inputNDWireName + ".nReady0";
+    std::string outputTokenCondition =
+        outputNDWireName + ".valid0 & " + outputNDWireName + ".nReady0";
+
+    tokenLimitConstraint << "DEFINE " << tokenLimitDef << " := " << limit
+                         << ";\n"
+                         << "VAR " << limiterVarName << " : 0.." << limit
+                         << ";\n"
+                         << "ASSIGN\n"
+                         << "init(" << limiterVarName << ") := 0;\n"
+                         << "next(" << limiterVarName << ") := case\n"
+                         << "  " << inputTokenCondition << " & "
+                         << outputTokenCondition << " : " << limiterVarName
+                         << ";\n"
+                         << "  " << outputTokenCondition << " & "
+                         << limiterVarName << " > 0 : " << limiterVarName
+                         << " - 1;\n"
+                         << "  " << inputTokenCondition << " & "
+                         << limiterVarName << " < " << tokenLimitDef << " : "
+                         << limiterVarName << " + 1;\n"
+                         << "  TRUE : " << limiterVarName << ";\n"
+                         << "  esac;\n"
+                         << "INVAR " << limiterVarName << " = " << tokenLimitDef
+                         << " -> " << inputNDWireName
+                         << ".state = sleeping;\n\n";
+  }
+
+  return tokenLimitConstraint.str();
+}
+
 std::string createMiterProperties(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
+    const SmallVector<std::pair<std::string, std::string>> &inputNDWires,
     const SmallVector<std::pair<std::string, std::string>> &outputBuffers,
+    const SmallVector<std::pair<std::string, std::string>> &outputNDWires,
     const SmallVector<std::pair<std::string, Type>> &arguments,
     const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream properties;
@@ -197,7 +256,40 @@ std::string createMiterProperties(
 
   properties << "\n";
 
-  // properties << createSeqContraintLoop(moduleName, arguments, 0, 1, true);
+  properties << createSeqContraintLoop(moduleName, arguments, 0, 1, true);
+
+  // TODO lhs and rhs
+  // size_t inputSeq = 1;
+  // size_t outputSeq = 0;
+  // size_t limit = 3;
+  // std::string limiterVarName = arguments[inputSeq].first + "_active_tokens";
+  // std::string tokenLimitDef = arguments[inputSeq].first +
+  // "_active_token_limit"; std::string outputSeqName = "seq_generator_" +
+  // results[outputSeq].first; std::string inputNDWireName = moduleName + "." +
+  // inputNDWires[inputSeq].first; std::string outputNDWireName =
+  //     moduleName + "." + outputNDWires[outputSeq].first;
+  // std::string inputTokenCondition =
+  //     inputNDWireName + ".valid0 & " + inputNDWireName + ".nReady0";
+  // std::string outputTokenCondition =
+  //     outputNDWireName + ".valid0 & " + outputNDWireName + ".nReady0";
+
+  // properties << "DEFINE " << tokenLimitDef << " := " << limit << ";\n"
+  //            << "VAR " << limiterVarName << " : 0.." << limit + 100 << ";\n"
+  //            << "ASSIGN\n"
+  //            << "init(" << limiterVarName << ") := 0;\n"
+  //            << "next(" << limiterVarName << ") := case\n"
+  //            << "  " << inputTokenCondition << " & " << outputTokenCondition
+  //            << " : " << limiterVarName << ";\n"
+  //            << "  " << outputTokenCondition << " & " << limiterVarName
+  //            << " > 0 : " << limiterVarName << " - 1;\n"
+  //            << "  " << inputTokenCondition << " & " << limiterVarName << " <
+  //            "
+  //            << tokenLimitDef << " : " << limiterVarName << " + 1;\n"
+  //            << "  TRUE : " << limiterVarName << ";\n"
+  //            << "  esac;\n"
+  //            << "INVAR " << limiterVarName << " = " << tokenLimitDef << " ->
+  //            "
+  //            << inputNDWireName << ".state = sleeping;\n";
 
   return properties.str();
 }
@@ -228,7 +320,8 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
 
   if (includeProperties) {
     wrapper << createMiterProperties(modelSmvName, config.inputBuffers,
-                                     config.outputBuffers, config.arguments,
+                                     config.inputNDWires, config.outputBuffers,
+                                     config.outputNDWires, config.arguments,
                                      config.results);
   }
 
