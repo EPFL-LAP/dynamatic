@@ -939,7 +939,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
-      = speculator[enable] %dataIn : !handshake.channel<i1>
+      = speculator[enable] %dataIn : !handshake.channel<i32, [spec: i1]>,
+        !handshake.control<[spec: i1]>
     ```
   }];
 
