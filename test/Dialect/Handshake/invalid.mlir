@@ -299,8 +299,8 @@ handshake.func @invalidSpecCommitWithDataOutSpec(
 
 handshake.func @invalidSpecCommitWithInvalidCtrl(
     %ctrl : !handshake.channel<i2>,
-    %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
+    %dataIn : !handshake.channel<i32, [spec: i1]>) {
   // expected-error @below {{'handshake.spec_commit' op failed to verify that ctrl should be of ChannelType carrying IntegerType data of width 1}}
-  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>, !handshake.channel<i32, [a: i1]>, <i2>
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, <i2>
   end
 }
