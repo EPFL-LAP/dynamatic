@@ -966,7 +966,6 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                       ChannelType:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
 
   // Infer the type of the control signals
   let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
