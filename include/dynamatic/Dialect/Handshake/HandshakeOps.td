@@ -919,7 +919,7 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  // Speculator is currently used only within loops.
+  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
