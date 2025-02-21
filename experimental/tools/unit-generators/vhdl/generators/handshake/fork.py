@@ -1,13 +1,11 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.support.logic import generate_or_n
 from generators.support.eager_fork_register_block import generate_eager_fork_register_block
 
 def generate_fork(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
-  size = int(params["size"])
+  size = params["size"]
 
   if data_type.is_channel():
     return _generate_fork(name, size, data_type.bitwidth)

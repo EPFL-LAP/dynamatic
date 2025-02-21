@@ -1,4 +1,6 @@
 import argparse
+import ast
+import sys
 
 import generators.handshake.addi as addi
 import generators.handshake.cmpi as cmpi
@@ -18,9 +20,16 @@ def generate_code(name, mod_type, parameters):
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
-def parse_key_value(key_value):
-  key, value = key_value.split("=")
-  return key, value
+def parse_parameters(param_list):
+  try:
+    param_dict = {}
+    if param_list is not None:
+      for pair in param_list:
+        key, value = pair.split("=")
+        param_dict[key.strip()] = ast.literal_eval(value.strip())
+    return param_dict
+  except ValueError:
+    raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 def main():
   parser = argparse.ArgumentParser(description="VHDL Generator Script")
@@ -33,15 +42,18 @@ def main():
   parser.add_argument(
       "-p",
       "--parameters",
-      type=parse_key_value,
+      required=False,
       nargs="*",
-      default=[],
       help="Set of parameters in key=value key=value format",
   )
 
   args = parser.parse_args()
 
-  parameters = dict(args.parameters)
+  try:
+    parameters = parse_parameters(args.parameters)
+  except ValueError as e:
+    sys.stderr.write(f"Error parsing parameters: {e}")
+    sys.exit(1)
 
   # Printing parameters for diagnostic purposes
   header = f"-- {args.name} : {args.type}({parameters})\n\n"

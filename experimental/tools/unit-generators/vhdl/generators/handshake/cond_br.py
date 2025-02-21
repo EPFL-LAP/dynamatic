@@ -1,10 +1,8 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
 def generate_cond_br(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["data"])
 
   if data_type.is_channel():
