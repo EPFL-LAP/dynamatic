@@ -96,7 +96,8 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
 
     // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
-    // resultType is tentative and will be updated in a later algorithm.
+    // resultType is tentative and will be updated in the addSpecTag algorithm
+    // later.
     T newOp =
         builder.create<T>(dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
                           /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal);
@@ -203,7 +204,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
 
       auto conditionOperand = branchOp.getConditionOperand();
       // trueResultType and falseResultType are tentative and will be updated in
-      // a later algorithm.
+      // the addSpecTag algorithm later.
       auto branchDiscardNonSpec =
           builder.create<handshake::SpeculatingBranchOp>(
               branchOp.getLoc(),
@@ -357,8 +358,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // First, discard if speculation didn't happen
 
   auto conditionOperand = controlBranch.getConditionOperand();
-  // trueResultType and falseResultType are tentative and will be updated in a
-  // later algorithm.
+  // trueResultType and falseResultType are tentative and will be updated in the
+  // addSpecTag algorithm later.
   auto branchDiscardCondNonSpec =
       builder.create<handshake::SpeculatingBranchOp>(
           controlBranch.getLoc(),
@@ -491,7 +492,8 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
-  // resultType is tentative and will be updated in a later algorithm.
+  // resultType is tentative and will be updated in the addSpecTag algorithm
+  // later.
   specOp = builder.create<handshake::SpeculatorOp>(
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
       /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
