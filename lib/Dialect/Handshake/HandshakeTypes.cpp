@@ -279,7 +279,7 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     return nullptr;
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
-    return nullptr;
+    return {};
 
   return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
 }
@@ -362,40 +362,42 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
   if (extraSignalArrays.size() < 2)
     return true;
 
+  auto *firstArrayIt = extraSignalArrays.begin();
+  auto *secondArrayIt = firstArrayIt + 1;
+
   // Use the first array as the reference for comparison.
-  ArrayRef<ExtraSignal> head = *extraSignalArrays.begin();
+  ArrayRef<ExtraSignal> head = *firstArrayIt;
   size_t headSize = head.size();
 
   // Compare the reference array against all other arrays.
-  for (const auto *it = extraSignalArrays.begin() + 1;
-       it != extraSignalArrays.end(); ++it) {
+  for (auto *it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
 
-    ArrayRef<ExtraSignal> current = *it;
-    size_t currentSize = current.size();
+    ArrayRef<ExtraSignal> toCheck = *it;
+    size_t toCheckSize = toCheck.size();
 
     // Use two indices to traverse both arrays while skipping the `except`
     // signal.
     size_t i = 0;
     size_t j = 0;
 
-    while (i < headSize || j < currentSize) {
+    while (i < headSize || j < toCheckSize) {
       // Skip elements in `head` with the excluded name.
       if (i < headSize && head[i].name == except) {
         i++;
         continue;
       }
       // Skip elements in `current` with the excluded name.
-      if (j < currentSize && current[j].name == except) {
+      if (j < toCheckSize && toCheck[j].name == except) {
         j++;
         continue;
       }
 
       // If one array is fully traversed but the other isn't, they differ.
-      if (i >= headSize || j >= currentSize)
+      if (i >= headSize || j >= toCheckSize)
         return false;
 
       // If corresponding signals don't match, the arrays are different.
-      if (head[i] != current[j])
+      if (head[i] != toCheck[j])
         return false;
 
       i++;
