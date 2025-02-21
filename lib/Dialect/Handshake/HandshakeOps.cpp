@@ -1613,34 +1613,39 @@ LogicalResult EndOp::verify() {
 ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand enable, dataIn;
   Type dataType;
+  Type enableType;
   SmallVector<Type> uniqueResTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
   if (parser.parseLSquare() || parser.parseOperand(enable) ||
       parser.parseRSquare() || parser.parseOperand(dataIn) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
+      parser.parseType(dataType) || parser.parseComma() ||
+      parser.parseType(enableType) || parser.parseArrowTypeList(uniqueResTypes))
     return failure();
+
   if (uniqueResTypes.size() != 3)
     return failure();
 
   Type ctrlType = uniqueResTypes[1];
   Type wideCtrlType = uniqueResTypes[2];
+
+  // dataOut, saveCtrl, commitCtrl, SCSaveCtrl, SCCommitCtrl, SCBranchCtrl
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
+  return parser.resolveOperands({dataIn, enable}, {dataType, enableType},
+                                allOperandLoc, result.operands);
 }
 
 void SpeculatorOp::print(OpAsmPrinter &p) {
   p << " [" << getEnable() << "] " << getDataIn() << " ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
-    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
-    << ")";
+  p << " : " << getDataIn().getType() << ", " << getEnable().getType();
+  p << " -> (";
+  p << getDataOut().getType() << ", " << getSaveCtrl().getType() << ", "
+    << getSCSaveCtrl().getType();
+  p << ")";
 }
 
 LogicalResult SpeculatorOp::inferReturnTypes(
