@@ -922,10 +922,15 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
+  IsIntSizedChannel<1, "saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
+  IsIntSizedChannel<1, "commitCtrl">,
   IsSimpleHandshake<"SCSaveCtrl">,
+  IsIntSizedChannel<3, "SCSaveCtrl">,
   IsSimpleHandshake<"SCCommitCtrl">,
+  IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCBranchCtrl">,
+  IsIntSizedChannel<1, "SCBranchCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
@@ -952,10 +957,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
   let results = (outs HandshakeType:$dataOut,
-                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl,
-                      IntSizedChannel<3>:$SCSaveCtrl,
-                      IntSizedChannel<3>:$SCCommitCtrl,
-                      BoolChannel:$SCBranchCtrl);
+                      ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
+                      ChannelType:$SCSaveCtrl,
+                      ChannelType:$SCCommitCtrl, 
+                      ChannelType:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
 }
@@ -967,6 +972,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
@@ -987,7 +993,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
@@ -1013,6 +1019,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
@@ -1034,7 +1041,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
   let results = (outs HandshakeType:$dataOut);
 
   let assemblyFormat = [{
@@ -1058,6 +1065,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   SpeculationOpInterface,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<3, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1073,7 +1081,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)

@@ -185,6 +185,20 @@ class FloatSizedChannel<int width> : TypedSizedChannel<
 
 def BoolChannel : IntSizedChannel<1>;
 
+/// Ensures an operand/result is of ChannelType carrying IntegerType data of the
+/// specified width.
+class IsIntSizedChannel<int width, string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data of width " # width,
+  CPred<
+    "::mlir::isa<::dynamatic::handshake::ChannelType>($"
+    # name # ".getType()) &&"
+    "::mlir::isa<::mlir::IntegerType>("
+    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+    ".getDataType()) &&"
+    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+    ".getDataBitWidth() == " # width>
+>;
+
 def SimpleControl : Type<
   HasNumExtras<0>,
   "must be a `handshake::ControlType` type with no extra signals",
