@@ -275,6 +275,7 @@ class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredO
 
 /// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
 /// signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
 class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
   "all of {" # !interleave(names, ", ") # "} should have the same extra " #
   "signals except for " # except,

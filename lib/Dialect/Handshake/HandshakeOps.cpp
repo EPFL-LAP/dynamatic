@@ -1681,31 +1681,6 @@ LogicalResult SpeculatorOp::inferReturnTypes(
 }
 
 //===----------------------------------------------------------------------===//
-// SpecCommitOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SpecCommitOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  OpBuilder builder(context);
-
-  auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
-  SmallVector<ExtraSignal> newExtraSignals;
-  for (const ExtraSignal &signal : dataInType.getExtraSignals()) {
-    if (signal.name != EXTRA_SIGNAL_SPEC) {
-      newExtraSignals.push_back(signal);
-    }
-  }
-  inferredReturnTypes.push_back(
-      dataInType.copyWithExtraSignals(newExtraSignals));
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 

@@ -919,7 +919,7 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  // Speculator is currently used only within loops.
+  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
@@ -960,30 +960,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let hasCustomAssemblyFormat = 1;
 }
 
-class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+def SpecSaveOp : Handshake_Op<"spec_save", [
+  SpeculationOpInterface,
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">
 ]> {
-  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs HandshakeType:$dataOut);
-  let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
-  }];
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
-      return (idx == 0) ? "ins" : "ctrl";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
-      return "outs";
-    }
-  }];
-}
-
-def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
     Save units are used to mark the beginning of the speculation region. 
@@ -998,21 +982,24 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
     Example:
 
     ```mlir
-    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i32>, !handshake.channel<i32, [spec: i1]>, !handshake.channel<i1>
     ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface,
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">,
-  // We specify InferTypeOpInterface to generate a builder which doesn't require the return type.
-  // The builder is used in the HandshakeSpeculation pass.
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  IsSimpleHandshake<"ctrl">
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1029,32 +1016,23 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     Example:
 
     ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, !handshake.channel<i1>
     ```
   }];
 
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
 
-  // While type($dataOut) can be inferred due to the inferReturnTypes,
-  // we chose to explicitly specify it in the IR for better clarity and understandability.
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
-      return (idx == 0) ? "ins" : "ctrl";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
-      return "outs";
-    }
-  }];
 }
 
-def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
+def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
+  SpeculationOpInterface,
+  AllTypesMatch<["dataIn", "dataOut"]>,
+  IsSimpleHandshake<"ctrl">
+]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
     Save-Commits are used when speculation occurs in a loop.
@@ -1069,12 +1047,16 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
-  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand","trueResult", "falseResult"]>,
+  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
   HasSpecTag<"tagFromOperand">,
   HasSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
@@ -1094,7 +1076,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     Example:
     ```mlir
     %trueResult, %falseResult = speculating_branch[%tagFromOperand]
-      %dataOperand : !handshake.channel<i1>, !handshake.channel<i32>
+      %dataOperand : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32, [spec: i1]>,
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
@@ -1105,11 +1088,6 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
   }];
-  let builders = [OpBuilder<(ins "Value":$tagFromOperand, "Value":$dataOperand), [{
-    $_state.addOperands({tagFromOperand, dataOperand});
-    auto resultType = dataOperand.getType().cast<ChannelType>().withExtraSignal({});
-    $_state.addTypes({resultType, resultType});
-  }]>];
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };

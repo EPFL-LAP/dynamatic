@@ -108,7 +108,8 @@ LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
     // Create and connect the new Operation
     builder.setInsertionPoint(bufferOp);
     handshake::SpecCommitOp newOp = builder.create<handshake::SpecCommitOp>(
-        bufferOp->getLoc(), bufferOp.getResult(), ctrlSignal);
+        bufferOp->getLoc(), bufferOp.getResult().getType(),
+        bufferOp.getResult(), ctrlSignal);
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
@@ -132,7 +133,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
 
     // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
-    T newOp = builder.create<T>(dstOp->getLoc(), srcOpResult, ctrlSignal);
+    // resultType is tentative and will be updated in a later algorithm.
+    T newOp =
+        builder.create<T>(dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+                          /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal);
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
@@ -225,10 +229,15 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       // the branch output is non-speculative. Speculative tag of the token is
       // currently implicit, so the branch input itself is used at the IR
       // level.
+
+      auto conditionOperand = branchOp.getConditionOperand();
+      // resultType is tentative and will be updated in a later algorithm.
       auto branchDiscardNonSpec =
           builder.create<handshake::SpeculatingBranchOp>(
-              branchOp.getLoc(), /*specTag=*/valueForSpecTag,
-              branchOp.getConditionOperand());
+              branchOp.getLoc(),
+              /*resultType=*/
+              conditionOperand.getType(), /*specTag=*/valueForSpecTag,
+              conditionOperand);
       inheritBB(specOp, branchDiscardNonSpec);
 
       // The replicated branch directs the control token based on the path the
@@ -387,10 +396,14 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
 
   // First, discard if speculation didn't happen
+
+  auto conditionOperand = controlBranch.getConditionOperand();
+  // resultType is tentative and will be updated in a later algorithm.
   auto branchDiscardCondNonSpec =
       builder.create<handshake::SpeculatingBranchOp>(
-          controlBranch.getLoc(), /*specTag=*/specOp.getDataOut(),
-          controlBranch.getConditionOperand());
+          controlBranch.getLoc(),
+          /*resultType=*/conditionOperand.getType(),
+          /*specTag=*/specOp.getDataOut(), conditionOperand);
   inheritBB(specOp, branchDiscardCondNonSpec);
 
   // Second, discard if speculation happened but it was correct
