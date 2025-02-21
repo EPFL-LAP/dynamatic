@@ -381,20 +381,20 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
     size_t j = 0;
 
     while (i < headSize || j < toCheckSize) {
+      // If one array is fully traversed but the other isn't, they differ.
+      if (i >= headSize || j >= toCheckSize)
+        return false;
+
       // Skip elements in `head` with the excluded name.
-      if (i < headSize && head[i].name == except) {
+      if (head[i].name == except) {
         i++;
         continue;
       }
       // Skip elements in `current` with the excluded name.
-      if (j < toCheckSize && toCheck[j].name == except) {
+      if (toCheck[j].name == except) {
         j++;
         continue;
       }
-
-      // If one array is fully traversed but the other isn't, they differ.
-      if (i >= headSize || j >= toCheckSize)
-        return false;
 
       // If corresponding signals don't match, the arrays are different.
       if (head[i] != toCheck[j])
