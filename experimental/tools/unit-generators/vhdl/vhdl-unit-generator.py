@@ -37,6 +37,9 @@ def main():
       "-n", "--name", required=True, help="Name of the generated module"
   )
   parser.add_argument(
+      "-o", "--output", required=True, help="Name of the output file"
+  )
+  parser.add_argument(
       "-t", "--type", required=True, help="Type of the generated module"
   )
   parser.add_argument(
@@ -57,7 +60,9 @@ def main():
 
   # Printing parameters for diagnostic purposes
   header = f"-- {args.name} : {args.type}({parameters})\n\n"
-  print(header + generate_code(args.name, args.type, parameters))
+
+  with open(args.output, 'w') as file:
+    print(header + generate_code(args.name, args.type, parameters), file=file)
 
 
 if __name__ == "__main__":
