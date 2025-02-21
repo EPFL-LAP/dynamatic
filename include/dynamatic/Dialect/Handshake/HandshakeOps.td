@@ -931,7 +931,11 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCBranchCtrl">,
   IsIntSizedChannel<1, "SCBranchCtrl">,
+<<<<<<< HEAD
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+=======
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+>>>>>>> 135f5962 (removed inferReturnTypes from Speculator)
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -963,6 +967,17 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  // Infer the type of the control signals
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
+    $_state.addOperands({dataIn, enable});
+
+    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
+    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+
+    $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
+      wideControlType, ctrlType});
+  }]>];
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [

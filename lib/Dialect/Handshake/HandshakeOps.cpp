@@ -1643,25 +1643,6 @@ void SpeculatorOp::print(OpAsmPrinter &p) {
     << ")";
 }
 
-LogicalResult SpeculatorOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  inferredReturnTypes.push_back(operands.front().getType());
-
-  OpBuilder builder(context);
-  ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
-  ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(ctrlType);
-  return success();
-}
-
 LogicalResult SpeculatorOp::verify() {
   Type refBoolType = getSaveCtrl().getType();
   if (refBoolType != getCommitCtrl().getType() ||
@@ -1697,8 +1678,6 @@ ParseResult BundleOp::parse(OpAsmParser &parser, OperationState &result) {
       parseHandshakeType(parser, dataflowType))
     return failure();
   result.addTypes(dataflowType);
-
-  // Determine the type of all input signals and of all upstream signals based
   // on the first result's type
   SmallVector<Type, 4> signalTypes;
   llvm::TypeSwitch<Type, void>(dataflowType)
