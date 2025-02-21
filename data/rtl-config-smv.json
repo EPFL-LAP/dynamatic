@@ -1,10 +1,103 @@
 [
   {
-    "name": "handshake.fork",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p size=SIZE datatype=\"DATA_TYPE\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+    "name": "handshake.br",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t br -p port_types=$PORT_TYPES",
+    "hdl": "smv"
   },
   {
     "name": "handshake.buffer",
-    "generator": "$DYNAMATIC/expermental/tools/unit-generators/smv/smv-unit-generator.py -n MODULE_NAME -t TYPE_NAME -p slots=NUM_SLOTS datatype=\"DATA_TYPE\" timing=\"TIMING\" >> $OUTPUT_DIR/$MODULE_NAME.smv"
+   "parameters": [
+    {"name": "NUM_SLOTS", "type": "unsigned"},
+    {"name": "TIMING", "type": "timing"}
+  ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\"",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.cond_br",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cond_br -p port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.constant",
+   "parameters": [
+    {"name": "DATA_WIDTH", "type": "unsigned"},
+    {"name": "VALUE", "type": "string"}
+  ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t constant -p value=0b$VALUE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.control_merge",
+   "parameters": [
+    {"name": "SIZE", "type": "unsigned"}
+  ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t control_merge -p size=$SIZE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.fork",
+   "parameters": [
+      {"name": "SIZE", "type": "unsigned"}
+   ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fork -p size=$SIZE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.join",
+   "parameters": [
+      {"name": "SIZE", "type": "unsigned"}
+   ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t join -p size=$SIZE",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.lazy_fork",
+   "parameters": [
+      {"name": "SIZE", "type": "unsigned"}
+   ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t lazy_fork -p size=$SIZE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.load",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t load -p port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.merge",
+   "parameters": [
+      {"name": "SIZE", "type": "unsigned"}
+   ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t merge -p size=$SIZE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.mux",
+   "parameters": [
+    {"name": "SIZE", "type": "unsigned"}
+  ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mux -p size=$SIZE port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.select",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t select -p port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.sink",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sink -p port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.source",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t source -p",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.store",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t store -p port_types=$PORT_TYPES",
+    "hdl": "smv"
   }
 ]
