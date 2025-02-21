@@ -231,13 +231,14 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       // level.
 
       auto conditionOperand = branchOp.getConditionOperand();
-      // resultType is tentative and will be updated in a later algorithm.
+      // trueResultType and falseResultType are tentative and will be updated in
+      // a later algorithm.
       auto branchDiscardNonSpec =
           builder.create<handshake::SpeculatingBranchOp>(
               branchOp.getLoc(),
-              /*resultType=*/
-              conditionOperand.getType(), /*specTag=*/valueForSpecTag,
-              conditionOperand);
+              /*trueResultType=*/conditionOperand.getType(),
+              /*falseResultType=*/conditionOperand.getType(),
+              /*specTag=*/valueForSpecTag, conditionOperand);
       inheritBB(specOp, branchDiscardNonSpec);
 
       // The replicated branch directs the control token based on the path the
@@ -398,11 +399,13 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // First, discard if speculation didn't happen
 
   auto conditionOperand = controlBranch.getConditionOperand();
-  // resultType is tentative and will be updated in a later algorithm.
+  // trueResultType and falseResultType are tentative and will be updated in a
+  // later algorithm.
   auto branchDiscardCondNonSpec =
       builder.create<handshake::SpeculatingBranchOp>(
           controlBranch.getLoc(),
-          /*resultType=*/conditionOperand.getType(),
+          /*trueResultType=*/conditionOperand.getType(),
+          /*falseResultType=*/conditionOperand.getType(),
           /*specTag=*/specOp.getDataOut(), conditionOperand);
   inheritBB(specOp, branchDiscardCondNonSpec);
 
