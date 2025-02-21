@@ -969,8 +969,8 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasSpecTag<"dataIn">,
-  LacksSpecTag<"dataOut">,
+  LacksSpecTag<"dataIn">,
+  HasSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
 ]> {
