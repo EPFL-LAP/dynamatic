@@ -1659,6 +1659,8 @@ ParseResult BundleOp::parse(OpAsmParser &parser, OperationState &result) {
       parseHandshakeType(parser, dataflowType))
     return failure();
   result.addTypes(dataflowType);
+
+  // Determine the type of all input signals and of all upstream signals based
   // on the first result's type
   SmallVector<Type, 4> signalTypes;
   llvm::TypeSwitch<Type, void>(dataflowType)
