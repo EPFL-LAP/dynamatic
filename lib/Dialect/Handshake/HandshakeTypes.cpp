@@ -366,8 +366,8 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
   auto *secondArrayIt = firstArrayIt + 1;
 
   // Use the first array as the reference for comparison.
-  ArrayRef<ExtraSignal> head = *firstArrayIt;
-  size_t headSize = head.size();
+  ArrayRef<ExtraSignal> refArray = *firstArrayIt;
+  size_t headSize = refArray.size();
 
   // Compare the reference array against all other arrays.
   for (auto *it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
@@ -386,7 +386,7 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
         return false;
 
       // Skip elements in `head` with the excluded name.
-      if (head[i].name == except) {
+      if (refArray[i].name == except) {
         i++;
         continue;
       }
@@ -397,7 +397,7 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
       }
 
       // If corresponding signals don't match, the arrays are different.
-      if (head[i] != toCheck[j])
+      if (refArray[i] != toCheck[j])
         return false;
 
       i++;
