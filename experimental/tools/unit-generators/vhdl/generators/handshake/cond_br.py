@@ -1,13 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.join import generate_join
 
-# todo: move to somewhere else (like utils.py)
-header = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-"""
-
 def generate_cond_br(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["data"])
@@ -23,10 +16,15 @@ def generate_cond_br(name, params):
     return _generate_cond_br_dataless(name)
 
 def _generate_cond_br_dataless(name):
-  # todo: generate_join is not implemented
-  dependencies = generate_join(f"{name}_join", {"size": 2})
+  join_name = f"{name}_join"
+
+  dependencies = generate_join(join_name, {"size": 2})
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -52,7 +50,7 @@ architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
 begin
 
-  join : entity work.{name}_join(arch)
+  join : entity work.{join_name}(arch)
     port map(
       -- input channels
       ins_valid(0) => data_valid,
@@ -70,12 +68,18 @@ begin
 end architecture;
 """
 
-  return dependencies + header + entity + architecture
+  return dependencies + entity + architecture
 
 def _generate_cond_br(name, bitwidth):
-  dependencies = _generate_cond_br_dataless(f"{name}_dataless")
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br_dataless(inner_name)
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -102,7 +106,7 @@ end entity;
   architecture = f"""
 architecture arch of {name} is
 begin
-  control : entity work.{name}_dataless
+  control : entity work.{inner_name}
     port map(
       clk             => clk,
       rst             => rst,
@@ -122,7 +126,7 @@ begin
 end architecture;
 """
 
-  return dependencies + header + entity + architecture
+  return dependencies + entity + architecture
 
 # todo: can be reusable among various unit generators
 extra_signal_logic = {
@@ -133,9 +137,15 @@ extra_signal_logic = {
 }
 
 def _generate_cond_br_signal_manager(name, data_type):
-  dependencies = _generate_cond_br(f"{name}_inner", data_type.bitwidth)
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br(inner_name, data_type.bitwidth)
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity {name} is
   port (
     clk : in std_logic;
@@ -175,7 +185,7 @@ begin
   -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGIC]
 
-  inner : entity work.{name}_inner(arch)
+  inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -199,12 +209,18 @@ end architecture;
     extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
-  return dependencies + header + entity + architecture
+  return dependencies + entity + architecture
 
 def _generate_cond_br_signal_manager_dataless(name, data_type):
-  dependencies = _generate_cond_br_dataless(f"{name}_inner")
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br_dataless(inner_name)
 
   entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 entity {name} is
   port (
     clk : in std_logic;
@@ -241,7 +257,7 @@ begin
   -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGIC]
 
-  inner : entity work.{name}_inner(arch)
+  inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -262,18 +278,4 @@ end architecture;
     extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
-  return dependencies + header + entity + architecture
-
-if __name__ == "__main__":
-  print(generate_cond_br("test_cond_br_dataless_spec", {
-    "data_type": "!handshake.control<>"
-  }))
-  print(generate_cond_br("test_cond_br_spec", {
-    "data_type": "!handshake.channel<i32>"
-  }))
-  print(generate_cond_br("test_cond_br_dataless_spec", {
-    "data_type": "!handshake.control<[spec: i1]>"
-  }))
-  print(generate_cond_br("test_cond_br_spec", {
-    "data_type": "!handshake.channel<i32, [spec: i1]>"
-  }))
+  return dependencies + entity + architecture

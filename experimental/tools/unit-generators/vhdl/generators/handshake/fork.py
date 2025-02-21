@@ -20,7 +20,6 @@ def generate_fork(name, params):
 def _generate_fork_dataless(name, size):
   or_n_name = f"{name}_or_n"
   regblock_name = f"{name}_regblock"
-  array_name = f"{name}_array"
 
   dependencies = \
     generate_or_n(or_n_name, {"size": size}) + \
@@ -91,7 +90,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
 
--- Entity of handshake_fork
+-- Entity of fork
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -108,7 +107,7 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of handshake_fork
+-- Architecture of fork
 architecture arch of {name} is
 begin
   control : entity work.{inner_name}
@@ -149,7 +148,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
 
--- Entity of handshake_fork signal manager
+-- Entity of fork signal manager
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -174,7 +173,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
--- Architecture of handshake_fork signal manager
+-- Architecture of fork signal manager
 architecture arch of {name} is
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
