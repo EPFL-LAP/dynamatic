@@ -966,7 +966,8 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">
+  IsSimpleHandshake<"ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -991,6 +992,18 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
@@ -999,7 +1012,8 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">
+  IsSimpleHandshake<"ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1026,12 +1040,25 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   SpeculationOpInterface,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">
+  IsSimpleHandshake<"ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1050,6 +1077,18 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
   }];
 }
 
