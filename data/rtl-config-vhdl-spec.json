@@ -125,7 +125,6 @@
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned" },
-      { "name": "DATA_TYPE", "type": "dataflow" },
       { "name": "TIMING", "type": "timing" }
     ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\""
@@ -183,9 +182,6 @@
   },
   {
     "name": "handshake.cond_br",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow" }
-    ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cond_br -p port_types=$PORT_TYPES"
   },
   {
@@ -248,6 +244,9 @@
   },
   {
     "name": "handshake.join",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned" }
+    ],
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t join -p size=$SIZE"
   },
   {
