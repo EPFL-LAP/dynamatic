@@ -931,11 +931,6 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCBranchCtrl">,
   IsIntSizedChannel<1, "SCBranchCtrl">,
-<<<<<<< HEAD
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
-=======
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
->>>>>>> 135f5962 (removed inferReturnTypes from Speculator)
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
