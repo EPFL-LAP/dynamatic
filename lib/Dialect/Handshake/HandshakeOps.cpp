@@ -1682,55 +1682,6 @@ LogicalResult SpeculatorOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// SpecSaveOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SpecSaveOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  OpBuilder builder(context);
-
-  auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
-
-  SmallVector<ExtraSignal> extraSignalsForDataOut(dataInType.getExtraSignals());
-  extraSignalsForDataOut.emplace_back("spec", builder.getIntegerType(1), true);
-  inferredReturnTypes.push_back(
-      dataInType.copyWithExtraSignals(extraSignalsForDataOut));
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// SpecCommitOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SpecCommitOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  OpBuilder builder(context);
-
-  auto dataInType = cast<ExtraSignalsTypeInterface>(operands.front().getType());
-
-  SmallVector<ExtraSignal> extraSignalsForDataOut;
-  for (const ExtraSignal &signal : dataInType.getExtraSignals()) {
-    // Add all extra signals except for spec
-    if (signal.name != "spec") {
-      extraSignalsForDataOut.push_back(signal);
-    }
-  }
-  inferredReturnTypes.push_back(
-      dataInType.copyWithExtraSignals(extraSignalsForDataOut));
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 

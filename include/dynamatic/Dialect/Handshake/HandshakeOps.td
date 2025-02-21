@@ -967,8 +967,6 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
-  // Use InferTypeOpInterface to generate a builder that infers the return type.
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1002,8 +1000,6 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   HasSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
-  // Use InferTypeOpInterface to generate a builder that infers the return type.
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1091,11 +1087,6 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
   }];
-  let builders = [OpBuilder<(ins "Value":$tagFromOperand, "Value":$dataOperand), [{
-    $_state.addOperands({tagFromOperand, dataOperand});
-    auto resultType = dataOperand.getType().cast<ChannelType>().copyWithExtraSignals({});
-    $_state.addTypes({resultType, resultType});
-  }]>];
 }
 
 //===----------------------------------------------------------------------===//
