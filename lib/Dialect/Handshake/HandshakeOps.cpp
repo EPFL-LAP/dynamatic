@@ -1649,37 +1649,6 @@ void SpeculatorOp::print(OpAsmPrinter &p) {
   p << ")";
 }
 
-LogicalResult SpeculatorOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  OpBuilder builder(context);
-  ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
-  ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
-
-  auto dataInType =
-      dyn_cast<ExtraSignalsTypeInterface>(operands.front().getType());
-  if (dataInType.hasExtraSignal(EXTRA_SIGNAL_SPEC)) {
-    // If dataIn already has the spec bit, just push it through (inside loops)
-    inferredReturnTypes.push_back(dataInType);
-  } else {
-    // Otherwise, add the spec bit to the dataIn type (outside loops)
-    SmallVector<ExtraSignal> newExtraSignals(dataInType.getExtraSignals());
-    newExtraSignals.emplace_back(EXTRA_SIGNAL_SPEC, builder.getIntegerType(1));
-    inferredReturnTypes.push_back(
-        dataInType.copyWithExtraSignals(newExtraSignals));
-  }
-
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(ctrlType);
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//

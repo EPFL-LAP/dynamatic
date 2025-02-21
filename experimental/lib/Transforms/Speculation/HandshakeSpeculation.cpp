@@ -529,8 +529,10 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   inheritBB(dstOp, bufferOp);
 
   builder.setInsertionPoint(bufferOp);
+  // resultType is tentative and will be updated in a later algorithm.
   specOp = builder.create<handshake::SpeculatorOp>(
-      bufferOp->getLoc(), srcOpResult, bufferOp.getResult());
+      bufferOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+      /*dataIn=*/srcOpResult, /*specIn=*/bufferOp.getResult());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
