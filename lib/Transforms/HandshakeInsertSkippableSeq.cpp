@@ -98,14 +98,19 @@ void findMemAccessesInFunc(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAc
 }
 
 SmallVector<Value> getNDelayedValues(Value initialVal, Value constVal, Operation* BBOp, ConversionPatternRewriter& rewriter){
+  auto hi = constVal.getType();
+  llvm::errs() << hi << "rrrrrrrrrrrrrrrrrrr\n";
+
   Value prevResult = initialVal;
   SmallVector<Value> delayedVals= {initialVal};
-  for (unsigned i = 0; i < N-1; i++){
-      SmallVector<Value, 2> values = {prevResult, constVal};
-      handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(BBOp->getLoc(), values);
-      inheritBB(BBOp, mergeOp);
-      delayedVals.push_back(mergeOp->getResult(0));
-      prevResult = mergeOp->getResult(0);
+  SmallVector<Value, 2> values;
+  
+  for (unsigned i = 0; i < N-1; i++){   
+    values = {prevResult, constVal};
+    handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(BBOp->getLoc(), values);
+    inheritBB(BBOp, mergeOp);
+    delayedVals.push_back(mergeOp->getResult(0));
+    prevResult = mergeOp->getResult(0);
   }
   return delayedVals;
 }
@@ -121,6 +126,7 @@ SmallVector<Value> insertBranches(SmallVector<Value> mainValues, SmallVector<Val
 }
 
 Value boolToSelect (Value cond, Value startSignal, Operation* predecessorOp, ConversionPatternRewriter& rewriter){
+  llvm::errs() << "yahoo\n";
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(predecessorOp->getLoc());
   inheritBB(predecessorOp, sourceOp);
   handshake::ConstantOp zeroConstOp = rewriter.create<handshake::ConstantOp>(predecessorOp->getLoc(), rewriter.getIntegerAttr(rewriter.getI1Type(), 0), sourceOp);
@@ -137,7 +143,12 @@ Value boolToSelect (Value cond, Value startSignal, Operation* predecessorOp, Con
   handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(predecessorOp->getLoc(), values);
   inheritBB(predecessorOp, mergeOp); 
 
+  llvm::errs() << "yahoo" << mergeOp.getResult().getType() << "\n";
+  llvm::errs() << "yahoo" << cond.getType() << "\n";
+
   return mergeOp.getResult();
+
+
 }
 
 
@@ -148,9 +159,9 @@ Value createSkip(Value waitingToken, Value cond, Value startSignal, Operation* p
   // inheritBB(predecessorOp, conditionalBranchOp);
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(predecessorOp->getLoc());
   inheritBB(predecessorOp, sourceOp);
-  SmallVector<Value, 2> muxOpValues = {sourceOp.getResult(), waitingToken};
-  Value select = boolToSelect(cond, startSignal, predecessorOp, rewriter);
-  handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(predecessorOp->getLoc(), select, muxOpValues);
+  SmallVector<Value, 2> muxOpValues = {waitingToken, sourceOp.getResult()};
+  // Value select = boolToSelect(cond, startSignal, predecessorOp, rewriter);
+  handshake::MuxOp muxOp = rewriter.create<handshake::MuxOp>(predecessorOp->getLoc(), cond, muxOpValues);
   inheritBB(predecessorOp, muxOp);
 
   // ValueRange *ab = new ValueRange();
@@ -187,7 +198,7 @@ DenseMap<int, Operation*> getControlMergeOps(FuncOp funcOp){
 Value calculateCFGCond(Operation* predecessorOp, Operation* successorOp, DenseMap<int, Operation*> &controlMerges, Value startSignal, ConversionPatternRewriter& rewriter){
   int predecessorBB = getBBNumberFromOp(predecessorOp);
   int successorBB = getBBNumberFromOp(successorOp);
-  ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[successorBB]);
+  ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[1]);
 
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(successorOp->getLoc());
   inheritBB(successorOp, sourceOp);
@@ -203,25 +214,28 @@ Value calculateCFGCond(Operation* predecessorOp, Operation* successorOp, DenseMa
 }
 
 
-Value createWaitingSignalForPair(Value predecessorOpDoneSignal, SmallVector<Value> conds, Value CFGCond, Operation* predecessorOp, Operation* successorOp, Value startSignal, ConversionPatternRewriter& rewriter){
+Value createWaitingSignalForPair(Value predecessorOpDoneSignal, SmallVector<Value> conds, Value CFGCond, Operation* predecessorOp, Operation* successorOp, Value startSignal, DenseMap<int, Operation*> &controlMerges, ConversionPatternRewriter& rewriter){
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(predecessorOp->getLoc());
   inheritBB(predecessorOp, sourceOp);
+
+  ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[1]);
   handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(predecessorOp->getLoc(), rewriter.getIntegerAttr(rewriter.getI1Type(), 0), sourceOp);
   inheritBB(predecessorOp, constOp);
-  handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(predecessorOp->getLoc(), constOp.getResult());
-  inheritBB(predecessorOp, unbundleOp);
-  ValueRange *ab = new ValueRange();
-  handshake::ChannelType ch =  handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-  handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(predecessorOp->getLoc(), unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
-  inheritBB(predecessorOp, bundleOp);
-  rewriter.create<handshake::SinkOp>(predecessorOp->getLoc(), bundleOp.getResult(0));
-  
+  handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOp->getLoc(), CmpIPredicate::eq, constOp.getResult(), controlMergeOp->getResult(1));
+  inheritBB(predecessorOp, cmpIOp);
 
-  SmallVector<Value> delayedDoneSignals = getNDelayedValues(predecessorOpDoneSignal, unbundleOp.getResult(0), predecessorOp, rewriter);
+  handshake::ConditionalBranchOp conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(predecessorOp->getLoc(), cmpIOp, sourceOp);
+  inheritBB(predecessorOp, conditionalBranchOp);
+
+
+  llvm::errs() << "mmmmmmm \n";
+  SmallVector<Value> delayedDoneSignals = getNDelayedValues(predecessorOpDoneSignal, conditionalBranchOp.getResult(0), predecessorOp, rewriter);
   SmallVector<Value> branchedDoneSignals = insertBranches(delayedDoneSignals, conds, predecessorOp, rewriter);
   SmallVector<Value> conditionallySkippedDoneSignals = insertConditionalSkips(branchedDoneSignals, conds, successorOp, startSignal, rewriter);
   handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(predecessorOp->getLoc(), conditionallySkippedDoneSignals);
   inheritBB(predecessorOp, joinOp);
+  // handshake::NotOp notOp = rewriter.create<handshake::NotOp>(predecessorOp->getLoc(), CFGCond);
+  // inheritBB(predecessorOp, notOp);
   return createSkip(joinOp.getResult(), CFGCond, startSignal, successorOp, rewriter);
 }
 
@@ -253,7 +267,7 @@ void createWaitingSignals(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAcc
           SmallVector<Value> conds = skipConditionForEachPair[predecessorOpName][successorName];
           Value CFGCond = calculateCFGCond(predecessorOpPointer, SuccessorOpPointer, controlMerges, startSignal, rewriter);
 
-          Value waitingSignal = createWaitingSignalForPair(predecessorOpDoneSignal, conds, CFGCond, predecessorOpPointer, SuccessorOpPointer, startSignal, rewriter);
+          Value waitingSignal = createWaitingSignalForPair(predecessorOpDoneSignal, conds, CFGCond, predecessorOpPointer, SuccessorOpPointer, startSignal, controlMerges, rewriter);
           waitingSignalsForEachDst[successorName].push_back(waitingSignal);
 
           newDeps.push_back(getInactivatedDependency(dependency));
@@ -305,25 +319,48 @@ SmallVector<Value> createSkipConditionForPair(Value predecessorOpDoneSignal, Val
 
   // rewriter.create<handshake::SinkOp>(predecessorOpPointer->getLoc(), dummyBundleOp.getResult(0));
 
+
+  ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[1]);
+
+  handshake::SourceOp sourceOp2 = rewriter.create<handshake::SourceOp>(predecessorOpPointer->getLoc());
+  inheritBB(predecessorOpPointer, sourceOp2);
+  handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getIntegerAttr(rewriter.getI1Type(), 0), sourceOp2);
+  inheritBB(predecessorOpPointer, constOp);
+  handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOpPointer->getLoc(), CmpIPredicate::eq, constOp.getResult(), controlMergeOp->getResult(1));
+  inheritBB(predecessorOpPointer, cmpIOp);
+
+  handshake::ConditionalBranchOp conditionalBranchOp2 = rewriter.create<handshake::ConditionalBranchOp>(predecessorOpPointer->getLoc(), cmpIOp, sourceOp);
+  inheritBB(predecessorOpPointer, conditionalBranchOp2);
+
+
+
+
   SmallVector<Value> diffTokens = {predecessorOpDoneSignal};
-  diffTokens.append(N, sourceOp.getResult());
+  diffTokens.append(N, conditionalBranchOp2.getResult(0));
   handshake::MergeOp mergeOp = rewriter.create<handshake::MergeOp>(predecessorOpPointer->getLoc(), diffTokens);
   inheritBB(predecessorOpPointer, mergeOp);
+  handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), mergeOp.getResult(), handshake::TimingInfo::tehb(), N);
+  inheritBB(predecessorOpPointer, bufferOp);
 
   //here
   Value CFGCond = calculateCFGCond(predecessorOpPointer, successorOpPointer, controlMerges, startSignal, rewriter);
-  handshake::ConstantOp falseConstOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getBoolAttr(false), sourceOp);
+
+  handshake::SourceOp sourceOpConstOp = rewriter.create<handshake::SourceOp>(predecessorOpPointer->getLoc());
+  inheritBB(successorOpPointer, sourceOpConstOp);
+
+  handshake::ConstantOp falseConstOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getBoolAttr(false), sourceOpConstOp);
   inheritBB(predecessorOpPointer, falseConstOp);
 
-  handshake::ConditionalBranchOp conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(successorOpPointer->getLoc(), falseConstOp, mergeOp.getResult());
+  handshake::ConditionalBranchOp conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(successorOpPointer->getLoc(), falseConstOp.getResult(), bufferOp.getResult());
   inheritBB(successorOpPointer, conditionalBranchOp);
 
 
   handshake::ConditionalBranchOp SuccessorAddrConditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(successorOpPointer->getLoc(), CFGCond, successorOpPointer->getOperand(0));
   inheritBB(successorOpPointer, SuccessorAddrConditionalBranchOp);
   // Not sure which one (0 or 1)
-  handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(predecessorOpPointer->getLoc(), SuccessorAddrConditionalBranchOp.getResult(0));
+  handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(predecessorOpPointer->getLoc(), SuccessorAddrConditionalBranchOp.getResult(1));
   inheritBB(predecessorOpPointer, unbundleOp);
+
 
   SmallVector<Value, 2> JoinOpValues = {conditionalBranchOp.getResult(1), unbundleOp.getResult(0)};
   handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(predecessorOpPointer->getLoc(), JoinOpValues);
@@ -339,7 +376,9 @@ SmallVector<Value> createSkipConditionForPair(Value predecessorOpDoneSignal, Val
   //lazy fork maybe
   SmallVector<Value> skipConditions;
   for (Value delayedAddress : delayedAddresses){
-      handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr, delayedAddress);
+      handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), delayedAddress, handshake::TimingInfo::tehb(), 5);
+      inheritBB(predecessorOpPointer, bufferOp);
+      handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr, bufferOp.getResult());
       inheritBB(predecessorOpPointer, cmpIOp);
       skipConditions.push_back(cmpIOp.getResult());
   }          
@@ -357,18 +396,46 @@ void createSkipConditionGenerator(FuncOp funcOp, DenseMap<StringRef, Operation*>
       // The dummy address
       handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(predecessorOpPointer->getLoc());
       inheritBB(predecessorOpPointer, sourceOp);
-      handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), sourceOp);
+
+
+      ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[1]);
+      handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getIntegerAttr(rewriter.getI1Type(), 0), sourceOp);
       inheritBB(predecessorOpPointer, constOp);
-      SmallVector<Value> delayedAddresses = getNDelayedValues(predecessorOpAddr, constOp.getResult(), predecessorOpPointer, rewriter);
+      handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOpPointer->getLoc(), CmpIPredicate::eq, constOp.getResult(), controlMergeOp->getResult(1));
+      inheritBB(predecessorOpPointer, cmpIOp);
+
+      handshake::ConditionalBranchOp conditionalBranchOp = rewriter.create<handshake::ConditionalBranchOp>(predecessorOpPointer->getLoc(), cmpIOp, sourceOp);
+      inheritBB(predecessorOpPointer, conditionalBranchOp);
+    
+      handshake::ConstantOp dummyConstOp = rewriter.create<handshake::ConstantOp>(predecessorOpPointer->getLoc(), rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), conditionalBranchOp.getResult(0));
+      inheritBB(predecessorOpPointer, dummyConstOp);
+
+      
 
       if (auto deps = getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)){
+        
         for (MemDependenceAttr dependency : deps.getDependencies()) {
           if (!dependency.getIsActive().getValue())
             continue;
-          StringRef dstAccess = dependency.getDstAccess();
-          Operation* SuccessorOpPointer = memAccesses[dstAccess];
+          /// This needs improvement!
+          // rouzbeh
+          // should be done once
+          
 
-          SmallVector<Value> skipConditions = createSkipConditionForPair(predecessorOpDoneSignal, startSignal, predecessorOpPointer, SuccessorOpPointer,delayedAddresses,controlMerges, rewriter);
+
+          SmallVector<Value> delayedAddresses = getNDelayedValues(predecessorOpAddr, dummyConstOp, predecessorOpPointer, rewriter);
+
+          
+          handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), predecessorOpAddr, handshake::TimingInfo::tehb(), 20);
+          inheritBB(predecessorOpPointer, bufferOp);
+          predecessorOpPointer->setOperand(0, bufferOp.getResult());
+
+
+          StringRef dstAccess = dependency.getDstAccess();
+          Operation* successorOpPointer = memAccesses[dstAccess];
+
+          
+          SmallVector<Value> skipConditions = createSkipConditionForPair(predecessorOpDoneSignal, startSignal, predecessorOpPointer, successorOpPointer,delayedAddresses,controlMerges, rewriter);
           skipConditionForEachPair[predecessorOpName][dstAccess] = skipConditions;
         }
       }

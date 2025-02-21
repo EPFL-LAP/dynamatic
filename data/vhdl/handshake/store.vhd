@@ -35,38 +35,38 @@ entity store is
 end entity;
 
 architecture arch of store is
-  signal single_ready : std_logic;
-  signal join_valid   : std_logic;
+  -- signal single_ready : std_logic;
+  -- signal join_valid   : std_logic;
   begin
-  join : entity work.join(arch)
-    generic map(
-      SIZE => 2
-    )
-    port map(
-      -- input channels
-      ins_valid(0) => dataIn_valid,
-      ins_valid(1) => addrIn_valid,
-      ins_ready(0) => dataIn_ready,
-      ins_ready(1) => addrIn_ready,
-      -- output channel
-      outs_valid => join_valid,
-      outs_ready => dataToMem_ready
-    );
-  -- address
-  addrOut       <= addrIn;
-  addrOut_valid <= join_valid;
-  -- data
-  dataToMem       <= dataIn;
-  dataToMem_valid <= join_valid;
-
+  -- join : entity work.join(arch)
+  --   generic map(
+  --     SIZE => 2
+  --   )
+  --   port map(
+  --     -- input channels
+  --     ins_valid(0) => dataIn_valid,
+  --     ins_valid(1) => addrIn_valid,
+  --     ins_ready(0) => dataIn_ready,
+  --     ins_ready(1) => addrIn_ready,
+  --     -- output channel
+  --     outs_valid => join_valid,
+  --     outs_ready => dataToMem_ready
+  --   );
+  -- -- address
+  -- addrOut       <= addrIn;
+  -- addrOut_valid <= join_valid;
   -- -- data
   -- dataToMem       <= dataIn;
-  -- dataToMem_valid <= dataIn_valid;
-  -- dataIn_ready    <= dataToMem_ready;
-  -- -- addr
-  -- addrOut         <= addrIn;
-  -- addrOut_valid   <= addrIn_valid;
-  -- addrIn_ready    <= addrOut_ready;
+  -- dataToMem_valid <= join_valid;
+
+  -- data
+  dataToMem       <= dataIn;
+  dataToMem_valid <= dataIn_valid;
+  dataIn_ready    <= dataToMem_ready;
+  -- addr
+  addrOut         <= addrIn;
+  addrOut_valid   <= addrIn_valid;
+  addrIn_ready    <= addrOut_ready;
   -- done
   doneOut_valid   <= doneFromMem_valid;
   doneFromMem_ready<= doneOut_ready;

@@ -1,8 +1,12 @@
 #set-src integration_test/memory/test_memory_1/test_memory_1.c
 # set-src integration_test/gcd/gcd.c
+#set-src integration-test/histogram_simple/histogram_simple.c
+#set-src integration-test/histogram2/histogram2.c
+#set-src integration-test/histogram_2/histogram_2.c
 set-src integration-test/histogram/histogram.c
-#compile --buffer-algorithm fpga20
-compile
+compile --buffer-algorithm fpga20
+#compile
 write-hdl
 simulate
+#visualize
 exit

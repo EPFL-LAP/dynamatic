@@ -111,7 +111,7 @@ begin
       for i in 0 to NUM_STORES - 1 loop
         if store_access_port_selected(i) = '1' then
           store_complete(i) <= '1';
-        elsif stDone_ready(i) = '1' then
+        else
           store_complete(i) <= '0';
         end if;
       end loop;

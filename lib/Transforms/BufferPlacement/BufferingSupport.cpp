@@ -180,7 +180,6 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       return channel.consumer->emitError() << ss.str();
     }
     channelProps[channel.value] = *channel.props;
-    llvm::errs() << "************* " << "\n";
     return success();
   };
 

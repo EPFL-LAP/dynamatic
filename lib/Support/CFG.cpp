@@ -380,7 +380,16 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     assert(false && "cannot set control for entry BB");
   }
 
-  addToCtrlOps(ctrl.getUsers());
+  for (auto a : ctrl.getUsers()){
+    llvm::errs() << "ali: " << *a << "\n";
+  }
+  // addToCtrlOps(ctrl.getUsers());
+
+  for (Operation *userOp : ctrl.getUsers()) {
+    if (!dyn_cast<handshake::MergeOp>(userOp))
+      ctrlOps.insert(userOp);
+  }
+
   while (!ctrlOps.empty()) {
     Operation *ctrlOp = ctrlOps.pop_back_val();
     exploredOps.insert(ctrlOp);

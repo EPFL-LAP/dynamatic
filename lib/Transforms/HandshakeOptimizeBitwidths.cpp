@@ -616,6 +616,9 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
             std::max(optWidth, getUsefulResultWidth(cast<ChannelVal>(res)));
     }
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
+    if (optWidth == 0){
+      llvm::errs() << "tof tof tof tof \n" << channelVal << "\n" ;
+    }
     if (optWidth >= dataWidth)
       return failure();
 
