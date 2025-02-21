@@ -962,8 +962,13 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">,
+  // Use InferTypeOpInterface to generate a builder that infers the return type.
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -979,14 +984,14 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     Example:
 
     ```mlir
-    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i32>, !handshake.channel<i32, [spec: i1]>, !handshake.channel<i1>
     ```
   }];
 
   let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 }
 
