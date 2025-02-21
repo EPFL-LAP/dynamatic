@@ -279,7 +279,7 @@ static Type parseChannelAfterLess(AsmParser &odsParser) {
     return nullptr;
 
   if (failed(checkChannelExtra(emitError, extraSignals)))
-    return {};
+    return nullptr;
 
   return ChannelType::get(odsParser.getContext(), *dataType, extraSignals);
 }
@@ -367,7 +367,7 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
 
   // Use the first array as the reference for comparison.
   ArrayRef<ExtraSignal> refArray = *firstArrayIt;
-  size_t headSize = refArray.size();
+  size_t refArraySize = refArray.size();
 
   // Compare the reference array against all other arrays.
   for (auto *it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
@@ -380,9 +380,9 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
     size_t i = 0;
     size_t j = 0;
 
-    while (i < headSize || j < toCheckSize) {
+    while (i < refArraySize || j < toCheckSize) {
       // Skip elements in `head` with the excluded name.
-      if (i < headSize && refArray[i].name == except) {
+      if (i < refArraySize && refArray[i].name == except) {
         i++;
         continue;
       }
@@ -393,7 +393,7 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
       }
 
       // If one array is fully traversed but the other isn't, they differ.
-      if (i >= headSize || j >= toCheckSize)
+      if (i >= refArraySize || j >= toCheckSize)
         return false;
 
       // If corresponding signals don't match, the arrays are different.
