@@ -49,6 +49,25 @@ static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(mainCategory));
 
+static cl::list<int> sameLengthSeqConstraint("same_length", cl::Prefix,
+                                             cl::CommaSeparated,
+                                             cl::desc("TODO"),
+                                             cl::cat(mainCategory));
+
+// TODO rename
+static cl::list<int> aplusBeqCseqConstraint("a_plus_b_equal_c", cl::Prefix,
+                                            cl::CommaSeparated,
+                                            cl::desc("TODO"),
+                                            cl::cat(mainCategory));
+
+static cl::list<int> loopSeqConstraint("loop", cl::Prefix, cl::CommaSeparated,
+                                       cl::desc("TODO"), cl::cat(mainCategory));
+
+static cl::list<int> loopStrictSeqConstraint("loop_strict", cl::Prefix,
+                                             cl::CommaSeparated,
+                                             cl::desc("TODO"),
+                                             cl::cat(mainCategory));
+
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
@@ -56,7 +75,7 @@ int main(int argc, char **argv) {
       argc, argv,
       "Checks the equivalence of two dynamic circuits in the handshake "
       "dialect. At the end it will output whether the circuits are "
-      "latency-insensitive equivalent."
+      "latency-insensitive equivalent.\n"
       "Takes two MLIR files as input. The files need to contain exactely one "
       "module each.\nEach module needs to contain exactely one "
       "handshake.func. "
@@ -67,6 +86,22 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
+
+  for (auto a : sameLengthSeqConstraint) {
+    llvm::outs() << a << "\n";
+  }
+  llvm::outs() << "-----------\n";
+  for (auto a : aplusBeqCseqConstraint) {
+    llvm::outs() << a << "\n";
+  }
+  llvm::outs() << "-----------\n";
+  for (auto a : loopSeqConstraint) {
+    llvm::outs() << a << "\n";
+  }
+  llvm::outs() << "-----------\n";
+  for (auto a : loopStrictSeqConstraint) {
+    llvm::outs() << a << "\n";
+  }
 
   std::filesystem::path lhsPath = lhsFilenameArg.getValue();
   std::filesystem::path rhsPath = rhsFilenameArg.getValue();

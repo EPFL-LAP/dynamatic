@@ -18,7 +18,7 @@ ninja
 exit_on_fail "Failed to build miter module generator"
 cd ..
 
-MOD="b"
+MOD="a"
 
-build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $OUT_DIR
+build/bin/elastic-miter --lhs=$REWRITES/${MOD}_lhs.mlir --rhs=$REWRITES/${MOD}_rhs.mlir -o $OUT_DIR --same_length=1,2,0 --a_plus_b_equal_c=1,2,3 --loop=1,2 --loop_strict=123123,123
 exit_on_fail "Equivalence checking failed"
