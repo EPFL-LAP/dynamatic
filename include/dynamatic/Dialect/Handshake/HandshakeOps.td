@@ -960,18 +960,11 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let hasVerifier = 1;
 }
 
-class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>,
+def SpecSaveOp : Handshake_Op<"spec_save", [
+  SpeculationOpInterface,
+  AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">
 ]> {
-  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs HandshakeType:$dataOut);
-  let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
-  }];
-}
-
-def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
     Save units are used to mark the beginning of the speculation region. 
@@ -988,6 +981,12 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
     ```mlir
     %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i11>
     ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
 }
 
@@ -1028,7 +1027,11 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   }];
 }
 
-def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
+def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
+  SpeculationOpInterface,
+  AllTypesMatch<["dataIn", "dataOut"]>,
+  IsSimpleHandshake<"ctrl">
+]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
     Save-Commits are used when speculation occurs in a loop.
@@ -1043,6 +1046,10 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
