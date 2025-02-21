@@ -1,4 +1,6 @@
-def generate_delay_buffer(name, size=32):
+def generate_delay_buffer(name, params):
+  slots = params["slots"]
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -18,12 +20,12 @@ end entity;
 -- Architecture of delay_buffer
 architecture arch of {name} is
 
-  type mem is array ({size} - 1 downto 0) of std_logic;
+  type mem is array ({slots} - 1 downto 0) of std_logic;
   signal regs : mem;
 
 begin
 
-  gen_assignements : for i in 0 to {size} - 1 generate
+  gen_assignements : for i in 0 to {slots} - 1 generate
     first_assignment : if i = 0 generate
       process (clk) begin
         if rising_edge(clk) then
@@ -48,7 +50,7 @@ begin
     end generate other_assignments;
   end generate gen_assignements;
 
-  valid_out <= regs({size} - 1);
+  valid_out <= regs({slots} - 1);
 end architecture;
 """
 

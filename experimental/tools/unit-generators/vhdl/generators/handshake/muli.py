@@ -74,9 +74,9 @@ def _generate_muli(name, bitwidth):
   oehb_name = f"{name}_oehb"
 
   dependencies = \
-    generate_join(join_name, 2) + \
+    generate_join(join_name, {"size": 2}) + \
     _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
-    generate_delay_buffer(buff_name, _get_latency() - 1) + \
+    generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
     generate_oehb(oehb_name, {
       "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",

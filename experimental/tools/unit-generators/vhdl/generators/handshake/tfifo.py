@@ -18,7 +18,11 @@ def generate_tfifo(name, params):
 
 def _generate_tfifo(name, size, bitwidth):
   fifo_inner_name = f"{name}_fifo"
-  dependencies = generate_elastic_fifo_inner(fifo_inner_name, size, bitwidth)
+  dependencies = \
+    generate_elastic_fifo_inner(fifo_inner_name, {
+      "size": size,
+      "bitwidth": bitwidth,
+    })
 
   entity = f"""
 library ieee;
@@ -87,7 +91,7 @@ end architecture;
 
 def _generate_tfifo_dataless(name, size):
   fifo_inner_name = f"{name}_fifo"
-  dependencies = generate_elastic_fifo_inner(fifo_inner_name, size)
+  dependencies = generate_elastic_fifo_inner(fifo_inner_name, {"size": size})
 
   entity = f"""
 library ieee;

@@ -11,7 +11,11 @@ def generate_mem_controller_loadless(name, params):
   control_name = f"{name}_control"
 
   dependencies = generate_mc_control(control_name) + \
-    generate_write_memory_arbiter(write_arbiter_name, num_stores, addr_bitwidth, data_bitwidth)
+    generate_write_memory_arbiter(write_arbiter_name, {
+      "arbiter_size": num_stores,
+      "addr_bitwidth": addr_bitwidth,
+      "data_bitwidth": data_bitwidth,
+    })
 
   entity = f"""
 library ieee;

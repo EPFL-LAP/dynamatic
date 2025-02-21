@@ -10,7 +10,11 @@ def generate_mem_controller_storeless(name, params):
   control_name = f"{name}_control"
 
   dependencies = generate_mc_control(control_name) + \
-    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth)
+    generate_read_memory_arbiter(read_arbiter_name, {
+      "arbiter_size": num_loads,
+      "addr_bitwidth": addr_bitwidth,
+      "data_bitwidth": data_bitwidth,
+    })
 
   entity = f"""
 library ieee;

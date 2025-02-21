@@ -43,7 +43,7 @@ def _generate_addf_single_precision(name):
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, 2) + \
+  dependencies = generate_join(join_name, {"size", 2}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1})
 
@@ -153,7 +153,7 @@ def _generate_addf_double_precision(name):
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, 2) + \
+  dependencies = generate_join(join_name, {"size": 2}) + \
     generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
     generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1})
 

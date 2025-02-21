@@ -27,7 +27,11 @@ def _generate_mem_controller(name, params):
   addr_bitwidth = int(port_types["loadAddr"][1:])
 
   dependencies = generate_mem_controller_loadless(loadless_name, params) + \
-    generate_read_memory_arbiter(read_arbiter_name, num_loads, addr_bitwidth, data_bitwidth)
+    generate_read_memory_arbiter(read_arbiter_name, {
+      "arbiter_size": num_loads,
+      "addr_bitwidth": addr_bitwidth,
+      "data_bitwidth": data_bitwidth,
+    })
 
   entity = f"""
 library ieee;

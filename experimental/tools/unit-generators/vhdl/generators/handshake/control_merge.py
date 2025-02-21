@@ -24,7 +24,7 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
   fork_name = f"{name}_fork"
 
-  dependencies = generate_merge_notehb(merge_name, size) + \
+  dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
     generate_tehb(tehb_name, {
       "port_types": {
         "ins": f"!handshake.channel<i{index_bitwidth}>",

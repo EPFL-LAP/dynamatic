@@ -21,7 +21,7 @@ def _generate_merge_dataless(name, size):
   inner_name = f"{name}_inner"
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_merge_notehb(inner_name, size) + \
+  dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
     generate_tehb(tehb_name, {
       "port_types": {
         "ins": f"!handshake.control<>",
@@ -82,7 +82,11 @@ def _generate_merge(name, size, bitwidth):
   inner_name = f"{name}_inner"
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_merge_notehb(inner_name, size, bitwidth) + \
+  dependencies = \
+    generate_merge_notehb(inner_name, {
+      "size": size,
+      "bitwidth": bitwidth,
+    }) + \
     generate_tehb(tehb_name, {
       "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",

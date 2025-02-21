@@ -21,7 +21,11 @@ def _generate_ofifo(name, size, bitwidth):
   tehb_name = f"{name}_tehb"
   fifo_name = f"{name}_fifo"
 
-  dependencies = generate_elastic_fifo_inner(fifo_name, size, bitwidth) + \
+  dependencies = \
+    generate_elastic_fifo_inner(fifo_name, {
+      "size": size,
+      "bitwidth": bitwidth
+    }) + \
     generate_tehb(tehb_name, {
       "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",
@@ -97,7 +101,10 @@ def _generate_ofifo_dataless(name, size):
   tehb_name = f"{name}_tehb"
   fifo_name = f"{name}_fifo"
 
-  dependencies = generate_elastic_fifo_inner(fifo_name, size) + \
+  dependencies = \
+    generate_elastic_fifo_inner(fifo_name, {
+      "size": size,
+    }) + \
     generate_tehb(tehb_name, {
       "port_types": {
         "ins": "!handshake.control<>",
