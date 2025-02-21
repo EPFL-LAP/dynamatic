@@ -1015,7 +1015,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     Example:
 
     ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11, [spec: i1]>, !handshake.channel<i11>, !handshake.channel<i1>
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, !handshake.channel<i1>
     ```
   }];
 
