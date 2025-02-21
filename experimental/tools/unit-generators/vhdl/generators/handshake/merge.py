@@ -1,13 +1,11 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
 def generate_merge(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["outs"])
-  size = int(params["size"])
+  size = params["size"]
 
   if data_type.has_extra_signals():
     if data_type.is_channel():
@@ -86,10 +84,10 @@ def _generate_merge(name, size, bitwidth):
 
   dependencies = generate_merge_notehb(inner_name, size, bitwidth) + \
     generate_tehb(tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<{bitwidth}>"
-      })
+      }
     })
 
   entity = f"""

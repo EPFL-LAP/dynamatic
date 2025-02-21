@@ -6,7 +6,7 @@ from generators.handshake.ofifo import generate_ofifo
 from generators.handshake.oehb import generate_oehb
 
 def generate_buffer(name, params):
-  num_slots = int(params["num_slots"])
+  num_slots = params["num_slots"]
 
   timing_r = bool(re.search(r"R: (\d+)", params["timing"]))
   timing_d = bool(re.search(r"D: (\d+)", params["timing"]))

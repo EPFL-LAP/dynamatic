@@ -1,10 +1,8 @@
-import ast
-
 from generators.support.mc_support import generate_read_memory_arbiter, generate_mc_control
 
 def generate_mem_controller_storeless(name, params):
-  num_loads = int(params["num_loads"])
-  port_types = ast.literal_eval(params["port_types"])
+  num_loads = params["num_loads"]
+  port_types = params["port_types"]
   data_bitwidth = int(port_types["loadData"][1:])
   addr_bitwidth = int(port_types["loadAddr"][1:])
 

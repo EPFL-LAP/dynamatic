@@ -1,5 +1,3 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
@@ -7,7 +5,7 @@ from generators.handshake.oehb import generate_oehb
 from generators.handshake.ofifo import generate_ofifo
 
 def generate_muli(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["result"])
 
   if data_type.has_extra_signals():
@@ -80,10 +78,10 @@ def _generate_muli(name, bitwidth):
     _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
     generate_delay_buffer(buff_name, _get_latency() - 1) + \
     generate_oehb(oehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>"
-      })
+      }
     })
 
   entity = f"""
@@ -173,10 +171,10 @@ def _generate_muli_signal_manager(name, data_type):
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
       "num_slots": _get_latency(), # todo: correct?
-      "port_types": str({
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     })
 
   # Now that the logic depends on the name, this dict is defined inside this function.

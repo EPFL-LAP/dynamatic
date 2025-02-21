@@ -1,9 +1,7 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
 def generate_sink(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
 
   entity = f"""

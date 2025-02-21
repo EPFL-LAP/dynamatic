@@ -1,9 +1,7 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, extra_signal_default_values
 
 def generate_source(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["outs"])
 
   entity = f"""

@@ -1,13 +1,11 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.handshake.fork import generate_fork
 from generators.handshake.tfifo import generate_tfifo
 
 def generate_speculator(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   bitwidth = VhdlScalarType(port_types["ins"]).bitwidth
-  fifo_depth = int(params["fifo_depth"])
+  fifo_depth = params["fifo_depth"]
 
   return _generate_speculator(name, bitwidth, fifo_depth)
 
@@ -892,25 +890,25 @@ def _generate_speculator_inner(name, bitwidth, fifo_depth):
   dependencies = \
     generate_fork(data_fork_name, {
       "size": 2,
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
         "outs_0": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
         "outs_1": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-      })
+      }
     }) + \
     _generate_specGen_core(specGen_name, bitwidth) + \
     _generate_predictor(predictor_name, bitwidth) + \
     _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
     generate_fork(control_fork_name, {
       "size": 5,
-      "port_types": str({
+      "port_types": {
         "ins": "!handshake.channel<i3>",
         "outs_0": "!handshake.channel<i3>",
         "outs_1": "!handshake.channel<i3>",
         "outs_2": "!handshake.channel<i3>",
         "outs_3": "!handshake.channel<i3>",
         "outs_4": "!handshake.channel<i3>",
-      })
+      }
     }) + \
     _generate_decodeSave(decodeSave_name) + \
     _generate_decodeCommit(decodeCommit_name) + \
@@ -1144,46 +1142,46 @@ def _generate_speculator(name, bitwidth, fifo_depth):
 
   dependencies = _generate_speculator_inner(inner_name, bitwidth, fifo_depth) + \
     generate_tfifo(fifo_outs_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
         "outs": f"!handshake.channel<i{bitwidth}, [spec: i1]>"
-      })
+      }
     }) + \
     generate_tfifo(fifo_ctrl_save_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     }) + \
     generate_tfifo(fifo_ctrl_commit_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     }) + \
     generate_tfifo(fifo_ctrl_sc_commit_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": "!handshake.channel<i3>",
         "outs": "!handshake.channel<i3>"
-      })
+      }
     }) + \
     generate_tfifo(fifo_ctrl_sc_save_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": "!handshake.channel<i3>",
         "outs": "!handshake.channel<i3>"
-      })
+      }
     }) + \
     generate_tfifo(fifo_ctrl_sc_branch_name, {
-      "num_slots": "32",
-      "port_types": str({
+      "num_slots": 32,
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     })
 
   entity = f"""

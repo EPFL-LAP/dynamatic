@@ -1,13 +1,11 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.handshake.tehb import generate_tehb
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
 
 def generate_control_merge(name, params):
-  size = int(params["size"])
-  port_types = ast.literal_eval(params["port_types"])
+  size = params["size"]
+  port_types = params["port_types"]
   outs_type = VhdlScalarType(port_types["outs"])
   index_type = VhdlScalarType(port_types["index"])
 
@@ -28,18 +26,18 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
 
   dependencies = generate_merge_notehb(merge_name, size) + \
     generate_tehb(tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{index_bitwidth}>",
         "outs": f"!handshake.channel<i{index_bitwidth}>"
-      })
+      }
     }) + \
     generate_fork(fork_name, {
       "size": "2",
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.control<>",
         "outs_0": f"!handshake.control<>",
         "outs_1": f"!handshake.control<>"
-      })
+      }
     })
 
   entity = f"""

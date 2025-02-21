@@ -1,13 +1,11 @@
-import ast
-
 from generators.support.mc_support import generate_read_memory_arbiter
 from generators.handshake.mem_controller_loadless import generate_mem_controller_loadless
 from generators.handshake.mem_controller_storeless import generate_mem_controller_storeless
 
 def generate_mem_controller(name, params):
-  num_controls = int(params["num_controls"])
-  num_loads = int(params["num_loads"])
-  num_stores = int(params["num_stores"])
+  num_controls = params["num_controls"]
+  num_loads = params["num_loads"]
+  num_stores = params["num_stores"]
 
   if num_controls == 0 and num_loads > 0 and num_stores == 0:
     return generate_mem_controller_storeless(name, params)
@@ -21,10 +19,10 @@ def _generate_mem_controller(name, params):
   loadless_name = f"{name}_loadless"
   read_arbiter_name = f"{name}_read_arbiter"
 
-  num_controls = int(params["num_controls"])
-  num_loads = int(params["num_loads"])
-  num_stores = int(params["num_stores"])
-  port_types = ast.literal_eval(params["port_types"])
+  num_controls = params["num_controls"]
+  num_loads = params["num_loads"]
+  num_stores = params["num_stores"]
+  port_types = params["port_types"]
   data_bitwidth = int(port_types["loadData"][1:])
   addr_bitwidth = int(port_types["loadAddr"][1:])
 

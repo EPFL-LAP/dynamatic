@@ -1,11 +1,9 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
 from generators.support.join import generate_join
 
 def generate_addi(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["result"])
 
   if data_type.has_extra_signals():

@@ -1,11 +1,9 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.handshake.tehb import generate_tehb
 
 def generate_mux(name, params):
-  size = int(params["size"])
-  port_types = ast.literal_eval(params["port_types"])
+  size = params["size"]
+  port_types = params["port_types"]
   outs_type = VhdlScalarType(port_types["outs"])
   index_type = VhdlScalarType(port_types["index"])
 
@@ -23,10 +21,10 @@ def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_tehb(tehb_name, {
-    "port_types": str({
+    "port_types": {
       "ins": f"!handshake.channel<i{data_bitwidth}>",
       "outs": f"!handshake.channel<i{data_bitwidth}>",
-    })
+    }
   })
 
   entity = f"""
@@ -109,10 +107,10 @@ def _generate_mux_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_tehb(tehb_name, {
-    "port_types": str({
+    "port_types": {
       "ins": f"!handshake.control<>",
       "outs": f"!handshake.control<>",
-    })
+    }
   })
 
   entity = f"""

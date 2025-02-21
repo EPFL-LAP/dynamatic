@@ -1,11 +1,9 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 
 def generate_load(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
 
   # Ports communicating with the elastic circuit have the complete and same extra signals
   data_type = VhdlScalarType(port_types["dataOut"])
@@ -22,16 +20,16 @@ def _generate_load(name, data_bitwidth, addr_bitwidth):
 
   dependencies = \
     generate_tehb(addr_tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{addr_bitwidth}>",
         "outs": f"!handshake.channel<i{addr_bitwidth}>"
-      })
+      }
     }) + \
     generate_tehb(data_tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{data_bitwidth}>",
         "outs": f"!handshake.channel<i{data_bitwidth}>"
-      })
+      }
     })
 
   entity = f"""
@@ -113,10 +111,10 @@ def _generate_load_signal_manager(name, data_type, addr_type):
 
   dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth) + \
     generate_tfifo(tfifo_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
         "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
-      }),
+      },
       "num_slots": 32 # todo
     })
 

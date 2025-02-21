@@ -1,9 +1,7 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
 def generate_trunci(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   ins_type = VhdlScalarType(port_types["ins"])
   outs_type = VhdlScalarType(port_types["outs"])
 

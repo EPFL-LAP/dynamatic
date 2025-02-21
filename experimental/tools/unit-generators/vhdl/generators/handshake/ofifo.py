@@ -1,12 +1,10 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 from generators.handshake.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_ofifo(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
 
   if data_type.has_extra_signals():
@@ -25,10 +23,10 @@ def _generate_ofifo(name, size, bitwidth):
 
   dependencies = generate_elastic_fifo_inner(fifo_name, size, bitwidth) + \
     generate_tehb(tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>",
-      })
+      }
     })
 
   entity = f"""
@@ -101,10 +99,10 @@ def _generate_ofifo_dataless(name, size):
 
   dependencies = generate_elastic_fifo_inner(fifo_name, size) + \
     generate_tehb(tehb_name, {
-      "port_types": str({
+      "port_types": {
         "ins": "!handshake.control<>",
         "outs": "!handshake.control<>",
-      })
+      }
     })
 
   entity = f"""

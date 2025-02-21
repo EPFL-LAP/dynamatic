@@ -266,10 +266,10 @@ def _generate_addf_signal_manager(name, data_type, is_double):
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
       "num_slots": _get_latency(is_double), # todo: correct?
-      "port_types": str({
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     })
 
   # Now that the logic depends on the name, this dict is defined inside this function.

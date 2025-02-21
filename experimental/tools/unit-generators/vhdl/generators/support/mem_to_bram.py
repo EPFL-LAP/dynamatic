@@ -1,9 +1,7 @@
-import ast
-
 def generate_mem_to_bram(name, params):
-  port_types = ast.literal_eval(params["port_types"])
-  data_bitwidth = int(port_types["loadData"][1:])
-  addr_bitwidth = int(port_types["loadAddr"][1:])
+  port_types = params["port_types"]
+  data_bitwidth = port_types["loadData"][1:]
+  addr_bitwidth = port_types["loadAddr"][1:]
 
   return f"""
 library ieee;

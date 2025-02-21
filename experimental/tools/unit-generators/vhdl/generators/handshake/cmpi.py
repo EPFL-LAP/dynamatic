@@ -1,11 +1,9 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.support.join import generate_join
 
 def generate_cmpi(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   predicate = params["predicate"]
   data_type = VhdlScalarType(port_types["lhs"])
 

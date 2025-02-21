@@ -1,9 +1,7 @@
-import ast
-
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 
 def generate_store(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
 
   # Ports communicating with the elastic circuit have the complete and same extra signals
   data_type = VhdlScalarType(port_types["dataIn"])

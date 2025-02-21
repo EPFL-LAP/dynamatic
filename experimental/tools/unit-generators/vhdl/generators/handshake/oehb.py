@@ -1,10 +1,8 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
 
 def generate_oehb(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
 
   if data_type.has_extra_signals():

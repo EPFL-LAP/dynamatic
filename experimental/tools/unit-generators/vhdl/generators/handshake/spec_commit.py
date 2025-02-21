@@ -1,12 +1,10 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.handshake.tfifo import generate_tfifo
 from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.merge import generate_merge
 
 def generate_spec_commit(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
 
   # TODO: Support extra signals other than spec
@@ -24,33 +22,33 @@ def _generate_spec_commit(name, bitwidth):
   dependencies = \
     generate_tfifo(fifo_disc_name, {
       "num_slots": 1,
-      "port_types": str({
+      "port_types": {
         "ins": "!handshake.channel<i1>",
         "outs": "!handshake.channel<i1>"
-      })
+      }
     }) + \
     generate_cond_br(cond_br_name, {
-      "port_types": str({
+      "port_types": {
         "data": f"!handshake.channel<i{bitwidth}>",
         "condition": f"!handshake.channel<i{bitwidth}>",
         "trueOut": f"!handshake.channel<i{bitwidth}>",
         "falseOut": f"!handshake.channel<i{bitwidth}>"
-      })
+      }
     }) + \
     generate_tfifo(buff_name, {
       "num_slots": 1,
-      "port_types": str({
+      "port_types": {
         "ins": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>"
-      })
+      }
     }) + \
     generate_merge(merge_name, {
       "size": 2,
-      "port_types": str({
+      "port_types": {
         "ins_0": f"!handshake.channel<i{bitwidth}>",
         "ins_1": f"!handshake.channel<i{bitwidth}>",
         "outs": f"!handshake.channel<i{bitwidth}>"
-      })
+      }
     })
 
   entity = f"""

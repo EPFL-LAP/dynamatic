@@ -1,12 +1,10 @@
-import ast
-
 from generators.support.utils import VhdlScalarType
 from generators.handshake.tfifo import generate_tfifo
 
 def generate_spec_save_commit(name, params):
-  port_types = ast.literal_eval(params["port_types"])
+  port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
-  fifo_depth = int(params["fifo_depth"])
+  fifo_depth = params["fifo_depth"]
 
   # TODO: Support extra signals other than spec
   if data_type.is_channel():
@@ -340,11 +338,11 @@ def _generate_spec_save_commit(name, bitwidth, fifo_depth):
   dependencies = \
     _generate_spec_save_commit_inner(inner_name, bitwidth, fifo_depth) + \
     generate_tfifo(tfifo_name, {
-      "num_slots": "32", # todo
-      "port_types": str({
+      "num_slots": 32, # todo
+      "port_types": {
         "ins": f"!handshake.channel<i3>",
         "outs": f"!handshake.channel<i3>"
-      })
+      }
     })
 
   entity = f"""
