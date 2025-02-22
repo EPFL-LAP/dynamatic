@@ -14,14 +14,18 @@
 
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <regex>
 #include <string>
 
 #include "dynamatic/InitAllDialects.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
 #include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
@@ -40,6 +44,7 @@ static cl::opt<std::string>
     lhsFilenameArg("lhs", cl::Prefix, cl::Required,
                    cl::desc("Specify the left-hand side (LHS) input file"),
                    cl::cat(mainCategory));
+
 static cl::opt<std::string>
     rhsFilenameArg("rhs", cl::Prefix, cl::Required,
                    cl::desc("Specify the right-hand side (RHS) input file"),
@@ -49,24 +54,68 @@ static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(mainCategory));
 
-static cl::list<int> sameLengthSeqConstraint("same_length", cl::Prefix,
+static cl::opt<std::string> seqLengthRelationConstraint("seq_length",
+                                                        cl::Prefix,
+                                                        cl::desc("TODO"),
+                                                        cl::cat(mainCategory));
+
+static cl::list<size_t> loopSeqConstraint("loop", cl::Prefix,
+                                          cl::CommaSeparated, cl::desc("TODO"),
+                                          cl::cat(mainCategory));
+
+static cl::list<size_t> loopStrictSeqConstraint("loop_strict", cl::Prefix,
+                                                cl::CommaSeparated,
+                                                cl::desc("TODO"),
+                                                cl::cat(mainCategory));
+
+static cl::list<size_t> tokenLimitConstraint("token_limit", cl::Prefix,
                                              cl::CommaSeparated,
                                              cl::desc("TODO"),
                                              cl::cat(mainCategory));
 
-// TODO rename
-static cl::list<int> aplusBeqCseqConstraint("a_plus_b_equal_c", cl::Prefix,
-                                            cl::CommaSeparated,
-                                            cl::desc("TODO"),
-                                            cl::cat(mainCategory));
+FailureOr<dynamatic::experimental::SequenceConstraints>
+parseSequenceConstraints() {
 
-static cl::list<int> loopSeqConstraint("loop", cl::Prefix, cl::CommaSeparated,
-                                       cl::desc("TODO"), cl::cat(mainCategory));
+  dynamatic::experimental::SequenceConstraints sequenceConstraints;
 
-static cl::list<int> loopStrictSeqConstraint("loop_strict", cl::Prefix,
-                                             cl::CommaSeparated,
-                                             cl::desc("TODO"),
-                                             cl::cat(mainCategory));
+  if (loopStrictSeqConstraint.size() == 2 && loopSeqConstraint.size() == 2) {
+    llvm::errs() << "The loop sequence and strict loop sequence are mutually "
+                    "exclusive\n";
+    return failure();
+  }
+
+  sequenceConstraints.seqLengthRelationConstraint = seqLengthRelationConstraint;
+
+  if (loopSeqConstraint.size() == 2) {
+    sequenceConstraints.loopSeqConstraint = {loopSeqConstraint[0],
+                                             loopSeqConstraint[1]};
+
+  } else if (loopSeqConstraint.size() != 0) {
+    llvm::errs()
+        << "The loop sequence constraint needs exactely two arguments\n";
+    return failure();
+  }
+  if (loopStrictSeqConstraint.size() == 2) {
+    sequenceConstraints.loopStrictSeqConstraint = {loopStrictSeqConstraint[0],
+                                                   loopStrictSeqConstraint[1]};
+
+  } else if (loopStrictSeqConstraint.size() != 0) {
+    llvm::errs()
+        << "The strict loop sequence constraint needs exactely two arguments\n";
+    return failure();
+  }
+  llvm::outs() << tokenLimitConstraint[1] << "\n";
+  if (tokenLimitConstraint.size() == 3) {
+    sequenceConstraints.tokenLimitConstraint = {tokenLimitConstraint[0],
+                                                tokenLimitConstraint[1],
+                                                tokenLimitConstraint[2]};
+  } else if (tokenLimitConstraint.size() != 0) {
+    llvm::errs()
+        << "The token limit constraints needs exactely three arguments\n";
+    return failure();
+  }
+  return sequenceConstraints;
+}
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -86,22 +135,6 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
-
-  for (auto a : sameLengthSeqConstraint) {
-    llvm::outs() << a << "\n";
-  }
-  llvm::outs() << "-----------\n";
-  for (auto a : aplusBeqCseqConstraint) {
-    llvm::outs() << a << "\n";
-  }
-  llvm::outs() << "-----------\n";
-  for (auto a : loopSeqConstraint) {
-    llvm::outs() << a << "\n";
-  }
-  llvm::outs() << "-----------\n";
-  for (auto a : loopStrictSeqConstraint) {
-    llvm::outs() << a << "\n";
-  }
 
   std::filesystem::path lhsPath = lhsFilenameArg.getValue();
   std::filesystem::path rhsPath = rhsFilenameArg.getValue();
@@ -150,13 +183,20 @@ int main(int argc, char **argv) {
   }
   auto smvPath = failOrSmvPath.value();
 
-  // TODO ...
   std::filesystem::path wrapperPath = miterDir / "main.smv";
+
+  // Create sequence constraint struct. cl::list needs to be converted to
+  // SmallVector first
+  auto failOrSequenceConstraints = parseSequenceConstraints();
+  if (failed(failOrSequenceConstraints)) {
+    llvm::errs() << "Failed to parse constraints\n";
+    return 1;
+  }
 
   // Create wrapper (main) for the elastic-miter
   // Currently handshake2smv only supports "model" as the model's name
-  auto fail = dynamatic::experimental::createWrapper(wrapperPath, config,
-                                                     "model", n, true);
+  auto fail = dynamatic::experimental::createWrapper(
+      wrapperPath, config, "model", n, true, failOrSequenceConstraints.value());
   if (failed(fail))
     return 1;
 

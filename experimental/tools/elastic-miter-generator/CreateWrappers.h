@@ -8,6 +8,17 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
+struct SequenceConstraints {
+  std::string seqLengthRelationConstraint;
+  SmallVector<size_t> loopSeqConstraint;
+  SmallVector<size_t> loopStrictSeqConstraint;
+  struct {
+    size_t inputSequence;
+    size_t outputSequence;
+    size_t length = 0;
+  } tokenLimitConstraint;
+};
+
 std::string
 createModuleCall(const std::string &moduleName,
                  const SmallVector<std::string> &argNames,
@@ -19,7 +30,8 @@ FailureOr<std::string> createReachableStateWrapper(ModuleOp mlir, int n = 0,
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                             const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
-                            bool includeProperties = false);
+                            bool includeProperties,
+                            const SequenceConstraints &sequenceConstraints);
 
 const std::string BOOL_INPUT =
     "#ifndef BOOL_INPUT\n"

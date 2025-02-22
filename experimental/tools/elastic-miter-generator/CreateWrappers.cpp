@@ -6,6 +6,7 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_ostream.h>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -30,8 +31,8 @@ createModuleCall(const std::string &moduleName,
   for (size_t i = 0; i < arguments.size(); ++i) {
     if (i > 0)
       call << ", ";
-    // The current handshake2smv conversion also puts dataOut when it is of type
-    // control
+    // The current handshake2smv conversion also creates a dataOut port when it
+    // is of type control
     if (false && arguments[i].second.isa<handshake::ControlType>()) {
       call << "seq_generator_" << arguments[i].first << ".valid0";
     } else {
@@ -86,38 +87,26 @@ createSinks(const std::string &moduleName,
   return sinks.str();
 }
 
-std::string createSeqContraintAplusBequalC(
+std::string createSeqRelationConstraint(
     const std::string &moduleName,
-    const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
-    size_t seqB, size_t seqC) {
+    const SmallVector<std::pair<std::string, Type>> &arguments,
+    const std::string &seqLengthRelationConstraint) {
 
-  std::ostringstream seqConstraint;
-  std::string aSeqName = "seq_generator_" + arguments[seqA].first;
-  std::string bSeqName = "seq_generator_" + arguments[seqB].first;
-  std::string cSeqName = "seq_generator_" + arguments[seqC].first;
-  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
-  seqConstraint << "INVAR (" << aSeqName << ".exact_tokens + " << bSeqName
-                << ".exact_tokens = " << cSeqName << ".exact_tokens);\n";
+  std::string output = "INVAR";
+  output += seqLengthRelationConstraint + "\n";
 
-  return seqConstraint.str();
+  for (size_t i = 0; i < arguments.size(); i++) {
+    std::regex numberRegex(std::to_string(i));
+
+    output = std::regex_replace(output, numberRegex,
+                                " seq_generator_" + arguments[i].first +
+                                    ".exact_tokens ");
+  }
+
+  return output;
 }
 
-std::string createSeqContraintAequalB(
-    const std::string &moduleName,
-    const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
-    size_t seqB) {
-
-  std::ostringstream seqConstraint;
-  std::string aSeqName = "seq_generator_" + arguments[seqA].first;
-  std::string bSeqName = "seq_generator_" + arguments[seqB].first;
-  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
-  seqConstraint << "INVAR (" << aSeqName << ".exact_tokens = " << bSeqName
-                << ".exact_tokens);\n";
-
-  return seqConstraint.str();
-}
-
-std::string createSeqContraintLoop(
+std::string createSeqConstraintLoop(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments, size_t seqA,
     size_t seqB, bool lastFalse) {
@@ -126,7 +115,7 @@ std::string createSeqContraintLoop(
   std::string falseTokenCounter = arguments[seqB].first + "_false_token_cnt";
   std::string falseTokenSeqName = "seq_generator_" + arguments[seqB].first;
   std::string otherSeqName = "seq_generator_" + arguments[seqA].first;
-  // Seq-contraint 4 A_EQUALS_FALSE_IN_B
+
   seqConstraint << "VAR " << falseTokenCounter << " : 0..31;\n"
                 << "ASSIGN init(" << falseTokenCounter << ") := 0;\n"
                 << "ASSIGN next(" << falseTokenCounter << ") := case\n"
@@ -151,7 +140,7 @@ std::string createSeqContraintLoop(
                 << "INVAR (" << falseTokenSeqName
                 << ".exact_tokens >= " << otherSeqName << ".exact_tokens);\n"
                 << "INVAR (" << otherSeqName << ".exact_tokens = 0) -> ("
-                << falseTokenSeqName << ".exact_tokens = 0);\n";
+                << falseTokenSeqName << ".exact_tokens = 0);\n\n";
 
   return seqConstraint.str();
 }
@@ -165,12 +154,15 @@ std::string createTokenLimiter(
 
   std::ostringstream tokenLimitConstraint;
 
+  std::string tokenLimitDef = arguments[inputSeq].first + "_active_token_limit";
+
+  tokenLimitConstraint << "DEFINE " << tokenLimitDef << " := " << limit
+                       << ";\n";
+
   for (std::string side : {"lhs", "rhs"}) {
 
     std::string limiterVarName =
         side + "_" + arguments[inputSeq].first + "_active_tokens";
-    std::string tokenLimitDef =
-        arguments[inputSeq].first + "_active_token_limit";
 
     std::string inputNDWireName;
     std::string outputNDWireName;
@@ -187,9 +179,7 @@ std::string createTokenLimiter(
     std::string outputTokenCondition =
         outputNDWireName + ".valid0 & " + outputNDWireName + ".nReady0";
 
-    tokenLimitConstraint << "DEFINE " << tokenLimitDef << " := " << limit
-                         << ";\n"
-                         << "VAR " << limiterVarName << " : 0.." << limit
+    tokenLimitConstraint << "VAR " << limiterVarName << " : 0.." << limit
                          << ";\n"
                          << "ASSIGN\n"
                          << "init(" << limiterVarName << ") := 0;\n"
@@ -256,48 +246,14 @@ std::string createMiterProperties(
 
   properties << "\n";
 
-  properties << createSeqContraintLoop(moduleName, arguments, 0, 1, true);
-
-  // TODO lhs and rhs
-  // size_t inputSeq = 1;
-  // size_t outputSeq = 0;
-  // size_t limit = 3;
-  // std::string limiterVarName = arguments[inputSeq].first + "_active_tokens";
-  // std::string tokenLimitDef = arguments[inputSeq].first +
-  // "_active_token_limit"; std::string outputSeqName = "seq_generator_" +
-  // results[outputSeq].first; std::string inputNDWireName = moduleName + "." +
-  // inputNDWires[inputSeq].first; std::string outputNDWireName =
-  //     moduleName + "." + outputNDWires[outputSeq].first;
-  // std::string inputTokenCondition =
-  //     inputNDWireName + ".valid0 & " + inputNDWireName + ".nReady0";
-  // std::string outputTokenCondition =
-  //     outputNDWireName + ".valid0 & " + outputNDWireName + ".nReady0";
-
-  // properties << "DEFINE " << tokenLimitDef << " := " << limit << ";\n"
-  //            << "VAR " << limiterVarName << " : 0.." << limit + 100 << ";\n"
-  //            << "ASSIGN\n"
-  //            << "init(" << limiterVarName << ") := 0;\n"
-  //            << "next(" << limiterVarName << ") := case\n"
-  //            << "  " << inputTokenCondition << " & " << outputTokenCondition
-  //            << " : " << limiterVarName << ";\n"
-  //            << "  " << outputTokenCondition << " & " << limiterVarName
-  //            << " > 0 : " << limiterVarName << " - 1;\n"
-  //            << "  " << inputTokenCondition << " & " << limiterVarName << " <
-  //            "
-  //            << tokenLimitDef << " : " << limiterVarName << " + 1;\n"
-  //            << "  TRUE : " << limiterVarName << ";\n"
-  //            << "  esac;\n"
-  //            << "INVAR " << limiterVarName << " = " << tokenLimitDef << " ->
-  //            "
-  //            << inputNDWireName << ".state = sleeping;\n";
-
   return properties.str();
 }
 
 LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                             const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
-                            bool includeProperties) {
+                            bool includeProperties,
+                            const SequenceConstraints &sequenceConstraints) {
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
@@ -323,6 +279,32 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                                      config.inputNDWires, config.outputBuffers,
                                      config.outputNDWires, config.arguments,
                                      config.results);
+
+    if (sequenceConstraints.seqLengthRelationConstraint != "") {
+      wrapper << createSeqRelationConstraint(
+          modelSmvName, config.arguments,
+          sequenceConstraints.seqLengthRelationConstraint);
+    }
+    if (sequenceConstraints.loopSeqConstraint.size() != 0) {
+      wrapper << createSeqConstraintLoop(
+          modelSmvName, config.arguments,
+          sequenceConstraints.loopSeqConstraint[0],
+          sequenceConstraints.loopSeqConstraint[1], false);
+    }
+    if (sequenceConstraints.loopStrictSeqConstraint.size() != 0) {
+      wrapper << createSeqConstraintLoop(
+          modelSmvName, config.arguments,
+          sequenceConstraints.loopStrictSeqConstraint[0],
+          sequenceConstraints.loopStrictSeqConstraint[1], true);
+    }
+    if (sequenceConstraints.tokenLimitConstraint.length != 0) {
+      wrapper << createTokenLimiter(
+          modelSmvName, config.arguments, config.inputNDWires,
+          config.outputNDWires,
+          sequenceConstraints.tokenLimitConstraint.inputSequence,
+          sequenceConstraints.tokenLimitConstraint.outputSequence,
+          sequenceConstraints.tokenLimitConstraint.length);
+    }
   }
 
   std::ofstream mainFile(wrapperPath);

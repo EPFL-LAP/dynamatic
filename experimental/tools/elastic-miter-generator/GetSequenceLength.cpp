@@ -139,7 +139,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
   // Currently handshake2smv only supports "model" as the model's name
   auto fail = dynamatic::experimental::createWrapper(outputDir / "main_inf.smv",
-                                                     config, "model", 0);
+                                                     config, "model", 0, false,
+                                                     SequenceConstraints());
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -169,8 +170,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
         outputDir / ("main_" + std::to_string(n) + ".smv");
 
     // Currently handshake2smv only supports "model" as the model's name
-    auto fail =
-        dynamatic::experimental::createWrapper(wrapperPath, config, "model", n);
+    auto fail = dynamatic::experimental::createWrapper(
+        wrapperPath, config, "model", n, false, SequenceConstraints());
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << n
                    << " token reachability wrapper.\n";
