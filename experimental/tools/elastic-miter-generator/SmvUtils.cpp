@@ -1,19 +1,9 @@
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <string>
 
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/Path.h"
-
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
+#include "CreateWrappers.h"
+#include "SmvUtils.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -26,7 +16,7 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
 
   std::string command = "set verbose_level 0;\n"
                         "set pp_list cpp;\n"
-                        "set counter_examples 0;\n"
+                        "set counter_examples 1;\n"
                         "set dynamic_reorder 1;\n"
                         "set on_failure_script_quits;\n"
                         "set reorder_method sift;\n"
@@ -59,7 +49,7 @@ int runNuXmv(const std::filesystem::path &cmdPath,
 
 FailureOr<std::filesystem::path>
 handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool png = false) {
+              const std::filesystem::path &outputDir, bool png) {
 
   std::filesystem::path dotFile = outputDir / "model.dot";
 

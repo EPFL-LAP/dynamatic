@@ -10,14 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_EXPERIMENTAL_ELATIC_MITER_FABRIC_GENERATION_H
-#define DYNAMATIC_EXPERIMENTAL_ELATIC_MITER_FABRIC_GENERATION_H
+#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_FABRIC_GENERATION_H
+#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_FABRIC_GENERATION_H
 
-#include "llvm/Support/JSON.h"
 #include <filesystem>
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/HandshakeMaterialize.h"
 
 using namespace mlir;
 using namespace dynamatic::handshake;
@@ -70,10 +68,6 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp);
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
 FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module);
-
-LogicalResult createFiles(const std::filesystem::path &outputDir,
-                          StringRef mlirFilename, ModuleOp mod,
-                          llvm::json::Object jsonObject);
 
 LogicalResult createMlirFile(const std::filesystem::path &outputDir,
                              StringRef mlirFilename, ModuleOp mod);

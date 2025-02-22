@@ -4,13 +4,16 @@
 #include <fstream>
 #include <string>
 
-#include "CreateWrappers.h"
-#include "ElasticMiterFabricGeneration.h"
-#include "SmvUtils.h"
-
+#include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include <llvm/ADT/StringSet.h>
+
+#include "CreateWrappers.h"
+#include "ElasticMiterFabricGeneration.h"
+#include "GetSequenceLength.h"
+#include "SmvUtils.h"
 
 using namespace mlir;
 using namespace llvm;

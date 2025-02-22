@@ -1,8 +1,8 @@
+#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_SMV_UTILS_H
+#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_SMV_UTILS_H
+
 #include "mlir/Support/LogicalResult.h"
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <string>
 
 using namespace mlir;
@@ -22,3 +22,4 @@ handshake2smv(const std::filesystem::path &mlirPath,
               const std::filesystem::path &outputDir, bool png = false);
 
 } // namespace dynamatic::experimental
+#endif

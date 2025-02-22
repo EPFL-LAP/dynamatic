@@ -6,27 +6,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/Dialect.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/JSON.h"
 #include <filesystem>
 #include <string>
 #include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
+#include "ElasticMiterFabricGeneration.h"
 
 using namespace mlir;
 using namespace dynamatic::handshake;
@@ -200,38 +195,6 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   return funcOp;
 }
 
-LogicalResult createFiles(const std::filesystem::path &outputDir,
-                          StringRef mlirFilename, ModuleOp mod,
-                          llvm::json::Object jsonObject) {
-
-  std::error_code ec;
-  OpPrintingFlags printingFlags;
-
-  // Create the output directory
-  std::filesystem::create_directories(outputDir);
-
-  // Create the the handshake miter file
-  std::filesystem::path mlirPath = outputDir / mlirFilename.str();
-  llvm::raw_fd_ostream fileStream(mlirPath.string(), ec,
-                                  llvm::sys::fs::OF_None);
-
-  mod->print(fileStream, printingFlags);
-  fileStream.close();
-
-  // Create the JSON config file
-  std::filesystem::path jsonPath = outputDir / "elastic-miter-config.json";
-  llvm::raw_fd_ostream jsonFileStream(jsonPath.string(), ec,
-                                      llvm::sys::fs::OF_None);
-
-  // Convert the JSON object to a JSON value in order to be printed
-  llvm::json::Value jsonValue(std::move(jsonObject));
-  // Print the JSON to the file with proper formatting
-  jsonFileStream << llvm::formatv("{0:2}", jsonValue);
-  jsonFileStream.close();
-
-  return success();
-}
-
 LogicalResult createMlirFile(const std::filesystem::path &outputDir,
                              StringRef mlirFilename, ModuleOp mod) {
 
@@ -274,7 +237,6 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
   // Create the config
   ElasticMiterConfig config;
   config.funcName = funcOp.getNameAttr().str();
-
 
   // Create the input side auxillary logic:
   // Every primary input of the LHS/RHS circuits is connected to a ND wire.
@@ -347,30 +309,36 @@ FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
                    size_t bufferSlots) {
 
-  // Get the LHS FuncOp from the LHS module, also check the
+  // Get the LHS FuncOp from the LHS module, also check some required properties
   auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
-  if (failed(funcOrFailure))
+  if (failed(funcOrFailure)) {
+    llvm::errs() << "Failed to get LHS FuncOp.\n";
     return failure();
+  }
   FuncOp lhsFuncOp = funcOrFailure.value();
 
   // Get the RHS FuncOp from the RHS module
   funcOrFailure = getModuleFuncOpAndCheck(rhsModule);
-  if (failed(funcOrFailure))
+  if (failed(funcOrFailure)) {
+    llvm::errs() << "Failed to get RHS FuncOp.\n";
     return failure();
+  }
   FuncOp rhsFuncOp = funcOrFailure.value();
 
   OpBuilder builder(&context);
 
   ModuleOp miterModule = ModuleOp::create(builder.getUnknownLoc());
   if (!miterModule) {
+    llvm::errs() << "Failed to create new empty module.\n";
     return failure();
   }
 
   // Create a new FuncOp containing an entry Block
   auto pairOrFailure = buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp);
-  if (failed(pairOrFailure))
+  if (failed(pairOrFailure)) {
+    llvm::errs() << "Failed to create new funcOp.\n";
     return failure();
-
+  }
   // Unpack the returned FuncOp and entry Block
   auto [newFuncOp, newBlock] = pairOrFailure.value();
 
@@ -379,13 +347,17 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   // Add "lhs_" to all operations in the LHS funcOp
   for (Operation &op : lhsFuncOp.getOps()) {
-    if (failed(prefixOperation(op, "lhs_")))
+    if (failed(prefixOperation(op, "lhs_"))) {
+      llvm::errs() << "Failed to prefix the LHS.\n";
       return failure();
+    }
   }
   // Add "rhs_" to all operations in the RHS funcOp
   for (Operation &op : rhsFuncOp.getOps()) {
-    if (failed(prefixOperation(op, "rhs_")))
+    if (failed(prefixOperation(op, "rhs_"))) {
+      llvm::errs() << "Failed to prefix the RHS.\n";
       return failure();
+    }
   }
 
   builder.setInsertionPointToStart(newBlock);
@@ -561,14 +533,6 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     previousOp = &op;
   }
 
-  SmallVector<std::string> argNames;
-  for (Attribute attr : lhsFuncOp.getArgNames()) {
-    auto strAttr = attr.dyn_cast<StringAttr>();
-    if (strAttr) {
-      argNames.push_back(strAttr.getValue().str());
-    }
-  }
-
   return std::make_pair(miterModule, config);
 }
 
@@ -595,7 +559,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
 
   auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens);
   if (failed(ret)) {
-    llvm::errs() << "Failed to create elastic-miter module.\n";
+    llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();
   }
   auto [miterModule, config] = ret.value();

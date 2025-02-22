@@ -1,3 +1,5 @@
+#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
+#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
 
 #include "ElasticMiterFabricGeneration.h"
 #include "dynamatic/Support/LLVM.h"
@@ -68,3 +70,4 @@ const std::string BOOL_INPUT_INF = "MODULE bool_input_inf(nReady0)\n"
                                    "    esac;\n"
                                    "    DEFINE valid0 := TRUE;\n\n";
 } // namespace dynamatic::experimental
+#endif

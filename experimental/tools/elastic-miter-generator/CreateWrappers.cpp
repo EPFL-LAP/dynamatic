@@ -1,19 +1,13 @@
-#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <llvm/ADT/StringSet.h>
-#include <llvm/Support/Error.h>
-#include <llvm/Support/JSON.h>
-#include <llvm/Support/raw_ostream.h>
 #include <regex>
-#include <sstream>
 #include <string>
-#include <utility>
 
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+
+#include "CreateWrappers.h"
+#include "ElasticMiterFabricGeneration.h"
 
 using namespace mlir;
 

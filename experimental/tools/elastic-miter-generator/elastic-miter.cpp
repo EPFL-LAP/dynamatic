@@ -12,25 +12,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
-#include <cstddef>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <regex>
 #include <string>
 
 #include "dynamatic/InitAllDialects.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "../experimental/tools/elastic-miter-generator/CreateWrappers.h"
-#include "../experimental/tools/elastic-miter-generator/ElasticMiterFabricGeneration.h"
-#include "../experimental/tools/elastic-miter-generator/GetSequenceLength.h"
-#include "../experimental/tools/elastic-miter-generator/SmvUtils.h"
+#include "CreateWrappers.h"
+#include "ElasticMiterFabricGeneration.h"
+#include "GetSequenceLength.h"
+#include "SmvUtils.h"
 
 namespace cl = llvm::cl;
 using namespace mlir;
@@ -104,7 +99,7 @@ parseSequenceConstraints() {
         << "The strict loop sequence constraint needs exactely two arguments\n";
     return failure();
   }
-  llvm::outs() << tokenLimitConstraint[1] << "\n";
+
   if (tokenLimitConstraint.size() == 3) {
     sequenceConstraints.tokenLimitConstraint = {tokenLimitConstraint[0],
                                                 tokenLimitConstraint[1],
