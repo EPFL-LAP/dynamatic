@@ -37,6 +37,7 @@ import generators.arith.minimumf as minimumf
 import generators.arith.muli as muli
 import generators.arith.mulf as mulf
 import generators.arith.negf as negf
+import generators.arith.noti as noti
 import generators.arith.ori as ori
 import generators.arith.shli as shli
 import generators.arith.shrsi as shrsi
@@ -117,6 +118,8 @@ def generate_code(name, mod_type, parameters):
       return muli.generate_muli(name, parameters)
     case "negf":
       return negf.generate_negf(name, parameters)
+    case "not":
+      return noti.generate_not(name, parameters)
     case "ori":
       return ori.generate_ori(name, parameters)
     case "shli":
