@@ -153,6 +153,10 @@ test_generator -t muli --abstract-data -p port_types='{"result":"!handshake.chan
 echo -e "\nTesting negf..."
 test_generator -t negf --abstract-data -p port_types='{"outs":"!handshake.channel<f32>"}' latency=0
 
+echo -e "\nTesting not..."
+test_generator -t not -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+test_generator -t not --abstract-data -p port_types='{"outs":"!handshake.channel<i32>"}' latency=0
+
 echo -e "\nTesting ori..."
 test_generator -t ori -p port_types='{"result":"!handshake.channel<i32>"}' latency=0
 test_generator -t ori --abstract-data -p port_types='{"result":"!handshake.channel<i32>"}' latency=0

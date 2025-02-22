@@ -213,6 +213,11 @@
     "hdl": "smv"
   },
   {
+    "name": "handshake.not",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.ori",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ori --abstract-data -p latency=0 port_types=$PORT_TYPES",
     "hdl": "smv"
