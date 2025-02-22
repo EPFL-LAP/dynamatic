@@ -985,9 +985,26 @@ private:
   LogicalResult createInternalSignals(WriteModData &data) const;
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteModData &data) const;
+  void writeIncludes(WriteModData &data) const;
 };
 
 } // namespace
+
+void SMVWriter::writeIncludes(WriteModData &data) const {
+  std::string moduleName;
+  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+    llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
+        .Case<hw::HWModuleOp>(
+            [&](hw::HWModuleOp hwModOp) { moduleName = hwModOp.getSymName(); })
+        .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
+          const RTLMatch &match = *exportInfo.externals.at(extModOp);
+          moduleName = match.getConcreteModuleName();
+        })
+        .Default([&](auto) { llvm_unreachable("unknown module type"); });
+
+    data.os << "#include \"" << moduleName << ".smv\"\n";
+  }
+}
 
 LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
   //  Create signal names for all block arguments
@@ -1125,6 +1142,9 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   WriteModData data(modOp, os);
   if (failed(createInternalSignals(data)))
     return failure();
+
+  writeIncludes(data);
+  os << "\n\n";
 
   os << "MODULE " << modOp.getSymName() << " (";
 
