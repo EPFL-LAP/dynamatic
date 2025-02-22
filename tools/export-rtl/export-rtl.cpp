@@ -393,10 +393,10 @@ void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      writeDeclaration(portName, dir, portType, os);
       bool toPrint =
           hdl != HDL::SMV ? true : portName != "rst" && portName != "clk";
       if (toPrint) {
+        writeDeclaration(portName, dir, portType, os);
         if (--numIOLeft != 0)
           os << sep;
         if (hdl != HDL::SMV)
@@ -455,8 +455,11 @@ void WriteModData::writeSignalAssignments(
   auto addValidReady = [&](StringRef name, StringRef signal) -> void {
     writeAssignment(signal + RTLWriter::VALID_SUFFIX,
                     name + RTLWriter::VALID_SUFFIX, os);
+
+    std::string signalName = signal.str();
+    std::replace(signalName.begin(), signalName.end(), '.', '_');
     writeAssignment(name + RTLWriter::READY_SUFFIX,
-                    signal + RTLWriter::READY_SUFFIX, os);
+                    signalName + RTLWriter::READY_SUFFIX, os);
   };
   auto addExtraSignals = [&](StringRef name, StringRef signal,
                              ArrayRef<ExtraSignal> extraSignals) -> void {
@@ -990,8 +993,9 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
   //  Create signal names for all block arguments
   for (auto [arg, name] :
        llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
-                       data.modOp.getInputNamesStr()))
+                       data.modOp.getInputNamesStr())) {
     data.signals[arg] = name.strref();
+  }
 
   // Create signal names for all operation results
   for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
@@ -1051,8 +1055,6 @@ void SMVWriter::constructIOMappings(
       instName = argNamesAttr.getValue().str();
       instFound = true;
     }
-    if (!instFound)
-      llvm::errs() << *userOp << " " << operandIndex << "\n";
     std::string argName;
     bool argFound = false;
     if (auto argNamesAttr =
@@ -1071,10 +1073,12 @@ void SMVWriter::constructIOMappings(
     if (instFound && argFound)
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
           getInternalSignalName(signal, SignalType::READY));
-    else
+    else {
+      std::string signalName = getValueName(res).str();
+      std::replace(signalName.begin(), signalName.end(), '.', '_');
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
-          getInternalSignalName(getValueName(res), SignalType::READY) +
-          "BBBBBB");
+          getInternalSignalName(signalName, SignalType::READY));
+    }
   };
   auto addExtraSignals = [&](StringRef port, StringRef signal,
                              ArrayRef<ExtraSignal> extraSignals) -> void {
@@ -1103,8 +1107,7 @@ void SMVWriter::constructIOMappings(
         .Case<ChannelType>([&](ChannelType channelType) { addReady(port, op); })
         .Case<ControlType>([&](ControlType type) { addReady(port, op); })
         .Case<IntegerType>([&](IntegerType intType) {
-          mappings[getSignalName(port)].push_back(getValueName(op).str() +
-                                                  "AAA");
+          mappings[getSignalName(port)].push_back(getValueName(op).str());
         });
   };
 
@@ -1133,6 +1136,12 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << ")\n\n";
 
   writeModuleInstantiations(data);
+
+  os << "\n// output\n";
+  data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
+                                 raw_indented_ostream &os) {
+    os << "DEFINE " << dst << " := " << src << ";\n";
+  });
 
   return success();
 }
