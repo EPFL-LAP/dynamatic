@@ -919,8 +919,18 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
+  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
   AllTypesMatch<["dataIn", "dataOut"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  IsSimpleHandshake<"saveCtrl">,
+  IsIntSizedChannel<1, "saveCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsIntSizedChannel<1, "commitCtrl">,
+  IsSimpleHandshake<"SCSaveCtrl">,
+  IsIntSizedChannel<3, "SCSaveCtrl">,
+  IsSimpleHandshake<"SCCommitCtrl">,
+  IsIntSizedChannel<3, "SCCommitCtrl">,
+  IsSimpleHandshake<"SCBranchCtrl">,
+  IsIntSizedChannel<1, "SCBranchCtrl">,
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -945,26 +955,34 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
   let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
   let results = (outs HandshakeType:$dataOut,
-                      BoolChannel:$saveCtrl, BoolChannel:$commitCtrl, 
-                      IntSizedChannel<3>:$SCSaveCtrl,
-                      IntSizedChannel<3>:$SCCommitCtrl, 
-                      BoolChannel:$SCBranchCtrl);
+                      ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
+                      ChannelType:$SCSaveCtrl,
+                      ChannelType:$SCCommitCtrl, 
+                      ChannelType:$SCBranchCtrl);
 
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
+
+  // Infer the type of the control signals
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
+    $_state.addOperands({dataIn, enable});
+
+    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
+    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+
+    $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
+      wideControlType, ctrlType});
+  }]>];
 }
 
-class Handshake_SpecOp<string mnemonic> : Handshake_Op<mnemonic, [
-  SpeculationOpInterface, AllTypesMatch<["dataIn", "dataOut"]>
+def SpecSaveOp : Handshake_Op<"spec_save", [
+  SpeculationOpInterface,
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  LacksSpecTag<"dataIn">,
+  HasSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<1, "ctrl">,
 ]> {
-  let arguments = (ins HandshakeType:$dataIn, BoolChannel:$ctrl);
-  let results = (outs HandshakeType:$dataOut);
-  let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
-  }];
-}
-
-def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
     Save units are used to mark the beginning of the speculation region. 
@@ -979,12 +997,26 @@ def SpecSaveOp : Handshake_SpecOp<"spec_save"> {
     Example:
 
     ```mlir
-    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_save[%ctrl] %dataIn : !handshake.channel<i32>, !handshake.channel<i32, [spec: i1]>, !handshake.channel<i1>
     ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 }
 
-def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
+def SpecCommitOp : Handshake_Op<"spec_commit", [
+  SpeculationOpInterface,
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<1, "ctrl">,
+]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
     Commit units are used to mark the end of the speculation region. 
@@ -1000,13 +1032,24 @@ def SpecCommitOp : Handshake_SpecOp<"spec_commit"> {
     Example:
 
     ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i11>
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, !handshake.channel<i1>
     ```
   }];
 
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
 }
 
-def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
+def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
+  SpeculationOpInterface,
+  AllTypesMatch<["dataIn", "dataOut"]>,
+  IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<3, "ctrl">,
+]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
     Save-Commits are used when speculation occurs in a loop.
@@ -1020,12 +1063,21 @@ def SpecSaveCommitOp : Handshake_SpecOp<"spec_save_commit"> {
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, IntSizedChannel<3>:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+  }];
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
-  AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>
+  AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
+  AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
+  HasSpecTag<"tagFromOperand">,
+  HasSpecTag<"dataOperand">,
+  LacksSpecTag<"trueResult">,
+  LacksSpecTag<"falseResult">
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1040,7 +1092,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     Example:
     ```mlir
     %trueResult, %falseResult = speculating_branch[%tagFromOperand]
-      %dataOperand : !handshake.channel<i1>, !handshake.channel<i32>
+      %dataOperand : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32, [spec: i1]>,
+      !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
@@ -1048,7 +1101,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   let results = (outs HandshakeType:$trueResult, HandshakeType:$falseResult);
   let assemblyFormat = [{
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
-      type($tagFromOperand) `,` type($dataOperand)
+      type($tagFromOperand) `,` type($dataOperand) `,`
+      type($trueResult) `,` type($falseResult)
   }];
 }
 
