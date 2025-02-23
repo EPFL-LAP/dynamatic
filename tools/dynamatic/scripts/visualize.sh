@@ -45,5 +45,5 @@ rm "$F_DOT_POS_TMP"
 
 # Launch the dataflow visualizer
 echo_info "Launching visualizer..."
-"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$F_CSV" --rendering-driver opengl3 >/dev/null
+"$VISUAL_DATAFLOW_BIN" "--dot=$F_DOT_POS" "--csv=$F_CSV" >/dev/null
 exit_on_fail "Failed to run visualizer" "Visualizer closed"

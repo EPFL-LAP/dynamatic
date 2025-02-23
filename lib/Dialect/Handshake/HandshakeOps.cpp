@@ -196,16 +196,15 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                     Value operand, const TimingInfo &timing,
-                     std::optional<unsigned> numSlots, StringRef bufferType) {
+                     Value operand, std::optional<unsigned> numSlots, 
+                     StringRef bufferType) {
   odsState.addOperands(operand);
   odsState.addTypes(operand.getType());
 
   // Create attribute dictionary
   SmallVector<NamedAttribute> attributes;
   MLIRContext *ctx = odsState.getContext();
-  attributes.emplace_back(StringAttr::get(ctx, TIMING_ATTR_NAME),
-                          TimingAttr::get(ctx, timing));
+ 
   if (numSlots) {
     attributes.emplace_back(
         StringAttr::get(ctx, NUM_SLOTS_ATTR_NAME),

@@ -83,17 +83,30 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     result.deductInternalBuffers(Channel(channel), timingDB);
 
     // Remap to general buffer types.
-    if (result.numSlotDV > 1) {
-      result.numSlotDVE = result.numSlotDV;
-      result.numSlotDV = 0;
-    }
-    // We change the original tehb chain to 'transpFIFO + tehb' to
-    // ensure that it performs the correct timing behavior.
     if (result.numSlotR > 1) {
-      result.numSlotT = result.numSlotR - 1;
-      result.numSlotR = 1;
+      result.numSlotT = result.numSlotR;
+      result.numSlotR = 0;
     }
-
+    if (result.numSlotDV == 2) {
+      if (result.numSlotR == 0){
+        result.numSlotDV = 1;
+        result.numSlotR = 1;
+      } else if (result.numSlotR == 1){
+        result.numSlotDVE = 2;
+        result.numSlotDV = 0;
+      }
+    } else if (result.numSlotDV > 2){
+      if (result.numSlotR == 0){
+        result.numSlotDVE = result.numSlotDV + result.numSlotT - 1;
+        result.numSlotT = 0;
+        result.numSlotR = 1;
+        result.numSlotDV = 0;
+      } else if (result.numSlotR == 1){
+        result.numSlotDVE = result.numSlotDV;
+        result.numSlotDV = 0;
+      }
+    }
+    
     placement[channel] = result;
   }
 

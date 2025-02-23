@@ -180,7 +180,7 @@ struct PlacementResult {
   /// The number of dvr chain slots that should be placed.
   unsigned numSlotDVR = 0;
 
-  /// Prefered order: DVSE, OB, DVFIFO, TranspFIFO, DVR, TB
+  /// Prefered order: DV, DVE, T, DVR, R
   /// Whether opaque slots should be placed transparent slots for placement
   /// results that include both.
   bool opaqueBeforeTrans = true;

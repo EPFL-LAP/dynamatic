@@ -219,7 +219,7 @@ def BufferOp : Handshake_Op<"buffer", [
 ]> {
   let summary = "buffer operation";
   let description = [{
-    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    Represents an arbitrary buffer whose properties (e.g., type, number of
     slots) are dictated by HW parameters. 
   }];
   
@@ -227,13 +227,12 @@ def BufferOp : Handshake_Op<"buffer", [
   let results = (outs HandshakeType:$result);
 
   let builders = [OpBuilder<
-    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-         "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
+    (ins "Value":$operand, "std::optional<unsigned>":$numSlots, 
+    "StringRef":$bufferType)>
   ];
 
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING",
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
     
     static constexpr ::llvm::StringLiteral DV_TYPE="DV", R_TYPE="R", 

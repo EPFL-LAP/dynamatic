@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Buffer placement pass in Handshake functions, it takes the location (i.e.,
-// the predecessor, and which output channel of it), type (i.e., opaque or
-// transparent), and slots of the buffer that should be placed.
+// the predecessor, and which output channel of it), type, and slots of the 
+// buffer that should be placed.
 //
 // This pass facilitates externally prototyping a custom buffer placement
 // analysis, e.g., in Python. This also makes the results of some research
@@ -75,29 +75,23 @@ struct HandshakePlaceBuffersCustomPass
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
-    handshake::TimingInfo timing;
     StringRef bufferType;
-    if (type == "oehb") {
-      timing = handshake::TimingInfo::oehb();
+    if (type == "DV") {
       bufferType = handshake::BufferOp::DV_TYPE;
-    } else if (type == "tehb") {
-      timing = handshake::TimingInfo::tehb();
+    } else if (type == "R") {
       bufferType = handshake::BufferOp::R_TYPE;
-    } else if (type == "dvfifo") {
-      timing = handshake::TimingInfo::dvfifo();
+    } else if (type == "DVE") {
       bufferType = handshake::BufferOp::DVE_TYPE;
-    } else if (type == "tfifo") {
-      timing = handshake::TimingInfo::tfifo();
+    } else if (type == "T") {
       bufferType = handshake::BufferOp::T_TYPE;
-    } else if (type == "dvr") {
-      timing = handshake::TimingInfo::dvr();
+    } else if (type == "DVR") {
       bufferType = handshake::BufferOp::DVR_TYPE;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots, bufferType);
+                                                     slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
