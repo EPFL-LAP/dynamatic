@@ -3,6 +3,9 @@
 
 #include "ElasticMiterFabricGeneration.h"
 #include "dynamatic/Support/LLVM.h"
+#include "llvm/ADT/SmallVector.h"
+#include <array>
+#include <cstddef>
 #include <filesystem>
 #include <string>
 
@@ -10,15 +13,22 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
+struct LoopSeqConstraint {
+  size_t dataSequence;
+  size_t controlSequence;
+  size_t lastFalse;
+};
+
+struct TokenLimitConstraint {
+  size_t inputSequence;
+  size_t outputSequence;
+  size_t limit;
+};
+
 struct SequenceConstraints {
-  std::string seqLengthRelationConstraint;
-  SmallVector<size_t> loopSeqConstraint;
-  SmallVector<size_t> loopStrictSeqConstraint;
-  struct {
-    size_t inputSequence;
-    size_t outputSequence;
-    size_t length = 0;
-  } tokenLimitConstraint;
+  SmallVector<std::string> seqLengthRelationConstraints;
+  SmallVector<LoopSeqConstraint> loopSeqConstraints;
+  SmallVector<TokenLimitConstraint> tokenLimitConstraints;
 };
 
 std::string

@@ -16,6 +16,7 @@
 #include "llvm/Support/CommandLine.h"
 #include <filesystem>
 #include <fstream>
+#include <regex>
 #include <string>
 
 #include "dynamatic/InitAllDialects.h"
@@ -49,66 +50,82 @@ static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(mainCategory));
 
-static cl::opt<std::string> seqLengthRelationConstraint("seq_length",
-                                                        cl::Prefix,
-                                                        cl::desc("TODO"),
-                                                        cl::cat(mainCategory));
+static cl::list<std::string>
+    seqLengthRelationConstraints("seq_length", cl::Prefix, cl::desc("TODO"),
+                                 cl::cat(mainCategory));
 
-static cl::list<size_t> loopSeqConstraint("loop", cl::Prefix,
-                                          cl::CommaSeparated, cl::desc("TODO"),
-                                          cl::cat(mainCategory));
-
-static cl::list<size_t> loopStrictSeqConstraint("loop_strict", cl::Prefix,
-                                                cl::CommaSeparated,
+static cl::list<std::string> loopSeqConstraints("loop", cl::Prefix,
                                                 cl::desc("TODO"),
                                                 cl::cat(mainCategory));
 
-static cl::list<size_t> tokenLimitConstraint("token_limit", cl::Prefix,
-                                             cl::CommaSeparated,
-                                             cl::desc("TODO"),
-                                             cl::cat(mainCategory));
+static cl::list<std::string> strictLoopSeqConstraints("loop_strict", cl::Prefix,
+                                                      cl::desc("TODO"),
+                                                      cl::cat(mainCategory));
+
+static cl::list<std::string> tokenLimitConstraints("token_limit", cl::Prefix,
+                                                   cl::desc("TODO"),
+                                                   cl::cat(mainCategory));
 
 FailureOr<dynamatic::experimental::SequenceConstraints>
 parseSequenceConstraints() {
 
   dynamatic::experimental::SequenceConstraints sequenceConstraints;
 
-  if (loopStrictSeqConstraint.size() == 2 && loopSeqConstraint.size() == 2) {
-    llvm::errs() << "The loop sequence and strict loop sequence are mutually "
-                    "exclusive\n";
-    return failure();
+  // Parse the sequence length relation constraints. They are string in the
+  // style "0+1+..=4+5+..", where the numbers represent the index of the
+  // sequence
+  for (const auto &constraint : seqLengthRelationConstraints)
+    sequenceConstraints.seqLengthRelationConstraints.push_back(constraint);
+
+  // TODO doc, dedublicate
+  for (const auto &csv : loopSeqConstraints) {
+    std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
+    std::smatch match;
+
+    if (!std::regex_match(csv, match, pattern)) {
+      llvm::errs() << "Loop sequence constraints are two positive numbers "
+                      "separated by a comma\n";
+      return failure();
+    }
+    size_t dataSequence = std::stoul(match[1]);
+    size_t controlSequence = std::stoul(match[2]);
+    sequenceConstraints.loopSeqConstraints.push_back(
+        {dataSequence, controlSequence, false});
   }
 
-  sequenceConstraints.seqLengthRelationConstraint = seqLengthRelationConstraint;
+  for (const auto &csv : strictLoopSeqConstraints) {
+    std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
+    std::smatch match;
 
-  if (loopSeqConstraint.size() == 2) {
-    sequenceConstraints.loopSeqConstraint = {loopSeqConstraint[0],
-                                             loopSeqConstraint[1]};
-
-  } else if (loopSeqConstraint.size() != 0) {
-    llvm::errs()
-        << "The loop sequence constraint needs exactely two arguments\n";
-    return failure();
-  }
-  if (loopStrictSeqConstraint.size() == 2) {
-    sequenceConstraints.loopStrictSeqConstraint = {loopStrictSeqConstraint[0],
-                                                   loopStrictSeqConstraint[1]};
-
-  } else if (loopStrictSeqConstraint.size() != 0) {
-    llvm::errs()
-        << "The strict loop sequence constraint needs exactely two arguments\n";
-    return failure();
+    if (!std::regex_match(csv, match, pattern)) {
+      llvm::errs()
+          << "Strict loop sequence constraints are two positive numbers "
+             "separated by a comma\n";
+      return failure();
+    }
+    size_t dataSequence = std::stoul(match[1]);
+    size_t controlSequence = std::stoul(match[2]);
+    sequenceConstraints.loopSeqConstraints.push_back(
+        {dataSequence, controlSequence, true});
   }
 
-  if (tokenLimitConstraint.size() == 3) {
-    sequenceConstraints.tokenLimitConstraint = {tokenLimitConstraint[0],
-                                                tokenLimitConstraint[1],
-                                                tokenLimitConstraint[2]};
-  } else if (tokenLimitConstraint.size() != 0) {
-    llvm::errs()
-        << "The token limit constraints needs exactely three arguments\n";
-    return failure();
+  for (const auto &csv : tokenLimitConstraints) {
+    std::regex pattern(
+        R"(^(\d+),(\d+),(\d+)$)"); // Three uint separated by commas
+    std::smatch match;
+
+    if (!std::regex_match(csv, match, pattern)) {
+      llvm::errs() << "Token limit constraints are three positive numbers "
+                      "separated by commas\n";
+      return failure();
+    }
+    size_t inputSequence = std::stoul(match[1]);
+    size_t outputSequence = std::stoul(match[2]);
+    size_t limit = std::stoul(match[3]);
+    sequenceConstraints.tokenLimitConstraints.push_back(
+        {inputSequence, outputSequence, limit});
   }
+
   return sequenceConstraints;
 }
 
