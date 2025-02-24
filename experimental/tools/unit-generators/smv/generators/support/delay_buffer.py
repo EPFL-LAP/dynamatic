@@ -1,4 +1,4 @@
-from generators.handshake.buffer import generate_buffer
+from generators.support.oehb import generate_oehb
 from generators.support.utils import *
 
 
@@ -32,7 +32,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", OEHB_BUFFER_PARAMS(HANDSHAKE_CONTROL_TYPE))}
+{generate_oehb(f"{name}__oehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
 
 
@@ -52,5 +52,5 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-  {generate_buffer(f"{name}__oehb_dataless", OEHB_BUFFER_PARAMS(HANDSHAKE_CONTROL_TYPE))}
+{generate_oehb(f"{name}__oehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
