@@ -70,6 +70,11 @@ static cl::list<std::string>
                           cl::desc("Specify token limit constraint."),
                           cl::cat(mainCategory));
 
+static cl::opt<bool> enableCounterExamples("cex",
+                                           cl::desc("Enable counter examples."),
+                                           cl::init(false),
+                                           cl::cat(mainCategory));
+
 static FailureOr<dynamatic::experimental::SequenceConstraints>
 parseSequenceConstraints() {
 
@@ -192,10 +197,10 @@ static FailureOr<bool> checkEquivalence(
   // read from that file to check whether all the CTL properties pass.
   std::filesystem::path resultTxtPath = miterDir / "result.txt";
   std::string miterCommand = "check_invar -s forward;\n"
-                             "check_ctlspec;\n"
-                             "show_traces -a -p 4 -o trace.xml;\n";
+                             "check_ctlspec;\n";
   LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
-      miterDir / "prove.cmd", miterDir / "main.smv", miterCommand);
+      miterDir / "prove.cmd", miterDir / "main.smv", miterCommand,
+      enableCounterExamples);
   if (failed(cmdFail))
     return failure();
 

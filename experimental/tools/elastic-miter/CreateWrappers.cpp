@@ -13,7 +13,8 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
-std::string
+// Create the call to the module
+static std::string
 createModuleCall(const std::string &moduleName,
                  const SmallVector<std::pair<std::string, Type>> &arguments,
                  const SmallVector<std::pair<std::string, Type>> &results) {
@@ -46,7 +47,8 @@ createModuleCall(const std::string &moduleName,
   return call.str();
 }
 
-std::string createSequenceGenerators(
+// Create the sequence generator at the inputs of the module
+static std::string createSequenceGenerators(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
     size_t nrOfTokens, bool exact = false) {
@@ -71,7 +73,8 @@ std::string createSequenceGenerators(
   return sequenceGenerators.str();
 }
 
-std::string
+// Create the sinks at the outputs of the module
+static std::string
 createSinks(const std::string &moduleName,
             const SmallVector<std::pair<std::string, Type>> &results,
             size_t nrOfTokens) {
@@ -85,7 +88,9 @@ createSinks(const std::string &moduleName,
   return sinks.str();
 }
 
-std::string createSeqRelationConstraint(
+// Create the constraints to restrict the relations of the length of input
+// sequences.
+static std::string createSeqRelationConstraint(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
     const std::string &seqLengthRelationConstraint) {
@@ -104,7 +109,8 @@ std::string createSeqRelationConstraint(
   return output;
 }
 
-std::string createSeqConstraintLoop(
+// Create the constraints for the loop condition.
+static std::string createSeqConstraintLoop(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
     LoopSeqConstraint constraint) {
@@ -147,7 +153,8 @@ std::string createSeqConstraintLoop(
   return seqConstraint.str();
 }
 
-std::string createTokenLimiter(
+// Create the constraints to limit the number of tokens in the circuit.
+static std::string createTokenLimiter(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
     const SmallVector<std::pair<std::string, std::string>> &inputNDWires,
@@ -211,7 +218,13 @@ std::string createTokenLimiter(
   return tokenLimitConstraint.str();
 }
 
-std::string createMiterProperties(
+// Creates all the properties required for the elastic-miter based equivalence
+// checking.
+// 1. All output tokens with data are true.
+// 2. At a certain point, and from then on, all the output buffers remain empty.
+// 3. At a certain point, and from then on, all input buffer pair store the same
+// number of tokens.
+static std::string createMiterProperties(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
     const SmallVector<std::pair<std::string, std::string>> &inputNDWires,

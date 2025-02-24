@@ -1,4 +1,4 @@
-//===- elastic-miter.cpp - The elastic-miter driver -------------*- C++ -*-===//
+//===- FabricGeneration.h - Generate Elastic Miter Circuit ------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.

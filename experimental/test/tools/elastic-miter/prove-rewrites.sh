@@ -19,8 +19,8 @@ exit_on_fail "Failed to build miter module generator"
 cd ..
 
 
-# build/bin/elastic-miter --lhs=$REWRITES/a_lhs.mlir --rhs=$REWRITES/a_rhs.mlir -o $OUT_DIR
-# exit_on_fail "(a): Equivalence checking failed"
+build/bin/elastic-miter --lhs=$REWRITES/a_lhs.mlir --rhs=$REWRITES/a_rhs.mlir -o $OUT_DIR
+exit_on_fail "(a): Equivalence checking failed"
 
 # build/bin/elastic-miter --lhs=$REWRITES/b_lhs.mlir --rhs=$REWRITES/b_rhs.mlir -o $OUT_DIR --seq_length="0+1=3" --seq_length="0=2" --loop_strict=0,1
 # exit_on_fail "(b): Equivalence checking failed"
@@ -34,8 +34,8 @@ cd ..
 # build/bin/elastic-miter --lhs=$REWRITES/e_lhs.mlir --rhs=$REWRITES/e_rhs.mlir -o $OUT_DIR --seq_length="0=1"
 # exit_on_fail "(e): Equivalence checking failed"
 
-build/bin/elastic-miter --lhs=$REWRITES/f_lhs.mlir --rhs=$REWRITES/f_rhs.mlir -o $OUT_DIR
-exit_on_fail "(f): Equivalence checking failed"
+# build/bin/elastic-miter --lhs=$REWRITES/f_lhs.mlir --rhs=$REWRITES/f_rhs.mlir -o $OUT_DIR
+# exit_on_fail "(f): Equivalence checking failed"
 
 # build/bin/elastic-miter --lhs=$REWRITES/g_lhs.mlir --rhs=$REWRITES/g_rhs.mlir -o $OUT_DIR
 # exit_on_fail "(g): Equivalence checking failed"

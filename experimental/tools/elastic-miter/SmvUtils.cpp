@@ -1,8 +1,17 @@
+//===- SmvUtils.cpp -------------------------------------------- *- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
 #include <filesystem>
 #include <fstream>
 #include <string>
 
-#include "CreateWrappers.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include "SmvUtils.h"
 
 using namespace mlir;
@@ -10,14 +19,16 @@ using namespace llvm;
 
 namespace dynamatic::experimental {
 
-// TODO option to print counter example
 LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                             const std::filesystem::path &smvPath,
-                            const std::string &additionalCommands) {
+                            const std::string &additionalCommands,
+                            bool showCounterExamples) {
 
   std::string command = "set verbose_level 0;\n"
                         "set pp_list cpp;\n"
-                        "set counter_examples 1;\n"
+                        "set counter_examples " +
+                        std::to_string(showCounterExamples) +
+                        ";\n"
                         "set dynamic_reorder 1;\n"
                         "set on_failure_script_quits;\n"
                         "set reorder_method sift;\n"
@@ -31,9 +42,13 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                         "encode_variables;\n"
                         "build_flat_model;\n"
                         "build_model -f;\n" +
-                        additionalCommands + ";\n" +
-                        "time;\n"
-                        "quit;\n";
+                        additionalCommands + ";\n";
+  if (showCounterExamples) {
+    command += "show_traces -a -p 4 -o " +
+               (cmdPath.parent_path() / "trace.xml").string() + ";\n";
+  }
+  command += "time;\n"
+             "quit;\n";
   std::ofstream mainFile(cmdPath);
   mainFile << command;
   mainFile.close();
@@ -69,6 +84,7 @@ handshake2smv(const std::filesystem::path &mlirPath,
 
   std::filesystem::path dotFile = outputDir / "model.dot";
 
+  // Convert the handshake to dot
   std::string cmd = "bin/export-dot " + mlirPath.string() +
                     " --edge-style=spline > " + dotFile.string();
   int ret = system(cmd.c_str());
@@ -77,6 +93,8 @@ handshake2smv(const std::filesystem::path &mlirPath,
     return failure();
   }
 
+  // Optionally, generate a visual representation of the circuit from the
+  // generated dotfile
   if (png) {
     std::filesystem::path pngFile = outputDir / "model.png";
     cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string() +
@@ -88,6 +106,7 @@ handshake2smv(const std::filesystem::path &mlirPath,
     }
   }
 
+  // Convert the dotfile to SMV
   // The current implementation of dot2smv uses the hardcoded name "model.smv"
   // in the dotfile's directory.
   std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
