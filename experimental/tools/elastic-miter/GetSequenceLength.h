@@ -1,3 +1,17 @@
+//===- GetSequenceLength.h -.-------------------------------- ---*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// An infinite number of input tokens can be emulated by a lower number of
+// tokens, if all internal states of the circuit can be reached. This file
+// provides a way to determine how many input tokens are needed.
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_SEQUENCE_LENGTH_H
 #define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_SEQUENCE_LENGTH_H
 

@@ -1,3 +1,11 @@
+//===- GetSequenceLength.cpp ----------------------------------- *- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
@@ -21,6 +29,7 @@ using namespace llvm;
 
 namespace dynamatic::experimental {
 
+// Remove all leading and trailing whitespace from a string
 static std::string stripString(const std::string &string) {
   std::string newString = string;
   size_t start = newString.find_first_not_of(" \t\n\r\f\v");
@@ -34,6 +43,10 @@ static std::string stripString(const std::string &string) {
   return newString;
 }
 
+// Get the set of states given the path to file containing the output to the
+// nuXmv command "print_reachable_states -v;". A set element is defined by a
+// string which is the concatenation of the state values, as represented in the
+// output file.
 static FailureOr<llvm::StringSet<>>
 getStateSet(const std::filesystem::path &filePath,
             const std::string &modelName) {
