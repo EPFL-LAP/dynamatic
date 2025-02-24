@@ -1,4 +1,4 @@
-//===- elastic-miter.cpp - The elastic-miter driver -------------*- C++ -*-===//
+//===- FabricGeneration.cpp ------------------------------------ *- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -21,7 +21,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-#include "ElasticMiterFabricGeneration.h"
+#include "FabricGeneration.h"
 
 using namespace mlir;
 using namespace dynamatic::handshake;
@@ -195,30 +195,35 @@ FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   return funcOp;
 }
 
-LogicalResult createMlirFile(const std::filesystem::path &outputDir,
-                             StringRef mlirFilename, ModuleOp mod) {
+// Prints the module to the provided file, creates the directory if it does not
+// exist yet.
+LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
+                             ModuleOp modul) {
 
   std::error_code ec;
   OpPrintingFlags printingFlags;
 
   // Create the output directory
-  std::filesystem::create_directories(outputDir);
+  std::filesystem::create_directories(mlirPath.parent_path());
 
-  // Create the the handshake miter file
-  std::filesystem::path mlirPath = outputDir / mlirFilename.str();
+  // Create the the file at the path
   llvm::raw_fd_ostream fileStream(mlirPath.string(), ec,
                                   llvm::sys::fs::OF_None);
 
-  mod->print(fileStream, printingFlags);
+  modul->print(fileStream, printingFlags);
   fileStream.close();
 
   return success();
 }
 
+// Create the reachability circuit by putting ND wires at all the in- and
+// outputs
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
-createReachabilityCircuit(MLIRContext &context, StringRef filename) {
+createReachabilityCircuit(MLIRContext &context,
+                          const std::filesystem::path &filename) {
 
-  OwningOpRef<ModuleOp> mod = parseSourceFile<ModuleOp>(filename, &context);
+  OwningOpRef<ModuleOp> mod =
+      parseSourceFile<ModuleOp>(filename.string(), &context);
   if (!mod)
     return failure();
 
@@ -245,7 +250,7 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
   for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
     BlockArgument arg = funcOp.getArgument(i);
 
-    std::string ndwName = "in_ndw_" + funcOp.getArgName(i).str();
+    std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
     NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
     setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
@@ -282,7 +287,7 @@ createReachabilityCircuit(MLIRContext &context, StringRef filename) {
   for (unsigned i = 0; i < endOp.getOperands().size(); ++i) {
     Value result = endOp.getOperand(i);
 
-    std::string ndwName = "out_ndw_" + funcOp.getResName(i).str();
+    std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
     NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
     setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
@@ -567,7 +572,7 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   std::string mlirFilename = "elastic_miter_" + config.rhsFuncName + "_" +
                              config.rhsFuncName + ".mlir";
 
-  if (failed(createMlirFile(outputDir, mlirFilename, miterModule))) {
+  if (failed(createMlirFile(outputDir / mlirFilename, miterModule))) {
     llvm::errs() << "Failed to write MLIR miter file.\n";
     return failure();
   }

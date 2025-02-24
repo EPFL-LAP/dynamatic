@@ -10,6 +10,7 @@ using namespace llvm;
 
 namespace dynamatic::experimental {
 
+// TODO option to print counter example
 LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                             const std::filesystem::path &smvPath,
                             const std::string &additionalCommands) {
@@ -24,7 +25,7 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
                         "set bdd_static_order_heuristics basic;\n"
                         "set cone_of_influence;\n"
                         "set use_coi_size_sorting 1;\n"
-                        "read_model -i" +
+                        "read_model -i " +
                         smvPath.string() + ";\n" +
                         "flatten_hierarchy;\n"
                         "encode_variables;\n"
@@ -39,12 +40,27 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
   return success();
 }
 
-// TODO proper output handling...
 int runNuXmv(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
   std::string command =
       "nuXmv -source " + cmdPath.string() + " > " + stdoutFile.string();
   return system(command.c_str());
+}
+
+int runNuSMV(const std::filesystem::path &cmdPath,
+             const std::filesystem::path &stdoutFile) {
+  std::string command =
+      "NuSMV -source " + cmdPath.string() + " > " + stdoutFile.string();
+  return system(command.c_str());
+}
+
+int runSmvCmd(const std::filesystem::path &cmdPath,
+              const std::filesystem::path &stdoutFile) {
+#ifdef USE_NUXMV
+  return runNuXmv(cmdPath, stdoutFile);
+#else
+  return runNuSMV(cmdPath, stdoutFile);
+#endif
 }
 
 FailureOr<std::filesystem::path>

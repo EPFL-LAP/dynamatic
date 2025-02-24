@@ -5,7 +5,7 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_tool(elastic-miter
   elastic-miter.cpp
   GetSequenceLength.cpp
-  ElasticMiterFabricGeneration.cpp
+  FabricGeneration.cpp
   CreateWrappers.cpp
   SmvUtils.cpp
 )

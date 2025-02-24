@@ -1,10 +1,8 @@
 #ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
 #define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
 
-#include "ElasticMiterFabricGeneration.h"
+#include "FabricGeneration.h"
 #include "dynamatic/Support/LLVM.h"
-#include "llvm/ADT/SmallVector.h"
-#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <string>
@@ -43,7 +41,8 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                             const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties,
-                            const SequenceConstraints &sequenceConstraints);
+                            const SequenceConstraints &sequenceConstraints,
+                            bool exact = false);
 
 const std::string BOOL_INPUT =
     "#ifndef BOOL_INPUT\n"
@@ -68,6 +67,29 @@ const std::string BOOL_INPUT =
     "\n"
     "  DEFINE valid0 := counter < exact_tokens;\n"
     "#endif // BOOL_INPUT\n\n";
+
+const std::string BOOL_INPUT_EXACT =
+    "#ifndef BOOL_INPUT_EXACT\n"
+    "#define BOOL_INPUT_EXACT\n"
+    "MODULE bool_input_exact(nReady0, exact_tokens)\n"
+    "  VAR dataOut0 : boolean;\n"
+    "  VAR counter : 0..31;\n"
+    "  ASSIGN\n"
+    "    init(counter) := 0;\n"
+    "    next(counter) := case\n"
+    "      nReady0 & counter < exact_tokens : counter + 1;\n"
+    "      TRUE : counter;\n"
+    "    esac;\n"
+    "\n"
+    "  -- make sure dataOut0 is persistent\n"
+    "  ASSIGN\n"
+    "    next(dataOut0) := case\n"
+    "      valid0 & !nReady0 : dataOut0;\n"
+    "      TRUE : {TRUE, FALSE};\n"
+    "    esac;\n"
+    "\n"
+    "  DEFINE valid0 := counter < exact_tokens;\n"
+    "#endif // BOOL_INPUT_EXACT\n\n";
 
 const std::string BOOL_INPUT_INF = "MODULE bool_input_inf(nReady0)\n"
                                    "    VAR dataOut0 : boolean;\n"

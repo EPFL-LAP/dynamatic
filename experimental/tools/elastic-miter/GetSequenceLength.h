@@ -9,12 +9,13 @@ using namespace llvm;
 
 namespace dynamatic::experimental {
 
-int compareReachableStates(const std::string &infFile,
-                           const std::string &finFile,
-                           const std::string &modelName);
-
+// Compute the length of the input sequence which is required to emulate an
+// infinite sequence. This is done by enumerating the reachable states and then
+// iteratively increasing the number of input tokens until the set of reachble
+// states is equivalent.
 FailureOr<size_t> getSequenceLength(MLIRContext &context,
                                     const std::filesystem::path &outputDir,
-                                    const std::string &mlirFile);
+                                    const std::filesystem::path &mlirPath);
 } // namespace dynamatic::experimental
+
 #endif

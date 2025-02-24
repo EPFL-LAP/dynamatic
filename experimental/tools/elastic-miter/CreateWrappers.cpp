@@ -7,19 +7,18 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
 #include "CreateWrappers.h"
-#include "ElasticMiterFabricGeneration.h"
+#include "FabricGeneration.h"
 
 using namespace mlir;
 
 namespace dynamatic::experimental {
 
-// TODO pass names of in and output and name
 std::string
 createModuleCall(const std::string &moduleName,
                  const SmallVector<std::pair<std::string, Type>> &arguments,
                  const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream call;
-  // TODO does this work?
+
   call << "  VAR " << moduleName << " : " << moduleName << "(";
 
   for (size_t i = 0; i < arguments.size(); ++i) {
@@ -50,13 +49,18 @@ createModuleCall(const std::string &moduleName,
 std::string createSequenceGenerators(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
-    size_t nrOfTokens) {
+    size_t nrOfTokens, bool exact = false) {
   std::ostringstream sequenceGenerators;
   for (const auto &argument : arguments) {
     if (nrOfTokens == 0) {
       sequenceGenerators << "  VAR seq_generator_" << argument.first
                          << " : bool_input_inf(" << moduleName << "."
                          << argument.first << "_ready);\n";
+    } else if (exact) {
+      sequenceGenerators << "  VAR seq_generator_" << argument.first
+                         << " : bool_input_exact(" << moduleName << "."
+                         << argument.first << "_ready, " << nrOfTokens
+                         << ");\n";
     } else {
       sequenceGenerators << "  VAR seq_generator_" << argument.first
                          << " : bool_input(" << moduleName << "."
@@ -72,7 +76,7 @@ createSinks(const std::string &moduleName,
             const SmallVector<std::pair<std::string, Type>> &results,
             size_t nrOfTokens) {
   std::ostringstream sinks;
-  sinks << "  -- TODO make sure we have sink_1_0\n";
+
   for (const auto &result : results) {
     sinks << "  VAR sink_" << result.first << " : sink_1_0(" << moduleName
           << "." << result.first << "_out, " << moduleName << "."
@@ -257,11 +261,13 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
                             const ElasticMiterConfig &config,
                             const std::string &modelSmvName, size_t nrOfTokens,
                             bool includeProperties,
-                            const SequenceConstraints &sequenceConstraints) {
+                            const SequenceConstraints &sequenceConstraints,
+                            bool exact) {
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
   wrapper << BOOL_INPUT;
+  wrapper << BOOL_INPUT_EXACT;
   wrapper << BOOL_INPUT_INF;
 
   wrapper << "MODULE main\n";
@@ -269,7 +275,7 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
   wrapper << "\n";
 
   wrapper << createSequenceGenerators(modelSmvName, config.arguments,
-                                      nrOfTokens);
+                                      nrOfTokens, exact);
 
   wrapper << createModuleCall(modelSmvName, config.arguments, config.results)
           << "\n";

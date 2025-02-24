@@ -1,4 +1,4 @@
-#include <any>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -11,9 +11,10 @@
 #include <llvm/ADT/StringSet.h>
 
 #include "CreateWrappers.h"
-#include "ElasticMiterFabricGeneration.h"
+#include "FabricGeneration.h"
 #include "GetSequenceLength.h"
 #include "SmvUtils.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -33,11 +34,11 @@ static std::string stripString(const std::string &string) {
   return newString;
 }
 
-// TODO handle too many states to print
-static std::vector<std::string> getStateSet(const std::string &filename,
-                                            const std::string &modelName) {
-  std::ifstream file(filename);
-  std::vector<std::string> states;
+static FailureOr<llvm::StringSet<>>
+getStateSet(const std::filesystem::path &filePath,
+            const std::string &modelName) {
+  std::ifstream file(filePath);
+  llvm::StringSet<> states;
   std::string line, currentState;
   bool recording = false;
 
@@ -45,11 +46,13 @@ static std::vector<std::string> getStateSet(const std::string &filename,
     line = stripString(line);
 
     if (line.find("warning: the states are more than") != std::string::npos) {
-      // TODO
+      llvm::errs() << "The number of states exceeded the number that can be "
+                      "printed by NuSMV/nuXmv.\n";
+      return failure();
     }
     if (line.find("-------") != std::string::npos) {
       if (!currentState.empty()) {
-        states.push_back(currentState);
+        states.insert(currentState);
       }
       currentState.clear();
       recording = true;
@@ -58,84 +61,87 @@ static std::vector<std::string> getStateSet(const std::string &filename,
 
     if (!recording)
       continue;
-    // Skip if it doesn't start with "miter."
-    if (line.rfind(modelName + ".", 0) != 0) {
+
+    // Skip if it doesn't start with "miter." or starts with "miter.ndw",
+    // indicating it is a ND wire
+    if (line.find(modelName + ".", 0) != 0 ||
+        line.find(modelName + ".ndw", 0) == 0) {
       continue;
     }
     currentState += line + "\n";
   }
+  file.close();
 
   if (!currentState.empty()) {
-    states.push_back(currentState);
+    states.insert(currentState);
   }
 
   return states;
 }
 
-int compareReachableStates(const std::string &infFile,
-                           const std::string &finFile,
-                           const std::string &modelName) {
-  std::vector<std::string> finVector = getStateSet(finFile, modelName);
-  std::vector<std::string> infVector = getStateSet(infFile, modelName);
+// Count how many states are in the set reached by infinite tokens but are not
+// in the set reached by finite tokens.
+static FailureOr<size_t>
+compareReachableStates(const std::string &modelName,
+                       const std::filesystem::path &infinitePath,
+                       const std::filesystem::path &finitePath) {
 
-  // TODO use StringSet directly
-  llvm::StringSet<> setFin;
-  llvm::StringSet<> setInf;
-  for (const auto &entry : finVector) {
-    setFin.insert(entry);
+  auto failOrInfiniteStates = getStateSet(infinitePath, modelName);
+  if (failed(failOrInfiniteStates)) {
+    llvm::errs() << "Failed to get the state set with infinite tokens.\n";
+    return failure();
   }
-  for (const auto &entry : infVector) {
-    setInf.insert(entry);
+  auto failOrFiniteStates = getStateSet(finitePath, modelName);
+  if (failed(failOrFiniteStates)) {
+    llvm::errs() << "Failed to get the state set with finite tokens.\n";
+    return failure();
   }
 
-  // llvm::outs() << setInf.size() << "\n";
-  // llvm::outs() << setFin.size() << "\n";
+  llvm::StringSet<> infiniteStateSet = failOrInfiniteStates.value();
+  llvm::StringSet<> finiteStateSet = failOrFiniteStates.value();
 
-  // for (auto &a : setInf) {
-  //   llvm::outs() << a.getKey() << "\n";
-  // }
-  // llvm::outs() << "-----------\n";
-  // for (auto &a : setFin) {
-  //   llvm::outs() << a.getKey() << "\n";
-  // }
+  if (infiniteStateSet.size() > finiteStateSet.size())
+    return infiniteStateSet.size() - finiteStateSet.size();
 
-  int diffCount = 0;
-  for (const auto &entry : infVector) {
-    if (std::find(finVector.begin(), finVector.end(), entry) ==
-        finVector.end()) {
-      diffCount++;
+  size_t differenceCount = 0;
+  for (const auto &entry : infiniteStateSet) {
+    if (finiteStateSet.find(entry.getKey()) == finiteStateSet.end()) {
+      differenceCount++;
     }
   }
-  return diffCount;
+
+  return differenceCount;
 }
 
 FailureOr<size_t> getSequenceLength(MLIRContext &context,
                                     const std::filesystem::path &outputDir,
-                                    const std::string &mlirFile) {
+                                    const std::filesystem::path &mlirPath) {
 
   // Create the outputDir if it doesn't exist
   std::filesystem::create_directories(outputDir);
 
   // Add ND wires to the circuit
   auto ret =
-      dynamatic::experimental::createReachabilityCircuit(context, mlirFile);
+      dynamatic::experimental::createReachabilityCircuit(context, mlirPath);
   if (failed(ret)) {
     llvm::errs() << "Failed to create reachability module.\n";
     return failure();
   }
   auto [miterModule, config] = ret.value();
 
-  std::string ndWireMlirFilename =
-      "elastic_miter_" + std::any_cast<std::string>(config.funcName) + ".mlir";
-  std::filesystem::path ndWireMlirPath = outputDir / ndWireMlirFilename;
+  // The filename is "elastic_miter_<funcOpName>.mlir"
+  std::string reachabilityMlirFilename =
+      "elastic_miter_" + config.funcName + ".mlir";
+  std::filesystem::path reachabilityMlirPath =
+      outputDir / reachabilityMlirFilename;
 
-  if (failed(createMlirFile(outputDir, ndWireMlirFilename, miterModule))) {
+  if (failed(createMlirFile(reachabilityMlirPath, miterModule))) {
     llvm::errs() << "Failed to write miter files.\n";
     return failure();
   }
 
-  auto failOrDstSmv =
-      dynamatic::experimental::handshake2smv(ndWireMlirPath, outputDir, true);
+  auto failOrDstSmv = dynamatic::experimental::handshake2smv(
+      reachabilityMlirPath, outputDir, true);
   if (failed(failOrDstSmv))
     return failure();
   auto dstSmv = failOrDstSmv.value();
@@ -149,65 +155,74 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
-  LogicalResult cmdFail =
-      createCMDfile(outputDir / "reachability_inf.cmd",
-                    outputDir / "main_inf.smv", "print_reachable_states -v;");
-  if (failed(cmdFail))
+  // create the .cmd file to print all the reachable states with infinite tokens
+  if (failed(createCMDfile(outputDir / "reachability_inf.cmd",
+                           outputDir / "main_inf.smv",
+                           "print_reachable_states -v;")))
     return failure();
 
-  // Run nuXmv for infinite tokens
-  int nuxmvRet = runNuXmv(outputDir / "reachability_inf.cmd",
-                          outputDir / "inf_states.txt");
-  if (nuxmvRet != 0) {
+  // Run the cmd file with NuSMV / nuXmv for infinite tokens
+  int cmdRet = runSmvCmd(outputDir / "reachability_inf.cmd",
+                         outputDir / "inf_states.txt");
+  if (cmdRet != 0) {
     llvm::errs()
         << "Failed to analyze reachable states with infinite tokens.\n";
     return failure();
   }
 
-  int n = 1;
+  int numberOfTokens = 1;
   while (true) {
     // TODO remove
-    llvm::outs() << "Checking " << n << " tokens.\n";
+    llvm::outs() << "Checking " << numberOfTokens << " tokens.\n";
 
     std::filesystem::path wrapperPath =
-        outputDir / ("main_" + std::to_string(n) + ".smv");
+        outputDir / ("main_" + std::to_string(numberOfTokens) + ".smv");
 
     // Currently handshake2smv only supports "model" as the model's name
     auto fail = dynamatic::experimental::createWrapper(
-        wrapperPath, config, "model", n, false, SequenceConstraints());
+        wrapperPath, config, "model", numberOfTokens, false,
+        SequenceConstraints(), true);
     if (failed(fail)) {
-      llvm::errs() << "Failed to create " << n
+      llvm::errs() << "Failed to create " << numberOfTokens
                    << " token reachability wrapper.\n";
       return failure();
     }
 
-    cmdFail = createCMDfile(outputDir /
-                                ("reachability_" + std::to_string(n) + ".cmd"),
-                            wrapperPath, "print_reachable_states -v;");
-    if (failed(cmdFail))
+    // create the .cmd file to print all the reachable states with n tokens
+    if (failed(
+            createCMDfile(outputDir / ("reachability_" +
+                                       std::to_string(numberOfTokens) + ".cmd"),
+                          wrapperPath, "print_reachable_states -v;")))
       return failure();
 
-    nuxmvRet =
-        runNuXmv(outputDir / ("reachability_" + std::to_string(n) + ".cmd"),
-                 outputDir.string() + "/" + std::to_string(n) + "_states.txt");
-    if (nuxmvRet != 0) {
+    // Run the cmd file with NuSMV / nuXmv for infinite tokens
+    cmdRet = runSmvCmd(
+        outputDir / ("reachability_" + std::to_string(numberOfTokens) + ".cmd"),
+        outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
+    if (cmdRet != 0) {
       llvm::errs() << "Failed to analyze reachable states with"
-                   << std::to_string(n) + " tokens.";
+                   << std::to_string(numberOfTokens) + " tokens.";
       return failure();
     }
 
     // Check state differences
     // Currently handshake2smv only supports "model" as the model's name
-    int nrOfDifferences = dynamatic::experimental::compareReachableStates(
-        outputDir.string() + "/inf_states.txt",
-        outputDir.string() + "/" + std::to_string(n) + "_states.txt", "model");
+    auto failOrNrOfDifferences =
+        dynamatic::experimental::compareReachableStates(
+            "model", outputDir / "inf_states.txt",
+            outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
+    if (failed(failOrNrOfDifferences)) {
+      llvm::errs() << "Failed to compare the number of reachable states with "
+                   << numberOfTokens << " tokens.\n";
+      return failure();
+    }
 
-    if (nrOfDifferences != 0) {
-      n++;
+    if (failOrNrOfDifferences.value() != 0) {
+      numberOfTokens++;
     } else {
       break;
     }
   }
-  return n;
+  return numberOfTokens;
 }
 } // namespace dynamatic::experimental

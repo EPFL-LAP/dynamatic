@@ -69,8 +69,8 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp);
 // 3. Arguments  and results are all handshake.channel or handshake.control type
 FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module);
 
-LogicalResult createMlirFile(const std::filesystem::path &outputDir,
-                             StringRef mlirFilename, ModuleOp mod);
+LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
+                             ModuleOp mod);
 
 // This creates an elastic-miter module given the path to two MLIR files.
 // The files need to contain exactely one module each. Each module needs to
@@ -83,7 +83,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 // outputs of the circuit. Additionally creates a json config file with the name
 // of the funcOp, and its argument and results.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
-createReachabilityCircuit(MLIRContext &context, StringRef filename);
+createReachabilityCircuit(MLIRContext &context,
+                          const std::filesystem::path &filename);
 
 // This creates an elastic-miter MLIR module and a JSON config file given the
 // path to two MLIR files. The input files need to contain exactly one module

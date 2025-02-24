@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO This file implements the elastic-miter tool, it creates an elastic miter
-// circuit, which can later be used to formally verify equivalence of two
-// handshake circuits.
+// This file implements the elastic-miter tool, it takes two MLIR circuits in
+// the Handshake dialect and formally verifies their equivalence.
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
 #include <filesystem>
@@ -24,7 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "CreateWrappers.h"
-#include "ElasticMiterFabricGeneration.h"
+#include "FabricGeneration.h"
 #include "GetSequenceLength.h"
 #include "SmvUtils.h"
 
@@ -50,23 +50,27 @@ static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
                                          cl::cat(mainCategory));
 
+static cl::list<std::string> seqLengthRelationConstraints(
+    "seq_length", cl::Prefix,
+    cl::desc("Specify constraints for the relation of sequence lengths."),
+    cl::cat(mainCategory));
+
 static cl::list<std::string>
-    seqLengthRelationConstraints("seq_length", cl::Prefix, cl::desc("TODO"),
-                                 cl::cat(mainCategory));
+    loopSeqConstraints("loop", cl::Prefix,
+                       cl::desc("Specify loop constraints."),
+                       cl::cat(mainCategory));
 
-static cl::list<std::string> loopSeqConstraints("loop", cl::Prefix,
-                                                cl::desc("TODO"),
-                                                cl::cat(mainCategory));
+static cl::list<std::string> strictLoopSeqConstraints(
+    "loop_strict", cl::Prefix,
+    cl::desc("Specify loop constraints, where the last token is false."),
+    cl::cat(mainCategory));
 
-static cl::list<std::string> strictLoopSeqConstraints("loop_strict", cl::Prefix,
-                                                      cl::desc("TODO"),
-                                                      cl::cat(mainCategory));
+static cl::list<std::string>
+    tokenLimitConstraints("token_limit", cl::Prefix,
+                          cl::desc("Specify token limit constraint."),
+                          cl::cat(mainCategory));
 
-static cl::list<std::string> tokenLimitConstraints("token_limit", cl::Prefix,
-                                                   cl::desc("TODO"),
-                                                   cl::cat(mainCategory));
-
-FailureOr<dynamatic::experimental::SequenceConstraints>
+static FailureOr<dynamatic::experimental::SequenceConstraints>
 parseSequenceConstraints() {
 
   dynamatic::experimental::SequenceConstraints sequenceConstraints;
@@ -129,6 +133,89 @@ parseSequenceConstraints() {
   return sequenceConstraints;
 }
 
+static FailureOr<bool> checkEquivalence(
+    MLIRContext &context, const std::filesystem::path &lhsPath,
+    const std::filesystem::path &rhsPath,
+    const std::filesystem::path &outputDir,
+    const dynamatic::experimental::SequenceConstraints &sequenceConstraints) {
+
+  // Find out needed number of tokens
+  auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
+      context, outputDir / "lhs_reachability", lhsPath);
+  if (failed(failOrLHSseqLen))
+    return failure();
+
+  // TODO remove
+  llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n";
+
+  auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
+      context, outputDir / "rhs_reachability", rhsPath);
+  if (failed(failOrRHSseqLen))
+    return failure();
+
+  // TODO remove
+  llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n";
+
+  size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
+
+  std::filesystem::path miterDir = outputDir / "miter";
+  // Create the miterDir if it doesn't exist
+  std::filesystem::create_directories(miterDir);
+
+  // Create Miter module with needed N
+  auto failOrPair = dynamatic::experimental::createMiterFabric(
+      context, lhsPath, rhsPath, miterDir.string(), n);
+  if (failed(failOrPair)) {
+    llvm::errs() << "Failed to create elastic-miter module.\n";
+    return failure();
+  }
+  auto [mlirPath, config] = failOrPair.value();
+
+  auto failOrSmvPath =
+      dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
+  if (failed(failOrSmvPath)) {
+    llvm::errs() << "Failed to convert miter module to SMV.\n";
+    return failure();
+  }
+  auto smvPath = failOrSmvPath.value();
+
+  std::filesystem::path wrapperPath = miterDir / "main.smv";
+
+  // Create wrapper (main) for the elastic-miter
+  // Currently handshake2smv only supports "model" as the model's name
+  auto fail = dynamatic::experimental::createWrapper(
+      wrapperPath, config, "model", n, true, sequenceConstraints);
+  if (failed(fail))
+    return failure();
+
+  // Put the output of the CTLSPEC check into results.txt. Later we
+  // read from that file to check whether all the CTL properties pass.
+  std::filesystem::path resultTxtPath = miterDir / "result.txt";
+  std::string miterCommand = "check_invar -s forward;\n"
+                             "check_ctlspec;\n"
+                             "show_traces -a -p 4 -o trace.xml;\n";
+  LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
+      miterDir / "prove.cmd", miterDir / "main.smv", miterCommand);
+  if (failed(cmdFail))
+    return failure();
+
+  // Run equivalence checking
+  dynamatic::experimental::runSmvCmd(miterDir / "prove.cmd", resultTxtPath);
+
+  bool isEquivalent = true;
+  std::string line;
+  std::ifstream result(resultTxtPath);
+  while (getline(result, line)) {
+    // TODO remove
+    llvm::outs() << line << "\n";
+    if (line.find("is false") != std::string::npos) {
+      isEquivalent = false;
+    }
+  }
+  result.close();
+  return isEquivalent;
+}
+
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
@@ -148,55 +235,6 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
 
-  std::filesystem::path lhsPath = lhsFilenameArg.getValue();
-  std::filesystem::path rhsPath = rhsFilenameArg.getValue();
-  std::filesystem::path outputDir = outputDirArg.getValue();
-
-  // Create the outputDir if it doesn't exist
-  std::filesystem::create_directories(outputDir);
-
-  // Find out needed number of tokens
-  auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "lhs_reachability", lhsPath);
-  if (failed(failOrLHSseqLen))
-    return 1;
-
-  // TODO remove
-  llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n";
-
-  auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
-      context, outputDir / "rhs_reachability", rhsPath);
-  if (failed(failOrRHSseqLen))
-    return 1;
-
-  // TODO remove
-  llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n";
-
-  size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
-
-  std::filesystem::path miterDir = outputDir / "miter";
-  // Create the miterDir if it doesn't exist
-  std::filesystem::create_directories(miterDir);
-
-  // Create Miter module with needed N
-  auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, miterDir.string(), n);
-  if (failed(failOrPair)) {
-    llvm::errs() << "Failed to create elastic-miter module.\n";
-    return 1;
-  }
-  auto [mlirPath, config] = failOrPair.value();
-
-  auto failOrSmvPath =
-      dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
-  if (failed(failOrSmvPath)) {
-    llvm::errs() << "Failed to convert miter module to SMV.\n";
-    return 1;
-  }
-  auto smvPath = failOrSmvPath.value();
-
-  std::filesystem::path wrapperPath = miterDir / "main.smv";
-
   // Create sequence constraint struct. cl::list needs to be converted to
   // SmallVector first
   auto failOrSequenceConstraints = parseSequenceConstraints();
@@ -205,39 +243,20 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Create wrapper (main) for the elastic-miter
-  // Currently handshake2smv only supports "model" as the model's name
-  auto fail = dynamatic::experimental::createWrapper(
-      wrapperPath, config, "model", n, true, failOrSequenceConstraints.value());
-  if (failed(fail))
+  std::filesystem::path lhsPath = lhsFilenameArg.getValue();
+  std::filesystem::path rhsPath = rhsFilenameArg.getValue();
+  std::filesystem::path outputDir = outputDirArg.getValue();
+
+  // Create the outputDir if it doesn't exist
+  std::filesystem::create_directories(outputDir);
+
+  auto failrOrEquivalent = checkEquivalence(
+      context, lhsPath, rhsPath, outputDir, failOrSequenceConstraints.value());
+  if (failed(failrOrEquivalent)) {
+    llvm::errs() << "Equivalence checking failed.\n";
     return 1;
-
-  // Put the output of the CTLSPEC check into results.txt. Later we read from
-  // that file to check whether all the CTL properties pass.
-  std::filesystem::path resultTxtPath = miterDir / "result.txt";
-  std::string miterCommand = "check_invar -s forward;\n"
-                             "show_traces -a -p 4 -o trace.xml;\n"
-                             "check_ctlspec;\n";
-  LogicalResult cmdFail = dynamatic::experimental::createCMDfile(
-      miterDir / "prove.cmd", miterDir / "main.smv", miterCommand);
-  if (failed(cmdFail))
-    return 1;
-
-  // Run equivalence checking
-  dynamatic::experimental::runNuXmv(miterDir / "prove.cmd", resultTxtPath);
-
-  bool equivalent = true;
-  std::string line;
-  std::ifstream result(resultTxtPath);
-  while (getline(result, line)) {
-    // TODO remove
-    llvm::outs() << line << "\n";
-    if (line.find("is false") != std::string::npos) {
-      equivalent = false;
-    }
   }
-  result.close();
   // TODO print?
 
-  exit(!equivalent);
+  exit(!failrOrEquivalent.value());
 }

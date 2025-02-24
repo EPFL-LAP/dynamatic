@@ -5,6 +5,8 @@
 This creates an elastic-miter module in the Handshake dialect using two MLIR files as input. Each file must contain exactly one module, and each module must include a single handshake.func. The generated miter MLIR file and JSON config file will be saved in the specified output directory.
 
 
+TODO nuXmv needs to be on path (maybe also nuSMV)
+
 #### Usage
 ```bash
 elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> --bufferSlots=<nr-of-slots>
