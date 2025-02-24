@@ -88,8 +88,8 @@ namespace llvm {
 /// the port is part of a vector in RTL.
 using Port = std::pair<std::string, bool>;
 
-Port EMPTY_KEY = {"EMPTY_KEY", false};
-Port TOMBSTONE_KEY = {"TOMBSTONE_KEY", false};
+const Port EMPTY_KEY = {"EMPTY_KEY", false};
+const Port TOMBSTONE_KEY = {"TOMBSTONE_KEY", false};
 
 template <>
 struct DenseMapInfo<Port> {
@@ -299,7 +299,7 @@ public:
   /// Associates each SSA value inside the module to internal module signals.
   /// Fails when encoutering an unsupported operation inside the module;
   /// succeeds otherwise.
-  LogicalResult createInternalSignals(WriteModData &data) const;
+  virtual LogicalResult createInternalSignals(WriteModData &data) const;
 
   void fillIOMappings(hw::InstanceOp instOp, const FGetValueName &getValueName,
                       IOMap &mappings) const;
@@ -327,14 +327,16 @@ using PortMapWriter = void (*)(const RTLWriter::Port &port,
 /// Writes IO mappings to the output stream. Provided with a correct
 /// port-mapping function, this works for both VHDL and Verilog.
 static void writeIOMap(const RTLWriter::IOMap &mappings,
-                       PortMapWriter writePortMap, raw_indented_ostream &os) {
+                       PortMapWriter writePortMap, const std::string &separator,
+                       raw_indented_ostream &os) {
   size_t numIOLeft = mappings.size();
   for (auto &[port, signalNames] : mappings) {
     writePortMap(port, signalNames, os);
     if (--numIOLeft != 0)
-      os << ",";
-    os << "\n";
+      os << separator;
   }
+  if (separator.find('\n') != std::string::npos)
+    os << '\n';
 }
 
 /// Returns the type's inclusive array bound.
@@ -393,7 +395,7 @@ void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      bool toPrint =
+      const bool toPrint =
           hdl != HDL::SMV ? true : portName != "rst" && portName != "clk";
       if (toPrint) {
         writeDeclaration(portName, dir, portType, os);
@@ -776,7 +778,6 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
 
       for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams}.drop_back())
         os << val << ", ";
-
       os << genericParams.back().second << ")";
     }
     os << "\n";
@@ -805,7 +806,7 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
     os.indent();
     IOMap mappings;
     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
-    writeIOMap(mappings, writePortMap, os);
+    writeIOMap(mappings, writePortMap, ",\n", os);
     os.unindent();
     os << ");\n";
     os.unindent();
@@ -944,7 +945,7 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
     os.indent();
     IOMap mappings;
     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
-    writeIOMap(mappings, writePortMap, os);
+    writeIOMap(mappings, writePortMap, ",\n", os);
     os.unindent();
     os << ");\n\n";
   }
@@ -963,18 +964,6 @@ struct SMVWriter : public RTLWriter {
   LogicalResult write(hw::HWModuleOp modOp,
                       raw_indented_ostream &os) const override;
 
-  // Overriding some stuff: should I mark them as virtual in the base class?
-  static void writeIOMap(const RTLWriter::IOMap &mappings,
-                         PortMapWriter writePortMap, raw_indented_ostream &os) {
-    size_t numIOLeft = mappings.size();
-    for (auto &[port, signalNames] : mappings) {
-      writePortMap(port, signalNames, os);
-      if (--numIOLeft != 0) {
-        os << ", ";
-      }
-    }
-  }
-
 private:
   void constructIOMappings(hw::InstanceOp instOp, hw::HWModuleLike modOp,
                            const FGetValueName &getValueName,
@@ -982,7 +971,7 @@ private:
                            const FGetSignalName &getSignalName,
                            IOMap &mappings) const override;
 
-  LogicalResult createInternalSignals(WriteModData &data) const;
+  LogicalResult createInternalSignals(WriteModData &data) const override;
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteModData &data) const;
   void writeIncludes(WriteModData &data) const;
@@ -1016,7 +1005,7 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
 
   // Create signal names for all operation results
   for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
-    LogicalResult res =
+    const LogicalResult res =
         llvm::TypeSwitch<Operation *, LogicalResult>(&op)
             .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) {
               // Retrieve the module referenced by the instance
@@ -1085,7 +1074,7 @@ void SMVWriter::constructIOMappings(
       }
     }
 
-    std::string signal = instName + "." + argName;
+    const std::string signal = instName + "." + argName;
 
     if (instFound && argFound)
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
@@ -1220,7 +1209,7 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
     // Write IO mappings
     IOMap mappings;
     fillIOMappings(instOp, data.getSignalNameFunc(), mappings);
-    writeIOMap(mappings, writePortMap, os);
+    writeIOMap(mappings, writePortMap, ", ", os);
     os << ");\n";
   }
 }
