@@ -250,7 +250,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     ```
   }];
 
-  // ConstantOp cannot limit the control signal to SimpleControl.
+  // The ctrl operand may have extra signals.
   // See type verification documentation for details.
   let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
   let results = (outs ChannelType:$result);

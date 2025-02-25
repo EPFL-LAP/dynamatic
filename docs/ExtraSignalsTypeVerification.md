@@ -149,20 +149,6 @@ Some `HandshakeType` instances may include **extra signals** beyond `(data +) va
 - `!handshake.channel<i32, [spec: i1]>`
 - `!handshake.control<[spec: i1, tag: i8]>`
 
-
-
-In some cases, we enforce that an operand is **without** extra signals. For this, we use **simple types**:
-
-- `SimpleHandshake`
-- `SimpleChannel`
-- `SimpleControl`
-
-For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
-
-https://github.com/EPFL-LAP/dynamatic/blob/28872676a0f3438e82c064242fac517059e22fc2/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L621-L624
-
-These ensure that the channel does not carry any additional signals.
-
 ### Traits
 
 **Traits** are constraints applied to operations. They serve various purposes, but here we discuss their use for type validation.
@@ -189,7 +175,9 @@ MLIR provides `AllTypesMatch`, but we've introduced similar traits:
 
 Traits are sometimes called **multi-entity constraints** because they enforce relationships across multiple operands or results.
 
-- In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
+In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
+
+It's worth noting that we sometimes use traits even in single-entity cases for consistency. For example, `IsSimpleHandshake` ensures the type doesn't include any extra signals, while `IsIntChannel` ensures the channel's data type is `IntegerType`.
 
 More on constraints: https://mlir.llvm.org/docs/DefiningDialects/Operations/#constraints
 

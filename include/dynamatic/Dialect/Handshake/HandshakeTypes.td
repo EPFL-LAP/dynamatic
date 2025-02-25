@@ -51,7 +51,7 @@ def ControlType : Handshake_Type<"Control", "control", [
   let parameters = (ins ExtraSignals:$extraSignals);
 
   let builders = [
-    // If no parameters provided, build SimpleControl
+    // If no parameters provided, build without extra signals
     TypeBuilder<(ins),
       [{
         return ControlType::get($_ctxt, {});
@@ -201,12 +201,6 @@ def SimpleControl : Type<
   "::dynamatic::handshake::ControlType"
 >;
 
-def SimpleChannel : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ChannelType` type with no extra signals",
-  "::dynamatic::handshake::ChannelType"
->;
-
 // Temporary constraint for UnbundleOp.
 def ChannelOrSimpleControl : TypeConstraint<
   CPred<[{
@@ -298,11 +292,25 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
   ), ", ") # "})">
 >;
 
-/// Constraint to ensure an input/output is of SimpleControl/Channel type.
+/// Constraint to ensure an operand/result shouldn't have any extra signals.
 class IsSimpleHandshake<string name> : PredOpTrait<
-  name # " should be of SimpleControl or SimpleChannel type",
+  name # " shouldn't have any extra signals",
   CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getNumExtraSignals() == 0">
+>;
+
+/// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
+class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<[{
+    ([&](auto&& variadicTypes) {
+      for (::mlir::Type variadicType : variadicTypes) {
+        if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ".getTypes())">
 >;
 
 /// Merging Relationship of Extra Signals:
