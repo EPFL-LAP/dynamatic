@@ -217,26 +217,6 @@ void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         DictionaryAttr::get(ctx, attributes));
 }
 
-std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
-  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
-}
-
-//===----------------------------------------------------------------------===//
-// InitOp
-//===----------------------------------------------------------------------===//
-
-std::pair<handshake::ChannelType, bool> InitOp::getReshapableChannelType() {
-  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
-}
-
-//===----------------------------------------------------------------------===//
-// NDWireOp
-//===----------------------------------------------------------------------===//
-
-std::pair<handshake::ChannelType, bool> NDWireOp::getReshapableChannelType() {
-  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
-}
-
 //===----------------------------------------------------------------------===//
 // MergeOp
 //===----------------------------------------------------------------------===//
