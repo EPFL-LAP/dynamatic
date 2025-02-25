@@ -51,7 +51,7 @@ def ControlType : Handshake_Type<"Control", "control", [
   let parameters = (ins ExtraSignals:$extraSignals);
 
   let builders = [
-    // If no parameters provided, build SimpleControl
+    // If no parameters provided, build without extra signals
     TypeBuilder<(ins),
       [{
         return ControlType::get($_ctxt, {});
@@ -123,23 +123,6 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
-
-class ChannelHasDataType<string type> : CPred<
-  "::mlir::isa<" # type #
-  ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
->;
-
-class ChannelHasDataWidth<int width> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
-  "($_self).getDataBitWidth() == " # width
->;
-
-class HasNumExtras<int numExtras> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>" #
-  "($_self).getNumExtraSignals() == " # numExtras
->;
-
 def SignalType : Type<
   CPred<"::dynamatic::handshake::ChannelType::isSupportedSignalType($_self)">,
   "must be an `IntegerType` or `FloatType`"> {
@@ -153,56 +136,71 @@ def HandshakeType : Type<
   "must be a `handshake::ControlType` or `handshake::ChannelType` type"> {
 }
 
-class TypedChannel<string type> : TypeConstraint<
-  ChannelHasDataType<type>,
-  "must be a `handshake::ChannelType` type whose data is " # type,
-  "::dynamatic::handshake::ChannelType"
+class IsChannelPred<string name> : CPred<
+  "::mlir::isa<::dynamatic::handshake::ChannelType>($" # name # ".getType())">;
+
+class IsIntChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::IntegerType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsFloatChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::FloatType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsSizedChannelPred<int width, string name> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataBitWidth() == " # width>;
+
+/// Ensures an operand/result is of ChannelType carrying IntegerType data.
+class IsIntChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data",
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>
+  ]>
 >;
-
-def IntChannelType : TypedChannel<"::mlir::IntegerType">;
-def FloatChannelType : TypedChannel<"::mlir::FloatType">;
-
-class TypedSizedChannel<string type, int width> : TypeConstraint<
-  And<[ChannelHasDataType<type>, ChannelHasDataWidth<width>]>,
-  "must be a `handshake::ChannelType` type whose data is " # type #
-  " and whose bitwidth is " # width,
-  "::dynamatic::handshake::ChannelType"
->;
-
-class IntSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::IntegerType", width
->;
-
-class FloatSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::FloatType", width
->;
-
-def BoolChannel : IntSizedChannel<1>;
 
 /// Ensures an operand/result is of ChannelType carrying IntegerType data of the
 /// specified width.
 class IsIntSizedChannel<int width, string name> : PredOpTrait<
   name # " should be of ChannelType carrying IntegerType data of width " # width,
-  CPred<
-    "::mlir::isa<::dynamatic::handshake::ChannelType>($"
-    # name # ".getType()) &&"
-    "::mlir::isa<::mlir::IntegerType>("
-    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
-    ".getDataType()) &&"
-    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
-    ".getDataBitWidth() == " # width>
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>,
+    IsSizedChannelPred<width, name>
+  ]>
 >;
 
-def SimpleControl : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ControlType` type with no extra signals",
-  "::dynamatic::handshake::ControlType"
+/// Ensures an operand/result is of ChannelType carrying FloatType data.
+class IsFloatChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying FloatType data",
+  And<[
+    IsChannelPred<name>,
+    IsFloatChannelPred<name>
+  ]>
 >;
 
-def SimpleChannel : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ChannelType` type with no extra signals",
-  "::dynamatic::handshake::ChannelType"
+/// Constraint to ensure an operand/result shouldn't have any extra signals.
+class IsSimpleHandshake<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getNumExtraSignals() == 0">
+>;
+
+/// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
+class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<[{
+    ([&](auto&& variadicTypes) {
+      for (::mlir::Type variadicType : variadicTypes) {
+        if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ".getTypes())">
 >;
 
 // Temporary constraint for UnbundleOp.
@@ -294,13 +292,6 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
     "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getExtraSignals()"
   ), ", ") # "})">
->;
-
-/// Constraint to ensure an input/output is of SimpleControl/Channel type.
-class IsSimpleHandshake<string name> : PredOpTrait<
-  name # " should be of SimpleControl or SimpleChannel type",
-  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
-    ".getType()).getNumExtraSignals() == 0">
 >;
 
 /// Merging Relationship of Extra Signals:

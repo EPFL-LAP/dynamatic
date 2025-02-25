@@ -355,6 +355,7 @@ def MuxOp : Handshake_Op<"mux", [
   VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  IsSimpleHandshake<"selectOperand">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -381,7 +382,7 @@ def MuxOp : Handshake_Op<"mux", [
       !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
-  let arguments = (ins SimpleChannel:$selectOperand,
+  let arguments = (ins ChannelType:$selectOperand,
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
 
@@ -394,6 +395,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   VariadicHasElement<"dataOperands">,
   MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  IsSimpleHandshake<"index">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
   DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
@@ -414,7 +416,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands);
-  let results = (outs HandshakeType:$result, SimpleChannel:$index);
+  let results = (outs HandshakeType:$result, ChannelType:$index);
   
   let builders = [OpBuilder<
     (ins "ValueRange":$operands), [{
@@ -460,6 +462,7 @@ def BranchOp : Handshake_Op<"br", [
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
   AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
+  IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
@@ -479,7 +482,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     ```
   }];
 
-  let arguments = (ins BoolChannel:$conditionOperand,
+  let arguments = (ins ChannelType:$conditionOperand,
                        HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
@@ -530,7 +533,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   let results = (outs ControlType:$result);
 
   let builders = [
-    // Unless otherwise specified, output type is SimpleControl
+    // Unless otherwise specified, output type doesn't have any extra signals.
     OpBuilder<(ins), [{
       $_state.addTypes(ControlType::get($_builder.getContext(), /*extraSignals=*/{}));
     }]>
@@ -582,6 +585,14 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 //===----------------------------------------------------------------------===//
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
+  // The memory controller does not accept ControlTypes with extra signals.
+  // Handling extra signals is the responsibility of MemPortOps (Load/Store).
+  // See the issue #214.
+  IsSimpleHandshake<"memStart">,
+  IsSimpleHandshake<"ctrlEnd">,
+  IsSimpleHandshake<"memEnd">,
+  IsSimpleHandshakeVariadic<"inputs">,
+  IsSimpleHandshakeVariadic<"outputs">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -629,13 +640,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     ```
   }];
 
-  // The memory controller does not accept ControlTypes with extra signals.
-  // Handling extra signals is the responsibility of MemPortOps (e.g., LoadOp, StoreOp, ...).
-  // See the issue #214.
-  let arguments = (ins AnyMemRef:$memRef, SimpleControl:$memStart,
-                       Variadic<SimpleChannel>:$inputs, SimpleControl:$ctrlEnd,
+  let arguments = (ins AnyMemRef:$memRef, ControlType:$memStart,
+                       Variadic<ChannelType>:$inputs, ControlType:$ctrlEnd,
                        I32ArrayAttr:$connectedBlocks);
-  let results = (outs Variadic<SimpleChannel>:$outputs, SimpleControl:$memEnd);
+  let results = (outs Variadic<ChannelType>:$outputs, ControlType:$memEnd);
 
   let builders = [OpBuilder<(ins "Value":$memRef, "Value":$memStart,
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
@@ -769,11 +777,13 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+    IsIntChannel<"address">,
+    IsIntChannel<"addressResult">
   ]
 > {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins ChannelType:$address, ChannelType:$data);
+  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult);
 
   let builders = customBuilders # [
     // Unless otherwise specified, addressResult/dataResult type is the same as
