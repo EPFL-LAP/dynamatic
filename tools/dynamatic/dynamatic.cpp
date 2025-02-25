@@ -603,6 +603,8 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+    } else if (it->second == "vhdl-spec") {
+      hdl = "vhdl-spec";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
                    << "', possible options are 'vhdl' and "

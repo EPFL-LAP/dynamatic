@@ -26,7 +26,10 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 # Set the correct config file
 RTL_CONFIG=""
 if [ "$HDL" == "vhdl" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
+elif [ "$HDL" == "vhdl-spec" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-spec.json"
+  HDL="vhdl"
 elif [ "$HDL" == "verilog" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
 fi
