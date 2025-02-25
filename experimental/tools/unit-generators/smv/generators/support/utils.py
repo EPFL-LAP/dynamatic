@@ -59,7 +59,7 @@ class SmvScalarType:
     if self.bitwidth == 1:
       return "TRUE" if bool(value) else "FALSE"
     else:
-      return int(value)
+      return str(value)
 
   def __str__(self):
     return f"{self.smv_type}"

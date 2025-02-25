@@ -21,7 +21,6 @@
   {
     "name": "handshake.constant",
    "parameters": [
-    {"name": "DATA_WIDTH", "type": "unsigned"},
     {"name": "VALUE", "type": "string"}
   ],
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t constant -p value=0b$VALUE port_types=$PORT_TYPES",
@@ -133,12 +132,15 @@
    "parameters": [
     {"name": "PREDICATE", "type": "string"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpi --abstract-data -p latency=0 predicate=\"$PREDICATE\" port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpi --abstract-data -p latency=0 predicate='\"$PREDICATE\"' port_types=$PORT_TYPES",
     "hdl": "smv"
   },
   {
     "name": "handshake.cmpf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpf --abstract-data -p latency=0 predicate=\"$PREDICATE\" port_types=$PORT_TYPES",
+    "parameters": [
+      {"name": "PREDICATE", "type": "string"}
+    ],  
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpf --abstract-data -p latency=0 predicate='\"$PREDICATE\"' port_types=$PORT_TYPES",
     "hdl": "smv"
   },
   {
@@ -151,9 +153,6 @@
   },
   {
     "name": "handshake.divf",
-   "parameters": [
-      {"name": "DATA_TYPE", "type": "dataflow"}
-   ],
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=29 port_types=$PORT_TYPES",
     "hdl": "smv"
   },
