@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType
 from generators.support.logic import generate_or_n
 from generators.support.eager_fork_register_block import generate_eager_fork_register_block
 
+
 def generate_fork(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
@@ -12,13 +13,14 @@ def generate_fork(name, params):
   else:
     return _generate_fork_dataless(name, size)
 
+
 def _generate_fork_dataless(name, size):
   or_n_name = f"{name}_or_n"
   regblock_name = f"{name}_regblock"
 
   dependencies = \
-    generate_or_n(or_n_name, {"size": size}) + \
-    generate_eager_fork_register_block(regblock_name)
+      generate_or_n(or_n_name, {"size": size}) + \
+      generate_eager_fork_register_block(regblock_name)
 
   entity = f"""
 library ieee;
@@ -74,6 +76,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_fork(name, size, bitwidth):
   inner_name = f"{name}_inner"

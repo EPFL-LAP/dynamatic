@@ -1,5 +1,6 @@
 import re
 
+
 def parse_extra_signals(extra_signals: str) -> dict[str, int]:
   """
   Parses a string of extra signals and their bitwidths.
@@ -24,12 +25,13 @@ def parse_extra_signals(extra_signals: str) -> dict[str, int]:
 
   return extra_signals_dict
 
+
 class VhdlScalarType:
 
   mlir_type: str
   # Note: VHDL only requires information on bitwidth and extra signals
   bitwidth: int
-  extra_signals: dict[str, int] # key: name, value: bitwidth (todo)
+  extra_signals: dict[str, int]  # key: name, value: bitwidth (todo)
 
   def __init__(self, mlir_type: str):
     """
