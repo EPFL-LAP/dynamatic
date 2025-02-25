@@ -24,7 +24,7 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    SameOperandsAndResultType, ReshapableChannelsInterface,
+    SameOperandsAndResultType,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
@@ -55,8 +55,7 @@ class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType]
 > {
   let arguments = (ins FloatChannelType:$operand);
   let results = (outs FloatChannelType:$result);
@@ -67,7 +66,6 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
     AllTypesMatch<["lhs", "rhs"]>, SameExtraSignalsInterface,
-    ReshapableChannelsInterface,
     DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]> {
@@ -89,8 +87,7 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface]
 > {
   let arguments = (ins IntChannelType:$in);
   let results = (outs IntChannelType:$out);
@@ -102,8 +99,7 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface]
 > {
   let arguments = (ins FloatChannelType:$in);
   let results = (outs FloatChannelType:$out);
@@ -114,8 +110,7 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface]
 > {
   let arguments = (ins IntChannelType:$in);
   let results = (outs FloatChannelType:$out);
@@ -126,8 +121,7 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                          ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface]
 > {
   let arguments = (ins FloatChannelType:$in);
   let results = (outs IntChannelType:$out);
@@ -289,7 +283,6 @@ def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
 
 def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   AllTypesMatch<["trueValue", "falseValue", "result"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
   DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
