@@ -153,6 +153,7 @@ class IsSizedChannelPred<int width, string name> : CPred<
   "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
   ".getDataBitWidth() == " # width>;
 
+/// Ensures an operand/result is of ChannelType carrying IntegerType data.
 class IsIntChannel<string name> : PredOpTrait<
   name # " should be of ChannelType carrying IntegerType data",
   And<[
@@ -172,6 +173,7 @@ class IsIntSizedChannel<int width, string name> : PredOpTrait<
   ]>
 >;
 
+/// Ensures an operand/result is of ChannelType carrying FloatType data.
 class IsFloatChannel<string name> : PredOpTrait<
   name # " should be of ChannelType carrying FloatType data",
   And<[

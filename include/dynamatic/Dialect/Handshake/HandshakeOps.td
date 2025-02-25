@@ -586,8 +586,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 
 def MemoryControllerOp : Handshake_Op<"mem_controller", [
   // The memory controller does not accept ControlTypes with extra signals.
-  // Handling extra signals is the responsibility of MemPortOps
-  // (e.g., LoadOp, StoreOp, ...).
+  // Handling extra signals is the responsibility of MemPortOps (Load/Store).
   // See the issue #214.
   IsSimpleHandshake<"memStart">,
   IsSimpleHandshake<"ctrlEnd">,
