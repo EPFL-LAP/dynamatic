@@ -43,6 +43,7 @@ For `FPGA20Buffers`, the remap is as follows:
 When numslot = 1, map to a 1-slot DV buffer.
 When numslot = 2, map to a 1-slot DV buffer plus a 1-slot R buffer.
 When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
+
 2. For Transparent Slots:
 When numslot = 1, map to a 1-slot R buffer.
 When numslot > 1, map to a numslot-slot T buffer.
