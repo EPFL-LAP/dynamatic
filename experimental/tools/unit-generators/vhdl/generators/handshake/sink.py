@@ -1,5 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
+
 def generate_sink(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
@@ -23,7 +24,8 @@ end entity;
 """
 
   # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([("ins", "in")], data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      [("ins", "in")], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
   architecture = f"""

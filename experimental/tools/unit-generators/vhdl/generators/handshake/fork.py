@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.logic import generate_or_n
 from generators.support.eager_fork_register_block import generate_eager_fork_register_block
 
+
 def generate_fork(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
@@ -17,13 +18,14 @@ def generate_fork(name, params):
   else:
     return _generate_fork_dataless(name, size)
 
+
 def _generate_fork_dataless(name, size):
   or_n_name = f"{name}_or_n"
   regblock_name = f"{name}_regblock"
 
   dependencies = \
-    generate_or_n(or_n_name, {"size": size}) + \
-    generate_eager_fork_register_block(regblock_name)
+      generate_or_n(or_n_name, {"size": size}) + \
+      generate_eager_fork_register_block(regblock_name)
 
   entity = f"""
 library ieee;
@@ -80,6 +82,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_fork(name, size, bitwidth):
   inner_name = f"{name}_inner"
 
@@ -131,6 +134,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_fork_signal_manager(name, size, data_type):
   inner_name = f"{name}_inner"
 
@@ -169,7 +173,8 @@ end entity;
   extra_signal_need_ports = [("ins", "in")]
   for i in range(size):
     extra_signal_need_ports.append((f"outs_{i}", "out"))
-  extra_signal_ports = generate_extra_signal_ports(extra_signal_need_ports, data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      extra_signal_need_ports, data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -194,17 +199,20 @@ begin
 end architecture;
 """
 
-  ins_conversion = generate_ins_concat_statements("ins", "ins_inner", extra_signal_mapping, bitwidth)
+  ins_conversion = generate_ins_concat_statements(
+      "ins", "ins_inner", extra_signal_mapping, bitwidth)
   outs_conversion = []
   for i in range(size):
-    outs_conversion.append(generate_outs_concat_statements(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"outs({i})"))
+    outs_conversion.append(generate_outs_concat_statements(
+        f"outs_{i}", f"outs_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"outs({i})"))
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + "\n" + "\n".join(outs_conversion)
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + "\n" + "\n".join(outs_conversion)
   )
 
   return dependencies + entity + architecture
+
 
 def _generate_fork_signal_manager_dataless(name, size, data_type):
   inner_name = f"{name}_inner"
@@ -240,7 +248,8 @@ end entity;
   extra_signal_need_ports = [("ins", "in")]
   for i in range(size):
     extra_signal_need_ports.append((f"outs_{i}", "out"))
-  extra_signal_ports = generate_extra_signal_ports(extra_signal_need_ports, data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      extra_signal_need_ports, data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -265,14 +274,16 @@ begin
 end architecture;
 """
 
-  ins_conversion = generate_ins_concat_statements_dataless("ins", "ins_inner", extra_signal_mapping)
+  ins_conversion = generate_ins_concat_statements_dataless(
+      "ins", "ins_inner", extra_signal_mapping)
   outs_conversion = []
   for i in range(size):
-    outs_conversion.append(generate_outs_concat_statements_dataless(f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
+    outs_conversion.append(generate_outs_concat_statements_dataless(
+        f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + "\n".join(outs_conversion)
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + "\n".join(outs_conversion)
   )
 
   return dependencies + entity + architecture

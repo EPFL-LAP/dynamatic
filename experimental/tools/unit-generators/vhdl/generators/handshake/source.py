@@ -1,5 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, extra_signal_default_values
 
+
 def generate_source(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["outs"])
@@ -23,7 +24,8 @@ end entity;
 """
 
   # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([("outs", "out")], data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      [("outs", "out")], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
   architecture = f"""
@@ -37,7 +39,9 @@ end arch;
 
   extra_signal_assignments = []
   for signal_name in data_type.extra_signals:
-    extra_signal_assignments.append(f"  outs_{signal_name} <= {extra_signal_default_values[signal_name]};")
-  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join(extra_signal_assignments))
+    extra_signal_assignments.append(
+        f"  outs_{signal_name} <= {extra_signal_default_values[signal_name]};")
+  architecture = architecture.replace(
+      "  [EXTRA_SIGNAL_LOGIC]", "\n".join(extra_signal_assignments))
 
   return entity + architecture

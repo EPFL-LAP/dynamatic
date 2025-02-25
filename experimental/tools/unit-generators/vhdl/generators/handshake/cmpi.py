@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.support.join import generate_join
 
+
 def generate_cmpi(name, params):
   port_types = params["port_types"]
   predicate = params["predicate"]
@@ -11,6 +12,7 @@ def generate_cmpi(name, params):
     return _generate_cmpi_signal_manager(name, predicate, data_type)
   else:
     return _generate_cmpi(name, predicate, data_type.bitwidth)
+
 
 def _get_symbol_from_predicate(pred):
   match pred:
@@ -40,6 +42,7 @@ def _get_sign_from_predicate(pred):
       return "unsigned"
     case _:
       raise ValueError(f"Predicate {pred} not known")
+
 
 def _generate_cmpi(name, predicate, bitwidth):
   join_name = f"{name}_join"
@@ -95,6 +98,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_cmpi_signal_manager(name, predicate, data_type):
   def _generate_inner(inner_name, in_bitwidth, _):

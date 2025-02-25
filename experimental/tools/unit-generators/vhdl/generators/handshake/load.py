@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 
+
 def generate_load(name, params):
   port_types = params["port_types"]
 
@@ -14,23 +15,24 @@ def generate_load(name, params):
   else:
     return _generate_load(name, data_type.bitwidth, addr_type.bitwidth)
 
+
 def _generate_load(name, data_bitwidth, addr_bitwidth):
   addr_tehb_name = f"{name}_addr_tehb"
   data_tehb_name = f"{name}_data_tehb"
 
   dependencies = \
-    generate_tehb(addr_tehb_name, {
-      "port_types": {
-        "ins": f"!handshake.channel<i{addr_bitwidth}>",
-        "outs": f"!handshake.channel<i{addr_bitwidth}>"
-      }
-    }) + \
-    generate_tehb(data_tehb_name, {
-      "port_types": {
-        "ins": f"!handshake.channel<i{data_bitwidth}>",
-        "outs": f"!handshake.channel<i{data_bitwidth}>"
-      }
-    })
+      generate_tehb(addr_tehb_name, {
+          "port_types": {
+              "ins": f"!handshake.channel<i{addr_bitwidth}>",
+              "outs": f"!handshake.channel<i{addr_bitwidth}>"
+          }
+      }) + \
+      generate_tehb(data_tehb_name, {
+          "port_types": {
+              "ins": f"!handshake.channel<i{data_bitwidth}>",
+              "outs": f"!handshake.channel<i{data_bitwidth}>"
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -97,6 +99,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_load_signal_manager(name, data_type, addr_type):
   inner_name = f"{name}_inner"
   tfifo_name = f"{name}_tfifo"
@@ -110,13 +113,13 @@ def _generate_load_signal_manager(name, data_type, addr_type):
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth) + \
-    generate_tfifo(tfifo_name, {
-      "port_types": {
-        "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
-        "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
-      },
-      "num_slots": 32 # todo
-    })
+      generate_tfifo(tfifo_name, {
+          "port_types": {
+              "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
+              "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
+          },
+          "num_slots": 32  # todo
+      })
 
   entity = f"""
 library ieee;
@@ -150,8 +153,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("addrIn", "in"),
-    ("dataOut", "out")
+      ("addrIn", "in"),
+      ("dataOut", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -201,12 +204,14 @@ begin
 end architecture;
 """
 
-  ins_conversion = generate_ins_concat_statements_dataless("addrIn", "tfifo_ins_inner", extra_signal_mapping)
-  outs_conversion = generate_outs_concat_statements_dataless("dataOut", "tfifo_outs_inner", extra_signal_mapping)
+  ins_conversion = generate_ins_concat_statements_dataless(
+      "addrIn", "tfifo_ins_inner", extra_signal_mapping)
+  outs_conversion = generate_outs_concat_statements_dataless(
+      "dataOut", "tfifo_outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + outs_conversion
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + outs_conversion
   )
 
   return dependencies + entity + architecture

@@ -5,6 +5,7 @@ from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 from generators.handshake.oehb import generate_oehb
 
+
 def generate_buffer(name, params):
   num_slots = params["num_slots"]
 

@@ -1,5 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 
+
 def generate_store(name, params):
   port_types = params["port_types"]
 
@@ -11,6 +12,7 @@ def generate_store(name, params):
     return _generate_store_signal_manager(name, data_type, addr_type)
   else:
     return _generate_store(name, data_type.bitwidth, addr_type.bitwidth)
+
 
 def _generate_store(name, data_bitwidth, addr_bitwidth):
   entity = f"""
@@ -59,6 +61,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_store_signal_manager(name, data_type, addr_type):
   inner_name = f"{name}_inner"
 
@@ -99,8 +102,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("addrIn", "in"),
-    ("dataIn", "out")
+      ("addrIn", "in"),
+      ("dataIn", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 

@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 
+
 def generate_buffer_like_signal_manager_full(name: str, size: int, data_type: VhdlScalarType, generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
 
@@ -38,7 +39,7 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("ins", "in"), ("outs", "out")
+      ("ins", "in"), ("outs", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -64,20 +65,24 @@ begin
 end architecture;
 """
 
-  ins_conversion = generate_ins_concat_statements("ins", "ins_inner", extra_signal_mapping, bitwidth)
-  outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
+  ins_conversion = generate_ins_concat_statements(
+      "ins", "ins_inner", extra_signal_mapping, bitwidth)
+  outs_conversion = generate_outs_concat_statements(
+      "outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + outs_conversion
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + outs_conversion
   )
 
   return dependencies + entity + architecture
 
+
 def generate_buffer_like_signal_manager(name: str, data_type: VhdlScalarType, generate_inner: Callable[[str, int], str]) -> str:
   return generate_buffer_like_signal_manager_full(
-    name, 0, data_type,
-    lambda name, _, bitwidth: generate_inner(name, bitwidth))
+      name, 0, data_type,
+      lambda name, _, bitwidth: generate_inner(name, bitwidth))
+
 
 def generate_buffer_like_signal_manager_dataless_full(name: str, size: int, data_type: VhdlScalarType, generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
@@ -111,7 +116,7 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("ins", "in"), ("outs", "out")
+      ("ins", "in"), ("outs", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -137,17 +142,20 @@ begin
 end architecture;
 """
 
-  ins_conversion = generate_ins_concat_statements_dataless("ins", "ins_inner", extra_signal_mapping)
-  outs_conversion = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
+  ins_conversion = generate_ins_concat_statements_dataless(
+      "ins", "ins_inner", extra_signal_mapping)
+  outs_conversion = generate_outs_concat_statements_dataless(
+      "outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    ins_conversion + outs_conversion
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + outs_conversion
   )
 
   return dependencies + entity + architecture
 
+
 def generate_buffer_like_signal_manager_dataless(name: str, data_type: VhdlScalarType, generate_inner: Callable[[str, int], str]) -> str:
   return generate_buffer_like_signal_manager_dataless_full(
-    name, 0, data_type,
-    lambda name, _, bitwidth: generate_inner(name, bitwidth))
+      name, 0, data_type,
+      lambda name, _, bitwidth: generate_inner(name, bitwidth))

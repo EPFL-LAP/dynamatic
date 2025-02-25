@@ -2,12 +2,14 @@ from generators.support.utils import VhdlScalarType
 from generators.handshake.fork import generate_fork
 from generators.handshake.tfifo import generate_tfifo
 
+
 def generate_speculator(name, params):
   port_types = params["port_types"]
   bitwidth = VhdlScalarType(port_types["ins"]).bitwidth
   fifo_depth = params["fifo_depth"]
 
   return _generate_speculator(name, bitwidth, fifo_depth)
+
 
 def _generate_specGen_core(name, bitwidth):
   entity = f"""
@@ -347,6 +349,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_decodeSave(name):
   entity = f"""
 library ieee;
@@ -405,6 +408,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_decodeCommit(name):
   entity = f"""
 library ieee;
@@ -459,6 +463,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_decodeBranch(name):
   entity = f"""
 library ieee;
@@ -512,6 +517,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_decodeSC(name):
   entity = f"""
@@ -582,6 +588,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_decodeOutput(name):
   entity = f"""
 library ieee;
@@ -632,6 +639,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_predictor(name, bitwidth):
   entity = f"""
@@ -692,6 +700,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_predFifo(name, bitwidth, fifo_depth):
   entity = f"""
@@ -875,6 +884,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_speculator_inner(name, bitwidth, fifo_depth):
   data_fork_name = f"{name}_data_fork"
   specGen_name = f"{name}_specGen"
@@ -888,33 +898,33 @@ def _generate_speculator_inner(name, bitwidth, fifo_depth):
   decodeBranch_name = f"{name}_decodeBranch"
 
   dependencies = \
-    generate_fork(data_fork_name, {
-      "size": 2,
-      "port_types": {
-        "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-        "outs_0": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-        "outs_1": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-      }
-    }) + \
-    _generate_specGen_core(specGen_name, bitwidth) + \
-    _generate_predictor(predictor_name, bitwidth) + \
-    _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
-    generate_fork(control_fork_name, {
-      "size": 5,
-      "port_types": {
-        "ins": "!handshake.channel<i3>",
-        "outs_0": "!handshake.channel<i3>",
-        "outs_1": "!handshake.channel<i3>",
-        "outs_2": "!handshake.channel<i3>",
-        "outs_3": "!handshake.channel<i3>",
-        "outs_4": "!handshake.channel<i3>",
-      }
-    }) + \
-    _generate_decodeSave(decodeSave_name) + \
-    _generate_decodeCommit(decodeCommit_name) + \
-    _generate_decodeSC(decodeSC_name) + \
-    _generate_decodeOutput(decodeOutput_name) + \
-    _generate_decodeBranch(decodeBranch_name)
+      generate_fork(data_fork_name, {
+          "size": 2,
+          "port_types": {
+              "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
+              "outs_0": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
+              "outs_1": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
+          }
+      }) + \
+      _generate_specGen_core(specGen_name, bitwidth) + \
+      _generate_predictor(predictor_name, bitwidth) + \
+      _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
+      generate_fork(control_fork_name, {
+          "size": 5,
+          "port_types": {
+              "ins": "!handshake.channel<i3>",
+              "outs_0": "!handshake.channel<i3>",
+              "outs_1": "!handshake.channel<i3>",
+              "outs_2": "!handshake.channel<i3>",
+              "outs_3": "!handshake.channel<i3>",
+              "outs_4": "!handshake.channel<i3>",
+          }
+      }) + \
+      _generate_decodeSave(decodeSave_name) + \
+      _generate_decodeCommit(decodeCommit_name) + \
+      _generate_decodeSC(decodeSC_name) + \
+      _generate_decodeOutput(decodeOutput_name) + \
+      _generate_decodeBranch(decodeBranch_name)
 
   entity = f"""
 library ieee;
@@ -1131,6 +1141,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_speculator(name, bitwidth, fifo_depth):
   inner_name = f"{name}_inner"
   fifo_outs_name = f"{name}_fifo_outs"
@@ -1141,48 +1152,48 @@ def _generate_speculator(name, bitwidth, fifo_depth):
   fifo_ctrl_sc_branch_name = f"{name}_fifo_ctrl_sc_branch"
 
   dependencies = _generate_speculator_inner(inner_name, bitwidth, fifo_depth) + \
-    generate_tfifo(fifo_outs_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-        "outs": f"!handshake.channel<i{bitwidth}, [spec: i1]>"
-      }
-    }) + \
-    generate_tfifo(fifo_ctrl_save_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": "!handshake.channel<i1>",
-        "outs": "!handshake.channel<i1>"
-      }
-    }) + \
-    generate_tfifo(fifo_ctrl_commit_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": "!handshake.channel<i1>",
-        "outs": "!handshake.channel<i1>"
-      }
-    }) + \
-    generate_tfifo(fifo_ctrl_sc_commit_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": "!handshake.channel<i3>",
-        "outs": "!handshake.channel<i3>"
-      }
-    }) + \
-    generate_tfifo(fifo_ctrl_sc_save_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": "!handshake.channel<i3>",
-        "outs": "!handshake.channel<i3>"
-      }
-    }) + \
-    generate_tfifo(fifo_ctrl_sc_branch_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": "!handshake.channel<i1>",
-        "outs": "!handshake.channel<i1>"
-      }
-    })
+      generate_tfifo(fifo_outs_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
+              "outs": f"!handshake.channel<i{bitwidth}, [spec: i1]>"
+          }
+      }) + \
+      generate_tfifo(fifo_ctrl_save_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": "!handshake.channel<i1>",
+              "outs": "!handshake.channel<i1>"
+          }
+      }) + \
+      generate_tfifo(fifo_ctrl_commit_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": "!handshake.channel<i1>",
+              "outs": "!handshake.channel<i1>"
+          }
+      }) + \
+      generate_tfifo(fifo_ctrl_sc_commit_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": "!handshake.channel<i3>",
+              "outs": "!handshake.channel<i3>"
+          }
+      }) + \
+      generate_tfifo(fifo_ctrl_sc_save_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": "!handshake.channel<i3>",
+              "outs": "!handshake.channel<i3>"
+          }
+      }) + \
+      generate_tfifo(fifo_ctrl_sc_branch_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": "!handshake.channel<i1>",
+              "outs": "!handshake.channel<i1>"
+          }
+      })
 
   entity = f"""
 library ieee;

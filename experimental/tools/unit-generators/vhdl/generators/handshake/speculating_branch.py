@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType
 from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.tfifo import generate_tfifo
 
+
 def generate_speculating_branch(name, params):
   port_types = params["port_types"]
   data_bitwidth = VhdlScalarType(port_types["data"]).bitwidth
@@ -9,16 +10,17 @@ def generate_speculating_branch(name, params):
 
   return _generate_speculating_branch(name, data_bitwidth, spec_tag_data_bitwidth)
 
+
 def _generate_speculating_branch_inner(name, data_bitwidth, spec_tag_data_bitwidth):
   inner_name = f"{name}_inner"
 
   dependencies = generate_cond_br(inner_name, {
-    "port_types": {
-      "data": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
-      "condition": "!handshake.channel<i1, [spec: i1]>",
-      "trueOut": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
-      "falseOut": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>"
-    }
+      "port_types": {
+          "data": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
+          "condition": "!handshake.channel<i1, [spec: i1]>",
+          "trueOut": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
+          "falseOut": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>"
+      }
   })
 
   entity = f"""
@@ -85,27 +87,28 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_speculating_branch(name, data_bitwidth, spec_tag_data_bitwidth):
   inner_name = f"{name}_inner"
   tfifo_data_name = f"{name}_tfifo_data"
   tfifo_spec_tag_name = f"{name}_tfifo_spec_tag"
 
   dependencies = \
-    _generate_speculating_branch_inner(inner_name, data_bitwidth, spec_tag_data_bitwidth) + \
-    generate_tfifo(tfifo_data_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
-        "outs": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
-      }
-    }) + \
-    generate_tfifo(tfifo_spec_tag_name, {
-      "num_slots": 32,
-      "port_types": {
-        "ins": f"!handshake.channel<i{spec_tag_data_bitwidth}, [spec: i1]>",
-        "outs": f"!handshake.channel<i{spec_tag_data_bitwidth}, [spec: i1]>",
-      }
-    })
+      _generate_speculating_branch_inner(inner_name, data_bitwidth, spec_tag_data_bitwidth) + \
+      generate_tfifo(tfifo_data_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
+              "outs": f"!handshake.channel<i{data_bitwidth}, [spec: i1]>",
+          }
+      }) + \
+      generate_tfifo(tfifo_spec_tag_name, {
+          "num_slots": 32,
+          "port_types": {
+              "ins": f"!handshake.channel<i{spec_tag_data_bitwidth}, [spec: i1]>",
+              "outs": f"!handshake.channel<i{spec_tag_data_bitwidth}, [spec: i1]>",
+          }
+      })
 
   entity = f"""
 library ieee;

@@ -1,6 +1,7 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.handshake.tehb import generate_tehb
 
+
 def generate_mux(name, params):
   size = params["size"]
   port_types = params["port_types"]
@@ -17,14 +18,15 @@ def generate_mux(name, params):
   else:
     return _generate_mux_dataless(name, size, index_type.bitwidth)
 
+
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_tehb(tehb_name, {
-    "port_types": {
-      "ins": f"!handshake.channel<i{data_bitwidth}>",
-      "outs": f"!handshake.channel<i{data_bitwidth}>",
-    }
+      "port_types": {
+          "ins": f"!handshake.channel<i{data_bitwidth}>",
+          "outs": f"!handshake.channel<i{data_bitwidth}>",
+      }
   })
 
   entity = f"""
@@ -103,14 +105,15 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_mux_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_tehb(tehb_name, {
-    "port_types": {
-      "ins": f"!handshake.control<>",
-      "outs": f"!handshake.control<>",
-    }
+      "port_types": {
+          "ins": f"!handshake.control<>",
+          "outs": f"!handshake.control<>",
+      }
   })
 
   entity = f"""
@@ -180,6 +183,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_mux_signal_manager(name, size, port_types):
   inner_name = f"{name}_inner"
 
@@ -233,9 +237,12 @@ end entity;
   # Add extra signal ports
   extra_signal_port_decls = []
   for i in range(size):
-    extra_signal_port_decls.append(generate_extra_signal_ports([(f"ins_{i}", "in")], ins_types[i].extra_signals))
-  extra_signal_port_decls.append(generate_extra_signal_ports([("outs", "out")], extra_signal_mapping.to_extra_signals()))
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
+    extra_signal_port_decls.append(generate_extra_signal_ports(
+        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+  extra_signal_port_decls.append(generate_extra_signal_ports(
+      [("outs", "out")], extra_signal_mapping.to_extra_signals()))
+  entity = entity.replace(
+      "    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of mux signal manager
@@ -264,25 +271,30 @@ end architecture;
 """
 
   architecture = architecture.replace(
-    "  [LACKING_EXTRA_SIGNAL_DECLS]",
-    generate_lacking_extra_signal_decls("ins", ins_types, extra_signal_mapping)
+      "  [LACKING_EXTRA_SIGNAL_DECLS]",
+      generate_lacking_extra_signal_decls(
+          "ins", ins_types, extra_signal_mapping)
   )
 
-  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments("ins", ins_types, extra_signal_mapping)
+  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
+      "ins", ins_types, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
-    ins_conversions.append(generate_ins_concat_statements(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
+    ins_conversions.append(generate_ins_concat_statements(
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
 
-  outs_conversions = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
+  outs_conversions = generate_outs_concat_statements(
+      "outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    lacking_extra_signal_assignments + "\n" + \
-    "\n".join(ins_conversions) + "\n" + outs_conversions
+      "  [EXTRA_SIGNAL_LOGIC]",
+      lacking_extra_signal_assignments + "\n" +
+      "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 
   return dependencies + entity + architecture
+
 
 def _generate_mux_signal_manager_dataless(name, size, port_types):
   inner_name = f"{name}_inner"
@@ -333,9 +345,12 @@ end entity;
   # Add extra signal ports
   extra_signal_port_decls = []
   for i in range(size):
-    extra_signal_port_decls.append(generate_extra_signal_ports([(f"ins_{i}", "in")], ins_types[i].extra_signals))
-  extra_signal_port_decls.append(generate_extra_signal_ports([("outs", "out")], extra_signal_mapping.to_extra_signals()))
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
+    extra_signal_port_decls.append(generate_extra_signal_ports(
+        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+  extra_signal_port_decls.append(generate_extra_signal_ports(
+      [("outs", "out")], extra_signal_mapping.to_extra_signals()))
+  entity = entity.replace(
+      "    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of mux signal manager
@@ -364,22 +379,26 @@ end architecture;
 """
 
   architecture = architecture.replace(
-    "  [LACKING_EXTRA_SIGNAL_DECLS]",
-    generate_lacking_extra_signal_decls("ins", ins_types, extra_signal_mapping)
+      "  [LACKING_EXTRA_SIGNAL_DECLS]",
+      generate_lacking_extra_signal_decls(
+          "ins", ins_types, extra_signal_mapping)
   )
 
-  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments("ins", ins_types, extra_signal_mapping)
+  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
+      "ins", ins_types, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
-    ins_conversions.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
+    ins_conversions.append(generate_ins_concat_statements_dataless(
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
 
-  outs_conversions = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
+  outs_conversions = generate_outs_concat_statements_dataless(
+      "outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    lacking_extra_signal_assignments + "\n" + \
-    "\n".join(ins_conversions) + "\n" + outs_conversions
+      "  [EXTRA_SIGNAL_LOGIC]",
+      lacking_extra_signal_assignments + "\n" +
+      "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 
   return dependencies + entity + architecture

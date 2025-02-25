@@ -1,6 +1,7 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.join import generate_join
 
+
 def generate_cond_br(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["data"])
@@ -14,6 +15,7 @@ def generate_cond_br(name, params):
     return _generate_cond_br(name, data_type.bitwidth)
   else:
     return _generate_cond_br_dataless(name)
+
 
 def _generate_cond_br_dataless(name):
   join_name = f"{name}_join"
@@ -69,6 +71,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_cond_br(name, bitwidth):
   inner_name = f"{name}_inner"
@@ -128,13 +131,15 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 # todo: can be reusable among various unit generators
 extra_signal_logic = {
-  "spec": """
+    "spec": """
   trueOut_spec <= data_spec or condition_spec;
   falseOut_spec <= data_spec or condition_spec;
-""" # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
 }
+
 
 def _generate_cond_br_signal_manager(name, data_type):
   inner_name = f"{name}_inner"
@@ -169,8 +174,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("data", "in"), ("condition", "in"),
-    ("trueOut", "out"), ("falseOut", "out")
+      ("data", "in"), ("condition", "in"),
+      ("trueOut", "out"), ("falseOut", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -206,10 +211,11 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-    extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
   return dependencies + entity + architecture
+
 
 def _generate_cond_br_signal_manager_dataless(name, data_type):
   inner_name = f"{name}_inner"
@@ -241,8 +247,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("data", "in"), ("condition", "in"),
-    ("trueOut", "out"), ("falseOut", "out")
+      ("data", "in"), ("condition", "in"),
+      ("trueOut", "out"), ("falseOut", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -275,7 +281,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-    extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
   return dependencies + entity + architecture

@@ -4,10 +4,11 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
 # todo: can be reusable among various unit generators
 extra_signal_logic = {
-  "spec": """
+    "spec": """
   result_spec <= lhs_spec or rhs_spec;
-""" # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
 }
+
 
 def generate_binary_no_latency_signal_manager_full(name: str, in_type: VhdlScalarType, out_type: VhdlScalarType, generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
@@ -45,7 +46,7 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("lhs", "in"), ("rhs", "in"), ("result", "out")
+      ("lhs", "in"), ("rhs", "in"), ("result", "out")
   ], in_type.extra_signals)
 
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
@@ -78,12 +79,13 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-    extra_signal_logic[name] for name in in_type.extra_signals
+      extra_signal_logic[name] for name in in_type.extra_signals
   ]))
 
   return dependencies + entity + architecture
 
+
 def generate_binary_no_latency_signal_manager(name: str, data_type: VhdlScalarType, generate_inner: Callable[[str, int], str]) -> str:
   return generate_binary_no_latency_signal_manager_full(
-    name, data_type, data_type,
-    lambda name, in_bitwidth, _: generate_inner(name, in_bitwidth))
+      name, data_type, data_type,
+      lambda name, in_bitwidth, _: generate_inner(name, in_bitwidth))

@@ -2,6 +2,7 @@ from generators.support.mc_support import generate_read_memory_arbiter
 from generators.handshake.mem_controller_loadless import generate_mem_controller_loadless
 from generators.handshake.mem_controller_storeless import generate_mem_controller_storeless
 
+
 def generate_mem_controller(name, params):
   num_controls = params["num_controls"]
   num_loads = params["num_loads"]
@@ -15,6 +16,7 @@ def generate_mem_controller(name, params):
     return _generate_mem_controller(name, params)
   raise ValueError("Invalid configuration for mem_controller")
 
+
 def _generate_mem_controller(name, params):
   loadless_name = f"{name}_loadless"
   read_arbiter_name = f"{name}_read_arbiter"
@@ -27,11 +29,11 @@ def _generate_mem_controller(name, params):
   addr_bitwidth = int(port_types["loadAddr"][1:])
 
   dependencies = generate_mem_controller_loadless(loadless_name, params) + \
-    generate_read_memory_arbiter(read_arbiter_name, {
-      "arbiter_size": num_loads,
-      "addr_bitwidth": addr_bitwidth,
-      "data_bitwidth": data_bitwidth,
-    })
+      generate_read_memory_arbiter(read_arbiter_name, {
+          "arbiter_size": num_loads,
+          "addr_bitwidth": addr_bitwidth,
+          "data_bitwidth": data_bitwidth,
+      })
 
   entity = f"""
 library ieee;

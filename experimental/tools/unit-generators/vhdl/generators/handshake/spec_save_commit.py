@@ -1,6 +1,7 @@
 from generators.support.utils import VhdlScalarType
 from generators.handshake.tfifo import generate_tfifo
 
+
 def generate_spec_save_commit(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
@@ -11,6 +12,7 @@ def generate_spec_save_commit(name, params):
     return _generate_spec_save_commit(name, data_type.bitwidth, fifo_depth)
   else:
     return _generate_spec_save_commit_dataless(name, fifo_depth)
+
 
 def _generate_spec_save_commit_inner(name, bitwidth, fifo_depth):
   entity = f"""
@@ -331,19 +333,20 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_spec_save_commit(name, bitwidth, fifo_depth):
   inner_name = f"{name}_inner"
   tfifo_name = f"{name}_tfifo"
 
   dependencies = \
-    _generate_spec_save_commit_inner(inner_name, bitwidth, fifo_depth) + \
-    generate_tfifo(tfifo_name, {
-      "num_slots": 32, # todo
-      "port_types": {
-        "ins": f"!handshake.channel<i3>",
-        "outs": f"!handshake.channel<i3>"
-      }
-    })
+      _generate_spec_save_commit_inner(inner_name, bitwidth, fifo_depth) + \
+      generate_tfifo(tfifo_name, {
+          "num_slots": 32,  # todo
+          "port_types": {
+              "ins": f"!handshake.channel<i3>",
+              "outs": f"!handshake.channel<i3>"
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -410,6 +413,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_spec_save_commit_dataless(name, fifo_depth):
   inner_name = f"{name}_inner"

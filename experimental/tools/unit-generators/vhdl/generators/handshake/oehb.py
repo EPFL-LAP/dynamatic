@@ -1,6 +1,7 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
 
+
 def generate_oehb(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
@@ -14,6 +15,7 @@ def generate_oehb(name, params):
     return _generate_oehb(name, data_type.bitwidth)
   else:
     return _generate_oehb_dataless(name)
+
 
 def _generate_oehb_dataless(name):
   entity = f"""
@@ -57,6 +59,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_oehb(name, bitwidth):
   inner_name = f"{name}_inner"
@@ -118,8 +121,10 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_oehb_signal_manager(name, data_type):
   return generate_buffer_like_signal_manager(name, data_type, _generate_oehb)
+
 
 def _generate_oehb_signal_manager_dataless(name, data_type):
   return generate_buffer_like_signal_manager_dataless(name, data_type, _generate_oehb)

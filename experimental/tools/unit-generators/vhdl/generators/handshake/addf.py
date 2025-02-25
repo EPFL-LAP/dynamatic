@@ -7,6 +7,7 @@ from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
 from generators.handshake.ofifo import generate_ofifo
 
+
 def generate_addf(name, options, out_directory):
   data_type = VhdlScalarType(options["data_type"])
 
@@ -29,14 +30,17 @@ def generate_addf(name, options, out_directory):
   else:
     return _generate_addf(name, is_double)
 
+
 def _generate_addf(name, is_double):
   if is_double:
     return _generate_addf_double_precision(name)
   else:
     return _generate_addf_single_precision(name)
 
+
 def _get_latency(is_double):
-  return 12 if is_double else 9 # todo
+  return 12 if is_double else 9  # todo
+
 
 def _generate_addf_single_precision(name):
   join_name = f"{name}_join"
@@ -44,8 +48,9 @@ def _generate_addf_single_precision(name):
   buff_name = f"{name}_buff"
 
   dependencies = generate_join(join_name, {"size", 2}) + \
-    generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
-    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1})
+      generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
+      generate_delay_buffer(
+      buff_name, {"slots": _get_latency(is_double=False) - 1})
 
   entity = f"""
 library ieee;
@@ -148,14 +153,16 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_addf_double_precision(name):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
   dependencies = generate_join(join_name, {"size": 2}) + \
-    generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
-    generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=True) - 1})
+      generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
+      generate_delay_buffer(
+      buff_name, {"slots": _get_latency(is_double=True) - 1})
 
   entity = f"""
 library ieee;
@@ -258,6 +265,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_addf_signal_manager(name, data_type, is_double):
   inner_name = f"{name}_inner"
 
@@ -265,23 +273,23 @@ def _generate_addf_signal_manager(name, data_type, is_double):
 
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
-      "num_slots": _get_latency(is_double), # todo: correct?
-      "port_types": {
-        "ins": "!handshake.channel<i1>",
-        "outs": "!handshake.channel<i1>"
-      }
+        "num_slots": _get_latency(is_double),  # todo: correct?
+        "port_types": {
+            "ins": "!handshake.channel<i1>",
+            "outs": "!handshake.channel<i1>"
+        }
     })
 
   # Now that the logic depends on the name, this dict is defined inside this function.
   extra_signal_logic = {
-    "spec": (
-      # First string is for the signal declaration
-      """
+      "spec": (
+          # First string is for the signal declaration
+          """
     signal spec_tfifo_in : std_logic_vector(0 downto 0);
     signal spec_tfifo_out : std_logic_vector(0 downto 0);
 """,
-      # Second string is for the actual logic
-      f"""
+          # Second string is for the actual logic
+          f"""
     spec_tfifo_in <= lhs_spec or rhs_spec;
     spec_tfifo : entity work.{name}_spec_ofifo(arch)
       port map(
@@ -330,8 +338,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("lhs", "in"), ("rhs", "in"),
-    ("result", "out")
+      ("lhs", "in"), ("rhs", "in"),
+      ("result", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -365,17 +373,18 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_SIGNAL_DECLS]",
-    "\n".join([
-      extra_signal_logic[name][0] for name in data_type.extra_signals
-    ]))
+                                      "\n".join([
+                                          extra_signal_logic[name][0] for name in data_type.extra_signals
+                                      ]))
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]",
-    "\n".join([
-      extra_signal_logic[name][1] for name in data_type.extra_signals
-    ]))
+                                      "\n".join([
+                                          extra_signal_logic[name][1] for name in data_type.extra_signals
+                                      ]))
 
   return dependencies + entity + architecture
 
+
 if __name__ == "__main__":
   print(generate_addf("addf", {
-    "data_type": "!handshake.channel<i32, [spec: i1]>"
+      "data_type": "!handshake.channel<i32, [spec: i1]>"
   }, "out/"))

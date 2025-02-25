@@ -2,6 +2,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
+
 def generate_merge(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["outs"])
@@ -17,17 +18,18 @@ def generate_merge(name, params):
   else:
     return _generate_merge_dataless(name, size)
 
+
 def _generate_merge_dataless(name, size):
   inner_name = f"{name}_inner"
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-    generate_tehb(tehb_name, {
-      "port_types": {
-        "ins": f"!handshake.control<>",
-        "outs": f"!handshake.control<>"
-      }
-    })
+      generate_tehb(tehb_name, {
+          "port_types": {
+              "ins": f"!handshake.control<>",
+              "outs": f"!handshake.control<>"
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -78,21 +80,22 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_merge(name, size, bitwidth):
   inner_name = f"{name}_inner"
   tehb_name = f"{name}_tehb"
 
   dependencies = \
-    generate_merge_notehb(inner_name, {
-      "size": size,
-      "bitwidth": bitwidth,
-    }) + \
-    generate_tehb(tehb_name, {
-      "port_types": {
-        "ins": f"!handshake.channel<i{bitwidth}>",
-        "outs": f"!handshake.channel<{bitwidth}>"
-      }
-    })
+      generate_merge_notehb(inner_name, {
+          "size": size,
+          "bitwidth": bitwidth,
+      }) + \
+      generate_tehb(tehb_name, {
+          "port_types": {
+              "ins": f"!handshake.channel<i{bitwidth}>",
+              "outs": f"!handshake.channel<{bitwidth}>"
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -152,6 +155,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_merge_signal_manager(name, size, data_type):
   inner_name = f"{name}_inner"
 
@@ -191,7 +195,8 @@ end entity;
   extra_signal_need_ports = [("outs", "out")]
   for i in range(size):
     extra_signal_need_ports.append((f"ins_{i}", "in"))
-  extra_signal_ports = generate_extra_signal_ports(extra_signal_need_ports, data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      extra_signal_need_ports, data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -218,15 +223,18 @@ end architecture;
 
   ins_conversion = []
   for i in range(size):
-    ins_conversion.append(generate_ins_concat_statements(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
-  outs_conversion = generate_outs_concat_statements("outs", "outs_inner", extra_signal_mapping, bitwidth)
+    ins_conversion.append(generate_ins_concat_statements(
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
+  outs_conversion = generate_outs_concat_statements(
+      "outs", "outs_inner", extra_signal_mapping, bitwidth)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    "\n".join(ins_conversion) + "\n" + outs_conversion
+      "  [EXTRA_SIGNAL_LOGIC]",
+      "\n".join(ins_conversion) + "\n" + outs_conversion
   )
 
   return dependencies + entity + architecture
+
 
 def _generate_merge_signal_manager_dataless(name, size, data_type):
   inner_name = f"{name}_inner"
@@ -263,7 +271,8 @@ end entity;
   extra_signal_need_ports = [("outs", "out")]
   for i in range(size):
     extra_signal_need_ports.append((f"ins_{i}", "in"))
-  extra_signal_ports = generate_extra_signal_ports(extra_signal_need_ports, data_type.extra_signals)
+  extra_signal_ports = generate_extra_signal_ports(
+      extra_signal_need_ports, data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -290,12 +299,14 @@ end architecture;
 
   ins_conversion = []
   for i in range(size):
-    ins_conversion.append(generate_ins_concat_statements_dataless(f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
-  outs_conversion = generate_outs_concat_statements_dataless("outs", "outs_inner", extra_signal_mapping)
+    ins_conversion.append(generate_ins_concat_statements_dataless(
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
+  outs_conversion = generate_outs_concat_statements_dataless(
+      "outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
-    "  [EXTRA_SIGNAL_LOGIC]",
-    "\n".join(ins_conversion) + "\n" + outs_conversion
+      "  [EXTRA_SIGNAL_LOGIC]",
+      "\n".join(ins_conversion) + "\n" + outs_conversion
   )
 
   return dependencies + entity + architecture

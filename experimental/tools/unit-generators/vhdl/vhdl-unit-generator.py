@@ -26,6 +26,7 @@ import generators.handshake.store as store
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
 
+
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "addi":
@@ -77,6 +78,7 @@ def generate_code(name, mod_type, parameters):
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
+
 def parse_parameters(param_list):
   try:
     param_dict = {}
@@ -87,6 +89,7 @@ def parse_parameters(param_list):
     return param_dict
   except ValueError:
     raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
+
 
 def main():
   parser = argparse.ArgumentParser(description="VHDL Generator Script")

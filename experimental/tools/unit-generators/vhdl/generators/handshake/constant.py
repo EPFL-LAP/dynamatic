@@ -1,5 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
+
 def generate_constant(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["outs"])
@@ -9,6 +10,7 @@ def generate_constant(name, params):
     return _generate_constant_signal_manager(name, value, data_type)
   else:
     return _generate_constant(name, value, data_type.bitwidth)
+
 
 def _generate_constant(name, value, bitwidth):
   entity = f"""
@@ -43,11 +45,13 @@ end architecture;
 
   return entity + architecture
 
+
 extra_signal_logic = {
-  "spec": """
+    "spec": """
   outs_spec <= ctrl_spec;
 """
 }
+
 
 def _generate_constant_signal_manager(name, value, data_type):
   inner_name = f"{name}_inner"
@@ -79,8 +83,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("ctrl", "in"),
-    ("outs", "out")
+      ("ctrl", "in"),
+      ("outs", "out")
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -104,7 +108,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-    extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in data_type.extra_signals
   ]))
 
   return dependencies + entity + architecture

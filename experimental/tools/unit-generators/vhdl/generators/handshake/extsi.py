@@ -1,5 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
+
 def generate_extsi(name, params):
   port_types = params["port_types"]
   ins_type = VhdlScalarType(port_types["ins"])
@@ -9,6 +10,7 @@ def generate_extsi(name, params):
     return _generate_extsi_signal_manager(name, ins_type, outs_type)
   else:
     return _generate_extsi(name, ins_type.bitwidth, outs_type.bitwidth)
+
 
 def _generate_extsi(name, input_bitwidth, output_bitwidth):
   entity = f"""
@@ -45,11 +47,13 @@ end architecture;
 
   return entity + architecture
 
+
 extra_signal_logic = {
-  "spec": """
+    "spec": """
   outs_spec <= ins_spec;
 """
 }
+
 
 def _generate_extsi_signal_manager(name, ins_type, outs_type):
   inner_name = f"{name}_inner"
@@ -83,8 +87,8 @@ end entity;
 
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
-    ("ins", "in"),
-    ("outs", "out")
+      ("ins", "in"),
+      ("outs", "out")
   ], ins_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -109,7 +113,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-    extra_signal_logic[name] for name in ins_type.extra_signals
+      extra_signal_logic[name] for name in ins_type.extra_signals
   ]))
 
   return dependencies + entity + architecture

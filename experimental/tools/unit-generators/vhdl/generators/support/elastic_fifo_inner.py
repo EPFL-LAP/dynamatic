@@ -6,6 +6,7 @@ def generate_elastic_fifo_inner(name, params):
   else:
     return _generate_elastic_fifo_inner(name, size, bitwidth)
 
+
 def _generate_elastic_fifo_inner_dataless(name, size):
   entity = f"""
 library ieee;
@@ -146,6 +147,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_elastic_fifo_inner(name, size, bitwidth):
   entity = f"""

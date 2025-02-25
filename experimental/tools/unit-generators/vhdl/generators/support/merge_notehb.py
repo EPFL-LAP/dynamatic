@@ -6,6 +6,7 @@ def generate_merge_notehb(name, params):
   else:
     return _generate_merge_notehb(name, size, bitwidth)
 
+
 def _generate_merge_notehb_dataless(name, size):
   entity = f"""
 library ieee;

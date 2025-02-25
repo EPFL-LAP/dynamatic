@@ -9,10 +9,10 @@ def generate_read_memory_arbiter(name, params):
   data_name = f"{name}_data"
 
   dependencies = \
-    _generate_read_priority(priority_name, arbiter_size) + \
-    _generate_read_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
-    _generate_read_address_ready(addressReady_name, arbiter_size) + \
-    _generate_read_data_signals(data_name, arbiter_size, data_bitwidth)
+      _generate_read_priority(priority_name, arbiter_size) + \
+      _generate_read_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
+      _generate_read_address_ready(addressReady_name, arbiter_size) + \
+      _generate_read_data_signals(data_name, arbiter_size, data_bitwidth)
 
   entity = f"""
 library ieee;
@@ -96,6 +96,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def generate_write_memory_arbiter(name, params):
   arbiter_size = params["arbiter_size"] if "arbiter_size" in params else 2
   addr_bitwidth = params["addr_bitwidth"] if "addr_bitwidth" in params else 32
@@ -107,10 +108,10 @@ def generate_write_memory_arbiter(name, params):
   data_name = f"{name}_data"
 
   dependencies = \
-    _generate_write_priority(priority_name, arbiter_size) + \
-    _generate_write_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
-    _generate_write_address_ready(addressReady_name, arbiter_size) + \
-    _generate_write_data_signals(data_name, arbiter_size, data_bitwidth)
+      _generate_write_priority(priority_name, arbiter_size) + \
+      _generate_write_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
+      _generate_write_address_ready(addressReady_name, arbiter_size) + \
+      _generate_write_data_signals(data_name, arbiter_size, data_bitwidth)
 
   entity = f"""
 library ieee;
@@ -195,6 +196,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def generate_mc_control(name):
   entity = f"""
 library ieee;
@@ -259,6 +261,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_read_address_mux(name, arbiter_size, addr_bitwidth):
   entity = f"""
 library ieee;
@@ -296,6 +299,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_read_address_ready(name, arbiter_size):
   entity = f"""
 library ieee;
@@ -323,6 +327,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_read_data_signals(name, arbiter_size, data_bitwidth):
   entity = f"""
@@ -410,6 +415,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_read_priority(name, arbiter_size):
   entity = f"""
 library ieee;
@@ -445,6 +451,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_write_address_mux(name, arbiter_size, addr_bitwidth):
   entity = f"""
@@ -483,6 +490,7 @@ end architecture;
 
   return entity + architecture
 
+
 def _generate_write_address_ready(name, arbiter_size):
   entity = f"""
 library ieee;
@@ -514,6 +522,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_write_data_signals(name, arbiter_size, data_bitwidth):
   entity = f"""
@@ -573,6 +582,7 @@ end architecture;
 """
 
   return entity + architecture
+
 
 def _generate_write_priority(name, arbiter_size):
   entity = f"""
