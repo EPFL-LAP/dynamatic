@@ -9,9 +9,12 @@ from generators.support.oehb import generate_oehb
 def generate_buffer(name, params):
   num_slots = params["num_slots"]
 
-  timing_r = bool(re.search(r"R: (\d+)", params["timing"]))
-  timing_d = bool(re.search(r"D: (\d+)", params["timing"]))
-  timing_v = bool(re.search(r"V: (\d+)", params["timing"]))
+  match_r = re.search(r"R: (\d+)", params["timing"])
+  timing_r = False if not match_r else bool(match_r[0])
+  match_d = re.search(r"D: (\d+)", params["timing"])
+  timing_d = False if not match_d else bool(match_d[0])
+  match_v = re.search(r"V: (\d+)", params["timing"])
+  timing_v = False if not match_v else bool(match_v[0])
   transparent = timing_r and not (timing_d or timing_v)
 
   if transparent and num_slots > 1:
