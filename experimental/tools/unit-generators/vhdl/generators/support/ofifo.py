@@ -1,6 +1,6 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
-from generators.handshake.tehb import generate_tehb
+from generators.support.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 

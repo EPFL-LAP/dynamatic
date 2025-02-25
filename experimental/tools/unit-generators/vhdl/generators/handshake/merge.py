@@ -1,6 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.support.merge_notehb import generate_merge_notehb
-from generators.handshake.tehb import generate_tehb
+from generators.support.tehb import generate_tehb
 
 
 def generate_merge(name, params):

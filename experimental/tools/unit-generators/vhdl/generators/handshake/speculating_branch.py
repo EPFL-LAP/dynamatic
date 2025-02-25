@@ -1,6 +1,6 @@
 from generators.support.utils import VhdlScalarType
 from generators.handshake.cond_br import generate_cond_br
-from generators.handshake.tfifo import generate_tfifo
+from generators.support.tfifo import generate_tfifo
 
 
 def generate_speculating_branch(name, params):

@@ -1,6 +1,6 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
-from generators.handshake.tehb import generate_tehb
-from generators.handshake.tfifo import generate_tfifo
+from generators.support.tehb import generate_tehb
+from generators.support.tfifo import generate_tfifo
 
 
 def generate_load(name, params):

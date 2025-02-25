@@ -4,8 +4,8 @@ import shutil
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.handshake.oehb import generate_oehb
-from generators.handshake.ofifo import generate_ofifo
+from generators.support.oehb import generate_oehb
+from generators.support.ofifo import generate_ofifo
 
 
 def generate_addf(name, options, out_directory):

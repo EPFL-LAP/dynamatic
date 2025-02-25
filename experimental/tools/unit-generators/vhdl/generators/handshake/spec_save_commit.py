@@ -1,5 +1,5 @@
 from generators.support.utils import VhdlScalarType
-from generators.handshake.tfifo import generate_tfifo
+from generators.support.tfifo import generate_tfifo
 
 
 def generate_spec_save_commit(name, params):
