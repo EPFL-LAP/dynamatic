@@ -1,12 +1,14 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
+
 def generate_cmpi(name, params):
   port_types = params["port_types"]
   predicate = params["predicate"]
   data_type = VhdlScalarType(port_types["lhs"])
 
   return _generate_cmpi(name, predicate, data_type.bitwidth)
+
 
 def _get_symbol_from_predicate(pred):
   match pred:
@@ -25,6 +27,7 @@ def _get_symbol_from_predicate(pred):
     case _:
       raise ValueError(f"Predicate {pred} not known")
 
+
 def _get_sign_from_predicate(pred):
   match pred:
     case "eq" | "neq":
@@ -35,6 +38,7 @@ def _get_sign_from_predicate(pred):
       return "unsigned"
     case _:
       raise ValueError(f"Predicate {pred} not known")
+
 
 def _generate_cmpi(name, predicate, bitwidth):
   join_name = f"{name}_join"

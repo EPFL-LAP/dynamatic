@@ -27,6 +27,7 @@ end architecture;
 
   return entity + architecture
 
+
 def generate_or_n(name, params):
   size = params["size"]
 

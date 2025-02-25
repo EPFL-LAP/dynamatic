@@ -1,11 +1,13 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
+
 def generate_addi(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["result"])
 
   return _generate_addi(name, data_type.bitwidth)
+
 
 def _generate_addi(name, bitwidth):
   join_name = f"{name}_join"

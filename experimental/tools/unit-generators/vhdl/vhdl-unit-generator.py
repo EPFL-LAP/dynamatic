@@ -7,6 +7,7 @@ import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
 import generators.handshake.fork as fork
 
+
 def generate_code(name, mod_type, parameters):
   match mod_type:
     case "addi":
@@ -20,6 +21,7 @@ def generate_code(name, mod_type, parameters):
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
+
 def parse_parameters(param_list):
   try:
     param_dict = {}
@@ -29,7 +31,9 @@ def parse_parameters(param_list):
         param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
-    raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
+    raise ValueError(
+        "Invalid parameter format. Use key=value key=value,...\n")
+
 
 def main():
   parser = argparse.ArgumentParser(description="VHDL Generator Script")

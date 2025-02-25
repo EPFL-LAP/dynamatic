@@ -1,6 +1,7 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
+
 def generate_cond_br(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["data"])
@@ -9,6 +10,7 @@ def generate_cond_br(name, params):
     return _generate_cond_br(name, data_type.bitwidth)
   else:
     return _generate_cond_br_dataless(name)
+
 
 def _generate_cond_br_dataless(name):
   join_name = f"{name}_join"
@@ -66,6 +68,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_cond_br(name, bitwidth):
   inner_name = f"{name}_inner"

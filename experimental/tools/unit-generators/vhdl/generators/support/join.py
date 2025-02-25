@@ -1,5 +1,6 @@
 from generators.support.logic import generate_and_n
 
+
 def generate_join(name, params):
   size = params["size"]
 
