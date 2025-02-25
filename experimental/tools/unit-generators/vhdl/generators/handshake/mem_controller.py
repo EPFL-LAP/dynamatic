@@ -14,11 +14,11 @@ def generate_mem_controller(name, params):
   elif num_controls > 0 and num_loads == 0 and num_stores > 0:
     return _generate_mem_controller_loadless(name, num_controls, num_stores, addr_bitwidth, data_bitwidth)
   elif num_controls > 0 and num_loads > 0 and num_stores > 0:
-    return _generate_mem_controller(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth)
+    return _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth)
   raise ValueError("Invalid configuration for mem_controller")
 
 
-def _generate_mem_controller(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth):
+def _generate_mem_controller_mixed(name, num_controls, num_loads, num_stores, addr_bitwidth, data_bitwidth):
   loadless_name = f"{name}_loadless"
   read_arbiter_name = f"{name}_read_arbiter"
 

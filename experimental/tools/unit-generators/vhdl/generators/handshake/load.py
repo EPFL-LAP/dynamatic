@@ -5,7 +5,6 @@ from generators.support.tehb import generate_tehb
 def generate_load(name, params):
   port_types = params["port_types"]
 
-  # Ports communicating with the elastic circuit have the complete and same extra signals
   data_type = VhdlScalarType(port_types["dataOut"])
   addr_type = VhdlScalarType(port_types["addrIn"])
 
