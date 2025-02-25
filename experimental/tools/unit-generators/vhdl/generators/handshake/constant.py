@@ -41,10 +41,3 @@ end architecture;
 """
 
   return entity + architecture
-
-
-extra_signal_logic = {
-    "spec": """
-  outs_spec <= ctrl_spec;
-"""
-}
