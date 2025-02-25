@@ -123,7 +123,7 @@ More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operation
 
 ### Types
 
-You may notice that operands and results are often denoted by types like `HandshakeType` or `BoolChannel`. In Handshake IR, types specify the kind of RTL port.
+You may notice that operands and results are often denoted by types like `HandshakeType` or `ChannelType`. In Handshake IR, types specify the kind of RTL port.
 The base class of all types in the Handshake dialect is the **`HandshakeType`** class.
 
 Most variables in the IR are either `ChannelType` or `ControlType`.
@@ -141,8 +141,6 @@ The actual operands have concrete **instances** of these types. For example, an 
 - `!handshake.channel<i8>` (for 8-bit integers)
 
 Since `ChannelType` allows different data types, multiple type instances are possible.
-
-`BoolChannel` is a special case that only allows `!handshake.channel<i1>`.
 
 
 

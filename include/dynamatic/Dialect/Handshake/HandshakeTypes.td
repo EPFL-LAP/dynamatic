@@ -123,8 +123,6 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-def IsChannel : CPred<"::mlir::isa<::dynamatic::handshake::ChannelType>($_self)">;
-
 class ChannelHasDataType<string type> : CPred<
   "::mlir::isa<" # type #
   ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
@@ -153,44 +151,48 @@ def HandshakeType : Type<
   "must be a `handshake::ControlType` or `handshake::ChannelType` type"> {
 }
 
-class TypedChannel<string type> : TypeConstraint<
-  ChannelHasDataType<type>,
-  "must be a `handshake::ChannelType` type whose data is " # type,
-  "::dynamatic::handshake::ChannelType"
+class IsChannelPred<string name> : CPred<
+  "::mlir::isa<::dynamatic::handshake::ChannelType>($" # name # ".getType())">;
+
+class IsIntChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::IntegerType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsFloatChannelPred<string name> : CPred<
+  "::mlir::isa<::mlir::FloatType>("
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataType())">;
+
+class IsSizedChannelPred<int width, string name> : CPred<
+  "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
+  ".getDataBitWidth() == " # width>;
+
+class IsIntChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying IntegerType data",
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>
+  ]>
 >;
-
-def IntChannelType : TypedChannel<"::mlir::IntegerType">;
-def FloatChannelType : TypedChannel<"::mlir::FloatType">;
-
-class TypedSizedChannel<string type, int width> : TypeConstraint<
-  And<[ChannelHasDataType<type>, ChannelHasDataWidth<width>]>,
-  "must be a `handshake::ChannelType` type whose data is " # type #
-  " and whose bitwidth is " # width,
-  "::dynamatic::handshake::ChannelType"
->;
-
-class IntSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::IntegerType", width
->;
-
-class FloatSizedChannel<int width> : TypedSizedChannel<
-  "::mlir::FloatType", width
->;
-
-def BoolChannel : IntSizedChannel<1>;
 
 /// Ensures an operand/result is of ChannelType carrying IntegerType data of the
 /// specified width.
 class IsIntSizedChannel<int width, string name> : PredOpTrait<
   name # " should be of ChannelType carrying IntegerType data of width " # width,
-  CPred<
-    "::mlir::isa<::dynamatic::handshake::ChannelType>($"
-    # name # ".getType()) &&"
-    "::mlir::isa<::mlir::IntegerType>("
-    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
-    ".getDataType()) &&"
-    "::mlir::cast<::dynamatic::handshake::ChannelType>($" # name # ".getType())"
-    ".getDataBitWidth() == " # width>
+  And<[
+    IsChannelPred<name>,
+    IsIntChannelPred<name>,
+    IsSizedChannelPred<width, name>
+  ]>
+>;
+
+class IsFloatChannel<string name> : PredOpTrait<
+  name # " should be of ChannelType carrying FloatType data",
+  And<[
+    IsChannelPred<name>,
+    IsFloatChannelPred<name>
+  ]>
 >;
 
 def SimpleControl : Type<

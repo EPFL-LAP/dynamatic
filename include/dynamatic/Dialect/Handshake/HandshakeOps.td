@@ -460,6 +460,7 @@ def BranchOp : Handshake_Op<"br", [
 def ConditionalBranchOp : Handshake_Op<"cond_br", [
   AllTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatch<["conditionOperand", "dataOperand", "trueResult", "falseResult"]>,
+  IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
@@ -479,7 +480,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     ```
   }];
 
-  let arguments = (ins BoolChannel:$conditionOperand,
+  let arguments = (ins ChannelType:$conditionOperand,
                        HandshakeType:$dataOperand);
   let results = (outs HandshakeType:$trueResult,
                       HandshakeType:$falseResult);
@@ -769,11 +770,13 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+    IsIntChannel<"address">,
+    IsIntChannel<"addressResult">
   ]
 > {
-  let arguments = (ins IntChannelType:$address, ChannelType:$data);
-  let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
+  let arguments = (ins ChannelType:$address, ChannelType:$data);
+  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult);
 
   let builders = customBuilders # [
     // Unless otherwise specified, addressResult/dataResult type is the same as
