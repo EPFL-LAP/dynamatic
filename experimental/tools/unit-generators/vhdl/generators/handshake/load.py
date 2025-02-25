@@ -1,5 +1,5 @@
 from generators.support.utils import VhdlScalarType
-from generators.handshake.tehb import generate_tehb
+from generators.support.tehb import generate_tehb
 
 
 def generate_load(name, params):

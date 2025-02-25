@@ -1,7 +1,8 @@
+from generators.support.ofifo import generate_ofifo
+from generators.support.oehb import generate_oehb
 from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.handshake.oehb import generate_oehb
 
 
 def generate_muli(name, params):
