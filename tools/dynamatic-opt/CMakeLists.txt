@@ -43,3 +43,12 @@ target_link_libraries(dynamatic-opt
   MLIRTransforms
   MLIRSCFDialect
 )
+
+
+if(DYNAMATIC_ENABLE_XLS)
+  target_link_libraries(dynamatic-opt
+    PRIVATE
+    XlsDialect
+    DynamaticHandshakeToXls
+  )
+endif()
