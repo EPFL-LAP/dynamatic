@@ -2,15 +2,15 @@
   {
     "name": "handshake.addf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores", "tfifo"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "handshake.addi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/addi.vhd",
     "dependencies": ["join"]
@@ -18,7 +18,7 @@
   {
     "name": "handshake.andi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/andi.vhd",
     "dependencies": ["join"]
@@ -31,6 +31,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-lb": 1,
+        "extra-eq": 0,
         "generic": true
       }
     ],
@@ -45,6 +46,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-lb": 1,
+        "extra-eq": 0,
         "generic": true
       }
     ],
@@ -54,7 +56,7 @@
   {
     "name": "handshake.divf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/divf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
@@ -62,7 +64,7 @@
   {
     "name": "handshake.divsi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/divsi.vhd",
     "dependencies": ["join", "delay_buffer"]
@@ -70,7 +72,7 @@
   {
     "name": "handshake.divui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/divui.vhd",
     "dependencies": ["join", "delay_buffer"]
@@ -78,23 +80,23 @@
   {
     "name": "handshake.extsi",
     "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/extsi.vhd"
   },
   {
     "name": "handshake.extui",
     "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/extui.vhd"
   },
   {
     "name": "handshake.maximumf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/maximumf.vhd",
     "dependencies": ["join", "delay_buffer"]
@@ -102,7 +104,7 @@
   {
     "name": "handshake.minimumf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/minimumf.vhd",
     "dependencies": ["join", "delay_buffer"]
@@ -110,15 +112,15 @@
   {
     "name": "handshake.mulf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/mulf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores", "tfifo"]
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
     "name": "handshake.muli",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/muli.vhd",
     "dependencies": ["join", "delay_buffer", "oehb"]
@@ -126,14 +128,14 @@
   {
     "name": "handshake.negf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/negf.vhd"
   },
   {
     "name": "handshake.ori",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/ori.vhd",
     "dependencies": ["join"]
@@ -141,7 +143,7 @@
   {
     "name": "handshake.select",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/select.vhd",
     "module-name": "selector"
@@ -149,7 +151,7 @@
   {
     "name": "handshake.shli",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/shli.vhd",
     "dependencies": ["join"]
@@ -157,7 +159,7 @@
   {
     "name": "handshake.shrsi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/shrsi.vhd",
     "dependencies": ["join"]
@@ -165,7 +167,7 @@
   {
     "name": "handshake.shrui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/shrui.vhd",
     "dependencies": ["join"]
@@ -173,7 +175,7 @@
   {
     "name": "handshake.subf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/subf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
@@ -181,7 +183,7 @@
   {
     "name": "handshake.subi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/subi.vhd",
     "dependencies": ["join"]
@@ -189,23 +191,23 @@
   {
     "name": "handshake.trunci",
     "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/trunci.vhd"
   },
   {
     "name": "handshake.truncf",
     "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/truncf.vhd"
   },
   {
     "name": "handshake.xori",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/xori.vhd",
     "dependencies": ["join"]
@@ -213,7 +215,7 @@
   {
     "name": "handshake.sitofp",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/sitofp.vhd",
     "dependencies": ["delay_buffer", "oehb"]
@@ -221,7 +223,7 @@
   {
     "name": "handshake.fptosi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/fptosi.vhd",
     "dependencies": ["delay_buffer", "oehb"]
@@ -229,15 +231,15 @@
   {
     "name": "handshake.absf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/absf.vhd"
   },
   {
     "name": "handshake.extf",
     "parameters": [
-      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "OUTPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/extf.vhd"
   },
@@ -249,6 +251,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
       {
@@ -260,14 +263,13 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
-    "module-name": "oehb_dataless",
-    "dependencies": ["oehb_dataless_with_tag"]
+    "module-name": "oehb_dataless"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
         "name": "TIMING",
         "type": "timing",
@@ -287,6 +289,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
       {
@@ -299,13 +302,13 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/ofifo.vhd",
     "module-name": "ofifo_dataless",
-    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless", "ofifo_dataless_with_tag"]
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
         "name": "TIMING",
         "type": "timing",
@@ -325,6 +328,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
       {
@@ -335,14 +339,13 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
-    "module-name": "tehb_dataless",
-    "dependencies": ["tehb_dataless_with_tag"]
+    "module-name": "tehb_dataless"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
         "name": "TIMING",
         "type": "timing",
@@ -361,6 +364,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
       {
@@ -372,13 +376,13 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tfifo.vhd",
     "module-name": "tfifo_dataless",
-    "dependencies": ["elastic_fifo_inner_dataless", "tfifo_dataless_with_tag"]
+    "dependencies": ["elastic_fifo_inner_dataless"]
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
         "name": "TIMING",
         "type": "timing",
@@ -423,18 +427,19 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/fork.vhd",
     "module-name": "fork_dataless",
-    "dependencies": ["logic", "eager_fork_register_block", "fork_dataless_with_tag"]
+    "dependencies": ["logic", "eager_fork_register_block"]
   },
   {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/fork.vhd",
     "module-name": "handshake_fork",
@@ -448,6 +453,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
@@ -459,7 +465,7 @@
     "name": "handshake.lazy_fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/lazy_fork.vhd",
     "dependencies": ["types", "lazy_fork_dataless"]
@@ -471,6 +477,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
@@ -480,7 +487,7 @@
   {
     "name": "handshake.sink",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/sink.vhd"
   },
@@ -492,9 +499,10 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
-      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/mux.vhd",
     "module-name": "mux_dataless",
@@ -504,8 +512,8 @@
     "name": "handshake.mux",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
     "dependencies": ["types", "tehb"]
@@ -518,20 +526,21 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       },
-      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/control_merge.vhd",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless", "control_merge_dataless_with_tag"]
+    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
   },
   {
     "name": "handshake.control_merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INDEX_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/control_merge.vhd",
     "dependencies": ["types", "control_merge_dataless"]
@@ -544,6 +553,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
@@ -555,7 +565,7 @@
     "name": "handshake.merge",
     "parameters": [
       { "name": "SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/merge.vhd",
     "dependencies": ["types", "tehb", "merge_notehb"]
@@ -567,6 +577,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
@@ -576,7 +587,7 @@
   {
     "name": "handshake.br",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/br.vhd"
   },
@@ -587,6 +598,7 @@
         "name": "DATA_TYPE",
         "type": "dataflow",
         "data-eq": 0,
+        "extra-eq": 0,
         "generic": false
       }
     ],
@@ -597,7 +609,7 @@
   {
     "name": "handshake.cond_br",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/cond_br.vhd",
     "dependencies": ["cond_br_dataless"]
@@ -622,17 +634,17 @@
   {
     "name": "handshake.load",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/load.vhd",
-    "dependencies": ["tehb", "tfifo"]
+    "dependencies": ["tehb"]
   },
   {
     "name": "handshake.store",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/store.vhd",
     "dependencies": ["join"]
@@ -643,8 +655,8 @@
       { "name": "NUM_CONTROLS", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_STORES", "type": "unsigned", "eq": 0, "generic": false },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller_storeless.vhd",
     "dependencies": ["mc_support"]
@@ -655,8 +667,8 @@
       { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_LOADS", "type": "unsigned", "eq": 0, "generic": false },
       { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller_loadless.vhd",
     "dependencies": ["mc_support"]
@@ -667,8 +679,8 @@
       { "name": "NUM_CONTROLS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_LOADS", "type": "unsigned", "lb": 1 },
       { "name": "NUM_STORES", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller.vhd",
     "dependencies": ["mem_controller_loadless"]
@@ -690,7 +702,7 @@
     "parameters": [
       { "name": "CREDITS", "type": "string" },
       { "name": "NUM_SHARED_OPERANDS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1 },
+      { "name": "DATA_WIDTH", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "LATENCY", "type": "unsigned", "lb": 1 }
     ],
     "dependencies": [
@@ -712,81 +724,10 @@
   {
     "name": "handshake.not",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/not.vhd",
     "module-name": "logic_not"
-  },
-  {
-    "name": "handshake.speculator",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow" },
-      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator_wrapper.vhd",
-    "dependencies": ["types", "speculator", "tehb", "tfifo"]
-  },
-  {
-    "name": "handshake.spec_commit",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit_wrapper.vhd",
-    "dependencies": ["types", "spec_commit"]
-  },
-  {
-    "name": "handshake.spec_commit",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_commit_wrapper.vhd",
-    "module-name": "spec_commit_wrapper_dataless",
-    "dependencies": ["types", "spec_commit_wrapper"]
-  },
-  {
-    "name": "handshake.spec_save",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_wrapper.vhd",
-    "dependencies": ["types", "spec_save"]
-  },
-  {
-    "name": "handshake.spec_save",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "generic": false }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_wrapper.vhd",
-    "module-name": "spec_save_wrapper_dataless",
-    "dependencies": ["types", "spec_save_wrapper"]
-  },
-  {
-    "name": "handshake.spec_save_commit",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1 },
-      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit_wrapper.vhd",
-    "dependencies": ["types", "spec_save_commit", "tfifo"]
-  },
-  {
-    "name": "handshake.spec_save_commit",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 0, "generic": false },
-      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/dataless/spec_save_commit_wrapper.vhd",
-    "module-name": "spec_save_commit_wrapper_dataless",
-    "dependencies": ["types", "spec_save_commit_wrapper", "tfifo"]
-  },
-  {
-    "name": "handshake.speculating_branch",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 0 },
-      { "name": "SPEC_TAG_DATA_TYPE", "type": "dataflow", "data-lb": 0 }
-    ],
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch_wrapper.vhd",
-    "dependencies": ["types", "speculating_branch", "tfifo"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
@@ -824,59 +765,6 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/fork_with_tag.vhd",
-    "module-name": "fork_dataless_with_tag",
-    "dependencies": ["handshake_fork"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/control_merge_with_tag.vhd",
-    "module-name": "control_merge_dataless_with_tag",
-    "dependencies": ["control_merge"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/oehb_with_tag.vhd",
-    "module-name": "oehb_dataless_with_tag",
-    "dependencies": ["oehb"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/tehb_with_tag.vhd",
-    "module-name": "tehb_dataless_with_tag",
-    "dependencies": ["tehb"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/tfifo_with_tag.vhd",
-    "module-name": "tfifo_dataless_with_tag",
-    "dependencies": ["tfifo"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/ofifo_with_tag.vhd",
-    "module-name": "ofifo_dataless_with_tag",
-    "dependencies": ["ofifo"]
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/old_dep.vhd"
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_commit.vhd",
-    "dependencies": ["old_dep"]
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save.vhd",
-    "dependencies": ["old_dep"]
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/spec_save_commit.vhd",
-    "dependencies": ["old_dep"]
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculating_branch.vhd",
-    "dependencies": ["old_dep"]
-  },
-  {
-    "generic": "$DYNAMATIC/experimental/data/vhdl/speculation/speculator.vhd",
-    "dependencies": ["old_dep"]
   },
   {
     "name": "mem_to_bram",
