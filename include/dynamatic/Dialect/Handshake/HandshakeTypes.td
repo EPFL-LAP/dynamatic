@@ -123,21 +123,6 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 // Type constraints
 //===----------------------------------------------------------------------===//
 
-class ChannelHasDataType<string type> : CPred<
-  "::mlir::isa<" # type #
-  ">(::mlir::cast<::dynamatic::handshake::ChannelType>($_self).getDataType())"
->;
-
-class ChannelHasDataWidth<int width> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ChannelType>" #
-  "($_self).getDataBitWidth() == " # width
->;
-
-class HasNumExtras<int numExtras> : CPred<
-  "::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>" #
-  "($_self).getNumExtraSignals() == " # numExtras
->;
-
 def SignalType : Type<
   CPred<"::dynamatic::handshake::ChannelType::isSupportedSignalType($_self)">,
   "must be an `IntegerType` or `FloatType`"> {
@@ -195,10 +180,25 @@ class IsFloatChannel<string name> : PredOpTrait<
   ]>
 >;
 
-def SimpleControl : Type<
-  HasNumExtras<0>,
-  "must be a `handshake::ControlType` type with no extra signals",
-  "::dynamatic::handshake::ControlType"
+/// Constraint to ensure an operand/result shouldn't have any extra signals.
+class IsSimpleHandshake<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getNumExtraSignals() == 0">
+>;
+
+/// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
+class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
+  name # " shouldn't have any extra signals",
+  CPred<[{
+    ([&](auto&& variadicTypes) {
+      for (::mlir::Type variadicType : variadicTypes) {
+        if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
+          return false;
+      }
+      return true;
+    })
+  }] # "($" # name # ".getTypes())">
 >;
 
 // Temporary constraint for UnbundleOp.
@@ -290,27 +290,6 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
     "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getExtraSignals()"
   ), ", ") # "})">
->;
-
-/// Constraint to ensure an operand/result shouldn't have any extra signals.
-class IsSimpleHandshake<string name> : PredOpTrait<
-  name # " shouldn't have any extra signals",
-  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
-    ".getType()).getNumExtraSignals() == 0">
->;
-
-/// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
-class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
-  name # " shouldn't have any extra signals",
-  CPred<[{
-    ([&](auto&& variadicTypes) {
-      for (::mlir::Type variadicType : variadicTypes) {
-        if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
-          return false;
-      }
-      return true;
-    })
-  }] # "($" # name # ".getTypes())">
 >;
 
 /// Merging Relationship of Extra Signals:
