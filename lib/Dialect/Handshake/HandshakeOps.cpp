@@ -70,7 +70,7 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
 static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
   // No parsing needed.
 
-  // Make SimpleControl type
+  // Make ControlType without any extra signals
   type = ControlType::get(parser.getContext());
   return success();
 }

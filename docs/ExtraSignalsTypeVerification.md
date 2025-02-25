@@ -123,7 +123,7 @@ More on operation results: https://mlir.llvm.org/docs/DefiningDialects/Operation
 
 ### Types
 
-You may notice that operands and results are often denoted by types like `HandshakeType` or `BoolChannel`. In Handshake IR, types specify the kind of RTL port.
+You may notice that operands and results are often denoted by types like `HandshakeType` or `ChannelType`. In Handshake IR, types specify the kind of RTL port.
 The base class of all types in the Handshake dialect is the **`HandshakeType`** class.
 
 Most variables in the IR are either `ChannelType` or `ControlType`.
@@ -142,28 +142,12 @@ The actual operands have concrete **instances** of these types. For example, an 
 
 Since `ChannelType` allows different data types, multiple type instances are possible.
 
-`BoolChannel` is a special case that only allows `!handshake.channel<i1>`.
-
 
 
 Some `HandshakeType` instances may include **extra signals** beyond `(data +) valid + ready`. For example:
 
 - `!handshake.channel<i32, [spec: i1]>`
 - `!handshake.control<[spec: i1, tag: i8]>`
-
-
-
-In some cases, we enforce that an operand is **without** extra signals. For this, we use **simple types**:
-
-- `SimpleHandshake`
-- `SimpleChannel`
-- `SimpleControl`
-
-For example, in `MemoryControllerOp`, some operands/results are of SimpleType.
-
-https://github.com/EPFL-LAP/dynamatic/blob/28872676a0f3438e82c064242fac517059e22fc2/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L621-L624
-
-These ensure that the channel does not carry any additional signals.
 
 ### Traits
 
@@ -191,7 +175,9 @@ MLIR provides `AllTypesMatch`, but we've introduced similar traits:
 
 Traits are sometimes called **multi-entity constraints** because they enforce relationships across multiple operands or results.
 
-- In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
+In contrast, types (or type constraints) are called **single-entity constraints** as they enforce properties on individual elements.
+
+It's worth noting that we sometimes use traits even in single-entity cases for consistency. For example, `IsSimpleHandshake` ensures the type doesn't include any extra signals, while `IsIntChannel` ensures the channel's data type is `IntegerType`.
 
 More on constraints: https://mlir.llvm.org/docs/DefiningDialects/Operations/#constraints
 
