@@ -42,7 +42,7 @@ def get_symbol_from_predicate(pred):
   match pred:
     case "eq":
       return "="
-    case "neq":
+    case "ne":
       return "!="
     case "slt" | "ult":
       return "<"
@@ -58,7 +58,7 @@ def get_symbol_from_predicate(pred):
 
 def get_sign_from_predicate(pred):
   match pred:
-    case "eq" | "neq":
+    case "eq" | "ne":
       return None
     case "slt" | "sle" | "sgt" | "sge":
       return "signed"
