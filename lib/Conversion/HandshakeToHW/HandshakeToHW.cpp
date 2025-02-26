@@ -1832,7 +1832,7 @@ public:
                     ConvertToHWInstance<handshake::ExtFOp>,
                     ConvertToHWInstance<handshake::AbsFOp>,
 
-                    // Operations for speculation
+                    // Speculative operations
                     ConvertToHWInstance<handshake::SpecCommitOp>,
                     ConvertToHWInstance<handshake::SpecSaveOp>,
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
