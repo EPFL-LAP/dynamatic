@@ -1,6 +1,7 @@
 """
 Script for running Dynamatic speculative integration tests.
 """
+import json
 import os
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
+EXPORT_DOT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-dot"
 
 
 class TermColors:
@@ -37,6 +39,14 @@ def color_print(string: str, color: str):
   `color` -- ANSI escape seq. for the desired color; use TermColors constants
   """
   print(f"{color}{string}{TermColors.ENDC}")
+
+
+def fail(id, msg):
+  return {
+      "id": id,
+      "msg": msg,
+      "status": "fail"
+  }
 
 
 def run_test(c_file, id, timeout):
@@ -89,11 +99,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Applied standard transformations to cf")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to apply standard transformations to cf",
-          "status": "fail"
-      }
+      return fail(id, "Failed to apply standard transformations to cf")
 
   # cf transformations (dynamatic)
   cf_dyn_transformed = os.path.join(out_dir, "cf_dyn_transformed.mlir")
@@ -110,11 +116,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Applied Dynamatic transformations to cf")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to apply Dynamatic transformations to cf",
-          "status": "fail"
-      }
+      return fail(id, "Failed to apply Dynamatic transformations to cf")
 
   # cf level -> handshake level
   handshake = os.path.join(out_dir, "handshake.mlir")
@@ -129,11 +131,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Compiled cf to handshake")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to compile cf to handshake",
-          "status": "fail"
-      }
+      return fail(id, "Failed to compile cf to handshake")
 
   # handshake transformations
   handshake_transformed = os.path.join(out_dir, "handshake_transformed.mlir")
@@ -150,11 +148,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Applied transformations to handshake")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to apply transformations to handshake",
-          "status": "fail"
-      }
+      return fail(id, "Failed to apply transformations to handshake")
 
   # Buffer placement (Simple buffer placement)
   handshake_buffered = os.path.join(out_dir, "handshake_buffered.mlir")
@@ -171,11 +165,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Placed simple buffers")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to place simple buffers",
-          "status": "fail"
-      }
+      return fail(id, "Failed to place simple buffers")
 
   # handshake canonicalization
   handshake_canonicalized = os.path.join(
@@ -193,11 +183,7 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Canonicalized handshake")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to canonicalize Handshake",
-          "status": "fail"
-      }
+      return fail(id, "Failed to canonicalize Handshake")
 
   # Speculation
   handshake_speculation = os.path.join(out_dir, "handshake_speculation.mlir")
@@ -215,12 +201,62 @@ def run_test(c_file, id, timeout):
     if result.returncode == 0:
       print("Added speculative units")
     else:
-      return {
-          "id": id,
-          "msg": "Failed to add speculative units",
-          "status": "fail"
-      }
+      return fail(id, "Failed to add speculative units")
 
+  # Export dot file
+  spec_dot = os.path.join(out_dir, "spec.dot")
+  with open(spec_dot, "w") as f:
+    result = subprocess.run([
+        EXPORT_DOT_BIN, handshake_speculation,
+        "--edge-style=spline", "--label-type=uname"
+    ],
+        stdout=f,
+        stderr=sys.stdout
+    )
+    if result.returncode == 0:
+      print("Created dot file")
+    else:
+      return fail(id, "Failed to export dot file")
+
+  # Convert DOT graph to PNG
+  spec_png = os.path.join(out_dir, "spec.png")
+  with open(spec_png, "w") as f:
+    result = subprocess.run([
+        "dot", "-Tpng", spec_dot
+    ],
+        stdout=f,
+        stderr=sys.stdout
+    )
+    if result.returncode == 0:
+      print("Created PNG file")
+    else:
+      return fail(id, "Failed to create PNG file")
+
+  buffer_json = os.path.join(c_file_dir, "buffer.json")
+  handshake_export = os.path.join(out_dir, "handshake_export.mlir")
+  with open(buffer_json, "r") as f:
+    buffers = json.load(f)
+    buffer_pass_args = []
+    for buffer in buffers:
+      buffer_pass_args.append(
+          "--handshake-placebuffers-custom=" +
+          f"pred={buffer['pred']} " +
+          f"outid={buffer['outid']} " +
+          f"slots={buffer['slots']} " +
+          f"type={buffer['type']}")
+    print(buffer_pass_args)
+    with open(handshake_export, "w") as f:
+      result = subprocess.run([
+          DYNAMATIC_OPT_BIN, handshake_speculation,
+          *buffer_pass_args
+      ],
+          stdout=f,
+          stderr=sys.stdout
+      )
+      if result.returncode == 0:
+        print("Exported Handshake")
+      else:
+        return fail(id, "Failed to export Handshake")
   return {
       "id": id,
       "msg": "Test passed",
