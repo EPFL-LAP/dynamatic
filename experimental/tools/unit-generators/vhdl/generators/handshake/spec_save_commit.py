@@ -9,7 +9,7 @@ def generate_spec_save_commit(name, params):
 
   # TODO: Support extra signals other than spec
   if data_type.is_channel():
-    return _generate_spec_save_commit(name, data_type.bitwidth, fifo_depth)
+    return _generate_spec_save_commit_inner(name, data_type.bitwidth, fifo_depth)
   else:
     return _generate_spec_save_commit_dataless(name, fifo_depth)
 
@@ -418,7 +418,7 @@ end architecture;
 def _generate_spec_save_commit_dataless(name, fifo_depth):
   inner_name = f"{name}_inner"
 
-  dependencies = _generate_spec_save_commit(inner_name, 1, fifo_depth)
+  dependencies = _generate_spec_save_commit_inner(inner_name, 1, fifo_depth)
 
   entity = f"""
 library ieee;

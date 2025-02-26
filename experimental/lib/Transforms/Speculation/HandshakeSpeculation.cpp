@@ -98,18 +98,10 @@ LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
     Operation *dstOp = operand->getOwner();
     Value srcOpResult = operand->get();
 
-    // We need a buffer in most cases
-    builder.setInsertionPoint(dstOp);
-    handshake::BufferOp bufferOp = builder.create<handshake::BufferOp>(
-        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
-    inheritBB(dstOp, bufferOp);
-
-    operand->set(bufferOp.getResult());
     // Create and connect the new Operation
-    builder.setInsertionPoint(bufferOp);
+    builder.setInsertionPoint(dstOp);
     handshake::SpecCommitOp newOp = builder.create<handshake::SpecCommitOp>(
-        bufferOp->getLoc(), bufferOp.getResult().getType(),
-        bufferOp.getResult(), ctrlSignal);
+        dstOp->getLoc(), srcOpResult.getType(), srcOpResult, ctrlSignal);
     inheritBB(dstOp, newOp);
 
     // Connect the new Operation to dstOp
@@ -525,16 +517,11 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
-  handshake::BufferOp bufferOp = builder.create<handshake::BufferOp>(
-      dstOp->getLoc(), enableSpecIn.value(), TimingInfo::tehb(), 16);
-  inheritBB(dstOp, bufferOp);
-
-  builder.setInsertionPoint(bufferOp);
   // resultType is tentative and will be updated in the addSpecTag algorithm
   // later.
   specOp = builder.create<handshake::SpeculatorOp>(
-      bufferOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*dataIn=*/srcOpResult, /*specIn=*/bufferOp.getResult());
+      dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+      /*dataIn=*/srcOpResult, /*specIn=*/enableSpecIn.value());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
@@ -543,28 +530,6 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
 
   // Assign a Basic Block to the speculator
   inheritBB(dstOp, specOp);
-
-  // for (auto user : specOp.getDataOut().getUsers()) {
-  //   if (auto forkOp = dyn_cast<handshake::ForkOp>(user)) {
-  //     for (auto res : forkOp.getResults()) {
-  //       for (auto &use : res.getUses()) {
-  //         auto bufOp = builder.create<handshake::BufferOp>(
-  //           forkOp.getLoc(), use.get(), TimingInfo::tehb(), 16);
-  //         inheritBB(forkOp, bufOp);
-  //         use.set(bufOp.getResult());
-  //       }
-  //     }
-  //   } else {
-  //     std::cerr << "user is not a fork" << std::endl;
-  //   }
-  // }
-
-  // for (auto &use : specOp.getDataOut().getUses()) {
-  //   auto bufOp = builder.create<handshake::BufferOp>(
-  //     specOp.getLoc(), specOp.getDataOut(), TimingInfo::tehb(), 3);
-  //   inheritBB(specOp, bufOp);
-  //   use.set(bufOp.getResult());
-  // }
 
   return success();
 }
@@ -787,9 +752,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 
-  // Place Buffer operations
-  if (failed(placeBuffers()))
-    return signalPassFailure();
+  // // Place Buffer operations
+  // if (failed(placeBuffers()))
+  //   return signalPassFailure();
 
   // After completing placement of the speculator and commit units, update the
   // types to include the speculative tag. Since type-checking occurs after this

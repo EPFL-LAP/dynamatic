@@ -8,7 +8,7 @@ def generate_speculator(name, params):
   bitwidth = VhdlScalarType(port_types["ins"]).bitwidth
   fifo_depth = params["fifo_depth"]
 
-  return _generate_speculator(name, bitwidth, fifo_depth)
+  return _generate_speculator_inner(name, bitwidth, fifo_depth)
 
 
 def _generate_specGen_core(name, bitwidth):

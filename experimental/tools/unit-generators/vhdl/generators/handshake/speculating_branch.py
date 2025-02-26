@@ -8,7 +8,7 @@ def generate_speculating_branch(name, params):
   data_bitwidth = VhdlScalarType(port_types["data"]).bitwidth
   spec_tag_data_bitwidth = VhdlScalarType(port_types["spec_tag_data"]).bitwidth
 
-  return _generate_speculating_branch(name, data_bitwidth, spec_tag_data_bitwidth)
+  return _generate_speculating_branch_inner(name, data_bitwidth, spec_tag_data_bitwidth)
 
 
 def _generate_speculating_branch_inner(name, data_bitwidth, spec_tag_data_bitwidth):
