@@ -35,7 +35,6 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
-F_HANDSHAKE_CANONICALIZED="$COMP_DIR/handshake_canonicalized.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
@@ -54,7 +53,7 @@ export_dot() {
   local f_png="$COMP_DIR/$2.png"
 
   # Export to DOT
-  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" "--label-type=uname" \
+  "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
 
@@ -70,34 +69,33 @@ export_dot() {
 
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
-cp "$SRC_DIR/cf.mlir" "$COMP_DIR/cf.mlir"
 
-# # source -> affine level
-# "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-#   -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
-#   -I "$DYNAMATIC_DIR/include" \
-#   -S -O3 --memref-fullrank --raise-scf-to-affine \
-#   > "$F_AFFINE"
-# exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
+# source -> affine level
+"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
+  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+  -I "$DYNAMATIC_DIR/include" \
+  -S -O3 --memref-fullrank --raise-scf-to-affine \
+  > "$F_AFFINE"
+exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
-# # affine level -> pre-processing and memory analysis
-# "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-#   --remove-polygeist-attributes \
-#   --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-#   --mark-memory-dependencies \
-#   > "$F_AFFINE_MEM"
-# exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
+# affine level -> pre-processing and memory analysis
+"$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
+  --remove-polygeist-attributes \
+  --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
+  --mark-memory-dependencies \
+  > "$F_AFFINE_MEM"
+exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
-# # affine level -> scf level
-# "$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
-#   --flatten-memref-row-major --scf-simple-if-to-select \
-#   --scf-rotate-for-loops \
-#   > "$F_SCF"
-# exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
+# affine level -> scf level
+"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
+  --flatten-memref-row-major --scf-simple-if-to-select \
+  --scf-rotate-for-loops \
+  > "$F_SCF"
+exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
-# # scf level -> cf level
-# "$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
-# exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
+# scf level -> cf level
+"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
+exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
 # cf transformations (standard)
 "$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
@@ -177,16 +175,8 @@ fi
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   --handshake-reshape-channels \
-  > "$F_HANDSHAKE_CANONICALIZED"
-  # > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
-
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
-  --handshake-speculation="json-path=integration-test/$KERNEL_NAME/spec.json" \
-  --handshake-materialize \
-  --handshake-canonicalize \
   > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to add speculation to Handshake" "Speculative handshake"
+exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
