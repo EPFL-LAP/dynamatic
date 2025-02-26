@@ -11,7 +11,7 @@
 // necessary).
 //
 //===----------------------------------------------------------------------===//
-
+#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -50,7 +50,6 @@
 #include <set>
 #include <string>
 #include <system_error>
-#include <unordered_map>
 #include <utility>
 
 using namespace llvm;
@@ -274,8 +273,7 @@ public:
 
   /// Associates every port of a component to internal signal names that should
   /// connect to it.
-  // llvm::MapVector
-  using IOMap = llvm::MapVector<Port, SmallVector<std::string>>;
+  using IOMap = llvm::MapVector<Port, SmallVector<std::string /*signal name*/>>;
 
   /// Suffixes for specfic signal types.
   static constexpr StringLiteral VALID_SUFFIX = StringLiteral("_valid"),
@@ -325,7 +323,11 @@ using PortMapWriter = void (*)(const RTLWriter::Port &port,
                                raw_indented_ostream &os);
 
 /// Writes IO mappings to the output stream. Provided with a correct
-/// port-mapping function, this works for both VHDL and Verilog.
+/// port-mapping function, this works for VHDL, Verilog, and SMV.
+/// Mapping examples:
+/// - VHDL    (..., ins => constant0_outs, ...)
+/// - Verilog (..., .ins (constant0_outs), ...)
+/// - SMV     (..., constant0.outs, ...)
 static void writeIOMap(const RTLWriter::IOMap &mappings,
                        PortMapWriter writePortMap, const std::string &separator,
                        raw_indented_ostream &os) {
@@ -388,15 +390,19 @@ static std::string getExtraSignalName(StringRef baseName,
 void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
                            StringRef sep, HDL hdl) {
   const RTLWriter::EntityIO entityIO(modOp);
-  size_t numIOLeft = hdl != HDL::SMV
-                         ? entityIO.inputs.size() + entityIO.outputs.size()
-                         : entityIO.inputs.size() - 2;
+  size_t numIOLeft =
+      hdl != HDL::SMV
+          ? entityIO.inputs.size() + entityIO.outputs.size()
+          // In SMV we ignore clk and rst signals and all the output ports
+          : entityIO.inputs.size() - 2;
 
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      const bool toPrint =
-          hdl != HDL::SMV ? true : portName != "rst" && portName != "clk";
+      const bool toPrint = hdl != HDL::SMV
+                               ? true
+                               : portName != dynamatic::hw::CLK_PORT &&
+                                     portName != dynamatic::hw::RST_PORT;
       if (toPrint) {
         writeDeclaration(portName, dir, portType, os);
         if (--numIOLeft != 0)
@@ -974,6 +980,7 @@ private:
   LogicalResult createInternalSignals(WriteModData &data) const override;
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteModData &data) const;
+  /// Writes the preprocessor directives to include the external modules
   void writeIncludes(WriteModData &data) const;
 };
 
@@ -996,7 +1003,8 @@ void SMVWriter::writeIncludes(WriteModData &data) const {
 }
 
 LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
-  //  Create signal names for all block arguments
+  // Create the names of all the input signals of the RTL module: i.e., the
+  // block arguments of the HW MLIR
   for (auto [arg, name] :
        llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
                        data.modOp.getInputNamesStr())) {
@@ -1020,6 +1028,9 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
               return success();
             })
             .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
+              // Create the names of all the output signals of the RTL module:
+              // i.e., the input signals connected to the terminator op
+              // (hw::OutputOp).
               llvm::copy(outputOp->getOperands(),
                          std::back_inserter(data.outputs));
               return success();
@@ -1045,6 +1056,9 @@ void SMVWriter::constructIOMappings(
         getInternalSignalName(signal, SignalType::VALID));
   };
   auto addReady = [&](StringRef port, OpResult res) -> void {
+    // To get the name of the ready signal we can't use the inetrnal signal
+    // name. We need to get the user of the signal, and search the name of the
+    // corresponding port
     auto *userOp = *res.getUsers().begin();
     unsigned operandIndex = 0;
     for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
@@ -1180,13 +1194,6 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
     // Declare the instance
     os << "VAR " << instOp.getInstanceName() << " : " << moduleName;
 
-    // Write generic parameters if there are any
-    if (!genericParams.empty()) {
-      for (auto [_, val] : ArrayRef<KeyValuePair>{genericParams})
-        os << "_" << val;
-
-      os << "_" << genericParams.back().second;
-    }
     os << "(";
 
     PortMapWriter writePortMap = [](const Port &port,
@@ -1201,7 +1208,7 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
       }
 
       ArrayRef<std::string> signals(signalNames);
-      for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
+      for (const std::string &sig : signals.drop_back())
         os << sig << ", ";
       os << signals.back();
     };

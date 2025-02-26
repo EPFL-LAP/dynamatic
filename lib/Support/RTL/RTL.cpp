@@ -60,7 +60,7 @@ static constexpr StringLiteral
     ERR_UNKNOWN_PARAM("unknown parameter name"),
     ERR_DUPLICATE_NAME("duplicated parameter name"),
     ERR_RESERVED_NAME("this is a reserved parameter name"),
-    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl", "verilog" or "smv)"),
+    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl", "verilog", or "smv)"),
     ERR_INVALID_IO_STYLE(
         R"(unknown IO style: options are "hierarchical" or "flat")");
 
