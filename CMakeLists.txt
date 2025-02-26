@@ -131,6 +131,20 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# XLS Integration (experimental)
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_XLS)
+  # Add 'DYNAMATIC_ENABLE_XLS` macro to prepoc + tablegen for conditioanl
+  # inclusion of XLS features.
+  add_compile_definitions(DYNAMATIC_ENABLE_XLS)
+  set(LLVM_TABLEGEN_FLAGS ${LLVM_TABLEGEN_FLAGS} -DDYNAMATIC_ENABLE_XLS)
+
+  include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/xls/include)
+  include_directories(${DYNAMATIC_BINARY_DIR}/experimental/xls/include)
+endif()
+
+#-------------------------------------------------------------------------------
 # Directory setup
 #-------------------------------------------------------------------------------
 
