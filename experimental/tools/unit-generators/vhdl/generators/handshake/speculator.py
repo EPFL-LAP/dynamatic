@@ -652,8 +652,8 @@ entity {name} is
   port (
     clk, rst     : in  std_logic;
 
-    enable_valid : in std_logic;
-    enable_ready : out std_logic;
+    trigger_valid : in std_logic;
+    trigger_ready : out std_logic;
 
     data_in      : in std_logic_vector({bitwidth} - 1 downto 0);
     data_in_valid : in std_logic;
@@ -690,12 +690,12 @@ begin
             end if;
     end process;
 
-    enable_ready <= data_out_ready;
+    trigger_ready <= data_out_ready;
     data_in_ready <= data_out_ready;
 
-    -- Predictor output valid if enabled
+    -- Predictor output valid if triggered
     data_out <= data_reg; -- zeros & '1';
-    data_out_valid <= enable_valid;
+    data_out_valid <= trigger_valid;
 end architecture;
 """
 
@@ -940,9 +940,9 @@ entity {name} is
     ins_valid: in std_logic;
     ins_spec: in std_logic_vector(0 downto 0);
     ins_ready: out std_logic;
-    -- enable is dataless (control token)
-    enable_valid: in std_logic;
-    enable_ready: out std_logic;
+    -- trigger is dataless (control token)
+    trigger_valid: in std_logic;
+    trigger_ready: out std_logic;
     -- outputs
     outs: out std_logic_vector({bitwidth} - 1 downto 0);
     outs_valid: out std_logic;
@@ -1047,8 +1047,8 @@ predictor0: entity work.{predictor_name}(arch)
     clk => clk,
     rst => rst,
 
-    enable_valid => enable_valid,
-    enable_ready => enable_ready,
+    trigger_valid => trigger_valid,
+    trigger_ready => trigger_ready,
 
     data_in => fork_data_outs(1),
     data_in_valid => fork_data_outs_valid(1),
@@ -1208,9 +1208,9 @@ entity {name} is
     ins: in std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid: in std_logic;
     ins_spec: in std_logic_vector(0 downto 0);
-    -- enable is dataless (control token)
-    enable_valid: in std_logic;
-    enable_spec: in std_logic_vector(0 downto 0);
+    -- trigger is dataless (control token)
+    trigger_valid: in std_logic;
+    trigger_spec: in std_logic_vector(0 downto 0);
     outs_ready: in std_logic;
     ctrl_save_ready: in std_logic;
     ctrl_commit_ready: in std_logic;
@@ -1232,7 +1232,7 @@ entity {name} is
     ctrl_sc_branch: out std_logic_vector(0 downto 0);
     ctrl_sc_branch_valid: out std_logic;
     ins_ready: out std_logic;
-    enable_ready: out std_logic
+    trigger_ready: out std_logic
   );
 end entity;
 """
@@ -1271,8 +1271,8 @@ begin
       ins_spec => ins_spec,
       ins_ready => ins_ready,
 
-      enable_valid => enable_valid,
-      enable_ready => enable_ready,
+      trigger_valid => trigger_valid,
+      trigger_ready => trigger_ready,
 
       outs => outs_inner,
       outs_valid => outs_valid_inner,

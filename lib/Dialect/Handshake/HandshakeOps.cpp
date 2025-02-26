@@ -1612,16 +1612,16 @@ LogicalResult EndOp::verify() {
 //===----------------------------------------------------------------------===//
 
 ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand enable, dataIn;
+  OpAsmParser::UnresolvedOperand trigger, dataIn;
   Type dataType;
-  Type enableType;
+  Type triggerType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
 
-  if (parser.parseLSquare() || parser.parseOperand(enable) ||
+  if (parser.parseLSquare() || parser.parseOperand(trigger) ||
       parser.parseRSquare() || parser.parseOperand(dataIn) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseType(dataType) || parser.parseComma() ||
-      parser.parseType(enableType))
+      parser.parseType(triggerType))
     return failure();
 
   OpBuilder builder(parser.getContext());
@@ -1632,14 +1632,14 @@ ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  return parser.resolveOperands({dataIn, enable}, {dataType, enableType},
+  return parser.resolveOperands({dataIn, trigger}, {dataType, triggerType},
                                 allOperandLoc, result.operands);
 }
 
 void SpeculatorOp::print(OpAsmPrinter &p) {
-  p << " [" << getEnable() << "] " << getDataIn() << " ";
+  p << " [" << getTrigger() << "] " << getDataIn() << " ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << ", " << getEnable().getType();
+  p << " : " << getDataIn().getType() << ", " << getTrigger().getType();
 }
 
 //===----------------------------------------------------------------------===//
