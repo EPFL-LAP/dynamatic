@@ -13,6 +13,7 @@
 
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
@@ -20,6 +21,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include <iostream>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -102,6 +104,10 @@ LogicalResult PlacementFinder::findSavePositions() {
         if (!specValues.contains(operand.get())) {
           // No save needed in front of Source Operations
           if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
+            continue;
+
+          // tmp
+          if (isa<handshake::StoreOp>(operand.getOwner()))
             continue;
 
           placements.addSave(operand);
@@ -216,14 +222,19 @@ void PlacementFinder::findCommitsBetweenBBs() {
     }
 
     if (countSpecInputs > 1) {
+      int placeIndex = 0;
+      int i = 0;
       // Potential ordering issue, add commits
       for (const BBArc &pred : predecessorArcs) {
-        for (CFGEdge *edge : pred.edges) {
-          // Add a Commit only in front of speculative inputs
-          if (speculativeEdges.count(edge))
-            placements.addCommit(*edge);
-          // Here, synchronizer operations will be needed in the future
+        if (i == placeIndex) {
+          for (CFGEdge *edge : pred.edges) {
+            // Add a Commit only in front of speculative inputs
+            if (speculativeEdges.count(edge))
+              placements.addCommit(*edge);
+            // Here, synchronizer operations will be needed in the future
+          }
         }
+        i++;
       }
     }
   }
@@ -365,6 +376,8 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
-                 failed(findSaveCommitPositions()));
+  return failure(failed(findSavePositions()) || failed(findCommitPositions()));
+  // return failure(failed(findSavePositions()) || failed(findCommitPositions())
+  // ||
+  //                failed(findSaveCommitPositions()));
 }
