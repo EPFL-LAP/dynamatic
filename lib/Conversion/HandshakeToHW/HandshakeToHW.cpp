@@ -673,6 +673,18 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
+      .Case<handshake::SpeculatorOp>([&](auto) {
+        // TODO: Determine the FIFO size based on speculation resolution delay.
+        addUnsigned("FIFO_DEPTH", 16);
+      })
+      .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
+            handshake::SpeculatingBranchOp>([&](auto) {
+        // No parameters needed for these operations
+      })
+      .Case<handshake::SpecSaveCommitOp>([&](auto) {
+        // TODO: Determine the FIFO size based on speculation resolution delay.
+        addUnsigned("FIFO_DEPTH", 16);
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1790,6 +1802,7 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,
@@ -1817,7 +1830,14 @@ public:
                     ConvertToHWInstance<handshake::SIToFPOp>,
                     ConvertToHWInstance<handshake::FPToSIOp>,
                     ConvertToHWInstance<handshake::ExtFOp>,
-                    ConvertToHWInstance<handshake::AbsFOp>>(
+                    ConvertToHWInstance<handshake::AbsFOp>,
+
+                    // Speculative operations
+                    ConvertToHWInstance<handshake::SpecCommitOp>,
+                    ConvertToHWInstance<handshake::SpecSaveOp>,
+                    ConvertToHWInstance<handshake::SpecSaveCommitOp>,
+                    ConvertToHWInstance<handshake::SpeculatorOp>,
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect

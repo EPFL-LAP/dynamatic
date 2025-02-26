@@ -364,61 +364,6 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
 }
 
 //===----------------------------------------------------------------------===//
-// SameExtraSignalsInterface
-//===----------------------------------------------------------------------===//
-
-namespace {
-using ChannelVal = TypedValue<handshake::ChannelType>;
-} // namespace
-
-static inline ChannelVal toChannel(Value val) { return cast<ChannelVal>(val); }
-
-static void insertChannels(ValueRange values,
-                           SmallVectorImpl<ChannelVal> &channels) {
-  for (Value val : values) {
-    if (auto channelVal = dyn_cast<ChannelVal>(val))
-      channels.push_back(channelVal);
-  }
-}
-
-SmallVector<ChannelVal>
-dynamatic::handshake::detail::getChannelsWithSameExtraSignals(Operation *op) {
-  SmallVector<ChannelVal> channels;
-  insertChannels(op->getOperands(), channels);
-  insertChannels(op->getResults(), channels);
-  return channels;
-}
-
-LogicalResult dynamatic::handshake::detail::verifySameExtraSignalsInterface(
-    Operation *op, ArrayRef<ChannelVal> channels) {
-  std::optional<ArrayRef<ExtraSignal>> refExtras;
-
-  for (TypedValue<ChannelType> chan : channels) {
-    if (!refExtras) {
-      refExtras = chan.getType().getExtraSignals();
-      continue;
-    }
-    ArrayRef<ExtraSignal> extras = chan.getType().getExtraSignals();
-    if (refExtras->size() != extras.size())
-      return op->emitError() << "incompatible number of extra signals "
-                                "between two operand/result channel types";
-    auto signalsZip = llvm::zip(*refExtras, extras);
-    for (const auto &[idx, signals] : llvm::enumerate(signalsZip)) {
-      auto &[refSig, sig] = signals;
-      if (refSig != sig)
-        return op->emitError()
-               << "different " << idx
-               << "-th extra signal between two operand/result channel types";
-    }
-  }
-  return success();
-}
-
-SmallVector<ChannelVal> SelectOp::getChannelsWithSameExtraSignals() {
-  return {getTrueValue(), getFalseValue(), getResult()};
-}
-
-//===----------------------------------------------------------------------===//
 // ReshapableChannelsInterface
 //===----------------------------------------------------------------------===//
 
