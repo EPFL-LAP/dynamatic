@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "jacobi_1d_imper.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void jacobi_1d_imper(inout_int_t A[N], inout_int_t B[N]) {

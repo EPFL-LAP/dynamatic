@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "matching_2.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void matching_2(in_int_t edges[1000], inout_float_t vertices[1000],

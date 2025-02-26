@@ -174,12 +174,12 @@ public:
                        Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
                       logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod, bool legacyPlacement)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -202,12 +202,12 @@ public:
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
                           logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -292,7 +292,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
                                    bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   SharingInfo &sharingInfo;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED

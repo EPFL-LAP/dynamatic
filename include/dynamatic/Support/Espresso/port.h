@@ -169,7 +169,9 @@ extern int memcmp(), strcmp();
   }
 #else
 #define assert(ex)                                                             \
-  { ; }
+  {                                                                            \
+    ;                                                                          \
+  }
 #endif
 #endif
 #endif

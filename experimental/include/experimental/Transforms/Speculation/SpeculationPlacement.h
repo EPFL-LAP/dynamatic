@@ -53,7 +53,7 @@ public:
   /// Initializer with operands specifying the speculator and buffer positions
   SpeculationPlacements(OpOperand &speculatorPosition,
                         llvm::DenseSet<OpOperand *> &bufferPositions)
-      : speculator(&speculatorPosition), buffers(bufferPositions){};
+      : speculator(&speculatorPosition), buffers(bufferPositions) {};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,

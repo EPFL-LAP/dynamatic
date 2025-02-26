@@ -109,7 +109,7 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
 
   LoadOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
                    MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering) {};
 
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -136,7 +136,7 @@ struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
 
   StoreOpConversion(MemoryOpLowering &memOpLowering, TypeConverter &converter,
                     MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering){};
+      : OpConversionPattern(converter, ctx), memOpLowering(memOpLowering) {};
 
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,

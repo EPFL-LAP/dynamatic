@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "share_test_1.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 #define AMOUNT_OF_TEST 1

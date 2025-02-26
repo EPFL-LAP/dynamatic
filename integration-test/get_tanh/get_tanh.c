@@ -8,8 +8,8 @@
 //
 //===------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "get_tanh.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void get_tanh(inout_float_t A[1000], in_int_t addr[1000]) {
