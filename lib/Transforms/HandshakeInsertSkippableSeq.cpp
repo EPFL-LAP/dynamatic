@@ -28,7 +28,7 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-unsigned N = 3;
+unsigned N = 1;
 
 namespace {
 
@@ -376,7 +376,7 @@ SmallVector<Value> createSkipConditionForPair(Value predecessorOpDoneSignal, Val
   //lazy fork maybe
   SmallVector<Value> skipConditions;
   for (Value delayedAddress : delayedAddresses){
-      handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), delayedAddress, handshake::TimingInfo::tehb(), 5);
+      handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), delayedAddress, handshake::TimingInfo::tehb(), 1);
       inheritBB(predecessorOpPointer, bufferOp);
       handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr, bufferOp.getResult());
       inheritBB(predecessorOpPointer, cmpIOp);
@@ -426,7 +426,7 @@ void createSkipConditionGenerator(FuncOp funcOp, DenseMap<StringRef, Operation*>
           SmallVector<Value> delayedAddresses = getNDelayedValues(predecessorOpAddr, dummyConstOp, predecessorOpPointer, rewriter);
 
           
-          handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), predecessorOpAddr, handshake::TimingInfo::tehb(), 20);
+          handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(predecessorOpPointer->getLoc(), predecessorOpAddr, handshake::TimingInfo::tehb(), 1);
           inheritBB(predecessorOpPointer, bufferOp);
           predecessorOpPointer->setOperand(0, bufferOp.getResult());
 
