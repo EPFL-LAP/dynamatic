@@ -608,7 +608,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
                    << "', possible options are 'vhdl', "
-                      "'verilog' and 'smv'.\n";
+                      "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
   }
