@@ -16,6 +16,10 @@ jobs:
         with:
           submodules: recursive
 
+      - name: check-format
+        run: |
+          git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | xargs clang-format --dry-run -Werror
+
       - name: build
         run: ./build.sh --release
 
