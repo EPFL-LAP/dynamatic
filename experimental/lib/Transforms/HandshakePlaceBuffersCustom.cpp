@@ -67,7 +67,7 @@ struct HandshakePlaceBuffersCustomPass
       llvm::errs() << "No operation named \"" << pred << "\" exists\n";
       return signalPassFailure();
     }
-    assert(outid <= op->getNumResults() &&
+    assert(outid < op->getNumResults() &&
            "The output id exceeds the number of output ports!");
     Value channel = op->getResult(outid);
     // Set the insertion point to be before the original successor of the
