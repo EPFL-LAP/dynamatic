@@ -13,6 +13,11 @@ INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
 EXPORT_DOT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-dot"
+EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
+SIMULATE_SH = DYNAMATIC_ROOT / "tools" / \
+    "dynamatic" / "scripts" / "simulate.sh"
+
+RTL_CONFIG = DYNAMATIC_ROOT / "data" / "rtl-config-vhdl-spec.json"
 
 
 class TermColors:
@@ -69,25 +74,27 @@ def run_test(c_file, id, timeout):
 
   # Get the c_file directory
   c_file_dir = os.path.dirname(c_file)
+  kernel_name = os.path.splitext(os.path.basename(c_file))[0]
 
   # Get out dir name
   out_dir = os.path.join(c_file_dir, "out")
-
   # Remove previous out directory
   if os.path.isdir(out_dir):
     shutil.rmtree(out_dir)
-
   Path(out_dir).mkdir()
+
+  comp_out_dir = os.path.join(out_dir, "comp")
+  Path(comp_out_dir).mkdir()
 
   # Custom compilation flow
 
   # Start with copying the .cf file to the out_dir
   cf_file_base = os.path.join(c_file_dir, "cf.mlir")
-  cf_file = os.path.join(out_dir, "cf.mlir")
+  cf_file = os.path.join(comp_out_dir, "cf.mlir")
   shutil.copy(cf_file_base, cf_file)
 
   # cf transformations (standard)
-  cf_transformed = os.path.join(out_dir, "cf_transformed.mlir")
+  cf_transformed = os.path.join(comp_out_dir, "cf_transformed.mlir")
   with open(cf_transformed, "w") as f:
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, cf_file,
@@ -102,7 +109,7 @@ def run_test(c_file, id, timeout):
       return fail(id, "Failed to apply standard transformations to cf")
 
   # cf transformations (dynamatic)
-  cf_dyn_transformed = os.path.join(out_dir, "cf_dyn_transformed.mlir")
+  cf_dyn_transformed = os.path.join(comp_out_dir, "cf_dyn_transformed.mlir")
   with open(cf_dyn_transformed, "w") as f:
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, cf_transformed,
@@ -119,7 +126,7 @@ def run_test(c_file, id, timeout):
       return fail(id, "Failed to apply Dynamatic transformations to cf")
 
   # cf level -> handshake level
-  handshake = os.path.join(out_dir, "handshake.mlir")
+  handshake = os.path.join(comp_out_dir, "handshake.mlir")
   with open(handshake, "w") as f:
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, cf_dyn_transformed,
@@ -134,7 +141,8 @@ def run_test(c_file, id, timeout):
       return fail(id, "Failed to compile cf to handshake")
 
   # handshake transformations
-  handshake_transformed = os.path.join(out_dir, "handshake_transformed.mlir")
+  handshake_transformed = os.path.join(
+      comp_out_dir, "handshake_transformed.mlir")
   with open(handshake_transformed, "w") as f:
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, handshake,
@@ -151,7 +159,7 @@ def run_test(c_file, id, timeout):
       return fail(id, "Failed to apply transformations to handshake")
 
   # Buffer placement (Simple buffer placement)
-  handshake_buffered = os.path.join(out_dir, "handshake_buffered.mlir")
+  handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
   timing_model = DYNAMATIC_ROOT / "data" / "components.json"
   with open(handshake_buffered, "w") as f:
     result = subprocess.run([
@@ -169,7 +177,7 @@ def run_test(c_file, id, timeout):
 
   # handshake canonicalization
   handshake_canonicalized = os.path.join(
-      out_dir, "handshake_canonicalized.mlir")
+      comp_out_dir, "handshake_canonicalized.mlir")
   with open(handshake_canonicalized, "w") as f:
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, handshake_buffered,
@@ -186,7 +194,8 @@ def run_test(c_file, id, timeout):
       return fail(id, "Failed to canonicalize Handshake")
 
   # Speculation
-  handshake_speculation = os.path.join(out_dir, "handshake_speculation.mlir")
+  handshake_speculation = os.path.join(
+      comp_out_dir, "handshake_speculation.mlir")
   spec_json = os.path.join(c_file_dir, "spec.json")
   with open(handshake_speculation, "w") as f:
     result = subprocess.run([
@@ -203,37 +212,8 @@ def run_test(c_file, id, timeout):
     else:
       return fail(id, "Failed to add speculative units")
 
-  # Export dot file
-  spec_dot = os.path.join(out_dir, "spec.dot")
-  with open(spec_dot, "w") as f:
-    result = subprocess.run([
-        EXPORT_DOT_BIN, handshake_speculation,
-        "--edge-style=spline", "--label-type=uname"
-    ],
-        stdout=f,
-        stderr=sys.stdout
-    )
-    if result.returncode == 0:
-      print("Created dot file")
-    else:
-      return fail(id, "Failed to export dot file")
-
-  # Convert DOT graph to PNG
-  spec_png = os.path.join(out_dir, "spec.png")
-  with open(spec_png, "w") as f:
-    result = subprocess.run([
-        "dot", "-Tpng", spec_dot
-    ],
-        stdout=f,
-        stderr=sys.stdout
-    )
-    if result.returncode == 0:
-      print("Created PNG file")
-    else:
-      return fail(id, "Failed to create PNG file")
-
   buffer_json = os.path.join(c_file_dir, "buffer.json")
-  handshake_export = os.path.join(out_dir, "handshake_export.mlir")
+  handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
   with open(buffer_json, "r") as f:
     buffers = json.load(f)
     buffer_pass_args = []
@@ -244,7 +224,6 @@ def run_test(c_file, id, timeout):
           f"outid={buffer['outid']} " +
           f"slots={buffer['slots']} " +
           f"type={buffer['type']}")
-    print(buffer_pass_args)
     with open(handshake_export, "w") as f:
       result = subprocess.run([
           DYNAMATIC_OPT_BIN, handshake_speculation,
@@ -257,6 +236,74 @@ def run_test(c_file, id, timeout):
         print("Exported Handshake")
       else:
         return fail(id, "Failed to export Handshake")
+
+  # Export dot file
+  dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
+  with open(dot, "w") as f:
+    result = subprocess.run([
+        EXPORT_DOT_BIN, handshake_export,
+        "--edge-style=spline", "--label-type=uname"
+    ],
+        stdout=f,
+        stderr=sys.stdout
+    )
+    if result.returncode == 0:
+      print("Created dot file")
+    else:
+      return fail(id, "Failed to export dot file")
+
+  # Convert DOT graph to PNG
+  png = os.path.join(comp_out_dir, f"{kernel_name}.png")
+  with open(png, "w") as f:
+    result = subprocess.run([
+        "dot", "-Tpng", dot
+    ],
+        stdout=f,
+        stderr=sys.stdout
+    )
+    if result.returncode == 0:
+      print("Created PNG file")
+    else:
+      return fail(id, "Failed to create PNG file")
+
+  # handshake level -> hw level
+  hw = os.path.join(comp_out_dir, "hw.mlir")
+  with open(hw, "w") as f:
+    result = subprocess.run([
+        DYNAMATIC_OPT_BIN, handshake_export,
+        "--lower-handshake-to-hw"
+    ],
+        stdout=f,
+        stderr=sys.stdout
+    )
+    if result.returncode == 0:
+      print("Lowered handshake to hw")
+    else:
+      return fail(id, "Failed to lower handshake to hw")
+
+  # Export hdl
+  hdl_dir = os.path.join(out_dir, "hdl")
+
+  result = subprocess.run([
+      EXPORT_RTL_BIN, hw, hdl_dir, RTL_CONFIG,
+      "--dynamatic-path", DYNAMATIC_ROOT, "--hdl", "vhdl"
+  ])
+  if result.returncode == 0:
+    print("Exported hdl")
+  else:
+    return fail(id, "Failed to export hdl")
+
+  # Simulate
+  print("Simulator launching")
+  result = subprocess.run([
+      SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name
+  ])
+
+  if result.returncode == 0:
+    print("Simulation succeeded")
+  else:
+    return fail(id, "Failed to simulate")
+
   return {
       "id": id,
       "msg": "Test passed",
