@@ -941,6 +941,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCCommitCtrl">,
   IsSimpleHandshake<"SCBranchCtrl">,
   IsIntSizedChannel<1, "SCBranchCtrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -982,6 +983,31 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
       wideControlType, ctrlType});
   }]>];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "enable";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      switch (idx) {
+      case 0:
+        return "outs";
+      case 1:
+        return "ctrl_save";
+      case 2:
+        return "ctrl_commit";
+      case 3:
+        return "ctrl_sc_save";
+      case 4:
+        return "ctrl_sc_commit";
+      default:
+        return "ctrl_sc_branch";
+      }
+    }
+  }];
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
@@ -992,6 +1018,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1016,6 +1043,18 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
@@ -1026,6 +1065,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1052,6 +1092,18 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
@@ -1059,6 +1111,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1078,6 +1131,18 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
@@ -1087,7 +1152,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasSpecTag<"tagFromOperand">,
   HasSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
-  LacksSpecTag<"falseResult">
+  LacksSpecTag<"falseResult">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1113,6 +1179,18 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     `[` $tagFromOperand `]` $dataOperand attr-dict `:` 
       type($tagFromOperand) `,` type($dataOperand) `,`
       type($trueResult) `,` type($falseResult)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return idx == 0 ? "spec_tag_data" : "data";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return idx == 0 ? "trueOut" : "falseOut";
+    }
   }];
 }
 
