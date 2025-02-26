@@ -18,6 +18,9 @@
 namespace dynamatic {
 
 namespace hw {
+/// Name of ports representing the clock and reset signals.
+static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
+
 /// Forward declare the HW dialect which the pass depends on.
 class HWDialect;
 } // namespace hw
