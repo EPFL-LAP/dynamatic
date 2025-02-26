@@ -942,6 +942,7 @@ entity {name} is
     ins_ready: out std_logic;
     -- trigger is dataless (control token)
     trigger_valid: in std_logic;
+    trigger_spec: in std_logic_vector(0 downto 0);
     trigger_ready: out std_logic;
     -- outputs
     outs: out std_logic_vector({bitwidth} - 1 downto 0);
