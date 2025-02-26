@@ -474,7 +474,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     Example:
 
     ```mlir
-    %true, %false = cond_br %cond, %data : !handshake.control<i1>, 
+    %true, %false = cond_br %cond, %data : !handshake.channel<i1>,
       !handshake.channel<i32>
     ```
   }];
