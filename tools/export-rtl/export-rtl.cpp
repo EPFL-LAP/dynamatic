@@ -465,6 +465,9 @@ void WriteModData::writeSignalAssignments(
                     name + RTLWriter::VALID_SUFFIX, os);
 
     std::string signalName = signal.str();
+    // Wehn connecting the ready signal of the top level module a proper
+    // internal signal is needed. This signal needs to be named
+    // component_name_port_name instead of component_name.port_name
     std::replace(signalName.begin(), signalName.end(), '.', '_');
     writeAssignment(name + RTLWriter::READY_SUFFIX,
                     signalName + RTLWriter::READY_SUFFIX, os);
@@ -971,12 +974,15 @@ struct SMVWriter : public RTLWriter {
                       raw_indented_ostream &os) const override;
 
 private:
+  /// creates the mapping between ports internal signals
   void constructIOMappings(hw::InstanceOp instOp, hw::HWModuleLike modOp,
                            const FGetValueName &getValueName,
                            const FGetTypedSignalName &getTypedSignalName,
                            const FGetSignalName &getSignalName,
                            IOMap &mappings) const override;
 
+  /// Creates internal signals that in SMV directly reference the unit to be
+  /// connected: component_name.port_name
   LogicalResult createInternalSignals(WriteModData &data) const override;
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteModData &data) const;
@@ -1094,6 +1100,9 @@ void SMVWriter::constructIOMappings(
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
           getInternalSignalName(signal, SignalType::READY));
     else {
+      // Connect the ready signal of the top level module: a proper internal
+      // signal is needed, with name component_name_port_name instead of
+      // component_name.port_name
       std::string signalName = getValueName(res).str();
       std::replace(signalName.begin(), signalName.end(), '.', '_');
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
