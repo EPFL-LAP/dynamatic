@@ -82,9 +82,14 @@ is not particularly large, this would `CMakeLists.txt` all over Dynamatic.
 
 Instead, all XLS-specific passes, dialects, and code is placed in its own
 folder hierarchy (located at `experimental/xls`), featuring its own `include`,
-folder, Pass sets, and namespace. With this setup only tools that explicitly
-require XLS features and import headers from this hierarchy need to link
-against the XLS dialect and passes when `DYNAMATIC_ENABLE_XLS` is set.
+folder, Pass sets, and namespace (`dynamatic::experimental::xls`). 
+
+With this setup, only tools that explicitly require XLS features and import
+headers from this hierarchy need to link against the XLS dialect and passes
+when `DYNAMATIC_ENABLE_XLS` is set.
+
+This subsystem also features a dedicated test suite that can be run
+using `ninja check-dynamatic-xls`.
 
 ### Overcoming LLVM version differences
 
@@ -135,7 +140,7 @@ do not prevent the dialect from compiling change its semantics.
 
 Since XLS does not use CMake and features a very different code structure, the
 default LLVM CMake rules for MLIR/Tablegen compilation do not work. Instead,
-the XLS folder structure is recreated inside `experimental/include/experimental/xls/Dialect/Xls`,
+the XLS folder structure is recreated inside `experimental/xls/include/experimental/xls/Dialect/Xls`,
 with the dialect specification files sym-linked from the XLS checkout into this hierarchy.
 
 Unfortunately this also requires a bit of CMake-hackery to get the include
