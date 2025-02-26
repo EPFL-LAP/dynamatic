@@ -22,7 +22,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
@@ -37,7 +36,6 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
 namespace {
-
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
@@ -87,33 +85,6 @@ private:
 };
 } // namespace
 
-template <>
-LogicalResult HandshakeSpeculationPass::placeUnits<handshake::SpecCommitOp>(
-    Value ctrlSignal) {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  for (OpOperand *operand :
-       placements.getPlacements<handshake::SpecCommitOp>()) {
-    Operation *dstOp = operand->getOwner();
-    Value srcOpResult = operand->get();
-
-    // Create and connect the new Operation
-    builder.setInsertionPoint(dstOp);
-    handshake::SpecCommitOp newOp = builder.create<handshake::SpecCommitOp>(
-        dstOp->getLoc(), srcOpResult.getType(), srcOpResult, ctrlSignal);
-    inheritBB(dstOp, newOp);
-
-    // Connect the new Operation to dstOp
-    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
-    // because the uses of srcOpResult may include a newly created
-    // operand for the speculator enable signal.
-    operand->set(newOp.getResult());
-  }
-
-  return success();
-}
-
 template <typename T>
 LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
   MLIRContext *ctx = &getContext();
@@ -134,8 +105,16 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
 
     // Connect the new Operation to dstOp
     // Note: srcOpResult.replaceAllUsesExcept cannot be used here
-    // because the uses of srcOpResult may include a newly created
-    // operand for the speculator enable signal.
+    // The following bug may occur in most cases:
+    // (a) Consider a scenario where a control value from a buffer is passed to
+    // the control branch.
+    // (b) Simultaneously, a speculator uses the same control value from the
+    // buffer as a trigger signal.
+    // (c) A save-commit unit is positioned on the edge from the buffer to the
+    // control branch.
+    // (d) If we apply replaceAllUsesExcept to the value referenced by the
+    // save-commit unit, the speculator will also be placed after the
+    // save-commit unit, which is undesirable.
     operand->set(newOp.getResult());
   }
 
@@ -342,8 +321,6 @@ static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
       continue;
 
     for (Value result : condBrOp->getResults()) {
-      // if (result.getType().isa<handshake::ControlType>())
-      //   return condBrOp;
       for (Operation *user : result.getUsers()) {
 
         if (isBackedge(result, user))
@@ -369,17 +346,6 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   if (controlBranch == nullptr) {
     specOp->emitError() << "Could not find backedge within speculation bb.\n";
     return failure();
-
-    // builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
-
-    // SmallVector<Value, 2> mergeOperands;
-    // mergeOperands.push_back(specOp.getSCSaveCtrl());
-    // mergeOperands.push_back(specOp.getSCCommitCtrl());
-    // auto mergeOp = builder.create<handshake::MergeOp>(
-    //     specOp.getLoc(), mergeOperands);
-    // inheritBB(specOp, mergeOp);
-
-    // return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
   }
 
   // To connect a Save-Commit, two control signals are sent from the Speculator
@@ -443,8 +409,6 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   }
   // If neither trueResult nor falseResult leads to a backedge, handle the error
   else {
-    // todo
-    // mergeOperands.push_back(branchReplicated.getTrueResult());
     unsigned bb = getLogicBB(specOp).value();
     controlBranch->emitError()
         << "Could not find the backedge in the Control Branch " << bb << "\n";
@@ -461,44 +425,44 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
 }
 
-std::optional<Value> findControlInputToBB(Operation *op) {
-  handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "op should have parent function");
+std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
+                                          unsigned targetBB) {
+  // Here we fork control token to use as trigger signal to speculator.
+  // The presence of a buffer between this fork and the control branch creates
+  // performance issues (see detailed speculation documentation). Therefore we
+  // fork control token from directly above the control branch
+  mlir::Value triggerChannelOrigin;
 
-  std::optional<unsigned> targetBB = getLogicBB(op);
-  if (!targetBB) {
-    op->emitError("Operation does not have a BB.");
-    return {};
-  }
-
-  // We use the control token, which is an input to the control branch
-  // as the enable signal for the speculator.
-  mlir::Value ctrlSignal;
+  // Find the control branch we want to speculate on.
+  // To find: Iterate over every branch, looking for 1) same bb as speculator,
+  // and 2) is a control branch
   bool isControlBranchFound = false;
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    // Check if the branch is in the same BB as the operation
-    // specified as the location for the speculator
+    // Ignore branches that are not in the speculator's BB
     if (auto brBB = getLogicBB(branchOp); !brBB || brBB != targetBB)
       continue;
 
-    // Check if the branch targets a control token
+    // We are looking for the control branch: data should be of control type
     if (branchOp.getDataOperand().getType().isa<handshake::ControlType>()) {
+      // BB should have only one control branch at most
       if (isControlBranchFound) {
-        branchOp->emitError("Multiple control branches found in the same BB");
+        branchOp->emitError("Multiple control branches found in the BB #" +
+                            std::to_string(targetBB));
         return {};
       }
-      ctrlSignal = branchOp.getDataOperand();
+      triggerChannelOrigin = branchOp.getDataOperand();
       isControlBranchFound = true;
     }
   }
 
   if (!isControlBranchFound) {
-    funcOp->emitError("Its BB #" + std::to_string(targetBB.value()) +
-                      " does not have a control branch.");
+    funcOp->emitError("BB #" + std::to_string(targetBB) +
+                      " was marked for speculation, but no corresponding "
+                      "control branch was found.");
     return {};
   }
 
-  return ctrlSignal;
+  return triggerChannelOrigin;
 }
 
 LogicalResult HandshakeSpeculationPass::placeSpeculator() {
@@ -508,9 +472,20 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Operation *dstOp = operand.getOwner();
   Value srcOpResult = operand.get();
 
-  std::optional<Value> enableSpecIn = findControlInputToBB(dstOp);
-  if (not enableSpecIn.has_value()) {
-    dstOp->emitError("Control signal for speculator's enableIn not found.");
+  handshake::FuncOp funcOp = dstOp->getParentOfType<handshake::FuncOp>();
+  assert(funcOp && "op should have parent function");
+
+  // Get the BB number of the operation safely
+  std::optional<unsigned> targetBB = getLogicBB(dstOp);
+  if (!targetBB) {
+    dstOp->emitError("Operation does not have a BB.");
+    return failure();
+  }
+
+  std::optional<Value> specTrigger =
+      findControlInputToBB(funcOp, targetBB.value());
+  if (not specTrigger.has_value()) {
+    dstOp->emitError("Control signal for speculator's trigger not found.");
     return failure();
   }
 
@@ -521,7 +496,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   // later.
   specOp = builder.create<handshake::SpeculatorOp>(
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*dataIn=*/srcOpResult, /*specIn=*/enableSpecIn.value());
+      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
@@ -752,14 +727,8 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 
-  // // Place Buffer operations
-  // if (failed(placeBuffers()))
-  //   return signalPassFailure();
-
-  // After completing placement of the speculator and commit units, update the
-  // types to include the speculative tag. Since type-checking occurs after this
-  // pass, skipping this update would result in an error.
-  if (failed(addSpecTagToSpecRegion()))
+  // Place Buffer operations
+  if (failed(placeBuffers()))
     return signalPassFailure();
 }
 
