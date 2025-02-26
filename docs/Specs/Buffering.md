@@ -53,5 +53,5 @@ For `FPL22Buffers`, the remap is as follows:
 
 ```
 Based on the FPGA20 mapping, if the R slot count exceeds 1, convert the additional slots beyond 1 into T buffers.
-Then, if both DVE and T buffers are present, convert the T buffers into DVE buffers.
+Then, if both DV/DVE and T buffers are present, convert the T buffers into DVE buffers.
 ```
