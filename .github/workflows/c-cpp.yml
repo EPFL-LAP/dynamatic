@@ -18,7 +18,7 @@ jobs:
 
       - name: check-format
         run: |
-          git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | xargs clang-format --dry-run -Werror
+          git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | xargs clang-format-19 --dry-run -Werror
 
       - name: build
         run: ./build.sh --release
