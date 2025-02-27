@@ -2,18 +2,13 @@
 ### A tool to compare two MLIR circuits in the Handshake dialect
 
 
-This compares two MLIR circuits in the handshake dialect by constructing an elastic-miter circuits. (TODO add link to paper).
-
-TODO how much should I explain how the elastic-miter works here?
-
-<!-- This creates an elastic-miter module in the Handshake dialect using two MLIR files as input. Each file must contain exactly one module, and each module must include a single handshake.func. The generated miter MLIR file and JSON config file will be saved in the specified output directory. -->
+The tool compares two MLIR circuits in the handshake dialect by constructing an Elastic-Miter circuit, formally verfiying their (non-)equivalence. (TODO citation to paper).
 
 
 ### Usage
-By default the tool uses NuSMV for the verification. The NuSMV needs to be reachable on the path. (TODO talk about modified NuSMV here).
+By default the tool uses NuSMV for the verification. The NuSMV needs to be in the PATH variable. By default NuSMV only supports printing up to 2^16 reachable states. It is recommended to use a version which raises this limit. 
 
-
-
+The tool supports following options:
 ```bash
 elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> [--loop=<string>] [--loop_strict=<string>] [--seq_length=<string>] [--token_limit=<string>] [--cex]
 ```
@@ -22,10 +17,14 @@ elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> [--loop=<
 #### Command-line options
 
 ```bash
---lhs=<string>	     Specify the left-hand side (LHS) input file
---rhs=<string>       Specify the right-hand side (RHS) input file
--o <string>	         Specify the output directory
---loop=<string>
+--lhs=<string>          Specify the left-hand side (LHS) input file
+--rhs=<string>          Specify the right-hand side (RHS) input file
+-o <string>             Specify the output directory
+--loop=<string>         Specify a Loop Condition sequence contraint. Can be used multiple times.
+--loop_strict=<string>  Specify a Strict Loop Condition sequence contraint. Can be used multiple times.
+--seq_length=<string>   Specify a Sequence Length Relation constraint. Can be used multiple times.
+--token_limit=<string>  Specify a Token Limit constraint. Can be used multiple times.
+--cex                   Enable counterexamples.
 ```
 
 
@@ -33,25 +32,35 @@ elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> [--loop=<
 
 Since the compared circuits are usually part of a larger circuit, they do not need to be equivalent under all circumstances, but rather only under specific *contexts*. These context are modeled using constraints on the sequence generators. 
 
+
 ##### Sequence Length Relation
+A Sequence Length Relation constraint controls the relative length of the input sequences.
+The constraint has the form of an arithmetic equation. The number in the equation will be replaced the respective input with the index of the number.  
+Example:  
+`--seq_length="0+1=2"` will ensure that the inputs with index 0 and index 1 together produce as many tokens as the input with index 2.
 
-``dsad``
+
 ##### Loop Condition
-The number of tokens in the
-input with the index dataSequence is equivalent to the number of false tokens
-at the output with the index controlSequence. If lastFalse is set, the last
-token in the controlSequence needs to be false.
-
-``dsad``
+A Loop Condition sequence contraint has the form "<dataSequence>,<controlSequence>".
+The number of tokens in the input with the index dataSequence is equivalent to the number of false tokens at the output with the index controlSequence.  
+Example:  
+`--loop="0,1"`
 
 ##### Token Limit
-The number of tokens at the input
-// with index inputSequence can only be up to "limit" higher than the number of
-// tokens at the ouput with the index outputSequence.
-``dsad``
+A Token Limit constraint has the form "<inputSequence>,<outputSequence>,<limit>".
+At any point in time, the number of tokens which are created at the input with index inputSequence can only be up to "limit" higher than the number of tokens reaching the output with the index outputSequence.  
+Example:  
+`--token_limit="1,1,2"` ensures that there are only two tokens in the circuit which enter at the input with index 1 and leave at the ouput with index 1.
 
-#### Example
-TODO
+#### Examples
+
+Some rewrites, with which the tool can be tested, are provided in `experimental/test/tools/elastic-miter`. In the same directory the `prove-rewrites.sh` script runs all tests.
+
+```bash
+experimental/test/tools/elastic-miter/prove-rewrites.sh
+```
+
+To directly call the tool a command like this can be used:
 ```bash
 OUT_DIR="experimental/tools/elastic-miter/out"
 REWRITES="experimental/test/tools/elastic-miter/rewrites"
