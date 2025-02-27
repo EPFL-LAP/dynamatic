@@ -185,9 +185,6 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
   int numberOfTokens = 1;
   while (true) {
-    // TODO remove
-    llvm::outs() << "Checking " << numberOfTokens << " tokens.\n";
-
     std::filesystem::path wrapperPath =
         outputDir / ("main_" + std::to_string(numberOfTokens) + ".smv");
 

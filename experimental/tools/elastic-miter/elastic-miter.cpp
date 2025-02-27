@@ -150,16 +150,10 @@ static FailureOr<bool> checkEquivalence(
   if (failed(failOrLHSseqLen))
     return failure();
 
-  // TODO remove
-  llvm::outs() << "The LHS needs " << failOrLHSseqLen.value() << " tokens.\n";
-
   auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
       context, outputDir / "rhs_reachability", rhsPath);
   if (failed(failOrRHSseqLen))
     return failure();
-
-  // TODO remove
-  llvm::outs() << "The RHS needs " << failOrRHSseqLen.value() << " tokens.\n";
 
   size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
@@ -210,8 +204,6 @@ static FailureOr<bool> checkEquivalence(
   std::string line;
   std::ifstream result(resultTxtPath);
   while (getline(result, line)) {
-    // TODO remove
-    llvm::outs() << line << "\n";
     if (line.find("is false") != std::string::npos) {
       isEquivalent = false;
     }
@@ -254,13 +246,19 @@ int main(int argc, char **argv) {
   // Create the outputDir if it doesn't exist
   std::filesystem::create_directories(outputDir);
 
-  auto failrOrEquivalent = checkEquivalence(
-      context, lhsPath, rhsPath, outputDir, failOrSequenceConstraints.value());
-  if (failed(failrOrEquivalent)) {
+  auto failOrEquivalent = checkEquivalence(context, lhsPath, rhsPath, outputDir,
+                                           failOrSequenceConstraints.value());
+  if (failed(failOrEquivalent)) {
     llvm::errs() << "Equivalence checking failed.\n";
     return 1;
   }
-  // TODO print?
+  bool equivalent = failOrEquivalent.value();
+  if (equivalent)
+    llvm::outs() << lhsPath.filename() << " <> " << rhsPath.filename()
+                 << ": EQUIVALENT.\n";
+  else
+    llvm::outs() << lhsPath.filename() << " <> " << rhsPath.filename()
+                 << ": NOT EQUIVALENT.\n";
 
-  exit(!failrOrEquivalent.value());
+  exit(!equivalent);
 }
