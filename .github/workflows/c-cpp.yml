@@ -16,9 +16,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: check-format
+      - name: check-format-cpp
         run: |
           git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | xargs clang-format-19 --dry-run -Werror
+
+      - name: check-format-python
+        run: |
+          autopep8 --diff $(git ls-files '*.py') | tee check.txt && [ ! -s check.txt ]
 
       - name: build
         run: ./build.sh --release
