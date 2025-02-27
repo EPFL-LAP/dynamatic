@@ -31,9 +31,9 @@ func.func @retunMultipleValues(%arg0 : i32, %arg1 : i1, %arg2 : index) -> (i32, 
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_0]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_0]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_10:.*]] = merge %[[VAL_4]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge %[[VAL_6]]  {handshake.bb = 1 : ui32} : <>, <i1>
+// CHECK:           %[[VAL_11:.*]], %[[VAL_12:.*]] = control_merge [%[[VAL_6]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
 // CHECK:           %[[VAL_13:.*]] = merge %[[VAL_9]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = control_merge %[[VAL_7]]  {handshake.bb = 2 : ui32} : <>, <i1>
+// CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = control_merge [%[[VAL_7]]]  {handshake.bb = 2 : ui32} : [<>] to <>, <i1>
 // CHECK:           %[[VAL_16:.*]] = merge %[[VAL_10]], %[[VAL_13]] {handshake.bb = 3 : ui32} : <i32>
 // CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_16]], %[[VAL_1]] : <i32>, <>
 // CHECK:         }
@@ -57,10 +57,10 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK:           %[[VAL_10:.*]], %[[VAL_11:.*]] = cond_br %[[VAL_0]], %[[VAL_5]] {handshake.bb = 0 : ui32} : <i1>, <>
 // CHECK:           %[[VAL_12:.*]], %[[VAL_13:.*]] = cond_br %[[VAL_0]], %[[VAL_7]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_14:.*]] = merge %[[VAL_8]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = control_merge %[[VAL_10]]  {handshake.bb = 1 : ui32} : <>, <i1>
+// CHECK:           %[[VAL_15:.*]], %[[VAL_16:.*]] = control_merge [%[[VAL_10]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
 // CHECK:           %[[VAL_17:.*]] = merge %[[VAL_15]], %[[VAL_18:.*]] {handshake.bb = 2 : ui32} : <>
 // CHECK:           %[[VAL_19:.*]] = merge %[[VAL_13]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_18]], %[[VAL_20:.*]] = control_merge %[[VAL_11]]  {handshake.bb = 2 : ui32} : <>, <i1>
+// CHECK:           %[[VAL_18]], %[[VAL_20:.*]] = control_merge [%[[VAL_11]]]  {handshake.bb = 2 : ui32} : [<>] to <>, <i1>
 // CHECK:           %[[VAL_21:.*]] = merge %[[VAL_14]], %[[VAL_19]] {handshake.bb = 3 : ui32} : <i32>
 // CHECK:           %[[VAL_22:.*]] = source {handshake.bb = 3 : ui32}
 // CHECK:           %[[VAL_23:.*]] = source {handshake.bb = 3 : ui32}
