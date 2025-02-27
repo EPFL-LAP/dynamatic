@@ -183,6 +183,10 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
+  // Initially we compare the number of reachable states with just one token, to
+  // the number of reachable states with an infinite number of tokens. We then
+  // iteratively increase the number of tokens, until all states reachable with
+  // inifinite tokens can be reached.
   int numberOfTokens = 1;
   while (true) {
     std::filesystem::path wrapperPath =

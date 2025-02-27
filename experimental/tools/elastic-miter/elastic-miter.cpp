@@ -86,7 +86,12 @@ parseSequenceConstraints() {
   for (const auto &constraint : seqLengthRelationConstraints)
     sequenceConstraints.seqLengthRelationConstraints.push_back(constraint);
 
-  // TODO doc, dedublicate
+  // A Loop Condition sequence contraint has the form
+  // "<dataSequence>,<controlSequence>". The number of tokens in the input with
+  // the index dataSequence is equivalent to the number of false tokens at the
+  // output with the index controlSequence.
+  // Example:
+  // --loop="0,1"
   for (const auto &csv : loopSeqConstraints) {
     std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
     std::smatch match;
@@ -102,6 +107,8 @@ parseSequenceConstraints() {
         {dataSequence, controlSequence, false});
   }
 
+  // Identical to the loop condition sequence contraint, with the addition that
+  // the last token also needs to be false.
   for (const auto &csv : strictLoopSeqConstraints) {
     std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
     std::smatch match;
@@ -118,6 +125,15 @@ parseSequenceConstraints() {
         {dataSequence, controlSequence, true});
   }
 
+  // A Token Limit constraint has the form
+  // "<inputSequence>,<outputSequence>,<limit>".
+  // At any point in time, the number of tokens which are created at the input
+  // with index inputSequence can only be up to "limit" higher than the number
+  // of tokens reaching the output with the index outputSequence.
+  // Example:
+  // `--token_limit="1,1,2"` ensures that there are only two tokens in the
+  // circuit which enter at the input with index 1 and leave at the ouput with
+  // index 1.
   for (const auto &csv : tokenLimitConstraints) {
     std::regex pattern(
         R"(^(\d+),(\d+),(\d+)$)"); // Three uint separated by commas
@@ -144,32 +160,36 @@ static FailureOr<bool> checkEquivalence(
     const std::filesystem::path &outputDir,
     const dynamatic::experimental::SequenceConstraints &sequenceConstraints) {
 
-  // Find out needed number of tokens
+  // Find out needed number of tokens for the LHS
   auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
       context, outputDir / "lhs_reachability", lhsPath);
   if (failed(failOrLHSseqLen))
     return failure();
 
+  // Find out needed number of tokens for the RHS
   auto failOrRHSseqLen = dynamatic::experimental::getSequenceLength(
       context, outputDir / "rhs_reachability", rhsPath);
   if (failed(failOrRHSseqLen))
     return failure();
 
-  size_t n = std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
+  size_t nrOfTokens =
+      std::max(failOrLHSseqLen.value(), failOrRHSseqLen.value());
 
   std::filesystem::path miterDir = outputDir / "miter";
   // Create the miterDir if it doesn't exist
   std::filesystem::create_directories(miterDir);
 
-  // Create Miter module with needed N
+  // Create an elastic-miter circuit with a needed nrOfTokens to emulate an
+  // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, miterDir.string(), n);
+      context, lhsPath, rhsPath, miterDir.string(), nrOfTokens);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();
   }
   auto [mlirPath, config] = failOrPair.value();
 
+  // Convert the MLIR circuit to SMV
   auto failOrSmvPair =
       dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
   if (failed(failOrSmvPair)) {
@@ -182,12 +202,12 @@ static FailureOr<bool> checkEquivalence(
 
   // Create wrapper (main) for the elastic-miter
   auto fail = dynamatic::experimental::createWrapper(
-      wrapperPath, config, smvModelName, n, true, sequenceConstraints);
+      wrapperPath, config, smvModelName, nrOfTokens, true, sequenceConstraints);
   if (failed(fail))
     return failure();
 
   // Put the output of the CTLSPEC check into results.txt. Later we
-  // read from that file to check whether all the CTL properties pass.
+  // read from that file to check whether all the properties pass.
   std::filesystem::path resultTxtPath = miterDir / "result.txt";
   std::string miterCommand = "check_invar -s forward;\n"
                              "check_ctlspec;\n";
@@ -197,12 +217,13 @@ static FailureOr<bool> checkEquivalence(
   if (failed(cmdFail))
     return failure();
 
-  // Run equivalence checking
+  // Run equivalence checking by calling NuSMV or nuXmv
   dynamatic::experimental::runSmvCmd(miterDir / "prove.cmd", resultTxtPath);
 
   bool isEquivalent = true;
   std::string line;
   std::ifstream result(resultTxtPath);
+  // Iterate through the lines to check if a property has failed.
   while (getline(result, line)) {
     if (line.find("is false") != std::string::npos) {
       isEquivalent = false;
