@@ -21,7 +21,7 @@ namespace experimental {
 namespace xls {
 
 inline void registerAllPasses() {
-    experimental::xls::registerConversionPasses();
+  experimental::xls::registerConversionPasses();
 }
 
 } // namespace xls
