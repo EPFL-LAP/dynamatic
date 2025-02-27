@@ -1,1 +1,0 @@
-../../../../../../../../../../../xls/xls/contrib/mlir/IR/interfaces.td
