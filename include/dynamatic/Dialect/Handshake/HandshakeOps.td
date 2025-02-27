@@ -248,7 +248,8 @@ def InitOp : Handshake_Op<"init", [
 ]> {
   let summary = "init operation";
   let description = [{
-    Represents a single-slot buffer which initially already contains a token. 
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
   }];
   
   let arguments = (ins HandshakeType:$operand);
