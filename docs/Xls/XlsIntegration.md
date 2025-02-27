@@ -136,20 +136,6 @@ Still, *this is not a good and permanent solution*. There is a very high
 likelyhood that there are subtle (or even not so subtle) changes in behaviour that
 do not prevent the dialect from compiling change its semantics.
 
-### CMake/Tablegen integration
-
-Since XLS does not use CMake and features a very different code structure, the
-default LLVM CMake rules for MLIR/Tablegen compilation do not work. Instead,
-the XLS folder structure is recreated inside `experimental/xls/include/experimental/xls/Dialect/Xls`,
-with the dialect specification files sym-linked from the XLS checkout into this hierarchy.
-
-Unfortunately this also requires a bit of CMake-hackery to get the include
-paths to line up.
-
-While not optimal, this keeps us as compatible with the upstream XLS sources as 
-possible. Note that this will always be a point of friction due to the different
-architectures of the two projects and is unrelated to the version of LLVM.
-
 ## Notes
 
 ### Updating XLS
