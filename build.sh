@@ -26,6 +26,7 @@ List of options:
   --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when 
                                          building llvm (defaults to 2)
   --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
+  --experimental-enable-xls            : enable experimental xls integration
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -118,6 +119,7 @@ run_ninja() {
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
 CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
 CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
+CMAKE_EXTRA_DYNAMATIC=""
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
@@ -125,6 +127,7 @@ LLVM_PARALLEL_LINK_JOBS=2
 BUILD_TYPE="Debug"
 BUILD_VISUAL_DATAFLOW=0
 GODOT_PATH=""
+ENABLE_XLS_INTEGRATION=0
 SKIP_POLYGEIST=0
 POLYGEIST_DIR="$PWD/polygeist"
 
@@ -180,6 +183,10 @@ do
           "--skip-polygeist")
               SKIP_POLYGEIST=1
               PARSE_ARG="polygeist-path"
+              ;;
+          "--experimental-enable-xls")
+              ENABLE_XLS_INTEGRATION=1
+              CMAKE_EXTRA_DYNAMATIC="-DDYNAMATIC_ENABLE_XLS=ON"
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -260,6 +267,52 @@ else
   fi
 fi
 
+#### XLS ####
+
+XLS_DIR="$SCRIPT_CWD/xls"
+XLS_UPSTREAM="https://github.com/ETHZ-DYNAMO/xls.git"
+XLS_COMMIT="658010efafb578493b89a112c616c6cd6ab0a118"
+
+if [[ ENABLE_XLS_INTEGRATION -eq 1 || -d "$XLS_DIR" ]]; then
+    echo_section "Preparing XLS"
+fi
+
+if [[ ENABLE_XLS_INTEGRATION -eq 1 ]]; then
+    # If XLS does not exist, clone it down + checkout the correct commit:
+    if [ ! -d "$XLS_DIR" ]; then
+        echo "XLS not found. Cloning from $XLS_UPSTREAM..."
+        git clone "$XLS_UPSTREAM" "$XLS_DIR"
+        exit_on_fail "Failed to clone XLS"
+        cd "$XLS_DIR"
+        git checkout "$XLS_COMMIT"
+        exit_on_fail "Failed to checkout commit $XLS_COMMIT"
+    fi
+fi
+
+# If an XLS checkout exists, verify that it is on the correct commit:
+if [ -d "$XLS_DIR" ]; then
+    echo "XLS found, validating commit.."
+    XLS_CURRENT_COMMIT=$(git --git-dir="$XLS_DIR/.git" describe --always --abbrev=0 --match "this_tag_does_not_exist")
+    exit_on_fail "Failed to determine XLS commit."
+
+    echo "Current commit:  $XLS_CURRENT_COMMIT"
+    echo "Required commit: $XLS_COMMIT"
+
+    if [[ "$XLS_CURRENT_COMMIT" != "$XLS_COMMIT" ]]; then
+        echo ""
+        printf "\033[91m"
+        echo_subsection "!! WARNING !!"
+        echo ""
+        echo "WARNING: Incorrect XLS commit detected. To checkout correct commit: "
+        echo "  cd $XLS_DIR"
+        echo "  git checkout $XLS_COMMIT"
+        echo_subsection "!! WARNING !!"
+        printf "\33[0m"
+    else
+        echo "OK"
+    fi
+fi
+
 #### Dynamatic ####
 
 prepare_to_build_project "Dynamatic" "build"
@@ -273,7 +326,7 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS
+      $CMAKE_COMPILERS $CMAKE_EXTRA_DYNAMATIC
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
@@ -345,6 +398,7 @@ create_symlink "$POLYGEIST_DIR"/build/bin/cgeist
 create_symlink "$POLYGEIST_DIR"/build/bin/polygeist-opt
 create_symlink "$POLYGEIST_DIR"/llvm-project/build/bin/clang++
 create_symlink ../build/bin/dynamatic
+create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-rtl

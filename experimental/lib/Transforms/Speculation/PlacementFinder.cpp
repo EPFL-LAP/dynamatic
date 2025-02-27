@@ -117,33 +117,45 @@ LogicalResult PlacementFinder::findSavePositions() {
 // Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
-// Recursively traverse the IR in a DFS way to find the placements of Commit
-// units. A commit unit before (1) an exit unit; (2) a store unit; (3) a save
-// unit if speculative tokens can reach them. Updates the `placements`
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                           Operation *currOp) {
+                                           OpOperand &currOpOperand) {
+  Operation *currOp = currOpOperand.getOwner();
+
+  if (placements.containsSave(currOpOperand)) {
+    // A Commit is needed in front of Save Operations. To allow for
+    // multiple loop speculation, SaveCommit units are used instead of
+    // consecutive Commit-Save units.
+    placements.addSaveCommit(currOpOperand);
+    placements.eraseSave(currOpOperand);
+    // Stop traversal since all commit units must be reachable from the
+    // speculator without passing through a save commit.
+    return;
+  }
+  if (isa<handshake::StoreOp>(currOp) ||
+      isa<handshake::MemoryControllerOp>(currOp) ||
+      isa<handshake::EndOp>(currOp)) {
+    // A Commit is needed in front of these units
+    placements.addCommit(currOpOperand);
+    // Stop traversal.
+    return;
+  }
+
+  auto [_, isNewOp] = visited.insert(currOp);
+
   // End traversal if currOp is already in visited set
-  if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
+  if (!isNewOp)
     return;
 
-  for (OpResult res : currOp->getResults()) {
-    for (OpOperand &dstOpOperand : res.getUses()) {
-      Operation *succOp = dstOpOperand.getOwner();
-      if (placements.containsSave(dstOpOperand)) {
-        // A Commit is needed in front of Save Operations. To allow for
-        // multiple loop speculation, SaveCommit units are used instead of
-        // consecutive Commit-Save units.
-        placements.addSaveCommit(dstOpOperand);
-        placements.eraseSave(dstOpOperand);
-      } else if (isa<handshake::MemoryOpInterface, handshake::LoadOp,
-                     handshake::StoreOp>(succOp)) {
-        // A commit is needed in front of memory operations
-        placements.addCommit(dstOpOperand);
-      } else if (isa<handshake::EndOp>(succOp)) {
-        // A commit is needed in front of the end/exit operation
-        placements.addCommit(dstOpOperand);
-      } else {
-        findCommitsTraversal(visited, succOp);
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
+    // Continue traversal only the data result of the LoadOp, skipping results
+    // connected to the memory controller.
+    for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
+      findCommitsTraversal(visited, dstOpOperand);
+    }
+  } else {
+    for (OpResult res : currOp->getResults()) {
+      for (OpOperand &dstOpOperand : res.getUses()) {
+        findCommitsTraversal(visited, dstOpOperand);
       }
     }
   }
@@ -244,7 +256,7 @@ LogicalResult PlacementFinder::findCommitPositions() {
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsTraversal(visited, specPos.getOwner());
+  findCommitsTraversal(visited, specPos);
 
   // Additionally, if there are many BBs, two control-only tokens can
   // themselves go out of order. For this reason, additional commits need

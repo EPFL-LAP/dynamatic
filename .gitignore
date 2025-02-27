@@ -47,3 +47,6 @@ cs
 .bloop/
 .ammonite/
 metals.sbt
+
+# xls
+/xls
