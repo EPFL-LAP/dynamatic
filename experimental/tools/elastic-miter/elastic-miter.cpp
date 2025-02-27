@@ -176,20 +176,19 @@ static FailureOr<bool> checkEquivalence(
   }
   auto [mlirPath, config] = failOrPair.value();
 
-  auto failOrSmvPath =
+  auto failOrSmvPair =
       dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
-  if (failed(failOrSmvPath)) {
+  if (failed(failOrSmvPair)) {
     llvm::errs() << "Failed to convert miter module to SMV.\n";
     return failure();
   }
-  auto smvPath = failOrSmvPath.value();
+  auto [smvPath, smvModelName] = failOrSmvPair.value();
 
   std::filesystem::path wrapperPath = miterDir / "main.smv";
 
   // Create wrapper (main) for the elastic-miter
-  // Currently handshake2smv only supports "model" as the model's name
   auto fail = dynamatic::experimental::createWrapper(
-      wrapperPath, config, "model", n, true, sequenceConstraints);
+      wrapperPath, config, smvModelName, n, true, sequenceConstraints);
   if (failed(fail))
     return failure();
 

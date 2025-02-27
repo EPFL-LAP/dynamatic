@@ -153,16 +153,16 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
-  auto failOrDstSmv = dynamatic::experimental::handshake2smv(
+  auto failOrSmvPair = dynamatic::experimental::handshake2smv(
       reachabilityMlirPath, outputDir, true);
-  if (failed(failOrDstSmv))
+  if (failed(failOrSmvPair))
     return failure();
-  auto dstSmv = failOrDstSmv.value();
+  auto [dstSmv, smvModelName] = failOrSmvPair.value();
 
-  // Currently handshake2smv only supports "model" as the model's name
-  auto fail = dynamatic::experimental::createWrapper(outputDir / "main_inf.smv",
-                                                     config, "model", 0, false,
-                                                     SequenceConstraints());
+  // Create the wrapper with infinite sequence generators
+  auto fail = dynamatic::experimental::createWrapper(
+      outputDir / "main_inf.smv", config, smvModelName, 0, false,
+      SequenceConstraints());
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -191,9 +191,9 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     std::filesystem::path wrapperPath =
         outputDir / ("main_" + std::to_string(numberOfTokens) + ".smv");
 
-    // Currently handshake2smv only supports "model" as the model's name
+    // Create the wrapper with n-token sequence generators
     auto fail = dynamatic::experimental::createWrapper(
-        wrapperPath, config, "model", numberOfTokens, false,
+        wrapperPath, config, smvModelName, numberOfTokens, false,
         SequenceConstraints(), true);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << numberOfTokens
@@ -218,11 +218,10 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
       return failure();
     }
 
-    // Check state differences
-    // Currently handshake2smv only supports "model" as the model's name
+    // Count the number of differences of reachable states
     auto failOrNrOfDifferences =
         dynamatic::experimental::compareReachableStates(
-            "model", outputDir / "inf_states.txt",
+            smvModelName, outputDir / "inf_states.txt",
             outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
     if (failed(failOrNrOfDifferences)) {
       llvm::errs() << "Failed to compare the number of reachable states with "

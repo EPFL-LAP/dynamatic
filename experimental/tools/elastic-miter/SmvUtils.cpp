@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -78,7 +79,7 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 #endif
 }
 
-FailureOr<std::filesystem::path>
+FailureOr<std::pair<std::filesystem::path, std::string>>
 handshake2smv(const std::filesystem::path &mlirPath,
               const std::filesystem::path &outputDir, bool png) {
 
@@ -116,7 +117,9 @@ handshake2smv(const std::filesystem::path &mlirPath,
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();
   }
+  // Currently dot2smv only supports "model" as the model's name
+  std::string moduleName = "model";
 
-  return smvFile;
+  return std::make_pair(smvFile, moduleName);
 }
 } // namespace dynamatic::experimental

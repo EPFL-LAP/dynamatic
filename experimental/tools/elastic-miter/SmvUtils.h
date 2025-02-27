@@ -54,10 +54,10 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 
 // Implements the handshake to SMV conversion flow. All needed files are placed
 // in outputDir. Either failed() or the path to the top level SMV file is
-// returned.
-FailureOr<std::filesystem::path>
+// returned. TODO
+FailureOr<std::pair<std::filesystem::path, std::string>>
 handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool png = false);
+              const std::filesystem::path &outputDir, bool png);
 
 } // namespace dynamatic::experimental
 #endif
