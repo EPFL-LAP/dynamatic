@@ -4,29 +4,5 @@
     "operand-idx": 0
   },
   "buffers": [
-    {
-      "operation-name": "mux0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "andi0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "cmpi2",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "extsi1",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "trunci0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "cond_br1",
-      "operand-idx": 0
-    }
   ]
 }
