@@ -34,46 +34,79 @@ using namespace dynamatic::handshake;
 
 // CLI Settings
 
-static cl::OptionCategory mainCategory("elastic-miter Options");
+static cl::OptionCategory generalCategory("1. General Elastic-Miter Options");
+static cl::OptionCategory constraintsCategory("2. Constraints Options");
 
-static cl::opt<std::string>
-    lhsFilenameArg("lhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the left-hand side (LHS) input file"),
-                   cl::cat(mainCategory));
+static cl::opt<std::string> lhsFilenameArg(
+    "lhs", cl::Prefix, cl::Required,
+    cl::desc("The left-hand side (LHS) input handshake MLIR file"),
+    cl::cat(generalCategory));
 
-static cl::opt<std::string>
-    rhsFilenameArg("rhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the right-hand side (RHS) input file"),
-                   cl::cat(mainCategory));
+static cl::opt<std::string> rhsFilenameArg(
+    "rhs", cl::Prefix, cl::Required,
+    cl::desc("The right-hand side (RHS) input handshake MLIR file"),
+    cl::cat(generalCategory));
 
 static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
                                          cl::desc("Specify output directory"),
-                                         cl::cat(mainCategory));
+                                         cl::cat(generalCategory));
 
+// Specify a Sequence Length Relation constraint.
+// Can be used multiple times. E.g.: --seq_length="0+1=2" --seq_length="1<2"
+// It controls the relative length of the input sequences.
+// The constraint has the form of an arithmetic equation. The number in the
+// equation will be replaced the respective input with the index of the number.
+// Example:
+// --seq_length="0+1=2" will ensure that the inputs with index 0 and index 1
+// together produce as many tokens as the input with index 2.
 static cl::list<std::string> seqLengthRelationConstraints(
     "seq_length", cl::Prefix,
     cl::desc("Specify constraints for the relation of sequence lengths."),
-    cl::cat(mainCategory));
+    cl::cat(constraintsCategory));
 
+// Specify a Loop Condition sequence contraint.
+// Can be used multiple times. E.g.: --loop="0,1" --loop="2,3"
+// It has the form "<dataSequence>,<controlSequence>".
+// The number of tokens in the input with the index dataSequence is equivalent
+// to the number of false tokens at the output with the index controlSequence.
+// Example:
+// --loop="0,1"
 static cl::list<std::string>
     loopSeqConstraints("loop", cl::Prefix,
                        cl::desc("Specify loop constraints."),
-                       cl::cat(mainCategory));
+                       cl::cat(constraintsCategory));
 
+// Specify a Strict Loop Condition sequence contraint.
+// Can be used multiple times. E.g.: --loop_strict="0,1" --loop_strict="2,3"
+// Works identically to the loop condition sequence contraint, with the
+// addition that the last token also needs to be false.
+// Example:
+// --loop_strict="0,1"
 static cl::list<std::string> strictLoopSeqConstraints(
     "loop_strict", cl::Prefix,
     cl::desc("Specify loop constraints, where the last token is false."),
-    cl::cat(mainCategory));
+    cl::cat(constraintsCategory));
 
+// Specify a Token Limit constraint.
+// Can be used multiple times. E.g. --token_limit="0,0,1" --token_limit="1,2,2"
+// It has the form "<inputSequence>,<outputSequence>,<limit>".
+// At any point in time, the number of tokens which are created at the input
+// with index inputSequence can only be up to "limit" higher than the number of
+// tokens reaching the output with the index outputSequence.
+// Example:
+// --token_limit="0,0,1"
 static cl::list<std::string>
     tokenLimitConstraints("token_limit", cl::Prefix,
                           cl::desc("Specify token limit constraint."),
-                          cl::cat(mainCategory));
+                          cl::cat(constraintsCategory));
 
-static cl::opt<bool> enableCounterExamples("cex",
-                                           cl::desc("Enable counter examples."),
-                                           cl::init(false),
-                                           cl::cat(mainCategory));
+//  Enable counterexamples. In case a property does not pass, this will generate
+//  a counterexample and put it in an XML file.
+static cl::opt<bool>
+    enableCounterExamples("cex",
+                          cl::desc("Enable counter examples and create XML "
+                                   "files in the output directory."),
+                          cl::init(false), cl::cat(generalCategory));
 
 static FailureOr<dynamatic::experimental::SequenceConstraints>
 parseSequenceConstraints() {
@@ -236,16 +269,25 @@ static FailureOr<bool> checkEquivalence(
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
+  // Hide the general options that are irrelevent for elastic-miter
+  cl::HideUnrelatedOptions({&generalCategory, &constraintsCategory});
+
   cl::ParseCommandLineOptions(
       argc, argv,
       "Checks the equivalence of two dynamic circuits in the handshake "
-      "dialect. At the end it will output whether the circuits are "
+      "dialect.\n"
+      "At the end it will output whether the circuits are "
       "latency-insensitive equivalent.\n"
-      "Takes two MLIR files as input. The files need to contain exactely one "
+      "Takes two MLIR files as input. The files need to contain exactely "
+      "one "
       "module each.\nEach module needs to contain exactely one "
       "handshake.func. "
       "\nThe resulting miter MLIR file and JSON config file are placed in "
-      "the specified output directory.");
+      "the specified output directory.\n\n"
+      "Usage Example:\n"
+      "elastic-miter --lhs=b_lhs.mlir --rhs=b_rhs.mlir -o out "
+      "--seq_length=\"0+1=3\" --seq_length=\"0=2\" "
+      "--loop_strict=0,1\n");
 
   // Register the supported dynamatic dialects and create a context
   DialectRegistry registry;
