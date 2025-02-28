@@ -56,18 +56,38 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
   return success();
 }
 
+// Runs a shell command and redirects the stdout to the provided file.
+static int executeWithRedirect(const std::string &command,
+                               const std::filesystem::path &stdoutFile) {
+  char buffer[128];
+
+  std::ofstream outFile(stdoutFile);
+
+  FILE *pipe = popen(command.c_str(), "r");
+  if (!pipe) {
+    llvm::errs() << "Failed to execute the command.\n";
+    return 1;
+  }
+
+  // Read the output from the process and print it to the provided file.
+  while (fgets(buffer, 128, pipe) != nullptr) {
+    outFile << buffer;
+  }
+
+  // Return the exit code of the command
+  return pclose(pipe);
+}
+
 int runNuXmv(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
-  std::string command =
-      "nuXmv -source " + cmdPath.string() + " > " + stdoutFile.string();
-  return system(command.c_str());
+  std::string command = "nuXmv -source " + cmdPath.string();
+  return executeWithRedirect(command, stdoutFile);
 }
 
 int runNuSMV(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
-  std::string command =
-      "NuSMV -source " + cmdPath.string() + " > " + stdoutFile.string();
-  return system(command.c_str());
+  std::string command = "NuSMV -source " + cmdPath.string();
+  return executeWithRedirect(command, stdoutFile);
 }
 
 int runSmvCmd(const std::filesystem::path &cmdPath,
@@ -86,9 +106,9 @@ handshake2smv(const std::filesystem::path &mlirPath,
   std::filesystem::path dotFile = outputDir / "model.dot";
 
   // Convert the handshake to dot
-  std::string cmd = "bin/export-dot " + mlirPath.string() +
-                    " --edge-style=spline > " + dotFile.string();
-  int ret = system(cmd.c_str());
+  std::string cmd =
+      "bin/export-dot " + mlirPath.string() + " --edge-style=spline";
+  int ret = executeWithRedirect(cmd, dotFile);
   if (ret != 0) {
     llvm::errs() << "Failed to convert to dot\n";
     return failure();
@@ -98,9 +118,8 @@ handshake2smv(const std::filesystem::path &mlirPath,
   // generated dotfile
   if (png) {
     std::filesystem::path pngFile = outputDir / "model.png";
-    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string() +
-          " > /dev/null";
-    ret = system(cmd.c_str());
+    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
+    ret = executeWithRedirect(cmd, "/dev/null");
     if (ret != 0) {
       llvm::errs() << "Failed to convert to PNG\n";
       return failure();
@@ -111,8 +130,8 @@ handshake2smv(const std::filesystem::path &mlirPath,
   // The current implementation of dot2smv uses the hardcoded name "model.smv"
   // in the dotfile's directory.
   std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
-  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string() + " > /dev/null";
-  ret = system(cmd.c_str());
+  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string();
+  ret = executeWithRedirect(cmd, "/dev/null");
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();
