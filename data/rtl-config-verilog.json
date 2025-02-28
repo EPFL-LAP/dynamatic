@@ -239,6 +239,13 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb_chain.v",
@@ -251,7 +258,14 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/oehb_chain.v",
     "module-name": "oehb_chain",
@@ -269,6 +283,13 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/support/dataless/elastic_fifo_inner.v",
@@ -280,7 +301,14 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/support/elastic_fifo_inner.v",
     "module-name": "elastic_fifo_inner",
@@ -297,6 +325,12 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tehb_chain.v",
@@ -309,7 +343,13 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tehb_chain.v",
     "module-name": "tehb_chain",
@@ -327,6 +367,14 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
+        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/tfifo.v",
@@ -339,7 +387,15 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 0,
+        "valid-lat-eq": 0,
+        "ready-lat-eq": 0,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/tfifo.v",
     "module-name": "tfifo",
@@ -357,6 +413,14 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 1,
+        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/dvr_chain.v",
@@ -369,7 +433,15 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 }
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 1,
+        "generic": false
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dvr_chain.v",
     "module-name": "dvr_chain",
