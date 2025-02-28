@@ -22,11 +22,18 @@
 #include "llvm/Support/Debug.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "experimental/Support/FtdImplementation.h"
+#include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/BooleanLogic/BoolExpression.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
+#include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+using namespace dynamatic::experimental;
+using namespace dynamatic::experimental::boolean;
 
 unsigned N = 1;
 
@@ -195,9 +202,30 @@ DenseMap<int, Operation*> getControlMergeOps(FuncOp funcOp){
 }
 
 
-Value calculateCFGCond(Operation* predecessorOp, Operation* successorOp, DenseMap<int, Operation*> &controlMerges, Value startSignal, ConversionPatternRewriter& rewriter){
+Value calculateCFGCond(Operation* predecessorOp, Operation* successorOp, DenseMap<int, Operation*> &controlMerges, Value startSignal, FuncOp funcOp, ConversionPatternRewriter& rewriter){
+
   int predecessorBB = getBBNumberFromOp(predecessorOp);
   int successorBB = getBBNumberFromOp(successorOp);
+
+  Region &region = funcOp.getBody();
+  ftd::BlockIndexing bi(region);
+  Block *entryBlock = &funcOp.getBody().front();
+
+  auto producerBlock = bi.getBlockFromIndex(predecessorBB);
+  ControlDependenceAnalysis::BlockControlDepsMap cdAnalysis = ControlDependenceAnalysis(region).getAllBlockDeps();
+
+  DenseSet<Block *> prodControlDeps =
+  cdAnalysis[producerBlock.value()].forwardControlDeps;
+
+
+  BoolExpression *fProd =
+      ftd::enumeratePaths(entryBlock, producerBlock.value(), bi, prodControlDeps);
+
+  // llvm::errs() << "jaleb: " << fProd->sopToString() << "\n";
+
+
+
+
   ControlMergeOp controlMergeOp = dyn_cast<handshake::ControlMergeOp>(controlMerges[1]);
 
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(successorOp->getLoc());
@@ -265,7 +293,7 @@ void createWaitingSignals(FuncOp funcOp, DenseMap<StringRef, Operation*> &memAcc
           Operation* SuccessorOpPointer = memAccesses[successorName];
 
           SmallVector<Value> conds = skipConditionForEachPair[predecessorOpName][successorName];
-          Value CFGCond = calculateCFGCond(predecessorOpPointer, SuccessorOpPointer, controlMerges, startSignal, rewriter);
+          Value CFGCond = calculateCFGCond(predecessorOpPointer, SuccessorOpPointer, controlMerges, startSignal, funcOp, rewriter);
 
           Value waitingSignal = createWaitingSignalForPair(predecessorOpDoneSignal, conds, CFGCond, predecessorOpPointer, SuccessorOpPointer, startSignal, controlMerges, rewriter);
           waitingSignalsForEachDst[successorName].push_back(waitingSignal);
@@ -303,7 +331,7 @@ void gateAllSuccessorAccesses(DenseMap<StringRef, Operation*> &memAccesses, Dens
 }
 
 SmallVector<Value> createSkipConditionForPair(Value predecessorOpDoneSignal, Value startSignal, Operation* predecessorOpPointer, Operation* successorOpPointer, 
-                    SmallVector<Value> delayedAddresses, DenseMap<int, Operation*> &controlMerges, 
+                    SmallVector<Value> delayedAddresses, DenseMap<int, Operation*> &controlMerges, FuncOp funcOp,
                     ConversionPatternRewriter& rewriter){
   handshake::SourceOp sourceOp = rewriter.create<handshake::SourceOp>(predecessorOpPointer->getLoc());
   inheritBB(successorOpPointer, sourceOp);
@@ -343,7 +371,7 @@ SmallVector<Value> createSkipConditionForPair(Value predecessorOpDoneSignal, Val
   inheritBB(predecessorOpPointer, bufferOp);
 
   //here
-  Value CFGCond = calculateCFGCond(predecessorOpPointer, successorOpPointer, controlMerges, startSignal, rewriter);
+  Value CFGCond = calculateCFGCond(predecessorOpPointer, successorOpPointer, controlMerges, startSignal, funcOp, rewriter);
 
   handshake::SourceOp sourceOpConstOp = rewriter.create<handshake::SourceOp>(predecessorOpPointer->getLoc());
   inheritBB(successorOpPointer, sourceOpConstOp);
@@ -435,7 +463,7 @@ void createSkipConditionGenerator(FuncOp funcOp, DenseMap<StringRef, Operation*>
           Operation* successorOpPointer = memAccesses[dstAccess];
 
           
-          SmallVector<Value> skipConditions = createSkipConditionForPair(predecessorOpDoneSignal, startSignal, predecessorOpPointer, successorOpPointer,delayedAddresses,controlMerges, rewriter);
+          SmallVector<Value> skipConditions = createSkipConditionForPair(predecessorOpDoneSignal, startSignal, predecessorOpPointer, successorOpPointer,delayedAddresses,controlMerges, funcOp, rewriter);
           skipConditionForEachPair[predecessorOpName][dstAccess] = skipConditions;
         }
       }
