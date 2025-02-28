@@ -5,9 +5,8 @@ def generate_mem_controller(name, params):
   num_controls = params["num_controls"]
   num_loads = params["num_loads"]
   num_stores = params["num_stores"]
-  port_types = params["port_types"]
-  data_bitwidth = int(port_types["loadData"][1:])
-  addr_bitwidth = int(port_types["loadAddr"][1:])
+  data_bitwidth = params["data_bitwidth"]
+  addr_bitwidth = params["addr_bitwidth"]
 
   if num_controls == 0 and num_loads > 0 and num_stores == 0:
     return _generate_mem_controller_storeless(name, num_loads, addr_bitwidth, data_bitwidth)

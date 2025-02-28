@@ -25,11 +25,113 @@ import generators.support.mem_to_bram as mem_to_bram
 
 def handle_params(mod_type, parameters):
   match mod_type:
+    case "addi":
+      return {
+          "bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "buffer":
+      return {
+          "num_slots": parameters["num_slots"],
+          "bitwidth": VhdlScalarType(parameters["ins"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "cmpi":
+      return {
+          "bitwidth": VhdlScalarType(parameters["lhs"]).bitwidth,
+          "predicate": parameters["predicate"],
+          "port_types": parameters["port_types"]
+      }
+    case "cond_br":
+      return {
+          "bitwidth": VhdlScalarType(parameters["data"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "constant":
+      return {
+          "bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "value": parameters["value"],
+          "port_types": parameters["port_types"]
+      }
     case "control_merge":
       return {
           "size": parameters["size"],
-          "data_width": VhdlScalarType(parameters["outs"]).bitwidth,
-          "index_width": VhdlScalarType(parameters["index"]).bitwidth
+          "data_bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "index_bitwidth": VhdlScalarType(parameters["index"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "extsi":
+      return {
+          "input_bitwidth": VhdlScalarType(parameters["ins"]).bitwidth,
+          "output_bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "fork":
+      return {
+          "size": parameters["size"],
+          "bitwidth": VhdlScalarType(parameters["ins"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "load":
+      return {
+          "addr_bitwidth": VhdlScalarType(parameters["addrIn"]).bitwidth,
+          "data_bitwidth": VhdlScalarType(parameters["dataOut"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "mem_controller":
+      port_types = parameters["port_types"]
+      return {
+          "num_controls": parameters["num_controls"],
+          "num_loads": parameters["num_loads"],
+          "num_stores": parameters["num_stores"],
+          "data_bitwidth": int(port_types["loadData"][1:]),
+          "addr_bitwidth": int(port_types["loadAddr"][1:]),
+          "port_types": parameters["port_types"]
+      }
+    case "merge":
+      return {
+          "size": parameters["size"],
+          "bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "muli":
+      return {
+          "bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "mux":
+      return {
+          "size": parameters["size"],
+          "data_bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "index_bitwidth": VhdlScalarType(parameters["index"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "sink":
+      return {
+          "bitwidth": VhdlScalarType(parameters["ins"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "source":
+      return {
+          "port_types": parameters["port_types"]
+      }
+    case "store":
+      return {
+          "addr_bitwidth": VhdlScalarType(parameters["addrIn"]).bitwidth,
+          "data_bitwidth": VhdlScalarType(parameters["dataIn"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "trunci":
+      return {
+          "input_bitwidth": VhdlScalarType(parameters["ins"]).bitwidth,
+          "output_bitwidth": VhdlScalarType(parameters["outs"]).bitwidth,
+          "port_types": parameters["port_types"]
+      }
+    case "mem_to_bram":
+      port_types = parameters["port_types"]
+      return {
+          "data_bitwidth": port_types["loadData"][1:],
+          "addr_bitwidth": port_types["loadAddr"][1:]
       }
 
 

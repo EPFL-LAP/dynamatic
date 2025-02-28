@@ -1,14 +1,11 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.tehb import generate_tehb
 
 
 def generate_load(name, params):
-  port_types = params["port_types"]
+  addr_bitwidth = params["addr_bitwidth"]
+  data_bitwidth = params["data_bitwidth"]
 
-  data_type = VhdlScalarType(port_types["dataOut"])
-  addr_type = VhdlScalarType(port_types["addrIn"])
-
-  return _generate_load(name, data_type.bitwidth, addr_type.bitwidth)
+  return _generate_load(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_load(name, data_bitwidth, addr_bitwidth):
@@ -16,18 +13,8 @@ def _generate_load(name, data_bitwidth, addr_bitwidth):
   data_tehb_name = f"{name}_data_tehb"
 
   dependencies = \
-      generate_tehb(addr_tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{addr_bitwidth}>",
-              "outs": f"!handshake.channel<i{addr_bitwidth}>"
-          }
-      }) + \
-      generate_tehb(data_tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{data_bitwidth}>",
-              "outs": f"!handshake.channel<i{data_bitwidth}>"
-          }
-      })
+      generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
+      generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
 
   entity = f"""
 library ieee;

@@ -1,12 +1,8 @@
-from generators.support.utils import VhdlScalarType
-
-
 def generate_extsi(name, params):
-  port_types = params["port_types"]
-  ins_type = VhdlScalarType(port_types["ins"])
-  outs_type = VhdlScalarType(port_types["outs"])
+  input_bitwidth = params["input_bitwidth"]
+  output_bitwidth = params["output_bitwidth"]
 
-  return _generate_extsi(name, ins_type.bitwidth, outs_type.bitwidth)
+  return _generate_extsi(name, input_bitwidth, output_bitwidth)
 
 
 def _generate_extsi(name, input_bitwidth, output_bitwidth):

@@ -1,14 +1,10 @@
-from generators.support.utils import VhdlScalarType
-
-
 def generate_oehb(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
 
-  if data_type.is_channel():
-    return _generate_oehb(name, data_type.bitwidth)
-  else:
+  if bitwidth == 0:
     return _generate_oehb_dataless(name)
+  else:
+    return _generate_oehb(name, bitwidth)
 
 
 def _generate_oehb_dataless(name):

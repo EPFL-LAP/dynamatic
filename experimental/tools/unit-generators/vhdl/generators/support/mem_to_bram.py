@@ -1,7 +1,6 @@
 def generate_mem_to_bram(name, params):
-  port_types = params["port_types"]
-  data_bitwidth = port_types["loadData"][1:]
-  addr_bitwidth = port_types["loadAddr"][1:]
+  data_bitwidth = params["data_bitwidth"]
+  addr_bitwidth = params["addr_bitwidth"]
 
   return f"""
 library ieee;

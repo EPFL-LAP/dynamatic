@@ -5,23 +5,23 @@ from generators.handshake.fork import generate_fork
 
 def generate_control_merge(name, params):
   size = params["size"]
-  data_width = params["data_width"]
-  index_width = params["index_width"]
+  data_bitwidth = params["data_bitwidth"]
+  index_bitwidth = params["index_bitwidth"]
 
-  if data_width == 0:
-    return _generate_control_merge_dataless(name, size, index_width)
+  if data_bitwidth == 0:
+    return _generate_control_merge_dataless(name, size, index_bitwidth)
   else:
-    return _generate_control_merge(name, size, index_width, data_width)
+    return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
 
 
-def _generate_control_merge_dataless(name, size, index_width):
+def _generate_control_merge_dataless(name, size, index_bitwidth):
   merge_name = f"{name}_merge"
   tehb_name = f"{name}_tehb"
   fork_name = f"{name}_fork"
 
   dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"width": index_width}) + \
-      generate_fork(fork_name, {"size": 2, "width": 0})
+      generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
+      generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
   entity = f"""
 library ieee;
@@ -39,7 +39,7 @@ entity {name} is
     outs_valid : out std_logic;
     outs_ready : in  std_logic;
     -- index output channel
-    index       : out std_logic_vector({index_width} - 1 downto 0);
+    index       : out std_logic_vector({index_bitwidth} - 1 downto 0);
     index_valid : out std_logic;
     index_ready : in  std_logic
   );
@@ -49,15 +49,15 @@ end entity;
   architecture = f"""
 -- Architecture of control_merge_dataless
 architecture arch of {name} is
-  signal index_tehb                                               : std_logic_vector ({index_width} - 1 downto 0);
+  signal index_tehb                                               : std_logic_vector ({index_bitwidth} - 1 downto 0);
   signal dataAvailable, readyToFork, tehbOut_valid, tehbOut_ready : std_logic;
 begin
   process (ins_valid)
   begin
-    index_tehb <= ({index_width} - 1 downto 0 => '0');
+    index_tehb <= ({index_bitwidth} - 1 downto 0 => '0');
     for i in 0 to ({size} - 1) loop
       if (ins_valid(i) = '1') then
-        index_tehb <= std_logic_vector(to_unsigned(i, {index_width}));
+        index_tehb <= std_logic_vector(to_unsigned(i, {index_bitwidth}));
         exit;
       end if;
     end loop;
@@ -102,11 +102,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_control_merge(name, size, index_width, data_width):
+def _generate_control_merge(name, size, index_bitwidth, data_bitwidth):
   inner_name = f"{name}_inner"
 
   dependencies = _generate_control_merge_dataless(
-      inner_name, size, index_width)
+      inner_name, size, index_bitwidth)
 
   entity = f"""
 library ieee;
@@ -119,15 +119,15 @@ entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channels
-    ins       : in  data_array({size} - 1 downto 0)({data_width} - 1 downto 0);
+    ins       : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- data output channel
-    outs       : out std_logic_vector({data_width} - 1 downto 0);
+    outs       : out std_logic_vector({data_bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic;
     -- index output channel
-    index       : out std_logic_vector({index_width} - 1 downto 0);
+    index       : out std_logic_vector({index_bitwidth} - 1 downto 0);
     index_valid : out std_logic;
     index_ready : in  std_logic
   );
@@ -137,7 +137,7 @@ end entity;
   architecture = f"""
 -- Architecture of control_merge
 architecture arch of {name} is
-  signal index_internal : std_logic_vector({index_width} - 1 downto 0);
+  signal index_internal : std_logic_vector({index_bitwidth} - 1 downto 0);
 begin
   control : entity work.{inner_name}
     port map(

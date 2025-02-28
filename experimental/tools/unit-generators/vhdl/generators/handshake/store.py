@@ -1,14 +1,8 @@
-from generators.support.utils import VhdlScalarType
-
-
 def generate_store(name, params):
-  port_types = params["port_types"]
+  data_bitwidth = params["data_bitwidth"]
+  addr_bitwidth = params["addr_bitwidth"]
 
-  # Ports communicating with the elastic circuit have the complete and same extra signals
-  data_type = VhdlScalarType(port_types["dataIn"])
-  addr_type = VhdlScalarType(port_types["addrIn"])
-
-  return _generate_store(name, data_type.bitwidth, addr_type.bitwidth)
+  return _generate_store(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_store(name, data_bitwidth, addr_bitwidth):

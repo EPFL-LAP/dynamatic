@@ -1,14 +1,10 @@
-from generators.support.utils import VhdlScalarType
-
-
 def generate_tehb(name, params):
-  port_types = params["port_types"]
-  ins_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
 
-  if ins_type.is_channel():
-    return _generate_tehb(name, ins_type.bitwidth)
-  else:
+  if bitwidth == 0:
     return _generate_tehb_dataless(name)
+  else:
+    return _generate_tehb(name, bitwidth)
 
 
 def _generate_tehb_dataless(name):

@@ -1,13 +1,11 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.join import generate_join
 
 
 def generate_cmpi(name, params):
-  port_types = params["port_types"]
+  bitwidth = params["bitwidth"]
   predicate = params["predicate"]
-  data_type = VhdlScalarType(port_types["lhs"])
 
-  return _generate_cmpi(name, predicate, data_type.bitwidth)
+  return _generate_cmpi(name, predicate, bitwidth)
 
 
 def _get_symbol_from_predicate(pred):

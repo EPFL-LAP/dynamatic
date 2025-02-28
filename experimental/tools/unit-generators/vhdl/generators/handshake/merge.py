@@ -1,17 +1,15 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.merge_notehb import generate_merge_notehb
 from generators.support.tehb import generate_tehb
 
 
 def generate_merge(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
   size = params["size"]
+  bitwidth = params["bitwidth"]
 
-  if data_type.is_channel():
-    return _generate_merge(name, size, data_type.bitwidth)
-  else:
+  if bitwidth == 0:
     return _generate_merge_dataless(name, size)
+  else:
+    return _generate_merge(name, size, bitwidth)
 
 
 def _generate_merge_dataless(name, size):
@@ -19,12 +17,7 @@ def _generate_merge_dataless(name, size):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.control<>",
-              "outs": f"!handshake.control<>"
-          }
-      })
+      generate_tehb(tehb_name, {"size": 0})
 
   entity = f"""
 library ieee;
@@ -85,12 +78,7 @@ def _generate_merge(name, size, bitwidth):
           "size": size,
           "bitwidth": bitwidth,
       }) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}>",
-              "outs": f"!handshake.channel<{bitwidth}>"
-          }
-      })
+      generate_tehb(tehb_name, {"bitwidth": bitwidth})
 
   entity = f"""
 library ieee;

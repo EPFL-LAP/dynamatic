@@ -1,15 +1,14 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_tfifo(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
+  num_slots = params["num_slots"]
 
-  if data_type.is_channel():
-    return _generate_tfifo(name, params["num_slots"], data_type.bitwidth)
+  if bitwidth == 0:
+    return _generate_tfifo_dataless(name, num_slots)
   else:
-    return _generate_tfifo_dataless(name, params["num_slots"])
+    return _generate_tfifo(name, num_slots, bitwidth)
 
 
 def _generate_tfifo(name, size, bitwidth):

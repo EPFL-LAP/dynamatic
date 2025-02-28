@@ -1,28 +1,21 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.tehb import generate_tehb
 
 
 def generate_mux(name, params):
   size = params["size"]
-  port_types = params["port_types"]
-  outs_type = VhdlScalarType(port_types["outs"])
-  index_type = VhdlScalarType(port_types["index"])
+  data_bitwidth = params["data_bitwidth"]
+  index_bitwidth = params["index_bitwidth"]
 
-  if outs_type.is_channel():
-    return _generate_mux(name, size, index_type.bitwidth, outs_type.bitwidth)
+  if data_bitwidth == 0:
+    return _generate_mux_dataless(name, size, index_bitwidth)
   else:
-    return _generate_mux_dataless(name, size, index_type.bitwidth)
+    return _generate_mux(name, size, index_bitwidth, data_bitwidth)
 
 
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.channel<i{data_bitwidth}>",
-          "outs": f"!handshake.channel<i{data_bitwidth}>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": data_bitwidth})
 
   entity = f"""
 library ieee;
@@ -104,12 +97,7 @@ end architecture;
 def _generate_mux_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.control<>",
-          "outs": f"!handshake.control<>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": 0})
 
   entity = f"""
 library ieee;

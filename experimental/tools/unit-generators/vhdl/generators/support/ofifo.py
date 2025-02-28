@@ -1,16 +1,15 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_ofifo(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
+  num_slots = params["num_slots"]
 
-  if data_type.is_channel():
-    return _generate_ofifo(name, params["num_slots"], data_type.bitwidth)
+  if bitwidth == 0:
+    return _generate_ofifo_dataless(name, num_slots)
   else:
-    return _generate_ofifo_dataless(name, params["num_slots"])
+    return _generate_ofifo(name, num_slots, bitwidth)
 
 
 def _generate_ofifo(name, size, bitwidth):
@@ -22,12 +21,7 @@ def _generate_ofifo(name, size, bitwidth):
           "size": size,
           "bitwidth": bitwidth
       }) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}>",
-              "outs": f"!handshake.channel<i{bitwidth}>",
-          }
-      })
+      generate_tehb(tehb_name, {"bitwidth": bitwidth})
 
   entity = f"""
 library ieee;
@@ -99,15 +93,8 @@ def _generate_ofifo_dataless(name, size):
   fifo_name = f"{name}_fifo"
 
   dependencies = \
-      generate_elastic_fifo_inner(fifo_name, {
-          "size": size,
-      }) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": "!handshake.control<>",
-              "outs": "!handshake.control<>",
-          }
-      })
+      generate_elastic_fifo_inner(fifo_name, {"size": size}) + \
+      generate_tehb(tehb_name, {"bitwidth": 0})
 
   entity = f"""
 library ieee;

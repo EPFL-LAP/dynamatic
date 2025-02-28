@@ -1,12 +1,8 @@
-from generators.support.utils import VhdlScalarType
-
-
 def generate_constant(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
+  bitwidth = params["bitwidth"]
   value = params["value"]
 
-  return _generate_constant(name, value, data_type.bitwidth)
+  return _generate_constant(name, value, bitwidth)
 
 
 def _generate_constant(name, value, bitwidth):
