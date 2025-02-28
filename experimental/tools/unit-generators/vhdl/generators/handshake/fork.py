@@ -1,6 +1,8 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.logic import generate_or_n
-from generators.support.eager_fork_register_block import generate_eager_fork_register_block
+from generators.support.eager_fork_register_block import (
+    generate_eager_fork_register_block,
+)
 
 
 def generate_fork(name, params):
@@ -18,9 +20,9 @@ def _generate_fork_dataless(name, size):
     or_n_name = f"{name}_or_n"
     regblock_name = f"{name}_regblock"
 
-    dependencies = \
-        generate_or_n(or_n_name, {"size": size}) + \
-        generate_eager_fork_register_block(regblock_name)
+    dependencies = generate_or_n(
+        or_n_name, {"size": size}
+    ) + generate_eager_fork_register_block(regblock_name)
 
     entity = f"""
 library ieee;

@@ -12,43 +12,43 @@ import sys
 
 
 def GetConfigs(path: str):
-    with open(path, 'r') as file:
+    with open(path, "r") as file:
         configString = file.read()
         configs = json.loads(configString)
         return Configs(configs)
 
 
 class Configs:
-    name:          str = 'test'
-    dataW:         int = 32
-    addrW:         int = 32
-    idW:           int = 3
+    name: str = "test"
+    dataW: int = 32
+    addrW: int = 32
+    idW: int = 3
     numLdqEntries: int = 8
     numStqEntries: int = 8
-    numLdPorts:    int = 1
-    numStPorts:    int = 1
-    numGroups:     int = 1
-    numLdMem:      int = 1
-    numStMem:      int = 1
+    numLdPorts: int = 1
+    numStPorts: int = 1
+    numGroups: int = 1
+    numLdMem: int = 1
+    numStMem: int = 1
 
-    stResp:        bool = False
-    gaMulti:       bool = False
+    stResp: bool = False
+    gaMulti: bool = False
 
-    gaNumLoads:    list = [1]
-    gaNumStores:   list = [1]
-    gaLdOrder:     list = [[0]]
-    gaLdPortIdx:   list = [[0]]
-    gaStPortIdx:   list = [[0]]
+    gaNumLoads: list = [1]
+    gaNumStores: list = [1]
+    gaLdOrder: list = [[0]]
+    gaLdPortIdx: list = [[0]]
+    gaStPortIdx: list = [[0]]
 
-    ldqAddrW:      int = 3
-    stqAddrW:      int = 3
-    ldpAddrW:      int = 0
-    stpAddrW:      int = 0
+    ldqAddrW: int = 3
+    stqAddrW: int = 3
+    ldpAddrW: int = 0
+    stpAddrW: int = 0
 
-    pipe0:        bool = False
-    pipe1:        bool = False
-    pipeComp:     bool = False
-    headLag:      bool = False
+    pipe0: bool = False
+    pipe1: bool = False
+    pipeComp: bool = False
+    headLag: bool = False
 
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
@@ -75,24 +75,26 @@ class Configs:
 
         self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
-        self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
-        self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
+        self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries + 1))
+        self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries + 1))
         # Check the number of ports, if num*Ports == 0, set it to 1
         self.ldpAddrW = math.ceil(
-            math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
+            math.log2(self.numLdPorts if self.numLdPorts > 0 else 1)
+        )
         self.stpAddrW = math.ceil(
-            math.log2(self.numStPorts if self.numStPorts > 0 else 1))
+            math.log2(self.numStPorts if self.numStPorts > 0 else 1)
+        )
 
         self.pipe0 = bool(config["pipe0En"])
         self.pipe1 = bool(config["pipe1En"])
         self.pipeComp = bool(config["pipeCompEn"])
         self.headLag = bool(config["headLagEn"])
 
-        assert (self.idW >= self.ldqAddrW)
+        assert self.idW >= self.ldqAddrW
 
         # list size checking
-        assert (len(self.gaNumLoads) == self.numGroups)
-        assert (len(self.gaNumStores) == self.numGroups)
-        assert (len(self.gaLdOrder) == self.numGroups)
-        assert (len(self.gaLdPortIdx) == self.numGroups)
-        assert (len(self.gaStPortIdx) == self.numGroups)
+        assert len(self.gaNumLoads) == self.numGroups
+        assert len(self.gaNumStores) == self.numGroups
+        assert len(self.gaLdOrder) == self.numGroups
+        assert len(self.gaLdPortIdx) == self.numGroups
+        assert len(self.gaStPortIdx) == self.numGroups

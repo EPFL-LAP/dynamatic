@@ -38,8 +38,7 @@ class SmvScalarType:
             else:
                 self.smv_type = f"unsigned word [{self.bitwidth}]"
         else:
-            raise ValueError(
-                f"Type {mlir_type} doesn't correspond to any SMV type")
+            raise ValueError(f"Type {mlir_type} doesn't correspond to any SMV type")
 
     def format_constant(self, value) -> str:
         """
@@ -58,4 +57,8 @@ HANDSHAKE_CONTROL_TYPE = SmvScalarType("!handshake.control<>")
 
 
 def TEHB_BUFFER_PARAMS(data_type):
-    return {ATTR_SLOTS: 1, ATTR_TIMING: "R: 1", ATTR_PORT_TYPES: {"outs": data_type.mlir_type}}
+    return {
+        ATTR_SLOTS: 1,
+        ATTR_TIMING: "R: 1",
+        ATTR_PORT_TYPES: {"outs": data_type.mlir_type},
+    }

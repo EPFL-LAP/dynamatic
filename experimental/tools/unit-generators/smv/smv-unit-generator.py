@@ -65,8 +65,7 @@ def parse_parameters(param_list):
                     param_dict[key.strip()] = ast.literal_eval(value.strip())
         return param_dict
     except ValueError:
-        raise ValueError(
-            "Invalid parameter format. Use key=value key=value,...\n")
+        raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
@@ -74,9 +73,7 @@ def main():
     parser.add_argument(
         "-n", "--name", required=True, help="Name of the generated module"
     )
-    parser.add_argument(
-        "-o", "--output", required=True, help="Name of the output file"
-    )
+    parser.add_argument("-o", "--output", required=True, help="Name of the output file")
     parser.add_argument(
         "-t", "--type", required=True, help="Type of the generated module"
     )
@@ -99,7 +96,7 @@ def main():
     # Printing parameters for diagnostic purposes
     header = f"// {args.name} : {args.type}({args.parameters})\n\n"
 
-    with open(args.output, 'w') as file:
+    with open(args.output, "w") as file:
         print(header + generate_code(args.name, args.type, parameters), file=file)
 
 
