@@ -1,6 +1,10 @@
 def generate_elastic_fifo_inner(name, params):
   size = params["size"]
-  bitwidth = params["bitwidth"] if "bitwidth" in params else 0
+  if "bitwidth" in params:
+    bitwidth = params["bitwidth"]
+  else:
+    bitwidth = 0
+
   if bitwidth == 0:
     return _generate_elastic_fifo_inner_dataless(name, size)
   else:
