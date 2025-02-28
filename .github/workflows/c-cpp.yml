@@ -22,7 +22,7 @@ jobs:
 
       - name: check-format-python
         run: |
-          autopep8 --diff --ignore=E501 $(git ls-files '*.py') | tee check.txt && [ ! -s check.txt ]
+          black --check $(git ls-files '*.py')
 
       - name: build
         run: ./build.sh --release
