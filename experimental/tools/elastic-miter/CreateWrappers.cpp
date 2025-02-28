@@ -23,24 +23,26 @@ createModuleCall(const std::string &moduleName,
   call << "  VAR " << moduleName << " : " << moduleName << "(";
 
   for (size_t i = 0; i < arguments.size(); ++i) {
+    auto [argumentName, argumentType] = arguments[i];
     if (i > 0)
       call << ", ";
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
-    if (false && arguments[i].second.isa<handshake::ControlType>()) {
-      call << "seq_generator_" << arguments[i].first << ".valid0";
+    if (false && argumentType.isa<handshake::ControlType>()) {
+      call << "seq_generator_" << argumentName << ".valid0";
     } else {
-      call << "seq_generator_" << arguments[i].first
-           << ".dataOut0, seq_generator_" << arguments[i].first << ".valid0";
+      call << "seq_generator_" << argumentName << ".dataOut0, seq_generator_"
+           << argumentName << ".valid0";
     }
   }
 
   call << ", ";
 
   for (size_t i = 0; i < results.size(); ++i) {
+    auto [resultName, _] = results[i];
     if (i > 0)
       call << ", ";
-    call << "sink_" << results[i].first << ".ready0";
+    call << "sink_" << resultName << ".ready0";
   }
 
   call << ");\n";
@@ -53,21 +55,19 @@ static std::string createSequenceGenerators(
     const SmallVector<std::pair<std::string, Type>> &arguments,
     size_t nrOfTokens, bool exact = false) {
   std::ostringstream sequenceGenerators;
-  for (const auto &argument : arguments) {
+  for (const auto &[argumentName, _] : arguments) {
     if (nrOfTokens == 0) {
-      sequenceGenerators << "  VAR seq_generator_" << argument.first
+      sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input_inf(" << moduleName << "."
-                         << argument.first << "_ready);\n";
+                         << argumentName << "_ready);\n";
     } else if (exact) {
-      sequenceGenerators << "  VAR seq_generator_" << argument.first
+      sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input_exact(" << moduleName << "."
-                         << argument.first << "_ready, " << nrOfTokens
-                         << ");\n";
+                         << argumentName << "_ready, " << nrOfTokens << ");\n";
     } else {
-      sequenceGenerators << "  VAR seq_generator_" << argument.first
+      sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input(" << moduleName << "."
-                         << argument.first << "_ready, " << nrOfTokens
-                         << ");\n";
+                         << argumentName << "_ready, " << nrOfTokens << ");\n";
     }
   }
   return sequenceGenerators.str();
@@ -80,10 +80,10 @@ createSinks(const std::string &moduleName,
             size_t nrOfTokens) {
   std::ostringstream sinks;
 
-  for (const auto &result : results) {
-    sinks << "  VAR sink_" << result.first << " : sink_1_0(" << moduleName
-          << "." << result.first << "_out, " << moduleName << "."
-          << result.first << "_valid);\n";
+  for (const auto &[resultName, _] : results) {
+    sinks << "  VAR sink_" << resultName << " : sink_1_0(" << moduleName << "."
+          << resultName << "_out, " << moduleName << "." << resultName
+          << "_valid);\n";
   }
   return sinks.str();
 }
@@ -99,11 +99,12 @@ static std::string createSeqRelationConstraint(
   output += seqLengthRelationConstraint + "\n";
 
   for (size_t i = 0; i < arguments.size(); i++) {
+    auto [argumentName, _] = arguments[i];
     std::regex numberRegex(std::to_string(i));
 
-    output = std::regex_replace(output, numberRegex,
-                                " seq_generator_" + arguments[i].first +
-                                    ".exact_tokens ");
+    output =
+        std::regex_replace(output, numberRegex,
+                           " seq_generator_" + argumentName + ".exact_tokens ");
   }
 
   return output;
@@ -115,13 +116,13 @@ static std::string createSeqConstraintLoop(
     const SmallVector<std::pair<std::string, Type>> &arguments,
     LoopSeqConstraint constraint) {
 
+  auto [controlSequenceName, _] = arguments[constraint.controlSequence];
+  auto [dataSequenceName, _] = arguments[constraint.dataSequence];
+
   std::ostringstream seqConstraint;
-  std::string falseTokenCounter =
-      arguments[constraint.controlSequence].first + "_false_token_cnt";
-  std::string falseTokenSeqName =
-      "seq_generator_" + arguments[constraint.controlSequence].first;
-  std::string otherSeqName =
-      "seq_generator_" + arguments[constraint.dataSequence].first;
+  std::string falseTokenCounter = controlSequenceName + "_false_token_cnt";
+  std::string falseTokenSeqName = "seq_generator_" + controlSequenceName;
+  std::string otherSeqName = "seq_generator_" + dataSequenceName;
 
   seqConstraint << "VAR " << falseTokenCounter << " : 0..31;\n"
                 << "ASSIGN init(" << falseTokenCounter << ") := 0;\n"
@@ -163,30 +164,31 @@ static std::string createTokenLimiter(
 
   std::ostringstream tokenLimitConstraint;
 
-  std::string tokenLimitDef =
-      arguments[constraint.inputSequence].first + "_active_token_limit";
+  auto [inputSequenceName, _] = arguments[constraint.inputSequence];
+
+  auto [lhsInputNDWire, rhsInputNDWire] =
+      inputNDWires[constraint.inputSequence];
+  auto [lhsOutputNDWire, rhsOutputNDWire] =
+      outputNDWires[constraint.outputSequence];
+
+  std::string tokenLimitDef = inputSequenceName + "_active_token_limit";
 
   tokenLimitConstraint << "DEFINE " << tokenLimitDef
                        << " := " << constraint.limit << ";\n";
 
   for (std::string side : {"lhs", "rhs"}) {
 
-    std::string limiterVarName = side + "_" +
-                                 arguments[constraint.inputSequence].first +
-                                 "_active_tokens";
+    std::string limiterVarName =
+        side + "_" + inputSequenceName + "_active_tokens";
 
     std::string inputNDWireName;
     std::string outputNDWireName;
     if (side == "lhs") {
-      inputNDWireName =
-          moduleName + "." + inputNDWires[constraint.inputSequence].first;
-      outputNDWireName =
-          moduleName + "." + outputNDWires[constraint.outputSequence].first;
+      inputNDWireName = moduleName + "." + lhsInputNDWire;
+      outputNDWireName = moduleName + "." + lhsOutputNDWire;
     } else {
-      inputNDWireName =
-          moduleName + "." + inputNDWires[constraint.inputSequence].second;
-      outputNDWireName =
-          moduleName + "." + outputNDWires[constraint.outputSequence].second;
+      inputNDWireName = moduleName + "." + rhsInputNDWire;
+      outputNDWireName = moduleName + "." + rhsOutputNDWire;
     }
 
     std::string inputTokenCondition =
@@ -234,17 +236,17 @@ static std::string createMiterProperties(
     const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream properties;
 
-  for (const auto &result : results) {
-    if (result.second.isa<handshake::ChannelType>())
+  for (const auto &[resultName, resultType] : results) {
+    if (resultType.isa<handshake::ChannelType>())
       properties << "INVARSPEC (" << moduleName
-                 << "." + result.first + "_valid -> " << moduleName
-                 << "." + result.first + "_out)\n";
+                 << "." + resultName + "_valid -> " << moduleName
+                 << "." + resultName + "_out)\n";
   }
 
   std::string inputProp;
-  for (const auto &bufferPair : inputBuffers) {
-    inputProp += "(" + moduleName + "." + bufferPair.first +
-                 ".num = " + moduleName + "." + bufferPair.second + ".num) & ";
+  for (const auto &[lhsBuffer, rhsBuffer] : inputBuffers) {
+    inputProp += "(" + moduleName + "." + lhsBuffer + ".num = " + moduleName +
+                 "." + rhsBuffer + ".num) & ";
   }
 
   // Remove the final " & "
@@ -252,9 +254,9 @@ static std::string createMiterProperties(
     inputProp = inputProp.substr(0, inputProp.size() - 3);
 
   std::string outputProp;
-  for (const auto &buffer : outputBuffers) {
-    outputProp += "(" + moduleName + "." + buffer.first + ".num = 0) & ";
-    outputProp += "(" + moduleName + "." + buffer.second + ".num = 0) & ";
+  for (const auto &[lhsBuffer, rhsBuffer] : outputBuffers) {
+    outputProp += "(" + moduleName + "." + lhsBuffer + ".num = 0) & ";
+    outputProp += "(" + moduleName + "." + rhsBuffer + ".num = 0) & ";
   }
 
   // Remove the final " & "
