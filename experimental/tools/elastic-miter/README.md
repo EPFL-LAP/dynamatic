@@ -54,10 +54,10 @@ Example:
 
 #### Examples
 
-Some rewrites, with which the tool can be tested, are provided in `experimental/test/tools/elastic-miter`. In the same directory the `prove-rewrites.sh` script runs all tests.
+Some rewrites, with which the tool can be tested, are provided. Additionally, the `prove-rewrites.sh` script runs all tests.
 
 ```bash
-experimental/test/tools/elastic-miter/prove-rewrites.sh
+experimental/tools/elastic-miter/prove-rewrites.sh
 ```
 
 To directly call the tool a command like this can be used:

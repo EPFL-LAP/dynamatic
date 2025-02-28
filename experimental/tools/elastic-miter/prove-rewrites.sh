@@ -10,7 +10,7 @@ COMP_DIR="$OUT_DIR/comp"
 F_HANDSHAKE_MITER="$COMP_DIR/handshake_miter.mlir"
 DOT="$COMP_DIR/miter.dot"
 
-REWRITES="experimental/test/tools/elastic-miter/rewrites"
+REWRITES="experimental/tools/elastic-miter/rewrites"
 
 
 build/bin/elastic-miter --lhs=$REWRITES/a_lhs.mlir --rhs=$REWRITES/a_rhs.mlir -o $OUT_DIR/a
