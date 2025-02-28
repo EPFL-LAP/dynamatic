@@ -1,4 +1,4 @@
-from generators.support.merge_notehb import generate_merge_notehb
+from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
 

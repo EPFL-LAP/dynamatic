@@ -1,4 +1,4 @@
-from generators.support.join import generate_join
+from generators.handshake.join import generate_join
 
 
 def generate_addi(name, params):

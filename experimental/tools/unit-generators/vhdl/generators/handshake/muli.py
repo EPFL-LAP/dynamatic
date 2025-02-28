@@ -1,5 +1,5 @@
 from generators.handshake.oehb import generate_oehb
-from generators.support.join import generate_join
+from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 
 
