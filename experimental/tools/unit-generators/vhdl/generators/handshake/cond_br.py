@@ -3,21 +3,21 @@ from generators.support.join import generate_join
 
 
 def generate_cond_br(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["data"])
+    port_types = params["port_types"]
+    data_type = VhdlScalarType(port_types["data"])
 
-  if data_type.is_channel():
-    return _generate_cond_br(name, data_type.bitwidth)
-  else:
-    return _generate_cond_br_dataless(name)
+    if data_type.is_channel():
+        return _generate_cond_br(name, data_type.bitwidth)
+    else:
+        return _generate_cond_br_dataless(name)
 
 
 def _generate_cond_br_dataless(name):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+    dependencies = generate_join(join_name, {"size": 2})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -43,7 +43,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cond_br_dataless
 architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
@@ -67,15 +67,15 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cond_br(name, bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_cond_br_dataless(inner_name)
+    dependencies = _generate_cond_br_dataless(inner_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -104,7 +104,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cond_br
 architecture arch of {name} is
 begin
@@ -128,4 +128,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture

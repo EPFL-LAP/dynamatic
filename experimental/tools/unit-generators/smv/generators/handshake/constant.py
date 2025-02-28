@@ -2,14 +2,14 @@ from generators.support.utils import *
 
 
 def generate_constant(name, params):
-  value = params[ATTR_VALUE]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+    value = params[ATTR_VALUE]
+    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
 
-  return _generate_constant(name, value, data_type)
+    return _generate_constant(name, value, data_type)
 
 
 def _generate_constant(name, value, data_type):
-  return f"""
+    return f"""
 MODULE {name}(ctrl_valid, outs_ready)
 
   // output

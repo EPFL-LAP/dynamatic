@@ -2,14 +2,14 @@ from generators.support.utils import *
 
 
 def generate_store(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["dataIn"])
-  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addrIn"])
+    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["dataIn"])
+    addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addrIn"])
 
-  return _generate_store(name, data_type, addr_type)
+    return _generate_store(name, data_type, addr_type)
 
 
 def _generate_store(name, data_type, addr_type):
-  return f"""
+    return f"""
 MODULE {name}(dataIn, dataIn_valid, addrIn, addrIn_valid, dataToMem_ready, addrOut_ready)
 
   //output

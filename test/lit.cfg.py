@@ -41,8 +41,8 @@ if config.cmake_build_type == "Release":
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [
-    config.dynamatic_tools_dir, 
-    config.mlir_tools_dir, 
+    config.dynamatic_tools_dir,
+    config.mlir_tools_dir,
     config.llvm_tools_dir
 ]
 tools = ['dynamatic-opt']

@@ -3,18 +3,18 @@ from generators.support.join import generate_join
 
 
 def generate_addi(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["result"])
+    port_types = params["port_types"]
+    data_type = VhdlScalarType(port_types["result"])
 
-  return _generate_addi(name, data_type.bitwidth)
+    return _generate_addi(name, data_type.bitwidth)
 
 
 def _generate_addi(name, bitwidth):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+    dependencies = generate_join(join_name, {"size": 2})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -39,7 +39,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of addi
 architecture arch of {name} is
 begin
@@ -59,4 +59,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
