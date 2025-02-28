@@ -2,8 +2,9 @@ import argparse
 import ast
 import sys
 
-import generators.handshake.addi as addi
 import generators.handshake.addf as addf
+import generators.handshake.addi as addi
+import generators.handshake.andi as andi
 import generators.handshake.buffer as buffer
 import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
@@ -16,6 +17,7 @@ import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
+import generators.handshake.shli as shli
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.spec_commit as spec_commit
@@ -23,16 +25,19 @@ import generators.handshake.spec_save_commit as spec_save_commit
 import generators.handshake.speculating_branch as speculating_branch
 import generators.handshake.speculator as speculator
 import generators.handshake.store as store
+import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
 
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
-    case "addi":
-      return addi.generate_addi(name, parameters)
     case "addf":
       return addf.generate_addf(name, parameters)
+    case "addi":
+      return addi.generate_addi(name, parameters)
+    case "andi":
+      return andi.generate_andi(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
     case "cmpi":
@@ -57,6 +62,8 @@ def generate_code(name, mod_type, parameters):
       return muli.generate_muli(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
+    case "shli":
+      return shli.generate_shli(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":
@@ -71,6 +78,8 @@ def generate_code(name, mod_type, parameters):
       return speculator.generate_speculator(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "subi":
+      return subi.generate_subi(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
     case "mem_to_bram":
