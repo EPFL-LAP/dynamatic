@@ -22,7 +22,7 @@ jobs:
 
       - name: check-format-python
         run: |
-          autopep8 --diff $(git ls-files '*.py') | tee check.txt && [ ! -s check.txt ]
+          autopep8 --diff --experimental $(git ls-files '*.py') | tee check.txt && [ ! -s check.txt ]
 
       - name: build
         run: ./build.sh --release
