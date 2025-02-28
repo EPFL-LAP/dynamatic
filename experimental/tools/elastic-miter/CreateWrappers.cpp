@@ -8,44 +8,58 @@
 
 #include "CreateWrappers.h"
 #include "FabricGeneration.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace mlir;
 
 namespace dynamatic::experimental {
 
+template <typename T>
+static std::string join(const T &v, const std::string &delim) {
+  std::ostringstream s;
+  for (const auto &i : v) {
+    if (&i != &v[0]) {
+      s << delim;
+    }
+    s << i;
+  }
+  return s.str();
+}
+
 // Create the call to the module
-static std::string
-createModuleCall(const std::string &moduleName,
-                 const SmallVector<std::pair<std::string, Type>> &arguments,
-                 const SmallVector<std::pair<std::string, Type>> &results) {
-  std::ostringstream call;
-
-  call << "  VAR " << moduleName << " : " << moduleName << "(";
-
-  for (size_t i = 0; i < arguments.size(); ++i) {
-    auto [argumentName, argumentType] = arguments[i];
-    if (i > 0)
-      call << ", ";
+// The resulting string will look like:
+// VAR <moduleName> : <moduleName> (seq_generator_A.dataOut0,
+// seq_generator_A.valid0, ..., sink_F.ready0, ...)
+static std::string instantiateModuleUnderTest(
+    const std::string &moduleName,
+    const SmallVector<std::pair<std::string, Type>> &arguments,
+    const SmallVector<std::pair<std::string, Type>> &results) {
+  SmallVector<std::string> inputVariables;
+  for (const auto &[argumentName, argumentType] : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
-    if (false && argumentType.isa<handshake::ControlType>()) {
-      call << "seq_generator_" << argumentName << ".valid0";
+    if (!LEGACY_DOT2SMV_COMPATIBLE &&
+        argumentType.isa<handshake::ControlType>()) {
+      inputVariables.push_back("seq_generator_" + argumentName + "." +
+                               SEQUENCE_GENERATOR_VALID_NAME.str());
     } else {
-      call << "seq_generator_" << argumentName << ".dataOut0, seq_generator_"
-           << argumentName << ".valid0";
+      inputVariables.push_back("seq_generator_" + argumentName + "." +
+                               SEQUENCE_GENERATOR_DATA_NAME.str());
+      inputVariables.push_back("seq_generator_" + argumentName + "." +
+                               SEQUENCE_GENERATOR_VALID_NAME.str());
     }
   }
 
-  call << ", ";
-
-  for (size_t i = 0; i < results.size(); ++i) {
-    auto [resultName, _] = results[i];
-    if (i > 0)
-      call << ", ";
-    call << "sink_" << resultName << ".ready0";
+  for (const auto &[resultName, _] : results) {
+    inputVariables.push_back("sink_" + resultName + "." +
+                             SINK_READY_NAME.str());
   }
 
+  std::ostringstream call;
+  call << "  VAR " << moduleName << " : " << moduleName << "(";
+  call << join(inputVariables, ", ");
   call << ");\n";
+
   return call.str();
 }
 
@@ -226,45 +240,50 @@ static std::string createTokenLimiter(
 // 2. At a certain point, and from then on, all the output buffers remain empty.
 // 3. At a certain point, and from then on, all input buffer pair store the same
 // number of tokens.
-static std::string createMiterProperties(
-    const std::string &moduleName,
-    const SmallVector<std::pair<std::string, std::string>> &inputBuffers,
-    const SmallVector<std::pair<std::string, std::string>> &inputNDWires,
-    const SmallVector<std::pair<std::string, std::string>> &outputBuffers,
-    const SmallVector<std::pair<std::string, std::string>> &outputNDWires,
-    const SmallVector<std::pair<std::string, Type>> &arguments,
-    const SmallVector<std::pair<std::string, Type>> &results) {
+static std::string createMiterProperties(const std::string &moduleName,
+                                         const ElasticMiterConfig &config) {
   std::ostringstream properties;
 
-  for (const auto &[resultName, resultType] : results) {
+  // Create the property that every output data token will be TRUE. The outputs
+  // are created by comparing the output from the LHS to the RHS. If the output
+  // is of type control it is the output of a join operation. In this case we do
+  // not need additional properties. Making sure the buffers will hold no tokens
+  // is sufficient.
+  // Example (Assuming data outputs A and B control output C):
+  // INVARSPEC (model.EQ_A_valid -> model.EQ_A_out)
+  // INVARSPEC (model.EQ_B_valid -> model.EQ_B_out)
+  for (const auto &[resultName, resultType] : config.results) {
     if (resultType.isa<handshake::ChannelType>())
       properties << "INVARSPEC (" << moduleName
                  << "." + resultName + "_valid -> " << moduleName
                  << "." + resultName + "_out)\n";
   }
 
-  std::string inputProp;
-  for (const auto &[lhsBuffer, rhsBuffer] : inputBuffers) {
-    inputProp += "(" + moduleName + "." + lhsBuffer + ".num = " + moduleName +
-                 "." + rhsBuffer + ".num) & ";
+  // Make sure the input buffers will have pairwise the same number of tokens.
+  // This means both circuits consume the same number of tokens.
+  SmallVector<std::string> bufferProperties;
+  for (const auto &[lhsBuffer, rhsBuffer] : config.inputBuffers) {
+    bufferProperties.push_back("(" + moduleName + "." + lhsBuffer + ".num = " +
+                               moduleName + "." + rhsBuffer + ".num)");
   }
 
-  // Remove the final " & "
-  if (!inputProp.empty())
-    inputProp = inputProp.substr(0, inputProp.size() - 3);
-
-  std::string outputProp;
-  for (const auto &[lhsBuffer, rhsBuffer] : outputBuffers) {
-    outputProp += "(" + moduleName + "." + lhsBuffer + ".num = 0) & ";
-    outputProp += "(" + moduleName + "." + rhsBuffer + ".num = 0) & ";
+  // Make sure the output buffers will be empty.
+  // This means both circuits produce the same number of output tokens.
+  for (const auto &[lhsBuffer, rhsBuffer] : config.outputBuffers) {
+    bufferProperties.push_back("(" + moduleName + "." + lhsBuffer +
+                               ".num = 0)");
+    bufferProperties.push_back("(" + moduleName + "." + rhsBuffer +
+                               ".num = 0)");
   }
 
-  // Remove the final " & "
-  if (!outputProp.empty())
-    outputProp = outputProp.substr(0, outputProp.size() - 3);
-
+  // Make sure the buffer will start to hold at one point and from there on.
+  // The final property will be (Assuming inputs D and C, and outputs A and B):
+  // CTLSPEC AF (AG ((model.lhs_in_buf_D.num = model.rhs_in_buf_D.num) &
+  // (model.lhs_in_buf_C.num = model.rhs_in_buf_C.num) &
+  // (model.lhs_out_buf_A.num = 0) & (model.rhs_out_buf_A.num = 0) &
+  // (model.lhs_out_buf_B.num = 0) & (model.rhs_out_buf_B.num = 0)))
   std::string finalBufferProp =
-      "AF (AG (" + inputProp + " & " + outputProp + "))";
+      "AF (AG (" + join(bufferProperties, " & ") + "))";
   properties << "CTLSPEC " + finalBufferProp + "\n";
 
   properties << "\n";
@@ -281,9 +300,9 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
-  wrapper << BOOL_INPUT;
-  wrapper << BOOL_INPUT_EXACT;
-  wrapper << BOOL_INPUT_INF;
+  wrapper << SMV_BOOL_INPUT;
+  wrapper << SMV_BOOL_INPUT_EXACT;
+  wrapper << SMV_BOOL_INPUT_INF;
 
   wrapper << "MODULE main\n";
 
@@ -292,18 +311,14 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
   wrapper << createSequenceGenerators(modelSmvName, config.arguments,
                                       nrOfTokens, exact);
 
-  wrapper << createModuleCall(modelSmvName, config.arguments, config.results)
+  wrapper << instantiateModuleUnderTest(modelSmvName, config.arguments,
+                                        config.results)
           << "\n";
 
-  wrapper << createSinks(modelSmvName, config.results, nrOfTokens);
-
-  wrapper << "\n";
+  wrapper << createSinks(modelSmvName, config.results, nrOfTokens) << "\n";
 
   if (includeProperties) {
-    wrapper << createMiterProperties(modelSmvName, config.inputBuffers,
-                                     config.inputNDWires, config.outputBuffers,
-                                     config.outputNDWires, config.arguments,
-                                     config.results);
+    wrapper << createMiterProperties(modelSmvName, config);
 
     for (const auto &constraint :
          sequenceConstraints.seqLengthRelationConstraints) {

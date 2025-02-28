@@ -25,6 +25,14 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
+// The legacy dot2smv conversion also generates dataOut signal even if the
+// output is of type Control
+#define LEGACY_DOT2SMV_COMPATIBLE 1
+
+static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_VALID_NAME("valid0");
+static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_DATA_NAME("dataOut0");
+static constexpr llvm::StringLiteral SINK_READY_NAME("ready0");
+
 // A struct to store a loop condition constraint. The number of tokens in the
 // input with the index dataSequence is equivalent to the number of false tokens
 // at the output with the index controlSequence. If lastFalse is set, the last
@@ -32,7 +40,7 @@ namespace dynamatic::experimental {
 struct LoopSeqConstraint {
   size_t dataSequence;
   size_t controlSequence;
-  size_t lastFalse;
+  bool lastFalse;
 };
 
 // A struct to store a token limit constraint. The number of tokens at the input
@@ -70,9 +78,7 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0 and
 // (inclusive) max_tokens.
-const std::string BOOL_INPUT =
-    "#ifndef BOOL_INPUT\n"
-    "#define BOOL_INPUT\n"
+const std::string SMV_BOOL_INPUT =
     "MODULE bool_input(nReady0, max_tokens)\n"
     "  VAR dataOut0 : boolean;\n"
     "  VAR counter : 0..31;\n"
@@ -91,14 +97,11 @@ const std::string BOOL_INPUT =
     "      TRUE : {TRUE, FALSE};\n"
     "    esac;\n"
     "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n"
-    "#endif // BOOL_INPUT\n\n";
+    "  DEFINE valid0 := counter < exact_tokens;\n\n";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-const std::string BOOL_INPUT_EXACT =
-    "#ifndef BOOL_INPUT_EXACT\n"
-    "#define BOOL_INPUT_EXACT\n"
+const std::string SMV_BOOL_INPUT_EXACT =
     "MODULE bool_input_exact(nReady0, exact_tokens)\n"
     "  VAR dataOut0 : boolean;\n"
     "  VAR counter : 0..31;\n"
@@ -116,19 +119,19 @@ const std::string BOOL_INPUT_EXACT =
     "      TRUE : {TRUE, FALSE};\n"
     "    esac;\n"
     "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n"
-    "#endif // BOOL_INPUT_EXACT\n\n";
+    "  DEFINE valid0 := counter < exact_tokens;\n\n";
 
 // SMV module for a sequence generator with an infinite number of tokens
-const std::string BOOL_INPUT_INF = "MODULE bool_input_inf(nReady0)\n"
-                                   "    VAR dataOut0 : boolean;\n"
-                                   "    \n"
-                                   "    -- make sure dataOut0 is persistent\n"
-                                   "    ASSIGN\n"
-                                   "    next(dataOut0) := case \n"
-                                   "      valid0 & !nReady0 : dataOut0;\n"
-                                   "      TRUE : {TRUE, FALSE};\n"
-                                   "    esac;\n"
-                                   "    DEFINE valid0 := TRUE;\n\n";
+const std::string SMV_BOOL_INPUT_INF =
+    "MODULE bool_input_inf(nReady0)\n"
+    "    VAR dataOut0 : boolean;\n"
+    "    \n"
+    "    -- make sure dataOut0 is persistent\n"
+    "    ASSIGN\n"
+    "    next(dataOut0) := case \n"
+    "      valid0 & !nReady0 : dataOut0;\n"
+    "      TRUE : {TRUE, FALSE};\n"
+    "    esac;\n"
+    "    DEFINE valid0 := TRUE;\n\n";
 } // namespace dynamatic::experimental
 #endif
