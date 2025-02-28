@@ -214,6 +214,41 @@ mlir::ParseResult TimingInfo::parseKey(mlir::AsmParser &odsParser,
   return success();
 }
 
+TimingInfo TimingInfo::oehb() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::tehb() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 1);
+}
+
+TimingInfo TimingInfo::dve() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::t() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::dvr() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 1);
+}
+
 bool dynamatic::handshake::operator==(const TimingInfo &lhs,
                                       const TimingInfo &rhs) {
   return lhs.dataLatency == rhs.dataLatency &&

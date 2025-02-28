@@ -1404,22 +1404,16 @@ void Simulator::associateModel(Operation *op) {
         registerModel<GenericUnaryOpModel<handshake::NotOp>>(notOp, callback);
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
-        auto params = bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-        if (!params)
-          return;
-      
-        auto optBufferType = params.getNamed(handshake::BufferOp::BUFFER_TYPE_ATTR_NAME);
-        if (!optBufferType)
-          return;
-      
-        if (auto typeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
-          StringRef typeStr = typeAttr.getValue();
-          if (typeStr == "DV" || typeStr == "DVE" || typeStr == "DVR") {
+        auto params =
+            bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+        if (auto timing =
+                dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+          auto info = timing.getInfo();
+          if (info == handshake::TimingInfo::oehb())
             registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
-          }
-          if (typeStr == "R" || typeStr == "T") {
+          if (info == handshake::TimingInfo::tehb())
             registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
-          } 
         }
       })
       .Case<handshake::SinkOp>([&](handshake::SinkOp sinkOp) {

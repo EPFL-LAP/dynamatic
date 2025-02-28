@@ -75,23 +75,29 @@ struct HandshakePlaceBuffersCustomPass
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
+    handshake::TimingInfo timing;
     StringRef bufferType;
-    if (type == "DV") {
+    if (type == "oehb") {
+      timing = handshake::TimingInfo::oehb();
       bufferType = handshake::BufferOp::DV_TYPE;
-    } else if (type == "R") {
+    } else if (type == "tehb") {
+      timing = handshake::TimingInfo::tehb();
       bufferType = handshake::BufferOp::R_TYPE;
-    } else if (type == "DVE") {
+    } else if (type == "dve") {
+      timing = handshake::TimingInfo::dve();
       bufferType = handshake::BufferOp::DVE_TYPE;
-    } else if (type == "T") {
+    } else if (type == "t") {
+      timing = handshake::TimingInfo::t();
       bufferType = handshake::BufferOp::T_TYPE;
-    } else if (type == "DVR") {
+    } else if (type == "dvr") {
+      timing = handshake::TimingInfo::dvr();
       bufferType = handshake::BufferOp::DVR_TYPE;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     slots, bufferType);
+                                                     timing, slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);

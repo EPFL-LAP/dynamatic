@@ -58,6 +58,17 @@ struct TimingInfo {
   /// parse the data after a key and colon were parsed (<key> <:>
   /// <data_to_parse>) and modifies the timing characteristics accordingly.
   mlir::ParseResult parseKey(mlir::AsmParser &odsParser, mlir::StringRef key);
+
+  /// Returns timing information for a standard OEHB.
+  /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
+  static TimingInfo oehb();
+
+  /// Returns timing information for a standard TEHB.
+  /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
+  static TimingInfo tehb();
+  static TimingInfo dve();
+  static TimingInfo t();
+  static TimingInfo dvr();
 };
 
 bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);

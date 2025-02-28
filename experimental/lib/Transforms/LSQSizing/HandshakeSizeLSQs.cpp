@@ -511,26 +511,31 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
       // If the node is a buffer, check if it is a tehb buffer and if so,
       // check the latency of the nodes connected to the buffer
       if (isa<handshake::BufferOp>(succedingOp)) {
-        auto params = succedingOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+        auto params = succedingOp->getAttrOfType<DictionaryAttr>(
+            RTL_PARAMETERS_ATTR_NAME);
+
         if (!params)
           continue;
 
-        auto optBufferType = params.getNamed(handshake::BufferOp::BUFFER_TYPE_ATTR_NAME);
-        if (!optBufferType)
+        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+        if (!optTiming)
           continue;
 
-        if (auto typeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
-          StringRef typeStr = typeAttr.getValue();
-          if (typeStr == "R") {
-            for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
-              // -1 because buffer can get the load result 1 cycle earlier
-              // Maybe it could also be earlier for a buffer with multiple slots
-              // But its not clear for now
-              maxLatency = std::max(
-                  maxLatency, graph.findMaxPathLatency(startNode, succedingOp2,
-                                                       false, false, true) +
-                                  (int)loadDeallocEntryLatency - 1);
-            }
+        auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue());
+        if (!timing)
+          continue;
+
+        handshake::TimingInfo info = timing.getInfo();
+
+        if (info == TimingInfo::tehb()) {
+          for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
+            // -1 because buffer can get the load result 1 cycle earlier
+            // Maybe it could also be earlier for a buffer with multiple slots
+            // But its not clear for now
+            maxLatency = std::max(
+                maxLatency, graph.findMaxPathLatency(startNode, succedingOp2,
+                                                     false, false, true) +
+                                (int)loadDeallocEntryLatency - 1);
           }
         }
       }
