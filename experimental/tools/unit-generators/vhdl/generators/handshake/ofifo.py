@@ -1,4 +1,4 @@
-from generators.support.tehb import generate_tehb
+from generators.handshake.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 

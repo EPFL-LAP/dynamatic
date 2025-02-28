@@ -1,9 +1,9 @@
 import re
 
-from generators.support.tfifo import generate_tfifo
-from generators.support.tehb import generate_tehb
-from generators.support.ofifo import generate_ofifo
-from generators.support.oehb import generate_oehb
+from generators.handshake.tfifo import generate_tfifo
+from generators.handshake.tehb import generate_tehb
+from generators.handshake.ofifo import generate_ofifo
+from generators.handshake.oehb import generate_oehb
 
 
 def generate_buffer(name, params):

@@ -1,4 +1,4 @@
-from generators.support.tehb import generate_tehb
+from generators.handshake.tehb import generate_tehb
 
 
 def generate_mux(name, params):
