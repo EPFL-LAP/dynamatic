@@ -18,6 +18,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include <llvm/ADT/StringSet.h>
 
+#include "Constraints.h"
 #include "CreateWrappers.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
@@ -159,10 +160,10 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   auto [dstSmv, smvModelName] = failOrSmvPair.value();
 
-  // Create the wrapper with infinite sequence generators
+  // Create the wrapper with infinite sequence generators TODO last argument
   auto fail = dynamatic::experimental::createWrapper(
       outputDir / "main_inf.smv", config, smvModelName, 0, false,
-      SequenceConstraints());
+      SmallVector<dynamatic::experimental::ElasticMiterConstraint *>());
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -195,7 +196,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     // Create the wrapper with n-token sequence generators
     auto fail = dynamatic::experimental::createWrapper(
         wrapperPath, config, smvModelName, numberOfTokens, false,
-        SequenceConstraints(), true);
+        SmallVector<dynamatic::experimental::ElasticMiterConstraint *>(), true);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << numberOfTokens
                    << " token reachability wrapper.\n";

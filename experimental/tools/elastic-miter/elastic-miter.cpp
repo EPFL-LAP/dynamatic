@@ -13,16 +13,17 @@
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include <filesystem>
 #include <fstream>
-#include <regex>
 #include <string>
 
 #include "dynamatic/InitAllDialects.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Constraints.h"
 #include "CreateWrappers.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
@@ -108,16 +109,18 @@ static cl::opt<bool>
                                    "files in the output directory."),
                           cl::init(false), cl::cat(generalCategory));
 
-static FailureOr<dynamatic::experimental::SequenceConstraints>
+static FailureOr<SmallVector<dynamatic::experimental::ElasticMiterConstraint *>>
 parseSequenceConstraints() {
 
-  dynamatic::experimental::SequenceConstraints sequenceConstraints;
+  SmallVector<dynamatic::experimental::ElasticMiterConstraint *> constraints;
 
   // Parse the sequence length relation constraints. They are string in the
   // style "0+1+..=4+5+..", where the numbers represent the index of the
   // sequence
   for (const auto &constraint : seqLengthRelationConstraints)
-    sequenceConstraints.seqLengthRelationConstraints.push_back(constraint);
+    constraints.push_back(
+        new dynamatic::experimental::SequenceLengthRelationConstraint(
+            constraint));
 
   // A Loop Condition sequence contraint has the form
   // "<dataSequence>,<controlSequence>". The number of tokens in the input with
@@ -125,38 +128,14 @@ parseSequenceConstraints() {
   // output with the index controlSequence.
   // Example:
   // --loop="0,1"
-  for (const auto &csv : loopSeqConstraints) {
-    std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
-    std::smatch match;
-
-    if (!std::regex_match(csv, match, pattern)) {
-      llvm::errs() << "Loop sequence constraints are two positive numbers "
-                      "separated by a comma\n";
-      return failure();
-    }
-    size_t dataSequence = std::stoul(match[1]);
-    size_t controlSequence = std::stoul(match[2]);
-    sequenceConstraints.loopSeqConstraints.push_back(
-        {dataSequence, controlSequence, false});
-  }
+  for (const auto &csv : loopSeqConstraints)
+    constraints.push_back(new dynamatic::experimental::LoopConstraint(csv));
 
   // Identical to the loop condition sequence contraint, with the addition that
   // the last token also needs to be false.
-  for (const auto &csv : strictLoopSeqConstraints) {
-    std::regex pattern(R"(^(\d+),(\d+)$)"); // Two uint separated by a comma
-    std::smatch match;
-
-    if (!std::regex_match(csv, match, pattern)) {
-      llvm::errs()
-          << "Strict loop sequence constraints are two positive numbers "
-             "separated by a comma\n";
-      return failure();
-    }
-    size_t dataSequence = std::stoul(match[1]);
-    size_t controlSequence = std::stoul(match[2]);
-    sequenceConstraints.loopSeqConstraints.push_back(
-        {dataSequence, controlSequence, true});
-  }
+  for (const auto &csv : strictLoopSeqConstraints)
+    constraints.push_back(
+        new dynamatic::experimental::StrictLoopConstraint(csv));
 
   // A Token Limit constraint has the form
   // "<inputSequence>,<outputSequence>,<limit>".
@@ -167,31 +146,19 @@ parseSequenceConstraints() {
   // `--token_limit="1,1,2"` ensures that there are only two tokens in the
   // circuit which enter at the input with index 1 and leave at the ouput with
   // index 1.
-  for (const auto &csv : tokenLimitConstraints) {
-    std::regex pattern(
-        R"(^(\d+),(\d+),(\d+)$)"); // Three uint separated by commas
-    std::smatch match;
+  for (const auto &csv : tokenLimitConstraints)
+    constraints.push_back(
+        new dynamatic::experimental::TokenLimitConstraint(csv));
 
-    if (!std::regex_match(csv, match, pattern)) {
-      llvm::errs() << "Token limit constraints are three positive numbers "
-                      "separated by commas\n";
-      return failure();
-    }
-    size_t inputSequence = std::stoul(match[1]);
-    size_t outputSequence = std::stoul(match[2]);
-    size_t limit = std::stoul(match[3]);
-    sequenceConstraints.tokenLimitConstraints.push_back(
-        {inputSequence, outputSequence, limit});
-  }
-
-  return sequenceConstraints;
+  return constraints;
 }
 
 static FailureOr<bool> checkEquivalence(
     MLIRContext &context, const std::filesystem::path &lhsPath,
     const std::filesystem::path &rhsPath,
     const std::filesystem::path &outputDir,
-    const dynamatic::experimental::SequenceConstraints &sequenceConstraints) {
+    const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
+        &constraints) {
 
   // Find out needed number of tokens for the LHS
   auto failOrLHSseqLen = dynamatic::experimental::getSequenceLength(
@@ -235,7 +202,7 @@ static FailureOr<bool> checkEquivalence(
 
   // Create wrapper (main) for the elastic-miter
   auto fail = dynamatic::experimental::createWrapper(
-      wrapperPath, config, smvModelName, nrOfTokens, true, sequenceConstraints);
+      wrapperPath, config, smvModelName, nrOfTokens, true, constraints);
   if (failed(fail))
     return failure();
 
@@ -294,8 +261,8 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   MLIRContext context(registry);
 
-  // Create sequence constraint struct. cl::list needs to be converted to
   // SmallVector first
+  // Create sequence constraint struct. cl::list needs to be converted to
   auto failOrSequenceConstraints = parseSequenceConstraints();
   if (failed(failOrSequenceConstraints)) {
     llvm::errs() << "Failed to parse constraints\n";

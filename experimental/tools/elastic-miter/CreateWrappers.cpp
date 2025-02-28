@@ -6,6 +6,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
+#include "Constraints.h"
 #include "CreateWrappers.h"
 #include "FabricGeneration.h"
 #include "llvm/ADT/SmallVector.h"
@@ -102,138 +103,6 @@ createSinks(const std::string &moduleName,
   return sinks.str();
 }
 
-// Create the constraints to restrict the relations of the length of input
-// sequences.
-static std::string createSeqRelationConstraint(
-    const std::string &moduleName,
-    const SmallVector<std::pair<std::string, Type>> &arguments,
-    const std::string &seqLengthRelationConstraint) {
-
-  std::string output = "INVAR";
-  output += seqLengthRelationConstraint + "\n";
-
-  for (size_t i = 0; i < arguments.size(); i++) {
-    auto [argumentName, _] = arguments[i];
-    std::regex numberRegex(std::to_string(i));
-
-    output =
-        std::regex_replace(output, numberRegex,
-                           " seq_generator_" + argumentName + ".exact_tokens ");
-  }
-
-  return output;
-}
-
-// Create the constraints for the loop condition.
-static std::string createSeqConstraintLoop(
-    const std::string &moduleName,
-    const SmallVector<std::pair<std::string, Type>> &arguments,
-    LoopSeqConstraint constraint) {
-
-  auto [controlSequenceName, _] = arguments[constraint.controlSequence];
-  auto [dataSequenceName, _] = arguments[constraint.dataSequence];
-
-  std::ostringstream seqConstraint;
-  std::string falseTokenCounter = controlSequenceName + "_false_token_cnt";
-  std::string falseTokenSeqName = "seq_generator_" + controlSequenceName;
-  std::string otherSeqName = "seq_generator_" + dataSequenceName;
-
-  seqConstraint << "VAR " << falseTokenCounter << " : 0..31;\n"
-                << "ASSIGN init(" << falseTokenCounter << ") := 0;\n"
-                << "ASSIGN next(" << falseTokenCounter << ") := case\n"
-                << "  " << falseTokenSeqName << ".valid0 & "
-                << falseTokenSeqName << ".nReady0 & (" << falseTokenSeqName
-                << ".dataOut0 = FALSE) & (" << falseTokenCounter << " < "
-                << otherSeqName << ".exact_tokens) : (" << falseTokenCounter
-                << " + 1);\n"
-                << "  TRUE : " << falseTokenCounter << ";\n"
-                << "esac;\n"
-                << "INVAR (((" << otherSeqName << ".exact_tokens - "
-                << falseTokenCounter << ") = (" << falseTokenSeqName
-                << ".exact_tokens - " << falseTokenSeqName << ".counter)) & (("
-                << otherSeqName << ".exact_tokens - " << falseTokenCounter
-                << ") >= 1) ) -> " << falseTokenSeqName
-                << ".dataOut0 = FALSE;\n"
-                << "INVAR (((" << otherSeqName << ".exact_tokens - "
-                << falseTokenCounter << ") = " << constraint.lastFalse
-                << " ) & ((" << falseTokenSeqName << ".exact_tokens - "
-                << falseTokenSeqName
-                << ".counter) >= " << 1 + constraint.lastFalse << ")) -> ("
-                << falseTokenSeqName << ".dataOut0 = TRUE);\n"
-                << "INVAR (" << falseTokenSeqName
-                << ".exact_tokens >= " << otherSeqName << ".exact_tokens);\n"
-                << "INVAR (" << otherSeqName << ".exact_tokens = 0) -> ("
-                << falseTokenSeqName << ".exact_tokens = 0);\n\n";
-
-  return seqConstraint.str();
-}
-
-// Create the constraints to limit the number of tokens in the circuit.
-static std::string createTokenLimiter(
-    const std::string &moduleName,
-    const SmallVector<std::pair<std::string, Type>> &arguments,
-    const SmallVector<std::pair<std::string, std::string>> &inputNDWires,
-    const SmallVector<std::pair<std::string, std::string>> &outputNDWires,
-    TokenLimitConstraint constraint) {
-
-  std::ostringstream tokenLimitConstraint;
-
-  auto [inputSequenceName, _] = arguments[constraint.inputSequence];
-
-  auto [lhsInputNDWire, rhsInputNDWire] =
-      inputNDWires[constraint.inputSequence];
-  auto [lhsOutputNDWire, rhsOutputNDWire] =
-      outputNDWires[constraint.outputSequence];
-
-  std::string tokenLimitDef = inputSequenceName + "_active_token_limit";
-
-  tokenLimitConstraint << "DEFINE " << tokenLimitDef
-                       << " := " << constraint.limit << ";\n";
-
-  for (std::string side : {"lhs", "rhs"}) {
-
-    std::string limiterVarName =
-        side + "_" + inputSequenceName + "_active_tokens";
-
-    std::string inputNDWireName;
-    std::string outputNDWireName;
-    if (side == "lhs") {
-      inputNDWireName = moduleName + "." + lhsInputNDWire;
-      outputNDWireName = moduleName + "." + lhsOutputNDWire;
-    } else {
-      inputNDWireName = moduleName + "." + rhsInputNDWire;
-      outputNDWireName = moduleName + "." + rhsOutputNDWire;
-    }
-
-    std::string inputTokenCondition =
-        inputNDWireName + ".valid0 & " + inputNDWireName + ".nReady0";
-    std::string outputTokenCondition =
-        outputNDWireName + ".valid0 & " + outputNDWireName + ".nReady0";
-
-    tokenLimitConstraint << "VAR " << limiterVarName << " : 0.."
-                         << constraint.limit << ";\n"
-                         << "ASSIGN\n"
-                         << "init(" << limiterVarName << ") := 0;\n"
-                         << "next(" << limiterVarName << ") := case\n"
-                         << "  " << inputTokenCondition << " & "
-                         << outputTokenCondition << " : " << limiterVarName
-                         << ";\n"
-                         << "  " << outputTokenCondition << " & "
-                         << limiterVarName << " > 0 : " << limiterVarName
-                         << " - 1;\n"
-                         << "  " << inputTokenCondition << " & "
-                         << limiterVarName << " < " << tokenLimitDef << " : "
-                         << limiterVarName << " + 1;\n"
-                         << "  TRUE : " << limiterVarName << ";\n"
-                         << "  esac;\n"
-                         << "INVAR " << limiterVarName << " = " << tokenLimitDef
-                         << " -> " << inputNDWireName
-                         << ".state = sleeping;\n\n";
-  }
-
-  return tokenLimitConstraint.str();
-}
-
 // Creates all the properties required for the elastic-miter based equivalence
 // checking.
 // 1. All output tokens with data are true.
@@ -291,12 +160,12 @@ static std::string createMiterProperties(const std::string &moduleName,
   return properties.str();
 }
 
-LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            const ElasticMiterConfig &config,
-                            const std::string &modelSmvName, size_t nrOfTokens,
-                            bool includeProperties,
-                            const SequenceConstraints &sequenceConstraints,
-                            bool exact) {
+LogicalResult createWrapper(
+    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
+    const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
+    const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
+        &sequenceConstraints,
+    bool exact) {
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
@@ -320,20 +189,8 @@ LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
   if (includeProperties) {
     wrapper << createMiterProperties(modelSmvName, config);
 
-    for (const auto &constraint :
-         sequenceConstraints.seqLengthRelationConstraints) {
-      wrapper << createSeqRelationConstraint(modelSmvName, config.arguments,
-                                             constraint);
-    }
-
-    for (const auto &constraint : sequenceConstraints.loopSeqConstraints) {
-      wrapper << createSeqConstraintLoop(modelSmvName, config.arguments,
-                                         constraint);
-    }
-    for (const auto &constraint : sequenceConstraints.tokenLimitConstraints) {
-      wrapper << createTokenLimiter(modelSmvName, config.arguments,
-                                    config.inputNDWires, config.outputNDWires,
-                                    constraint);
+    for (const auto &constraint : sequenceConstraints) {
+      wrapper << constraint->createConstraintString(modelSmvName, config);
     }
   }
 

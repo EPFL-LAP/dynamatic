@@ -15,6 +15,7 @@
 #ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
 #define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
 
+#include "Constraints.h"
 #include "FabricGeneration.h"
 #include "dynamatic/Support/LLVM.h"
 #include <cstddef>
@@ -33,32 +34,6 @@ static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_VALID_NAME("valid0");
 static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_DATA_NAME("dataOut0");
 static constexpr llvm::StringLiteral SINK_READY_NAME("ready0");
 
-// A struct to store a loop condition constraint. The number of tokens in the
-// input with the index dataSequence is equivalent to the number of false tokens
-// at the output with the index controlSequence. If lastFalse is set, the last
-// token in the controlSequence needs to be false.
-struct LoopSeqConstraint {
-  size_t dataSequence;
-  size_t controlSequence;
-  bool lastFalse;
-};
-
-// A struct to store a token limit constraint. The number of tokens at the input
-// with index inputSequence can only be up to "limit" higher than the number of
-// tokens at the ouput with the index outputSequence.
-struct TokenLimitConstraint {
-  size_t inputSequence;
-  size_t outputSequence;
-  size_t limit;
-};
-
-// A struct to store all the supported sequence constraints.
-struct SequenceConstraints {
-  SmallVector<std::string> seqLengthRelationConstraints;
-  SmallVector<LoopSeqConstraint> loopSeqConstraints;
-  SmallVector<TokenLimitConstraint> tokenLimitConstraints;
-};
-
 // Create a wrapper for the provided SMV file.
 // includeProperties: If set also creates properties to check if all output
 //   tokens are true, the output buffers are empty, and the input buffer have
@@ -68,12 +43,12 @@ struct SequenceConstraints {
 //   capabale of creating an infinite number of tokens will be created.
 // exact: determines if the sequence generator create exactly "nrOfTokens"
 //   tokens, or can non-determinstically create fewer tokens.
-LogicalResult createWrapper(const std::filesystem::path &wrapperPath,
-                            const ElasticMiterConfig &config,
-                            const std::string &modelSmvName, size_t nrOfTokens,
-                            bool includeProperties,
-                            const SequenceConstraints &sequenceConstraints,
-                            bool exact = false);
+LogicalResult createWrapper(
+    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
+    const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
+    const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
+        &sequenceConstraints,
+    bool exact = false);
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0 and

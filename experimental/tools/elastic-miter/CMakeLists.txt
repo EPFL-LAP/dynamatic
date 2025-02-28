@@ -8,6 +8,7 @@ add_llvm_tool(elastic-miter
   FabricGeneration.cpp
   CreateWrappers.cpp
   SmvUtils.cpp
+  Constraints.cpp
 )
 
 llvm_update_compile_flags(elastic-miter)
