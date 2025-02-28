@@ -6,6 +6,7 @@ import generators.handshake.addf as addf
 import generators.handshake.addi as addi
 import generators.handshake.andi as andi
 import generators.handshake.buffer as buffer
+import generators.handshake.cmpf as cmpf
 import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
@@ -15,6 +16,7 @@ import generators.handshake.fork as fork
 import generators.handshake.load as load
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
+import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.shli as shli
@@ -40,6 +42,8 @@ def generate_code(name, mod_type, parameters):
       return andi.generate_andi(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
     case "cond_br":
@@ -58,6 +62,8 @@ def generate_code(name, mod_type, parameters):
       return mem_controller.generate_mem_controller(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
+    case "mulf":
+      return mulf.generate_mulf(name, parameters)
     case "muli":
       return muli.generate_muli(name, parameters)
     case "mux":

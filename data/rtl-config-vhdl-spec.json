@@ -1,7 +1,8 @@
 [
   {
     "name": "handshake.addf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.addi",
@@ -16,7 +17,8 @@
     "parameters": [
       { "name": "PREDICATE", "type": "string" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\""
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\"",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.cmpi",
@@ -27,7 +29,8 @@
   },
   {
     "name": "handshake.divf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.divsi",
@@ -47,15 +50,18 @@
   },
   {
     "name": "handshake.maximumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.minimumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.mulf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.muli",
@@ -63,7 +69,8 @@
   },
   {
     "name": "handshake.negf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t negf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t negf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.ori",
@@ -87,7 +94,8 @@
   },
   {
     "name": "handshake.subf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.subi",
@@ -99,7 +107,8 @@
   },
   {
     "name": "handshake.truncf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t truncf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t truncf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.xori",
@@ -115,11 +124,13 @@
   },
   {
     "name": "handshake.absf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.extf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extf -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extf -p port_types=$PORT_TYPES",
+    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.buffer",
@@ -287,5 +298,8 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   }
 ]

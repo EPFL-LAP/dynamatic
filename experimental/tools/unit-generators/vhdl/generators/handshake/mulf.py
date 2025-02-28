@@ -5,7 +5,7 @@ from generators.support.oehb import generate_oehb
 from generators.support.ofifo import generate_ofifo
 
 
-def generate_addf(name, params):
+def generate_mulf(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["result"])
 
@@ -17,41 +17,41 @@ def generate_addf(name, params):
     raise ValueError(f"Unsupported bitwidth {data_type.bitwidth}")
 
   if data_type.has_extra_signals():
-    return _generate_addf_signal_manager(name, data_type, is_double)
+    return _generate_mulf_signal_manager(name, data_type, is_double)
   else:
-    return _generate_addf(name, is_double)
+    return _generate_mulf(name, is_double)
 
 
-def _generate_addf(name, is_double):
+def _generate_mulf(name, is_double):
   if is_double:
-    return _generate_addf_double_precision(name)
+    return _generate_mulf_double_precision(name)
   else:
-    return _generate_addf_single_precision(name)
+    return _generate_mulf_single_precision(name)
 
 
 def _get_latency(is_double):
-  return 12 if is_double else 9  # todo
+  # doesn't depend on the bitwidth
+  return 4
 
 
-def _generate_addf_single_precision(name):
+def _generate_mulf_single_precision(name):
   join_name = f"{name}_join"
-  oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
+  oehb_name = f"{name}_oehb"
 
   dependencies = generate_join(join_name, {"size": 2}) + \
+      generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1}) + \
       generate_oehb(oehb_name, {"port_types": {
-          "ins": "!handshake.channel<i1>",
-          "outs": "!handshake.channel<i1>"
-      }}) + \
-      generate_delay_buffer(
-      buff_name, {"slots": _get_latency(is_double=False) - 1})
+          "ins": "!handshake.control<>",
+          "outs": "!handshake.control<>"
+      }})
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of addf_single_precision
+-- Entity of mulf_single_precision
 entity {name} is
   port (
     -- inputs
@@ -72,9 +72,9 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of addf_single_precision
+-- Architecture of mulf_single_precision
 architecture arch of {name} is
-  signal join_valid : std_logic;
+  signal join_valid             : std_logic;
   signal buff_valid, oehb_ready : std_logic;
 
   -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
@@ -95,18 +95,6 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.{oehb_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => buff_valid,
-      outs_ready => result_ready,
-      outs_valid => result_valid,
-      ins_ready  => oehb_ready,
-      ins(0)     => '0',
-      outs    => open
-    );
-
   buff : entity work.{buff_name}(arch)
     port map(
       clk,
@@ -115,6 +103,16 @@ begin
       oehb_ready,
       buff_valid
     );
+
+  oehb : entity work.{oehb_name}(arch)
+  port map(
+    clk        => clk,
+    rst        => rst,
+    ins_valid  => buff_valid,
+    outs_ready => result_ready,
+    outs_valid => result_valid,
+    ins_ready  => oehb_ready
+  );
 
   ieee2nfloat_lhs: entity work.InputIEEE_32bit(arch)
     port map (
@@ -134,7 +132,7 @@ begin
         R => result
     );
 
-  ip : entity work.FloatingPointAdder(arch)
+  ip : entity work.FloatingPointMultiplier(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,
@@ -148,13 +146,13 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_addf_double_precision(name):
+def _generate_mulf_double_precision(name):
   join_name = f"{name}_join"
   oehb_name = f"{name}_oehb"
   buff_name = f"{name}_buff"
 
   dependencies = generate_join(join_name, {"size": 2}) + \
-      generate_oehb(oehb_name, {"data_type": "!handshake.channel<i1>"}) + \
+      generate_oehb(oehb_name, {"data_type": "!handshake.control<>"}) + \
       generate_delay_buffer(
       buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -163,7 +161,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of addf_double_precision
+-- Entity of mulf_double_precision
 entity {name} is
   port (
     -- inputs
@@ -184,9 +182,9 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of addf_double_precision
+-- Architecture of mulf_double_precision
 architecture arch of {name} is
-  signal join_valid : std_logic;
+  signal join_valid             : std_logic;
   signal buff_valid, oehb_ready : std_logic;
 
   -- intermediate input signals for IEEE-754 to Flopoco-simple-float conversion
@@ -207,18 +205,6 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  oehb : entity work.{oehb_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => buff_valid,
-      outs_ready => result_ready,
-      outs_valid => result_valid,
-      ins_ready  => oehb_ready,
-      ins(0)     => '0',
-      outs    => open
-    );
-
   buff : entity work.{buff_name}(arch)
     port map(
       clk,
@@ -227,6 +213,18 @@ begin
       oehb_ready,
       buff_valid
     );
+
+  oehb : entity work.{oehb_name}(arch)
+  port map(
+    clk        => clk,
+    rst        => rst,
+    ins_valid  => buff_valid,
+    outs_ready => result_ready,
+    outs_valid => result_valid,
+    ins_ready  => oehb_ready,
+    ins(0)     => '0',
+    outs    => open
+  );
 
   ieee2nfloat_lhs: entity work.InputIEEE_64bit(arch)
     port map (
@@ -246,7 +244,7 @@ begin
         R => result
     );
 
-  ip : entity work.FPAdd_64bit(arch)
+  ip : entity work.FPMult_64bit(arch)
     port map (
         clk => clk,
         ce  => oehb_ready,
@@ -260,11 +258,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_addf_signal_manager(name, data_type, is_double):
+def _generate_mulf_signal_manager(name, data_type, is_double):
   inner_name = f"{name}_inner"
   bitwidth = 64 if is_double else 32
 
-  dependencies = _generate_addf(inner_name, is_double)
+  dependencies = _generate_mulf(inner_name, is_double)
 
   if "spec" in data_type.extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
@@ -310,7 +308,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of addf signal manager
+-- Entity of mulf signal manager
 entity {name} is
   port (
     [EXTRA_SIGNAL_PORTS]
@@ -339,7 +337,7 @@ end entity;
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
--- Architecture of addf signal manager
+-- Architecture of mulf signal manager
 architecture arch of {name} is
   signal transfer_in, transfer_out : std_logic;
   [EXTRA_SIGNAL_SIGNAL_DECLS]
