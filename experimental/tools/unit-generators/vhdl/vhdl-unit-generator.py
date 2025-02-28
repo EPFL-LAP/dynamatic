@@ -2,6 +2,7 @@ import argparse
 import ast
 import sys
 
+from generators.support.utils import VhdlScalarType
 import generators.handshake.addi as addi
 import generators.handshake.buffer as buffer
 import generators.handshake.cmpi as cmpi
@@ -22,7 +23,18 @@ import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
 
 
+def handle_params(mod_type, parameters):
+  match mod_type:
+    case "control_merge":
+      return {
+          "size": parameters["size"],
+          "data_width": VhdlScalarType(parameters["outs"]).bitwidth,
+          "index_width": VhdlScalarType(parameters["index"]).bitwidth
+      }
+
+
 def generate_code(name, mod_type, parameters):
+  parameters = handle_params(mod_type, parameters)
   match mod_type:
     case "addi":
       return addi.generate_addi(name, parameters)
