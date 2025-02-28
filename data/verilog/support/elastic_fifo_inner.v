@@ -29,11 +29,15 @@ module elastic_fifo_inner #(
   assign WriteEn = ins_valid & (~Full | outs_ready);
   assign outs = Memory[Head];
 
-  // Initialize memory content
-  initial begin
-     for (i=0; i<NUM_SLOTS; i=i+1) begin
-        Memory[i] = 0;
-     end
+  // Update FIFO valid
+  always @(posedge clk) begin
+    if (rst) begin
+      fifo_valid <= 0;
+    end else if (ReadEn) begin
+      fifo_valid <= 1;
+    end else if (outs_ready) begin
+      fifo_valid <= 0;
+    end
   end
 
   always @(posedge clk) begin

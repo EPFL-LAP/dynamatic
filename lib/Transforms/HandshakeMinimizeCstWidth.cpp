@@ -164,6 +164,7 @@ struct MinimizeConstantBitwidth
     // Create a new constant to replace the matched one with
     auto newCstOp = rewriter.create<handshake::ConstantOp>(
         cstOp->getLoc(), newAttr, cstOp.getCtrl());
+    inheritBB(cstOp, newCstOp);
     rewriter.replaceOp(cstOp, insertExtOp(newCstOp, cstOp, rewriter));
     return success();
   }

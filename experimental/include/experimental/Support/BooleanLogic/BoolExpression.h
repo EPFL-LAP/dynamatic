@@ -61,7 +61,7 @@ struct BoolExpression {
   /// Prints BooolExpression tree in inorder traversal
   /// Inspired from
   /// https://www.geeksforgeeks.org/print-binary-tree-2-dimensions/
-  void print(int space = 0);
+  void print();
 
   /// Converts a BoolExpression tree into its string representation
   std::string toString();

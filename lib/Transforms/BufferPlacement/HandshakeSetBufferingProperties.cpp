@@ -61,6 +61,13 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
             ctrlDefOp))
       continue;
 
+    if (mlir::isa<handshake::LazyForkOp>(ctrlDefOp)) {
+      auto inputSignal = ctrlDefOp->getOperand(0);
+      Channel channelLF(inputSignal, true);
+      channelLF.props->minOpaque = std::max(channelLF.props->minOpaque, 1U);
+      channelLF.props->minTrans = std::max(channelLF.props->minTrans, 1U);
+    }
+
     // Force placement of an opaque buffer slot on other fork output channels
     // triggering group allocations to the same LSQ. Other output channels not
     // part of the control paths to the LSQ get a transparent buffer slot
@@ -112,7 +119,21 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
       Channel channel(mergeOp.getResult(), true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
+    }
+  }
+
+  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (muxOp->getNumOperands() > 1) {
+      Channel channel(muxOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
+    }
+  }
+
+  for (handshake::ForkOp fork : funcOp.getOps<handshake::ForkOp>()) {
+    for (auto result : fork->getResults()) {
+      Channel channel(result, true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1000U);
     }
   }
 

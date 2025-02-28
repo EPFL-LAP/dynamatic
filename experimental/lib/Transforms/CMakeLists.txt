@@ -1,5 +1,9 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
+  HandshakeCombineSteeringLogic.cpp
+  HandshakeStraightToQueue.cpp
+  FtdProfiling.cpp
+  ConvertMuxToMerge.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -8,10 +12,12 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRControlFlowDialect
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  DynamaticExperimentalAnalysis
 )
 
 add_subdirectory(Speculation)

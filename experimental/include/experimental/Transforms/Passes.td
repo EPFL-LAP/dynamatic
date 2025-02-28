@@ -16,6 +16,48 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple outputs.
+      This is a simplification which comes immediately after the FTD logic.
+  }];
+  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
+}
+
+def FtdProfiling : DynamaticPass< "ftd-profiling">  {
+  let summary = "Profiling pass to extract relevant IR information";
+  let description = [{
+    The pass is in charge of extracting static information from the IR, 
+    related to the relationship between loops and multiplexers in the circuit.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createFtdProfiling()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
+def ConvertMuxToMerge : DynamaticPass< "convert-mux-to-merge">  {
+  let summary = "Convert a set of muxes to merges";
+  let description = [{
+    The pass reads the content of a file containing the set of muxes to transform to merges.
+    That same mux is converted to a cmerge, and all the other muxes in the same loop 
+    header are connected to the index output of the new component.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createConvertMuxToMerge()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
+def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
+  let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
+  let description = [{
+    "Straight to the queue" allows to allocate the basic blocks in the LSQ 
+    according to an ASAP approach rather than by following the control flow
+    relationships coming from the network of cmerges.
+  }];
+  let constructor = "dynamatic::experimental::ftd::createStraightToQueue()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{

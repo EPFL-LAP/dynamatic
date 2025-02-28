@@ -682,6 +682,7 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
     auto newMuxOp = rewriter.create<handshake::MuxOp>(
         muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
         muxOp->getAttrs());
+    inheritBB(muxOp, newMuxOp);
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
     return success();
@@ -725,6 +726,7 @@ struct HandshakeCMergeIndex
         cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
         cmergeOp->getAttrs());
     namer.replaceOp(cmergeOp, newCmergeOp);
+    inheritBB(cmergeOp, newCmergeOp);
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::LOGICAL},
                                  indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
@@ -1654,7 +1656,6 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   patterns.add<ArithSingleType<handshake::AddIOp>,
                ArithSingleType<handshake::SubIOp>>(forward, addWidth, ctx,
                                                    getAnalysis<NameAnalysis>());
-
   patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx,
                                                    getAnalysis<NameAnalysis>());
 
@@ -1668,7 +1669,6 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   patterns.add<ArithShift<handshake::ShLIOp>, ArithShift<handshake::ShRSIOp>,
                ArithShift<handshake::ShRUIOp>, ArithSelect>(
       forward, ctx, getAnalysis<NameAnalysis>());
-
   patterns.add<ArithExtToTruncOpt>(ctx, getAnalysis<NameAnalysis>());
 }
 

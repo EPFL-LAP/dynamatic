@@ -22,7 +22,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <string>
 
 using namespace mlir;
 using namespace dynamatic;

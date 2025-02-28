@@ -32,7 +32,6 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
@@ -122,19 +121,11 @@ mergeFuncResults(handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
   return results;
 }
 
-/// Checks whether the blocks in `opsPerBlock`'s keys exhibit a "linear
-/// dominance relationship" i.e., whether the execution of the "most dominant"
-/// block necessarily triggers the execution of all others in a deterministic
-/// order. This verification happens in linear time thanks to the cached
-/// dominator/dominated relationships in `dominations`. On success, stores the
-/// blocks' execution order in `dominanceOrder` ("most dominant" block first,
-/// then "second most dominant", etc.). Fails when the blocks do not exhibit
-/// that property.
-static LogicalResult computeLinearDominance(
+LogicalResult LowerFuncToHandshake::computeLinearDominance(
     DenseMap<Block *, DenseSet<Block *>> &dominations,
     llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
         &opsPerBlock,
-    SmallVector<Block *> &dominanceOrder) {
+    SmallVector<Block *> &dominanceOrder) const {
   // Initialize the dominance order to the proper size, setting each element to
   // nullptr initially
   size_t numBlocks = opsPerBlock.size();
@@ -757,6 +748,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               memOpLowering.recordReplacement(loadOp, newOp, false);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
+              loadOp.getResult().replaceAllUsesWith(dataOut);
               return newOp;
             })
             .Case<memref::StoreOp>([&](memref::StoreOp storeOp) {
@@ -1023,80 +1015,6 @@ static Value getBlockControl(Operation *op) {
   return nullptr;
 }
 
-namespace {
-
-template <typename SrcOp, typename DstOp>
-struct OneToOneConversion : public OpConversionPattern<SrcOp> {
-public:
-  using OpAdaptor = typename SrcOp::Adaptor;
-
-  OneToOneConversion(NameAnalysis &namer, const TypeConverter &typeConverter,
-                     MLIRContext *ctx)
-      : OpConversionPattern<SrcOp>(typeConverter, ctx), namer(namer) {}
-
-  LogicalResult
-  matchAndRewrite(SrcOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-
-protected:
-  /// Reference to the running pass's naming analysis.
-  NameAnalysis &namer;
-};
-
-template <typename CastOp, typename ExtOp>
-struct ConvertIndexCast : public OpConversionPattern<CastOp> {
-public:
-  using OpAdaptor = typename CastOp::Adaptor;
-
-  ConvertIndexCast(NameAnalysis &namer, const TypeConverter &typeConverter,
-                   MLIRContext *ctx)
-      : OpConversionPattern<CastOp>(typeConverter, ctx), namer(namer) {}
-
-  LogicalResult
-  matchAndRewrite(CastOp castOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-
-protected:
-  /// Reference to the running pass's naming analysis.
-  NameAnalysis &namer;
-};
-
-/// Converts each `func::CallOp` operation to an equivalent
-/// `handshake::InstanceOp` operation.
-struct ConvertCalls : public DynOpConversionPattern<func::CallOp> {
-public:
-  using DynOpConversionPattern<func::CallOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-
-/// Convers arith-level constants to handshake-level constants. Constants are
-/// triggered by a source if their successor is not a branch/return or memory
-/// operation. Otherwise they are triggered by the control-only network.
-struct ConvertConstants : public DynOpConversionPattern<arith::ConstantOp> {
-public:
-  using DynOpConversionPattern<arith::ConstantOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(arith::ConstantOp cstOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-
-/// Converts undefined operations (LLVM::UndefOp) with a default "0" constant
-/// triggered by the control merge of the block associated to the matched
-/// operation.
-struct ConvertUndefinedValues : public DynOpConversionPattern<LLVM::UndefOp> {
-public:
-  using DynOpConversionPattern<LLVM::UndefOp>::DynOpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(LLVM::UndefOp undefOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
-};
-} // namespace
-
 template <typename SrcOp, typename DstOp>
 LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
     SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
@@ -1107,6 +1025,10 @@ LogicalResult OneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
   auto newOp =
       rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
                              srcOp->getAttrDictionary().getValue());
+
+  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
+    from.replaceAllUsesWith(to);
+
   namer.replaceOp(srcOp, newOp);
   rewriter.replaceOp(srcOp, newOp);
   return success();
@@ -1119,6 +1041,9 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
 
   auto getWidth = [](Type type) -> unsigned {
     if (isa<IndexType>(type))
+      return 32;
+    // temporary
+    if (isa<handshake::ChannelType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
   };
@@ -1140,6 +1065,7 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   }
   namer.replaceOp(castOp, newOp);
   rewriter.replaceOp(castOp, newOp);
+  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }
 
