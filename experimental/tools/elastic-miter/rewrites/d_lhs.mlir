@@ -1,6 +1,6 @@
 module {
   handshake.func @d_lhs(%d: !handshake.channel<i32>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i32>) attributes {argNames = ["Dd", "Cd"], resNames = ["A"]} {
-    %a = mux %index [%d, %f_0_buf] {handshake.bb = 1 : ui32, handshake.name = "mux"}  : <i1>, <i32>
+    %a = mux %index [%d, %f_0_buf] {handshake.bb = 1 : ui32, handshake.name = "mux"}  : <i1>, [<i32>, <i32>] to <i32>
     %c_forked:3 = fork [3] %c {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
     %index = init %c_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
     %c_not = not %c_forked#2 {handshake.bb = 1 : ui32, handshake.name = "not"} : <i1>

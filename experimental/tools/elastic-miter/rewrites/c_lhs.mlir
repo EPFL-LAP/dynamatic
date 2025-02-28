@@ -7,7 +7,7 @@ module {
     sink %t_0 {handshake.bb = 1 : ui32, handshake.name = "sink_0"} : <>
     %t_1, %f_1 = cond_br %c_forked#1, %d_forked#1 {handshake.bb = 1 : ui32, handshake.name = "supp_br_1"} : <i1>, <>
     sink %t_1 {handshake.bb = 1 : ui32, handshake.name = "sink_1"} : <>
-    %b, %a = control_merge %f_0, %f_1 {handshake.bb = 1 : ui32, handshake.name = "cmerge"} : <>, <i1>
+    %b, %a = control_merge [%f_0, %f_1] {handshake.bb = 1 : ui32, handshake.name = "cmerge"} : [<>, <>] to <>, <i1>
     end {handshake.bb = 4 : ui32, handshake.name = "end0"} %a, %b : <i1>, <>
   }
 }

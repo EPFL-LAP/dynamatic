@@ -3,7 +3,7 @@ module {
     %d_forked:2 = fork [2] %d {handshake.bb = 1 : ui32, handshake.name = "fork_data"} : <i32>
     %c_forked:2 = fork [2] %c {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
 
-    %data_0 = mux %ctrl_init_0 [%d_forked#0, %loop_out_0] {handshake.bb = 1 : ui32, handshake.name = "data_mux_0"}  : <i1>, <i32>
+    %data_0 = mux %ctrl_init_0 [%d_forked#0, %loop_out_0] {handshake.bb = 1 : ui32, handshake.name = "data_mux_0"}  : <i1>, [<i32>, <i32>] to <i32>
     %data_forked_0:2 = fork [2] %data_0 {handshake.bb = 1 : ui32, handshake.name = "fork_data_mux_0"} : <i32>
     %t_0, %f_0 = cond_br %ctrl_not_0, %data_forked_0#1 {handshake.bb = 1 : ui32, handshake.name = "supp_br_0"} : <i1>, <i32>
     sink %t_0 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_0"} : <i32>
@@ -14,7 +14,7 @@ module {
     %ctrl_not_0 = not %ctrl_forked_0#1 {handshake.bb = 1 : ui32, handshake.name = "not_ctrl_0"} : <i1>
 
 
-    %data_1 = mux %ctrl_init_1 [%d_forked#1, %loop_out_1] {handshake.bb = 1 : ui32, handshake.name = "data_mux_1"}  : <i1>, <i32>
+    %data_1 = mux %ctrl_init_1 [%d_forked#1, %loop_out_1] {handshake.bb = 1 : ui32, handshake.name = "data_mux_1"}  : <i1>, [<i32>, <i32>] to <i32>
     %data_forked_1:2 = fork [2] %data_1 {handshake.bb = 1 : ui32, handshake.name = "fork_data_mux_1"} : <i32>
     %t_1, %f_1 = cond_br %ctrl_not_1, %data_forked_1#1 {handshake.bb = 1 : ui32, handshake.name = "supp_br_1"} : <i1>, <i32>
     sink %t_1 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_1"} : <i32>

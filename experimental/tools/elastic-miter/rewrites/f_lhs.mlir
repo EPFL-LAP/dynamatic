@@ -1,11 +1,11 @@
 module {
   handshake.func @f_lhs(%d: !handshake.channel<i32>, %m: !handshake.channel<i1>, %n: !handshake.channel<i1>, ...) -> (!handshake.channel<i32>) attributes {argNames = ["D", "M", "N"], resNames = ["A"]} {
-    %mux_0 = mux %m_init [%d, %loop_out_0] {handshake.bb = 1 : ui32, handshake.name = "mux_0"}  : <i1>, <i32>
+    %mux_0 = mux %m_init [%d, %loop_out_0] {handshake.bb = 1 : ui32, handshake.name = "mux_0"}  : <i1>, [<i32>, <i32>] to <i32>
     %mux0_forked:2 = fork [2] %mux_0 {handshake.bb = 1 : ui32, handshake.name = "fork_mux0"} : <i32>
     %t_0, %f_0 = cond_br %m_not, %mux0_forked#1 {handshake.bb = 1 : ui32, handshake.name = "supp_br_0"} : <i1>, <i32>
     sink %t_0 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_0"} : <i32>
     %loop_out_0 = buffer %f_0 {handshake.bb = 1 : ui32, handshake.name = "comb_buf_0", hw.parameters = {NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
-    %mux_1 = mux %n_init [%mux0_forked#0, %loop_out_1] {handshake.bb = 1 : ui32, handshake.name = "mux_1"}  : <i1>, <i32>
+    %mux_1 = mux %n_init [%mux0_forked#0, %loop_out_1] {handshake.bb = 1 : ui32, handshake.name = "mux_1"}  : <i1>, [<i32>, <i32>] to <i32>
     %mux1_forked:2 = fork [2] %mux_1 {handshake.bb = 1 : ui32, handshake.name = "fork_mux1"} : <i32>
     %t_1, %f_1 = cond_br %n_not, %mux1_forked#1 {handshake.bb = 1 : ui32, handshake.name = "supp_br_1"} : <i1>, <i32>
     sink %t_1 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_1"} : <i32>
