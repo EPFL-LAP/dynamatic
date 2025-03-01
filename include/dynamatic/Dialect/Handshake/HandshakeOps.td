@@ -255,11 +255,6 @@ def InitOp : Handshake_Op<"init", [
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let builders = [OpBuilder<
-    (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-         "std::optional<unsigned>":$numSlots)>
-  ];
-
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
                                            TIMING_ATTR_NAME = "TIMING";
