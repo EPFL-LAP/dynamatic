@@ -31,9 +31,9 @@ struct StackNode {
   std::optional<Token> term;
 
   // Constructors
-  StackNode(Token tt) : expr(nullptr), term(std::move(tt)){};
+  StackNode(Token tt) : expr(nullptr), term(std::move(tt)) {};
 
-  StackNode(BoolExpression *e) : expr(e), term(std::nullopt){};
+  StackNode(BoolExpression *e) : expr(e), term(std::nullopt) {};
 
   ~StackNode() {
     if (expr != nullptr)

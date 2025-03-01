@@ -44,7 +44,7 @@ public:
   using OpRewritePattern<AffineLoadOp>::OpRewritePattern;
 
   AffineLoadLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering){};
+      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering) {};
 
   LogicalResult matchAndRewrite(AffineLoadOp affineLoadOp,
                                 PatternRewriter &rewriter) const override {
@@ -77,7 +77,7 @@ public:
   using OpRewritePattern<AffineStoreOp>::OpRewritePattern;
 
   AffineStoreLowering(MemoryOpLowering &memOpLowering, MLIRContext *ctx)
-      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering){};
+      : OpRewritePattern(ctx, 2), memOpLowering(memOpLowering) {};
 
   LogicalResult matchAndRewrite(AffineStoreOp affineStoreOp,
                                 PatternRewriter &rewriter) const override {

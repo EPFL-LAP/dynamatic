@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "spmv.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int spmv(in_int_t n, inout_int_t row[10], inout_int_t col[10],

@@ -1,6 +1,7 @@
 """
 Script for running Dynamatic integration tests.
 """
+
 import argparse
 import os
 import sys
@@ -25,25 +26,29 @@ class CLIHandler:
         Configures all available command line arguments.
         """
         self.parser.add_argument(
-            "-l", "--list",
-            help="Path to a text file with names of tests to run. If not given, runs all tests."
+            "-l",
+            "--list",
+            help="Path to a text file with names of tests to run. If not given, runs all tests.",
         )
         self.parser.add_argument(
-            "-i", "--ignore",
-            help="Path to a text file with names of tests to ignore (i.e. skip)."
+            "-i",
+            "--ignore",
+            help="Path to a text file with names of tests to ignore (i.e. skip).",
         )
         self.parser.add_argument(
-            "-t", "--timeout",
+            "-t",
+            "--timeout",
             nargs="?",
             type=int,
             default=500,
-            help="Custom timeout value for a single test. Default is 500 seconds."
+            help="Custom timeout value for a single test. Default is 500 seconds.",
         )
         self.parser.add_argument(
-            "-w", "--workers",
+            "-w",
+            "--workers",
             nargs="?",
             type=int,
-            help="Number of workers to run in parallel for testing. Default is os.cpu_count()."
+            help="Number of workers to run in parallel for testing. Default is os.cpu_count().",
         )
 
     def parse_args(self, args=None):
@@ -60,8 +65,8 @@ class CLIHandler:
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
-SCRIPT_CONTENT = \
-    f"set-dynamatic-path {DYNAMATIC_ROOT}" \
+SCRIPT_CONTENT = (
+    f"set-dynamatic-path {DYNAMATIC_ROOT}"
     + """
 set-src {src_path}
 compile
@@ -69,17 +74,20 @@ write-hdl
 simulate
 exit
 """
+)
 
 # Note: Must use --exit-on-failure in order for run_command_with_timeout
 #       to be able to detect the status code properly
-DYNAMATIC_COMMAND = str(DYNAMATIC_ROOT / "bin" / "dynamatic") + \
-    " --exit-on-failure --run {script_path}"
+DYNAMATIC_COMMAND = (
+    str(DYNAMATIC_ROOT / "bin" / "dynamatic") + " --exit-on-failure --run {script_path}"
+)
 
 
 class TermColors:
     """
     Contains ANSI color escape sequences for colored terminal output.
     """
+
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
     OKCYAN = "\033[96m"
@@ -145,7 +153,9 @@ def read_file(file_path):
         return file.read()
 
 
-def run_command_with_timeout(command, timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def run_command_with_timeout(
+    command, timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+):
     """
     Runs a command with a time limit for execution.
 
@@ -167,7 +177,7 @@ def run_command_with_timeout(command, timeout, stdout=subprocess.PIPE, stderr=su
             timeout=timeout,
             check=True,
             stdout=stdout,
-            stderr=stderr
+            stderr=stderr,
         )
         return 0
     except subprocess.CalledProcessError:
@@ -255,14 +265,15 @@ def run_test(c_file, id, timeout):
 
     Path(out_dir).mkdir()
 
-    with open(Path(out_dir) / "dynamatic_out.txt", "w") as stdout, \
-            open(Path(out_dir) / "dynamatic_err.txt", "w") as stderr:
+    with open(Path(out_dir) / "dynamatic_out.txt", "w") as stdout, open(
+        Path(out_dir) / "dynamatic_err.txt", "w"
+    ) as stderr:
         # Run test and output result
         exit_code = run_command_with_timeout(
             DYNAMATIC_COMMAND.format(script_path=dyn_file),
             timeout=timeout,
             stdout=stdout,
-            stderr=stderr
+            stderr=stderr,
         )
 
         name = Path(c_file).name[:-2]
@@ -274,28 +285,20 @@ def run_test(c_file, id, timeout):
                     "id": id,
                     "msg": f"[PASS] {name} (simulation duration: "
                     f"{round(sim_time / 4)} cycles)",
-                    "status": "pass"
+                    "status": "pass",
                 }
             except ValueError:
                 # This should never happen
                 return {
                     "id": id,
                     "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
-                    "status": "pass"
+                    "status": "pass",
                 }
 
         elif exit_code == 1:
-            return {
-                "id": id,
-                "msg": f"[FAIL] {name}",
-                "status": "fail"
-            }
+            return {"id": id, "msg": f"[FAIL] {name}", "status": "fail"}
         else:
-            return {
-                "id": id,
-                "msg": f"[TIMEOUT] {name}",
-                "status": "timeout"
-            }
+            return {"id": id, "msg": f"[TIMEOUT] {name}", "status": "timeout"}
 
 
 def main():
@@ -319,8 +322,7 @@ def main():
                     break
 
             if not found:
-                color_print(f"[WARNING] Test '{test}' not found",
-                            TermColors.WARNING)
+                color_print(f"[WARNING] Test '{test}' not found", TermColors.WARNING)
 
         c_files = filtered_c_files
 
@@ -345,8 +347,7 @@ def main():
         # os.cpu_count() or os.process_cpu_count(), depending on the Python version.
         # This is "cheating", but is independent of the Python version.
         color_print(
-            f"[INFO] Running with {executor._max_workers} worker(s).",
-            TermColors.OKBLUE
+            f"[INFO] Running with {executor._max_workers} worker(s).", TermColors.OKBLUE
         )
 
         processes = []
@@ -362,17 +363,9 @@ def main():
             test_cnt += 1
 
             # Run the test
-            processes.append(
-                executor.submit(
-                    run_test,
-                    c_file, idx, args.timeout
-                )
-            )
+            processes.append(executor.submit(run_test, c_file, idx, args.timeout))
 
-            color_print(
-                f"[INFO] Submitted {name} for execution",
-                TermColors.OKBLUE
-            )
+            color_print(f"[INFO] Submitted {name} for execution", TermColors.OKBLUE)
             sys.stdout.flush()
 
         for p in processes:

@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "while_loop_2.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void while_loop_2(inout_int_t a[1000]) {
