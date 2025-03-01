@@ -101,7 +101,7 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 
 FailureOr<std::pair<std::filesystem::path, std::string>>
 handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool png) {
+              const std::filesystem::path &outputDir, bool generateCircuitPng) {
 
   std::filesystem::path dotFile = outputDir / "model.dot";
 
@@ -116,7 +116,7 @@ handshake2smv(const std::filesystem::path &mlirPath,
 
   // Optionally, generate a visual representation of the circuit from the
   // generated dotfile
-  if (png) {
+  if (generateCircuitPng) {
     std::filesystem::path pngFile = outputDir / "model.png";
     cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
     ret = executeWithRedirect(cmd, "/dev/null");

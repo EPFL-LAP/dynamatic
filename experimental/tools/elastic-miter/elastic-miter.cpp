@@ -201,7 +201,7 @@ static FailureOr<bool> checkEquivalence(
   std::filesystem::path wrapperPath = miterDir / "main.smv";
 
   // Create wrapper (main) for the elastic-miter
-  auto fail = dynamatic::experimental::createWrapper(
+  auto fail = dynamatic::experimental::createSmvFormalTestbench(
       wrapperPath, config, smvModelName, nrOfTokens, true, constraints);
   if (failed(fail))
     return failure();

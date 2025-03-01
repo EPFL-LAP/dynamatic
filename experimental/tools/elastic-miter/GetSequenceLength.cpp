@@ -48,6 +48,29 @@ static std::string stripString(const std::string &string) {
 // nuXmv command "print_reachable_states -v;". A set element is defined by a
 // string which is the concatenation of the state values, as represented in the
 // output file.
+// Example:
+// State 1:
+//   seq_generator_C.dataOut0 = FALSE
+//   model.ndw_in_C.state = running
+//   model.fork_control.regBlock0.reg_value = TRUE
+// State 2:
+//   seq_generator_C.dataOut0 = TRUE
+//   model.ndw_in_C.state = running
+//   model.fork_control.regBlock0.reg_value = TRUE
+// State 3:
+//   seq_generator_C.dataOut0 = TRUE
+//   model.ndw_in_C.state = sleeping
+//   model.fork_control.regBlock0.reg_value = TRUE
+// State 4:
+//   seq_generator_C.dataOut0 = FALSE
+//   model.ndw_in_C.state = running
+//   model.fork_control.regBlock0.reg_value = FALSE
+// Here State 1, 2, and 3 are equivalent, since they only differ in variables
+// outside of the circuit being tested (the ND wire is not considered part of
+// the circuit).
+// State 4 is a new distict state, as the model.fork_control.regBlock0.reg_value
+// is different for the other three states.
+// So in this example we have two unique states.
 static FailureOr<llvm::StringSet<>>
 getStateSet(const std::filesystem::path &filePath,
             const std::string &modelName) {
@@ -154,16 +177,17 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
+  // Convert the circuit to SMV and generate a PNG with the circuit's
+  // representation.
   auto failOrSmvPair = dynamatic::experimental::handshake2smv(
       reachabilityMlirPath, outputDir, true);
   if (failed(failOrSmvPair))
     return failure();
   auto [dstSmv, smvModelName] = failOrSmvPair.value();
 
-  // Create the wrapper with infinite sequence generators TODO last argument
-  auto fail = dynamatic::experimental::createWrapper(
-      outputDir / "main_inf.smv", config, smvModelName, 0, false,
-      SmallVector<dynamatic::experimental::ElasticMiterConstraint *>());
+  // Create the wrapper with infinite sequence generators
+  auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
+      outputDir / "main_inf.smv", config, smvModelName, 0);
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -194,9 +218,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
         outputDir / ("main_" + std::to_string(numberOfTokens) + ".smv");
 
     // Create the wrapper with n-token sequence generators
-    auto fail = dynamatic::experimental::createWrapper(
-        wrapperPath, config, smvModelName, numberOfTokens, false,
-        SmallVector<dynamatic::experimental::ElasticMiterConstraint *>(), true);
+    auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
+        wrapperPath, config, smvModelName, numberOfTokens);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << numberOfTokens
                    << " token reachability wrapper.\n";

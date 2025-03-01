@@ -43,16 +43,22 @@ static constexpr llvm::StringLiteral SINK_READY_NAME("ready0");
 //   capabale of creating an infinite number of tokens will be created.
 // exact: determines if the sequence generator create exactly "nrOfTokens"
 //   tokens, or can non-determinstically create fewer tokens.
-LogicalResult createWrapper(
+LogicalResult createSmvFormalTestbench(
     const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
     const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
-    const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
+    const std::optional<
+        SmallVector<dynamatic::experimental::ElasticMiterConstraint *>>
         &sequenceConstraints,
-    bool exact = false);
+    bool generateExactNrOfTokens = false);
+
+// TODO
+LogicalResult createSmvSequenceLengthTestbench(
+    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
+    const std::string &modelSmvName, size_t nrOfTokens);
 
 // SMV module for a sequence generator with a finite number of tokens. The
-// actual number of generated tokens is non-determinstically set between 0 and
-// (inclusive) max_tokens.
+// actual number of generated tokens is non-determinstically set between 0
+// and (inclusive) max_tokens.
 const std::string SMV_BOOL_INPUT =
     "MODULE bool_input(nReady0, max_tokens)\n"
     "  VAR dataOut0 : boolean;\n"

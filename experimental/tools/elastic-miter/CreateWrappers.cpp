@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <regex>
 #include <string>
 
@@ -68,18 +69,29 @@ static std::string instantiateModuleUnderTest(
 static std::string createSequenceGenerators(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
-    size_t nrOfTokens, bool exact = false) {
+    size_t nrOfTokens, bool generateExactNrOfTokens = false) {
   std::ostringstream sequenceGenerators;
   for (const auto &[argumentName, _] : arguments) {
+    // We support three different kinds of sequence generators:
+    // 1. Infinite sequence generator: Will create an infinite number of tokens.
+    // 2. Standard finite generator: Will create 0 to the maximal number of
+    //    tokens. The exact number of tokens is non-deterministic.
+    // 3. Exact finite generator: Will create the exact number of tokens (if it
+    //    receives enough ready inputs).
+    // When nrOfTokens is set to 0, the infinite sequence generator is created
+    // and the value of generateExactNrOfTokens is ignored.
     if (nrOfTokens == 0) {
+      // Example: VAR seq_generator_D : bool_input_inf(model.D_ready);
       sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input_inf(" << moduleName << "."
                          << argumentName << "_ready);\n";
-    } else if (exact) {
+    } else if (generateExactNrOfTokens) {
+      // Example: VAR seq_generator_D : bool_input_exact(model.D_ready, 1);
       sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input_exact(" << moduleName << "."
                          << argumentName << "_ready, " << nrOfTokens << ");\n";
     } else {
+      // Example: VAR seq_generator_D : bool_input(model.D_ready, 1);
       sequenceGenerators << "  VAR seq_generator_" << argumentName
                          << " : bool_input(" << moduleName << "."
                          << argumentName << "_ready, " << nrOfTokens << ");\n";
@@ -160,12 +172,13 @@ static std::string createMiterProperties(const std::string &moduleName,
   return properties.str();
 }
 
-LogicalResult createWrapper(
+LogicalResult createSmvFormalTestbench(
     const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
     const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
-    const SmallVector<dynamatic::experimental::ElasticMiterConstraint *>
+    const std::optional<
+        SmallVector<dynamatic::experimental::ElasticMiterConstraint *>>
         &sequenceConstraints,
-    bool exact) {
+    bool generateExactNrOfTokens) {
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n";
@@ -178,7 +191,7 @@ LogicalResult createWrapper(
   wrapper << "\n";
 
   wrapper << createSequenceGenerators(modelSmvName, config.arguments,
-                                      nrOfTokens, exact);
+                                      nrOfTokens, generateExactNrOfTokens);
 
   wrapper << instantiateModuleUnderTest(modelSmvName, config.arguments,
                                         config.results)
@@ -189,8 +202,10 @@ LogicalResult createWrapper(
   if (includeProperties) {
     wrapper << createMiterProperties(modelSmvName, config);
 
-    for (const auto &constraint : sequenceConstraints) {
-      wrapper << constraint->createConstraintString(modelSmvName, config);
+    if (sequenceConstraints) {
+      for (const auto &constraint : *sequenceConstraints) {
+        wrapper << constraint->createSmvConstraint(modelSmvName, config);
+      }
     }
   }
 
@@ -199,5 +214,15 @@ LogicalResult createWrapper(
   mainFile.close();
 
   return success();
+}
+
+LogicalResult createSmvSequenceLengthTestbench(
+    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
+    const std::string &modelSmvName, size_t nrOfTokens) {
+
+  // Call the function to generate a general testbench. We do not need to
+  // include properties nor sequence constraints.
+  return createSmvFormalTestbench(wrapperPath, config, modelSmvName, nrOfTokens,
+                                  false, std::nullopt, true);
 }
 } // namespace dynamatic::experimental
