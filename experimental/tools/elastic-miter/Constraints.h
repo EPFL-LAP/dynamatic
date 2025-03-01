@@ -1,30 +1,32 @@
-#ifndef ELASTIC_MITER_CONSTRAINTS_H
-#define ELASTIC_MITER_CONSTRAINTS_H
+#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CONSTRAINTS_H
+#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CONSTRAINTS_H
 
 #include "FabricGeneration.h"
-#include "llvm/Support/raw_ostream.h"
 #include <cstddef>
-#include <regex>
 #include <string>
-#include <utility>
 
 namespace dynamatic::experimental {
+
 class ElasticMiterConstraint {
 public:
   virtual ~ElasticMiterConstraint() = default;
-  virtual std::string createConstraintString(
+  virtual std::string createSmvConstraint(
       const std::string &moduleName,
       const dynamatic::experimental::ElasticMiterConfig &config) const = 0;
 };
 
-// Parse the sequence length relation constraints. They are string in the
-// style "0+1+..=4+5+..", where the numbers represent the index of the
-// sequence TODO
+// A class to describe a Sequence Length Relation constraint.
+// It controls the relative length of the input sequences.
+// The constraint has the form of an arithmetic equation. Once we for the actual
+// SMV constraint, the number in the equation will be replaced the respective
+// input with the index of the number.
 class SequenceLengthRelationConstraint : public ElasticMiterConstraint {
 public:
+  // We don't need to parse a SequenceLengthRelationConstraint, we can just copy
+  // the constraint string.
   SequenceLengthRelationConstraint(const std::string &option)
       : constraint(option) {};
-  std::string createConstraintString(
+  std::string createSmvConstraint(
       const std::string &moduleName,
       const dynamatic::experimental::ElasticMiterConfig &config) const override;
 
@@ -38,7 +40,7 @@ private:
 class TokenLimitConstraint : public ElasticMiterConstraint {
 public:
   TokenLimitConstraint(const std::string &option) { parseString(option); };
-  std::string createConstraintString(
+  std::string createSmvConstraint(
       const std::string &moduleName,
       const dynamatic::experimental::ElasticMiterConfig &config) const override;
 
@@ -57,9 +59,11 @@ class LoopConstraint : public ElasticMiterConstraint {
 public:
   LoopConstraint(const std::string &option) { parseString(option); };
   std::string
-  createConstraintString(const std::string &moduleName,
-                         const dynamatic::experimental::ElasticMiterConfig
-                             &config) const override {
+  createSmvConstraint(const std::string &moduleName,
+                      const dynamatic::experimental::ElasticMiterConfig &config)
+      const override {
+    // Call the more general method with the option for the last token to be
+    // false disabled.
     return createConstraintString(moduleName, config, false);
   };
   std::string createConstraintString(
@@ -73,15 +77,19 @@ private:
   size_t controlSequence;
 };
 
+// The same as a LoopConstraint, but the last token needs to be false.
 class StrictLoopConstraint : public LoopConstraint {
 public:
   StrictLoopConstraint(const std::string &option) : LoopConstraint(option) {};
   std::string
-  createConstraintString(const std::string &moduleName,
-                         const dynamatic::experimental::ElasticMiterConfig
-                             &config) const override {
+  createSmvConstraint(const std::string &moduleName,
+                      const dynamatic::experimental::ElasticMiterConfig &config)
+      const override {
+    // Call the LoopConstraint's method with the option for the last token to be
+    // false.
     return LoopConstraint::createConstraintString(moduleName, config, true);
   };
 };
 } // namespace dynamatic::experimental
-#endif // ELASTIC_MITER_CONSTRAINTS_H
+
+#endif // DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CONSTRAINTS_H
