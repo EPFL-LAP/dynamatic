@@ -6,7 +6,7 @@ add_llvm_tool(elastic-miter
   elastic-miter.cpp
   GetSequenceLength.cpp
   FabricGeneration.cpp
-  CreateWrappers.cpp
+  CreateSmvFormalTestbench.cpp
   SmvUtils.cpp
   Constraints.cpp
 )

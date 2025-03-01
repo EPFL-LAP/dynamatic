@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
-#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_WRAPPERS_H
+#ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
+#define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
 
 #include "Constraints.h"
 #include "FabricGeneration.h"
@@ -115,4 +115,4 @@ const std::string SMV_BOOL_INPUT_INF =
     "    esac;\n"
     "    DEFINE valid0 := TRUE;\n\n";
 } // namespace dynamatic::experimental
-#endif
+#endif // DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H

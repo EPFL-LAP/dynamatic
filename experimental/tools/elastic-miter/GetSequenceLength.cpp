@@ -19,7 +19,7 @@
 #include <llvm/ADT/StringSet.h>
 
 #include "Constraints.h"
-#include "CreateWrappers.h"
+#include "CreateSmvFormalTestbench.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
 #include "SmvUtils.h"

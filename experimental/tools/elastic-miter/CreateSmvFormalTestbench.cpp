@@ -8,7 +8,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
 #include "Constraints.h"
-#include "CreateWrappers.h"
+#include "CreateSmvFormalTestbench.h"
 #include "FabricGeneration.h"
 #include "llvm/ADT/SmallVector.h"
 
