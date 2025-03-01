@@ -72,8 +72,8 @@ std::string LoopConstraint::createConstraintString(
     const dynamatic::experimental::ElasticMiterConfig &config,
     bool lastFalse) const {
 
-  auto [controlSequenceName, _] = config.arguments[controlSequence];
-  auto [dataSequenceName, _] = config.arguments[dataSequence];
+  auto [controlSequenceName, ignored1] = config.arguments[controlSequence];
+  auto [dataSequenceName, ignored2] = config.arguments[dataSequence];
 
   // The name of the SMV variable to keep track of false tokens.
   std::string falseCounterTokenCounterVariable =
