@@ -134,6 +134,8 @@ endif()
 # XLS Integration (experimental)
 #-------------------------------------------------------------------------------
 
+set(DYNAMATIC_XLS_DIR ${DYNAMATIC_SOURCE_DIR}/xls)
+
 if(DYNAMATIC_ENABLE_XLS)
   # Add 'DYNAMATIC_ENABLE_XLS` macro to prepoc + tablegen for conditioanl
   # inclusion of XLS features.
@@ -142,6 +144,7 @@ if(DYNAMATIC_ENABLE_XLS)
 
   include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/xls/include)
   include_directories(${DYNAMATIC_BINARY_DIR}/experimental/xls/include)
+  include_directories(${DYNAMATIC_XLS_DIR})
 endif()
 
 #-------------------------------------------------------------------------------
