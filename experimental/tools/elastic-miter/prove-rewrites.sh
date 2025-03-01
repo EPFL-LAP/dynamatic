@@ -1,14 +1,8 @@
 DYNAMATIC_DIR=.
 
 source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
-DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 
 OUT_DIR="experimental/tools/elastic-miter/out"
-F_HW="$OUT_DIR/hw.mlir"
-
-COMP_DIR="$OUT_DIR/comp"
-F_HANDSHAKE_MITER="$COMP_DIR/handshake_miter.mlir"
-DOT="$COMP_DIR/miter.dot"
 
 REWRITES="experimental/tools/elastic-miter/rewrites"
 
