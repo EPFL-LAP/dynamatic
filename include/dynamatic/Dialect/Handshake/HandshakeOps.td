@@ -965,22 +965,27 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
-      = speculator[enable] %dataIn : !handshake.channel<i1>
+      = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
+        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
-  let results = (outs HandshakeType:$dataOut,
+  let arguments = (ins ChannelType:$dataIn, ControlType:$trigger);
+  let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
                       ChannelType:$SCCommitCtrl, 
                       ChannelType:$SCBranchCtrl);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
+    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCBranchCtrl)
+  }];
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
-    $_state.addOperands({dataIn, enable});
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
+    $_state.addOperands({dataIn, trigger});
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -992,7 +997,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "enable";
+      return idx == 0 ? "ins" : "trigger";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {

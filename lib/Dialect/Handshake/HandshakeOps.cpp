@@ -1595,43 +1595,6 @@ LogicalResult EndOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// SpeculatorOp
-//===----------------------------------------------------------------------===//
-
-ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand enable, dataIn;
-  Type dataType;
-  SmallVector<Type> uniqueResTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseLSquare() || parser.parseOperand(enable) ||
-      parser.parseRSquare() || parser.parseOperand(dataIn) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
-    return failure();
-  if (uniqueResTypes.size() != 3)
-    return failure();
-
-  Type ctrlType = uniqueResTypes[1];
-  Type wideCtrlType = uniqueResTypes[2];
-  result.addTypes(
-      {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
-
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
-}
-
-void SpeculatorOp::print(OpAsmPrinter &p) {
-  p << " [" << getEnable() << "] " << getDataIn() << " ";
-  p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
-    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
-    << ")";
-}
-
-//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 
