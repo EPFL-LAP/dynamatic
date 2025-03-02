@@ -75,14 +75,6 @@ private:
   SmallVector<std::string> outputs;
 };
 
-namespace detail {
-/// `ReshapableChannelsInterface`'s default `getReshapableChannelType` method
-/// implementation (defined as a free function to avoid instantiating an
-/// implementation for every concrete operation type).
-std::pair<handshake::ChannelType, bool> getReshapableChannelType(Operation *op);
-
-} // namespace detail
-
 class ControlType;
 
 } // end namespace handshake
