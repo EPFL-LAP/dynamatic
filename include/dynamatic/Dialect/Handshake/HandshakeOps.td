@@ -988,19 +988,17 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, ControlType:$trigger);
-  let results = (outs HandshakeType:$dataOut,
+  let arguments = (ins ChannelType:$dataIn, ControlType:$trigger);
+  let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
                       ChannelType:$SCCommitCtrl, 
                       ChannelType:$SCBranchCtrl);
 
   let assemblyFormat = [{
-    `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,`
-    custom<HandshakeType>(type($dataIn)) `,`
-    custom<HandshakeType>(type($dataOut)) `,` type($saveCtrl) `,`
-    type($commitCtrl) `,` type($SCSaveCtrl) `,` type($SCCommitCtrl) `,`
-    type($SCBranchCtrl)
+    `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
+    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCBranchCtrl)
   }];
 
   // Infer the type of the control signals
