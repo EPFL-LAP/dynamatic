@@ -182,8 +182,7 @@ def run_test(c_file, id, timeout):
     result = subprocess.run([
         DYNAMATIC_OPT_BIN, handshake_buffered,
         "--handshake-canonicalize",
-        "--handshake-hoist-ext-instances",
-        "--handshake-reshape-channels"
+        "--handshake-hoist-ext-instances"
     ],
         stdout=f,
         stderr=sys.stdout
