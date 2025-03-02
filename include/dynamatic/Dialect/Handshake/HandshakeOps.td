@@ -983,8 +983,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
-      = speculator[trigger] %dataIn : !handshake.channel<i32, [spec: i1]>,
-        !handshake.control<[spec: i1]>
+      = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
+        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
     ```
   }];
 
@@ -995,7 +995,11 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                       ChannelType:$SCCommitCtrl, 
                       ChannelType:$SCBranchCtrl);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
+    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCBranchCtrl)
+  }];
 
   // Infer the type of the control signals
   let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
