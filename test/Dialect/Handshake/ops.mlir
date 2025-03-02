@@ -26,30 +26,6 @@ handshake.func @unbundleChannelComplex(%channel: !handshake.channel<i32, [e1: i1
 
 // -----
 
-handshake.func @reshapeChannelIntoData(%channel: !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>) -> !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]> {
-  %reshaped = reshape [MergeData] %channel : <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]> -> <i42, [mergedUp: i8 (U)]>
-  %backToOriginal = reshape [SplitData] %reshaped : <i42, [mergedUp: i8 (U)]> -> <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-  end %backToOriginal : !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-}
-
-// -----
-
-handshake.func @reshapeChannelIntoDataNoExtraDown(%channel: !handshake.channel<f32, [up1: i4 (U)]>) -> !handshake.channel<f32, [up1: i4 (U)]> {
-  %reshaped = reshape [MergeData] %channel : <f32, [up1: i4 (U)]> -> <f32, [mergedUp: i4 (U)]>
-  %backToOriginal = reshape [SplitData] %reshaped : <f32, [mergedUp: i4 (U)]> -> <f32, [up1: i4 (U)]>
-  end %backToOriginal : !handshake.channel<f32, [up1: i4 (U)]>
-}
-
-// -----
-
-handshake.func @reshapeChannelIntoExtra(%channel: !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>) -> !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]> {
-  %reshaped = reshape [MergeExtra] %channel : <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]> -> <f32, [mergedDown: i10, mergedUp: i8 (U)]>
-  %backToOriginal = reshape [SplitExtra] %reshaped : <f32, [mergedDown: i10, mergedUp: i8 (U)]> -> <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-  end %backToOriginal : !handshake.channel<f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-}
-
-// -----
-
 handshake.func @sourceAndConstantWithExtraSignal(%ctrl : !handshake.control<>) -> !handshake.control<> {
   %ctrlWithExtraSignal = source : <[test: i2]>
   %valueWithExtraSignal = constant %ctrlWithExtraSignal {value = 100 : i32} : <[test: i2]>, <i32, [test: i2]>

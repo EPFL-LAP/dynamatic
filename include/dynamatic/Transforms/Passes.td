@@ -224,18 +224,6 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
-def HandshakeReshapeChannels : DynamaticPass<"handshake-reshape-channels"> {
-  let summary = "Reshape channels to simplify RTL generation.";
-  let description = [{
-    Relies on the `ReshapableChannelsInterface` (part of the Handshake dialect)
-    to simplify the shape of channels with extra signals around operations that
-    ignore the content of all extra signals (and potentially the data signal
-    too). The pass inserts `handshake::ReshapeOp` operations as needed to
-    reshape channels back and forth between their original and simplified forms.
-  }];
-  let constructor = "dynamatic::createHandshakeReshapeChannels()"; 
-}
-
 def HandshakeSetBufferingProperties :
   DynamaticPass<"handshake-set-buffering-properties"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
