@@ -1608,41 +1608,6 @@ LogicalResult EndOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// SpeculatorOp
-//===----------------------------------------------------------------------===//
-
-ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand trigger, dataIn;
-  Type dataType;
-  Type triggerType;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-
-  if (parser.parseLSquare() || parser.parseOperand(trigger) ||
-      parser.parseRSquare() || parser.parseOperand(dataIn) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseComma() ||
-      parser.parseType(triggerType))
-    return failure();
-
-  OpBuilder builder(parser.getContext());
-  Type ctrlType = ChannelType::get(builder.getIntegerType(1));
-  Type wideCtrlType = ChannelType::get(builder.getIntegerType(3));
-
-  // dataOut, saveCtrl, commitCtrl, SCSaveCtrl, SCCommitCtrl, SCBranchCtrl
-  result.addTypes(
-      {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
-
-  return parser.resolveOperands({dataIn, trigger}, {dataType, triggerType},
-                                allOperandLoc, result.operands);
-}
-
-void SpeculatorOp::print(OpAsmPrinter &p) {
-  p << " [" << getTrigger() << "] " << getDataIn() << " ";
-  p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << ", " << getTrigger().getType();
-}
-
-//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 
