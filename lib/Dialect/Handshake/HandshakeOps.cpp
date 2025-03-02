@@ -1619,36 +1619,34 @@ LogicalResult EndOp::verify() {
 //===----------------------------------------------------------------------===//
 
 ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand enable, dataIn;
+  OpAsmParser::UnresolvedOperand trigger, dataIn;
   Type dataType;
-  SmallVector<Type> uniqueResTypes;
+  Type triggerType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseLSquare() || parser.parseOperand(enable) ||
+
+  if (parser.parseLSquare() || parser.parseOperand(trigger) ||
       parser.parseRSquare() || parser.parseOperand(dataIn) ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
-    return failure();
-  if (uniqueResTypes.size() != 3)
+      parser.parseType(dataType) || parser.parseComma() ||
+      parser.parseType(triggerType))
     return failure();
 
-  Type ctrlType = uniqueResTypes[1];
-  Type wideCtrlType = uniqueResTypes[2];
+  OpBuilder builder(parser.getContext());
+  Type ctrlType = ChannelType::get(builder.getIntegerType(1));
+  Type wideCtrlType = ChannelType::get(builder.getIntegerType(3));
+
+  // dataOut, saveCtrl, commitCtrl, SCSaveCtrl, SCCommitCtrl, SCBranchCtrl
   result.addTypes(
       {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
 
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
+  return parser.resolveOperands({dataIn, trigger}, {dataType, triggerType},
+                                allOperandLoc, result.operands);
 }
 
 void SpeculatorOp::print(OpAsmPrinter &p) {
-  p << " [" << getEnable() << "] " << getDataIn() << " ";
+  p << " [" << getTrigger() << "] " << getDataIn() << " ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
-    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
-    << ")";
+  p << " : " << getDataIn().getType() << ", " << getTrigger().getType();
 }
 
 //===----------------------------------------------------------------------===//

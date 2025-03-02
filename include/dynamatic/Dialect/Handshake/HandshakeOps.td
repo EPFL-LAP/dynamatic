@@ -983,11 +983,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
     ```mlir
     %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
-      = speculator[enable] %dataIn : !handshake.channel<i1>
+      = speculator[trigger] %dataIn : !handshake.channel<i32, [spec: i1]>,
+        !handshake.control<[spec: i1]>
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
+  let arguments = (ins HandshakeType:$dataIn, ControlType:$trigger);
   let results = (outs HandshakeType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
@@ -997,8 +998,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let hasCustomAssemblyFormat = 1;
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
-    $_state.addOperands({dataIn, enable});
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
+    $_state.addOperands({dataIn, trigger});
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -1010,7 +1011,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "enable";
+      return idx == 0 ? "ins" : "trigger";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
