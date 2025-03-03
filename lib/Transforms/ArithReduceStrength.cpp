@@ -254,7 +254,7 @@ struct MulReduceStrength : public OpRewritePattern<arith::MulIOp> {
   using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
 
   MulReduceStrength(unsigned maxAdderDepth, MLIRContext *ctx)
-      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth){};
+      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth) {};
 
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {

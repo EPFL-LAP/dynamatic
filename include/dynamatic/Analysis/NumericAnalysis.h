@@ -65,11 +65,11 @@ public:
 
   /// Constructs an integer range.
   NumericRange(std::optional<IntBound> lb, std::optional<IntBound> ub)
-      : concept(new NumericRangeModel<IntBound>(lb, ub)){};
+      : concept(new NumericRangeModel<IntBound>(lb, ub)) {};
 
   /// Constructs an floating-point range.
   NumericRange(std::optional<FloatBound> lb, std::optional<FloatBound> ub)
-      : concept(new NumericRangeModel<FloatBound>(lb, ub)){};
+      : concept(new NumericRangeModel<FloatBound>(lb, ub)) {};
 
   /// Determine whether the range is positive i.e., whether its lower bound is
   /// greater than or equal to 0.
@@ -195,7 +195,7 @@ public:
     /// Simple constructor that constructs a range from a given lower bound and
     /// upper bound.
     NumericRangeModel(std::optional<T> lb, std::optional<T> ub)
-        : lb(lb), ub(ub){};
+        : lb(lb), ub(ub) {};
 
     bool isPositive() const override {
       return lb.has_value() && *lb >= static_cast<T>(0);

@@ -5,17 +5,17 @@ from generators.support.utils import *
 
 
 def generate_fork(name, params):
-  size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
+    size = params[ATTR_SIZE]
+    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
 
-  if data_type.bitwidth == 0:
-    return _generate_fork_dataless(name, size)
-  else:
-    return _generate_fork(name, size, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_fork_dataless(name, size)
+    else:
+        return _generate_fork(name, size, data_type)
 
 
 def _generate_fork_dataless(name, size):
-  return f"""
+    return f"""
 MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
   {"\n    ".join([f"VAR inner_reg_block_{n} : {name}__eager_fork_register_block(ins_valid, outs_ready_{n}, backpressure);" for n in range(size)])}
 
@@ -33,7 +33,7 @@ MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
 
 def _generate_fork(name, size, data_type):
-  return f"""
+    return f"""
 MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
   VAR
   inner_fork : {name}__fork_dataless(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])});

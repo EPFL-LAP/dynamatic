@@ -57,7 +57,7 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
 }
 
 float FloatCompare::decodeToken(unsigned int token) const {
-  return *((float *) &token);
+  return *((float *)&token);
 }
 
 DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
@@ -81,7 +81,7 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
 }
 
 double DoubleCompare::decodeToken(unsigned int token) const {
-  return *((double *) &token);
+  return *((double *)&token);
 }
 
 string extractParentDirectoryPath(string filepath) {

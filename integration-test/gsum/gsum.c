@@ -8,8 +8,8 @@
 //
 //===------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "gsum.h"
+#include "dynamatic/Integration.h"
 
 float gsum(in_float_t a[N]) {
   int i;
