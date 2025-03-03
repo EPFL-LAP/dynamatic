@@ -1,7 +1,7 @@
 module {
   handshake.func @i_lhs(%d: !handshake.channel<i32>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i32>, !handshake.channel<i32>) attributes {argNames = ["D", "C"], resNames = ["A", "B"]} {
 
-    %data = mux %ctrl_init [%d, %loop_out] {handshake.bb = 1 : ui32, handshake.name = "data_mux"}  : <i1>, <i32>
+    %data = mux %ctrl_init [%d, %loop_out] {handshake.bb = 1 : ui32, handshake.name = "data_mux"}  : <i1>, [<i32>, <i32>] to <i32>
     %data_forked:3 = fork [3] %data {handshake.bb = 1 : ui32, handshake.name = "fork_data_mux"} : <i32>
     %t, %f = cond_br %ctrl_not, %data_forked#2 {handshake.bb = 1 : ui32, handshake.name = "supp_br"} : <i1>, <i32>
     sink %t {handshake.bb = 1 : ui32, handshake.name = "supp_sink"} : <i32>
