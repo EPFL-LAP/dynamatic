@@ -1,7 +1,7 @@
 from generators.support.merge_notehb import (
     generate_merge_notehb,
 )
-from generators.handshake.buffer import generate_buffer
+from generators.support.tehb import generate_tehb
 from generators.support.utils import *
 
 
@@ -28,7 +28,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
   outs_valid := inner_tehb.outs_valid;
 
 {generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
-{generate_buffer(f"{name}__tehb_dataless", TEHB_BUFFER_PARAMS(HANDSHAKE_CONTROL_TYPE))}
+{generate_tehb(f"{name}__tehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
 """
 
 
@@ -46,5 +46,5 @@ MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, out
   outs_valid := inner_tehb.outs_valid;
 
 {generate_merge_notehb(f"{name}__merge_notehb", {ATTR_SIZE: size, ATTR_DATA_TYPE: data_type.mlir_type})}
-{generate_buffer(f"{name}__tehb", TEHB_BUFFER_PARAMS(data_type))}
+{generate_tehb(f"{name}__tehb_dataless", {ATTR_DATA_TYPE: data_type.mlir_type})}
 """
