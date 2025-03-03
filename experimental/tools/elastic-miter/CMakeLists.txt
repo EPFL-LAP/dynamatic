@@ -4,6 +4,11 @@ set(LLVM_LINK_COMPONENTS
 
 add_llvm_tool(elastic-miter
   elastic-miter.cpp
+  GetSequenceLength.cpp
+  FabricGeneration.cpp
+  CreateSmvFormalTestbench.cpp
+  SmvUtils.cpp
+  Constraints.cpp
 )
 
 llvm_update_compile_flags(elastic-miter)
