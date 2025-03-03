@@ -472,7 +472,8 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<DataBitwidthInterface, ["getDataBitwidth"]>,
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -500,6 +501,11 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+  }];
+  let extraClassDefinition = [{
+    unsigned $cppClass::getDataBitwidth() {
+      return ::mlir::cast<ChannelType>(getDataOperand().getType()).getIntOrFloatBitWidth();
+    }
   }];
 }
 
