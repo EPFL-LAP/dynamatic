@@ -17,7 +17,7 @@ Here, operations are considered within a basic block if all their operands and r
 
 To further specify the meaning of "consistent extra signals across all their inputs and outputs", we provide an example: if one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
 
-<img alt="the IO of addi" src="./Figures/ExtraSignalsTypeVerification/addi.png" width="300" />
+<img alt="the IO of addi" src="./figs/ExtraSignalsTypeVerification/addi.png" width="300" />
 
 This is enforced for the following reasons:
 - To reduce variability in these operations, simplifying RTL generation.
@@ -31,7 +31,7 @@ This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/d
 
 These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
 
-<img alt="the inputs of Mux" src="./Figures/ExtraSignalsTypeVerification/mux_inputs.png" width="400" />
+<img alt="the inputs of Mux" src="./figs/ExtraSignalsTypeVerification/mux_inputs.png" width="400" />
 
 Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`. This is because when there are two input signals with the same name but different widths, they cannot both be propagated to the output with that name.
 
@@ -43,7 +43,7 @@ The selector input (for Mux) or the output (for CMerge) is kept simple, meaning 
 
 As a result, the complete structure of a Mux or CMerge operation appears as follows:
 
-<img alt="the IO of Mux and Cmerge" src="./Figures/ExtraSignalsTypeVerification/mux_cmerge.png" width="600" />
+<img alt="the IO of Mux and Cmerge" src="./figs/ExtraSignalsTypeVerification/mux_cmerge.png" width="600" />
 
 The data output has `spec: i1` and `tag: i8` because some inputs have them, and nothing else.
 
@@ -63,14 +63,14 @@ Note that these operations can also be considered to reside at the boundary of a
 
 For the load operation, the structure is as follows:
 
-<img alt="the IO of Load" src="./Figures/ExtraSignalsTypeVerification/load.png" width="400" />
+<img alt="the IO of Load" src="./figs/ExtraSignalsTypeVerification/load.png" width="400" />
 
 - The `addrResult` and `data` ports, used to communicate with the memory controller, must be simple.
 - The `addr` and `dataResult` ports must carry the same set of extra signals.
 
 For the store operation, the structure is:
 
-<img alt="the IO of Store" src="./Figures/ExtraSignalsTypeVerification/store.png" width="400" />
+<img alt="the IO of Store" src="./figs/ExtraSignalsTypeVerification/store.png" width="400" />
 
 - The `addrResult` and `dataResult` ports, which interface with the memory controller, must also be simple.
 - The `addr` and `data` ports must have matching extra signals.
@@ -83,7 +83,7 @@ While this operation falls under the category of "operations within a basic bloc
 
 `ConstantOp` has one input (a `ControlType` to trigger the emission) and one output (a `ChannelType`). Like other operations, the extra signals of the input and output should match.
 
-<img alt="the IO of Constant" src="./Figures/ExtraSignalsTypeVerification/constant.png" width="300" />
+<img alt="the IO of Constant" src="./figs/ExtraSignalsTypeVerification/constant.png" width="300" />
 
 To ensure consistency for succeeding operations, `ConstantOp` must generate an output with extra signals. For example, if an adder expects a `spec` tag, the preceding `ConstantOp` must provide one.
 
