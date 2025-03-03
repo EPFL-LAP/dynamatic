@@ -271,8 +271,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // counterparts. No LSQ interface is created yet.
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
+  MLIRContext *ctx = getContext();
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo)))
+                              memInfo, ctx)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports

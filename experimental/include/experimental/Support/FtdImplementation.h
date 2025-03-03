@@ -23,6 +23,8 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+  using namespace boolean;
+
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
 void addRegenOperandConsumer(PatternRewriter &rewriter,
@@ -80,6 +82,10 @@ LogicalResult createPhiNetwork(Region &funcRegion, PatternRewriter &rewriter,
 LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
+
+BoolExpression *enumeratePaths(Block *start, Block *end,
+    const ftd::BlockIndexing &bi,
+    const DenseSet<Block *> &controlDeps);
 
 }; // namespace ftd
 }; // namespace experimental

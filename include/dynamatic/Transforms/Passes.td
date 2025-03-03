@@ -134,6 +134,7 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
     **
   }];
   let constructor = "dynamatic::createHandshakeInsertSkippableSeq()";
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {

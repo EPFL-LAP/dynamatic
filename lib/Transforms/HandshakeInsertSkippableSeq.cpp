@@ -26,6 +26,7 @@
 #include "experimental/Support/FtdSupport.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
+#include "experimental/Support/CFGAnnotation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 
 
@@ -204,22 +205,46 @@ DenseMap<int, Operation*> getControlMergeOps(FuncOp funcOp){
 
 Value calculateCFGCond(Operation* predecessorOp, Operation* successorOp, DenseMap<int, Operation*> &controlMerges, Value startSignal, FuncOp funcOp, ConversionPatternRewriter& rewriter){
 
+  llvm::errs() << "be to che --------------\n";
+
   int predecessorBB = getBBNumberFromOp(predecessorOp);
   int successorBB = getBBNumberFromOp(successorOp);
 
-  Region &region = funcOp.getBody();
-  ftd::BlockIndexing bi(region);
-  Block *entryBlock = &funcOp.getBody().front();
+  // Region &region = funcOp.getBody();
+  // ftd::BlockIndexing bi(region);
 
-  auto producerBlock = bi.getBlockFromIndex(predecessorBB);
-  ControlDependenceAnalysis::BlockControlDepsMap cdAnalysis = ControlDependenceAnalysis(region).getAllBlockDeps();
-
-  DenseSet<Block *> prodControlDeps =
-  cdAnalysis[producerBlock.value()].forwardControlDeps;
+  // for (Block &bb : region.getBlocks())
+  //   llvm::errs() << bb << "\n";
 
 
-  BoolExpression *fProd =
-      ftd::enumeratePaths(entryBlock, producerBlock.value(), bi, prodControlDeps);
+  // Block *entryBlock = &funcOp.getBody().front();
+
+  // auto producerBlock = bi.getBlockFromIndex(predecessorBB);
+  // llvm::errs() << "be to che --------------\n";
+
+  // ControlDependenceAnalysis::BlockControlDepsMap cdAnalysis = ControlDependenceAnalysis(region).getAllBlockDeps();
+
+  // llvm::errs() << "be to che 2 :) --------------\n";
+
+  // for (int i = 0; i < 10; i++){
+  //   auto producerBlock = bi.getBlockFromIndex(i);
+  //   llvm::errs() << "prod: " << i <<  producerBlock << "\n";
+  // }
+  // if (!producerBlock){
+  //   llvm::errs() << "prod: " << predecessorBB << "\n";
+  // }
+  // DenseSet<Block *> prodControlDeps =
+  // cdAnalysis[producerBlock.value()].forwardControlDeps;
+
+
+  // llvm::errs() << "be to che --------------\n";
+  
+
+  // BoolExpression *fProd =
+  //     ftd::enumeratePaths(entryBlock, producerBlock.value(), bi, prodControlDeps);
+
+  
+  // llvm::errs() << "be to che --------------\n";
 
   // llvm::errs() << "jaleb: " << fProd->sopToString() << "\n";
 
@@ -477,6 +502,9 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
   ConversionPatternRewriter rewriter(ctx);
 
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()){
+    // if (failed(experimental::cfg::restoreCfStructure(funcOp, rewriter)))
+    //   signalPassFailure();
+
       DenseMap<StringRef, Operation*> memAccesses;
       DenseMap<StringRef, DenseMap<StringRef, SmallVector<Value>>> skipConditionForEachPair;
       DenseMap<StringRef, SmallVector<Value>> waitingSignalsForEachDst;
@@ -487,6 +515,10 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
       createSkipConditionGenerator(funcOp, memAccesses, skipConditionForEachPair, controlMerges, rewriter);
       createWaitingSignals(funcOp, memAccesses, waitingSignalsForEachDst, skipConditionForEachPair, controlMerges, ctx, rewriter);
       gateAllSuccessorAccesses(memAccesses, waitingSignalsForEachDst, rewriter);   
+
+
+      // if (failed(cfg::flattenFunction(funcOp)))
+      //   signalPassFailure();
 
   }
 

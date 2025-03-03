@@ -50,6 +50,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <utility>
+#include "experimental/Support/CFGAnnotation.h"
 
 using namespace mlir;
 using namespace mlir::func;
@@ -241,6 +242,7 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
+  // experimental::cfg::annotateCFG(funcOp, rewriter, namer);
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 

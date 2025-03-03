@@ -215,7 +215,7 @@ static bool isaMuxLoop(Operation *mux, CFGLoopInfo &li) {
 /// (`end`). "Each path identifies a Boolean product of elementary conditions
 /// expressing the reaching of the target BB from the corresponding member of
 /// the set; the product of all such paths are added".
-static BoolExpression *enumeratePaths(Block *start, Block *end,
+BoolExpression *experimental::ftd::enumeratePaths(Block *start, Block *end,
                                       const ftd::BlockIndexing &bi,
                                       const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be

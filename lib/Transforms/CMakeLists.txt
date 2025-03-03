@@ -27,6 +27,8 @@ add_dynamatic_library(DynamaticTransforms
   DynamaticTransformsPassIncGen
 
   LINK_LIBS PUBLIC
+  MLIRControlFlowDialect
+  MLIRFuncDialect
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
