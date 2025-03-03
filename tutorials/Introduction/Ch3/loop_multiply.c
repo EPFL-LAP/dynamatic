@@ -1,13 +1,13 @@
 #include "loop_multiply.h"
 #include "dynamatic/Integration.h"
 
-unsigned loop_multiply(in_int_t a[N]) {
+unsigned loopMultiply(in_int_t a[N]) {
   unsigned x = 2;
   for (unsigned i = 0; i < N; ++i) {
     if (a[i] == 0)
       x = x * x;
   }
-  return a[0];
+  return x;
 }
 
 int main(void) {
@@ -15,6 +15,6 @@ int main(void) {
   // Initialize a to [0, 1, 0, 1, ...]
   for (unsigned i = 0; i < N; ++i)
     a[i] = i % 2;
-  CALL_KERNEL(loop_multiply, a);
+  CALL_KERNEL(loopMultiply, a);
   return 0;
 }

@@ -254,6 +254,8 @@ public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
       "fast-token-delivery";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
+  // static constexpr llvm::StringLiteral OUT_OF_ORDER_EXECUTION =
+  //     "out-of-order-execution";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
 
@@ -270,6 +272,7 @@ public:
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
     addFlag({STRAIGHT_TO_QUEUE, "Use straight to queue strategy"});
+    // addFlag({OUT_OF_ORDER_EXECUTION, "Use out-of-order execution strategy"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -576,6 +579,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
+  // std::string outOfOrderExecution =
+  //     args.flags.contains(OUT_OF_ORDER_EXECUTION) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||

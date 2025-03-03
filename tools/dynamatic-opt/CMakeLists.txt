@@ -18,6 +18,7 @@ target_link_libraries(dynamatic-opt
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
+  DynamaticPutOfOrderExecution
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake
