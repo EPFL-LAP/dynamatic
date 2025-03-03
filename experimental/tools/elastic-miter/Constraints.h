@@ -16,7 +16,7 @@ public:
 };
 
 // A class to describe a Sequence Length Relation constraint.
-// It controls the relative length of the input sequences.
+// It controls the relative lengths of the input sequences.
 // The constraint has the form of an arithmetic equation. Once we for the actual
 // SMV constraint, the number in the equation will be replaced the respective
 // input with the index of the number.

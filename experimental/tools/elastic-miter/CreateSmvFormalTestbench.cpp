@@ -157,10 +157,10 @@ static std::string createMiterProperties(const std::string &moduleName,
                                ".num = 0)");
   }
 
-  // Make sure the buffer will start to hold at one point and from there on.
-  // The final property will be (Assuming inputs D and C, and outputs A and B):
-  // CTLSPEC AF (AG ((model.lhs_in_buf_D.num = model.rhs_in_buf_D.num) &
-  // (model.lhs_in_buf_C.num = model.rhs_in_buf_C.num) &
+  // Make sure the buffer property will start to hold at one point and from
+  // there on. The final property will be (Assuming inputs D and C, and outputs
+  // A and B): CTLSPEC AF (AG ((model.lhs_in_buf_D.num = model.rhs_in_buf_D.num)
+  // & (model.lhs_in_buf_C.num = model.rhs_in_buf_C.num) &
   // (model.lhs_out_buf_A.num = 0) & (model.rhs_out_buf_A.num = 0) &
   // (model.lhs_out_buf_B.num = 0) & (model.rhs_out_buf_B.num = 0)))
   std::string finalBufferProp =
