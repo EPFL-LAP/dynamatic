@@ -47,6 +47,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+const std::string EXTRA_SIGNAL_SPEC = "spec";
+
 static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
   return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
     if ((ty = handshake::detail::jointHandshakeTypeParser(parser)))
@@ -612,7 +614,6 @@ LogicalResult ConstantOp::inferReturnTypes(
   // - extra signals matching the input control type
   inferredReturnTypes.push_back(handshake::ChannelType::get(
       attr.getType(), controlType.getExtraSignals()));
-
   return success();
 }
 
