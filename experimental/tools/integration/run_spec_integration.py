@@ -310,7 +310,7 @@ def run_test(c_file, id, timeout):
   }
 
 
-kernel_name = "single_loop"
+kernel_name = "subdiag"
 
 
 def main():

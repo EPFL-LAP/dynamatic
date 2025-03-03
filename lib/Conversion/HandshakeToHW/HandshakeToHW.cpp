@@ -675,7 +675,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpeculatorOp>([&](auto) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+        addUnsigned("FIFO_DEPTH", 32);
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
             handshake::SpeculatingBranchOp>([&](auto) {
@@ -683,7 +683,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpecSaveCommitOp>([&](auto) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+        addUnsigned("FIFO_DEPTH", 32);
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
