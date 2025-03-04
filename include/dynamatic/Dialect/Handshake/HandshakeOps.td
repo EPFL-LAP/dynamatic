@@ -553,6 +553,88 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 }
 
 //===----------------------------------------------------------------------===//
+// Out-of-Order Execuion Operations
+//===----------------------------------------------------------------------===//
+
+
+def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
+  Pure, SameOperandsAndResultType,
+]> {
+  let summary = "fifo operation for tags.";
+  let description = [{
+    The `free_tags_fifo` operation represents a FIFO queue that supports multiple inputs and a single output. 
+    It takes free tags as input and outputs a free tag, giving it to the Tagger when necessary
+    
+    Example:
+
+    ```mlir
+    %0 = free_tags_fifo %data_in, %valid_in, %ready_out : !handshake.channel<i32>, !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins Variadic<HandshakeType>:$tags);
+
+  let results = (outs HandshakeType:$freeTag);
+
+}
+
+def TaggerOp : Handshake_Op<"tagger", [
+  Pure, SameOperandsAndResultType
+]> {
+  let summary = "Tagger operation for tagging data with tag signals.";
+  let description = [{
+    The `tagger` operation tags data with tags, where the tag is determined based on the `freeTag_data`.
+    It processes a set of input data arrays and tags them with the provided tag value for each data item.
+
+    Example:
+
+    ```mlir
+    %tagged = tagger %data_in, %valid_in, %ready_out, %freeTag_data : !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$freeTagData ,
+     Variadic<HandshakeType>:$dataOperands
+  );
+
+  let results = (outs Variadic<HandshakeType>:$result);
+
+  //let assemblyFormat = "$dataOperands, $freeTagData `:` $result";
+}
+
+def UntaggerOp : Handshake_Op<"untagger", [
+  Pure, SameOperandsAndResultType
+]> {
+  let summary = "Untagger operation for extracting tag signals and forwarding data.";
+  let description = [{
+    The `untagger` operation extracts tags from incoming tagged data while forwarding the data itself. 
+    It processes a set of input data arrays and separates the tag portion, outputting it as `freeTag_data`.
+
+    Example:
+
+    ```mlir
+    %untagged, %freeTag = untagger %data_in, %valid_in, %ready_out, %tag_in 
+      : !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins
+    HandshakeType:$tagIn ,   
+    Variadic<HandshakeType>:$dataOperands   
+                      
+  );
+
+  let results = (outs
+    HandshakeType:$freeTagData ,  
+    Variadic<HandshakeType>:$result         
+  );
+
+  // let assemblyFormat = "$dataOperands, $tagIn `:` $result, $freeTagData";
+}
+
+
+
+//===----------------------------------------------------------------------===//
 // Memory interfaces
 //===----------------------------------------------------------------------===//
 

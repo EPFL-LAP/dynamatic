@@ -1,10 +1,10 @@
-#ifndef LOOP_MULTIPLY_H
-#define LOOP_MULTIPLY_H
+#ifndef HOME_KOSSAYBA_DYNAMATIC_TUTORIALS_INTRODUCTION_CH1_LOOP_MULTIPLY_H
+#define HOME_KOSSAYBA_DYNAMATIC_TUTORIALS_INTRODUCTION_CH1_LOOP_MULTIPLY_H
 
 #define N 8
 
 typedef int in_int_t;
 
-unsigned loop_multiply(in_int_t a[N]);
+unsigned loopMultiply(in_int_t a[N]);
 
-#endif // LOOP_MULTIPLY_H
+#endif // HOME_KOSSAYBA_DYNAMATIC_TUTORIALS_INTRODUCTION_CH1_LOOP_MULTIPLY_H

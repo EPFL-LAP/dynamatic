@@ -749,5 +749,43 @@
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd",
     "dependencies": ["types"]
+  },
+  {
+    "name": "handshake.tagger",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_IN", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_OUT", "type": "unsigned", "lb": 1 },
+      { "name": "TOTAL_TAG_SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "TAG_SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/tagger.vhd",
+    "dependencies": ["join", "fork"]
+  },
+
+{
+    "name": "handshake.untagger",
+    "parameters": [
+      { "name": "SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_IN", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_OUT", "type": "unsigned", "lb": 1 },
+      { "name": "TOTAL_TAG_SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "TAG_SIZE", "type": "unsigned", "lb": 1 },
+      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/untagger.vhd"
+  },
+
+ {
+    "name": "handshake.free_tags_fifo",
+    "parameters": [
+      { "name": "INPUTS", "type": "unsigned", "lb": 1 },
+      { "name": "OUTPUTS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_IN", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_SIZE_OUT", "type": "unsigned", "lb": 1 },
+      { "name": "FIFO_DEPTH", "type": "unsigned", "lb": 1 }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/free_tags_fifo.vhd"
   }
 ]
