@@ -88,7 +88,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
     // 2. For Transparent Slots:
     // When numslot = 1, map to a 1-slot R buffer.
-    When numslot > 1, map to a numslot-slot T buffer.
+    // When numslot > 1, map to a numslot-slot T buffer.
     if (result.numSlotDV == 1){
       result.numSlotDV = 1;
     } else if (result.numSlotDV == 2){

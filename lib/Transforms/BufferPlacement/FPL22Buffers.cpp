@@ -89,9 +89,10 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     // When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
     // 2. For Transparent Slots:
     // When numslot = 1, map to a 1-slot R buffer.
-    // After the two steps, if the R slot count exceeds 1, 
+    // When numslot > 1, map to a numslot-slot T buffer.
+    // 3. After the two steps, if the R slot count exceeds 1, 
     // convert the additional slots beyond 1 into T buffers.
-    // Then, if both DV/DVE and T buffers are present, 
+    // 4. Then, if both DV/DVE and T buffers are present, 
     // convert the T buffers into DVE buffers.
     if (result.numSlotR > 1) {
       result.numSlotT = result.numSlotR;
