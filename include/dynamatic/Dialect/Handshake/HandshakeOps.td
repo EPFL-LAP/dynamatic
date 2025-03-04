@@ -230,15 +230,40 @@ def BufferOp : Handshake_Op<"buffer", [
     (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
          "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
   ];
-
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
                                            TIMING_ATTR_NAME = "TIMING",
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
     
-    static constexpr ::llvm::StringLiteral DV_TYPE="DV", R_TYPE="R", 
-                                           T_TYPE="T", DVE_TYPE="DVE",
-                                           DVR_TYPE="DVR";
+    /// DV buffer. A DV buffer cuts DV signal paths. It consists of a chain of OEHBs (Opaque Elastic Half-Buffers).
+    /// Each slot in a DV buffer is an OEHB, which introduces one cycle of latency on DV paths.
+    /// Therefore, the latency on DV paths equals its number of slots.
+    /// A DV buffer does not cut the R signal path and introduces no latency on R.
+    static constexpr ::llvm::StringLiteral DV_TYPE = "DV";
+    
+    /// R buffer. An R buffer cuts the R signal path. 
+    /// It consists of a chain of TEHBs (Transparent Elastic Half-Buffers).
+    /// Each slot introduces one cycle of latency on the R path.
+    /// The latency on R equals its number of slots, while DV paths remain unaffected.
+    static constexpr ::llvm::StringLiteral R_TYPE = "R";
+    
+    /// T (Transparent) Buffer. A T buffer is a DVE equipped with a bypass, 
+    /// introducing no latency on any signal paths.
+    /// Its sole function is to contain tokens.
+    static constexpr ::llvm::StringLiteral T_TYPE = "T";
+    
+    /// DVE (DV Elastic) buffer. A DVE buffer cuts DV paths.
+    /// Unlike a DV buffer, which is composed of concatenated OEHB slots, 
+    /// a DVE has an unsplittable structure.
+    /// It introduces one cycle of latency on DV paths regardless of the 
+    /// number of slots and has no latency on R.
+    static constexpr ::llvm::StringLiteral DVE_TYPE = "DVE";
+    
+    /// DVR buffer. A DVR buffer cuts both DV and R signal paths.
+    /// It consists of a chain of DVR slots.
+    /// Each slot introduces one cycle of latency on both DV and R paths, 
+    /// so the latency on both equals its number of slots.
+    static constexpr ::llvm::StringLiteral DVR_TYPE = "DVR";
     
   }];
 

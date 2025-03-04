@@ -83,6 +83,16 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     result.deductInternalBuffers(Channel(channel), timingDB);
 
     // Remap to general buffer types.
+    // 1. For Opaque Slots:
+    // When numslot = 1, map to a 1-slot DV buffer.
+    // When numslot = 2, map to a 1-slot DV buffer plus a 1-slot R buffer.
+    // When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
+    // 2. For Transparent Slots:
+    // When numslot = 1, map to a 1-slot R buffer.
+    // After the two steps, if the R slot count exceeds 1, 
+    // convert the additional slots beyond 1 into T buffers.
+    // Then, if both DV/DVE and T buffers are present, 
+    // convert the T buffers into DVE buffers.
     if (result.numSlotR > 1) {
       result.numSlotT = result.numSlotR;
       result.numSlotR = 0;
