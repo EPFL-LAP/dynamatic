@@ -29,20 +29,18 @@ using namespace dynamatic::buffer::fpga20;
 
 FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, bool legacyPlacement)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
-      legacyPlacement(legacyPlacement) {
+                             double targetPeriod)
+    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
 FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, bool legacyPlacement,
-                             Logger &logger, StringRef milpName)
+                             double targetPeriod, Logger &logger,
+                             StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName),
-      legacyPlacement(legacyPlacement) {
+                          milpName) {
   if (!unsatisfiable)
     setup();
 }
@@ -65,23 +63,18 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
     if (placeOpaque) {
-      if (legacyPlacement) {
-        // Satisfy the transparent slots requirement, all other slots are opaque
-        result.numSlotR = props.minTrans;
-        result.numSlotDV = numSlotsToPlace - props.minTrans;
+      // We want as many slots as possible to be transparent and at least one
+      // opaque slot, while satisfying all buffering constraints
+      unsigned actualMinOpaque = std::max(1U, props.minOpaque);
+      if (props.maxTrans.has_value() &&
+          (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
+        result.numSlotR = props.maxTrans.value();
+        result.numSlotDV = numSlotsToPlace - result.numSlotR;
       } else {
-        // We want as many slots as possible to be transparent and at least one
-        // opaque slot, while satisfying all buffering constraints
-        unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-        if (props.maxTrans.has_value() &&
-            (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-          result.numSlotR = props.maxTrans.value();
-          result.numSlotDV = numSlotsToPlace - result.numSlotR;
-        } else {
-          result.numSlotDV = actualMinOpaque;
-          result.numSlotR = numSlotsToPlace - result.numSlotDV;
-        }
+        result.numSlotDV = actualMinOpaque;
+        result.numSlotR = numSlotsToPlace - result.numSlotDV;
       }
+    }
     } else {
       // All slots should be transparent
       result.numSlotR = numSlotsToPlace;

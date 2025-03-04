@@ -1,5 +1,12 @@
 import re
 
+ATTR_DATA_TYPE = "data_type"
+ATTR_TIMING = "timing"
+ATTR_SIZE = "size"
+ATTR_SLOTS = "slots"
+ATTR_VALUE = "value"
+ATTR_PORT_TYPES = "port_types"
+
 
 class SmvScalarType:
 
@@ -44,3 +51,9 @@ class SmvScalarType:
 
   def __str__(self):
     return f"{self.smv_type}"
+
+
+HANDSHAKE_CONTROL_TYPE = SmvScalarType("!handshake.control<>")
+
+def TEHB_BUFFER_PARAMS(data_type):
+  return {ATTR_SLOTS: 1, ATTR_TIMING: "R: 1", ATTR_PORT_TYPES: {"outs": data_type.mlir_type}}

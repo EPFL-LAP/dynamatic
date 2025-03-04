@@ -24,9 +24,12 @@ class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
 
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    SameOperandsAndResultType, ReshapableChannelsInterface,
+    SameOperandsAndResultType,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
+  let arguments = (ins ChannelType:$lhs, ChannelType:$rhs);
+  let results = (outs ChannelType:$result);
+
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
 
   let extraClassDefinition = [{
@@ -43,35 +46,39 @@ class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IntBinaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_BinaryOp<mnemonic, traits> {
-  let arguments = (ins IntChannelType:$lhs, IntChannelType:$rhs);
-  let results = (outs IntChannelType:$result);
-}
+  Handshake_Arith_BinaryOp<mnemonic, traits # [
+    IsIntChannel<"lhs">,
+    IsIntChannel<"rhs">,
+    IsIntChannel<"result">
+  ]> {}
 
 class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_BinaryOp<mnemonic, traits> {
-  let arguments = (ins FloatChannelType:$lhs, FloatChannelType:$rhs);
-  let results = (outs FloatChannelType:$result);
-}
+  Handshake_Arith_BinaryOp<mnemonic, traits # [
+    IsFloatChannel<"lhs">,
+    IsFloatChannel<"rhs">,
+    IsFloatChannel<"result">
+  ]> {}
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType,
-                                         ReshapableChannelsInterface]
+                                         IsFloatChannel<"operand">,
+                                         IsFloatChannel<"result">]
 > {
-  let arguments = (ins FloatChannelType:$operand);
-  let results = (outs FloatChannelType:$result);
+  let arguments = (ins ChannelType:$operand);
+  let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$operand attr-dict `:` type($result)";
 }
 
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_Op<mnemonic, traits # [
-    AllTypesMatch<["lhs", "rhs"]>, SameExtraSignalsInterface,
-    ReshapableChannelsInterface,
+    AllTypesMatch<["lhs", "rhs"]>,
+    AllExtraSignalsMatch<["lhs", "rhs", "result"]>,
+    IsIntSizedChannel<1, "result">,
     DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]> {
-  let results = (outs BoolChannel:$result);
+  let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$predicate `,` $lhs `,` $rhs attr-dict `:` type($lhs)";
 
@@ -89,11 +96,12 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [AllExtraSignalsMatch<["in", "out"]>,
+                                         IsIntChannel<"in">,
+                                         IsIntChannel<"out">]
 > {
-  let arguments = (ins IntChannelType:$in);
-  let results = (outs IntChannelType:$out);
+  let arguments = (ins ChannelType:$in);
+  let results = (outs ChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
@@ -102,11 +110,12 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [AllExtraSignalsMatch<["in", "out"]>,
+                                         IsFloatChannel<"in">,
+                                         IsFloatChannel<"out">]
 > {
-  let arguments = (ins FloatChannelType:$in);
-  let results = (outs FloatChannelType:$out);
+  let arguments = (ins ChannelType:$in);
+  let results = (outs ChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
@@ -114,11 +123,12 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                         ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [AllExtraSignalsMatch<["in", "out"]>,
+                                         IsIntChannel<"in">,
+                                         IsFloatChannel<"out">]
 > {
-  let arguments = (ins IntChannelType:$in);
-  let results = (outs FloatChannelType:$out);
+  let arguments = (ins ChannelType:$in);
+  let results = (outs ChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
@@ -126,11 +136,12 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameExtraSignalsInterface,
-                                          ReshapableChannelsInterface]
+  Handshake_Arith_Op<mnemonic, traits # [AllExtraSignalsMatch<["in", "out"]>,
+                                         IsFloatChannel<"in">,
+                                         IsIntChannel<"out">]
 > {
-  let arguments = (ins FloatChannelType:$in);
-  let results = (outs IntChannelType:$out);
+  let arguments = (ins ChannelType:$in);
+  let results = (outs ChannelType:$out);
   
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
@@ -177,11 +188,14 @@ def Handshake_CmpFPredicateAttr : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
-def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf"> {
+def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
+  IsFloatChannel<"lhs">,
+  IsFloatChannel<"rhs">
+]> {
   let summary = "Floating-point comparison.";
  
   let arguments = (ins Handshake_CmpFPredicateAttr:$predicate, 
-                       FloatChannelType:$lhs, FloatChannelType:$rhs);
+                       ChannelType:$lhs, ChannelType:$rhs);
 }
 
 // Same as the arithmetic integer predicates
@@ -202,14 +216,18 @@ def Handshake_CmpIPredicateAttr : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
-def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi"> {
+def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">
+]> {
   let summary = "Integer comparison.";
  
-  let arguments = (ins Handshake_CmpIPredicateAttr:$predicate, IntChannelType:$lhs,
-                       IntChannelType:$rhs);
+  let arguments = (ins Handshake_CmpIPredicateAttr:$predicate, ChannelType:$lhs,
+                       ChannelType:$rhs);
 }
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
+  AllExtraSignalsMatch<["ctrl", "result"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
 ]> {
@@ -226,8 +244,10 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     ```
   }];
 
-  let arguments = (ins TypedAttrInterface:$value, SimpleControl:$ctrl);
-  let results = (outs SimpleChannel:$result);
+  // The ctrl operand may have extra signals.
+  // See type verification documentation for details.
+  let arguments = (ins TypedAttrInterface:$value, ControlType:$ctrl);
+  let results = (outs ChannelType:$result);
 
   // The type of the control also needs to be specified in the IR.
   // It may have extra bits, which could affect the result's type and token.
@@ -286,13 +306,13 @@ def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [Commutative]> {
 
 def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   AllTypesMatch<["trueValue", "falseValue", "result"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
-  DeclareOpInterfaceMethods<SameExtraSignalsInterface, ["getChannelsWithSameExtraSignals"]>,
+  AllExtraSignalsMatch<["condition", "trueValue", "falseValue", "result"]>,
+  IsIntSizedChannel<1, "condition">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
  
-  let arguments = (ins BoolChannel:$condition, ChannelType:$trueValue,
+  let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue);
   let results = (outs ChannelType:$result);
 

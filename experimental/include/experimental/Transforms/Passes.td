@@ -75,10 +75,7 @@ def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
   let constructor = "dynamatic::experimental::sharing::createCreditBasedSharing()";
 
   let options = [Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
-      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
-      "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
-      "legacy Dynamatic would, placing at most a single buffer type on any given "
-      "channel)">,
+      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), 'fpl22'.">,
       Option<"frequencies", "frequencies", "std::string", "",
       "Path to CSV-formatted file containing estimated transition frequencies "
       "between basic blocks in the kernel.">,
