@@ -1,79 +1,41 @@
-//===- elastic-miter.cpp - The elastic-miter driver -------------*- C++ -*-===//
+//===- FabricGeneration.cpp ------------------------------------ *- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements the elastic-miter tool, it creates an elastic miter
-// circuit, which can later be used to formally verify equivalence of two
-// handshake circuits.
-//
-//===----------------------------------------------------------------------===//
 
-#include <filesystem>
-
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/Parser/Parser.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/Path.h"
+#include <filesystem>
+#include <string>
+#include <utility>
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/InitAllDialects.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 
-namespace cl = llvm::cl;
+#include "FabricGeneration.h"
+
 using namespace mlir;
 using namespace dynamatic::handshake;
 
-// Instead of keeping the original BB for the LHS/RHS circuit, the BB is used to
-// organize the different part of the miter circuit. The BBs can therefore not
-// be used for any control-flow analysis.
-static constexpr unsigned int BB_IN = 0;  // Input auxillary logic
-static constexpr unsigned int BB_LHS = 1; // Operations of the LHS circuit
-static constexpr unsigned int BB_RHS = 2; // Operations of the RHS circuit
-static constexpr unsigned int BB_OUT = 3; // Output auxillary logic
+namespace dynamatic::experimental {
 
-// CLI Settings
-
-static cl::OptionCategory mainCategory("elastic-miter Options");
-
-static cl::opt<size_t>
-    nrOfBufferSlots("bufferSlots", cl::Prefix, cl::Required,
-                    cl::desc("Specify the number of required buffers."),
-                    cl::cat(mainCategory));
-static cl::opt<std::string>
-    lhsFilenameArg("lhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the left-hand side (LHS) input file"),
-                   cl::cat(mainCategory));
-static cl::opt<std::string>
-    rhsFilenameArg("rhs", cl::Prefix, cl::Required,
-                   cl::desc("Specify the right-hand side (RHS) input file"),
-                   cl::cat(mainCategory));
-
-static cl::opt<std::string> outputDir("o", cl::Prefix, cl::Required,
-                                      cl::desc("Specify output directory"),
-                                      cl::cat(mainCategory));
-
-static void setHandshakeName(OpBuilder &builder, Operation *op,
-                             const std::string &name) {
+void setHandshakeName(OpBuilder &builder, Operation *op,
+                      const std::string &name) {
   StringAttr nameAttr = builder.getStringAttr(name);
   op->setAttr(dynamatic::NameAnalysis::ATTR_NAME, nameAttr);
 }
 
-static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
-                                   const std::string &name) {
+void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
+                            const std::string &name) {
   dynamatic::setBB(op, bb);
   setHandshakeName(builder, op, name);
 }
@@ -81,7 +43,7 @@ static void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
 // Add a prefix to the handshake.name attribute of an operation.
 // This avoids naming conflicts when merging two functions together.
 // Returns failure() when the operation doesn't already have a handshake.name
-static LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
+LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
   StringAttr nameAttr =
       op.getAttrOfType<StringAttr>(dynamatic::NameAnalysis::ATTR_NAME);
   if (!nameAttr)
@@ -95,7 +57,7 @@ static LogicalResult prefixOperation(Operation &op, const std::string &prefix) {
   return success();
 }
 
-static FailureOr<std::pair<FuncOp, Block *>>
+FailureOr<std::pair<FuncOp, Block *>>
 buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
                       ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
                       NamedAttribute argNamedAttr,
@@ -117,7 +79,7 @@ buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
 
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
 // The result names have EQ_ prefixed.
-static FailureOr<std::pair<FuncOp, Block *>>
+FailureOr<std::pair<FuncOp, Block *>>
 buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 
   // Check equality of interfaces
@@ -149,14 +111,26 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
   auto resNamedAttr =
       builder.getNamedAttr("resNames", builder.getArrayAttr(prefixedResAttr));
 
-  size_t nrOfResults = lhsFuncOp.getResultTypes().size();
   ChannelType i1ChannelType = ChannelType::get(builder.getI1Type());
 
-  // The outputs of the elastic miter are an EQ gate with a Boolean result
-  // for every primary output of the original circuits.
-  // Create a vector with to replace all the output channels with type
-  // !handshake.channel<i1>
-  llvm::SmallVector<Type> outputTypes(nrOfResults, i1ChannelType);
+  // If the original output was of ChannelType, outputs of the elastic miter is
+  // an EQ gate with a Boolean result. Otherwise it is the output of a join. The
+  // ChannelTypes are replaced with !handshake.channel<i1>, independent of size,
+  // ControlType are kept the same.
+  llvm::SmallVector<Type> outputTypes;
+
+  for (Type type : lhsFuncOp.getResultTypes()) {
+    // If the type is a handshake::ControlType, keep it
+    if (type.isa<handshake::ControlType>()) {
+      outputTypes.push_back(type);
+    } else {
+      // Otherwise replace it with !handshake.channel<i1>
+      outputTypes.push_back(i1ChannelType);
+    }
+  }
+
+  // Now, you have the modified SmallVector<Type>
+  mlir::ArrayRef<mlir::Type> newArrayRef(outputTypes);
 
   // The name of the new function is: elastic_miter_<LHS_NAME>_<RHS_NAME>
   std::string miterName = "elastic_miter_" + lhsFuncOp.getNameAttr().str() +
@@ -172,7 +146,7 @@ buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp) {
 // 1. The FuncOp is materialized (each Value is only used once).
 // 2. There are no memory interfaces
 // 3. Arguments  and results are all handshake.channel or handshake.control type
-static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
+FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   // We only support one function per module
   FuncOp funcOp = nullptr;
   for (auto op : module.getOps<FuncOp>()) {
@@ -221,80 +195,155 @@ static FailureOr<FuncOp> getModuleFuncOpAndCheck(ModuleOp module) {
   return funcOp;
 }
 
-static LogicalResult createFiles(StringRef outputDir, StringRef mlirFilename,
-                                 ModuleOp mod, llvm::json::Object jsonObject) {
+// Prints the module to the provided file, creates the directory if it does not
+// exist yet.
+LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
+                             ModuleOp modul) {
 
   std::error_code ec;
   OpPrintingFlags printingFlags;
 
-  // Create the (potentially nested) output directory
-  if (auto ec = llvm::sys::fs::create_directories(outputDir); ec.value() != 0) {
-    llvm::errs() << "Failed to create output directory\n" << ec.message();
+  // Create the output directory
+  std::filesystem::create_directories(mlirPath.parent_path());
+
+  // Create the the file at the path
+  llvm::raw_fd_ostream fileStream(mlirPath.string(), ec,
+                                  llvm::sys::fs::OF_None);
+
+  modul->print(fileStream, printingFlags);
+  fileStream.close();
+
+  return success();
+}
+
+// Create the reachability circuit by putting ND wires at all the in- and
+// outputs
+FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
+createReachabilityCircuit(MLIRContext &context,
+                          const std::filesystem::path &filename) {
+
+  OwningOpRef<ModuleOp> mod =
+      parseSourceFile<ModuleOp>(filename.string(), &context);
+  if (!mod)
+    return failure();
+
+  // Get the FuncOp from the module, also check some needed properties
+  auto funcOrFailure = getModuleFuncOpAndCheck(mod.get());
+  if (failed(funcOrFailure))
+    return failure();
+  FuncOp funcOp = funcOrFailure.value();
+
+  OpBuilder builder(&context);
+
+  for (Block &block : funcOp.getBlocks()) {
+    builder.setInsertionPointToStart(&block);
+  }
+
+  // Create the config
+  ElasticMiterConfig config;
+  config.funcName = funcOp.getNameAttr().str();
+
+  // Create the input side auxillary logic:
+  // Every primary input of the LHS/RHS circuits is connected to a ND wire.
+  // The output of the ND wire is then connected to the original input of the
+  // circuit.
+  for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
+    BlockArgument arg = funcOp.getArgument(i);
+
+    std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
+
+    NDWireOp ndWireOp = builder.create<NDWireOp>(funcOp.getLoc(), arg);
+    setHandshakeAttributes(builder, ndWireOp, 0, ndwName);
+
+    // Use the newly created NDwire's output instead of the original argument in
+    // the funcOp's operations
+    for (Operation *op : llvm::make_early_inc_range(arg.getUsers())) {
+      if (op != ndWireOp)
+        op->replaceUsesOfWith(arg, ndWireOp.getResult());
+    }
+
+    Attribute attr = funcOp.getArgNames()[i];
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    config.arguments.push_back(
+        std::make_pair(strAttr.getValue().str(), arg.getType()));
+  }
+
+  size_t endOpCount = std::distance(funcOp.getOps<EndOp>().begin(),
+                                    funcOp.getOps<EndOp>().end());
+
+  if (endOpCount != 1) {
+    llvm::errs() << "The provided FuncOp is invalid. It needs to contain "
+                    "exactly one EndOp.\n";
     return failure();
   }
 
-  // Create the the handshake miter file
-  SmallString<128> outMLIRFile;
-  llvm::sys::path::append(outMLIRFile, outputDir, mlirFilename);
-  llvm::raw_fd_ostream fileStream(outMLIRFile, ec, llvm::sys::fs::OF_None);
+  // GetEndOp, after checking there is only one EndOp
+  EndOp endOp = *funcOp.getOps<EndOp>().begin();
 
-  mod->print(fileStream, printingFlags);
-  fileStream.close();
+  // Create the output side auxillary logic:
+  // Every output of the LHS/RHS circuits is connected to a non-derministic
+  // wire (ND wire). The output of the ND wire is connected to the respective
+  // primary output.
+  for (unsigned i = 0; i < endOp.getOperands().size(); ++i) {
+    Value result = endOp.getOperand(i);
 
-  // Create the JSON config file
-  SmallString<128> outJsonFile;
-  llvm::sys::path::append(outJsonFile, outputDir, "elastic-miter-config.json");
-  llvm::raw_fd_ostream jsonFileStream(outJsonFile, ec, llvm::sys::fs::OF_None);
+    std::string ndwName = "ndw_out_" + funcOp.getResName(i).str();
 
-  // Convert the JSON object to a JSON value in order to be printed
-  llvm::json::Value jsonValue(std::move(jsonObject));
-  // Print the JSON to the file with proper formatting
-  jsonFileStream << llvm::formatv("{0:2}", jsonValue);
-  jsonFileStream.close();
+    NDWireOp endNDWireOp = builder.create<NDWireOp>(endOp->getLoc(), result);
+    setHandshakeAttributes(builder, endNDWireOp, 3, ndwName);
 
-  return success();
+    // Use the newly created NDwire's output instead of the original argument in
+    // the FuncOp's operations
+    for (Operation *op : llvm::make_early_inc_range(result.getUsers())) {
+      if (op != endNDWireOp)
+        op->replaceUsesOfWith(result, endNDWireOp.getResult());
+    }
+    Attribute attr = funcOp.getResNames()[i];
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    config.results.push_back(
+        std::make_pair(strAttr.getValue().str(), result.getType()));
+  }
+
+  return std::make_pair(mod.release(), config);
 }
 
 // This creates an elastic-miter module given the path to two MLIR files. The
 // files need to contain exactely one module each. Each module needs to contain
 // exactely one handshake.func.
-static FailureOr<std::pair<ModuleOp, llvm::json::Object>>
-createElasticMiter(MLIRContext &context, StringRef lhsFilename,
-                   StringRef rhsFilename, size_t bufferSlots) {
+FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
+createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
+                   size_t bufferSlots) {
 
-  OwningOpRef<ModuleOp> lhsModule =
-      parseSourceFile<ModuleOp>(lhsFilename, &context);
-  if (!lhsModule)
+  // Get the LHS FuncOp from the LHS module, also check some required properties
+  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
+  if (failed(funcOrFailure)) {
+    llvm::errs() << "Failed to get LHS FuncOp.\n";
     return failure();
-  OwningOpRef<ModuleOp> rhsModule =
-      parseSourceFile<ModuleOp>(rhsFilename, &context);
-  if (!rhsModule)
-    return failure();
-
-  // Get the LHS FuncOp from the LHS module, also check the
-  auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule.get());
-  if (failed(funcOrFailure))
-    return failure();
+  }
   FuncOp lhsFuncOp = funcOrFailure.value();
 
   // Get the RHS FuncOp from the RHS module
-  funcOrFailure = getModuleFuncOpAndCheck(rhsModule.get());
-  if (failed(funcOrFailure))
+  funcOrFailure = getModuleFuncOpAndCheck(rhsModule);
+  if (failed(funcOrFailure)) {
+    llvm::errs() << "Failed to get RHS FuncOp.\n";
     return failure();
+  }
   FuncOp rhsFuncOp = funcOrFailure.value();
 
   OpBuilder builder(&context);
 
   ModuleOp miterModule = ModuleOp::create(builder.getUnknownLoc());
   if (!miterModule) {
+    llvm::errs() << "Failed to create new empty module.\n";
     return failure();
   }
 
   // Create a new FuncOp containing an entry Block
   auto pairOrFailure = buildEmptyMiterFuncOp(builder, lhsFuncOp, rhsFuncOp);
-  if (failed(pairOrFailure))
+  if (failed(pairOrFailure)) {
+    llvm::errs() << "Failed to create new funcOp.\n";
     return failure();
-
+  }
   // Unpack the returned FuncOp and entry Block
   auto [newFuncOp, newBlock] = pairOrFailure.value();
 
@@ -303,22 +352,25 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
   // Add "lhs_" to all operations in the LHS funcOp
   for (Operation &op : lhsFuncOp.getOps()) {
-    if (failed(prefixOperation(op, "lhs_")))
+    if (failed(prefixOperation(op, "lhs_"))) {
+      llvm::errs() << "Failed to prefix the LHS.\n";
       return failure();
+    }
   }
   // Add "rhs_" to all operations in the RHS funcOp
   for (Operation &op : rhsFuncOp.getOps()) {
-    if (failed(prefixOperation(op, "rhs_")))
+    if (failed(prefixOperation(op, "rhs_"))) {
+      llvm::errs() << "Failed to prefix the RHS.\n";
       return failure();
+    }
   }
 
   builder.setInsertionPointToStart(newBlock);
 
-  // We need to keep track of the names to add them to the JSON config file
-  llvm::json::Array inputBufferNames;
-  llvm::json::Array outputBufferNames;
-  llvm::json::Array ndwireNames;
-  llvm::json::Array eqNames;
+  // Create the config
+  ElasticMiterConfig config;
+  config.lhsFuncName = lhsFuncOp.getNameAttr().str();
+  config.rhsFuncName = rhsFuncOp.getNameAttr().str();
 
   Operation *nextLocation;
 
@@ -331,9 +383,9 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   // the original input of the circuits. This completely decouples the
   // operation of the two circuits.
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
-    BlockArgument lhsArgs = lhsFuncOp.getArgument(i);
-    BlockArgument rhsArgs = rhsFuncOp.getArgument(i);
-    BlockArgument miterArgs = newFuncOp.getArgument(i);
+    BlockArgument lhsArg = lhsFuncOp.getArgument(i);
+    BlockArgument rhsArg = rhsFuncOp.getArgument(i);
+    BlockArgument miterArg = newFuncOp.getArgument(i);
 
     std::string forkName = "in_fork_" + lhsFuncOp.getArgName(i).str();
     std::string lhsBufName = "lhs_in_buf_" + lhsFuncOp.getArgName(i).str();
@@ -341,7 +393,8 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     std::string lhsNdwName = "lhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
     std::string rhsNdwName = "rhs_in_ndw_" + lhsFuncOp.getArgName(i).str();
 
-    ForkOp forkOp = builder.create<ForkOp>(newFuncOp.getLoc(), miterArgs, 2);
+    LazyForkOp forkOp =
+        builder.create<LazyForkOp>(newFuncOp.getLoc(), miterArg, 2);
     setHandshakeAttributes(builder, forkOp, BB_IN, forkName);
 
     BufferOp lhsBufferOp =
@@ -362,23 +415,23 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
 
     nextLocation = rhsNDWireOp;
 
-    llvm::json::Array inputBufferPair;
-    inputBufferPair.push_back(lhsBufName);
-    inputBufferPair.push_back(rhsBufName);
-    inputBufferNames.push_back(std::move(inputBufferPair));
-
-    ndwireNames.push_back(std::move(lhsNdwName));
-    ndwireNames.push_back(std::move(rhsNdwName));
+    config.inputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
+    config.inputNDWires.push_back(std::make_pair(lhsNdwName, rhsNdwName));
 
     // Use the newly created fork's output instead of the original argument in
     // the lhsFuncOp's operations
-    for (Operation *op : llvm::make_early_inc_range(lhsArgs.getUsers()))
-      op->replaceUsesOfWith(lhsArgs, lhsNDWireOp.getResult());
+    for (Operation *op : llvm::make_early_inc_range(lhsArg.getUsers()))
+      op->replaceUsesOfWith(lhsArg, lhsNDWireOp.getResult());
 
     // Use the newly created fork's output instead of the original argument in
     // the rhsFuncOp's operations
-    for (Operation *op : llvm::make_early_inc_range(rhsArgs.getUsers()))
-      op->replaceUsesOfWith(rhsArgs, rhsNDWireOp.getResult());
+    for (Operation *op : llvm::make_early_inc_range(rhsArg.getUsers()))
+      op->replaceUsesOfWith(rhsArg, rhsNDWireOp.getResult());
+
+    Attribute attr = lhsFuncOp.getArgNames()[i];
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    config.arguments.push_back(
+        std::make_pair(strAttr.getValue().str(), lhsArg.getType()));
   }
 
   size_t lhsEndOpCount = std::distance(lhsFuncOp.getOps<EndOp>().begin(),
@@ -403,7 +456,7 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
   // completely decouples the operation of the two circuits. The buffers then
   // are connected pairwise to a comparator to check that the outputs are
   // equivalent.
-  llvm::SmallVector<Value> eqResults;
+  llvm::SmallVector<Value> miterResultValues;
   for (unsigned i = 0; i < lhsEndOp.getOperands().size(); ++i) {
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
@@ -434,25 +487,35 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
-    CmpIOp compOp = builder.create<CmpIOp>(
-        builder.getUnknownLoc(), CmpIPredicate::eq, lhsEndBufferOp.getResult(),
-        rhsEndBufferOp.getResult());
-    setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
+    if (lhsResult.getType().isa<handshake::ControlType>()) {
+      ValueRange joinInputs = {lhsEndBufferOp.getResult(),
+                               rhsEndBufferOp.getResult()};
+      JoinOp joinOp =
+          builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
+      setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);
+      miterResultValues.push_back(joinOp.getResult());
+    } else {
+      CmpIOp compOp = builder.create<CmpIOp>(
+          builder.getUnknownLoc(), CmpIPredicate::eq,
+          lhsEndBufferOp.getResult(), rhsEndBufferOp.getResult());
+      setHandshakeAttributes(builder, compOp, BB_OUT, eqName);
+      miterResultValues.push_back(compOp.getResult());
+    }
 
-    llvm::json::Array outputBufferPair;
-    outputBufferPair.push_back(lhsBufName);
-    outputBufferPair.push_back(rhsBufName);
-    outputBufferNames.push_back(std::move(outputBufferPair));
+    config.outputBuffers.push_back(std::make_pair(lhsBufName, rhsBufName));
+    config.outputNDWires.push_back(std::make_pair(lhsNDwName, rhsNDwName));
 
-    ndwireNames.push_back(std::move(lhsNDwName));
-    ndwireNames.push_back(std::move(rhsNDwName));
+    config.eq.push_back(eqName);
 
-    eqNames.push_back(std::move(eqName));
-
-    eqResults.push_back(compOp.getResult());
+    Attribute attr = lhsFuncOp.getResNames()[i];
+    auto strAttr = attr.dyn_cast<StringAttr>();
+    // The result name is prefixed with EQ_
+    config.results.push_back(
+        std::make_pair("EQ_" + strAttr.getValue().str(), lhsResult.getType()));
   }
 
-  EndOp newEndOp = builder.create<EndOp>(builder.getUnknownLoc(), eqResults);
+  EndOp newEndOp =
+      builder.create<EndOp>(builder.getUnknownLoc(), miterResultValues);
   setHandshakeAttributes(builder, newEndOp, BB_OUT, "end");
 
   // Delete old end operation, we can only have one end operation in a
@@ -475,47 +538,45 @@ createElasticMiter(MLIRContext &context, StringRef lhsFilename,
     previousOp = &op;
   }
 
-  // Create a new jsonObject and put all required names into it
-  llvm::json::Object jsonObject = *new llvm::json::Object;
-  jsonObject["input_buffers"] = std::move(inputBufferNames);
-  jsonObject["output_buffers"] = std::move(outputBufferNames);
-  jsonObject["ndwires"] = std::move(ndwireNames);
-  jsonObject["eq"] = std::move(eqNames);
-
-  return std::make_pair(miterModule, jsonObject);
+  return std::make_pair(miterModule, config);
 }
 
-int main(int argc, char **argv) {
-  llvm::InitLLVM y(argc, argv);
+FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
+createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
+                  const std::filesystem::path &rhsPath,
+                  const std::filesystem::path &outputDir, size_t nrOfTokens) {
 
-  cl::ParseCommandLineOptions(
-      argc, argv,
-      "Creates an elastic-miter module in the handshake dialect.\n"
-      "Takes two MLIR files as input. The files need to contain exactely one "
-      "module each.\nEach module needs to contain exactely one "
-      "handshake.func. "
-      "\nThe resulting miter MLIR file and JSON config file are placed in "
-      "the "
-      "specified output directory.");
-
-  // Register the supported dynamatic dialects and create a context
-  DialectRegistry registry;
-  dynamatic::registerAllDialects(registry);
-  MLIRContext context(registry);
-
-  auto ret = createElasticMiter(context, lhsFilenameArg, rhsFilenameArg,
-                                nrOfBufferSlots);
-  if (failed(ret)) {
-    llvm::errs() << "Failed to create elastic-miter module.\n";
-    return 1;
+  OwningOpRef<ModuleOp> lhsModuleRef =
+      parseSourceFile<ModuleOp>(lhsPath.string(), &context);
+  if (!lhsModuleRef) {
+    llvm::errs() << "Failed to load LHS module.\n";
+    return failure();
   }
-  auto [miterModule, json] = ret.value();
+  ModuleOp lhsModule = lhsModuleRef.get();
 
-  std::string mlirFilename =
-      "elastic_miter_" +
-      std::filesystem::path(lhsFilenameArg.getValue()).stem().string() + "_" +
-      std::filesystem::path(rhsFilenameArg.getValue()).stem().string() +
-      ".mlir";
+  OwningOpRef<ModuleOp> rhsModuleRef =
+      parseSourceFile<ModuleOp>(rhsPath.string(), &context);
+  if (!rhsModuleRef) {
+    llvm::errs() << "Failed to load RHS module.\n";
+    return failure();
+  }
+  ModuleOp rhsModule = rhsModuleRef.get();
 
-  exit(failed(createFiles(outputDir, mlirFilename, miterModule, json)));
+  auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens);
+  if (failed(ret)) {
+    llvm::errs() << "Failed to create elastic-miter fabric.\n";
+    return failure();
+  }
+  auto [miterModule, config] = ret.value();
+
+  std::string mlirFilename = "elastic_miter_" + config.rhsFuncName + "_" +
+                             config.rhsFuncName + ".mlir";
+
+  if (failed(createMlirFile(outputDir / mlirFilename, miterModule))) {
+    llvm::errs() << "Failed to write MLIR miter file.\n";
+    return failure();
+  }
+  return std::make_pair(outputDir / mlirFilename, config);
 }
+
+} // namespace dynamatic::experimental
