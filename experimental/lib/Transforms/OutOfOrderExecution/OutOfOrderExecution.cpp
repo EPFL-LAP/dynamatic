@@ -18,12 +18,14 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
+using namespace handshake;
 
 Type channelifyType(Type type) {
   return llvm::TypeSwitch<Type, Type>(type)
@@ -48,29 +50,55 @@ static LogicalResult applyOutOfOrderExecution(handshake::FuncOp funcOp,
                                               MLIRContext *ctx) {
 
   ConversionPatternRewriter rewriter(ctx);
-  /*for (Operation &mux : funcOp.getOps<handshake::MuxOp>()) {
-    
-    mux->getOperand(1).setType(channelifyType(mux->getOperand(1).getType()));
-    mux->getOperand(2).setType(channelifyType(mux->getOperand(2).getType()));
-    mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
-  }*/
-  for (Operation &op : funcOp.getOps()) {
-    // hange all the inputs into channels
-    for(Value operand: op.getOperands()){
-      operand.setType(channelifyType(operand.getType()));
-    }
 
-    rewriter.setInsertionPointAfterValue(op.getOperand(0));
-    //auto FifoOp = rewriter.create<handshake::FreeTagsFifoOp>(op.getOperand(0).getLoc());
-  }
-  int i = 0;
+  
   for (auto op : funcOp.getOps<handshake::LoadOp>()) {
-    i++;
+    Value addrInput = op.getAddressInput();
+    auto channel = cast<TypedValue<handshake::ChannelType>>(addrInput);
+    //handshake::ChannelType c;
+    //handshake::ExtraSignal s = c.getExtraSignals().front();
+    
+    rewriter.setInsertionPoint(op);
+    
+    
+    // Tag the address input of the load of
+    handshake::TaggerOp taggerOp =
+       rewriter.create<handshake::TaggerOp>(op.getLoc(), addrInput.getType(), addrInput, addrInput);
+    
+    Value data = taggerOp.getDataOut().front();
+    Value tag = taggerOp.getTagOut();
+
+    // Define the channel type with the data and the tag
+    auto channelType = handshake::ChannelType::get(ctx, 
+      data.getType(), 
+       {/* Extra signal */ handshake::ExtraSignal("tag1", tag.getType(),true)});
+
+    handshake::BundleOp bundleOp = 
+       rewriter.create<handshake::BundleOp>(op.getLoc(), data, tag, channelType);
+
+    auto r = bundleOp.getChannelLike();
+
+    //handshake::LoadOpTagged
+
+    // Create a control signal first
+    //Value validSignal = ...;  // Assume this is available (i1)
+    //auto bundleCtrlOp = builder.create<handshake::BundleOp>(op.getLoc(), validSignal);
+    //Value ctrl = bundleCtrlOp.getResult(0);  // !handshake.control
+
+    
+
+    /*
+  
+
+    handshake::LoadOpTagged taggedLoad = rewriter.create<handshake::LoadOpTagged>(op.getLoc(), op.getAddressInput(), bundleOp.getChannelLike(), op.getDataInput());
+
+    SmallVector<Type, 2> resultTypes;
+    resultTypes.push_back(op.getDataOutput().getType());
+    resultTypes.push_back(taggerOp.getTagOut().getType());
+
+    handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op.getLoc());*/
   }
-  for (auto op : funcOp.getOps<handshake::MulIOp>()) {
-    i++;
-  }
-  llvm::outs() << i;
+  
   return success();
 }
 

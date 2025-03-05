@@ -1763,6 +1763,27 @@ void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   }
 }
 
+void BundleOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+   Value data, ValueRange downstreams,
+  ChannelType channelType) {
+  assert(handshake::ChannelType::isSupportedSignalType(data.getType()) &&
+  "unsupported data type");
+  assert(downstreams.size() == channelType.getNumDownstreamExtraSignals() &&
+  "incorrect number of extra downstream signals");
+
+  odsState.addOperands(data);
+  odsState.addOperands(downstreams);
+
+  // The operation produces the bundled channel type as well as any upstream
+  // signal in the channel separately (in the order in which they are declared
+  // by the channel)
+  odsState.addTypes(channelType);
+  for (const ExtraSignal &extra : channelType.getExtraSignals()) {
+  if (!extra.downstream)
+  odsState.addTypes(extra.type);
+  }
+}
+
 LogicalResult BundleOp::verify() {
   return verifyBundlingOp(getChannelLike().getType(), getUpstreams(),
                           getSignals(), true, [&]() { return emitError(); });

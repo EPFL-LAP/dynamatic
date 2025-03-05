@@ -355,6 +355,22 @@
     "dependencies": ["tehb_dataless"]
   },
   {
+    "name": "handshake.buffert",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "TAG_SIZE", "type": "unsigned", "eq": 4, "generic": false },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "ready-lat-eq": 1,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/tehbTagged.vhd",
+    "dependencies": ["tehb_dataless"]
+  },
+  {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 2 },
@@ -613,6 +629,16 @@
     "dependencies": ["tehb"]
   },
   {
+    "name": "handshake.load_tagged",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ADDR_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "TAG_SIZE", "type": "unsigned", "eq": 1, "generic": false }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/load_tagged.vhd",
+    "dependencies": ["tehb"]
+  },
+  {
     "name": "handshake.store",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
@@ -758,7 +784,7 @@
       { "name": "DATA_SIZE_OUT", "type": "unsigned", "lb": 1 },
       { "name": "TOTAL_TAG_SIZE", "type": "unsigned", "lb": 1 },
       { "name": "TAG_SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 1 }
+      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tagger.vhd",
     "dependencies": ["join", "fork"]
@@ -772,7 +798,7 @@
       { "name": "DATA_SIZE_OUT", "type": "unsigned", "lb": 1 },
       { "name": "TOTAL_TAG_SIZE", "type": "unsigned", "lb": 1 },
       { "name": "TAG_SIZE", "type": "unsigned", "lb": 1 },
-      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 1 }
+      { "name": "TAG_OFFSET", "type": "unsigned", "lb": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/untagger.vhd"
   },

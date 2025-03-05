@@ -10,7 +10,28 @@
     "vector": "c",
     "loop_multiply.h": "c",
     "integration.h": "c",
-    "random": "c"
+    "random": "c",
+    "type_traits": "cpp",
+    "__bit_reference": "cpp",
+    "bitset": "cpp",
+    "deque": "cpp",
+    "__memory": "cpp",
+    "limits": "cpp",
+    "ratio": "cpp",
+    "scoped_allocator": "cpp",
+    "tuple": "cpp",
+    "array": "cpp",
+    "functional": "cpp",
+    "utility": "cpp",
+    "variant": "cpp",
+    "__split_buffer": "cpp",
+    "forward_list": "cpp",
+    "list": "cpp",
+    "queue": "cpp",
+    "span": "cpp",
+    "string": "cpp",
+    "string_view": "cpp",
+    "ranges": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
@@ -23,5 +44,8 @@
     "CMAKE_BUILD_TYPE": "Debug",
     "CMAKE_EXPORT_COMPILE_COMMAND": "ON"
   },
-  "C_Cpp.errorSquiggles": "disabled"
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
+    "clang-diagnostic-error"
+  ]
 }

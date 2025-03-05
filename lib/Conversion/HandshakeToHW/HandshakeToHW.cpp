@@ -829,7 +829,7 @@ protected:
 /// `handshake::MemoryOpInterface` interface.
 class HWMemConverter : public HWConverter {
 public:
-  using HWConverter::HWConverter;
+  using :HWConverter;
 
   /// Replaces the memory interface with an equivalent instance using all the
   /// inputs added so far as operands. If no external module matching the

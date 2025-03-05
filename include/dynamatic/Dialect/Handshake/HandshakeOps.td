@@ -572,9 +572,9 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
     ```
   }];
 
-  let arguments = (ins Variadic<HandshakeType>:$tags);
+  let arguments = (ins Variadic<HandshakeType>:$tagOperands);
 
-  let results = (outs HandshakeType:$freeTag);
+  let results = (outs HandshakeType:$tagOut);
 
 }
 
@@ -589,15 +589,17 @@ def TaggerOp : Handshake_Op<"tagger", [
     Example:
 
     ```mlir
-    %tagged = tagger %data_in, %valid_in, %ready_out, %freeTag_data : !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>
+    
     ```
   }];
 
-  let arguments = (ins HandshakeType:$freeTagData ,
-     Variadic<HandshakeType>:$dataOperands
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands,
+     HandshakeType:$tagOperand 
   );
 
-  let results = (outs Variadic<HandshakeType>:$result);
+  let results = (outs Variadic<HandshakeType>:$dataOut,
+     HandshakeType:$tagOut 
+  );
 
   //let assemblyFormat = "$dataOperands, $freeTagData `:` $result";
 }
@@ -618,15 +620,12 @@ def UntaggerOp : Handshake_Op<"untagger", [
     ```
   }];
 
-  let arguments = (ins
-    HandshakeType:$tagIn ,   
-    Variadic<HandshakeType>:$dataOperands   
-                      
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands,   
+     HandshakeType:$tagOperand                  
   );
 
-  let results = (outs
-    HandshakeType:$freeTagData ,  
-    Variadic<HandshakeType>:$result         
+  let results = (outs Variadic<HandshakeType>:$dataOut ,
+    HandshakeType:$tagOut
   );
 
   // let assemblyFormat = "$dataOperands, $tagIn `:` $result, $freeTagData";
@@ -884,6 +883,59 @@ def LoadOp : Handshake_MemPortOp<"load"> {
     }
   }];
 }
+
+def LoadOpTagged : Handshake_MemPortOp<"load_tagged"> {
+  let summary = "load port with tag for memory interface";
+  let description = [{
+    Represents a load memory port which sends load requests to a memory
+    interface. It receives a tagged address from a dataflow predecessor and a data
+    value from the memory interface that eventually holds the loaded data. It
+    returns an address that is sent to the memory interface as well as tagged data
+    value that is sent to its dataflow successor.
+
+    The order of operands is
+    1. address (from predecessor)
+    2. tag for the address
+    3. data value (from memory interface)
+
+    The order of results is
+    1. address (to memory interface)
+    2. data value (to successor)
+    3. tag for the data
+
+    Example:
+
+    ```mlir
+    %addrOut, %dataOut = load [%addrIn] %dataFromMem : <i32>, <i32>
+    ```
+  }];
+
+  let builders = [
+    OpBuilder<(ins "MemRefType":$memrefType, "Value":$address, "Value":$tag), [{
+      // Address (data operand needs to be added later)
+      $_state.addOperands(address);
+      $_state.addOperands(tag);
+
+      // Data and address results
+      $_state.types.push_back(address.getType());
+      $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+        memrefType.getElementType()));
+    }]>
+  ];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return (idx == 0) ? "addrIn" : ((idx == 1) ? "tagIn" : "dataFromMem") ;
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return (idx == 0) ? "addrOut" : ((idx == 1) ? "dataOut" : "tagOut") ;
+    }
+  }];
+}
+
 
 def StoreOp : Handshake_MemPortOp<"store"> {
   let summary = "store operation for memory controller (MC)";
@@ -1201,6 +1253,12 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
     }]>,
     // Builder for bundling ChannelType
     OpBuilder<(ins "::mlir::Value":$ctrl, "::mlir::Value":$data,
+                   "::mlir::ValueRange":$downstreams,
+                   "::dynamatic::handshake::ChannelType":$channelType)
+    >,
+
+    // Builder for bundling ChannelType without control
+    OpBuilder<(ins "::mlir::Value":$data,
                    "::mlir::ValueRange":$downstreams,
                    "::dynamatic::handshake::ChannelType":$channelType)
     >
