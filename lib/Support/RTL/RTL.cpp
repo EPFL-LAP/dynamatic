@@ -13,6 +13,7 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
@@ -266,6 +267,75 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
 
   // Register PORT_TYPES parameter
   serializedParams["PORT_TYPES"] = portTypes.str();
+}
+
+static std::string getHandshakeBitwidth(Type type) {
+  if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
+    return std::to_string(channelType.getDataBitWidth());
+  }
+  if (isa<handshake::ControlType>(type)) {
+    return "0";
+  }
+  llvm_unreachable("unsupported type");
+}
+
+void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
+  auto name =
+      modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
+  auto mod = modOp.getModuleType();
+  // bitwidth
+  if (name == "handshake.addi" || name == "handshake.buffer" ||
+      name == "handshake.cmpi" || name == "handshake.fork" ||
+      name == "handshake.merge" || name == "handshake.muli" ||
+      name == "handshake.sink") {
+    // Default
+    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getInputType(0));
+  } else if (name == "handshake.cond_br") {
+    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getInputType(1));
+  } else if (name == "handshake.constant") {
+    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getOutputType(0));
+  } else if (name == "handshake.control_merge") {
+    serializedParams["DATA_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["INDEX_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getOutputType(1));
+  } else if (name == "handshake.extsi" || name == "handshake.trunci") {
+    serializedParams["INPUT_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["OUTPUT_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getOutputType(0));
+  } else if (name == "handshake.load") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getOutputType(1));
+  } else if (name == "handshake.mux") {
+    serializedParams["INDEX_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(1));
+  } else if (name == "handshake.store") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getHandshakeBitwidth(mod.getInputType(1));
+  } else if (name == "handshake.mem_controller") {
+    serializedParams["DATA_BITWIDTH"] =
+        std::to_string(mod.getInputType(0).getIntOrFloatBitWidth());
+    // Warning: Ports differ from instance to instance.
+    // Therefore, mod.getNumOutputs() is also variable.
+    serializedParams["ADDR_BITWIDTH"] = std::to_string(
+        mod.getOutputType(mod.getNumOutputs() - 2).getIntOrFloatBitWidth());
+  } else if (name == "mem_to_bram") {
+    serializedParams["ADDR_BITWIDTH"] =
+        std::to_string(mod.getInputType(0).getIntOrFloatBitWidth());
+    serializedParams["DATA_BITWIDTH"] =
+        std::to_string(mod.getInputType(1).getIntOrFloatBitWidth());
+  } else if (name == "handshake.source" || name == "mem_controller") {
+    // Skip
+  } else {
+    llvm::errs() << "Uncaught module: " << name << "\n";
+  }
 }
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,

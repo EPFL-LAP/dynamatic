@@ -136,7 +136,7 @@ def handle_params(mod_type, parameters):
 
 
 def generate_code(name, mod_type, parameters):
-  parameters = handle_params(mod_type, parameters)
+  # parameters = handle_params(mod_type, parameters)
   match mod_type:
     case "addi":
       return addi.generate_addi(name, parameters)
