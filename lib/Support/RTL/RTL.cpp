@@ -274,16 +274,10 @@ static std::string serializePortTypes(hw::ModuleType &mod) {
   return portTypes.str();
 }
 
-/// Returns the bitwidth of the handshake type.
-/// If the type is a control type, returns 0.
-static std::string getHandshakeBitwidth(Type type) {
-  if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
-    return std::to_string(channelType.getDataBitWidth());
-  }
-  if (isa<handshake::ControlType>(type)) {
-    return "0";
-  }
-  llvm_unreachable("unsupported type");
+/// Returns the bitwidth of the type as string.
+/// If the type is a control type, returns "0".
+static std::string getBitwidthString(Type type) {
+  return std::to_string(handshake::getHandshakeTypeBitWidth(type));
 }
 
 void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
@@ -299,48 +293,37 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       name == "handshake.merge" || name == "handshake.muli" ||
       name == "handshake.sink") {
     // Default
-    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(0));
   } else if (name == "handshake.cond_br") {
-    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getInputType(1));
+    serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.constant") {
-    serializedParams["BITWIDTH"] = getHandshakeBitwidth(mod.getOutputType(0));
+    serializedParams["BITWIDTH"] = getBitwidthString(mod.getOutputType(0));
   } else if (name == "handshake.control_merge") {
-    serializedParams["DATA_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getOutputType(1));
+        getBitwidthString(mod.getOutputType(1));
   } else if (name == "handshake.extsi" || name == "handshake.trunci") {
-    serializedParams["INPUT_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(0));
+    serializedParams["INPUT_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getOutputType(0));
+        getBitwidthString(mod.getOutputType(0));
   } else if (name == "handshake.load") {
-    serializedParams["ADDR_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getOutputType(1));
+    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getOutputType(1));
   } else if (name == "handshake.mux") {
-    serializedParams["INDEX_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(1));
+    serializedParams["INDEX_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.store") {
-    serializedParams["ADDR_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] =
-        getHandshakeBitwidth(mod.getInputType(1));
+    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.mem_controller") {
-    serializedParams["DATA_BITWIDTH"] =
-        std::to_string(mod.getInputType(0).getIntOrFloatBitWidth());
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
     // Warning: Ports differ from instance to instance.
     // Therefore, mod.getNumOutputs() is also variable.
-    serializedParams["ADDR_BITWIDTH"] = std::to_string(
-        mod.getOutputType(mod.getNumOutputs() - 2).getIntOrFloatBitWidth());
-  } else if (name == "mem_to_bram") {
     serializedParams["ADDR_BITWIDTH"] =
-        std::to_string(mod.getInputType(1).getIntOrFloatBitWidth());
-    serializedParams["DATA_BITWIDTH"] =
-        std::to_string(mod.getInputType(4).getIntOrFloatBitWidth());
+        getBitwidthString(mod.getOutputType(mod.getNumOutputs() - 2));
+  } else if (name == "mem_to_bram") {
+    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(4));
   } else if (name == "handshake.source" || name == "mem_controller") {
     // Skip
   } else {
