@@ -143,7 +143,7 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
 
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries.
-static void eliminateCommonBlocks(DenseSet<Block *> &s1,
+void experimental::ftd::eliminateCommonBlocks(DenseSet<Block *> &s1,
                                   DenseSet<Block *> &s2) {
 
   SmallVector<Block *> intersection;
@@ -695,7 +695,7 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
                           const ftd::BlockIndexing &bi) {
   if (!bdd->inputs.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
@@ -706,9 +706,9 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   // creates other muxes in a hierarchical way)
   SmallVector<Value> muxOperands;
   muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->inputs.value().first, block, bi));
+    bddToCircuit(rewriter, bdd->inputs.value().first, block, bi));
   muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->inputs.value().second, block, bi));
+    bddToCircuit(rewriter, bdd->inputs.value().second, block, bi));
   Value muxCond =
       boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
@@ -856,7 +856,7 @@ static void insertDirectSuppression(
   }
 
   // Get rid of common entries in the two sets
-  eliminateCommonBlocks(prodControlDeps, consControlDeps);
+  experimental::ftd::eliminateCommonBlocks(prodControlDeps, consControlDeps);
 
   // Compute the activation function of producer and consumer
   BoolExpression *fProd =

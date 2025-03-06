@@ -242,7 +242,7 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
-  // experimental::cfg::annotateCFG(funcOp, rewriter, namer);
+  experimental::cfg::annotateCFG(funcOp, rewriter, namer);
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 

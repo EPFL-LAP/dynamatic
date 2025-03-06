@@ -18,6 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Analysis/GSAAnalysis.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -86,6 +87,12 @@ LogicalResult createPhiNetworkDeps(
 BoolExpression *enumeratePaths(Block *start, Block *end,
     const ftd::BlockIndexing &bi,
     const DenseSet<Block *> &controlDeps);
+
+Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+  const ftd::BlockIndexing &bi);
+
+void eliminateCommonBlocks(DenseSet<Block *> &s1,
+  DenseSet<Block *> &s2);
 
 }; // namespace ftd
 }; // namespace experimental
