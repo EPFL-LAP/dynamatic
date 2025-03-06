@@ -328,9 +328,9 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
         mod.getOutputType(mod.getNumOutputs() - 2).getIntOrFloatBitWidth());
   } else if (name == "mem_to_bram") {
     serializedParams["ADDR_BITWIDTH"] =
-        std::to_string(mod.getInputType(0).getIntOrFloatBitWidth());
-    serializedParams["DATA_BITWIDTH"] =
         std::to_string(mod.getInputType(1).getIntOrFloatBitWidth());
+    serializedParams["DATA_BITWIDTH"] =
+        std::to_string(mod.getInputType(4).getIntOrFloatBitWidth());
   } else if (name == "handshake.source" || name == "mem_controller") {
     // Skip
   } else {
