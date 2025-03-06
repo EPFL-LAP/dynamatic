@@ -151,11 +151,10 @@ LogicalResult ExportInfo::concretizeExternalModules() {
         return failure();
     }
 
-    if (extOp) {
-      // Include PORT_TYPES parameter in the serialized parameters
-      match->registerPortTypesParameter(extOp);
+    // Parameter analysis
+    // TODO: Do this at the HW-level analysis
+    if (extOp)
       match->registerParameters(extOp);
-    }
 
     // ...then generate the component itself
     return match->concretize(request, dynamaticPath, outputPath);

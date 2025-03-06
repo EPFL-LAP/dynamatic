@@ -289,14 +289,6 @@ public:
   /// parameters, in the order in which the component defines them,
   llvm::MapVector<StringRef, StringRef> getGenericParameterValues() const;
 
-  /// Registers PORT_TYPES parameter, which includes the types of all ports
-  /// (operands and results) of the original operation. This parameter is passed
-  /// to the RTL generator to help it generate the correct port types.
-  /// e.g., '{"lhs": "!handshake.channel<i32, [spec: i1]>",
-  // "rhs": "!handshake.channel<i32, [spec: i1]>",
-  // "result": "!handshake.channel<i1, [spec: i1]>"}'
-  void registerPortTypesParameter(hw::HWModuleExternOp &modOp);
-
   /// Registers different parameters for each type of extern op.
   /// Temporary function. These parameters should be added to hw.parameters
   /// (generation_params in the future)

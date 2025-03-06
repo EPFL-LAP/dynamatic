@@ -240,7 +240,13 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
   return values;
 }
 
-void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
+/// Serializes the module's "port_types", which includes the types of all ports
+/// (operands and results) of the original operation. This is passed to the RTL
+/// generator to help it generate the correct port types. e.g., '{"lhs":
+/// "!handshake.channel<i32, [spec: i1]>",
+// "rhs": "!handshake.channel<i32, [spec: i1]>",
+// "result": "!handshake.channel<i1, [spec: i1]>"}'
+static std::string serializePortTypes(hw::ModuleType &mod) {
   // Prepare a string stream to serialize the port types
   std::string portTypesValue;
   llvm::raw_string_ostream portTypes(portTypesValue);
@@ -249,7 +255,7 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   portTypes << "'{"; // Start of the JSON object
 
   bool first = true;
-  for (const hw::ModulePort &port : modOp.getModuleType().getPorts()) {
+  for (const hw::ModulePort &port : mod.getPorts()) {
     // Skip the clock and reset ports
     if (port.name == "clk" || port.name == "rst")
       continue;
@@ -265,8 +271,7 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   }
   portTypes << "}'"; // End of the JSON object
 
-  // Register PORT_TYPES parameter
-  serializedParams["PORT_TYPES"] = portTypes.str();
+  return portTypes.str();
 }
 
 /// Returns the bitwidth of the handshake type.
@@ -285,6 +290,9 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   auto name =
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto mod = modOp.getModuleType();
+  // port types
+  serializedParams["PORT_TYPES"] = serializePortTypes(mod);
+
   // bitwidth
   if (name == "handshake.addi" || name == "handshake.buffer" ||
       name == "handshake.cmpi" || name == "handshake.fork" ||
