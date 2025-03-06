@@ -269,6 +269,8 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   serializedParams["PORT_TYPES"] = portTypes.str();
 }
 
+/// Returns the bitwidth of the handshake type.
+/// If the type is a control type, returns 0.
 static std::string getHandshakeBitwidth(Type type) {
   if (auto channelType = dyn_cast<handshake::ChannelType>(type)) {
     return std::to_string(channelType.getDataBitWidth());
