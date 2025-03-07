@@ -1,15 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_addi(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params["extra_signals"]
 
-  if data_type.has_extra_signals():
-    return _generate_addi_signal_manager(name, data_type)
+  if extra_signals:
+    return _generate_addi_signal_manager(name, bitwidth, extra_signals)
   else:
-    return _generate_addi(name, data_type.bitwidth)
+    return _generate_addi(name, bitwidth)
 
 
 def _generate_addi(name, bitwidth):
@@ -73,5 +73,5 @@ extra_signal_logic = {
 }
 
 
-def _generate_addi_signal_manager(name, data_type):
-  return generate_binary_no_latency_signal_manager(name, data_type, _generate_addi)
+def _generate_addi_signal_manager(name, bitwidth, extra_signals):
+  return generate_binary_no_latency_signal_manager(name, bitwidth, extra_signals, _generate_addi)

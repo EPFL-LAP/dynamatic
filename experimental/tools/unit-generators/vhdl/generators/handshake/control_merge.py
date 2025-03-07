@@ -1,42 +1,25 @@
-from generators.handshake.fork import generate_fork
-from generators.handshake.merge_notehb import generate_merge_notehb
-from generators.handshake.tehb import generate_tehb
-from generators.support.merge_notehb import generate_merge_notehb
-from generators.support.tehb import generate_tehb
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-<< << << < HEAD
-== == == =
->>>>>> > origin/main
+from generators.handshake.tehb import generate_tehb
+from generators.handshake.merge_notehb import generate_merge_notehb
+from generators.handshake.fork import generate_fork
 
 
 def generate_control_merge(name, params):
   size = params["size"]
-
-
-<< << << < HEAD
- data_bitwidth = params["data_bitwidth"]
+  data_bitwidth = params["data_bitwidth"]
   index_bitwidth = params["index_bitwidth"]
+  input_extra_signals_list = params["input_extra_signals_list"]
+  output_extra_signals = params["output_extra_signals"]
 
-  port_types = params["port_types"]
-  outs_type = VhdlScalarType(port_types["outs"])
-  index_type = VhdlScalarType(port_types["index"])
-
-  if outs_type.has_extra_signals():
-    if outs_type.is_channel():
-      return _generate_control_merge_signal_manager(name, size, port_types)
+  if output_extra_signals:
+    if data_bitwidth == 0:
+      return _generate_control_merge_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals)
     else:
-      return _generate_control_merge_signal_manager_dataless(name, size, port_types)
-  elif outs_type.is_channel():
-    return _generate_control_merge(name, size, index_type.bitwidth, outs_type.bitwidth)
-  else:
-    return _generate_control_merge_dataless(name, size, index_type.bitwidth)
-== == == =
-
- if data_bitwidth == 0:
+      return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals)
+  elif data_bitwidth == 0:
     return _generate_control_merge_dataless(name, size, index_bitwidth)
   else:
     return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
->>>>>> > origin/main
 
 
 def _generate_control_merge_dataless(name, size, index_bitwidth):
@@ -45,27 +28,10 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
   fork_name = f"{name}_fork"
 
   dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
-<<<<<< < HEAD
-   generate_tehb(tehb_name, {
-        "port_types": {
-            "ins": f"!handshake.channel<i{index_bitwidth}>",
-            "outs": f"!handshake.channel<i{index_bitwidth}>"
-        }
-    }) + \
-        generate_fork(fork_name, {
-        "size": "2",
-        "port_types": {
-            "ins": f"!handshake.control<>",
-            "outs_0": f"!handshake.control<>",
-            "outs_1": f"!handshake.control<>"
-        }
-    })
-== =====
- generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
+      generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
       generate_fork(fork_name, {"size": 2, "bitwidth": 0})
->>>>>> > origin/main
 
- entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -200,26 +166,14 @@ end architecture;
 """
 
   return dependencies + entity + architecture
-<<<<<< < HEAD
 
 
-def _generate_control_merge_signal_manager(name, size, port_types):
+def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
-  outs_type = VhdlScalarType(port_types["outs"])
-  ins_types = []
-  index_type = VhdlScalarType(port_types["index"])
-
-  bitwidth = outs_type.bitwidth
-  index_bitwidth = index_type.bitwidth
-
-  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
-  for i in range(size):
-    ins_i_name = f"ins_{i}"
-    ins_i_type = VhdlScalarType(port_types[ins_i_name])
-    ins_types.append(ins_i_type)
-
-    for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
+  extra_signal_mapping = ExtraSignalMapping(offset=data_bitwidth)
+  for input_extra_signals in input_extra_signals_list:
+    for signal_name, signal_bitwidth in input_extra_signals.items():
       if not extra_signal_mapping.has(signal_name):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
@@ -239,11 +193,11 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- data input channels
-    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
+    ins       : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- output channel
-    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs       : out std_logic_vector({data_bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic;
     -- index output channel
@@ -258,7 +212,7 @@ end entity;
   extra_signal_port_decls = []
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
-        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+        [(f"ins_{i}", "in")], input_extra_signals_list[i]))
   extra_signal_port_decls.append(generate_extra_signal_ports(
       [("outs", "out")], extra_signal_mapping.to_extra_signals()))
   entity = entity.replace(
@@ -293,19 +247,19 @@ end architecture;
   architecture = architecture.replace(
       "  [LACKING_EXTRA_SIGNAL_DECLS]",
       generate_lacking_extra_signal_decls(
-          "ins", ins_types, extra_signal_mapping)
+          "ins", input_extra_signals_list, extra_signal_mapping)
   )
 
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", ins_types, extra_signal_mapping)
+      "ins", input_extra_signals_list, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
     ins_conversions.append(generate_ins_concat_statements(
-        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, data_bitwidth, custom_data_name=f"ins({i})"))
 
   outs_conversions = generate_outs_concat_statements(
-      "outs", "outs_inner", extra_signal_mapping, bitwidth)
+      "outs", "outs_inner", extra_signal_mapping, data_bitwidth)
 
   architecture = architecture.replace(
       "  [EXTRA_SIGNAL_LOGIC]",
@@ -316,21 +270,12 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_control_merge_signal_manager_dataless(name, size, port_types):
+def _generate_control_merge_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
-  ins_types = []
-  index_type = VhdlScalarType(port_types["index"])
-
-  index_bitwidth = index_type.bitwidth
-
   extra_signal_mapping = ExtraSignalMapping()
-  for i in range(size):
-    ins_i_name = f"ins_{i}"
-    ins_i_type = VhdlScalarType(port_types[ins_i_name])
-    ins_types.append(ins_i_type)
-
-    for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
+  for input_extra_signals in input_extra_signals_list:
+    for signal_name, signal_bitwidth in input_extra_signals.items():
       if not extra_signal_mapping.has(signal_name):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
@@ -367,7 +312,7 @@ end entity;
   extra_signal_port_decls = []
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
-        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+        [(f"ins_{i}", "in")], input_extra_signals_list[i]))
   extra_signal_port_decls.append(generate_extra_signal_ports(
       [("outs", "out")], extra_signal_mapping.to_extra_signals()))
   entity = entity.replace(
@@ -402,11 +347,11 @@ end architecture;
   architecture = architecture.replace(
       "  [LACKING_EXTRA_SIGNAL_DECLS]",
       generate_lacking_extra_signal_decls(
-          "ins", ins_types, extra_signal_mapping)
+          "ins", input_extra_signals_list, extra_signal_mapping)
   )
 
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", ins_types, extra_signal_mapping)
+      "ins", input_extra_signals_list, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
@@ -423,5 +368,3 @@ end architecture;
   )
 
   return dependencies + entity + architecture
-== =====
->>>>>> > origin/main

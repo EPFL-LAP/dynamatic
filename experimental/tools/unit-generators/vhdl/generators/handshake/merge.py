@@ -1,4 +1,4 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
@@ -6,16 +6,17 @@ from generators.handshake.tehb import generate_tehb
 def generate_merge(name, params):
   size = params["size"]
   bitwidth = params["bitwidth"]
+  extra_signals = params["extra_signals"]
 
-  if data_type.has_extra_signals():
-    if data_type.is_channel():
-      return _generate_merge_signal_manager(name, size, data_type)
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_merge_signal_manager_dataless(name, size, extra_signals)
     else:
-      return _generate_merge_signal_manager_dataless(name, size, data_type)
-  elif data_type.is_channel():
-    return _generate_merge(name, size, data_type.bitwidth)
-  else:
+      return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_merge_dataless(name, size)
+  else:
+    return _generate_merge(name, size, bitwidth)
 
 
 def _generate_merge_dataless(name, size):
@@ -145,13 +146,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_merge_signal_manager(name, size, data_type):
+def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
 
-  bitwidth = data_type.bitwidth
-
   extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
-  for signal_name, signal_bitwidth in data_type.extra_signals.items():
+  for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
@@ -185,7 +184,7 @@ end entity;
   for i in range(size):
     extra_signal_need_ports.append((f"ins_{i}", "in"))
   extra_signal_ports = generate_extra_signal_ports(
-      extra_signal_need_ports, data_type.extra_signals)
+      extra_signal_need_ports, extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -225,11 +224,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_merge_signal_manager_dataless(name, size, data_type):
+def _generate_merge_signal_manager_dataless(name, size, extra_signals):
   inner_name = f"{name}_inner"
 
   extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_bitwidth in data_type.extra_signals.items():
+  for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
@@ -261,7 +260,7 @@ end entity;
   for i in range(size):
     extra_signal_need_ports.append((f"ins_{i}", "in"))
   extra_signal_ports = generate_extra_signal_ports(
-      extra_signal_need_ports, data_type.extra_signals)
+      extra_signal_need_ports, extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""

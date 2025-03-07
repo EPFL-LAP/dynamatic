@@ -408,6 +408,9 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getInputType(0));
   } else if (name == "handshake.control_merge") {
+    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(mod.getOutputType(0));
+
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -418,8 +421,11 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       extraSignalsList << serializeExtraSignals(mod.getInputType(i), false);
     }
     extraSignalsList << "]'";
-    serializedParams["EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
+    serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
   } else if (name == "handshake.mux") {
+    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(mod.getOutputType(0));
+
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -430,7 +436,7 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       extraSignalsList << serializeExtraSignals(mod.getInputType(i), false);
     }
     extraSignalsList << "]'";
-    serializedParams["EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
+    serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
   } else if (name == "handshake.spec_commit" ||
              name == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS_EXCEPT_SPEC"] =
