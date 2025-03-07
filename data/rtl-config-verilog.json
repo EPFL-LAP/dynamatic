@@ -798,6 +798,18 @@
     "hdl": "verilog"
   },
   {
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/ofifo.v",
+    "module-name": "ofifo_dataless",
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"],
+    "hdl": "verilog"
+  },
+  {
+    "generic": "$DYNAMATIC/data/verilog/handshake/ofifo.v",
+    "module-name": "ofifo",
+    "dependencies": ["tehb", "elastic_fifo_inner"],
+    "hdl": "verilog"
+  },
+  {
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/oehb.v",
     "module-name": "oehb_dataless",    
     "hdl": "verilog"

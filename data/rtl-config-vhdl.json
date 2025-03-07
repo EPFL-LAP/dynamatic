@@ -796,6 +796,16 @@
     "generic": "$DYNAMATIC/data/vhdl/support/eager_fork_register_block.vhd"
   },
   {
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/ofifo.vhd",
+    "module-name": "ofifo_dataless",
+    "dependencies": ["tehb_dataless", "elastic_fifo_inner_dataless"]
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/handshake/ofifo.vhd",
+    "module-name": "ofifo",
+    "dependencies": ["tehb", "elastic_fifo_inner"]
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
     "module-name": "oehb_dataless"
   },
