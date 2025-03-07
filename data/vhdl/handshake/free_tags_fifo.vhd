@@ -10,7 +10,7 @@ entity init_elasticFifoInner is
  
   Port ( 
     clk, rst : in std_logic;  
-    dataInArray : in data_array (0 downto 0)(DATA_SIZE_IN-1 downto 0);
+    dataInArray : in data_array (INPUT_COUNT downto 0)(DATA_SIZE_IN-1 downto 0);
     dataOutArray : out data_array (0 downto 0)(DATA_SIZE_OUT-1 downto 0);
     readyArray : out std_logic_vector(0 downto 0);
     validArray : out std_logic_vector(0 downto 0);

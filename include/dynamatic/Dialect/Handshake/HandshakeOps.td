@@ -594,14 +594,12 @@ def TaggerOp : Handshake_Op<"tagger", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands,
-     HandshakeType:$tagOperand 
+     HandshakeType:$tagOperand   
   );
 
-  let results = (outs Variadic<HandshakeType>:$dataOut,
-     HandshakeType:$tagOut 
-  );
+  let results = (outs Variadic<HandshakeType>:$dataOut);
 
-  //let assemblyFormat = "$dataOperands, $freeTagData `:` $result";
+  //let assemblyFormat = "$dataOperands `:` $result";
 }
 
 def UntaggerOp : Handshake_Op<"untagger", [
@@ -615,20 +613,16 @@ def UntaggerOp : Handshake_Op<"untagger", [
     Example:
 
     ```mlir
-    %untagged, %freeTag = untagger %data_in, %valid_in, %ready_out, %tag_in 
-      : !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>
     ```
   }];
 
-  let arguments = (ins Variadic<HandshakeType>:$dataOperands,   
-     HandshakeType:$tagOperand                  
-  );
+  let arguments = (ins Variadic<HandshakeType>:$dataOperands);
 
-  let results = (outs Variadic<HandshakeType>:$dataOut ,
+  let results = (outs Variadic<HandshakeType>:$dataOut,
     HandshakeType:$tagOut
   );
 
-  // let assemblyFormat = "$dataOperands, $tagIn `:` $result, $freeTagData";
+  // let assemblyFormat = "$dataOperands `:` $dataOut";
 }
 
 
