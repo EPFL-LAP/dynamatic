@@ -1,10 +1,16 @@
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_addi(name, params):
-  bitwidth = params["bitwidth"]
+  port_types = params["port_types"]
+  data_type = VhdlScalarType(port_types["result"])
 
-  return _generate_addi(name, bitwidth)
+  if data_type.has_extra_signals():
+    return _generate_addi_signal_manager(name, data_type)
+  else:
+    return _generate_addi(name, data_type.bitwidth)
 
 
 def _generate_addi(name, bitwidth):
@@ -58,3 +64,15 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+# todo: can be reusable among various unit generators
+extra_signal_logic = {
+    "spec": """
+  result_spec <= lhs_spec or rhs_spec;
+"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+}
+
+
+def _generate_addi_signal_manager(name, data_type):
+  return generate_binary_no_latency_signal_manager(name, data_type, _generate_addi)

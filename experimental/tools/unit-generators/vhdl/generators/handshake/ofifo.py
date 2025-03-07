@@ -1,15 +1,22 @@
+from generators.support.utils import VhdlScalarType
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 from generators.handshake.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_ofifo(name, params):
-  bitwidth = params["bitwidth"]
-  num_slots = params["num_slots"]
+  port_types = params["port_types"]
+  data_type = VhdlScalarType(port_types["ins"])
 
-  if bitwidth == 0:
-    return _generate_ofifo_dataless(name, num_slots)
+  if data_type.has_extra_signals():
+    if data_type.is_channel():
+      return _generate_ofifo_signal_manager(name, params["size"], data_type)
+    else:
+      return _generate_ofifo_signal_manager_dataless(name, params["size"], data_type)
+  elif data_type.is_channel():
+    return _generate_ofifo(name, params["num_slots"], data_type.bitwidth)
   else:
-    return _generate_ofifo(name, num_slots, bitwidth)
+    return _generate_ofifo_dataless(name, params["num_slots"])
 
 
 def _generate_ofifo(name, size, bitwidth):
@@ -21,7 +28,12 @@ def _generate_ofifo(name, size, bitwidth):
           "size": size,
           "bitwidth": bitwidth
       }) + \
-      generate_tehb(tehb_name, {"bitwidth": bitwidth})
+      generate_tehb(tehb_name, {
+          "port_types": {
+              "ins": f"!handshake.channel<i{bitwidth}>",
+              "outs": f"!handshake.channel<i{bitwidth}>",
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -93,8 +105,15 @@ def _generate_ofifo_dataless(name, size):
   fifo_name = f"{name}_fifo"
 
   dependencies = \
-      generate_elastic_fifo_inner(fifo_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"bitwidth": 0})
+      generate_elastic_fifo_inner(fifo_name, {
+          "size": size,
+      }) + \
+      generate_tehb(tehb_name, {
+          "port_types": {
+              "ins": "!handshake.control<>",
+              "outs": "!handshake.control<>",
+          }
+      })
 
   entity = f"""
 library ieee;
@@ -151,3 +170,11 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_ofifo_signal_manager(name, size, data_type):
+  return generate_buffer_like_signal_manager_full(name, size, data_type, _generate_ofifo)
+
+
+def _generate_ofifo_signal_manager_dataless(name, size, data_type):
+  return generate_buffer_like_signal_manager_dataless_full(name, size, data_type, _generate_ofifo)
