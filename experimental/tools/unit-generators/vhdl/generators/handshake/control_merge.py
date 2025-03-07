@@ -1,11 +1,22 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-from generators.support.tehb import generate_tehb
-from generators.support.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
+from generators.handshake.merge_notehb import generate_merge_notehb
+from generators.handshake.tehb import generate_tehb
+from generators.support.merge_notehb import generate_merge_notehb
+from generators.support.tehb import generate_tehb
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+<< << << < HEAD
+== == == =
+>>>>>> > origin/main
 
 
 def generate_control_merge(name, params):
   size = params["size"]
+
+
+<< << << < HEAD
+ data_bitwidth = params["data_bitwidth"]
+  index_bitwidth = params["index_bitwidth"]
+
   port_types = params["port_types"]
   outs_type = VhdlScalarType(port_types["outs"])
   index_type = VhdlScalarType(port_types["index"])
@@ -19,6 +30,13 @@ def generate_control_merge(name, params):
     return _generate_control_merge(name, size, index_type.bitwidth, outs_type.bitwidth)
   else:
     return _generate_control_merge_dataless(name, size, index_type.bitwidth)
+== == == =
+
+ if data_bitwidth == 0:
+    return _generate_control_merge_dataless(name, size, index_bitwidth)
+  else:
+    return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
+>>>>>> > origin/main
 
 
 def _generate_control_merge_dataless(name, size, index_bitwidth):
@@ -27,22 +45,27 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
   fork_name = f"{name}_fork"
 
   dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{index_bitwidth}>",
-              "outs": f"!handshake.channel<i{index_bitwidth}>"
-          }
-      }) + \
-      generate_fork(fork_name, {
-          "size": "2",
-          "port_types": {
-              "ins": f"!handshake.control<>",
-              "outs_0": f"!handshake.control<>",
-              "outs_1": f"!handshake.control<>"
-          }
-      })
+<<<<<< < HEAD
+   generate_tehb(tehb_name, {
+        "port_types": {
+            "ins": f"!handshake.channel<i{index_bitwidth}>",
+            "outs": f"!handshake.channel<i{index_bitwidth}>"
+        }
+    }) + \
+        generate_fork(fork_name, {
+        "size": "2",
+        "port_types": {
+            "ins": f"!handshake.control<>",
+            "outs_0": f"!handshake.control<>",
+            "outs_1": f"!handshake.control<>"
+        }
+    })
+== =====
+ generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
+      generate_fork(fork_name, {"size": 2, "bitwidth": 0})
+>>>>>> > origin/main
 
-  entity = f"""
+ entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -177,6 +200,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+<<<<<< < HEAD
 
 
 def _generate_control_merge_signal_manager(name, size, port_types):
@@ -399,3 +423,5 @@ end architecture;
   )
 
   return dependencies + entity + architecture
+== =====
+>>>>>> > origin/main

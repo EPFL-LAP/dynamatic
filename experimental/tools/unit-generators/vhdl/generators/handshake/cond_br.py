@@ -1,10 +1,9 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
-from generators.support.join import generate_join
+from generators.handshake.join import generate_join
 
 
 def generate_cond_br(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["data"])
+  bitwidth = params["bitwidth"]
 
   if data_type.has_extra_signals():
     if data_type.is_channel():
@@ -15,6 +14,8 @@ def generate_cond_br(name, params):
     return _generate_cond_br(name, data_type.bitwidth)
   else:
     return _generate_cond_br_dataless(name)
+  else:
+    return _generate_cond_br(name, bitwidth)
 
 
 def _generate_cond_br_dataless(name):

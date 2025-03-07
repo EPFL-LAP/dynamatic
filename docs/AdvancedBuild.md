@@ -155,3 +155,20 @@ Building an executable binary for the interactive dataflow circuit visualizer is
     ```
 
     The tool's binary is generated at `visual-dataflow/bin/visual-dataflow` and sym-linked at `bin/visual-dataflow` for convenience. Whenever you make a modification to the C++ library or to the Godot project itself, you can simply re-run the above command to recompile everything and re-generate the executable binary for the tool.
+
+### Enabling the XLS integration
+
+The experimental integration with the XLS HLS tool (see [here](./Xls/XlsIntegration.md) for more information) can be enabled by providing the `--experimental-enable-xls` flag to `build.sh`. 
+
+> [!WARNING]
+> Note that `--experimental-enable-xls`, just like any other cmake-related flags, will only be applied if `./build.sh` configures CMake, which it, by default, will not do if a build folder (with a `CMakeCache.txt`) exists. 
+> To enable xls if you already have a local build, you can either force a reconfigure of all projects by providing the `--force` flag, or delete the Dynamatic's `CMakeCache.txt` to only force a reconfigure (and costly rebuild) of Dynamatic:
+
+```sh
+./build.sh --force --experimental-enable-xls
+# OR
+rm build/CMakeCache.txt
+./build.sh --experimental-enable-xls
+```
+
+Once enabled, you do not need to provide `./build.sh` with `--experimental-enable-xls`to re-build.

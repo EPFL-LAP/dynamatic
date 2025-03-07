@@ -1,12 +1,11 @@
 from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
-from generators.support.join import generate_join
+from generators.handshake.join import generate_join
 
 
 def generate_cmpi(name, params):
-  port_types = params["port_types"]
+  bitwidth = params["bitwidth"]
   predicate = params["predicate"]
-  data_type = VhdlScalarType(port_types["lhs"])
 
   if data_type.has_extra_signals():
     return _generate_cmpi_signal_manager(name, predicate, data_type)

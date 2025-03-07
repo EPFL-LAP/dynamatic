@@ -1,13 +1,12 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
-from generators.support.join import generate_join
+from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.oehb import generate_oehb
-from generators.support.ofifo import generate_ofifo
+from generators.handshake.oehb import generate_oehb
+from generators.handshake.ofifo import generate_ofifo
 
 
 def generate_muli(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["result"])
+  bitwidth = params["bitwidth"]
 
   if data_type.has_extra_signals():
     return _generate_muli_signal_manager(name, data_type)
@@ -81,12 +80,7 @@ def _generate_muli(name, bitwidth):
       generate_join(join_name, {"size": 2}) + \
       _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
       generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
-      generate_oehb(oehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}>",
-              "outs": f"!handshake.channel<i{bitwidth}>"
-          }
-      })
+      generate_oehb(oehb_name, {"bitwidth": bitwidth})
 
   entity = f"""
 library ieee;

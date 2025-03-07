@@ -1,12 +1,11 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-from generators.support.merge_notehb import generate_merge_notehb
-from generators.support.tehb import generate_tehb
+from generators.handshake.merge_notehb import generate_merge_notehb
+from generators.handshake.tehb import generate_tehb
 
 
 def generate_merge(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
   size = params["size"]
+  bitwidth = params["bitwidth"]
 
   if data_type.has_extra_signals():
     if data_type.is_channel():
@@ -24,12 +23,7 @@ def _generate_merge_dataless(name, size):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.control<>",
-              "outs": f"!handshake.control<>"
-          }
-      })
+      generate_tehb(tehb_name, {"size": 0})
 
   entity = f"""
 library ieee;
@@ -90,12 +84,7 @@ def _generate_merge(name, size, bitwidth):
           "size": size,
           "bitwidth": bitwidth,
       }) + \
-      generate_tehb(tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}>",
-              "outs": f"!handshake.channel<{bitwidth}>"
-          }
-      })
+      generate_tehb(tehb_name, {"bitwidth": bitwidth})
 
   entity = f"""
 library ieee;

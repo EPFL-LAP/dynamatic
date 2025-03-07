@@ -4,6 +4,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 def generate_sink(name, params):
   port_types = params["port_types"]
   data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
 
   entity = f"""
 library ieee;
@@ -16,7 +17,7 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- input channel
-    ins       : in  std_logic_vector({data_type.bitwidth} - 1 downto 0);
+    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic;
     ins_ready : out std_logic
   );

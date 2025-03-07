@@ -4,8 +4,7 @@ from generators.support.eager_fork_register_block import generate_eager_fork_reg
 
 
 def generate_fork(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
   size = params["size"]
 
   if data_type.has_extra_signals():
@@ -17,6 +16,8 @@ def generate_fork(name, params):
     return _generate_fork(name, size, data_type.bitwidth)
   else:
     return _generate_fork_dataless(name, size)
+  else:
+    return _generate_fork(name, size, bitwidth)
 
 
 def _generate_fork_dataless(name, size):

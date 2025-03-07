@@ -8,6 +8,9 @@ def generate_store(name, params):
   data_type = VhdlScalarType(port_types["dataIn"])
   addr_type = VhdlScalarType(port_types["addrIn"])
 
+  data_bitwidth = params["data_bitwidth"]
+  addr_bitwidth = params["addr_bitwidth"]
+
   if data_type.has_extra_signals():
     return _generate_store_signal_manager(name, data_type, addr_type)
   else:

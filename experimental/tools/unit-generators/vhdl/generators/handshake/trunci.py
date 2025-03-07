@@ -5,6 +5,8 @@ def generate_trunci(name, params):
   port_types = params["port_types"]
   ins_type = VhdlScalarType(port_types["ins"])
   outs_type = VhdlScalarType(port_types["outs"])
+  input_bitwidth = params["input_bitwidth"]
+  output_bitwidth = params["output_bitwidth"]
 
   if ins_type.has_extra_signals():
     return _generate_trunci_signal_manager(name, ins_type, outs_type)

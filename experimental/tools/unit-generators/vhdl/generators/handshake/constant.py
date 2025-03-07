@@ -2,8 +2,7 @@ from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
 
 
 def generate_constant(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
+  bitwidth = params["bitwidth"]
   value = params["value"]
 
   if data_type.has_extra_signals():
@@ -44,6 +43,9 @@ end architecture;
 """
 
   return entity + architecture
+
+
+<< << << < HEAD
 
 
 extra_signal_logic = {
@@ -112,3 +114,7 @@ end architecture;
   ]))
 
   return dependencies + entity + architecture
+
+
+== == == =
+>>>>>> > origin/main

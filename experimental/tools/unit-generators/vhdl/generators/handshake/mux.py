@@ -1,5 +1,5 @@
 from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
-from generators.support.tehb import generate_tehb
+from generators.handshake.tehb import generate_tehb
 
 
 def generate_mux(name, params):
@@ -7,6 +7,8 @@ def generate_mux(name, params):
   port_types = params["port_types"]
   outs_type = VhdlScalarType(port_types["outs"])
   index_type = VhdlScalarType(port_types["index"])
+  data_bitwidth = params["data_bitwidth"]
+  index_bitwidth = params["index_bitwidth"]
 
   if outs_type.has_extra_signals():
     if outs_type.is_channel():
@@ -22,12 +24,7 @@ def generate_mux(name, params):
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.channel<i{data_bitwidth}>",
-          "outs": f"!handshake.channel<i{data_bitwidth}>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": data_bitwidth})
 
   entity = f"""
 library ieee;
@@ -109,12 +106,7 @@ end architecture;
 def _generate_mux_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.control<>",
-          "outs": f"!handshake.control<>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": 0})
 
   entity = f"""
 library ieee;
