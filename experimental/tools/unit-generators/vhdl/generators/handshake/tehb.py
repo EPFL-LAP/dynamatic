@@ -1,10 +1,20 @@
-def generate_tehb(name, params):
-  bitwidth = params["bitwidth"]
+from generators.support.utils import VhdlScalarType
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
 
-  if bitwidth == 0:
-    return _generate_tehb_dataless(name)
+
+def generate_tehb(name, params):
+  port_types = params["port_types"]
+  ins_type = VhdlScalarType(port_types["ins"])
+
+  if ins_type.has_extra_signals():
+    if ins_type.is_channel():
+      return _generate_tehb_signal_manager(name, ins_type)
+    else:
+      return _generate_tehb_signal_manager_dataless(name, ins_type)
+  elif ins_type.is_channel():
+    return _generate_tehb(name, ins_type.bitwidth)
   else:
-    return _generate_tehb(name, bitwidth)
+    return _generate_tehb_dataless(name)
 
 
 def _generate_tehb_dataless(name):
@@ -123,3 +133,11 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_tehb_signal_manager(name, data_type):
+  return generate_buffer_like_signal_manager(name, data_type, _generate_tehb)
+
+
+def _generate_tehb_signal_manager_dataless(name, data_type):
+  return generate_buffer_like_signal_manager_dataless(name, data_type, _generate_tehb)

@@ -1,11 +1,17 @@
+from generators.support.utils import VhdlScalarType
+from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.handshake.join import generate_join
 
 
 def generate_cmpi(name, params):
-  bitwidth = params["bitwidth"]
+  port_types = params["port_types"]
   predicate = params["predicate"]
+  data_type = VhdlScalarType(port_types["lhs"])
 
-  return _generate_cmpi(name, predicate, bitwidth)
+  if data_type.has_extra_signals():
+    return _generate_cmpi_signal_manager(name, predicate, data_type)
+  else:
+    return _generate_cmpi(name, predicate, data_type.bitwidth)
 
 
 def _get_symbol_from_predicate(pred):
@@ -92,3 +98,9 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_cmpi_signal_manager(name, predicate, data_type):
+  def _generate_inner(inner_name, in_bitwidth, _):
+    return _generate_cmpi(inner_name, predicate, in_bitwidth)
+  return generate_binary_no_latency_signal_manager_full(name, data_type, VhdlScalarType("!handshake.channel<i1>"), _generate_inner)
