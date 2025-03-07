@@ -13,6 +13,8 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
@@ -21,6 +23,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
@@ -328,6 +331,25 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     // Skip
   } else {
     llvm::errs() << "Uncaught module: " << name << "\n";
+  }
+
+  // transparent
+  if (name == "handshake.buffer") {
+    auto params =
+        modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+      auto info = timing.getInfo();
+      if (info == handshake::TimingInfo::oehb())
+        serializedParams["TRANSPARENT"] = "True";
+      else if (info == handshake::TimingInfo::tehb())
+        serializedParams["TRANSPARENT"] = "False";
+      else {
+        llvm_unreachable("Unknown timing info");
+      }
+    } else {
+      llvm_unreachable("Unknown timing attr");
+    }
   }
 }
 

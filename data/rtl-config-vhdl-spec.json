@@ -127,7 +127,7 @@
       { "name": "NUM_SLOTS", "type": "unsigned" },
       { "name": "TIMING", "type": "timing" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\" bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\" bitwidth=$BITWIDTH transparent=$TRANSPARENT"
   },
   {
     "name": "handshake.ndwire",
