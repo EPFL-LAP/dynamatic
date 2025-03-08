@@ -1,4 +1,4 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import generate_extra_signal_ports
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
@@ -6,13 +6,13 @@ from generators.handshake.ofifo import generate_ofifo
 
 
 def generate_muli(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["result"])
+  bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if data_type.has_extra_signals():
-    return _generate_muli_signal_manager(name, data_type)
+  if extra_signals:
+    return _generate_muli_signal_manager(name, bitwidth, extra_signals)
   else:
-    return _generate_muli(name, data_type.bitwidth)
+    return _generate_muli(name, bitwidth)
 
 
 def _get_latency():
@@ -81,12 +81,7 @@ def _generate_muli(name, bitwidth):
       generate_join(join_name, {"size": 2}) + \
       _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
       generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
-      generate_oehb(oehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}>",
-              "outs": f"!handshake.channel<i{bitwidth}>"
-          }
-      })
+      generate_oehb(oehb_name, {"bitwidth": bitwidth})
 
   entity = f"""
 library ieee;
@@ -166,20 +161,15 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_muli_signal_manager(name, data_type):
+def _generate_muli_signal_manager(name, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
-
-  bitwidth = data_type.bitwidth
 
   dependencies = _generate_muli(inner_name, bitwidth)
 
-  if "spec" in data_type.extra_signals:
+  if "spec" in extra_signals:
     dependencies += generate_ofifo(f"{name}_spec_ofifo", {
         "num_slots": _get_latency(),  # todo: correct?
-        "port_types": {
-            "ins": "!handshake.channel<i1>",
-            "outs": "!handshake.channel<i1>"
-        }
+        "bitwidth": 1,
     })
 
   # Now that the logic depends on the name, this dict is defined inside this function.
@@ -208,7 +198,7 @@ def _generate_muli_signal_manager(name, data_type):
 """)
   }
 
-  for signal_name in data_type.extra_signals:
+  for signal_name in extra_signals:
     if signal_name not in extra_signal_logic:
       raise ValueError(f"Extra signal {signal_name} is not supported")
 
@@ -242,7 +232,7 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("lhs", "in"), ("rhs", "in"),
       ("result", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -276,11 +266,11 @@ end architecture;
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_SIGNAL_DECLS]",
                                       "\n".join([
-                                          extra_signal_logic[name][0] for name in data_type.extra_signals
+                                          extra_signal_logic[name][0] for name in extra_signals
                                       ]))
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]",
                                       "\n".join([
-                                          extra_signal_logic[name][1] for name in data_type.extra_signals
+                                          extra_signal_logic[name][1] for name in extra_signals
                                       ]))
 
   return dependencies + entity + architecture

@@ -178,7 +178,7 @@ def generate_extra_signal_concat_logic(ins: tuple[str, str], outs: list[tuple[st
 # For merge-like signal managers (mux and cmerge)
 
 
-def generate_lacking_extra_signal_decls(ins_name: str, ins_types: list[VhdlScalarType], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
+def generate_lacking_extra_signal_decls(ins_name: str, extra_signals_list: list[dict[str, int]], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
   """
   Generates the declarations for extra signals that are not present in the input signals.
   ins_name: The name of the input signal. (e.g., "ins")
@@ -188,9 +188,9 @@ def generate_lacking_extra_signal_decls(ins_name: str, ins_types: list[VhdlScala
   indent_str = " " * indent
   decls = []
   extra_signals_union = extra_signal_mapping.to_extra_signals().items()
-  for i, ins_type in enumerate(ins_types):
+  for i, extra_signals in enumerate(extra_signals_list):
     for name, bitwidth in extra_signals_union:
-      if name not in ins_type.extra_signals:
+      if name not in extra_signals:
         decls.append(
             f"{indent_str}signal {ins_name}_{i}_{name} : std_logic_vector({bitwidth - 1} downto 0);")
   return "\n".join(decls)
@@ -201,7 +201,7 @@ extra_signal_default_values = {
 }
 
 
-def generate_lacking_extra_signal_assignments(ins_name: str, ins_types: list[VhdlScalarType], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
+def generate_lacking_extra_signal_assignments(ins_name: str, extra_signals_list: list[dict[str, int]], extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
   """
   Generates the assignments for extra signals that are not present in the input signals.
   ins_name: The name of the input signal. (e.g., "ins")
@@ -211,9 +211,9 @@ def generate_lacking_extra_signal_assignments(ins_name: str, ins_types: list[Vhd
   indent_str = " " * indent
   assignments = []
   extra_signals_union = extra_signal_mapping.to_extra_signals().items()
-  for i, ins_type in enumerate(ins_types):
-    for name, bitwidth in extra_signals_union:
-      if name not in ins_type.extra_signals:
+  for i, extra_signals in enumerate(extra_signals_list):
+    for name, _ in extra_signals_union:
+      if name not in extra_signals:
         assignments.append(
             f"{indent_str}{ins_name}_{i}_{name} <= {extra_signal_default_values[name]};")
   return "\n".join(assignments)

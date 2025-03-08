@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+from generators.support.utils import generate_extra_signal_ports
 
 # todo: can be reusable among various unit generators
 extra_signal_logic = {
@@ -10,11 +10,8 @@ extra_signal_logic = {
 }
 
 
-def generate_binary_no_latency_signal_manager_full(name: str, in_type: VhdlScalarType, out_type: VhdlScalarType, generate_inner: Callable[[str, int, int], str]) -> str:
+def generate_binary_no_latency_signal_manager_full(name: str, in_bitwidth: int, out_bitwidth: int, extra_signals: dict[str, int], generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
-
-  in_bitwidth = in_type.bitwidth
-  out_bitwidth = out_type.bitwidth
 
   dependencies = generate_inner(inner_name, in_bitwidth, out_bitwidth)
 
@@ -47,7 +44,7 @@ end entity;
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports([
       ("lhs", "in"), ("rhs", "in"), ("result", "out")
-  ], in_type.extra_signals)
+  ], extra_signals)
 
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
@@ -79,13 +76,13 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-      extra_signal_logic[name] for name in in_type.extra_signals
+      extra_signal_logic[name] for name in extra_signals
   ]))
 
   return dependencies + entity + architecture
 
 
-def generate_binary_no_latency_signal_manager(name: str, data_type: VhdlScalarType, generate_inner: Callable[[str, int], str]) -> str:
+def generate_binary_no_latency_signal_manager(name: str, bitwidth: int, extra_signals: dict[str, int], generate_inner: Callable[[str, int], str]) -> str:
   return generate_binary_no_latency_signal_manager_full(
-      name, data_type, data_type,
+      name, bitwidth, bitwidth, extra_signals,
       lambda name, in_bitwidth, _: generate_inner(name, in_bitwidth))

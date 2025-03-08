@@ -1,19 +1,17 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 
 
 def generate_load(name, params):
-  port_types = params["port_types"]
+  addr_bitwidth = params["addr_bitwidth"]
+  data_bitwidth = params["data_bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  # Ports communicating with the elastic circuit have the complete and same extra signals
-  data_type = VhdlScalarType(port_types["dataOut"])
-  addr_type = VhdlScalarType(port_types["addrIn"])
-
-  if data_type.has_extra_signals():
-    return _generate_load_signal_manager(name, data_type, addr_type)
+  if extra_signals:
+    return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
   else:
-    return _generate_load(name, data_type.bitwidth, addr_type.bitwidth)
+    return _generate_load(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_load(name, data_bitwidth, addr_bitwidth):
@@ -21,18 +19,8 @@ def _generate_load(name, data_bitwidth, addr_bitwidth):
   data_tehb_name = f"{name}_data_tehb"
 
   dependencies = \
-      generate_tehb(addr_tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{addr_bitwidth}>",
-              "outs": f"!handshake.channel<i{addr_bitwidth}>"
-          }
-      }) + \
-      generate_tehb(data_tehb_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{data_bitwidth}>",
-              "outs": f"!handshake.channel<i{data_bitwidth}>"
-          }
-      })
+      generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
+      generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
 
   entity = f"""
 library ieee;
@@ -100,24 +88,18 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_load_signal_manager(name, data_type, addr_type):
+def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   inner_name = f"{name}_inner"
   tfifo_name = f"{name}_tfifo"
 
-  data_bitwidth = data_type.bitwidth
-  addr_bitwidth = addr_type.bitwidth
-
   extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_type in data_type.extra_signals.items():
+  for signal_name, signal_type in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth) + \
       generate_tfifo(tfifo_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
-              "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
-          },
+          "bitwidth": extra_signals_total_bitwidth,
           "num_slots": 32  # todo
       })
 
@@ -155,7 +137,7 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("addrIn", "in"),
       ("dataOut", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""

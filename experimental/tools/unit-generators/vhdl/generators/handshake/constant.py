@@ -1,15 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import generate_extra_signal_ports
 
 
 def generate_constant(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
+  bitwidth = params["bitwidth"]
   value = params["value"]
+  extra_signals = params.get("extra_signals", None)
 
-  if data_type.has_extra_signals():
-    return _generate_constant_signal_manager(name, value, data_type)
+  if extra_signals:
+    return _generate_constant_signal_manager(name, value, bitwidth, extra_signals)
   else:
-    return _generate_constant(name, value, data_type.bitwidth)
+    return _generate_constant(name, value, bitwidth)
 
 
 def _generate_constant(name, value, bitwidth):
@@ -53,10 +53,8 @@ extra_signal_logic = {
 }
 
 
-def _generate_constant_signal_manager(name, value, data_type):
+def _generate_constant_signal_manager(name, value, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
-
-  bitwidth = data_type.bitwidth
 
   dependencies = _generate_constant(inner_name, value, bitwidth)
 
@@ -85,7 +83,7 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("ctrl", "in"),
       ("outs", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -108,7 +106,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-      extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in extra_signals
   ]))
 
   return dependencies + entity + architecture
