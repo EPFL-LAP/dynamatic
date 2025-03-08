@@ -1,11 +1,16 @@
+from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.handshake.join import generate_join
 
 
 def generate_cmpi(name, params):
   bitwidth = params["bitwidth"]
   predicate = params["predicate"]
+  extra_signals = params.get("extra_signals", None)
 
-  return _generate_cmpi(name, predicate, bitwidth)
+  if extra_signals:
+    return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
+  else:
+    return _generate_cmpi(name, predicate, bitwidth)
 
 
 def _get_symbol_from_predicate(pred):
@@ -92,3 +97,9 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
+  def _generate_inner(inner_name, in_bitwidth, _):
+    return _generate_cmpi(inner_name, predicate, in_bitwidth)
+  return generate_binary_no_latency_signal_manager_full(name, bitwidth, 1, extra_signals, _generate_inner)

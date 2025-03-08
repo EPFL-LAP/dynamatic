@@ -2,7 +2,6 @@ import argparse
 import ast
 import sys
 
-from generators.support.utils import VhdlScalarType
 import generators.handshake.addi as addi
 import generators.handshake.buffer as buffer
 import generators.handshake.cmpi as cmpi
