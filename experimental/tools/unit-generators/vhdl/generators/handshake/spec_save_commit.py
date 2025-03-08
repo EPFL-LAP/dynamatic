@@ -1,20 +1,15 @@
-from generators.support.utils import VhdlScalarType
-from generators.support.tfifo import generate_tfifo
-
-
 def generate_spec_save_commit(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
   # TODO: Support extra signals other than spec
-  if data_type.is_channel():
-    return _generate_spec_save_commit_inner(name, data_type.bitwidth, fifo_depth)
-  else:
+  if bitwidth == 0:
     return _generate_spec_save_commit_dataless(name, fifo_depth)
+  else:
+    return _generate_spec_save_commit(name, bitwidth, fifo_depth)
 
 
-def _generate_spec_save_commit_inner(name, bitwidth, fifo_depth):
+def _generate_spec_save_commit(name, bitwidth, fifo_depth):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -334,91 +329,10 @@ end architecture;
   return entity + architecture
 
 
-def _generate_spec_save_commit(name, bitwidth, fifo_depth):
-  inner_name = f"{name}_inner"
-  tfifo_name = f"{name}_tfifo"
-
-  dependencies = \
-      _generate_spec_save_commit_inner(inner_name, bitwidth, fifo_depth) + \
-      generate_tfifo(tfifo_name, {
-          "num_slots": 32,  # todo
-          "port_types": {
-              "ins": f"!handshake.channel<i3>",
-              "outs": f"!handshake.channel<i3>"
-          }
-      })
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-use work.types.all;
-
--- Entity of spec_save_commit wrapper
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    -- inputs
-    ins : in std_logic_vector({bitwidth} - 1 downto 0);
-    ins_valid : in std_logic;
-    ins_spec : in std_logic_vector(0 downto 0);
-    ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
-    ctrl_valid : in std_logic;
-    outs_ready : in std_logic;
-    -- outputs
-    outs : out std_logic_vector({bitwidth} - 1 downto 0);
-    outs_valid : out std_logic;
-    outs_spec : out std_logic_vector(0 downto 0);
-    ins_ready : out std_logic;
-    ctrl_ready : out std_logic
-  );
-end entity;
-"""
-
-  architecture = f"""
--- Architecture of spec_save_commit wrapper
-architecture arch of {name} is
-  signal ctrl_inner : std_logic_vector(2 downto 0);
-  signal ctrl_valid_inner : std_logic;
-  signal ctrl_ready_inner : std_logic;
-begin
-  ctrl_buf : entity work.{tfifo_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl,
-      ins_valid => ctrl_valid,
-      ins_ready => ctrl_ready,
-      outs => ctrl_inner,
-      outs_valid => ctrl_valid_inner,
-      outs_ready => ctrl_ready_inner
-    );
-  spec_save_commit : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ins,
-      ins_valid => ins_valid,
-      ins_spec => ins_spec,
-      ctrl => ctrl_inner,
-      ctrl_valid => ctrl_valid_inner,
-      outs_ready => outs_ready,
-      outs => outs,
-      outs_valid => outs_valid,
-      outs_spec => outs_spec,
-      ins_ready => ins_ready,
-      ctrl_ready => ctrl_ready_inner
-    );
-end architecture;
-"""
-
-  return dependencies + entity + architecture
-
-
 def _generate_spec_save_commit_dataless(name, fifo_depth):
   inner_name = f"{name}_inner"
 
-  dependencies = _generate_spec_save_commit_inner(inner_name, 1, fifo_depth)
+  dependencies = _generate_spec_save_commit(inner_name, 1, fifo_depth)
 
   entity = f"""
 library ieee;

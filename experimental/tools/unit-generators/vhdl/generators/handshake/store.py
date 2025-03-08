@@ -1,20 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.utils import generate_extra_signal_ports
 
 
 def generate_store(name, params):
-  port_types = params["port_types"]
-
-  # Ports communicating with the elastic circuit have the complete and same extra signals
-  data_type = VhdlScalarType(port_types["dataIn"])
-  addr_type = VhdlScalarType(port_types["addrIn"])
-
   data_bitwidth = params["data_bitwidth"]
   addr_bitwidth = params["addr_bitwidth"]
+  extra_signals = params["extra_signals"]
 
-  if data_type.has_extra_signals():
-    return _generate_store_signal_manager(name, data_type, addr_type)
+  if extra_signals:
+    return _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
   else:
-    return _generate_store(name, data_type.bitwidth, addr_type.bitwidth)
+    return _generate_store(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_store(name, data_bitwidth, addr_bitwidth):
@@ -65,11 +60,8 @@ end architecture;
   return entity + architecture
 
 
-def _generate_store_signal_manager(name, data_type, addr_type):
+def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   inner_name = f"{name}_inner"
-
-  data_bitwidth = data_type.bitwidth
-  addr_bitwidth = addr_type.bitwidth
 
   dependencies = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
 
@@ -107,7 +99,7 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("addrIn", "in"),
       ("dataIn", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""

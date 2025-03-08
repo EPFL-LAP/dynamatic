@@ -1,7 +1,16 @@
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
+
+
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params["extra_signals"]
 
-  if bitwidth == 0:
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_tehb_signal_manager_dataless(name, extra_signals)
+    else:
+      return _generate_tehb_signal_manager(name, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_tehb_dataless(name)
   else:
     return _generate_tehb(name, bitwidth)
@@ -123,3 +132,11 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
+  return generate_buffer_like_signal_manager(name, bitwidth, extra_signals, generate_tehb)
+
+
+def _generate_tehb_signal_manager_dataless(name, extra_signals):
+  return generate_buffer_like_signal_manager_dataless(name, extra_signals, _generate_tehb)

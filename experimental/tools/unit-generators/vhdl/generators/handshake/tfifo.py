@@ -1,11 +1,18 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 
 
 def generate_tfifo(name, params):
   bitwidth = params["bitwidth"]
   num_slots = params["num_slots"]
+  extra_signals = params["extra_signals"]
 
-  if bitwidth == 0:
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_tfifo_signal_manager_dataless(name, num_slots, extra_signals)
+    else:
+      return _generate_tfifo_signal_manager(name, num_slots, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_tfifo_dataless(name, num_slots)
   else:
     return _generate_tfifo(name, num_slots, bitwidth)
@@ -136,3 +143,11 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
+  return generate_buffer_like_signal_manager_full(name, size, bitwidth, extra_signals, _generate_tfifo)
+
+
+def _generate_tfifo_signal_manager_dataless(name, size, extra_signals):
+  return generate_buffer_like_signal_manager_dataless_full(name, size, extra_signals, _generate_tfifo)

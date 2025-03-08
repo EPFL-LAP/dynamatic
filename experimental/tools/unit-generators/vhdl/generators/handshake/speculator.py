@@ -1,14 +1,12 @@
 from generators.support.utils import VhdlScalarType
 from generators.handshake.fork import generate_fork
-from generators.support.tfifo import generate_tfifo
 
 
 def generate_speculator(name, params):
-  port_types = params["port_types"]
-  bitwidth = VhdlScalarType(port_types["ins"]).bitwidth
+  bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
-  return _generate_speculator_inner(name, bitwidth, fifo_depth)
+  return _generate_speculator(name, bitwidth, fifo_depth)
 
 
 def _generate_specGen_core(name, bitwidth):
@@ -885,7 +883,7 @@ end architecture;
   return entity + architecture
 
 
-def _generate_speculator_inner(name, bitwidth, fifo_depth):
+def _generate_speculator(name, bitwidth, fifo_depth):
   data_fork_name = f"{name}_data_fork"
   specGen_name = f"{name}_specGen"
   predictor_name = f"{name}_predictor"
@@ -900,25 +898,15 @@ def _generate_speculator_inner(name, bitwidth, fifo_depth):
   dependencies = \
       generate_fork(data_fork_name, {
           "size": 2,
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-              "outs_0": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-              "outs_1": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-          }
+          "bitwidth": bitwidth,
+          "extra_signals": {"spec": 1}
       }) + \
       _generate_specGen_core(specGen_name, bitwidth) + \
       _generate_predictor(predictor_name, bitwidth) + \
       _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
       generate_fork(control_fork_name, {
           "size": 5,
-          "port_types": {
-              "ins": "!handshake.channel<i3>",
-              "outs_0": "!handshake.channel<i3>",
-              "outs_1": "!handshake.channel<i3>",
-              "outs_2": "!handshake.channel<i3>",
-              "outs_3": "!handshake.channel<i3>",
-              "outs_4": "!handshake.channel<i3>",
-          }
+          "bitwidth": 3
       }) + \
       _generate_decodeSave(decodeSave_name) + \
       _generate_decodeCommit(decodeCommit_name) + \
@@ -1137,237 +1125,6 @@ decodeBranch0: entity work.{decodeBranch_name}(arch)
     control_out_valid => ctrl_sc_branch_valid,
     control_out_ready => ctrl_sc_branch_ready
   );
-end architecture;
-"""
-
-  return dependencies + entity + architecture
-
-
-def _generate_speculator(name, bitwidth, fifo_depth):
-  inner_name = f"{name}_inner"
-  fifo_outs_name = f"{name}_fifo_outs"
-  fifo_ctrl_save_name = f"{name}_fifo_ctrl_save"
-  fifo_ctrl_commit_name = f"{name}_fifo_ctrl_commit"
-  fifo_ctrl_sc_commit_name = f"{name}_fifo_ctrl_sc_commit"
-  fifo_ctrl_sc_save_name = f"{name}_fifo_ctrl_sc_save"
-  fifo_ctrl_sc_branch_name = f"{name}_fifo_ctrl_sc_branch"
-
-  dependencies = _generate_speculator_inner(inner_name, bitwidth, fifo_depth) + \
-      generate_tfifo(fifo_outs_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": f"!handshake.channel<i{bitwidth}, [spec: i1]>",
-              "outs": f"!handshake.channel<i{bitwidth}, [spec: i1]>"
-          }
-      }) + \
-      generate_tfifo(fifo_ctrl_save_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": "!handshake.channel<i1>",
-              "outs": "!handshake.channel<i1>"
-          }
-      }) + \
-      generate_tfifo(fifo_ctrl_commit_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": "!handshake.channel<i1>",
-              "outs": "!handshake.channel<i1>"
-          }
-      }) + \
-      generate_tfifo(fifo_ctrl_sc_commit_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": "!handshake.channel<i3>",
-              "outs": "!handshake.channel<i3>"
-          }
-      }) + \
-      generate_tfifo(fifo_ctrl_sc_save_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": "!handshake.channel<i3>",
-              "outs": "!handshake.channel<i3>"
-          }
-      }) + \
-      generate_tfifo(fifo_ctrl_sc_branch_name, {
-          "num_slots": 32,
-          "port_types": {
-              "ins": "!handshake.channel<i1>",
-              "outs": "!handshake.channel<i1>"
-          }
-      })
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of speculator wrapper
-entity {name} is
-  port (
-    clk, rst: std_logic;
-    -- inputs
-    ins: in std_logic_vector({bitwidth} - 1 downto 0);
-    ins_valid: in std_logic;
-    ins_spec: in std_logic_vector(0 downto 0);
-    -- trigger is dataless (control token)
-    trigger_valid: in std_logic;
-    trigger_spec: in std_logic_vector(0 downto 0);
-    outs_ready: in std_logic;
-    ctrl_save_ready: in std_logic;
-    ctrl_commit_ready: in std_logic;
-    ctrl_sc_save_ready: in std_logic;
-    ctrl_sc_commit_ready: in std_logic;
-    ctrl_sc_branch_ready: in std_logic;
-    -- outputs
-    outs: out std_logic_vector({bitwidth} - 1 downto 0);
-    outs_valid: out std_logic;
-    outs_spec: out std_logic_vector(0 downto 0);
-    ctrl_save: out std_logic_vector(0 downto 0);
-    ctrl_save_valid: out std_logic;
-    ctrl_commit: out std_logic_vector(0 downto 0);
-    ctrl_commit_valid: out std_logic;
-    ctrl_sc_save: out std_logic_vector(2 downto 0);
-    ctrl_sc_save_valid: out std_logic;
-    ctrl_sc_commit: out std_logic_vector(2 downto 0);
-    ctrl_sc_commit_valid: out std_logic;
-    ctrl_sc_branch: out std_logic_vector(0 downto 0);
-    ctrl_sc_branch_valid: out std_logic;
-    ins_ready: out std_logic;
-    trigger_ready: out std_logic
-  );
-end entity;
-"""
-
-  architecture = f"""
--- Architecture of speculator wrapper
-architecture arch of {name} is
-  signal outs_inner: std_logic_vector({bitwidth} - 1 downto 0);
-  signal outs_valid_inner: std_logic;
-  signal outs_spec_inner: std_logic_vector(0 downto 0);
-  signal outs_ready_inner: std_logic;
-
-  signal ctrl_save_inner: std_logic_vector(0 downto 0);
-  signal ctrl_save_valid_inner: std_logic;
-  signal ctrl_save_ready_inner: std_logic;
-  signal ctrl_commit_inner: std_logic_vector(0 downto 0);
-  signal ctrl_commit_valid_inner: std_logic;
-  signal ctrl_commit_ready_inner: std_logic;
-  signal ctrl_sc_save_inner: std_logic_vector(2 downto 0);
-  signal ctrl_sc_save_valid_inner: std_logic;
-  signal ctrl_sc_save_ready_inner: std_logic;
-  signal ctrl_sc_commit_inner: std_logic_vector(2 downto 0);
-  signal ctrl_sc_commit_valid_inner: std_logic;
-  signal ctrl_sc_commit_ready_inner: std_logic;
-  signal ctrl_sc_branch_inner: std_logic_vector(0 downto 0);
-  signal ctrl_sc_branch_valid_inner: std_logic;
-  signal ctrl_sc_branch_ready_inner: std_logic;
-begin
-  speculator : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-
-      ins => ins,
-      ins_valid => ins_valid,
-      ins_spec => ins_spec,
-      ins_ready => ins_ready,
-
-      trigger_valid => trigger_valid,
-      trigger_ready => trigger_ready,
-
-      outs => outs_inner,
-      outs_valid => outs_valid_inner,
-      outs_spec => outs_spec_inner,
-      outs_ready => outs_ready_inner,
-
-      ctrl_save => ctrl_save_inner,
-      ctrl_save_valid => ctrl_save_valid_inner,
-      ctrl_save_ready => ctrl_save_ready_inner,
-
-      ctrl_commit => ctrl_commit_inner,
-      ctrl_commit_valid => ctrl_commit_valid_inner,
-      ctrl_commit_ready => ctrl_commit_ready_inner,
-
-      ctrl_sc_save => ctrl_sc_save_inner,
-      ctrl_sc_save_valid => ctrl_sc_save_valid_inner,
-      ctrl_sc_save_ready => ctrl_sc_save_ready_inner,
-
-      ctrl_sc_commit => ctrl_sc_commit_inner,
-      ctrl_sc_commit_valid => ctrl_sc_commit_valid_inner,
-      ctrl_sc_commit_ready => ctrl_sc_commit_ready_inner,
-
-      ctrl_sc_branch => ctrl_sc_branch_inner,
-      ctrl_sc_branch_valid => ctrl_sc_branch_valid_inner,
-      ctrl_sc_branch_ready => ctrl_sc_branch_ready_inner
-    );
-  tehb_outs : entity work.{fifo_outs_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => outs_inner,
-      ins_valid => outs_valid_inner,
-      ins_spec => outs_spec_inner,
-      ins_ready => outs_ready_inner,
-      outs => outs,
-      outs_valid => outs_valid,
-      outs_spec => outs_spec,
-      outs_ready => outs_ready
-    );
-  tehb_ctrl_save : entity work.{fifo_ctrl_save_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl_save_inner,
-      ins_valid => ctrl_save_valid_inner,
-      ins_ready => ctrl_save_ready_inner,
-      outs => ctrl_save,
-      outs_valid => ctrl_save_valid,
-      outs_ready => ctrl_save_ready
-    );
-  tehb_ctrl_commit : entity work.{fifo_ctrl_commit_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl_commit_inner,
-      ins_valid => ctrl_commit_valid_inner,
-      ins_ready => ctrl_commit_ready_inner,
-      outs => ctrl_commit,
-      outs_valid => ctrl_commit_valid,
-      outs_ready => ctrl_commit_ready
-    );
-  tehb_ctrl_sc_save : entity work.{fifo_ctrl_sc_save_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl_sc_save_inner,
-      ins_valid => ctrl_sc_save_valid_inner,
-      ins_ready => ctrl_sc_save_ready_inner,
-      outs => ctrl_sc_save,
-      outs_valid => ctrl_sc_save_valid,
-      outs_ready => ctrl_sc_save_ready
-    );
-  tehb_ctrl_sc_commit : entity work.{fifo_ctrl_sc_commit_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl_sc_commit_inner,
-      ins_valid => ctrl_sc_commit_valid_inner,
-      ins_ready => ctrl_sc_commit_ready_inner,
-      outs => ctrl_sc_commit,
-      outs_valid => ctrl_sc_commit_valid,
-      outs_ready => ctrl_sc_commit_ready
-    );
-  tehb_ctrl_sc_branch : entity work.{fifo_ctrl_sc_branch_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ctrl_sc_branch_inner,
-      ins_valid => ctrl_sc_branch_valid_inner,
-      ins_ready => ctrl_sc_branch_ready_inner,
-      outs => ctrl_sc_branch,
-      outs_valid => ctrl_sc_branch_valid,
-      outs_ready => ctrl_sc_branch_ready
-    );
 end architecture;
 """
 
