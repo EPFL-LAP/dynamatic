@@ -27,6 +27,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of cond_br_dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -48,6 +49,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br_dataless
 architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
 begin
@@ -83,6 +85,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of cond_br
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -107,6 +110,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br
 architecture arch of {name} is
 begin
   control : entity work.{inner_name}
@@ -132,12 +136,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-# todo: can be reusable among various unit generators
 extra_signal_logic = {
     "spec": """
   trueOut_spec <= data_spec or condition_spec;
   falseOut_spec <= data_spec or condition_spec;
-"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+"""
 }
 
 
