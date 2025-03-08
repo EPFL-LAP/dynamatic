@@ -538,8 +538,6 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     // Extract number and type of slots
     unsigned numSlotsToPlace = static_cast<unsigned>(
         channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
-                           GRB_DoubleAttr_X) > 0;
 
     PlacementResult result = placement[value];
     ChannelBufProps &props = channelProps[value];
@@ -550,8 +548,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     std::stringstream propsStr;
     propsStr << props;
     os << "- Buffering constraints: " << propsStr.str() << "\n";
-    os << "- MILP decision: " << numSlotsToPlace << " "
-       << (placeOpaque ? "opaque" : "transparent") << " slot(s)\n";
+    os << "- MILP decision: " << numSlotsToPlace << " slot(s)\n";
     os << "- Placement decision: \n";
     os << result.numSlotDV << " DV slot(s)\n";
     os << result.numSlotR << " R slot(s)\n";
