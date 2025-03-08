@@ -1,7 +1,3 @@
-import os
-import shutil
-
-
 def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dict[str, int]) -> str:
   if not extra_signals:
     return ""
@@ -17,10 +13,14 @@ def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dic
 
 
 class ExtraSignalMapping:
+  # List of tuples of (extra_signal_name, (msb, lsb))
   mapping: list[tuple[str, tuple[int, int]]]
   total_bitwidth: int
 
   def __init__(self, offset: int = 0):
+    """
+    offset: The starting bitwidth of the extra signals (if data is present).
+    """
     self.mapping = []
     self.total_bitwidth = offset
 
@@ -40,6 +40,16 @@ class ExtraSignalMapping:
 
 
 def generate_ins_concat_statements(in_name: str, in_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2, custom_data_name=None) -> str:
+  """
+  Generates the input signal concatenation statement.
+  in_name: The name of the input signal. (e.g., "ins")
+  in_inner_name: The name of the inner input signal. (e.g., "ins_inner")
+  extra_signal_mapping: An ExtraSignalMapping object.
+  bitwidth: The bitwidth of the data signal.
+  e.g., ins_inner(31 downto 0) <= ins;
+  ins_inner(32 downto 32) <= ins_spec;
+  ins_inner(40 downto 33) <= ins_tag;
+  """
   indent_str = " " * indent
   if custom_data_name is None:
     custom_data_name = in_name
@@ -49,6 +59,14 @@ def generate_ins_concat_statements(in_name: str, in_inner_name: str, extra_signa
 
 
 def generate_ins_concat_statements_dataless(in_name: str, in_inner_name: str, extra_signal_mapping: ExtraSignalMapping, indent=2) -> str:
+  """
+  Generates the input signal concatenation statement.
+  in_name: The name of the input signal. (e.g., "ins")
+  in_inner_name: The name of the inner input signal. (e.g., "ins_inner")
+  extra_signal_mapping: An ExtraSignalMapping object.
+  e.g., ins_inner(0 downto 0) <= ins_spec;
+  ins_inner(8 downto 1) <= ins_tag;
+  """
   indent_str = " " * indent
   return "\n".join([
       f"{indent_str}{in_inner_name}({msb} downto {lsb}) <= {in_name}_{name};" for name, (msb, lsb) in extra_signal_mapping.mapping
