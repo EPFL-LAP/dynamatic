@@ -4,7 +4,7 @@ from generators.support.utils import generate_extra_signal_ports
 def generate_trunci(name, params):
   input_bitwidth = params["input_bitwidth"]
   output_bitwidth = params["output_bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)

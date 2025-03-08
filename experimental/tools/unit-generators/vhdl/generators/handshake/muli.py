@@ -7,7 +7,7 @@ from generators.handshake.ofifo import generate_ofifo
 
 def generate_muli(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_muli_signal_manager(name, bitwidth, extra_signals)

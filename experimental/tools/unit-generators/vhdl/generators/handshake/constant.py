@@ -4,7 +4,7 @@ from generators.support.utils import generate_extra_signal_ports
 def generate_constant(name, params):
   bitwidth = params["bitwidth"]
   value = params["value"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_constant_signal_manager(name, value, bitwidth, extra_signals)

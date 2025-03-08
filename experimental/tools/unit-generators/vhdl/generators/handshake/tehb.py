@@ -3,7 +3,7 @@ from generators.support.signal_manager.buffer import generate_buffer_like_signal
 
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     if bitwidth == 0:
@@ -135,7 +135,7 @@ end architecture;
 
 
 def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
-  return generate_buffer_like_signal_manager(name, bitwidth, extra_signals, generate_tehb)
+  return generate_buffer_like_signal_manager(name, bitwidth, extra_signals, _generate_tehb)
 
 
 def _generate_tehb_signal_manager_dataless(name, extra_signals):

@@ -401,12 +401,15 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       name == "handshake.constant" || name == "handshake.extsi" ||
       name == "handshake.fork" || name == "handshake.merge" ||
       name == "handshake.muli" || name == "handshake.sink" ||
-      name == "handshake.source" || name == "handshake.spec_save_commit" ||
-      name == "handshake.speculator" || name == "handshake.trunci" ||
+      name == "handshake.spec_save_commit" || name == "handshake.speculator" ||
+      name == "handshake.trunci" ||
       // the first input has extra signals
       name == "handshake.load" || name == "handshake.store") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getInputType(0));
+  } else if (name == "handshake.source") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(mod.getOutputType(0));
   } else if (name == "handshake.control_merge") {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));

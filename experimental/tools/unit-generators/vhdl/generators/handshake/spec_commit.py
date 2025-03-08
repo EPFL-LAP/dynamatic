@@ -1,4 +1,4 @@
-from generators.support.tfifo import generate_tfifo
+from generators.handshake.tfifo import generate_tfifo
 from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.merge import generate_merge
 

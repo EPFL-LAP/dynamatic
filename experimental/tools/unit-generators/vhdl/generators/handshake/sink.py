@@ -3,7 +3,7 @@ from generators.support.utils import generate_extra_signal_ports
 
 def generate_sink(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   entity = f"""
 library ieee;

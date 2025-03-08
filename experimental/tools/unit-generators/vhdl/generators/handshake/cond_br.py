@@ -4,7 +4,7 @@ from generators.handshake.join import generate_join
 
 def generate_cond_br(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     if bitwidth == 0:

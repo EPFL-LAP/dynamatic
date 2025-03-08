@@ -6,7 +6,7 @@ from generators.handshake.tfifo import generate_tfifo
 def generate_load(name, params):
   addr_bitwidth = params["addr_bitwidth"]
   data_bitwidth = params["data_bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
@@ -99,10 +99,7 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
 
   dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth) + \
       generate_tfifo(tfifo_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
-              "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
-          },
+          "bitwidth": extra_signals_total_bitwidth,
           "num_slots": 32  # todo
       })
 

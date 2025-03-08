@@ -6,7 +6,7 @@ from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 def generate_ofifo(name, params):
   bitwidth = params["bitwidth"]
   num_slots = params["num_slots"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     if bitwidth == 0:

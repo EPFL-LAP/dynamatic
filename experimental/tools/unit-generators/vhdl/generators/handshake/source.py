@@ -2,7 +2,7 @@ from generators.support.utils import generate_extra_signal_ports, extra_signal_d
 
 
 def generate_source(name, params):
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   entity = f"""
 library ieee;
@@ -33,7 +33,7 @@ architecture arch of {name} is
 begin
   outs_valid <= '1';
   [EXTRA_SIGNAL_LOGIC]
-end arch;
+end architecture;
 """
 
   extra_signal_assignments = []

@@ -5,7 +5,7 @@ from generators.support.signal_manager.buffer import generate_buffer_like_signal
 def generate_tfifo(name, params):
   bitwidth = params["bitwidth"]
   num_slots = params["num_slots"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     if bitwidth == 0:

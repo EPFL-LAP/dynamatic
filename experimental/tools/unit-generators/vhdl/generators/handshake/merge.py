@@ -6,7 +6,7 @@ from generators.handshake.tehb import generate_tehb
 def generate_merge(name, params):
   size = params["size"]
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     if bitwidth == 0:

@@ -4,7 +4,7 @@ from generators.handshake.join import generate_join
 
 def generate_addi(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_addi_signal_manager(name, bitwidth, extra_signals)

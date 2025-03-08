@@ -4,7 +4,7 @@ from generators.support.utils import generate_extra_signal_ports
 def generate_store(name, params):
   data_bitwidth = params["data_bitwidth"]
   addr_bitwidth = params["addr_bitwidth"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)

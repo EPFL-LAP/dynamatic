@@ -6,7 +6,7 @@ from generators.handshake.join import generate_join
 def generate_cmpi(name, params):
   bitwidth = params["bitwidth"]
   predicate = params["predicate"]
-  extra_signals = params["extra_signals"]
+  extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
     return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
