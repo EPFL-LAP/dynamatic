@@ -1,4 +1,3 @@
-from generators.support.utils import VhdlScalarType
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager_full
 from generators.handshake.join import generate_join
 
