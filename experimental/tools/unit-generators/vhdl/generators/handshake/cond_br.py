@@ -1,20 +1,20 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import generate_extra_signal_ports
 from generators.handshake.join import generate_join
 
 
 def generate_cond_br(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["data"])
+  bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if data_type.has_extra_signals():
-    if data_type.is_channel():
-      return _generate_cond_br_signal_manager(name, data_type)
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_cond_br_signal_manager_dataless(name, extra_signals)
     else:
-      return _generate_cond_br_signal_manager_dataless(name, data_type)
-  elif data_type.is_channel():
-    return _generate_cond_br(name, data_type.bitwidth)
-  else:
+      return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_cond_br_dataless(name)
+  else:
+    return _generate_cond_br(name, bitwidth)
 
 
 def _generate_cond_br_dataless(name):
@@ -141,10 +141,10 @@ extra_signal_logic = {
 }
 
 
-def _generate_cond_br_signal_manager(name, data_type):
+def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
 
-  dependencies = _generate_cond_br(inner_name, data_type.bitwidth)
+  dependencies = _generate_cond_br(inner_name, bitwidth)
 
   entity = f"""
 library ieee;
@@ -156,16 +156,16 @@ entity {name} is
     clk : in std_logic;
     rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
-    data : in std_logic_vector({data_type.bitwidth - 1} downto 0);
+    data : in std_logic_vector({bitwidth - 1} downto 0);
     data_valid : in std_logic;
     data_ready : out std_logic;
     condition : in std_logic_vector(0 downto 0);
     condition_valid : in std_logic;
     condition_ready : out std_logic;
-    trueOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);
+    trueOut : out std_logic_vector({bitwidth - 1} downto 0);
     trueOut_valid : out std_logic;
     trueOut_ready : in std_logic;
-    falseOut : out std_logic_vector({data_type.bitwidth - 1} downto 0);
+    falseOut : out std_logic_vector({bitwidth - 1} downto 0);
     falseOut_valid : out std_logic;
     falseOut_ready : in std_logic
   );
@@ -176,10 +176,10 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("data", "in"), ("condition", "in"),
       ("trueOut", "out"), ("falseOut", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-  for signal_name in data_type.extra_signals:
+  for signal_name in extra_signals:
     if signal_name not in extra_signal_logic:
       raise ValueError(f"Extra signal {signal_name} is not supported")
 
@@ -211,13 +211,13 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-      extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in extra_signals
   ]))
 
   return dependencies + entity + architecture
 
 
-def _generate_cond_br_signal_manager_dataless(name, data_type):
+def _generate_cond_br_signal_manager_dataless(name, extra_signals):
   inner_name = f"{name}_inner"
 
   dependencies = _generate_cond_br_dataless(inner_name)
@@ -249,10 +249,10 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("data", "in"), ("condition", "in"),
       ("trueOut", "out"), ("falseOut", "out")
-  ], data_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-  for signal_name in data_type.extra_signals:
+  for signal_name in extra_signals:
     if signal_name not in extra_signal_logic:
       raise ValueError(f"Extra signal {signal_name} is not supported")
 
@@ -281,7 +281,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-      extra_signal_logic[name] for name in data_type.extra_signals
+      extra_signal_logic[name] for name in extra_signals
   ]))
 
   return dependencies + entity + architecture

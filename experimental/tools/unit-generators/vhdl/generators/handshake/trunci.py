@@ -1,15 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import generate_extra_signal_ports
 
 
 def generate_trunci(name, params):
-  port_types = params["port_types"]
-  ins_type = VhdlScalarType(port_types["ins"])
-  outs_type = VhdlScalarType(port_types["outs"])
+  input_bitwidth = params["input_bitwidth"]
+  output_bitwidth = params["output_bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if ins_type.has_extra_signals():
-    return _generate_trunci_signal_manager(name, ins_type, outs_type)
+  if extra_signals:
+    return _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
   else:
-    return _generate_trunci(name, ins_type.bitwidth, outs_type.bitwidth)
+    return _generate_trunci(name, input_bitwidth, output_bitwidth)
 
 
 def _generate_trunci(name, input_bitwidth, output_bitwidth):
@@ -54,11 +54,8 @@ extra_signal_logic = {
 }
 
 
-def _generate_trunci_signal_manager(name, ins_type, outs_type):
+def _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
   inner_name = f"{name}_inner"
-
-  input_bitwidth = ins_type.bitwidth
-  output_bitwidth = outs_type.bitwidth
 
   dependencies = _generate_trunci(inner_name, input_bitwidth, output_bitwidth)
 
@@ -88,7 +85,7 @@ end entity;
   extra_signal_ports = generate_extra_signal_ports([
       ("ins", "in"),
       ("outs", "out")
-  ], ins_type.extra_signals)
+  ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -112,7 +109,7 @@ end architecture;
 """
 
   architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
-      extra_signal_logic[name] for name in ins_type.extra_signals
+      extra_signal_logic[name] for name in extra_signals
   ]))
 
   return dependencies + entity + architecture

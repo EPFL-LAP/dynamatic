@@ -1,21 +1,21 @@
-from generators.support.utils import VhdlScalarType
-from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
+from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager_full, generate_buffer_like_signal_manager_dataless_full
 
 
 def generate_tfifo(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  bitwidth = params["bitwidth"]
+  num_slots = params["num_slots"]
+  extra_signals = params.get("extra_signals", None)
 
-  if data_type.has_extra_signals():
-    if data_type.is_channel():
-      return _generate_tfifo_signal_manager(name, params["num_slots"], data_type)
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_tfifo_signal_manager_dataless(name, num_slots, extra_signals)
     else:
-      return _generate_tfifo_signal_manager_dataless(name, params["num_slots"], data_type)
-  elif data_type.is_channel():
-    return _generate_tfifo(name, params["num_slots"], data_type.bitwidth)
+      return _generate_tfifo_signal_manager(name, num_slots, bitwidth, extra_signals)
+  elif bitwidth == 0:
+    return _generate_tfifo_dataless(name, num_slots)
   else:
-    return _generate_tfifo_dataless(name, params["num_slots"])
+    return _generate_tfifo(name, num_slots, bitwidth)
 
 
 def _generate_tfifo(name, size, bitwidth):
@@ -145,20 +145,9 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_tfifo_signal_manager(name, size, data_type):
-  return generate_buffer_like_signal_manager_full(name, size, data_type, _generate_tfifo)
+def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
+  return generate_buffer_like_signal_manager_full(name, size, bitwidth, extra_signals, _generate_tfifo)
 
 
-def _generate_tfifo_signal_manager_dataless(name, size, data_type):
-  return generate_buffer_like_signal_manager_dataless_full(name, size, data_type, _generate_tfifo)
-
-
-if __name__ == "__main__":
-  print(generate_tfifo("tfifo", {
-      "num_slots": 16,
-      "data_type": "!handshake.channel<i32, [spec: i1, tag: i8]>"
-  }))
-  print(generate_tfifo("tfifo", {
-      "num_slots": 16,
-      "data_type": "!handshake.control<[spec: i1, tag: i8]>"
-  }))
+def _generate_tfifo_signal_manager_dataless(name, size, extra_signals):
+  return generate_buffer_like_signal_manager_dataless_full(name, size, extra_signals, _generate_tfifo)

@@ -4,30 +4,26 @@ from generators.handshake.tehb import generate_tehb
 
 def generate_mux(name, params):
   size = params["size"]
-  port_types = params["port_types"]
-  outs_type = VhdlScalarType(port_types["outs"])
-  index_type = VhdlScalarType(port_types["index"])
+  data_bitwidth = params["data_bitwidth"]
+  index_bitwidth = params["index_bitwidth"]
+  input_extra_signals_list = params["input_extra_signals_list"]
+  output_extra_signals = params["output_extra_signals"]
 
-  if outs_type.has_extra_signals():
-    if outs_type.is_channel():
-      return _generate_mux_signal_manager(name, size, port_types)
+  if output_extra_signals:
+    if data_bitwidth == 0:
+      return _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals)
     else:
-      return _generate_mux_signal_manager_dataless(name, size, port_types)
-  elif outs_type.is_channel():
-    return _generate_mux(name, size, index_type.bitwidth, outs_type.bitwidth)
+      return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals)
+  elif data_bitwidth == 0:
+    return _generate_mux_dataless(name, size, index_bitwidth)
   else:
-    return _generate_mux_dataless(name, size, index_type.bitwidth)
+    return _generate_mux(name, size, index_bitwidth, data_bitwidth)
 
 
 def _generate_mux(name, size, index_bitwidth, data_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.channel<i{data_bitwidth}>",
-          "outs": f"!handshake.channel<i{data_bitwidth}>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": data_bitwidth})
 
   entity = f"""
 library ieee;
@@ -109,12 +105,7 @@ end architecture;
 def _generate_mux_dataless(name, size, index_bitwidth):
   tehb_name = f"{name}_tehb"
 
-  dependencies = generate_tehb(tehb_name, {
-      "port_types": {
-          "ins": f"!handshake.control<>",
-          "outs": f"!handshake.control<>",
-      }
-  })
+  dependencies = generate_tehb(tehb_name, {"bitwidth": 0})
 
   entity = f"""
 library ieee;
@@ -184,23 +175,12 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_mux_signal_manager(name, size, port_types):
+def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
-  outs_type = VhdlScalarType(port_types["outs"])
-  ins_types = []
-  index_type = VhdlScalarType(port_types["index"])
-
-  bitwidth = outs_type.bitwidth
-  index_bitwidth = index_type.bitwidth
-
-  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
-  for i in range(size):
-    ins_i_name = f"ins_{i}"
-    ins_i_type = VhdlScalarType(port_types[ins_i_name])
-    ins_types.append(ins_i_type)
-
-    for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
+  extra_signal_mapping = ExtraSignalMapping(offset=data_bitwidth)
+  for input_extra_signals in input_extra_signals_list:
+    for signal_name, signal_bitwidth in input_extra_signals.items():
       if not extra_signal_mapping.has(signal_name):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
@@ -219,7 +199,7 @@ entity {name} is
     clk, rst : in std_logic;
     [EXTRA_SIGNAL_PORTS]
     -- data input channels
-    ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
+    ins       : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
     -- index input channel
@@ -227,7 +207,7 @@ entity {name} is
     index_valid : in  std_logic;
     index_ready : out std_logic;
     -- output channel
-    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs       : out std_logic_vector({data_bitwidth} - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in  std_logic
   );
@@ -238,7 +218,7 @@ end entity;
   extra_signal_port_decls = []
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
-        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+        [(f"ins_{i}", "in")], input_extra_signals_list[i]))
   extra_signal_port_decls.append(generate_extra_signal_ports(
       [("outs", "out")], extra_signal_mapping.to_extra_signals()))
   entity = entity.replace(
@@ -273,19 +253,19 @@ end architecture;
   architecture = architecture.replace(
       "  [LACKING_EXTRA_SIGNAL_DECLS]",
       generate_lacking_extra_signal_decls(
-          "ins", ins_types, extra_signal_mapping)
+          "ins", input_extra_signals_list, extra_signal_mapping)
   )
 
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", ins_types, extra_signal_mapping)
+      "ins", input_extra_signals_list, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
     ins_conversions.append(generate_ins_concat_statements(
-        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"ins({i})"))
+        f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, data_bitwidth, custom_data_name=f"ins({i})"))
 
   outs_conversions = generate_outs_concat_statements(
-      "outs", "outs_inner", extra_signal_mapping, bitwidth)
+      "outs", "outs_inner", extra_signal_mapping, data_bitwidth)
 
   architecture = architecture.replace(
       "  [EXTRA_SIGNAL_LOGIC]",
@@ -296,21 +276,12 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_mux_signal_manager_dataless(name, size, port_types):
+def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
-  ins_types = []
-  index_type = VhdlScalarType(port_types["index"])
-
-  index_bitwidth = index_type.bitwidth
-
   extra_signal_mapping = ExtraSignalMapping()
-  for i in range(size):
-    ins_i_name = f"ins_{i}"
-    ins_i_type = VhdlScalarType(port_types[ins_i_name])
-    ins_types.append(ins_i_type)
-
-    for signal_name, signal_bitwidth in ins_i_type.extra_signals.items():
+  for input_extra_signals in input_extra_signals_list:
+    for signal_name, signal_bitwidth in input_extra_signals.items():
       if not extra_signal_mapping.has(signal_name):
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
@@ -346,7 +317,7 @@ end entity;
   extra_signal_port_decls = []
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
-        [(f"ins_{i}", "in")], ins_types[i].extra_signals))
+        [(f"ins_{i}", "in")], input_extra_signals_list[i]))
   extra_signal_port_decls.append(generate_extra_signal_ports(
       [("outs", "out")], extra_signal_mapping.to_extra_signals()))
   entity = entity.replace(
@@ -381,11 +352,11 @@ end architecture;
   architecture = architecture.replace(
       "  [LACKING_EXTRA_SIGNAL_DECLS]",
       generate_lacking_extra_signal_decls(
-          "ins", ins_types, extra_signal_mapping)
+          "ins", input_extra_signals_list, extra_signal_mapping)
   )
 
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", ins_types, extra_signal_mapping)
+      "ins", input_extra_signals_list, extra_signal_mapping)
 
   ins_conversions = []
   for i in range(size):
