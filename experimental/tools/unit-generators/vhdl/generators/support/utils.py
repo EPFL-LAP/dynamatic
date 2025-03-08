@@ -1,31 +1,5 @@
-import re
 import os
 import shutil
-
-
-def parse_extra_signals(extra_signals: str) -> dict[str, int]:
-  """
-  Parses a string of extra signals and their bitwidths.
-  e.g., extra_signals = "spec: i1, tag: i8"
-  """
-  type_pattern = r"u?i(\d+)"
-  extra_signals_dict = {}
-  for signal in extra_signals.split(","):
-    name, signal_type = signal.split(":")
-
-    # Remove whitespace
-    name = name.strip()
-    signal_type = signal_type.strip()
-
-    # Extract bitwidth from signal type
-    match = re.match(type_pattern, signal_type)
-    if match:
-      bitwidth = int(match.group(1))
-      extra_signals_dict[name] = bitwidth
-    else:
-      raise ValueError(f"Type {signal_type} of {name} is invalid")
-
-  return extra_signals_dict
 
 
 def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dict[str, int]) -> str:
@@ -116,21 +90,6 @@ def generate_outs_concat_statements_dataless(out_name: str, out_inner_name: str,
   ])
 
 
-def generate_extra_signal_concat_logic(ins: tuple[str, str], outs: list[tuple[str, str]], bit_map: tuple[dict[str, tuple[int, int]]]) -> str:
-  """
-  Generates the logic for extra signal concatenation.
-  ins: tuple specifying input signal. e.g., ("ins", "ins_inner")
-  outs: tuple specifying output signal.
-  bit_map: A bit map for the extra signals.
-  """
-  ins_logic = []
-  for name, (msb, lsb) in bit_map[0].items():
-    ins_logic.append(f"  {name} <= ins_inner({msb} downto {lsb})")
-  outs_logic = []
-  for name, (msb, lsb) in bit_map[0].items():
-    outs_logic.append(f"  outs_inner({msb} downto {lsb}) <= {name}")
-  return "\n".join(ins_logic + outs_logic)
-
 # For merge-like signal managers (mux and cmerge)
 
 
@@ -173,8 +132,3 @@ def generate_lacking_extra_signal_assignments(ins_name: str, extra_signals_list:
         assignments.append(
             f"{indent_str}{ins_name}_{i}_{name} <= {extra_signal_default_values[name]};")
   return "\n".join(assignments)
-
-
-def copy_types(output_dir: str):
-  types_path = os.path.join(os.path.dirname(__file__), "types.vhd")
-  shutil.copy(types_path, output_dir)
