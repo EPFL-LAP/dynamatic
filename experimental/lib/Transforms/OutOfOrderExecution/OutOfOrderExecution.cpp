@@ -53,6 +53,8 @@ static LogicalResult applyOutOfOrderExecution(handshake::FuncOp funcOp,
 
   
   for (auto op : funcOp.getOps<handshake::LoadOp>()) {
+    auto startValue = (Value)funcOp.getArguments().back();
+
     Value addrInput = op.getAddressInput();
     auto channel = cast<TypedValue<handshake::ChannelType>>(addrInput);
     //handshake::ChannelType c;
@@ -60,43 +62,21 @@ static LogicalResult applyOutOfOrderExecution(handshake::FuncOp funcOp,
     
     rewriter.setInsertionPoint(op);
     
-    
     // Tag the address input of the load of
     handshake::TaggerOp taggerOp =
-       rewriter.create<handshake::TaggerOp>(op.getLoc(), addrInput.getType(), addrInput, addrInput);
-    
-    Value data = taggerOp.getDataOut().front();
-    Value tag = taggerOp.getTagOut();
-
-    // Define the channel type with the data and the tag
-    auto channelType = handshake::ChannelType::get(ctx, 
-      data.getType(), 
-       {/* Extra signal */ handshake::ExtraSignal("tag1", tag.getType(),true)});
-
-    handshake::BundleOp bundleOp = 
-       rewriter.create<handshake::BundleOp>(op.getLoc(), data, tag, channelType);
-
-    auto r = bundleOp.getChannelLike();
-
-    //handshake::LoadOpTagged
-
-    // Create a control signal first
-    //Value validSignal = ...;  // Assume this is available (i1)
-    //auto bundleCtrlOp = builder.create<handshake::BundleOp>(op.getLoc(), validSignal);
-    //Value ctrl = bundleCtrlOp.getResult(0);  // !handshake.control
+       rewriter.create<handshake::TaggerOp>(op.getLoc(), addrInput.getType(), addrInput, startValue);
 
     
+    //Connect the tagger to the load
+    op.getOperation()->replaceUsesOfWith(addrInput, taggerOp.getDataOut().front());
 
-    /*
-  
+    UntaggerOp untaggerOp = rewriter.create<handshake::TaggerOp>(op.getLoc(), op.getDataResult());
 
-    handshake::LoadOpTagged taggedLoad = rewriter.create<handshake::LoadOpTagged>(op.getLoc(), op.getAddressInput(), bundleOp.getChannelLike(), op.getDataInput());
+    FreeTagsFifoOp fifo = rewriter.create<handshake::TaggerOp>(op.getLoc(), untaggerOp.getTagOut());
 
-    SmallVector<Type, 2> resultTypes;
-    resultTypes.push_back(op.getDataOutput().getType());
-    resultTypes.push_back(taggerOp.getTagOut().getType());
+    op.getOperation()->replaceUsesOfWith(op.getDataOutput(), untaggerOp.getDataOut().front());
 
-    handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(op.getLoc());*/
+    taggerOp.getOperation()->replaceUsesOfWith(startValue, fifo.getTagOut());
   }
   
   return success();

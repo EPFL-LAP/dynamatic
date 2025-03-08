@@ -1,4 +1,5 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports_arrays, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.join import generate_join
 from generators.handshake.fork.py import _generate_fork
 
 def generate_tagger(name, params):
@@ -8,9 +9,9 @@ def generate_tagger(name, params):
   tag_bitwidth = VhdlScalarType(port_types["tagOperand"]).bitwidth
 
   if data_type.has_extra_signals():
-    return _generate_tagger_signal_manager(name, data_type, addr_type)
+    return _generate_tagger_signal_manager(name, data_type, tag_bitwidth)
   else:
-    return _generate_tagger(name, data_type.bitwidth, tag_bitwidth)
+    return _generate_tagger(name, data_type, tag_bitwidth)
 
 def _generate_tagger(name, size, data_type, tag_bitwidth):
   join_name = f"{name}_join"
@@ -50,12 +51,6 @@ entity {name} is
   );
 end {name};
 """
-  # Add extra signal ports: possibly tags coming from outer graph
-  extra_signal_ports = generate_extra_signal_ports([
-      ("addrIn", "in"),
-      ("dataOut", "out")
-  ], data_type.extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
 architecture arch of {name} is
@@ -115,14 +110,7 @@ def _generate_tagger_signal_manager(name, size, data_type, tag_bitwidth):
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_tagger(inner_name, size, data_type, tag_bitwidth) + \
-      generate_tfifo(tfifo_name, {
-          "port_types": {
-              "ins": f"!handshake.channel<i{extra_signals_total_bitwidth}>",
-              "outs": f"!handshake.channel<i{extra_signals_total_bitwidth}>"
-          },
-          "num_slots": 32  # todo
-      })
+  dependencies = _generate_tagger(inner_name, size, data_type, tag_bitwidth)
 
   entity = f"""
 library ieee;
@@ -152,22 +140,17 @@ entity {name} is
 end {name};
 """
   # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-      ("dataInArray", "in"),
-      ("dataOutArray", "out")
+  extra_signal_ports = generate_extra_signal_ports_arrays([
+      ("dataInArray", "in", {size}),
+      ("dataOutArray", "out", {size})
   ], data_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-    architecture = f"""
+  architecture = f"""
 architecture arch of {name} is
-  signal nReadyArray : std_logic_vector({size} - 1 downto 0);
-  signal tfifo_ready : std_logic;
-  signal tfifo_n_ready : std_logic;
-  signal tfifo_ins_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
-  signal tfifo_outs_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
+  signal ins_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
+  signal outs_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
 begin
-  addrIn_ready <= nReadyArray and tfifo_ready;
-  tfifo_n_ready <= dataOut_valid and dataOut_ready;
 
   [EXTRA_SIGNAL_LOGIC]
 
@@ -185,5 +168,18 @@ begin
       tagOut => tagOut
     );
 
+    outs_inner <= ins_inner;
+
 end architecture;
 """
+  ins_conversion = generate_ins_concat_statements_dataless(
+      "dataInArray", "ins_inner", extra_signal_mapping)
+  outs_conversion = generate_outs_concat_statements_dataless(
+      "dataOutArray", "outs_inner", extra_signal_mapping)
+
+  architecture = architecture.replace(
+      "  [EXTRA_SIGNAL_LOGIC]",
+      ins_conversion + outs_conversion
+  )
+
+  return dependencies + entity + architecture

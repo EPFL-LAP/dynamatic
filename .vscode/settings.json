@@ -31,7 +31,12 @@
     "span": "cpp",
     "string": "cpp",
     "string_view": "cpp",
-    "ranges": "cpp"
+    "ranges": "cpp",
+    "propagate_const": "cpp",
+    "future": "cpp",
+    "istream": "cpp",
+    "locale": "cpp",
+    "memory": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",

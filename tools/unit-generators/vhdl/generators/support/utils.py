@@ -83,6 +83,17 @@ def generate_extra_signal_ports(ports: list[tuple[str, str]], extra_signals: dic
       for port, inout in ports
   ])
 
+def generate_extra_signal_ports_arrays(ports: list[tuple[str, str, int]], extra_signals: dict[str, int]) -> str:
+  if not extra_signals:
+    return ""
+  return "    -- extra signal ports\n" + "\n".join([
+      "\n".join([
+          f"    {port}_{name} : {inout} data_array({portSize - 1} downto 0)({bitwidth - 1} downto 0);"
+          for name, bitwidth in extra_signals.items()
+      ])
+      for port, inout, portSize in ports
+  ])
+
 # For concat-type signal managers (e.g., tehb, fork)
 
 
