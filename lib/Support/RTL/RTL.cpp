@@ -344,6 +344,12 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
         serializedParams["TRANSPARENT"] = "True";
       else if (info == handshake::TimingInfo::tehb())
         serializedParams["TRANSPARENT"] = "False";
+      else if (info == handshake::TimingInfo::dve())
+        serializedParams["TRANSPARENT"] = "True";
+      else if (info == handshake::TimingInfo::t())
+        serializedParams["TRANSPARENT"] = "False";
+      else if (info == handshake::TimingInfo::dvr())
+        serializedParams["TRANSPARENT"] = "True";
       else {
         llvm_unreachable("Unknown timing info");
       }
