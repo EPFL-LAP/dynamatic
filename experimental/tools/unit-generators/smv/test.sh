@@ -203,5 +203,8 @@ echo -e "\nTesting memory_controller..."
 test_generator -t memory_controller -p num_loads=0 num_stores=1 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
 test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
 test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=5 port_types='{"stAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=1 num_stores=0 num_controls=0 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=5 num_stores=0 num_controls=0 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=5 num_stores=5 num_controls=5 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
 
 rm $OUT
