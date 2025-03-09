@@ -85,4 +85,9 @@ test_generator -t source
 echo -e "\nTesting store..."
 test_generator -t store -p port_types='{"dataIn":"!handshake.channel<i16>","addrIn":"!handshake.channel<i16>"}'
 
+echo -e "\nTesting memory_controller..."
+test_generator -t memory_controller -p num_loads=0 num_stores=1 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=5 port_types='{"stAddr":"!handshake.channel<i16>"}'
+
 rm $OUT
