@@ -199,5 +199,9 @@ echo -e "\nTesting xori..."
 test_generator -t xori -p port_types='{"result":"!handshake.channel<i32>"}' latency=0
 test_generator -t xori --abstract-data -p port_types='{"result":"!handshake.channel<i32>"}' latency=0
 
+echo -e "\nTesting memory_controller..."
+test_generator -t memory_controller -p num_loads=0 num_stores=1 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=5 port_types='{"stAddr":"!handshake.channel<i16>"}'
 
 rm $OUT
