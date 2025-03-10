@@ -368,7 +368,6 @@ def MuxOp : Handshake_Op<"mux", [
   HasSpecTagIfPresent<"dataOperands", "result">,
   LacksSpecTag<"selectOperand">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {
