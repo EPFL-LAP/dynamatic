@@ -229,44 +229,6 @@ OpResult MergeOp::getDataResult() { return cast<OpResult>(getResult()); }
 // MuxOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult
-MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
-                        ValueRange operands, DictionaryAttr attributes,
-                        mlir::OpaqueProperties properties,
-                        mlir::RegionRange regions,
-                        SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  // MuxOp must have at least one data operand (in addition to the select
-  // operand)
-  if (operands.size() < 2)
-    return failure();
-
-  // DenseSet to collect the extra signal names from data operands
-  llvm::DenseSet<StringRef> unionOfExtraSignalNames;
-  // SmallVector to store the extra signals for the output type
-  llvm::SmallVector<ExtraSignal> unionOfExtraSignals;
-  for (Value operand : operands) {
-    auto operandType = cast<ExtraSignalsTypeInterface>(operand.getType());
-    for (const ExtraSignal &extraSignal : operandType.getExtraSignals()) {
-      if (!unionOfExtraSignalNames.contains(extraSignal.name)) {
-        unionOfExtraSignalNames.insert(extraSignal.name);
-
-        // The constraint MergingExtraSignals guarantees that
-        // extra signals sharing the same name is equivalent.
-        unionOfExtraSignals.push_back(extraSignal);
-      }
-    }
-  }
-
-  auto firstDataInType = cast<ExtraSignalsTypeInterface>(operands[1].getType());
-
-  // The return type is data type of any data operand (if ControlType) with
-  // union of data operand's extra signals.
-  inferredReturnTypes.push_back(
-      firstDataInType.copyWithExtraSignals(unionOfExtraSignals));
-
-  return success();
-}
-
 bool MuxOp::isControl() {
   return isa<handshake::ControlType>(getResult().getType());
 }
