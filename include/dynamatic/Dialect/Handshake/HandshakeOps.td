@@ -363,11 +363,13 @@ def MergeOp : Handshake_Op<"merge", [
 def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"selectOperand">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
+  // Constraints on spec tag
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
+  LacksSpecTag<"selectOperand">,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {
@@ -402,9 +404,12 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"index">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
+  // Constraints on spec tag
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
+  LacksSpecTag<"index">,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -935,8 +940,8 @@ def EndOp : Handshake_Op<"end", [
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
   // Expect a spec tag for dataIn, since Speculator is used in a loop.
-  HasSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
@@ -1027,7 +1032,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1073,7 +1078,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasSpecTag<"dataIn">,
+  HasValidSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
@@ -1120,8 +1125,8 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   SpeculationOpInterface,
-  HasSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
@@ -1163,8 +1168,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
-  HasSpecTag<"tagFromOperand">,
-  HasSpecTag<"dataOperand">,
+  HasValidSpecTag<"tagFromOperand">,
+  HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
