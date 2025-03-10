@@ -548,7 +548,8 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
     iMerge.indexEdge = edgeBuilder.get(handshake::ChannelType::get(idxType));
     addFromAllPredecessors(blockArg.getType());
     Value index = *iMerge.indexEdge;
-    iMerge.op = rewriter.create<handshake::MuxOp>(loc, index, operands);
+    iMerge.op = rewriter.create<handshake::MuxOp>(
+        loc, /*resultType=*/operands[0].getType(), index, operands);
   }
 }
 

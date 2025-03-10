@@ -122,7 +122,7 @@ handshake.func @invalidMuxWithDifferentDataTypesOutput(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that the operands inside the variadic name and result should all have the same type}}
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i1, [e1: i2, e3: i6, e2: i4]>
   end %ctrl : !handshake.control<>
 }
@@ -136,7 +136,7 @@ handshake.func @invalidMuxWithDifferentDataTypesVariadic(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i1, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that the operands inside the variadic name and result should all have the same type}}
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i1, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>
   end %ctrl : !handshake.control<>
 }
@@ -150,7 +150,7 @@ handshake.func @invalidMuxWithMoreExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of inputs and output should satisfy "Merging Relationship of Extra Signals"}}
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4, e4: i8]>
   end %ctrl : !handshake.control<>
 }
@@ -164,7 +164,7 @@ handshake.func @invalidMuxWithLessExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e3: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of inputs and output should satisfy "Merging Relationship of Extra Signals"}}
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6]>
   end %ctrl : !handshake.control<>
 }
@@ -178,7 +178,7 @@ handshake.func @invalidMuxWithConflictingExtraSignal(
     %data2 : !handshake.channel<i32, [e1: i2]>,
     %data3 : !handshake.channel<i32, [e2: i6]>,
     %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that the extra signals of inputs and output should satisfy "Merging Relationship of Extra Signals"}}
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
   %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e2: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e2: i6]>
   end %ctrl : !handshake.control<>
 }
@@ -190,6 +190,20 @@ handshake.func @invalidMuxWithNoDataInputs(
     %sel : !handshake.channel<i2>) -> !handshake.control<> {
   // expected-error @below {{'handshake.mux' op failed to verify that the variadic dataOperands should have at least one element}}
   %data = mux %sel [] : <i2>, [] to <i32>
+  end %ctrl : !handshake.control<>
+}
+
+// -----
+
+handshake.func @invalidMuxWithoutSpecTagForOutput(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>,
+    %data1 : !handshake.channel<i32>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32>,
+    %data4 : !handshake.channel<i32>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that result should have a spec tag iff any of dataOperands has it}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [spec: i1]>, <i32>, <i32>] to <i32>
   end %ctrl : !handshake.control<>
 }
 
@@ -230,5 +244,15 @@ handshake.func @invalidSpecCommitWithInvalidCtrl(
     %dataIn : !handshake.channel<i32, [spec: i1]>) {
   // expected-error @below {{'handshake.spec_commit' op failed to verify that ctrl should be of ChannelType carrying IntegerType data of width 1}}
   %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, <i2>
+  end
+}
+
+// -----
+
+handshake.func @invalidSpecCommitWithInvalidDataTypes(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that all of {dataIn, dataOut} have same data type}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.control<>, <i1>
   end
 }
