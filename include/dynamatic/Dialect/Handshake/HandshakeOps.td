@@ -1029,7 +1029,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1075,7 +1075,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasSpecTag<"dataIn">,
+  HasValidSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
@@ -1165,8 +1165,8 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
-  HasSpecTag<"tagFromOperand">,
-  HasSpecTag<"dataOperand">,
+  HasValidSpecTag<"tagFromOperand">,
+  HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
