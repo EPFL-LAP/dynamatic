@@ -355,8 +355,7 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
 
 bool dynamatic::handshake::doesExtraSignalsMatchExcept(
     const llvm::StringRef &except,
-    std::initializer_list<const llvm::ArrayRef<ExtraSignal>>
-        extraSignalArrays) {
+    llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
 
   // If there are fewer than two arrays, they are trivially considered matching.
   if (extraSignalArrays.size() < 2)
