@@ -145,15 +145,6 @@ class variadicToExtraSignalArrays<string variadic> {
   })}] # "($" # variadic # ")";
 }
 
-class concatExtraSignalArrays<string a, string b> {
-  string result = [{[](llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> a, llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> b) {
-    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
-    extraSignalArrays.insert(extraSignalArrays.end(), a.begin(), a.end());
-    extraSignalArrays.insert(extraSignalArrays.end(), b.begin(), b.end());
-    return extraSignalArrays;
-  } }] # "(" # a # ", " # b # ")";
-}
-
 class variadicToExtraSignalTypes<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
@@ -164,6 +155,15 @@ class variadicToExtraSignalTypes<string variadic> {
     }
     return extraSignalTypes;
   })}] # "($" # variadic # ")";
+}
+
+class concatExtraSignalArrays<string a, string b> {
+  string result = [{[](llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> a, llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> b) {
+    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+    extraSignalArrays.insert(extraSignalArrays.end(), a.begin(), a.end());
+    extraSignalArrays.insert(extraSignalArrays.end(), b.begin(), b.end());
+    return extraSignalArrays;
+  } }] # "(" # a # ", " # b # ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -267,10 +267,7 @@ def ChannelOrSimpleControl : TypeConstraint<
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
-    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
-    // Compare using ControlType without extra signals
-    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
-    // Compare using data type
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ? nullptr :
     ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
   }],
   "data type"
