@@ -354,7 +354,7 @@ class VariadicHasElement<string variadic> : PredOpTrait<
 
 // Constraints for spec tags
 
-class HasSpecTag<string operand> : PredOpTrait<
+class HasValidSpecTag<string operand> : PredOpTrait<
   "should have a valid spec tag as an extra signal",
   CPred<[{
     [](ExtraSignalsTypeInterface type) {
