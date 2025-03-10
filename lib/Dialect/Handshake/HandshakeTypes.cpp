@@ -26,7 +26,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/JSON.h"
-#include "llvm/Support/raw_ostream.h"
 #include <cctype>
 #include <iostream>
 #include <ostream>
