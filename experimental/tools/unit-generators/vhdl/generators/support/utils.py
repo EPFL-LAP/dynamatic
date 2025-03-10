@@ -70,7 +70,7 @@ def generate_ins_concat_statements_dataless(in_name: str, in_inner_name: str, ex
   indent_str = " " * indent
   return "\n".join([
       f"{indent_str}{in_inner_name}({msb} downto {lsb}) <= {in_name}_{name};" for name, (msb, lsb) in extra_signal_mapping.mapping
-  ])
+  ]) + "\n"
 
 
 def generate_outs_concat_statements(out_name: str, out_inner_name: str, extra_signal_mapping: ExtraSignalMapping, bitwidth: int, indent=2, custom_data_name=None) -> str:
@@ -105,7 +105,7 @@ def generate_outs_concat_statements_dataless(out_name: str, out_inner_name: str,
   indent_str = " " * indent
   return "\n".join([
       f"{indent_str}{out_name}_{name} <= {out_inner_name}({msb} downto {lsb});" for name, (msb, lsb) in extra_signal_mapping.mapping
-  ])
+  ]) + "\n"
 
 
 # For merge-like signal managers (mux and cmerge)
