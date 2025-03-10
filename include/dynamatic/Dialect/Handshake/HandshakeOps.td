@@ -366,7 +366,7 @@ def MuxOp : Handshake_Op<"mux", [
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
   // Constraints on spec tag
-  HasSpecTagIfPresent<"dataOperands", "result">,
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
   LacksSpecTag<"selectOperand">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
@@ -407,7 +407,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
   // Constraints on spec tag
-  HasSpecTagIfPresent<"dataOperands", "result">,
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
   LacksSpecTag<"index">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
