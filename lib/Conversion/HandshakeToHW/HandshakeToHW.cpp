@@ -135,8 +135,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(CLK_PORT, i1Type);
-    addInput(RST_PORT, i1Type);
+    addInput(dynamatic::hw::CLK_PORT, i1Type);
+    addInput(dynamatic::hw::RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -920,9 +920,10 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
+         "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
