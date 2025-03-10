@@ -142,6 +142,7 @@ class valuesToDataTypes<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
+    // Treat ControlType's data type as nullptr
     "isa<ControlType>($" # name # ".getType()) ? nullptr :"
     "$" # name # ".getType().cast<ChannelType>().getDataType()"
   ), ", ") # "}";
