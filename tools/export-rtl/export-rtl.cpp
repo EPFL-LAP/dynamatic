@@ -990,6 +990,7 @@ private:
   void writeModuleInstantiations(WriteModData &data) const;
   /// Writes the preprocessor directives to include the external modules
   void writeIncludes(WriteModData &data) const;
+  void writeAbsenceOfBackPressure(WriteModData &data) const;
 };
 
 } // namespace
@@ -1167,13 +1168,66 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
   writeModuleInstantiations(data);
 
-  os << "\n// output\n";
+  os << "\n// outputs\n";
   data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
                                  raw_indented_ostream &os) {
     os << "DEFINE " << dst << " := " << src << ";\n";
   });
 
+  os << "\n// properties\n";
+  writeAbsenceOfBackPressure(data);
+
   return success();
+}
+
+void SMVWriter::writeAbsenceOfBackPressure(WriteModData &data) const {
+  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+    for (auto res : instOp.getResults()) {
+      std::string validSignalName =
+          data.getSignalNameFunc()(res).str() + VALID_SUFFIX.str();
+      std::string readySignalName;
+
+      auto *userOp = *res.getUsers().begin();
+      unsigned operandIndex = 0;
+      for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
+        auto operand = userOp->getOperand(i);
+        if (operand == res) {
+          operandIndex = i;
+          break;
+        }
+      }
+      std::string instName;
+      bool instFound = false;
+      if (auto argNamesAttr =
+              userOp->getAttrOfType<mlir::StringAttr>("instanceName")) {
+        instName = argNamesAttr.getValue().str();
+        instFound = true;
+      }
+      std::string argName;
+      bool argFound = false;
+      if (auto argNamesAttr =
+              userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
+        if (operandIndex < argNamesAttr.size()) {
+          if (auto strAttr =
+                  argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+            argName = strAttr.getValue().str();
+            argFound = true;
+          }
+        }
+      }
+
+      if (instFound && argFound)
+        readySignalName = instName + "." + argName + READY_SUFFIX.str();
+      else {
+        std::string signalName = data.getSignalNameFunc()(res).str();
+        std::replace(signalName.begin(), signalName.end(), '.', '_');
+        readySignalName = signalName + READY_SUFFIX.str();
+      }
+
+      data.os << "INVARSPEC " << validSignalName << " -> " << readySignalName
+              << ";\n";
+    }
+  }
 }
 
 void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
