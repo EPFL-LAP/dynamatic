@@ -195,6 +195,20 @@ handshake.func @invalidMuxWithNoDataInputs(
 
 // -----
 
+handshake.func @invalidMuxWithoutSpecTagForOutput(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>,
+    %data1 : !handshake.channel<i32>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32>,
+    %data4 : !handshake.channel<i32>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that result should have a spec tag iff any of dataOperands has it}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [spec: i1]>, <i32>, <i32>] to <i32>
+  end %ctrl : !handshake.control<>
+}
+
+// -----
+
 handshake.func @invalidSpecCommitWithDifferentExtraSignals(
     %ctrl : !handshake.channel<i1>,
     %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
