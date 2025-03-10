@@ -50,6 +50,7 @@
 #include <set>
 #include <string>
 #include <system_error>
+#include <unordered_set>
 #include <utility>
 
 using namespace llvm;
@@ -994,18 +995,12 @@ private:
 } // namespace
 
 void SMVWriter::writeIncludes(WriteModData &data) const {
-  std::string moduleName;
-  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
-    llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
-        .Case<hw::HWModuleOp>(
-            [&](hw::HWModuleOp hwModOp) { moduleName = hwModOp.getSymName(); })
-        .Case<hw::HWModuleExternOp>([&](hw::HWModuleExternOp extModOp) {
-          const RTLMatch &match = *exportInfo.externals.at(extModOp);
-          moduleName = match.getConcreteModuleName();
-        })
-        .Default([&](auto) { llvm_unreachable("unknown module type"); });
-
-    data.os << "#include \"" << moduleName << ".smv\"\n";
+  std::unordered_set<std::string> incNames;
+  for (auto m : exportInfo.externals) {
+    incNames.insert(m.getSecond()->getConcreteModuleName().str());
+  }
+  for (const std::string &name : incNames) {
+    data.os << "#include \"" << name << ".smv\"\n";
   }
 }
 
