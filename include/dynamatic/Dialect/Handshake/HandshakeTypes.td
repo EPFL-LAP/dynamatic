@@ -127,15 +127,24 @@ class valuesToExtraSignalArrays<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
-    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    "cast<ExtraSignalsTypeInterface>($" # name #
     ".getType()).getExtraSignals()"
+  ), ", ") # "}";
+}
+
+class valueToDataTypes<list<string> names> {
+  string result = "{" # !interleave(!foreach(
+    name, // variable name
+    names,
+    "isa<ControlType>($" # name # ".getType()) ? nullptr :"
+    "$" # name # ".getType().cast<ChannelType>().getDataType()"
   ), ", ") # "}";
 }
 
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
-    // Retrive all types of operands in the variadic.
+    // Retrieve all types of operands in the variadic.
     ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
     for (Type type : variadicTypes) {
       extraSignalArrays.push_back(
@@ -145,10 +154,25 @@ class variadicToExtraSignalArrays<string variadic> {
   })}] # "($" # variadic # ")";
 }
 
+class variadicToDataTypes<string variadic> {
+  string result = [{([](const mlir::OperandRange &variadic) {
+    llvm::SmallVector<Type> dataTypes;
+    // Retrieve all types of operands in the variadic.
+    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+    for (Type type : variadicTypes) {
+      if (isa<ControlType>(type))
+        dataTypes.push_back(nullptr);
+      else
+        dataTypes.push_back(type.cast<ChannelType>().getDataType());
+    }
+    return dataTypes;
+  })}] # "($" # variadic # ")";
+}
+
 class variadicToExtraSignalTypes<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
-    // Retrive all types of operands in the variadic.
+    // Retrieve all types of operands in the variadic.
     ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
     for (Type type : variadicTypes) {
       extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
@@ -157,13 +181,13 @@ class variadicToExtraSignalTypes<string variadic> {
   })}] # "($" # variadic # ")";
 }
 
-class concatExtraSignalArrays<string a, string b> {
-  string result = [{[](llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> a, llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> b) {
-    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
-    extraSignalArrays.insert(extraSignalArrays.end(), a.begin(), a.end());
-    extraSignalArrays.insert(extraSignalArrays.end(), b.begin(), b.end());
-    return extraSignalArrays;
-  } }] # "(" # a # ", " # b # ")";
+class concatArrays<string type, string a, string b> {
+  string result = !subst("$T", type, [{[](llvm::ArrayRef<$T> a, llvm::ArrayRef<$T> b) {
+    llvm::SmallVector<$T> result;
+    result.insert(result.end(), a.begin(), a.end());
+    result.insert(result.end(), b.begin(), b.end());
+    return result;
+  } }]) # "(" # a # ", " # b # ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -294,50 +318,29 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
 /// Returns true if the variadic is empty.
-class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredOpTrait<
-  "the operands inside the variadic " # name # " and " # nonvariadic # " should all have the same type",
+class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same data type",
   CPred<[{
-    ([](const mlir::OperandRange &variadic, const mlir::Value &nonvariadic) {
-      // Retrive all types of operands in the variadic.
-      ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
-      size_t variadicLen = variadicTypes.size();
-
-      // Return *true* if the variadic is empty
-      if (variadicLen < 1)
+    [](llvm::ArrayRef<Type> dataTypes) {
+      if (dataTypes.empty())
         return true;
-
-      Type nonvariadicType = nonvariadic.getType();
-
-      if (mlir::isa<ControlType>(nonvariadicType)) {
-        // If the nonvariadic operand is of ControlType, it is enough to
-        // ensure that variadic operands are also of ControlType
-        for (size_t i = 0; i < variadicLen; i++) {
-          if (!mlir::isa<ControlType>(variadicTypes[i]))
-            return false;
-        }
-        return true;
-      }
-
-      Type nonvariadicDataType =
-        mlir::cast<ChannelType>(nonvariadicType).getDataType();
-
-      // Ensure that data types of all variadic operands are equal to
-      // nonvariadicDataType
-      for (size_t i = 0; i < variadicLen; i++) {
-        Type dataType = mlir::cast<ChannelType>(variadicTypes[i]).getDataType();
-        if (dataType != nonvariadicDataType)
-          return false;
-      }
-      return true;
-    })
-  }] # "($" # variadic # ", $" # nonvariadic # ")">
+      Type firstType = dataTypes.front();
+      return llvm::all_of(dataTypes, [&](Type type) {
+        return type == firstType;
+      });
+    }
+  }] # "(" # concatArrays<"Type",
+    variadicToDataTypes<variadic>.result,
+    valueToDataTypes<nonvariadics>.result
+  >.result # ")">
 >;
 
 class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same extra signals except for " # except,
   CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  "\", " # concatExtraSignalArrays<
+  "\", " # concatArrays<"llvm::ArrayRef<ExtraSignal>",
     variadicToExtraSignalArrays<variadic>.result,
     valuesToExtraSignalArrays<nonvariadics>.result
   >.result # ")">
