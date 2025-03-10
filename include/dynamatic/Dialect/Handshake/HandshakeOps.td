@@ -402,9 +402,10 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
   AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"index">,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
+  HasSpecTagIfPresent<"dataOperands", "result">,
+  LacksSpecTag<"index">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
