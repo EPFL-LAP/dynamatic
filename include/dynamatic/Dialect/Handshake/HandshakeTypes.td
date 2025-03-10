@@ -151,60 +151,57 @@ class valuesToDataTypes<list<string> names> {
 /// e.g., if the variadic has two elements, the result will be an array of two
 /// ExtraSignal arrays.
 class variadicToExtraSignalArrays<string variadic> {
-  string result = [{([](const mlir::OperandRange &variadic) {
-    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+  string result = [{
+    [](auto &&variadic) {
+      llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
 
-    // Retrieve all types in the variadic.
-    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+      for (Type type : variadic.getTypes()) {
+        extraSignalArrays.push_back(
+          type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+      }
 
-    for (Type type : variadicTypes) {
-      extraSignalArrays.push_back(
-        type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+      return extraSignalArrays;
     }
-
-    return extraSignalArrays;
-  })}] # "($" # variadic # ")";
+  }] # "($" # variadic # ")";
 }
 
 /// Convert variadic to data type arrays.
 /// e.g., if the variadic has two elements, the result will be an array of two
 /// data types.
 class variadicToDataTypes<string variadic> {
-  string result = [{([](const mlir::OperandRange &variadic) {
-    llvm::SmallVector<Type> dataTypes;
+  string result = [{
+    [](auto &&variadic) {
+      llvm::SmallVector<Type> dataTypes;
 
-    // Retrieve all types of operands in the variadic.
-    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
-
-    for (Type type : variadicTypes) {
-      if (isa<ControlType>(type)) {
-        // Treat ControlType's data type as nullptr
-        dataTypes.push_back(nullptr);
-      } else {
-        dataTypes.push_back(type.cast<ChannelType>().getDataType());
+      for (Type type : variadic.getTypes()) {
+        if (isa<ControlType>(type)) {
+          // Treat ControlType's data type as nullptr
+          dataTypes.push_back(nullptr);
+        } else {
+          dataTypes.push_back(type.cast<ChannelType>().getDataType());
+        }
       }
-    }
 
-    return dataTypes;
-  })}] # "($" # variadic # ")";
+      return dataTypes;
+    }
+  }] # "($" # variadic # ")";
 }
 
 /// Convert variadic to ExtraSignalsTypeInterface arrays.
 /// e.g., if the variadic has two elements, the result will be an array of two
 /// ExtraSignalsTypeInterfaces.
 class variadicToExtraSignalTypes<string variadic> {
-  string result = [{([](const mlir::OperandRange &variadic) {
-    llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
+  string result = [{
+    [](auto &&variadic) {
+      llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
 
-    // Retrieve all types of operands in the variadic.
-    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+      for (Type type : variadic.getTypes()) {
+        extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
+      }
 
-    for (Type type : variadicTypes) {
-      extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
+      return extraSignalTypes;
     }
-
-    return extraSignalTypes;
-  })}] # "($" # variadic # ")";
+  }] # "($" # variadic # ")";
 }
 
 /// Concat two arrays of the same type, specified by the first argument.
@@ -292,15 +289,10 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 /// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
 class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
-  CPred<[{
-    ([](auto&& variadicTypes) {
-      for (::mlir::Type variadicType : variadicTypes) {
-        if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
-          return false;
-      }
-      return true;
-    })
-  }] # "($" # name # ".getTypes())">
+  CPred<"llvm::all_of(" # variadicToExtraSignalTypes<name>.result # ", "
+    "[](ExtraSignalsTypeInterface type) {"
+    "  return type.getNumExtraSignals() == 0;"
+    "})">
 >;
 
 // Temporary constraint for UnbundleOp.
