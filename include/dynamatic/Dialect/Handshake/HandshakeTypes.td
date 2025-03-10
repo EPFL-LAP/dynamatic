@@ -120,6 +120,41 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 }
 
 //===----------------------------------------------------------------------===//
+// Tablegen helper functions
+//===----------------------------------------------------------------------===//
+
+class valuesToExtraSignalArrays<list<string> names> {
+  string result = "{" # !interleave(!foreach(
+    name, // variable name
+    names,
+    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getExtraSignals()"
+  ), ", ") # "}";
+}
+
+class variadicToExtraSignalArrays<string variadic> {
+  string result = [{([](const mlir::OperandRange &variadic) {
+    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+    // Retrive all types of operands in the variadic.
+    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+    for (Type type : variadicTypes) {
+      extraSignalArrays.push_back(
+        type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+    }
+    return extraSignalArrays;
+  })}] # "($" # variadic # ")";
+}
+
+class concatExtraSignalArrays<string a, string b> {
+  string result = [{[](llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> a, llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> b) {
+    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignals;
+    extraSignals.insert(extraSignals.end(), a.begin(), a.end());
+    extraSignals.insert(extraSignals.end(), b.begin(), b.end());
+    return extraSignals;
+  } }] # "(" # a # ", " # b # ")";
+}
+
+//===----------------------------------------------------------------------===//
 // Type constraints
 //===----------------------------------------------------------------------===//
 
@@ -236,6 +271,16 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
   "extra signals"
 >;
 
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
+/// signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
+  "all of {" # !interleave(names, ", ") # "} should have the same extra " #
+  "signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
+  "\", " # valuesToExtraSignalArrays<names>.result  # ")">
+>;
+
 /// Multi-entity constraint ensuring that the all operands of variadic and non-variadic
 /// operand have the same data types.
 /// Also applies to ControlTypes, as some operations treat them interchangeably.
@@ -279,128 +324,14 @@ class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredO
   }] # "($" # variadic # ", $" # nonvariadic # ")">
 >;
 
-/// Multi-entity constraint ensuring that all HandshakeTypes have matching extra
-/// signals, except for any signal with the given `except` name.
-/// The core implementation of this predicate is in C++.
-class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
-  "all of {" # !interleave(names, ", ") # "} should have the same extra " #
-  "signals except for " # except,
-  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  "\", {" # !interleave(!foreach(
-    name, // variable name
-    names,
-    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
-    ".getType()).getExtraSignals()"
-  ), ", ") # "})">
->;
-
 class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same extra signals except for " # except,
   CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  [{", ([](const mlir::OperandRange &variadic,
-           std::initializer_list<llvm::ArrayRef<ExtraSignal>>
-             nonvariadicExtraSignalArrays) {
-    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
-    // Retrive all types of operands in the variadic.
-    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
-    for (Type type : variadicTypes) {
-      extraSignalArrays.push_back(
-        type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
-    }
-    extraSignalArrays.insert(extraSignalArrays.end(), nonvariadicExtraSignalArrays);
-    return extraSignalArrays;
-  })}] # "($" # variadic # ", "
-  "{" # !interleave(!foreach(
-    name, // variable name
-    nonvariadics,
-    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
-    ".getType()).getExtraSignals()"
-  ), ", ") # "}))">
->;
-
-/// Merging Relationship of Extra Signals:
-/// the output has the extra signal A if and only if
-/// there exists an input which has the extra signal A.
-/// In Merge-like Ops inputs are always provided as variadic.
-class MergingExtraSignals<string inputs, string output> : PredOpTrait<
-  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
-  CPred<[{
-    ([&](const mlir::OperandRange &inputs, Value output) {
-
-      // Variable to collect extra signals from inputs
-      // Map used to help check uniqueness of extra signal names
-      llvm::DenseMap<StringRef, const ExtraSignal *> unionOfExtraSignals;
-
-      // Iterate over the type of each input operand
-      for (auto inputOperandType : inputs.getTypes()) {
-        for (const ExtraSignal &extraSignal :
-            cast<ExtraSignalsTypeInterface>(inputOperandType).getExtraSignals()) {
-          if (unionOfExtraSignals.contains(extraSignal.name)) {
-            if (*unionOfExtraSignals.lookup(extraSignal.name) != extraSignal) {
-              // Two different extra signals among inputs must have different names
-              // to be merge-able.
-              // e.g. [spec: i1] and [spec: i2] are prohibited.
-              llvm::errs() << "inputs have different extra signals of the same name: "
-                << extraSignal.name << "\n";
-              return false;
-            }
-          } else {
-            unionOfExtraSignals.insert({extraSignal.name, &extraSignal});
-          }
-        }
-      }
-
-      auto outputOperandType =
-        cast<ExtraSignalsTypeInterface>(output.getType());
-
-      // The type of the output operand should have the exact unionOfExtraSignals
-      // collected from input operands, though the order doesn't matter
-
-      // (1 of 2) Check the number of extra signals
-      // #(extraSignals of the output) = #(union(extraSignals of each input))
-      if (unionOfExtraSignals.size() != outputOperandType.getExtraSignals().size()) {
-        llvm::errs() << "#(extraSignals of the output) is different from #(union(extraSignals of each input)).\n";
-        return false;
-      }
-
-      // (2 of 2) Check the inclusion relationship (only one direction is sufficient)
-      // extraSignals of the output ⊆ union(extraSignals of each input)
-      for (auto extraSignal : outputOperandType.getExtraSignals()) {
-        if (unionOfExtraSignals.contains(extraSignal.name)) {
-          if (*unionOfExtraSignals.lookup(extraSignal.name) != extraSignal) {
-            llvm::errs() << "an input has an extra signal " << extraSignal.name
-                << ", but it is different from the output\n";
-            return false;
-          }
-        } else {
-          llvm::errs() << "the output has an extra signal " << extraSignal.name
-              << ", which is not from any input\n";
-          return false;
-        }
-      }
-
-      return true;
-    })(
-  }] # "$" # inputs # ", $" # output # ")">
->;
-
-class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
-  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
-  CPred<[{
-    ([&](const mlir::OperandRange &inputVariadic, Value output) {
-      // Retrive all types of operands in the variadic.
-      ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
-      bool inputHasSpecTag = false;
-      for (Type type : inputTypes) {
-        if (type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec")) {
-          inputHasSpecTag = true;
-          break;
-        }
-      }
-      return output.getType().cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec") == inputHasSpecTag;
-    })(
-  }] # "$" # inputVariadic # ", $" # output # ")">
+  "\", " # concatExtraSignalArrays<
+    variadicToExtraSignalArrays<variadic>.result,
+    valuesToExtraSignalArrays<nonvariadics>.result
+  >.result # ")">
 >;
 
 /// Constraint to ensure that the variadic has at least one element.
@@ -437,6 +368,24 @@ class LacksSpecTag<string operand> : PredOpTrait<
   "shouldn't have a spec tag as an extra signal",
   CPred<"!::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" #
   operand # ".getType()).hasExtraSignal(\"spec\")">
+>;
+
+class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
+  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
+  CPred<[{
+    ([&](const mlir::OperandRange &inputVariadic, Value output) {
+      // Retrive all types of operands in the variadic.
+      ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
+      bool inputHasSpecTag = false;
+      for (Type type : inputTypes) {
+        if (type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec")) {
+          inputHasSpecTag = true;
+          break;
+        }
+      }
+      return output.getType().cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec") == inputHasSpecTag;
+    })(
+  }] # "$" # inputVariadic # ", $" # output # ")">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
