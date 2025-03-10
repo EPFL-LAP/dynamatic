@@ -1,10 +1,15 @@
+from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_addi(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  return _generate_addi(name, bitwidth)
+  if extra_signals:
+    return _generate_addi_signal_manager(name, bitwidth, extra_signals)
+  else:
+    return _generate_addi(name, bitwidth)
 
 
 def _generate_addi(name, bitwidth):
@@ -58,3 +63,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_addi_signal_manager(name, bitwidth, extra_signals):
+  return generate_binary_no_latency_signal_manager(name, bitwidth, extra_signals, _generate_addi)

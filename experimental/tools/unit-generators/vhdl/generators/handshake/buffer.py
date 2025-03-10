@@ -1,5 +1,3 @@
-import re
-
 from generators.handshake.tfifo import generate_tfifo
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo

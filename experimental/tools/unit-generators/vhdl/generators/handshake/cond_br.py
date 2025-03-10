@@ -1,10 +1,17 @@
+from generators.support.utils import generate_extra_signal_ports
 from generators.handshake.join import generate_join
 
 
 def generate_cond_br(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if bitwidth == 0:
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_cond_br_signal_manager_dataless(name, extra_signals)
+    else:
+      return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_cond_br_dataless(name)
   else:
     return _generate_cond_br(name, bitwidth)
@@ -125,5 +132,159 @@ begin
   falseOut <= data;
 end architecture;
 """
+
+  return dependencies + entity + architecture
+
+
+extra_signal_logic = {
+    "spec": """
+  trueOut_spec <= data_spec or condition_spec;
+  falseOut_spec <= data_spec or condition_spec;
+"""
+}
+
+
+def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br(inner_name, bitwidth)
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    [EXTRA_SIGNAL_PORTS]
+    data : in std_logic_vector({bitwidth - 1} downto 0);
+    data_valid : in std_logic;
+    data_ready : out std_logic;
+    condition : in std_logic_vector(0 downto 0);
+    condition_valid : in std_logic;
+    condition_ready : out std_logic;
+    trueOut : out std_logic_vector({bitwidth - 1} downto 0);
+    trueOut_valid : out std_logic;
+    trueOut_ready : in std_logic;
+    falseOut : out std_logic_vector({bitwidth - 1} downto 0);
+    falseOut_valid : out std_logic;
+    falseOut_ready : in std_logic
+  );
+end entity;
+"""
+
+  # Add extra signal ports
+  extra_signal_ports = generate_extra_signal_ports([
+      ("data", "in"), ("condition", "in"),
+      ("trueOut", "out"), ("falseOut", "out")
+  ], extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+
+  for signal_name in extra_signals:
+    if signal_name not in extra_signal_logic:
+      raise ValueError(f"Extra signal {signal_name} is not supported")
+
+  architecture = f"""
+architecture arch of {name} is
+begin
+
+  -- list of logic for supported extra signals
+  [EXTRA_SIGNAL_LOGIC]
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      data => data,
+      data_valid => data_valid,
+      data_ready => data_ready,
+      condition => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueOut => trueOut,
+      trueOut_valid => trueOut_valid,
+      trueOut_ready => trueOut_ready,
+      falseOut => falseOut,
+      falseOut_valid => falseOut_valid,
+      falseOut_ready => falseOut_ready
+    );
+end architecture;
+"""
+
+  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+      extra_signal_logic[name] for name in extra_signals
+  ]))
+
+  return dependencies + entity + architecture
+
+
+def _generate_cond_br_signal_manager_dataless(name, extra_signals):
+  inner_name = f"{name}_inner"
+
+  dependencies = _generate_cond_br_dataless(inner_name)
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity {name} is
+  port (
+    clk : in std_logic;
+    rst : in std_logic;
+    [EXTRA_SIGNAL_PORTS]
+    data_valid : in std_logic;
+    data_ready : out std_logic;
+    condition : in std_logic_vector(0 downto 0);
+    condition_valid : in std_logic;
+    condition_ready : out std_logic;
+    trueOut_valid : out std_logic;
+    trueOut_ready : in std_logic;
+    falseOut_valid : out std_logic;
+    falseOut_ready : in std_logic
+  );
+end entity;
+"""
+
+  # Add extra signal ports
+  extra_signal_ports = generate_extra_signal_ports([
+      ("data", "in"), ("condition", "in"),
+      ("trueOut", "out"), ("falseOut", "out")
+  ], extra_signals)
+  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+
+  for signal_name in extra_signals:
+    if signal_name not in extra_signal_logic:
+      raise ValueError(f"Extra signal {signal_name} is not supported")
+
+  architecture = f"""
+architecture arch of {name} is
+begin
+
+  -- list of logic for supported extra signals
+  [EXTRA_SIGNAL_LOGIC]
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      data_valid => data_valid,
+      data_ready => data_ready,
+      condition => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueOut_valid => trueOut_valid,
+      trueOut_ready => trueOut_ready,
+      falseOut_valid => falseOut_valid,
+      falseOut_ready => falseOut_ready
+    );
+end architecture;
+"""
+
+  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]", "\n".join([
+      extra_signal_logic[name] for name in extra_signals
+  ]))
 
   return dependencies + entity + architecture
