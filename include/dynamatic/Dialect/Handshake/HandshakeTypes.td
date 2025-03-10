@@ -415,7 +415,7 @@ class LacksSpecTag<string operand> : PredOpTrait<
   operand # ".getType()).hasExtraSignal(\"spec\")">
 >;
 
-class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
+class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   output # " should have a spec tag iff any of " # inputVariadic # " has it",
   CPred<[{
     [](llvm::ArrayRef<ExtraSignalsTypeInterface> inputTypes,
