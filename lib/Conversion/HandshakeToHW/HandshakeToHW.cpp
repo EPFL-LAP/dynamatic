@@ -53,9 +53,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-/// Name of ports representing the clock and reset signals.
-static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
-
 /// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
@@ -108,7 +105,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -138,8 +135,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(CLK_PORT, i1Type);
-    addInput(RST_PORT, i1Type);
+    addInput(dynamatic::hw::CLK_PORT, i1Type);
+    addInput(dynamatic::hw::RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -318,7 +315,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -802,7 +799,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -923,9 +920,10 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
+         "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
@@ -1481,7 +1479,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
