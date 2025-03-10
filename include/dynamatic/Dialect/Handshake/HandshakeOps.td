@@ -363,7 +363,7 @@ def MergeOp : Handshake_Op<"merge", [
 def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
   HasSpecTagIfPresent<"dataOperands", "result">,
   LacksSpecTag<"selectOperand">,
@@ -402,7 +402,7 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
   HasSpecTagIfPresent<"dataOperands", "result">,
   LacksSpecTag<"index">,
