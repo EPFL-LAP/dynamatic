@@ -228,7 +228,7 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
   CPred<[{
-    ([&](auto&& variadicTypes) {
+    ([](auto&& variadicTypes) {
       for (::mlir::Type variadicType : variadicTypes) {
         if (cast<ExtraSignalsTypeInterface>(variadicType).getNumExtraSignals() != 0)
           return false;
@@ -288,7 +288,7 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
 class AllDataTypesMatchWithVariadic<string variadic, string nonvariadic> : PredOpTrait<
   "the operands inside the variadic " # name # " and " # nonvariadic # " should all have the same type",
   CPred<[{
-    ([&](const mlir::OperandRange &variadic, const mlir::Value &nonvariadic) {
+    ([](const mlir::OperandRange &variadic, const mlir::Value &nonvariadic) {
       // Retrive all types of operands in the variadic.
       ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
       size_t variadicLen = variadicTypes.size();
@@ -345,7 +345,7 @@ class VariadicHasElement<string variadic> : PredOpTrait<
 class HasSpecTag<string operand> : PredOpTrait<
   "should have a valid spec tag as an extra signal",
   CPred<[{
-    ([&](std::optional<ExtraSignal> getExtraSignalResult) {
+    ([](std::optional<ExtraSignal> getExtraSignalResult) {
       if (!getExtraSignalResult.has_value()) {
         // There is no extra signal called "spec"
         return false;
@@ -373,7 +373,7 @@ class LacksSpecTag<string operand> : PredOpTrait<
 class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
   "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
   CPred<[{
-    ([&](const mlir::OperandRange &inputVariadic, Value output) {
+    ([](const mlir::OperandRange &inputVariadic, Value output) {
       // Retrive all types of operands in the variadic.
       ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
       bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
