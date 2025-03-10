@@ -933,7 +933,6 @@ def EndOp : Handshake_Op<"end", [
 //===----------------------------------------------------------------------===//
 
 def SpeculatorOp : Handshake_Op<"speculator", [
-  SpeculationOpInterface,
   // Expect a spec tag for dataIn, since Speculator is used in a loop.
   HasSpecTag<"dataIn">,
   HasSpecTag<"dataOut">,
@@ -1023,7 +1022,6 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
@@ -1070,7 +1068,6 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   HasSpecTag<"dataIn">,
@@ -1119,7 +1116,6 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
-  SpeculationOpInterface,
   HasSpecTag<"dataIn">,
   HasSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
@@ -1160,7 +1156,6 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
   HasSpecTag<"tagFromOperand">,
