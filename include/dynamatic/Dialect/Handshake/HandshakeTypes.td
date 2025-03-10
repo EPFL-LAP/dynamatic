@@ -132,7 +132,7 @@ class valuesToExtraSignalArrays<list<string> names> {
   ), ", ") # "}";
 }
 
-class valueToDataTypes<list<string> names> {
+class valuesToDataTypes<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
@@ -332,7 +332,7 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
     }
   }] # "(" # concatArrays<"Type",
     variadicToDataTypes<variadic>.result,
-    valueToDataTypes<nonvariadics>.result
+    valuesToDataTypes<nonvariadics>.result
   >.result # ")">
 >;
 
