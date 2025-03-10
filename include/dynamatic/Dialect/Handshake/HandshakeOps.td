@@ -934,7 +934,9 @@ def EndOp : Handshake_Op<"end", [
 
 def SpeculatorOp : Handshake_Op<"speculator", [
   SpeculationOpInterface,
-  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
+  // Expect a spec tag for dataIn, since Speculator is used in a loop.
+  HasSpecTag<"dataIn">,
+  HasSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
@@ -1118,6 +1120,8 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   SpeculationOpInterface,
+  HasSpecTag<"dataIn">,
+  HasSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
