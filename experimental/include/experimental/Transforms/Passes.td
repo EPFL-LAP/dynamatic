@@ -164,7 +164,7 @@ def OutOfOrderExecution : DynamaticPass<"out-of-order-execution"> {
     Once tagged, the pass allows these operations to be reordered dynamically, executing as soon as 
     their inputs are ready, rather than following strict program order. 
   }];
-  let constructor = "dynamatic::experimental::createOutOfOrderExecution()";
+  let constructor = "dynamatic::experimental::outoforder::createOutOfOrderExecution()";
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

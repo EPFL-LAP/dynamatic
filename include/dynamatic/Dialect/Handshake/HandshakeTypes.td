@@ -40,7 +40,7 @@ def ExtraSignals : TypeParameter<
 }
 
 def ControlType : Handshake_Type<"Control", "control", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["copyWithExtraSignals"]>
 ]> {
   let summary = "a control-only dataflow channel";
   let description = [{
@@ -68,7 +68,7 @@ def ControlType : Handshake_Type<"Control", "control", [
 }
 
 def ChannelType : Handshake_Type<"Channel", "channel", [
-  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["addExtraSignal"]>
+  DeclareTypeInterfaceMethods<ExtraSignalsTypeInterface, ["copyWithExtraSignals"]>
 ]> {
   let summary = "a dataflow channel with optional extra signals";
   let description = [{
@@ -204,6 +204,18 @@ def ChannelOrSimpleControl : TypeConstraint<
      ::mlir::cast<::dynamatic::handshake::ControlType>($_self).getNumExtraSignals() == 0)
   }]>,
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
+>;
+
+class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
+  names,
+  [{
+    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ?
+    // Compare using ControlType without extra signals
+    ::dynamatic::handshake::ControlType::get($_self.getContext(), {}) :
+    // Compare using data type
+    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+  }],
+  "data type"
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

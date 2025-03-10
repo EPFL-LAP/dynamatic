@@ -558,7 +558,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
 
 
 def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
-  Pure, SameOperandsAndResultType,
+  Pure
 ]> {
   let summary = "fifo operation for tags.";
   let description = [{
@@ -576,10 +576,12 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
 
   let results = (outs HandshakeType:$tagOut);
 
+  //let assemblyFormat = "$tagOperands `:` $tagOut";
+
 }
 
 def TaggerOp : Handshake_Op<"tagger", [
-  Pure, SameOperandsAndResultType
+  Pure
 ]> {
   let summary = "Tagger operation for tagging data with tag signals.";
   let description = [{
@@ -594,16 +596,16 @@ def TaggerOp : Handshake_Op<"tagger", [
   }];
 
   let arguments = (ins Variadic<HandshakeType>:$dataOperands,
-     HandshakeType:$tagOperand   
+     ChannelType:$tagOperand   
   );
 
   let results = (outs Variadic<HandshakeType>:$dataOut);
 
-  //let assemblyFormat = "$dataOperands `:` $result";
+  //let assemblyFormat = "$dataOperands `,` $tagOperand `:` $dataOut";
 }
 
 def UntaggerOp : Handshake_Op<"untagger", [
-  Pure, SameOperandsAndResultType
+  Pure
 ]> {
   let summary = "Untagger operation for extracting tag signals and forwarding data.";
   let description = [{
@@ -622,7 +624,7 @@ def UntaggerOp : Handshake_Op<"untagger", [
     HandshakeType:$tagOut
   );
 
-  // let assemblyFormat = "$dataOperands `:` $dataOut";
+  //let assemblyFormat = "$dataOperands `:` $dataOut `,` $tagOut ";
 }
 
 

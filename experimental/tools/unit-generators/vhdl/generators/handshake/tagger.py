@@ -3,10 +3,10 @@ from generators.support.join import generate_join
 from generators.handshake.fork.py import _generate_fork
 
 def generate_tagger(name, params):
-  dataOperands = port_types["dataOperands"]
-  size = len(dataOperands)
-  data_type = VhdlScalarType(dataOperands[0])
-  tag_bitwidth = VhdlScalarType(port_types["tagOperand"]).bitwidth
+  size = params["size"]
+  port_types = params["port_types"]
+  data_type = VhdlScalarType(port_types["DATA_TYPE"])
+  tag_bitwidth = VhdlScalarType(port_types["TAG_TYPE"]).bitwidth
 
   if data_type.has_extra_signals():
     return _generate_tagger_signal_manager(name, data_type, tag_bitwidth)

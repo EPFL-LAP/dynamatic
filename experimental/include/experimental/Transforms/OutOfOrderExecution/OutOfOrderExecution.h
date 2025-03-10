@@ -21,14 +21,17 @@
 
 namespace dynamatic {
 namespace experimental {
+namespace outoforder {
+
+std::unique_ptr<dynamatic::DynamaticPass> createOutOfOrderExecution();
 
 #define GEN_PASS_DECL_OUTOFORDEREXECUTION
 #define GEN_PASS_DEF_OUTOFORDEREXECUTION
 #include "experimental/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createOutOfOrderExecution();
-
+} // namespace outoforder
 } // namespace experimental
+
 } // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_OUTOFORDEREXECUTION_H

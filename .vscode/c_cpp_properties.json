@@ -22,7 +22,7 @@
         "${env:GUROBI_HOME}/include/"
       ],
       "intelliSenseMode": "linux-clang-x64",
-      "compilerPath": "/usr/bin/clang",
+      "compilerPath": "/usr/bin",
       "cStandard": "c17",
       "cppStandard": "c++17",
       "configurationProvider": "llvm-vs-code-extensions.vscode-clangd"

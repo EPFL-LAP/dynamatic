@@ -13,5 +13,4 @@ add_dynamatic_library(DynamaticOutOfOrderExecution
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
-  DynamaticBufferPlacement
   )

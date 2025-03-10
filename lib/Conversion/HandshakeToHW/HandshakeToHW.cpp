@@ -108,7 +108,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -318,7 +318,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -629,6 +629,30 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
+      .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
+        // Numner of Inputs, data bitwidth, and tag bitwidth
+        addUnsigned("SIZE", taggerOp.getDataOperands().size());
+        // Data bitwidth
+        addType("DATA_TYPE", taggerOp.getDataOperands().front().getType());
+        addType("TAG_TYPE", taggerOp.getTagOperand().getType());
+      })
+      .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
+        // Numner of Inputs, data bitwidth, and tag bitwidth
+        addUnsigned("SIZE", untaggerOp.getDataOperands().size());
+        addType("DATA_TYPE", untaggerOp.getDataOperands().front().getType());
+        addType("TAG_TYPE", untaggerOp.getTagOut().getType());
+      })
+      .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
+        // Tag bitwidth and fifo depth
+        addType("TAG_TYPE", fifo.getTagOut().getType());
+        auto i = dyn_cast_or_null<IntegerType>(fifo.getTagOut().getType());
+        if (!i) {
+          op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
+          unsupported = true;
+          return;
+        }
+        addUnsigned("FIFO_DEPTH", 1 << i.getWidth());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -746,7 +770,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -829,7 +853,7 @@ protected:
 /// `handshake::MemoryOpInterface` interface.
 class HWMemConverter : public HWConverter {
 public:
-  using :HWConverter;
+  using HWConverter::HWConverter;
 
   /// Replaces the memory interface with an equivalent instance using all the
   /// inputs added so far as operands. If no external module matching the
@@ -1425,7 +1449,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to

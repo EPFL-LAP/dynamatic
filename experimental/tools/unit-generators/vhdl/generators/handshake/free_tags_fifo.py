@@ -2,9 +2,9 @@ from generators.support.utils import VhdlScalarType
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_free_tags_fifo(name, params):
-  port_types = params["port_types"]
-  bitwidth = VhdlScalarType(port_types["outs"]).bitwidth
   fifo_depth = params["fifo_depth"]
+  port_types = params["port_types"]
+  bitwidth = VhdlScalarType(port_types["TAG_TYPE"]).bitwidth
 
   return _generate_free_tags_fifo(name, bitwidth, fifo_depth)
 
