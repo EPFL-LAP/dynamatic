@@ -83,25 +83,26 @@ static cl::list<std::string>
                cl::desc("<RTL configuration files...>"), cl::cat(mainCategory));
 
 namespace llvm {
-/// Represents a component's port; its name and a boolean indicating whether
-/// the port is part of a vector in RTL.
-using Port = std::pair<std::string, bool>;
-
-const Port EMPTY_KEY = {"EMPTY_KEY", false};
-const Port TOMBSTONE_KEY = {"TOMBSTONE_KEY", false};
+const std::pair<std::string, bool> EMPTY_KEY = {"EMPTY_KEY", false};
+const std::pair<std::string, bool> TOMBSTONE_KEY = {"TOMBSTONE_KEY", false};
 
 template <>
-struct DenseMapInfo<Port> {
-  static inline Port getEmptyKey() { return EMPTY_KEY; }
+struct DenseMapInfo<std::pair<std::string, bool>> {
+  static inline std::pair<std::string, bool> getEmptyKey() { return EMPTY_KEY; }
 
-  static inline Port getTombstoneKey() { return TOMBSTONE_KEY; }
+  static inline std::pair<std::string, bool> getTombstoneKey() {
+    return TOMBSTONE_KEY;
+  }
 
-  static unsigned getHashValue(const Port &p) {
+  static unsigned getHashValue(const std::pair<std::string, bool> &p) {
     return std::hash<std::string>{}(p.first) ^
            (static_cast<unsigned>(p.second) << 1);
   }
 
-  static bool isEqual(const Port &LHS, const Port &RHS) { return LHS == RHS; }
+  static bool isEqual(const std::pair<std::string, bool> &LHS,
+                      const std::pair<std::string, bool> &RHS) {
+    return LHS == RHS;
+  }
 };
 } // namespace llvm
 
@@ -1064,7 +1065,9 @@ void SMVWriter::constructIOMappings(
   auto addReady = [&](StringRef port, OpResult res) -> void {
     // To get the name of the ready signal we can't use the inetrnal signal
     // name. We need to get the user of the signal, and search the name of the
-    // corresponding port
+    // corresponding port.
+    // Example: unit_tx -> [channel] -> unit_rx
+    //          The ready signal needs the name of the user unit_rx.ins_ready
     auto *userOp = *res.getUsers().begin();
     unsigned operandIndex = 0;
     for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
