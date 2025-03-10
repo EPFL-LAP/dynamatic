@@ -294,6 +294,31 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
   ), ", ") # "})">
 >;
 
+class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same extra signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
+  [{", ([](const mlir::OperandRange &variadic,
+           std::initializer_list<llvm::ArrayRef<ExtraSignal>>
+             nonvariadicExtraSignalArrays) {
+    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+    // Retrive all types of operands in the variadic.
+    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+    for (Type type : variadicTypes) {
+      extraSignalArrays.push_back(
+        type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+    }
+    extraSignalArrays.insert(extraSignalArrays.end(), nonvariadicExtraSignalArrays);
+    return extraSignalArrays;
+  })}] # "($" # variadic # ", "
+  "{" # !interleave(!foreach(
+    name, // variable name
+    nonvariadics,
+    "cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getExtraSignals()"
+  ), ", ") # "}))">
+>;
+
 /// Merging Relationship of Extra Signals:
 /// the output has the extra signal A if and only if
 /// there exists an input which has the extra signal A.
@@ -358,6 +383,24 @@ class MergingExtraSignals<string inputs, string output> : PredOpTrait<
       return true;
     })(
   }] # "$" # inputs # ", $" # output # ")">
+>;
+
+class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
+  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
+  CPred<[{
+    ([&](const mlir::OperandRange &inputVariadic, Value output) {
+      // Retrive all types of operands in the variadic.
+      ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
+      bool inputHasSpecTag = false;
+      for (Type type : inputTypes) {
+        if (type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec")) {
+          inputHasSpecTag = true;
+          break;
+        }
+      }
+      return output.getType().cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec") == inputHasSpecTag;
+    })(
+  }] # "$" # inputVariadic # ", $" # output # ")">
 >;
 
 /// Constraint to ensure that the variadic has at least one element.
