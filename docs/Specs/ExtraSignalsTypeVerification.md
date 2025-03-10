@@ -29,29 +29,15 @@ This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/d
 
 ### MuxOp and CMergeOp
 
-These operations may have different extra signals for each input because they typically reside at the boundary of a basic block, receiving inputs from various blocks. For instance, the extra signals on the inputs of a MuxOp might look like this:
+For these operations, all operands and results must have the same extra signals, including the `selector` port, **except for the spec tag**. The spec tag is present on some inputs but not others, depending on their origin.
 
-<img alt="the inputs of Mux" src="./figs/ExtraSignalsTypeVerification/mux_inputs.png" width="400" />
-
-Each input can carry a different set of extra signals. However, the *type* of any extra signal must remain consistent across all inputs. For example, if one input has `tag: i8`, no other input can have `tag: i1` or `tag: i2`. This is because when there are two input signals with the same name but different widths, they cannot both be propagated to the output with that name.
-
-The extra signals on the data output are determined as follows:
-
-- The data output includes an extra signal `A` if, and only if, at least one of the inputs carries the extra signal `A`.
-
-The selector input (for Mux) or the output (for CMerge) is kept simple, meaning it does not carry any extra signals.
-
-As a result, the complete structure of a Mux or CMerge operation appears as follows:
+As a result, the Mux and CMerge operations follow this structure:
 
 <img alt="the IO of Mux and Cmerge" src="./figs/ExtraSignalsTypeVerification/mux_cmerge.png" width="600" />
 
-The data output has `spec: i1` and `tag: i8` because some inputs have them, and nothing else.
+All operands and results include a `tag`, while only some have a `spec` tag.
 
-The specification for the output extra signals implies that if an input is selected but lacks a specific extra signal present in other inputs, the Mux or CMerge must provide the value of the missing extra signal for the output.
-
-This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
-
-For additional examples, please refer to the unit tests.
+This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a discussion in #225](https://github.com/EPFL-LAP/dynamatic/pull/225/files/a03fde5071f21978e0a00c1a43981508d1ff590a#r1956407375).
 
 ### MemPortOp (Load and Store)
 
