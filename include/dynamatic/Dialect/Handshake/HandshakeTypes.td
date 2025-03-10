@@ -123,6 +123,9 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 // Tablegen helper functions
 //===----------------------------------------------------------------------===//
 
+/// Convert variable names to an array of ExtraSignal arrays.
+/// e.g., if names is ["a", "b"], the result will be "{a.(...).getExtraSignals(),
+/// b.(...).getExtraSignals()}".
 class valuesToExtraSignalArrays<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
@@ -132,6 +135,9 @@ class valuesToExtraSignalArrays<list<string> names> {
   ), ", ") # "}";
 }
 
+/// Convert variable names to data type arrays.
+/// e.g., if names is ["a", "b"], the result will be "{a.(...).getDataType(),
+/// b.(...).getDataType()}".
 class valuesToDataTypes<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
@@ -141,53 +147,76 @@ class valuesToDataTypes<list<string> names> {
   ), ", ") # "}";
 }
 
+/// Convert variadic to an array of ExtraSignal arrays.
+/// e.g., if the variadic has two elements, the result will be an array of two
+/// ExtraSignal arrays.
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
-    // Retrieve all types of operands in the variadic.
+
+    // Retrieve all types in the variadic.
     ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+
     for (Type type : variadicTypes) {
       extraSignalArrays.push_back(
         type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
     }
+
     return extraSignalArrays;
   })}] # "($" # variadic # ")";
 }
 
+/// Convert variadic to data type arrays.
+/// e.g., if the variadic has two elements, the result will be an array of two
+/// data types.
 class variadicToDataTypes<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<Type> dataTypes;
+
     // Retrieve all types of operands in the variadic.
     ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+
     for (Type type : variadicTypes) {
-      if (isa<ControlType>(type))
+      if (isa<ControlType>(type)) {
+        // Treat ControlType's data type as nullptr
         dataTypes.push_back(nullptr);
-      else
+      } else {
         dataTypes.push_back(type.cast<ChannelType>().getDataType());
+      }
     }
+
     return dataTypes;
   })}] # "($" # variadic # ")";
 }
 
+/// Convert variadic to ExtraSignalsTypeInterface arrays.
+/// e.g., if the variadic has two elements, the result will be an array of two
+/// ExtraSignalsTypeInterfaces.
 class variadicToExtraSignalTypes<string variadic> {
   string result = [{([](const mlir::OperandRange &variadic) {
     llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
+
     // Retrieve all types of operands in the variadic.
     ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+
     for (Type type : variadicTypes) {
       extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
     }
+
     return extraSignalTypes;
   })}] # "($" # variadic # ")";
 }
 
+/// Concat two arrays of the same type, specified by the first argument.
 class concatArrays<string type, string a, string b> {
-  string result = !subst("$T", type, [{[](llvm::ArrayRef<$T> a, llvm::ArrayRef<$T> b) {
-    llvm::SmallVector<$T> result;
-    result.insert(result.end(), a.begin(), a.end());
-    result.insert(result.end(), b.begin(), b.end());
-    return result;
-  } }]) # "(" # a # ", " # b # ")";
+  string result = !subst("$T", type, [{
+    [](llvm::ArrayRef<$T> a, llvm::ArrayRef<$T> b) {
+      llvm::SmallVector<$T> result;
+      result.insert(result.end(), a.begin(), a.end());
+      result.insert(result.end(), b.begin(), b.end());
+      return result;
+    }
+  }]) # "(" # a # ", " # b # ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -284,15 +313,14 @@ def ChannelOrSimpleControl : TypeConstraint<
   "must be a `handshake::ControlType` with no extra signals or `handshake::ChannelType`"
 >;
 
-/// Multi-entity constraint ensuring that all ChannelTypes have matching data types.
-/// Also applies to ControlTypes, as some operations treat them interchangeably
-/// using HandshakeType.
+/// Multi-entity constraint ensuring that all HandshakeTypes have matching data types.
 /// For the ControlType case, this predicate is satisfied only when all types are ControlType.
 class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
-    ::mlir::isa<::dynamatic::handshake::ControlType>($_self.getType()) ? nullptr :
-    ::mlir::cast<::dynamatic::handshake::ChannelType>($_self.getType()).getDataType()
+    ::mlir::isa<ControlType>($_self.getType()) ?
+    nullptr // Treat ControlType's data type as nullptr
+    : ::mlir::cast<ChannelType>($_self.getType()).getDataType()
   }],
   "data type"
 >;
@@ -314,10 +342,8 @@ class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrai
   "\", " # valuesToExtraSignalArrays<names>.result  # ")">
 >;
 
-/// Multi-entity constraint ensuring that the all operands of variadic and non-variadic
-/// operand have the same data types.
-/// Also applies to ControlTypes, as some operations treat them interchangeably.
-/// Returns true if the variadic is empty.
+/// Multi-entity constraint ensuring that the all HandshakeTypes including variadic
+/// have matching data types.
 class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same data type",
@@ -325,7 +351,10 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
     [](llvm::ArrayRef<Type> dataTypes) {
       if (dataTypes.empty())
         return true;
+
       Type firstType = dataTypes.front();
+
+      // Compares all types with the first type.
       return llvm::all_of(dataTypes, [&](Type type) {
         return type == firstType;
       });
@@ -336,6 +365,9 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
   >.result # ")">
 >;
 
+/// Multi-entity constraint ensuring that all HandshakeTypes including variadic
+/// have matching extra signals, except for any signal with the given `except` name.
+/// The core implementation of this predicate is in C++.
 class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same extra signals except for " # except,
@@ -384,7 +416,7 @@ class LacksSpecTag<string operand> : PredOpTrait<
 >;
 
 class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
-  "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
+  output # " should have a spec tag iff any of " # inputVariadic # " has it",
   CPred<[{
     [](llvm::ArrayRef<ExtraSignalsTypeInterface> inputTypes,
         ExtraSignalsTypeInterface outputType) {
