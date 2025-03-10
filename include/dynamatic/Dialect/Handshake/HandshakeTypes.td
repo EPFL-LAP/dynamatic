@@ -376,13 +376,9 @@ class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
     ([&](const mlir::OperandRange &inputVariadic, Value output) {
       // Retrive all types of operands in the variadic.
       ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
-      bool inputHasSpecTag = false;
-      for (Type type : inputTypes) {
-        if (type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec")) {
-          inputHasSpecTag = true;
-          break;
-        }
-      }
+      bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
+        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
+      });
       return output.getType().cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec") == inputHasSpecTag;
     })(
   }] # "$" # inputVariadic # ", $" # output # ")">
