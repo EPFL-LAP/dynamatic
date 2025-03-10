@@ -147,11 +147,23 @@ class variadicToExtraSignalArrays<string variadic> {
 
 class concatExtraSignalArrays<string a, string b> {
   string result = [{[](llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> a, llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> b) {
-    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignals;
-    extraSignals.insert(extraSignals.end(), a.begin(), a.end());
-    extraSignals.insert(extraSignals.end(), b.begin(), b.end());
-    return extraSignals;
+    llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+    extraSignalArrays.insert(extraSignalArrays.end(), a.begin(), a.end());
+    extraSignalArrays.insert(extraSignalArrays.end(), b.begin(), b.end());
+    return extraSignalArrays;
   } }] # "(" # a # ", " # b # ")";
+}
+
+class variadicToExtraSignalTypes<string variadic> {
+  string result = [{([](const mlir::OperandRange &variadic) {
+    llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
+    // Retrive all types of operands in the variadic.
+    ValueTypeRange<OperandRange> variadicTypes = variadic.getTypes();
+    for (Type type : variadicTypes) {
+      extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
+    }
+    return extraSignalTypes;
+  })}] # "($" # variadic # ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -345,7 +357,8 @@ class VariadicHasElement<string variadic> : PredOpTrait<
 class HasSpecTag<string operand> : PredOpTrait<
   "should have a valid spec tag as an extra signal",
   CPred<[{
-    ([](std::optional<ExtraSignal> getExtraSignalResult) {
+    [](ExtraSignalsTypeInterface type) {
+      auto getExtraSignalResult = type.getExtraSignal("spec");
       if (!getExtraSignalResult.has_value()) {
         // There is no extra signal called "spec"
         return false;
@@ -360,8 +373,8 @@ class HasSpecTag<string operand> : PredOpTrait<
         return false;
 
       return true;
-    })(::mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(
-  $}] # operand # ".getType()).getExtraSignal(\"spec\"))">
+    }
+  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
 class LacksSpecTag<string operand> : PredOpTrait<
@@ -373,15 +386,15 @@ class LacksSpecTag<string operand> : PredOpTrait<
 class HasSpecTagIfPresent<string inputVariadic, string output> : PredOpTrait<
   "the extra signals of inputs and output should satisfy \\\"Merging Relationship of Extra Signals\\\"",
   CPred<[{
-    ([](const mlir::OperandRange &inputVariadic, Value output) {
-      // Retrive all types of operands in the variadic.
-      ValueTypeRange<OperandRange> inputTypes = inputVariadic.getTypes();
-      bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
-        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
+    [](llvm::ArrayRef<ExtraSignalsTypeInterface> inputTypes,
+        ExtraSignalsTypeInterface outputType) {
+      bool inputHasSpecTag = llvm::any_of(inputTypes, [](ExtraSignalsTypeInterface type) {
+        return type.hasExtraSignal("spec");
       });
-      return output.getType().cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec") == inputHasSpecTag;
-    })(
-  }] # "$" # inputVariadic # ", $" # output # ")">
+      return outputType.hasExtraSignal("spec") == inputHasSpecTag;
+    }
+  }] # "(" # variadicToExtraSignalTypes<inputVariadic>.result # ", "
+  "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD
