@@ -1,10 +1,17 @@
-from generators.support.utils import generate_extra_signal_ports
+from generators.support.signal_manager import generate_signal_manager
 
 
 def generate_sink(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
 
+  if extra_signals:
+    return _generate_sink_signal_manager(name, bitwidth, extra_signals)
+  else:
+    return _generate_sink(name, bitwidth)
+
+
+def _generate_sink(name, bitwidth):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -14,7 +21,6 @@ use ieee.numeric_std.all;
 entity {name} is
   port (
     clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
     -- input channel
     ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic;
@@ -22,11 +28,6 @@ entity {name} is
   );
 end entity;
 """
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports(
-      [("ins", "in")], extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
   architecture = f"""
 -- Architecture of sink
@@ -37,3 +38,16 @@ end architecture;
 """
 
   return entity + architecture
+
+
+def _generate_sink_signal_manager(name, bitwidth, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_sink(name, bitwidth))

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from generators.support.utils import extra_signal_default_values
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
@@ -30,8 +31,10 @@ def _generate_entity(entity_name, in_ports, out_ports):
     bitwidth = in_port["bitwidth"]
     extra_signals = in_port.get("extra_signals", None)
 
-    port_decls.append(
-        f"    {name} : in std_logic_vector({bitwidth} - 1 downto 0)")
+    if bitwidth > 0:
+      port_decls.append(
+          f"    {name} : in std_logic_vector({bitwidth} - 1 downto 0)")
+
     port_decls.append(f"    {name}_valid : in std_logic")
     port_decls.append(f"    {name}_ready : out std_logic")
 
@@ -46,8 +49,10 @@ def _generate_entity(entity_name, in_ports, out_ports):
     bitwidth = out_port["bitwidth"]
     extra_signals = out_port.get("extra_signals", None)
 
-    port_decls.append(
-        f"    {name} : out std_logic_vector({bitwidth} - 1 downto 0)")
+    if bitwidth > 0:
+      port_decls.append(
+          f"    {name} : out std_logic_vector({bitwidth} - 1 downto 0)")
+
     port_decls.append(f"    {name}_valid : out std_logic")
     port_decls.append(f"    {name}_ready : in std_logic")
 
@@ -82,12 +87,15 @@ def _generate_normal_architecture(arch_name, in_ports, out_ports, extra_signals)
   for signal_name in extra_signals:
     in_extra_signals = []
 
-    # Collect extra signals from all input ports
-    for in_port in in_ports:
-      name = in_port["name"]
-      in_extra_signals.append(f"{name}_{signal_name}")
+    if not in_ports:
+      extra_signal_exps[signal_name] = extra_signal_default_values[signal_name]
+    else:
+      # Collect extra signals from all input ports
+      for in_port in in_ports:
+        name = in_port["name"]
+        in_extra_signals.append(f"{name}_{signal_name}")
 
-    extra_signal_exps[signal_name] = f" or ".join(in_extra_signals)
+      extra_signal_exps[signal_name] = f" or ".join(in_extra_signals)
 
   # Generate extra signal assignments for each output port and extra signal,
   # based on the extra signal expressions
@@ -104,7 +112,11 @@ def _generate_normal_architecture(arch_name, in_ports, out_ports, extra_signals)
   ports = []
   for port in in_ports + out_ports:
     name = port["name"]
-    ports.append(f"      {name} => {name}")
+    bitwidth = port["bitwidth"]
+
+    if bitwidth > 0:
+      ports.append(f"      {name} => {name}")
+
     ports.append(f"      {name}_valid => {name}_valid")
     ports.append(f"      {name}_ready => {name}_ready")
 
