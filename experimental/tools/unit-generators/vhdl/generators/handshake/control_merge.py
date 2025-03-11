@@ -257,7 +257,7 @@ end architecture;
       i for i in range(size) if i not in spec_inputs
   ]
   lacking_spec_port_decls = [
-      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0)" for i in lacking_spec_ports
+      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
   architecture = architecture.replace(
       "  [LACKING_SPEC_INPUT_DECLS]",
@@ -371,7 +371,7 @@ end architecture;
       i for i in range(size) if i not in spec_inputs
   ]
   lacking_spec_port_decls = [
-      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0)" for i in lacking_spec_ports
+      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
   architecture = architecture.replace(
       "  [LACKING_SPEC_INPUT_DECLS]",
