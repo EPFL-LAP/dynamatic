@@ -17,6 +17,7 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.memory_controller as memory_controller
 
 
 def generate_code(name, mod_type, parameters):
@@ -51,6 +52,8 @@ def generate_code(name, mod_type, parameters):
       return source.generate_source(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "memory_controller":
+      return memory_controller.generate_memory_controller(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
