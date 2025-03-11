@@ -142,8 +142,8 @@ class valuesToDataTypes<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
-    // Treat ControlType's data type as nullptr
-    "isa<ControlType>($" # name # ".getType()) ? nullptr :"
+    // Treat ControlType's data type as i0
+    "isa<ControlType>($" # name # ".getType()) ? IntegerType::get($_ctxt, 0) :"
     "$" # name # ".getType().cast<ChannelType>().getDataType()"
   ), ", ") # "}";
 }
@@ -153,7 +153,7 @@ class valuesToDataTypes<list<string> names> {
 /// ExtraSignal arrays.
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{
-    [](auto &&variadic) {
+    [&](auto &&variadic) {
       llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
 
       for (Type type : variadic.getTypes()) {
@@ -171,13 +171,13 @@ class variadicToExtraSignalArrays<string variadic> {
 /// data types.
 class variadicToDataTypes<string variadic> {
   string result = [{
-    [](auto &&variadic) {
+    [&](auto &&variadic) {
       llvm::SmallVector<Type> dataTypes;
 
       for (Type type : variadic.getTypes()) {
         if (isa<ControlType>(type)) {
-          // Treat ControlType's data type as nullptr
-          dataTypes.push_back(nullptr);
+          // Treat ControlType's data type as i0
+          dataTypes.push_back(IntegerType::get($_ctxt, 0));
         } else {
           dataTypes.push_back(type.cast<ChannelType>().getDataType());
         }
@@ -312,7 +312,7 @@ class AllDataTypesMatch<list<string> names> : AllMatchSameOperatorTrait<
   names,
   [{
     ::mlir::isa<ControlType>($_self.getType()) ?
-    nullptr // Treat ControlType's data type as nullptr
+    IntegerType::get($_ctxt, 0) // Treat ControlType's data type as i0
     : ::mlir::cast<ChannelType>($_self.getType()).getDataType()
   }],
   "data type"
