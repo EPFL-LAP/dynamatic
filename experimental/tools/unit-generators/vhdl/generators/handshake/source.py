@@ -29,7 +29,7 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of sink
+-- Architecture of source
 architecture arch of {name} is
 begin
   outs_valid <= '1';
