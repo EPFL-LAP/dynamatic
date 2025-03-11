@@ -171,6 +171,8 @@ end architecture;
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
+  # Specify offset for data bitwidth
   extra_signal_mapping = ExtraSignalMapping(offset=data_bitwidth)
   for input_extra_signals in input_extra_signals_list:
     for signal_name, signal_bitwidth in input_extra_signals.items():
@@ -178,6 +180,7 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate control merge for concatenated data and extra signals
   dependencies = _generate_control_merge(
       inner_name, size, index_bitwidth, full_bitwidth)
 
@@ -210,17 +213,22 @@ end entity;
 
   # Add extra signal ports
   extra_signal_port_decls = []
+
+  # Generate extra signal ports for each input channel (ins_0, ins_1, ...)
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
         [(f"ins_{i}", "in")], input_extra_signals_list[i]))
+
   extra_signal_port_decls.append(generate_extra_signal_ports(
-      [("outs", "out")], extra_signal_mapping.to_extra_signals()))
+      [("outs", "out")], output_extra_signals))
+
   entity = entity.replace(
       "    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of control merge signal manager
 architecture arch of {name} is
+  -- Concatenated data and extra signals
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
@@ -253,11 +261,11 @@ end architecture;
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
       "ins", input_extra_signals_list, extra_signal_mapping)
 
+  # Concatenate data and extra signals based on extra signal mapping
   ins_conversions = []
   for i in range(size):
     ins_conversions.append(generate_ins_concat_statements(
         f"ins_{i}", f"ins_inner({i})", extra_signal_mapping, data_bitwidth, custom_data_name=f"ins({i})"))
-
   outs_conversions = generate_outs_concat_statements(
       "outs", "outs_inner", extra_signal_mapping, data_bitwidth)
 
@@ -273,6 +281,7 @@ end architecture;
 def _generate_control_merge_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals):
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
   for input_extra_signals in input_extra_signals_list:
     for signal_name, signal_bitwidth in input_extra_signals.items():
@@ -280,6 +289,7 @@ def _generate_control_merge_signal_manager_dataless(name, size, index_bitwidth, 
         extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate control merge for concatenated extra signals
   dependencies = _generate_control_merge(
       inner_name, size, index_bitwidth, full_bitwidth)
 
@@ -310,17 +320,22 @@ end entity;
 
   # Add extra signal ports
   extra_signal_port_decls = []
+
+  # Generate extra signal ports for each input channel (ins_0, ins_1, ...)
   for i in range(size):
     extra_signal_port_decls.append(generate_extra_signal_ports(
         [(f"ins_{i}", "in")], input_extra_signals_list[i]))
+
   extra_signal_port_decls.append(generate_extra_signal_ports(
-      [("outs", "out")], extra_signal_mapping.to_extra_signals()))
+      [("outs", "out")], output_extra_signals))
+
   entity = entity.replace(
       "    [EXTRA_SIGNAL_PORTS]\n", "\n".join(extra_signal_port_decls))
 
   architecture = f"""
 -- Architecture of control merge signal manager
 architecture arch of {name} is
+  -- Concatenated extra signals
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   [LACKING_EXTRA_SIGNAL_DECLS]
@@ -353,11 +368,11 @@ end architecture;
   lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
       "ins", input_extra_signals_list, extra_signal_mapping)
 
+  # Concatenate extra signals based on extra signal mapping
   ins_conversions = []
   for i in range(size):
     ins_conversions.append(generate_ins_concat_statements_dataless(
         f"ins_{i}", f"ins_inner({i})", extra_signal_mapping))
-
   outs_conversions = generate_outs_concat_statements_dataless(
       "outs", "outs_inner", extra_signal_mapping)
 
