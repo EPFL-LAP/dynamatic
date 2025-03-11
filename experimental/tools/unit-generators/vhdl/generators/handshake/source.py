@@ -1,9 +1,16 @@
-from generators.support.utils import generate_extra_signal_ports, extra_signal_default_values
+from generators.support.signal_manager import generate_signal_manager
 
 
 def generate_source(name, params):
   extra_signals = params.get("extra_signals", None)
 
+  if extra_signals:
+    return _generate_source_signal_manager(name, extra_signals)
+  else:
+    return _generate_source(name)
+
+
+def _generate_source(name):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -13,7 +20,6 @@ use ieee.numeric_std.all;
 entity {name} is
   port (
     clk, rst   : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
     -- inputs
     outs_ready : in std_logic;
     -- outputs
@@ -22,25 +28,25 @@ entity {name} is
 end entity;
 """
 
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports(
-      [("outs", "out")], extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
-
   architecture = f"""
 -- Architecture of sink
 architecture arch of {name} is
 begin
   outs_valid <= '1';
-  [EXTRA_SIGNAL_LOGIC]
 end architecture;
 """
 
-  extra_signal_assignments = []
-  for signal_name in extra_signals:
-    extra_signal_assignments.append(
-        f"  outs_{signal_name} <= {extra_signal_default_values[signal_name]};")
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_LOGIC]", "\n".join(extra_signal_assignments))
-
   return entity + architecture
+
+
+def _generate_source_signal_manager(name, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": 0,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_source(name))
