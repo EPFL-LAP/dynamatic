@@ -159,8 +159,8 @@ class valuesToDataTypes<list<string> names> {
 /// ExtraSignal arrays.
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{
-    [&](auto &&variadic) {
-      llvm::SmallVector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
+    [&](auto &&variadic) -> std::vector<llvm::ArrayRef<ExtraSignal>> {
+      std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays;
 
       for (Type type : variadic.getTypes()) {
         extraSignalArrays.push_back(
@@ -177,8 +177,8 @@ class variadicToExtraSignalArrays<string variadic> {
 /// data types.
 class variadicToDataTypes<string variadic> {
   string result = [{
-    [&](auto &&variadic) {
-      llvm::SmallVector<Type> dataTypes;
+    [&](auto &&variadic) -> std::vector<Type> {
+      std::vector<Type> dataTypes;
 
       for (Type type : variadic.getTypes()) {
         if (isa<ControlType>(type)) {
@@ -199,8 +199,8 @@ class variadicToDataTypes<string variadic> {
 /// ExtraSignalsTypeInterfaces.
 class variadicToExtraSignalTypes<string variadic> {
   string result = [{
-    [](auto &&variadic) {
-      llvm::SmallVector<ExtraSignalsTypeInterface> extraSignalTypes;
+    [](auto &&variadic) -> std::vector<ExtraSignalsTypeInterface> {
+      std::vector<ExtraSignalsTypeInterface> extraSignalTypes;
 
       for (Type type : variadic.getTypes()) {
         extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
@@ -214,8 +214,8 @@ class variadicToExtraSignalTypes<string variadic> {
 /// Concat two arrays of the same type, specified by the first argument.
 class concatArrays<string type, string a, string b> {
   string result = !subst("$T", type, [{
-    [](llvm::ArrayRef<$T> a, llvm::ArrayRef<$T> b) {
-      llvm::SmallVector<$T> result;
+    [](std::vector<$T> a, std::vector<$T> b) -> std::vector<$T> {
+      std::vector<$T> result;
       result.insert(result.end(), a.begin(), a.end());
       result.insert(result.end(), b.begin(), b.end());
       return result;
