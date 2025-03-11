@@ -1184,7 +1184,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
 void SMVWriter::writeProperties(WriteModData &data) const {
   writeAbsenceOfBackPressure(data);
-  writeTriggerEquivalence(data, 5);
+  writeTriggerEquivalence(data, 3);
 }
 
 void SMVWriter::writeTriggerEquivalence(WriteModData &data,
@@ -1209,25 +1209,31 @@ void SMVWriter::writeTriggerEquivalence(WriteModData &data,
                                      PairHash, PairEqual>;
   PairSet eqSignals;
 
-  std::function<void(const std::string &, const OpResult &, unsigned,
-                     PairSet &)>
+  std::function<void(const std::string &, const Value &, unsigned, PairSet &)>
       addPossiblyEquivalentSignals;
 
   addPossiblyEquivalentSignals = [&](const std::string &firstSignal,
-                                     const OpResult &res, unsigned radius,
+                                     const Value &res, unsigned radius,
                                      PairSet &s) {
-    if (radius == 0) {
-      for (auto otherRes : res.getOwner()->getResults()) {
+    if (res.getDefiningOp() != nullptr)
+      for (auto otherRes : res.getDefiningOp()->getResults()) {
         if (otherRes != res) {
           std::string secondSignal =
               data.getSignalNameFunc()(otherRes).str() + VALID_SUFFIX.str();
           s.insert({firstSignal, secondSignal});
         }
       }
-    } else {
+
+    if (radius > 0) {
       for (auto *userOp : res.getUsers()) {
-        for (auto newRes : userOp->getResults())
+        for (auto newRes : userOp->getResults()) {
           addPossiblyEquivalentSignals(firstSignal, newRes, radius - 1, s);
+        }
+        for (auto oper : userOp->getOperands()) {
+          if (oper.getType().isa<ChannelType>() ||
+              oper.getType().isa<ControlType>())
+            addPossiblyEquivalentSignals(firstSignal, oper, radius - 1, s);
+        }
       }
     }
   };
@@ -1239,11 +1245,13 @@ void SMVWriter::writeTriggerEquivalence(WriteModData &data,
       addPossiblyEquivalentSignals(validSignalName, res, radius, eqSignals);
     }
   }
-
+  // for fir only-res finds 1377 pairs at most
+  // res+oper finds up to 1740 pairs at most
   for (const auto &[firstValidSignalName, secondValidSignalName] : eqSignals) {
     data.os << "INVARSPEC " << firstValidSignalName << " <-> "
             << secondValidSignalName << ";\n";
   }
+  llvm::errs() << eqSignals.size() << "\n";
 }
 
 void SMVWriter::writeAbsenceOfBackPressure(WriteModData &data) const {
