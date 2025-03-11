@@ -470,7 +470,6 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
         isFirst = false;
         specInputs << i;
       }
-      specInputs << serializeExtraSignals(mod.getInputType(i), false);
     }
     specInputs << "]'";
     serializedParams["SPEC_INPUTS"] = specInputs.str();
@@ -489,7 +488,6 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
         isFirst = false;
         specInputs << i - 1; // Skip the index input
       }
-      specInputs << serializeExtraSignals(mod.getInputType(i), false);
     }
     specInputs << "]'";
     serializedParams["SPEC_INPUTS"] = specInputs.str();
