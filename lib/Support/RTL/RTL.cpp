@@ -414,6 +414,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
 
+    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
+    // input.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -429,6 +431,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
 
+    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
+    // input.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
