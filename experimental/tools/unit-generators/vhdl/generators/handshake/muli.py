@@ -1,4 +1,4 @@
-from generators.support.utils import generate_extra_signal_ports
+from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
@@ -161,46 +161,28 @@ end architecture;
   return dependencies + entity + architecture
 
 
+extra_signal_logic = {
+    "spec": """
+  ofifo_in_spec <= lhs_spec or rhs_spec;
+"""
+}
+
+
 def _generate_muli_signal_manager(name, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
+  extra_signals_ofifo_name = f"{name}_extra_signals_ofifo"
 
-  dependencies = _generate_muli(inner_name, bitwidth)
+  # Construct extra signal mapping
+  extra_signal_mapping = ExtraSignalMapping()
+  for signal_name, signal_bitwidth in extra_signals.items():
+    extra_signal_mapping.add(signal_name, signal_bitwidth)
+  extra_signal_full_bitwidth = extra_signal_mapping.total_bitwidth
 
-  if "spec" in extra_signals:
-    dependencies += generate_ofifo(f"{name}_spec_ofifo", {
-        "num_slots": _get_latency(),  # todo: correct?
-        "bitwidth": 1,
-    })
-
-  # Now that the logic depends on the name, this dict is defined inside this function.
-  extra_signal_logic = {
-      "spec": (
-          # First string is for the signal declaration
-          """
-    signal spec_tfifo_in : std_logic_vector(0 downto 0);
-    signal spec_tfifo_out : std_logic_vector(0 downto 0);
-""",
-          # Second string is for the actual logic
-          f"""
-    spec_tfifo_in <= lhs_spec or rhs_spec;
-    spec_tfifo : entity work.{name}_spec_ofifo(arch)
-      port map(
-        clk => clk,
-        rst => rst,
-        ins => spec_tfifo_in,
-        ins_valid => transfer_in,
-        ins_ready => open,
-        outs => spec_tfifo_out,
-        outs_valid => open,
-        outs_ready => transfer_out
-      );
-    result_spec <= spec_tfifo_out;
-""")
-  }
-
-  for signal_name in extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
+  dependencies = _generate_muli(inner_name, bitwidth) + \
+      generate_ofifo(extra_signals_ofifo_name, {
+          "num_slots": _get_latency(),  # todo: correct?
+          "bitwidth": extra_signal_full_bitwidth,
+      })
 
   entity = f"""
 library ieee;
@@ -239,6 +221,8 @@ end entity;
 -- Architecture of muli signal manager
 architecture arch of {name} is
   signal transfer_in, transfer_out : std_logic;
+  signal extra_signals_ofifo_in : std_logic_vector({extra_signal_full_bitwidth - 1} downto 0);
+  signal extra_signals_ofifo_out : std_logic_vector({extra_signal_full_bitwidth - 1} downto 0);
   [EXTRA_SIGNAL_SIGNAL_DECLS]
 begin
   transfer_in <= lhs_valid and lhs_ready;
@@ -246,6 +230,18 @@ begin
 
   -- list of logic for supported extra signals
   [EXTRA_SIGNAL_LOGIC]
+
+  extra_signals_ofifo : entity work.{extra_signals_ofifo_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => extra_signals_ofifo_in,
+      ins_valid => transfer_in,
+      ins_ready => open,
+      outs => extra_signals_ofifo_out,
+      outs_valid => open,
+      outs_ready => transfer_out
+    );
 
   inner : entity work.{inner_name}(arch)
     port map(
@@ -264,13 +260,22 @@ begin
 end architecture;
 """
 
-  architecture = architecture.replace("  [EXTRA_SIGNAL_SIGNAL_DECLS]",
-                                      "\n".join([
-                                          extra_signal_logic[name][0] for name in extra_signals
-                                      ]))
-  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]",
-                                      "\n".join([
-                                          extra_signal_logic[name][1] for name in extra_signals
-                                      ]))
+  architecture = architecture.replace(
+      "  [EXTRA_SIGNAL_SIGNAL_DECLS]",
+      "\n".join([
+          f"  signal ofifo_in_{name} : std_logic_vector({bitwidth - 1} downto 0);" for name, bitwidth in extra_signals.items()
+      ]))
+
+  # Concatenate extra signals based on extra signal mapping
+  ins_conversion = generate_ins_concat_statements_dataless(
+      "ofifo_in", "extra_signals_ofifo_in", extra_signal_mapping)
+  outs_conversion = generate_outs_concat_statements_dataless(
+      "result", "extra_signals_ofifo_out", extra_signal_mapping)
+
+  architecture = architecture.replace(
+      "  [EXTRA_SIGNAL_LOGIC]",
+      "\n".join([
+          extra_signal_logic[name] for name in extra_signals
+      ]) + ins_conversion + outs_conversion)
 
   return dependencies + entity + architecture
