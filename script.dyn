@@ -3,11 +3,11 @@
 #set-src integration-test/histogram_simple/histogram_simple.c
 #set-src integration-test/histogram2/histogram2.c
 #set-src integration-test/histogram_2/histogram_2.c
-#set-src integration-test/histogram/histogram.c
-set-src integration-test/memory/test_memory_1/test_memory_1.c
+set-src integration-test/histogram/histogram.c
+#set-src integration-test/memory/test_memory_1/test_memory_1.c
 #compile --buffer-algorithm fpga20
-compile --buffer-algorithm fpl22
-#compile
+#compile --buffer-algorithm fpl22
+compile
 write-hdl
 simulate
 #visualize
