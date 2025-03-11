@@ -138,11 +138,14 @@ end architecture;
 def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
 
-  extra_signal_mapping = ExtraSignalMapping(bitwidth)
+  # Construct extra signal mapping
+  # Specify offset for data bitwidth
+  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
   for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate fork for concatenated data and extra signals
   dependencies = _generate_fork(inner_name, size, full_bitwidth)
 
   entity = f"""
@@ -178,6 +181,7 @@ end entity;
   architecture = f"""
 -- Architecture of fork signal manager
 architecture arch of {name} is
+  -- Concatenated data and extra signals
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
 begin
@@ -197,6 +201,7 @@ begin
 end architecture;
 """
 
+  # Concatenate data and extra signals based on extra signal mapping
   ins_conversion = generate_ins_concat_statements(
       "ins", "ins_inner", extra_signal_mapping, bitwidth)
   outs_conversion = []
@@ -215,11 +220,13 @@ end architecture;
 def _generate_fork_signal_manager_dataless(name, size, extra_signals):
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate fork for concatenated extra signals
   dependencies = _generate_fork(inner_name, size, full_bitwidth)
 
   entity = f"""
@@ -253,6 +260,7 @@ end entity;
   architecture = f"""
 -- Architecture of fork signal manager dataless
 architecture arch of {name} is
+  -- Concatenated extra signals
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
 begin
@@ -272,6 +280,7 @@ begin
 end architecture;
 """
 
+  # Concatenate extra signals based on extra signal mapping
   ins_conversion = generate_ins_concat_statements_dataless(
       "ins", "ins_inner", extra_signal_mapping)
   outs_conversion = []

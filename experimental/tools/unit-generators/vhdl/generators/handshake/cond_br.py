@@ -182,10 +182,6 @@ end entity;
   ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
-  for signal_name in extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
-
   architecture = f"""
 architecture arch of {name} is
 begin
@@ -254,10 +250,6 @@ end entity;
       ("trueOut", "out"), ("falseOut", "out")
   ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  for signal_name in extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is

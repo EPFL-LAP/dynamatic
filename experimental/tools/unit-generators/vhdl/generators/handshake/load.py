@@ -92,16 +92,18 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   inner_name = f"{name}_inner"
   tfifo_name = f"{name}_tfifo"
 
+  # Construct extra signal mapping to concatenate extra signals
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_type in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth) + \
-      generate_tfifo(tfifo_name, {
-          "bitwidth": extra_signals_total_bitwidth,
-          "num_slots": 32  # todo
-      })
+  dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
+  # Generate tfifo to store extra signals for in-flight memory requests
+  dependencies += generate_tfifo(tfifo_name, {
+      "bitwidth": extra_signals_total_bitwidth,
+      "num_slots": 32  # todo
+  })
 
   entity = f"""
 library ieee;
@@ -186,6 +188,7 @@ begin
 end architecture;
 """
 
+  # Concatenate data and extra signals based on extra signal mapping
   ins_conversion = generate_ins_concat_statements_dataless(
       "addrIn", "tfifo_ins_inner", extra_signal_mapping)
   outs_conversion = generate_outs_concat_statements_dataless(
