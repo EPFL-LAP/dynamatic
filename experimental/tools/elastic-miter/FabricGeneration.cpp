@@ -399,10 +399,10 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     BufferOp lhsBufferOp =
         builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[BB_IN],
-                                 TimingInfo::oehb(), bufferSlots);
+                                 TimingInfo::oehb(), bufferSlots, dynamatic::handshake::BufferOp::DV_TYPE);
     BufferOp rhsBufferOp =
         builder.create<BufferOp>(forkOp.getLoc(), forkOp.getResults()[1],
-                                 TimingInfo::oehb(), bufferSlots);
+                                 TimingInfo::oehb(), bufferSlots, dynamatic::handshake::BufferOp::DV_TYPE);
     setHandshakeAttributes(builder, lhsBufferOp, BB_IN, lhsBufName);
     setHandshakeAttributes(builder, rhsBufferOp, BB_IN, rhsBufName);
 
@@ -480,10 +480,10 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), lhsEndNDWireOp.getResult(), TimingInfo::oehb(),
-        bufferSlots);
+        bufferSlots, dynamatic::handshake::BufferOp::DV_TYPE);
     BufferOp rhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), rhsEndNDWireOp.getResult(), TimingInfo::oehb(),
-        bufferSlots);
+        bufferSlots, dynamatic::handshake::BufferOp::DV_TYPE);
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
