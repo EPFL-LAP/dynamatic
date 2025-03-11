@@ -990,7 +990,9 @@ private:
   void writeModuleInstantiations(WriteModData &data) const;
   /// Writes the preprocessor directives to include the external modules
   void writeIncludes(WriteModData &data) const;
+  void writeProperties(WriteModData &data) const;
   void writeAbsenceOfBackPressure(WriteModData &data) const;
+  void writeTriggerEquivalence(WriteModData &data, unsigned radius) const;
 };
 
 } // namespace
@@ -1175,9 +1177,73 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   });
 
   os << "\n// properties\n";
-  writeAbsenceOfBackPressure(data);
+  writeProperties(data);
 
   return success();
+}
+
+void SMVWriter::writeProperties(WriteModData &data) const {
+  writeAbsenceOfBackPressure(data);
+  writeTriggerEquivalence(data, 5);
+}
+
+void SMVWriter::writeTriggerEquivalence(WriteModData &data,
+                                        unsigned radius) const {
+  struct PairHash {
+    size_t operator()(const std::pair<std::string, std::string> &p) const {
+      auto &a = p.first;
+      auto &b = p.second;
+      return std::hash<std::string>{}(a < b ? a : b) ^
+             std::hash<std::string>{}(a < b ? b : a);
+    }
+  };
+
+  struct PairEqual {
+    bool operator()(const std::pair<std::string, std::string> &p1,
+                    const std::pair<std::string, std::string> &p2) const {
+      return (p1.first == p2.first && p1.second == p2.second) ||
+             (p1.first == p2.second && p1.second == p2.first);
+    }
+  };
+  using PairSet = std::unordered_set<std::pair<std::string, std::string>,
+                                     PairHash, PairEqual>;
+  PairSet eqSignals;
+
+  std::function<void(const std::string &, const OpResult &, unsigned,
+                     PairSet &)>
+      addPossiblyEquivalentSignals;
+
+  addPossiblyEquivalentSignals = [&](const std::string &firstSignal,
+                                     const OpResult &res, unsigned radius,
+                                     PairSet &s) {
+    if (radius == 0) {
+      for (auto otherRes : res.getOwner()->getResults()) {
+        if (otherRes != res) {
+          std::string secondSignal =
+              data.getSignalNameFunc()(otherRes).str() + VALID_SUFFIX.str();
+          s.insert({firstSignal, secondSignal});
+        }
+      }
+    } else {
+      for (auto *userOp : res.getUsers()) {
+        for (auto newRes : userOp->getResults())
+          addPossiblyEquivalentSignals(firstSignal, newRes, radius - 1, s);
+      }
+    }
+  };
+
+  for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
+    for (auto res : instOp.getResults()) {
+      std::string validSignalName =
+          data.getSignalNameFunc()(res).str() + VALID_SUFFIX.str();
+      addPossiblyEquivalentSignals(validSignalName, res, radius, eqSignals);
+    }
+  }
+
+  for (const auto &[firstValidSignalName, secondValidSignalName] : eqSignals) {
+    data.os << "INVARSPEC " << firstValidSignalName << " <-> "
+            << secondValidSignalName << ";\n";
+  }
 }
 
 void SMVWriter::writeAbsenceOfBackPressure(WriteModData &data) const {
