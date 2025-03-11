@@ -47,7 +47,7 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS spec_inputs=$SPEC_INPUTS",
     "dependencies": ["types"]
   },
   {
@@ -55,7 +55,7 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t control_merge -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t control_merge -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS spec_inputs=$SPEC_INPUTS",
     "dependencies": ["types"]
   },
   {

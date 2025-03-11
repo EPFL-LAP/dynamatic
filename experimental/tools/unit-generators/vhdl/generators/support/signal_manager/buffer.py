@@ -6,6 +6,8 @@ from generators.support.utils import generate_extra_signal_ports, ExtraSignalMap
 def generate_buffer_like_signal_manager_full(name: str, size: int, bitwidth: int, extra_signals: dict[str, int], generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
+  # Specify offset for data bitwidth
   extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
   for signal_name, signal_type in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
@@ -44,6 +46,7 @@ end entity;
   architecture = f"""
 -- Architecture of buffer-like signal manager
 architecture arch of {name} is
+  -- Concatenated data and extra signals
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
@@ -63,6 +66,7 @@ begin
 end architecture;
 """
 
+  # Concatenate data and extra signals based on extra signal mapping
   ins_conversion = generate_ins_concat_statements(
       "ins", "ins_inner", extra_signal_mapping, bitwidth)
   outs_conversion = generate_outs_concat_statements(
@@ -85,6 +89,7 @@ def generate_buffer_like_signal_manager(name: str, bitwidth: int, extra_signals:
 def generate_buffer_like_signal_manager_dataless_full(name: str, size: int, extra_signals: dict[str, int], generate_inner: Callable[[str, int, int], str]) -> str:
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
@@ -121,6 +126,7 @@ end entity;
   architecture = f"""
 -- Architecture of buffer-like signal manager dataless
 architecture arch of {name} is
+  -- Concatenated extra signals
   signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
@@ -140,6 +146,7 @@ begin
 end architecture;
 """
 
+  # Concatenate extra signals based on extra signal mapping
   ins_conversion = generate_ins_concat_statements_dataless(
       "ins", "ins_inner", extra_signal_mapping)
   outs_conversion = generate_outs_concat_statements_dataless(

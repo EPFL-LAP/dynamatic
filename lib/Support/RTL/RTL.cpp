@@ -414,6 +414,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
 
+    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
+    // input.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -429,6 +431,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
 
+    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
+    // input.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -448,6 +452,47 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     // Skip
   } else {
     llvm::errs() << "Uncaught module: " << name << "\n";
+  }
+
+  // spec ports
+  if (name == "handshake.control_merge") {
+    std::string specInputsValue;
+    llvm::raw_string_ostream specInputs(specInputsValue);
+    specInputs << "'[";
+    bool isFirst = true;
+    // The last two inputs are clk and rst
+    for (size_t i = 1; i < mod.getNumInputs() - 2; i++) {
+      if (mod.getInputType(i)
+              .cast<handshake::ExtraSignalsTypeInterface>()
+              .hasExtraSignal("spec")) {
+        if (!isFirst)
+          specInputs << ", ";
+        isFirst = false;
+        specInputs << i;
+      }
+      specInputs << serializeExtraSignals(mod.getInputType(i), false);
+    }
+    specInputs << "]'";
+    serializedParams["SPEC_INPUTS"] = specInputs.str();
+  } else if (name == "handshake.mux") {
+    std::string specInputsValue;
+    llvm::raw_string_ostream specInputs(specInputsValue);
+    specInputs << "'[";
+    bool isFirst = true;
+    // The first input is index, and the last two inputs are clk and rst
+    for (size_t i = 0; i < mod.getNumInputs() - 2; i++) {
+      if (mod.getInputType(i)
+              .cast<handshake::ExtraSignalsTypeInterface>()
+              .hasExtraSignal("spec")) {
+        if (!isFirst)
+          specInputs << ", ";
+        isFirst = false;
+        specInputs << i - 1; // Skip the index input
+      }
+      specInputs << serializeExtraSignals(mod.getInputType(i), false);
+    }
+    specInputs << "]'";
+    serializedParams["SPEC_INPUTS"] = specInputs.str();
   }
 }
 

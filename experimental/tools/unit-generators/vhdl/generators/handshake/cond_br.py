@@ -132,12 +132,11 @@ end architecture;
   return dependencies + entity + architecture
 
 
-# todo: can be reusable among various unit generators
 extra_signal_logic = {
     "spec": """
   trueOut_spec <= data_spec or condition_spec;
   falseOut_spec <= data_spec or condition_spec;
-"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+"""
 }
 
 
@@ -178,10 +177,6 @@ end entity;
       ("trueOut", "out"), ("falseOut", "out")
   ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  for signal_name in extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is
@@ -251,10 +246,6 @@ end entity;
       ("trueOut", "out"), ("falseOut", "out")
   ], extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  for signal_name in extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
 
   architecture = f"""
 architecture arch of {name} is

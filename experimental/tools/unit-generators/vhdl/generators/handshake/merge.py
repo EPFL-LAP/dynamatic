@@ -149,11 +149,14 @@ end architecture;
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
+  # Specify offset for data bitwidth
   extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
   for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate merge for concatenated data and extra signals
   dependencies = _generate_merge(inner_name, size, full_bitwidth)
 
   entity = f"""
@@ -190,6 +193,7 @@ end entity;
   architecture = f"""
 -- Architecture of merge signal manager
 architecture arch of {name} is
+  -- Concatenated data and extra signals
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
@@ -209,6 +213,7 @@ begin
 end architecture;
 """
 
+  # Concatenate data and extra signals based on extra signal mapping
   ins_conversion = []
   for i in range(size):
     ins_conversion.append(generate_ins_concat_statements(
@@ -227,11 +232,13 @@ end architecture;
 def _generate_merge_signal_manager_dataless(name, size, extra_signals):
   inner_name = f"{name}_inner"
 
+  # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_bitwidth in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_bitwidth)
   full_bitwidth = extra_signal_mapping.total_bitwidth
 
+  # Generate merge for concatenated extra signals
   dependencies = _generate_merge(inner_name, size, full_bitwidth)
 
   entity = f"""
@@ -266,6 +273,7 @@ end entity;
   architecture = f"""
 -- Architecture of merge signal manager dataless
 architecture arch of {name} is
+  -- Concatenated extra signals
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
 begin
@@ -285,6 +293,7 @@ begin
 end architecture;
 """
 
+  # Concatenate extra signals based on extra signal mapping
   ins_conversion = []
   for i in range(size):
     ins_conversion.append(generate_ins_concat_statements_dataless(

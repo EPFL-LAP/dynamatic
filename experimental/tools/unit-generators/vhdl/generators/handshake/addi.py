@@ -65,13 +65,5 @@ end architecture;
   return dependencies + entity + architecture
 
 
-# todo: can be reusable among various unit generators
-extra_signal_logic = {
-    "spec": """
-  result_spec <= lhs_spec or rhs_spec;
-"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
-}
-
-
 def _generate_addi_signal_manager(name, bitwidth, extra_signals):
   return generate_binary_no_latency_signal_manager(name, bitwidth, extra_signals, _generate_addi)

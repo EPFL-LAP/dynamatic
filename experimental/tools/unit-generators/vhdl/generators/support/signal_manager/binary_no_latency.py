@@ -2,11 +2,10 @@ from collections.abc import Callable
 
 from generators.support.utils import generate_extra_signal_ports
 
-# todo: can be reusable among various unit generators
 extra_signal_logic = {
     "spec": """
   result_spec <= lhs_spec or rhs_spec;
-"""  # todo: generate_normal_spec_logic(["trueOut", "falseOut"], ["data", "condition"])
+"""
 }
 
 
