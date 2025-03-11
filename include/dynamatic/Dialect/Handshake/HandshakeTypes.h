@@ -20,7 +20,6 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include <initializer_list>
 
 namespace dynamatic {
 namespace handshake {
