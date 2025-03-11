@@ -1,4 +1,5 @@
 from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
+from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
 
@@ -66,4 +67,21 @@ end architecture;
 
 
 def _generate_addi_signal_manager(name, bitwidth, extra_signals):
-  return generate_binary_no_latency_signal_manager(name, bitwidth, extra_signals, _generate_addi)
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_addi(name, bitwidth))
