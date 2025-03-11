@@ -1,4 +1,4 @@
-from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_lacking_extra_signal_decls, generate_lacking_extra_signal_assignments, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless, extra_signal_default_values
 from generators.handshake.tehb import generate_tehb
 
 
@@ -8,12 +8,13 @@ def generate_mux(name, params):
   index_bitwidth = params["index_bitwidth"]
   input_extra_signals_list = params["input_extra_signals_list"]
   output_extra_signals = params["output_extra_signals"]
+  spec_inputs = params["spec_inputs"]
 
   if output_extra_signals:
     if data_bitwidth == 0:
-      return _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals)
+      return _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals, spec_inputs)
     else:
-      return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals)
+      return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, spec_inputs)
   elif data_bitwidth == 0:
     return _generate_mux_dataless(name, size, index_bitwidth)
   else:
@@ -175,7 +176,7 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals):
+def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, spec_inputs):
   inner_name = f"{name}_inner"
 
   # Construct extra signal mapping
@@ -237,7 +238,7 @@ architecture arch of {name} is
   -- Concatenated data and extra signals
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  [LACKING_EXTRA_SIGNAL_DECLS]
+  [LACKING_SPEC_INPUT_DECLS]
 begin
   [EXTRA_SIGNAL_LOGIC]
 
@@ -258,14 +259,21 @@ begin
 end architecture;
 """
 
+  lacking_spec_ports = [
+      i for i in range(size) if i not in spec_inputs
+  ]
+  lacking_spec_port_decls = [
+      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0)" for i in lacking_spec_ports
+  ]
   architecture = architecture.replace(
-      "  [LACKING_EXTRA_SIGNAL_DECLS]",
-      generate_lacking_extra_signal_decls(
-          "ins", input_extra_signals_list, extra_signal_mapping)
+      "  [LACKING_SPEC_INPUT_DECLS]",
+      "\n".join(lacking_spec_port_decls)
   )
 
-  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", input_extra_signals_list, extra_signal_mapping)
+  spec_default_value = extra_signal_default_values["spec"]
+  lacking_spec_port_assignments = [
+      f"  ins_{i}_spec <= {spec_default_value};" for i in lacking_spec_ports
+  ]
 
   # Concatenate data and extra signals based on extra signal mapping
   ins_conversions = []
@@ -277,14 +285,14 @@ end architecture;
 
   architecture = architecture.replace(
       "  [EXTRA_SIGNAL_LOGIC]",
-      lacking_extra_signal_assignments + "\n" +
+      "\n".join(lacking_spec_port_assignments) + "\n" +
       "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 
   return dependencies + entity + architecture
 
 
-def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals):
+def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals, spec_inputs):
   inner_name = f"{name}_inner"
 
   # Construct extra signal mapping
@@ -342,7 +350,7 @@ end entity;
 architecture arch of {name} is
   signal ins_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
   signal outs_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  [LACKING_EXTRA_SIGNAL_DECLS]
+  [LACKING_SPEC_INPUT_DECLS]
 begin
   [EXTRA_SIGNAL_LOGIC]
 
@@ -363,14 +371,21 @@ begin
 end architecture;
 """
 
+  lacking_spec_ports = [
+      i for i in range(size) if i not in spec_inputs
+  ]
+  lacking_spec_port_decls = [
+      f"  signal ins_{i}_spec : std_logic_vector(0 downto 0)" for i in lacking_spec_ports
+  ]
   architecture = architecture.replace(
-      "  [LACKING_EXTRA_SIGNAL_DECLS]",
-      generate_lacking_extra_signal_decls(
-          "ins", input_extra_signals_list, extra_signal_mapping)
+      "  [LACKING_SPEC_INPUT_DECLS]",
+      "\n".join(lacking_spec_port_decls)
   )
 
-  lacking_extra_signal_assignments = generate_lacking_extra_signal_assignments(
-      "ins", input_extra_signals_list, extra_signal_mapping)
+  spec_default_value = extra_signal_default_values["spec"]
+  lacking_spec_port_assignments = [
+      f"  ins_{i}_spec <= {spec_default_value};" for i in lacking_spec_ports
+  ]
 
   # Concatenate extra signals based on extra signal mapping
   ins_conversions = []
@@ -382,7 +397,7 @@ end architecture;
 
   architecture = architecture.replace(
       "  [EXTRA_SIGNAL_LOGIC]",
-      lacking_extra_signal_assignments + "\n" +
+      "\n".join(lacking_spec_port_assignments) + "\n" +
       "\n".join(ins_conversions) + "\n" + outs_conversions
   )
 

@@ -453,6 +453,47 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   } else {
     llvm::errs() << "Uncaught module: " << name << "\n";
   }
+
+  // spec ports
+  if (name == "handshake.control_merge") {
+    std::string specInputsValue;
+    llvm::raw_string_ostream specInputs(specInputsValue);
+    specInputs << "'[";
+    bool isFirst = true;
+    // The last two inputs are clk and rst
+    for (size_t i = 1; i < mod.getNumInputs() - 2; i++) {
+      if (mod.getInputType(i)
+              .cast<handshake::ExtraSignalsTypeInterface>()
+              .hasExtraSignal("spec")) {
+        if (!isFirst)
+          specInputs << ", ";
+        isFirst = false;
+        specInputs << i;
+      }
+      specInputs << serializeExtraSignals(mod.getInputType(i), false);
+    }
+    specInputs << "]'";
+    serializedParams["SPEC_INPUTS"] = specInputs.str();
+  } else if (name == "handshake.mux") {
+    std::string specInputsValue;
+    llvm::raw_string_ostream specInputs(specInputsValue);
+    specInputs << "'[";
+    bool isFirst = true;
+    // The first input is index, and the last two inputs are clk and rst
+    for (size_t i = 0; i < mod.getNumInputs() - 2; i++) {
+      if (mod.getInputType(i)
+              .cast<handshake::ExtraSignalsTypeInterface>()
+              .hasExtraSignal("spec")) {
+        if (!isFirst)
+          specInputs << ", ";
+        isFirst = false;
+        specInputs << i - 1; // Skip the index input
+      }
+      specInputs << serializeExtraSignals(mod.getInputType(i), false);
+    }
+    specInputs << "]'";
+    serializedParams["SPEC_INPUTS"] = specInputs.str();
+  }
 }
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
