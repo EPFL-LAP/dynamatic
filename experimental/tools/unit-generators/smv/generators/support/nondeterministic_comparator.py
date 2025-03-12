@@ -2,14 +2,14 @@ from generators.support.utils import *
 from generators.support.arith_utils import *
 
 
-def generate_undeterministic_comparator(name, params):
+def generate_nondeterministic_comparator(name, params):
   latency = params[ATTR_LATENCY]
   data_type = SmvScalarType(params[ATTR_PORT_TYPES]["lhs"])
 
-  return _generate_undeterministic_comparator(name, latency, data_type)
+  return _generate_nondeterministic_comparator(name, latency, data_type)
 
 
-def _generate_undeterministic_comparator(name, latency, data_type):
+def _generate_nondeterministic_comparator(name, latency, data_type):
   return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);

@@ -1,4 +1,4 @@
-from generators.support.undeterministic_comparator import generate_undeterministic_comparator
+from generators.support.nondeterministic_comparator import generate_nondeterministic_comparator
 from generators.support.utils import *
 
 
@@ -10,7 +10,7 @@ def generate_cmpf(name, params):
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
-    return generate_undeterministic_comparator(name, params)
+    return generate_nondeterministic_comparator(name, params)
   else:
     raise ValueError("Floating point operations support abstract data only")
 

@@ -1,6 +1,6 @@
 from generators.support.arith_utils import *
 from generators.support.utils import *
-from generators.support.undeterministic_comparator import generate_undeterministic_comparator
+from generators.support.nondeterministic_comparator import generate_nondeterministic_comparator
 
 
 def generate_cmpi(name, params):
@@ -12,7 +12,7 @@ def generate_cmpi(name, params):
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
-    return generate_undeterministic_comparator(name, params)
+    return generate_nondeterministic_comparator(name, params)
   elif sign is None or data_type.smv_type.split()[0] == sign:
     return _generate_cmpi(name, latency, symbol, data_type)
   else:
