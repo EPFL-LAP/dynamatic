@@ -91,9 +91,7 @@ end architecture;
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_type in extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_type)
+  extra_signal_mapping = ExtraSignalMapping(extra_signals)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
   inner_name = f"{name}_inner"

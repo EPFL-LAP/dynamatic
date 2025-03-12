@@ -3,12 +3,12 @@ class ExtraSignalMapping:
   mapping: list[tuple[str, tuple[int, int]]]
   total_bitwidth: int
 
-  def __init__(self, offset: int = 0):
-    """
-    offset: The starting bitwidth of the extra signals (if data is present).
-    """
+  def __init__(self, extra_signals: dict[str, int]):
     self.mapping = []
-    self.total_bitwidth = offset
+    self.total_bitwidth = 0
+
+    for name, bitwidth in extra_signals.items():
+      self.add(name, bitwidth)
 
   def add(self, name: str, bitwidth: int):
     self.mapping.append(
