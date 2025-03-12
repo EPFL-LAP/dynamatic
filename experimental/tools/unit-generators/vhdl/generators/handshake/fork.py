@@ -1,4 +1,5 @@
-from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements, generate_ins_concat_statements_dataless, generate_outs_concat_statements, generate_outs_concat_statements_dataless
+from generators.support.signal_manager import generate_signal_manager
+from generators.support.utils import get_concat_extra_signals_bitwidth
 from generators.support.logic import generate_or_n
 from generators.support.eager_fork_register_block import generate_eager_fork_register_block
 
@@ -136,161 +137,40 @@ end architecture;
 
 
 def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
-  inner_name = f"{name}_inner"
-
-  # Construct extra signal mapping
-  # Specify offset for data bitwidth
-  extra_signal_mapping = ExtraSignalMapping(offset=bitwidth)
-  for signal_name, signal_bitwidth in extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_bitwidth)
-  full_bitwidth = extra_signal_mapping.total_bitwidth
-
-  # Generate fork for concatenated data and extra signals
-  dependencies = _generate_fork(inner_name, size, full_bitwidth)
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use work.types.all;
-
--- Entity of fork signal manager
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
-    -- input channel
-    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
-    ins_valid : in  std_logic;
-    ins_ready : out std_logic;
-    -- output channels
-    outs       : out data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
-    outs_valid : out std_logic_vector({size} - 1 downto 0);
-    outs_ready : in  std_logic_vector({size} - 1 downto 0)
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_need_ports = [("ins", "in")]
-  for i in range(size):
-    extra_signal_need_ports.append((f"outs_{i}", "out"))
-  extra_signal_ports = generate_extra_signal_ports(
-      extra_signal_need_ports, extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of fork signal manager
-architecture arch of {name} is
-  -- Concatenated data and extra signals
-  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  signal outs_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
-begin
-  [EXTRA_SIGNAL_LOGIC]
-
-  inner : entity work.{inner_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins        => ins_inner,
-      ins_valid  => ins_valid,
-      ins_ready  => ins_ready,
-      outs       => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
-end architecture;
-"""
-
-  # Concatenate data and extra signals based on extra signal mapping
-  ins_conversion = generate_ins_concat_statements(
-      "ins", "ins_inner", extra_signal_mapping, bitwidth)
-  outs_conversion = []
-  for i in range(size):
-    outs_conversion.append(generate_outs_concat_statements(
-        f"outs_{i}", f"outs_inner({i})", extra_signal_mapping, bitwidth, custom_data_name=f"outs({i})"))
-
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_LOGIC]",
-      ins_conversion + "\n" + "\n".join(outs_conversion)
-  )
-
-  return dependencies + entity + architecture
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals,
+          "2d": True,
+          "size": size
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_fork(name, size, bitwidth + extra_signals_bitwidth))
 
 
 def _generate_fork_signal_manager_dataless(name, size, extra_signals):
-  inner_name = f"{name}_inner"
-
-  # Construct extra signal mapping
-  extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_bitwidth in extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_bitwidth)
-  full_bitwidth = extra_signal_mapping.total_bitwidth
-
-  # Generate fork for concatenated extra signals
-  dependencies = _generate_fork(inner_name, size, full_bitwidth)
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use work.types.all;
-
--- Entity of fork signal manager dataless
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
-    -- input channel
-    ins_valid : in  std_logic;
-    ins_ready : out std_logic;
-    -- output channels
-    outs_valid : out std_logic_vector({size} - 1 downto 0);
-    outs_ready : in  std_logic_vector({size} - 1 downto 0)
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_need_ports = [("ins", "in")]
-  for i in range(size):
-    extra_signal_need_ports.append((f"outs_{i}", "out"))
-  extra_signal_ports = generate_extra_signal_ports(
-      extra_signal_need_ports, extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of fork signal manager dataless
-architecture arch of {name} is
-  -- Concatenated extra signals
-  signal ins_inner : std_logic_vector({full_bitwidth} - 1 downto 0);
-  signal outs_inner : data_array({size} - 1 downto 0)({full_bitwidth} - 1 downto 0);
-begin
-  [EXTRA_SIGNAL_LOGIC]
-
-  inner : entity work.{inner_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins        => ins_inner,
-      ins_valid  => ins_valid,
-      ins_ready  => ins_ready,
-      outs       => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
-end architecture;
-"""
-
-  # Concatenate extra signals based on extra signal mapping
-  ins_conversion = generate_ins_concat_statements_dataless(
-      "ins", "ins_inner", extra_signal_mapping)
-  outs_conversion = []
-  for i in range(size):
-    outs_conversion.append(generate_outs_concat_statements_dataless(
-        f"outs_{i}", f"outs_inner({i})", extra_signal_mapping))
-
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_LOGIC]",
-      ins_conversion + "\n".join(outs_conversion)
-  )
-
-  return dependencies + entity + architecture
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": 0,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": 0,
+          "extra_signals": extra_signals,
+          "2d": True,
+          "size": size
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_fork(name, size,  extra_signals_bitwidth))

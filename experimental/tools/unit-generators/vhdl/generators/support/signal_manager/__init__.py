@@ -20,46 +20,61 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
 def _generate_entity(entity_name, in_ports, out_ports):
   port_decls = []
 
-  # Generate input port declarations
-  for in_port in in_ports:
-    name = in_port["name"]
-    bitwidth = in_port["bitwidth"]
-    extra_signals = in_port.get("extra_signals", None)
-
-    if bitwidth > 0:
-      port_decls.append(
-          f"    {name} : in std_logic_vector({bitwidth} - 1 downto 0)")
-
-    port_decls.append(f"    {name}_valid : in std_logic")
-    port_decls.append(f"    {name}_ready : out std_logic")
-
-    # Generate extra signal port declarations for this input port
-    for signal_name, signal_bitwidth in extra_signals.items():
-      port_decls.append(
-          f"    {name}_{signal_name} : in std_logic_vector({signal_bitwidth} - 1 downto 0)")
-
-  # Generate output port declarations
+  unified_ports = []
+  for port in in_ports:
+    unified_ports.append({
+        **port,
+        "direction": "in"
+    })
   for out_port in out_ports:
-    name = out_port["name"]
-    bitwidth = out_port["bitwidth"]
-    extra_signals = out_port.get("extra_signals", None)
+    unified_ports.append({
+        **out_port,
+        "direction": "out"
+    })
 
-    if bitwidth > 0:
+  for port in unified_ports:
+    dir = port["direction"]
+    ready_dir = "out" if dir == "in" else "in"
+
+    name = port["name"]
+    bitwidth = port["bitwidth"]
+    extra_signals = port.get("extra_signals", None)
+    port_2d = port.get("2d", False)
+
+    if port_2d:
+      size = port["size"]
+      if bitwidth > 0:
+        port_decls.append(
+            f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+
       port_decls.append(
-          f"    {name} : out std_logic_vector({bitwidth} - 1 downto 0)")
-
-    port_decls.append(f"    {name}_valid : out std_logic")
-    port_decls.append(f"    {name}_ready : in std_logic")
-
-    # Generate extra signal port declarations for this output port
-    for signal_name, signal_bitwidth in extra_signals.items():
+          f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
       port_decls.append(
-          f"    {name}_{signal_name} : out std_logic_vector({signal_bitwidth} - 1 downto 0)")
+          f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+
+      for i in range(size):
+        # Generate extra signal port declarations for this input port
+        for signal_name, signal_bitwidth in extra_signals.items():
+          port_decls.append(
+              f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+    else:
+      if bitwidth > 0:
+        port_decls.append(
+            f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
+
+      port_decls.append(f"    {name}_valid : {dir} std_logic")
+      port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+
+      # Generate extra signal port declarations for this input port
+      for signal_name, signal_bitwidth in extra_signals.items():
+        port_decls.append(
+            f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 
   return f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.types.all;
 
 -- Entity of signal manager
 entity {entity_name} is
@@ -154,34 +169,64 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
   for port in in_ports + out_ports:
     port_name = port["name"]
     port_bitwidth = port["bitwidth"]
+    port_2d = port.get("2d", False)
 
-    inner_signal_decls.append(
-        f"  signal {port_name}_inner : std_logic_vector({extra_signals_bitwidth} + {port_bitwidth} - 1 downto 0);")
+    if port_2d:
+      port_size = port["size"]
+      inner_signal_decls.append(
+          f"  signal {port_name}_inner : data_array({port_size} - 1 downto 0)({extra_signals_bitwidth + port_bitwidth} - 1 downto 0);")
+    else:
+      inner_signal_decls.append(
+          f"  signal {port_name}_inner : std_logic_vector({extra_signals_bitwidth + port_bitwidth} - 1 downto 0);")
 
   concat_logic = []
   for port in in_ports:
     port_name = port["name"]
     port_bitwidth = port["bitwidth"]
+    port_2d = port.get("2d", False)
 
-    if port_bitwidth > 0:
-      concat_logic.append(
-          f"  {port_name}_inner({port_bitwidth} - 1 downto 0) <= {port_name};")
+    if port_2d:
+      port_size = port["size"]
+      for i in range(port_size):
+        if port_bitwidth > 0:
+          concat_logic.append(
+              f"  {port_name}_inner({i})({port_bitwidth} - 1 downto 0) <= {port_name}({i});")
 
-    for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
-      concat_logic.append(
-          f"  {port_name}_inner({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth}) <= {port_name}_{signal_name};")
+        for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+          concat_logic.append(
+              f"  {port_name}_inner({i})({msb + port_bitwidth} downto {lsb + port_bitwidth}) <= {port_name}_{i}_{signal_name};")
+    else:
+      if port_bitwidth > 0:
+        concat_logic.append(
+            f"  {port_name}_inner({port_bitwidth} - 1 downto 0) <= {port_name};")
+
+      for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+        concat_logic.append(
+            f"  {port_name}_inner({msb + port_bitwidth} downto {lsb + port_bitwidth}) <= {port_name}_{signal_name};")
 
   for port in out_ports:
     port_name = port["name"]
     port_bitwidth = port["bitwidth"]
+    port_2d = port.get("2d", False)
 
-    if port_bitwidth > 0:
-      concat_logic.append(
-          f"  {port_name} <= {port_name}_inner({port_bitwidth} - 1 downto 0);")
+    if port_2d:
+      port_size = port["size"]
+      for i in range(port_size):
+        if port_bitwidth > 0:
+          concat_logic.append(
+              f"  {port_name}({i}) <= {port_name}_inner({i})({port_bitwidth} - 1 downto 0);")
 
-    for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
-      concat_logic.append(
-          f"  {port_name}_{signal_name} <= {port_name}_inner({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth});")
+        for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+          concat_logic.append(
+              f"  {port_name}_{i}_{signal_name} <= {port_name}_inner({i})({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth});")
+    else:
+      if port_bitwidth > 0:
+        concat_logic.append(
+            f"  {port_name} <= {port_name}_inner({port_bitwidth} - 1 downto 0);")
+
+      for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+        concat_logic.append(
+            f"  {port_name}_{signal_name} <= {port_name}_inner({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth});")
 
   # Port forwarding for inner entity
   ports = []
