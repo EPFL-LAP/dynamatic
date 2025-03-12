@@ -1,4 +1,4 @@
-from generators.support.utils import generate_extra_signal_ports
+from generators.support.signal_manager import generate_entity
 
 
 def generate_store(name, params):
@@ -65,42 +65,23 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
 
   dependencies = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
 
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of store signal manager
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    [EXTRA_SIGNAL_PORTS]
-    -- data from circuit channel
-    dataIn       : in  std_logic_vector({data_bitwidth} - 1 downto 0);
-    dataIn_valid : in  std_logic;
-    dataIn_ready : out std_logic;
-    -- address from circuit channel
-    addrIn       : in  std_logic_vector({addr_bitwidth} - 1 downto 0);
-    addrIn_valid : in  std_logic;
-    addrIn_ready : out std_logic;
-    -- data to interface channel
-    dataToMem       : out std_logic_vector({data_bitwidth} - 1 downto 0);
-    dataToMem_valid : out std_logic;
-    dataToMem_ready : in  std_logic;
-    -- address to interface channel
-    addrOut       : out std_logic_vector({addr_bitwidth} - 1 downto 0);
-    addrOut_valid : out std_logic;
-    addrOut_ready : in  std_logic
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-      ("addrIn", "in"),
-      ("dataIn", "out")
-  ], extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+  entity = generate_entity(name, [{
+      "name": "dataIn",
+      "bitwidth": data_bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": "addrIn",
+      "bitwidth": addr_bitwidth,
+      "extra_signals": extra_signals
+  }], [{
+      "name": "dataToMem",
+      "bitwidth": data_bitwidth,
+      "extra_signals": {}
+  }, {
+      "name": "addrOut",
+      "bitwidth": addr_bitwidth,
+      "extra_signals": {}
+  }])
 
   architecture = f"""
 -- Architecture of store signal manager
