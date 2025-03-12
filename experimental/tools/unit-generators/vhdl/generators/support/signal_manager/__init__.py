@@ -156,7 +156,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
     port_bitwidth = port["bitwidth"]
 
     inner_signal_decls.append(
-        f"  signal {port_name}_inner : std_logic_vector({extra_signals_bitwidth} + {port_bitwidth} - 1 downto 0);\n")
+        f"  signal {port_name}_inner : std_logic_vector({extra_signals_bitwidth} + {port_bitwidth} - 1 downto 0);")
 
   concat_logic = []
   for port in in_ports:
@@ -188,7 +188,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
   for port in in_ports + out_ports:
     port_name = port["name"]
 
-    ports.append(f"      {port_name} => {port_name}")
+    ports.append(f"      {port_name} => {port_name}_inner")
     ports.append(f"      {port_name}_valid => {port_name}_valid")
     ports.append(f"      {port_name}_ready => {port_name}_ready")
 
