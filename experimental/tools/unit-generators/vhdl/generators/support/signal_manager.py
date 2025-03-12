@@ -148,7 +148,7 @@ def _calc_forwarded_extra_signals(extra_signals: dict[str, int], in_ports):
   return forwarded_extra_signals
 
 
-def _generate_inner_port_forwarding(ports):
+def generate_inner_port_forwarding(ports):
   """
   Generate port forwarding for inner entity
   e.g.,
@@ -193,7 +193,7 @@ def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, ge
       extra_signal_assignments.append(
           f"  {port_name}_{signal_name} <= {extra_signal_exps[signal_name]};")
 
-  forwarding = _generate_inner_port_forwarding(in_ports + out_ports)
+  forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (normal)
@@ -262,7 +262,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
       signal_assignments.append(
           f"  {port_name}_{signal_name} <= buff_out({msb} downto {lsb});")
 
-  forwarding = _generate_inner_port_forwarding(in_ports + out_ports)
+  forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (normal)
