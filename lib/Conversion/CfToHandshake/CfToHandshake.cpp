@@ -550,7 +550,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
     addFromAllPredecessors(blockArg.getType());
     Value index = *iMerge.indexEdge;
 
-    for (auto operand : operands) {
+    for (Value &operand : operands) {
       assert(operand.getType()
                      .cast<handshake::ExtraSignalsTypeInterface>()
                      .getNumExtraSignals() == 0 &&

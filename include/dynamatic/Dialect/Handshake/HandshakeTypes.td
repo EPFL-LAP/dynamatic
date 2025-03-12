@@ -155,8 +155,8 @@ class valuesToDataTypes<list<string> names> {
 }
 
 /// Convert variadic to an array of ExtraSignal arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// ExtraSignal arrays.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getExtraSignals(), dataOut1.(...).getExtraSignals()}.
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{
     [&](auto &&variadic) -> std::vector<llvm::ArrayRef<ExtraSignal>> {
@@ -173,8 +173,8 @@ class variadicToExtraSignalArrays<string variadic> {
 }
 
 /// Convert variadic to data type arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// data types.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getDataType(), dataOut1.(...).getDataType()}.
 class variadicToDataTypes<string variadic> {
   string result = [{
     [&](auto &&variadic) -> std::vector<Type> {
@@ -190,23 +190,6 @@ class variadicToDataTypes<string variadic> {
       }
 
       return dataTypes;
-    }
-  }] # "($" # variadic # ")";
-}
-
-/// Convert variadic to ExtraSignalsTypeInterface arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// ExtraSignalsTypeInterfaces.
-class variadicToExtraSignalTypes<string variadic> {
-  string result = [{
-    [](auto &&variadic) -> std::vector<ExtraSignalsTypeInterface> {
-      std::vector<ExtraSignalsTypeInterface> extraSignalTypes;
-
-      for (Type type : variadic.getTypes()) {
-        extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
-      }
-
-      return extraSignalTypes;
     }
   }] # "($" # variadic # ")";
 }
@@ -296,9 +279,9 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 /// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
 class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
-  CPred<"llvm::all_of(" # variadicToExtraSignalTypes<name>.result # ", "
-    "[](ExtraSignalsTypeInterface type) {"
-    "  return type.getNumExtraSignals() == 0;"
+  CPred<"llvm::all_of($" # name # ".getTypes(), "
+    "[](Type type) {"
+    "  return type.cast<ExtraSignalsTypeInterface>().getNumExtraSignals() == 0;"
     "})">
 >;
 
@@ -347,7 +330,7 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same data type",
   CPred<[{
-    [](llvm::ArrayRef<Type> dataTypes) {
+    [](std::vector<Type> dataTypes) {
       if (dataTypes.empty())
         return true;
 
@@ -417,14 +400,14 @@ class LacksSpecTag<string operand> : PredOpTrait<
 class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   output # " should have a spec tag iff any of " # inputVariadic # " has it",
   CPred<[{
-    [](llvm::ArrayRef<ExtraSignalsTypeInterface> inputTypes,
+    [](OperandRange::type_range inputTypes,
         ExtraSignalsTypeInterface outputType) {
-      bool inputHasSpecTag = llvm::any_of(inputTypes, [](ExtraSignalsTypeInterface type) {
-        return type.hasExtraSignal("spec");
+      bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
+        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
       });
       return outputType.hasExtraSignal("spec") == inputHasSpecTag;
     }
-  }] # "(" # variadicToExtraSignalTypes<inputVariadic>.result # ", "
+  }] # "($" # inputVariadic # ".getTypes(), "
   "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
