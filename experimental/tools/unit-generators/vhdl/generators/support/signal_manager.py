@@ -1,3 +1,5 @@
+# See docs/Specs/SignalManager.md
+
 from collections.abc import Callable
 from generators.support.utils import get_default_extra_signal_value, ExtraSignalMapping
 
