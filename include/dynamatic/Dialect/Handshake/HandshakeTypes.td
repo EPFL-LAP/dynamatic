@@ -188,23 +188,6 @@ class variadicToDataTypes<string variadic> {
   }] # "($" # variadic # ")";
 }
 
-/// Convert variadic to ExtraSignalsTypeInterface arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// ExtraSignalsTypeInterfaces.
-class variadicToExtraSignalTypes<string variadic> {
-  string result = [{
-    [](auto &&variadic) -> std::vector<ExtraSignalsTypeInterface> {
-      std::vector<ExtraSignalsTypeInterface> extraSignalTypes;
-
-      for (Type type : variadic.getTypes()) {
-        extraSignalTypes.push_back(type.cast<ExtraSignalsTypeInterface>());
-      }
-
-      return extraSignalTypes;
-    }
-  }] # "($" # variadic # ")";
-}
-
 /// Concat two arrays of the same type, specified by the first argument.
 class concatArrays<string type, string a, string b> {
   string result = !subst("$T", type, [{
@@ -290,9 +273,9 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 /// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
 class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
-  CPred<"llvm::all_of(" # variadicToExtraSignalTypes<name>.result # ", "
-    "[](ExtraSignalsTypeInterface type) {"
-    "  return type.getNumExtraSignals() == 0;"
+  CPred<"llvm::all_of($" # name # ".getTypes(), "
+    "[](Type type) {"
+    "  return type.cast<ExtraSignalsTypeInterface>().getNumExtraSignals() == 0;"
     "})">
 >;
 
@@ -411,14 +394,14 @@ class LacksSpecTag<string operand> : PredOpTrait<
 class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   output # " should have a spec tag iff any of " # inputVariadic # " has it",
   CPred<[{
-    [](llvm::ArrayRef<ExtraSignalsTypeInterface> inputTypes,
+    [](OperandRange::type_range inputTypes,
         ExtraSignalsTypeInterface outputType) {
-      bool inputHasSpecTag = llvm::any_of(inputTypes, [](ExtraSignalsTypeInterface type) {
-        return type.hasExtraSignal("spec");
+      bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
+        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
       });
       return outputType.hasExtraSignal("spec") == inputHasSpecTag;
     }
-  }] # "(" # variadicToExtraSignalTypes<inputVariadic>.result # ", "
+  }] # "($" # inputVariadic # ".getTypes(), "
   "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
