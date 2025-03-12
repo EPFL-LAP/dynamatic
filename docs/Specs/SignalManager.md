@@ -2,9 +2,9 @@
 
 The signal manager wraps each unit (e.g., `addi`, `buffer`, etc.) and forwards extra signals.
 
-The generator code may look abstract without concrete examples, so here I show you some generated signal managers.
+The generator code may seem abstract without concrete examples, so here are some generated signal managers.
 
-Comments starting from `Note:` are for understandability and not generated.
+Comments starting with `Note:` are for clarity and are not part of the generated output.
 
 ## `cond_br` (normal signal manager)
 
