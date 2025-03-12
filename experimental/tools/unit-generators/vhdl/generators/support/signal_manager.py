@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from generators.support.utils import extra_signal_default_values, ExtraSignalMapping
+from generators.support.utils import get_default_extra_signal_value, ExtraSignalMapping
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
@@ -134,7 +134,8 @@ def _calc_forwarded_extra_signals(extra_signals: dict[str, int], in_ports):
 
     if not in_ports:
       # Use default values for extra signals
-      forwarded_extra_signals[signal_name] = extra_signal_default_values[signal_name]
+      forwarded_extra_signals[signal_name] = get_default_extra_signal_value(
+          signal_name)
     else:
       # Collect extra signals from all input ports
       for in_port in in_ports:
@@ -465,9 +466,8 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
   lacking_spec_port_decls = [
       f"  signal {data_in_name}_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
-  spec_default_value = extra_signal_default_values["spec"]
   lacking_spec_port_assignments = [
-      f"  {data_in_name}_{i}_spec <= {spec_default_value};" for i in lacking_spec_ports
+      f"  {data_in_name}_{i}_spec <= {get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
   ]
 
   concat_signal_decls = generate_concat_signal_decls(
