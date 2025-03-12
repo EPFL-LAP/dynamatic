@@ -29,6 +29,10 @@ import generators.handshake.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
+import generators.handshake.tagger as tagger
+import generators.handshake.untagger as untagger
+import generators.handshake.free_tags_fifo as fifo
+import generators.handshake.extui as extui
 import generators.support.mem_to_bram as mem_to_bram
 
 
@@ -88,6 +92,14 @@ def generate_code(name, mod_type, parameters):
       return subi.generate_subi(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
+    case "tagger":
+      return tagger.generate_tagger(name, parameters)
+    case "untagger":
+      return untagger.generate_untagger(name, parameters)
+    case "free_tags_fifo":
+      return fifo.generate_free_tags_fifo(name, parameters)
+    case "extui":
+      return extui.generate_extui(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:

@@ -185,18 +185,24 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
   for (const auto &p : cDuvParams) {
     MemElem mElem;
 
-    Constant inFileName("INPUT_" + p.parameterName, "STRING",
+    string inName =
+        (!p.parameterName.empty()) ? ("INPUT_" + p.parameterName) : "INPUT";
+    Constant inFileName(inName, "STRING",
                         "\"" + getInputFilepathForParam(p) + "\"");
     constants.push_back(inFileName);
     mElem.inFileParamValue = inFileName.constName;
 
-    Constant outFileName("OUTPUT_" + p.parameterName, "STRING",
+    string outName =
+        (!p.parameterName.empty()) ? ("OUTPUT_" + p.parameterName) : "OUTPUT";
+    Constant outFileName(outName, "STRING",
                          "\"" + getOutputFilepathForParam(p) + "\"");
     constants.push_back(outFileName);
     mElem.outFileParamValue = outFileName.constName;
 
-    Constant dataWidth("DATA_WIDTH_" + p.parameterName, "INTEGER",
-                       to_string(p.dtWidth));
+    string dataName = (!p.parameterName.empty())
+                          ? ("DATA_WIDTH_" + p.parameterName)
+                          : "DATA_WIDTH";
+    Constant dataWidth(dataName, "INTEGER", to_string(p.dtWidth));
     constants.push_back(dataWidth);
     mElem.dataWidthParamValue = dataWidth.constName;
 
@@ -205,13 +211,18 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
     if (mElem.isArray) {
 
       string addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
-      Constant addrWidth("ADDR_WIDTH_" + p.parameterName, "INTEGER",
-                         addrwidthvalue);
+      string addrName = (!p.parameterName.empty())
+                            ? ("ADDR_WIDTH_" + p.parameterName)
+                            : "ADDR_WIDTH";
+      Constant addrWidth(addrName, "INTEGER", addrwidthvalue);
       // to_string(((int) ceil(log2(p.arrayLength)))));
       constants.push_back(addrWidth);
       mElem.addrWidthParamValue = addrWidth.constName;
-      Constant dataDepth("DATA_DEPTH_" + p.parameterName, "INTEGER",
-                         to_string(p.arrayLength));
+
+      string dataDepthName = (!p.parameterName.empty())
+                                 ? ("DATA_DEPTH_" + p.parameterName)
+                                 : "DATA_DEPTH";
+      Constant dataDepth(dataDepthName, "INTEGER", to_string(p.arrayLength));
       constants.push_back(dataDepth);
       mElem.dataDepthParamValue = dataDepth.constName;
     }
@@ -337,6 +348,12 @@ string HlsVhdlTb::getArchitectureBegin() {
 string HlsVhdlTb::getConstantDeclaration() {
   stringstream code;
   for (const auto &c : constants) {
+    /*
+    std::string name = c.constName;
+    if (!name.empty() && name.back() == '_') {
+      name.pop_back(); // Remove the trailing underscore
+    }*/
+
     code << "\t"
          << "constant " << c.constName << " : " << c.constType
          << " := " << c.constValue << ";" << endl;

@@ -633,25 +633,26 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Numner of Inputs, data bitwidth, and tag bitwidth
         addUnsigned("SIZE", taggerOp.getDataOperands().size());
         // Data bitwidth
-        addType("DATA_TYPE", taggerOp.getDataOperands().front().getType());
-        addType("TAG_TYPE", taggerOp.getTagOperand().getType());
+        addType("DATA_TYPE", taggerOp.getDataOperands().front());
+        addType("TAG_TYPE", taggerOp.getTagOperand());
       })
       .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
         // Numner of Inputs, data bitwidth, and tag bitwidth
         addUnsigned("SIZE", untaggerOp.getDataOperands().size());
-        addType("DATA_TYPE", untaggerOp.getDataOperands().front().getType());
-        addType("TAG_TYPE", untaggerOp.getTagOut().getType());
+        addType("DATA_TYPE", untaggerOp.getDataOperands().front());
+        addType("TAG_TYPE", untaggerOp.getTagOut());
       })
       .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
         // Tag bitwidth and fifo depth
-        addType("TAG_TYPE", fifo.getTagOut().getType());
-        auto i = dyn_cast_or_null<IntegerType>(fifo.getTagOut().getType());
-        if (!i) {
+        addType("TAG_TYPE", fifo.getTagOut());
+        ChannelType ct =
+            dyn_cast_or_null<ChannelType>(fifo.getTagOut().getType());
+        if (!ct) {
           op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
           unsupported = true;
           return;
         }
-        addUnsigned("FIFO_DEPTH", 1 << i.getWidth());
+        addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
@@ -1770,6 +1771,9 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::TaggerOp>,
+                    ConvertToHWInstance<handshake::UntaggerOp>,
+                    ConvertToHWInstance<handshake::FreeTagsFifoOp>,
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,

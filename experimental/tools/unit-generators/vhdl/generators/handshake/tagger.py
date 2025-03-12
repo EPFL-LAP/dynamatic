@@ -1,17 +1,17 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports_arrays, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports_arrays, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 from generators.support.join import generate_join
-from generators.handshake.fork.py import _generate_fork
+from generators.handshake.fork import _generate_fork
 
 def generate_tagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["DATA_TYPE"])
-  tag_bitwidth = VhdlScalarType(port_types["TAG_TYPE"]).bitwidth
+  data_type = VhdlScalarType(port_types["ins_0"])
+  tag_bitwidth = VhdlScalarType(port_types["ins_1"]).bitwidth
 
   if data_type.has_extra_signals():
-    return _generate_tagger_signal_manager(name, data_type, tag_bitwidth)
+    return _generate_tagger_signal_manager(name, size, data_type, tag_bitwidth)
   else:
-    return _generate_tagger(name, data_type, tag_bitwidth)
+    return _generate_tagger(name, size, data_type, tag_bitwidth)
 
 def _generate_tagger(name, size, data_type, tag_bitwidth):
   join_name = f"{name}_join"
@@ -60,7 +60,7 @@ constant all_one : std_logic_vector({size}-1 downto 0) := (others => '1');
 
 signal join_readyArray : std_logic_vector({size} downto 0);
 
-signal fork_ready: STD_LOGIC_VECTOR ({size} - 1 downto 0);
+signal fork_ready: std_logic;
 signal fork_useless_out : data_array({size} - 1 downto 0)(0 downto 0);
 
 begin
@@ -76,11 +76,11 @@ begin
     tagging_process : process (freeTag_data)
     begin
       for I in 0 to {size} - 1 loop
-        tagOut(I)({TAG_SIZE} downto 0) <= freeTag_data;
+        tagOut(I)({tag_bitwidth}-1 downto 0) <= freeTag_data;
       end loop;
     end process;
 
-    join_nReady <= fork_ready(0); 
+    join_nReady <= fork_ready; 
 
     f : entity work.{fork_name}(arch)
             port map (
@@ -93,7 +93,7 @@ begin
         --outputs
             outs => fork_useless_out,
             outs_valid => validArray,   
-            outs_ready => fork_ready
+            outs_ready => nReadyArray
             );
 
 end architecture;

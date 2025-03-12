@@ -819,15 +819,15 @@ def LSQOp : Handshake_Op<"lsq", [
 class Handshake_MemPortOp<string mnemonic> :
   Handshake_Op<mnemonic, [
     MemPortOpInterface,
-    AllTypesMatch<["address", "addressResult"]>,
-    AllTypesMatch<["data", "dataResult"]>,
+    AllDataTypesMatch<["address", "addressResult"]>,
+    AllDataTypesMatch<["data", "dataResult"]>,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   ]
 > {
   let arguments = (ins IntChannelType:$address, ChannelType:$data);
   let results = (outs IntChannelType:$addressResult, ChannelType:$dataResult);
-  let assemblyFormat = [{
-    `[` $address `]` $data attr-dict `:` type($address) `,` type($data)
+    let assemblyFormat = [{
+    `[` $address `]` $data attr-dict `:` type($address) `,` type($addressResult) `,` type($data) `,` type($dataResult)
   }];
 }
 

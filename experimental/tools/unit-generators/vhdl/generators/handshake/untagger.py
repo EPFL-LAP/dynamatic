@@ -1,16 +1,16 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports_arrays, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.utils import VhdlScalarType, generate_extra_signal_ports_arrays, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
 from generators.support.join import generate_join
 
 def generate_untagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["DATA_TYPE"])
-  tag_bitwidth = VhdlScalarType(port_types["TAG_TYPE"]).bitwidth
+  data_type = VhdlScalarType(port_types["outs_0"])
+  tag_bitwidth = VhdlScalarType(port_types["outs_1"]).bitwidth
 
   if data_type.has_extra_signals():
-    return _generate_untagger_signal_manager(name, data_type, tag_bitwidth)
+    return _generate_untagger_signal_manager(name, size, data_type, tag_bitwidth)
   else:
-    return _generate_untagger(name, data_type, tag_bitwidth)
+    return _generate_untagger(name, size, data_type, tag_bitwidth)
 
 def _generate_untagger(name, size, data_type, tag_bitwidth):
   join_name = f"{name}_join"
@@ -50,6 +50,7 @@ end {name};
 """
 
   architecture = f"""
+architecture arch of {name} is
 signal join_valid : std_logic;
 signal join_nReady : std_logic;
 constant all_one : std_logic_vector({size}-1 downto 0) := (others => '1');
@@ -66,7 +67,7 @@ begin
 
     dataOutArray <= dataInArray;
 
-    freeTag_data <= tagInArray(0)({tag_bitwidth} downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
+    freeTag_data <= tagInArray(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
 
     process(join_valid)
     begin
@@ -90,7 +91,6 @@ begin
             join_nReady <= '0';
         end if;
     end process;
-architecture arch of {name} is
 end architecture;
 """
   return dependencies + entity + architecture
@@ -107,6 +107,7 @@ def _generate_untagger_signal_manager(name, size, data_type, tag_bitwidth):
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
   dependencies = _generate_untagger(inner_name, size, data_type, tag_bitwidth) 
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -136,10 +137,10 @@ end {name};
 """
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports_arrays([
-      ("dataInArray", "in", {size}),
-      ("dataOutArray", "out", {size})
+      ("dataInArray", "in", size),
+      ("dataOutArray", "out", size)
   ], data_type.extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
+  entity = entity.replace("  [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
   architecture = f"""
 architecture arch of {name} is

@@ -103,7 +103,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -131,8 +131,13 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
     }
+    // If match is not external, it must be freed when function returns
+    // we don't like this solution, feel free to propose a better one
+    std::unique_ptr<RTLMatch> matchUniquePtr;
     if (extOp)
       externals[extOp] = match;
+    else
+      matchUniquePtr.reset(match);
 
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
@@ -145,6 +150,10 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       if (failed(concretizeComponent(dependencyRequest, nullptr)))
         return failure();
     }
+
+    // Include PORT_TYPES parameter in the serialized parameters
+    if (extOp)
+      match->registerPortTypesParameter(extOp);
 
     // ...then generate the component itself
     return match->concretize(request, dynamaticPath, outputPath);
@@ -252,7 +261,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, HDL hdl)
-      : exportInfo(exportInfo), hdl(hdl){};
+      : exportInfo(exportInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -300,13 +309,23 @@ static void writeIOMap(const RTLWriter::IOMap &mappings,
   }
 }
 
+/// Returns the type's inclusive array bound.
+static unsigned convertToInclusiveArrayBound(IntegerType intType) {
+  return intType.getWidth() - 1;
+}
+
+/// Returns the type's inclusive array bound.
+static unsigned convertToInclusiveArrayBound(ChannelType channelType) {
+  return channelType.getDataBitWidth() - 1;
+}
+
 /// Returns the type's "raw" RTL type.
 static std::optional<unsigned> getRawType(IntegerType intType) {
   unsigned dataWidth = intType.getIntOrFloatBitWidth();
   assert(dataWidth != 0 && "0-width signals are not allowed");
   if (dataWidth == 1)
     return std::nullopt;
-  return dataWidth - 1;
+  return convertToInclusiveArrayBound(intType);
 }
 
 /// Returns the hardare module the hardware instance is of.
@@ -370,8 +389,9 @@ void WriteModData::writeSignalDeclarations(
   auto addExtraSignals = [&](StringRef name,
                              ArrayRef<ExtraSignal> extraSignals) -> void {
     for (const ExtraSignal &extra : extraSignals) {
-      writeDeclaration(getExtraSignalName(name, extra),
-                       getRawType(cast<IntegerType>(extra.type)), os);
+      writeDeclaration(
+          getExtraSignalName(name, extra),
+          convertToInclusiveArrayBound(cast<IntegerType>(extra.type)), os);
     }
   };
 
@@ -380,7 +400,7 @@ void WriteModData::writeSignalDeclarations(
         .Case<ChannelType>([&](ChannelType channelType) {
           writeDeclaration(
               getInternalSignalName(valueAndName.second, SignalType::DATA),
-              channelType.getDataBitWidth() - 1, os);
+              convertToInclusiveArrayBound(channelType), os);
           addValidReady(valueAndName.second);
           addExtraSignals(valueAndName.second, channelType.getExtraSignals());
         })
@@ -448,7 +468,7 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
       std::vector<IOPort> &portsDir = extra.downstream ? down : up;
       IntegerType ty = cast<IntegerType>(extra.type);
       portsDir.emplace_back(getExtraSignalName(portName, extra),
-                            getRawType(ty));
+                            convertToInclusiveArrayBound(ty));
     }
   };
 
@@ -457,7 +477,7 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) {
           down.emplace_back(getInternalSignalName(portName, SignalType::DATA),
-                            channelType.getDataBitWidth() - 1);
+                            convertToInclusiveArrayBound(channelType));
           addValidAndReady(portName, down, up);
           addExtraSignals(portName, down, up, channelType.getExtraSignals());
         })

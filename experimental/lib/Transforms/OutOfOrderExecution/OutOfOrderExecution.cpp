@@ -85,7 +85,9 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     // Replaces all the connections load->consumer to untagger->consumer
     Value loadOutput = loadOp.getDataOutput();
     for (Operation *user : loadOutput.getUsers()) {
-      user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut().front());
+      if (!isa<handshake::UntaggerOp>(user))
+
+        user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut().front());
     }
 
     // Connet the free tag from the untagger to the fifo
@@ -123,10 +125,8 @@ addTagSignalsRecursive(MLIRContext &ctx, OpOperand &opOperand,
                        bool isDownstream,
                        llvm::DenseSet<Operation *> &visited) {
   // Add the tag to the current operand
-  if (failed(addTagToValue(opOperand.get()))) {
-    llvm::errs() << "Failed to add tag to value\n";
+  if (failed(addTagToValue(opOperand.get())))
     return failure();
-  }
 
   Operation *op;
 
@@ -139,12 +139,10 @@ addTagSignalsRecursive(MLIRContext &ctx, OpOperand &opOperand,
     op = opOperand.get().getDefiningOp();
   }
 
-  if (!op) {
+  if (!op)
     // As long as the algorithm traverses inside the tagged region,
     // all operands should have an owner and defining operation.
-    llvm::errs() << "Operand without owner or defining operation\n";
     return failure();
-  }
 
   if (visited.contains(op))
     return success();
@@ -166,24 +164,19 @@ addTagSignalsRecursive(MLIRContext &ctx, OpOperand &opOperand,
   }
   // MemPortOp (Load and Store)
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    llvm::errs() << "LoadOp\n";
     if (isDownstream) {
       // Continue traversal to dataOut, skipping ports connected to the memory
       // controller.
       for (auto &operand : loadOp->getOpResult(1).getUses()) {
-        if (failed(addTagSignalsRecursive(ctx, operand, true, visited))) {
-          llvm::errs() << "Failed load downstream\n";
+        if (failed(addTagSignalsRecursive(ctx, operand, true, visited)))
           return failure();
-        }
       }
     } else {
       // Continue traversal to addrIn, skipping ports connected to the memory
       // controller.
       auto &operand = loadOp->getOpOperand(0);
-      if (failed(addTagSignalsRecursive(ctx, operand, false, visited))) {
-        llvm::errs() << "Failed load upstream\n";
+      if (failed(addTagSignalsRecursive(ctx, operand, false, visited)))
         return failure();
-      }
     }
 
     return success();
@@ -209,10 +202,8 @@ addTagSignalsRecursive(MLIRContext &ctx, OpOperand &opOperand,
       // Skip the operand that is the same as the current operand
       if (!isDownstream && &operand == &opOperand)
         continue;
-      if (failed(addTagSignalsRecursive(ctx, operand, true, visited))) {
-        llvm::errs() << "Failed downstream\n";
+      if (failed(addTagSignalsRecursive(ctx, operand, true, visited)))
         return failure();
-      }
     }
   }
 
@@ -235,17 +226,6 @@ LogicalResult OutOfOrderExecutionPass::addTagSignals(handshake::FuncOp funcOp,
         if (failed(addTagSignalsRecursive(*ctx, opOperand, true, visited)))
           return failure();
       }
-    }
-
-    for (auto loadOp : funcOp.getOps<handshake::LoadOp>()) {
-      Value addrInput = loadOp.getAddressInput();
-      addrInput.print(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << addrInput.getType() << "\n";
-      Value addressOutput = loadOp.getAddressOutput();
-      addressOutput.print(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << addressOutput.getType() << "\n";
     }
   }
 

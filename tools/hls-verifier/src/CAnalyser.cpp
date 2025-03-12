@@ -385,7 +385,7 @@ bool CAnalyser::parseCFunction(const string &cSrc, const string &fuvName,
 
   for (size_t i = 0; i < params.size(); i++) {
     cout << "i" << i << endl;
-    params[i].actualType = getActualType(cSrc, params[i].immediateType);
+    params[i].parameterName = "param" + to_string(i);
     params[i].dtWidth = getBitWidth(params[i].actualType);
     params[i].isFloatType = isFloatType(params[i].actualType);
     params[i].isIntType = !params[i].isFloatType;

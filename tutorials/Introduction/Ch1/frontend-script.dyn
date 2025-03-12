@@ -7,10 +7,10 @@ set-src             tutorials/Introduction/Ch1/loop_multiply.c
 compile  --fast-token-delivery
 
 # Generate the VHDL design corresponding to the source code
-#write-hdl
+write-hdl
 
 # Simulate and verify using Modelsim
-#simulate
+simulate
 
 # Exit the frontend
 exit

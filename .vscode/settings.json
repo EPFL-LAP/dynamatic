@@ -87,7 +87,9 @@
     "hash_set": "cpp",
     "regex": "cpp",
     "unordered_set": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "__locale": "cpp",
+    "typeindex": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",

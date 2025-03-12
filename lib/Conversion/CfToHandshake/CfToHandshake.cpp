@@ -739,7 +739,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               assert(addr && "failed to remap address");
               Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
               Value data = edgeBuilder.get(channelifyType(dataTy));
-              auto newOp = rewriter.create<handshake::LoadOp>(loc, addr, data);
+              auto newOp = rewriter.create<handshake::LoadOp>(
+                  loc, addr.getType(), data.getType(), addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(loadOp, newOp, false);
@@ -755,7 +756,8 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
               assert((addr && data) && "failed to remap address or data");
-              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
+              auto newOp = rewriter.create<handshake::StoreOp>(
+                  loc, addr.getType(), data.getType(), addr, data);
 
               // Record the memory access replacement
               memOpLowering.recordReplacement(storeOp, newOp, false);

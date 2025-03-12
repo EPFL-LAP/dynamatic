@@ -274,7 +274,7 @@ struct RTLTimingType : public RTLType::Model<RTLTimingType, TimingConstraints> {
 
   /// There is no implementation for serializing the timing type to a string;
   /// this always returns the "timing" string.
-  static std::string serialize(mlir::Attribute attr) { return ID.str(); }
+  static std::string serialize(mlir::Attribute attr);
 };
 
 } // namespace dynamatic

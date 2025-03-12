@@ -290,3 +290,15 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
   }
   return deserial.exhausted(RESERVED_KEYS);
 }
+
+std::string RTLTimingType::serialize(Attribute attr) {
+  std::string serializedDataStorage;
+  llvm::raw_string_ostream serializedData(serializedDataStorage);
+
+  // Wrap in single quotes for easier passing as a generator argument.
+  serializedData << "'";
+  attr.print(serializedData);
+  serializedData << "'";
+
+  return serializedData.str();
+}

@@ -4,7 +4,7 @@ from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 def generate_free_tags_fifo(name, params):
   fifo_depth = params["fifo_depth"]
   port_types = params["port_types"]
-  bitwidth = VhdlScalarType(port_types["TAG_TYPE"]).bitwidth
+  bitwidth = VhdlScalarType(port_types["outs"]).bitwidth
 
   return _generate_free_tags_fifo(name, bitwidth, fifo_depth)
 
@@ -31,7 +31,8 @@ port (
         pValid        : in  std_logic;
         nReady        : in  std_logic;
         valid         : out std_logic;
-        ready         : out std_logic;
+        ready         : out std_logic
+);
 end entity;
 """
   architecture = f"""
@@ -64,14 +65,15 @@ begin
         port map (
         --inputs
             clk => clk, 
-            rst => rst, 
-            pValid  => fifo_pvalid, 
-            nReady => fifo_nready,    
-            valid => fifo_valid, 
+            rst => rst,
+            ins =>fifo_in, 
+            ins_valid  => fifo_pvalid, 
+            outs_ready => fifo_nready,    
+            
         --outputs
-            ready => fifo_ready,   
-            dataIn =>fifo_in,
-            dataOut => fifo_out
+            outs => fifo_out,
+            outs_valid => fifo_valid,
+            ins_ready => fifo_ready   
         );
 end architecture;
 """
