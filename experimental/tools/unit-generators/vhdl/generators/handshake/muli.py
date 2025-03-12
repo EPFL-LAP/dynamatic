@@ -1,8 +1,7 @@
-from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
-from generators.handshake.ofifo import generate_ofifo
 
 
 def generate_muli(name, params):
@@ -161,121 +160,23 @@ end architecture;
   return dependencies + entity + architecture
 
 
-extra_signal_logic = {
-    "spec": """
-  ofifo_in_spec <= lhs_spec or rhs_spec;
-"""
-}
-
-
 def _generate_muli_signal_manager(name, bitwidth, extra_signals):
-  inner_name = f"{name}_inner"
-  extra_signals_ofifo_name = f"{name}_extra_signals_ofifo"
-
-  # Construct extra signal mapping
-  extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_bitwidth in extra_signals.items():
-    extra_signal_mapping.add(signal_name, signal_bitwidth)
-  extra_signal_full_bitwidth = extra_signal_mapping.total_bitwidth
-
-  dependencies = _generate_muli(inner_name, bitwidth) + \
-      generate_ofifo(extra_signals_ofifo_name, {
-          "num_slots": _get_latency(),  # todo: correct?
-          "bitwidth": extra_signal_full_bitwidth,
-      })
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of muli signal manager
-entity {name} is
-  port (
-    [EXTRA_SIGNAL_PORTS]
-    -- inputs
-    clk          : in std_logic;
-    rst          : in std_logic;
-    lhs          : in std_logic_vector(32 - 1 downto 0);
-    lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector(32 - 1 downto 0);
-    rhs_valid    : in std_logic;
-    result_ready : in std_logic;
-    -- outputs
-    result       : out std_logic_vector(32 - 1 downto 0);
-    result_valid : out std_logic;
-    lhs_ready    : out std_logic;
-    rhs_ready    : out std_logic
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-      ("lhs", "in"), ("rhs", "in"),
-      ("result", "out")
-  ], extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of muli signal manager
-architecture arch of {name} is
-  signal transfer_in, transfer_out : std_logic;
-  signal extra_signals_ofifo_in : std_logic_vector({extra_signal_full_bitwidth - 1} downto 0);
-  signal extra_signals_ofifo_out : std_logic_vector({extra_signal_full_bitwidth - 1} downto 0);
-  [EXTRA_SIGNAL_SIGNAL_DECLS]
-begin
-  transfer_in <= lhs_valid and lhs_ready;
-  transfer_out <= result_valid and result_ready;
-
-  -- list of logic for supported extra signals
-  [EXTRA_SIGNAL_LOGIC]
-
-  extra_signals_ofifo : entity work.{extra_signals_ofifo_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => extra_signals_ofifo_in,
-      ins_valid => transfer_in,
-      ins_ready => open,
-      outs => extra_signals_ofifo_out,
-      outs_valid => open,
-      outs_ready => transfer_out
-    );
-
-  inner : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      lhs => lhs,
-      lhs_valid => lhs_valid,
-      rhs => rhs,
-      rhs_valid => rhs_valid,
-      result_ready => result_ready,
-      result => result,
-      result_valid => result_valid,
-      lhs_ready => lhs_ready,
-      rhs_ready => rhs_ready
-    );
-end architecture;
-"""
-
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_SIGNAL_DECLS]",
-      "\n".join([
-          f"  signal ofifo_in_{name} : std_logic_vector({bitwidth - 1} downto 0);" for name, bitwidth in extra_signals.items()
-      ]))
-
-  # Concatenate extra signals based on extra signal mapping
-  ins_conversion = generate_ins_concat_statements_dataless(
-      "ofifo_in", "extra_signals_ofifo_in", extra_signal_mapping)
-  outs_conversion = generate_outs_concat_statements_dataless(
-      "result", "extra_signals_ofifo_out", extra_signal_mapping)
-
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_LOGIC]",
-      "\n".join([
-          extra_signal_logic[name] for name in extra_signals
-      ]) + ins_conversion + outs_conversion)
-
-  return dependencies + entity + architecture
+  return generate_signal_manager(name, {
+      "type": "buffered",
+      "latency": _get_latency(),
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_muli(name, bitwidth))
