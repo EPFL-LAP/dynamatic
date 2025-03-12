@@ -143,15 +143,23 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
 architecture arch of {name} is
   signal addrIn_ready_inner : std_logic;
   signal tfifo_ready : std_logic;
+  -- Concatenated signals
 {concat_signal_decls}
+  -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
+  -- addrIn is ready only when addrIn from inner load is ready and tfifo is ready
   addrIn_ready <= addrIn_ready_inner and tfifo_ready;
+
+  -- Transfer signal assignments
   transfer_in <= addrIn_valid and addrIn_ready_inner;
   transfer_out <= dataOut_valid and dataOut_ready;
 
+  -- Concatenate extra signals
 {concat_signal_logic}
 
+  -- Buffer to store extra signals for in-flight memory requests
+  -- Use tfifo because the latency is unknown
   tfifo : entity work.{tfifo_name}(arch)
     port map(
       clk => clk,
