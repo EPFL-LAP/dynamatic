@@ -32,7 +32,7 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
   raise ValueError(f"Unsupported signal manager type: {type}")
 
 
-def _generate_entity(entity_name, in_ports, out_ports):
+def generate_entity(entity_name, in_ports, out_ports):
   # Unify input and output ports, and add direction
   unified_ports = []
   for port in in_ports:
@@ -174,7 +174,7 @@ def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, ge
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  entity = _generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_ports, out_ports)
 
   extra_signal_exps = _calc_forwarded_extra_signals(
       extra_signals, in_ports)
@@ -220,7 +220,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  entity = _generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_ports, out_ports)
 
   extra_signal_exps = _calc_forwarded_extra_signals(
       extra_signals, in_ports)
@@ -397,7 +397,7 @@ def _generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[])
 
 
 def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
-  entity = _generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_ports, out_ports)
 
   # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
@@ -447,7 +447,7 @@ end architecture;
 
 
 def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, spec_inputs, generate_inner: Callable[[str], str]):
-  entity = _generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_ports, out_ports)
 
   # Construct extra signal mapping
   extra_signal_mapping = ExtraSignalMapping()
