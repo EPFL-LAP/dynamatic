@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from generators.support.utils import extra_signal_default_values
+from generators.support.utils import extra_signal_default_values, ExtraSignalMapping
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
@@ -7,19 +7,14 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
   out_ports = params["out_ports"]
   type = params["type"]
 
-  inner = generate_inner(_get_inner_name(name))
-  entity = _generate_entity(name, in_ports, out_ports)
-
   if type == "normal":
     extra_signals = params["extra_signals"]
-    architecture = _generate_normal_architecture(
-        name, in_ports, out_ports, extra_signals)
-
-  return inner + entity + architecture
-
-
-def _get_inner_name(name):
-  return f"{name}_inner"
+    return _generate_normal_signal_manager(
+        name, in_ports, out_ports, extra_signals, generate_inner)
+  elif type == "concat":
+    extra_signals = params["extra_signals"]
+    return _generate_concat_signal_manager(
+        name, in_ports, out_ports, extra_signals, generate_inner)
 
 
 def _generate_entity(entity_name, in_ports, out_ports):
@@ -77,8 +72,11 @@ end entity;
 """
 
 
-def _generate_normal_architecture(arch_name, in_ports, out_ports, extra_signals):
-  inner_name = _get_inner_name(arch_name)
+def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
+  inner_name = f"{name}_inner"
+  inner = generate_inner(inner_name)
+
+  entity = _generate_entity(name, in_ports, out_ports)
 
   # Generate extra signal expressions for each extra signal
   # We assume that all extra signals are ORed currently
@@ -92,8 +90,8 @@ def _generate_normal_architecture(arch_name, in_ports, out_ports, extra_signals)
     else:
       # Collect extra signals from all input ports
       for in_port in in_ports:
-        name = in_port["name"]
-        in_extra_signals.append(f"{name}_{signal_name}")
+        port_name = in_port["name"]
+        in_extra_signals.append(f"{port_name}_{signal_name}")
 
       extra_signal_exps[signal_name] = f" or ".join(in_extra_signals)
 
@@ -102,27 +100,27 @@ def _generate_normal_architecture(arch_name, in_ports, out_ports, extra_signals)
   # e.g., result_spec <= lhs_spec or rhs_spec;
   extra_signal_assignments = []
   for out_port in out_ports:
-    name = out_port["name"]
+    port_name = out_port["name"]
 
     for signal_name in extra_signals:
       extra_signal_assignments.append(
-          f"  {name}_{signal_name} <= {extra_signal_exps[signal_name]};")
+          f"  {port_name}_{signal_name} <= {extra_signal_exps[signal_name]};")
 
   # Port forwarding for inner entity
   ports = []
   for port in in_ports + out_ports:
-    name = port["name"]
+    port_name = port["name"]
     bitwidth = port["bitwidth"]
 
     if bitwidth > 0:
-      ports.append(f"      {name} => {name}")
+      ports.append(f"      {port_name} => {port_name}")
 
-    ports.append(f"      {name}_valid => {name}_valid")
-    ports.append(f"      {name}_ready => {name}_ready")
+    ports.append(f"      {port_name}_valid => {port_name}_valid")
+    ports.append(f"      {port_name}_ready => {port_name}_ready")
 
-  return f"""
+  architecture = f"""
 -- Architecture of signal manager (normal)
-architecture arch of {arch_name} is
+architecture arch of {name} is
 begin
 
 {"\n".join(extra_signal_assignments)}
@@ -135,3 +133,80 @@ begin
     );
 end architecture;
 """
+
+  return inner + entity + architecture
+
+
+def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
+  inner_name = f"{name}_inner"
+
+  entity = _generate_entity(name, in_ports, out_ports)
+
+  # Construct extra signal mapping
+  extra_signal_mapping = ExtraSignalMapping()
+  for signal_name, signal_bitwidth in extra_signals.items():
+    extra_signal_mapping.add(signal_name, signal_bitwidth)
+  extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
+
+  inner = generate_inner(inner_name)
+
+  inner_signal_decls = []
+  for port in in_ports + out_ports:
+    port_name = port["name"]
+    port_bitwidth = port["bitwidth"]
+
+    inner_signal_decls.append(
+        f"  signal {port_name}_inner : std_logic_vector({extra_signals_bitwidth} + {port_bitwidth} - 1 downto 0);\n")
+
+  concat_logic = []
+  for port in in_ports:
+    port_name = port["name"]
+    port_bitwidth = port["bitwidth"]
+
+    if port_bitwidth > 0:
+      concat_logic.append(
+          f"  {port_name}_inner({port_bitwidth} - 1 downto 0) <= {port_name};")
+
+    for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+      concat_logic.append(
+          f"  {port_name}_inner({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth}) <= {port_name}_{signal_name};")
+
+  for port in out_ports:
+    port_name = port["name"]
+    port_bitwidth = port["bitwidth"]
+
+    if port_bitwidth > 0:
+      concat_logic.append(
+          f"  {port_name} <= {port_name}_inner({port_bitwidth} - 1 downto 0);")
+
+    for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+      concat_logic.append(
+          f"  {port_name}_{signal_name} <= {port_name}_inner({msb} + {port_bitwidth} downto {lsb} + {port_bitwidth});")
+
+  # Port forwarding for inner entity
+  ports = []
+  for port in in_ports + out_ports:
+    port_name = port["name"]
+
+    ports.append(f"      {port_name} => {port_name}")
+    ports.append(f"      {port_name}_valid => {port_name}_valid")
+    ports.append(f"      {port_name}_ready => {port_name}_ready")
+
+  architecture = f"""
+-- Architecture of signal manager (concat)
+architecture arch of {name} is
+  -- Concatenated data and extra signals
+{"\n".join(inner_signal_decls)}
+begin
+{"\n".join(concat_logic)}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+{",\n".join(ports)}
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture

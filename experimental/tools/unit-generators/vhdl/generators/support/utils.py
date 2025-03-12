@@ -108,3 +108,7 @@ def generate_outs_concat_statements_dataless(out_name: str, out_inner_name: str,
 extra_signal_default_values = {
     "spec": "\"0\"",
 }
+
+
+def get_concat_extra_signals_bitwidth(extra_signals: dict[str, int]):
+  return sum(extra_signals.values())
