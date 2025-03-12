@@ -22,9 +22,8 @@ class ExtraSignalMapping:
     return self.mapping[[name for name, _ in self.mapping].index(name)]
 
 
-extra_signal_default_values = {
-    "spec": "\"0\"",
-}
+def get_default_extra_signal_value(extra_signal_name: str):
+  return "\"0\""
 
 
 def get_concat_extra_signals_bitwidth(extra_signals: dict[str, int]):
