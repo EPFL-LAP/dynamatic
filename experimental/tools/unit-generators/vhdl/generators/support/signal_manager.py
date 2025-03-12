@@ -29,6 +29,8 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]):
     return _generate_bbmerge_signal_manager(
         name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, spec_inputs, generate_inner)
 
+  raise ValueError(f"Unsupported signal manager type: {type}")
+
 
 def _generate_entity(entity_name, in_ports, out_ports):
   # Unify input and output ports, and add direction
@@ -55,30 +57,8 @@ def _generate_entity(entity_name, in_ports, out_ports):
     extra_signals = port.get("extra_signals", {})
     port_2d = port.get("2d", False)
 
-    if port_2d:
-      size = port["size"]
-      if bitwidth > 0:
-        port_decls.append(
-            f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
-
-      port_decls.append(
-          f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
-      port_decls.append(
-          f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
-
-      # Use extra_signals_list if available to handle per-port extra signals
-      use_extra_signals_list = "extra_signals_list" in port
-      for i in range(size):
-        if use_extra_signals_list:
-          current_extra_signals = port["extra_signals_list"][i]
-        else:
-          current_extra_signals = extra_signals
-
-        # Generate extra signal port declarations for this input port
-        for signal_name, signal_bitwidth in current_extra_signals.items():
-          port_decls.append(
-              f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
-    else:
+    if not port_2d:
+      # Generate data signal port if present
       if bitwidth > 0:
         port_decls.append(
             f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
@@ -90,6 +70,36 @@ def _generate_entity(entity_name, in_ports, out_ports):
       for signal_name, signal_bitwidth in extra_signals.items():
         port_decls.append(
             f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+    else:
+      # Port is 2d
+      size = port["size"]
+
+      # Generate data_array port declarations for 2d input port with bitwidth > 0
+      if bitwidth > 0:
+        port_decls.append(
+            f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+
+      # Use std_logic_vector for valid/ready of 2d input port
+      port_decls.append(
+          f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
+      port_decls.append(
+          f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+
+      # Use extra_signals_list if available to handle per-port extra signals
+      use_extra_signals_list = "extra_signals_list" in port
+
+      # Generate extra signal port declarations for each item in the 2d input port
+      for i in range(size):
+        if use_extra_signals_list:
+          current_extra_signals = port["extra_signals_list"][i]
+        else:
+          current_extra_signals = extra_signals
+
+        # The netlist generator declares extra signals independently per index,
+        # in contrast to ready/valid signals.
+        for signal_name, signal_bitwidth in current_extra_signals.items():
+          port_decls.append(
+              f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 
   return f"""
 library ieee;
@@ -150,6 +160,7 @@ def _generate_inner_port_forwarding(ports):
     port_name = port["name"]
     bitwidth = port["bitwidth"]
 
+    # Forward data if present
     if bitwidth > 0:
       forwardings.append(f"      {port_name} => {port_name}")
 
@@ -473,6 +484,7 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
   for port in in_ports + out_ports:
     port_name = port["name"]
 
+    # Forward the original data signal for the index port
     if port_name == index_name:
       forwardings.append(f"      {port_name} => {port_name}")
     else:
