@@ -297,7 +297,7 @@ end architecture;
   return inner + buff + entity + architecture
 
 
-def _generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]):
+def generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]):
   """
   Declare signals for concatenated data and extra signals
   e.g., signal lhs_inner : std_logic_vector(32 downto 0); // 32 (data) + 1 (spec)
@@ -326,7 +326,7 @@ def _generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]):
   return "\n".join(signal_decls)
 
 
-def _generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
+def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
   """
   Generate concat logic for all input/output ports
   e.g.,
@@ -408,10 +408,10 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  concat_signal_decls = _generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls(
       in_ports + out_ports, extra_signals_bitwidth)
 
-  concat_logic = _generate_concat_logic(
+  concat_logic = generate_concat_logic(
       in_ports, out_ports, extra_signal_mapping)
 
   # Port forwarding for the inner entity
@@ -470,10 +470,10 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
       f"  {data_in_name}_{i}_spec <= {spec_default_value};" for i in lacking_spec_ports
   ]
 
-  concat_signal_decls = _generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls(
       in_ports + out_ports, extra_signals_bitwidth, ignore=[index_name])
 
-  concat_logic = _generate_concat_logic(
+  concat_logic = generate_concat_logic(
       in_ports, out_ports, extra_signal_mapping, ignore=[index_name])
 
   # Port forwarding for the inner entity

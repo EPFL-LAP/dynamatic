@@ -1,5 +1,5 @@
-from generators.support.signal_manager import generate_entity
-from generators.support.utils import generate_extra_signal_ports, ExtraSignalMapping, generate_ins_concat_statements_dataless, generate_outs_concat_statements_dataless
+from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic
+from generators.support.utils import ExtraSignalMapping
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 
@@ -124,30 +124,45 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
+  addrIn_port = {
+      "name": "addrIn",
+      "bitwidth": 0,
+      "extra_signals": extra_signals
+  }
+  dataOut_port = {
+      "name": "dataOut",
+      "bitwidth": 0,
+      "extra_signals": extra_signals
+  }
+  concat_signal_decls = generate_concat_signal_decls(
+      [addrIn_port, dataOut_port], extra_signals_total_bitwidth)
+  concat_signal_logic = generate_concat_logic(
+      [addrIn_port], [dataOut_port], extra_signal_mapping)
+
   architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
   signal addrIn_ready_inner : std_logic;
   signal tfifo_ready : std_logic;
-  signal tfifo_n_ready : std_logic;
-  signal tfifo_ins_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
-  signal tfifo_outs_inner : std_logic_vector({extra_signals_total_bitwidth} - 1 downto 0);
+{concat_signal_decls}
+  signal transfer_in, transfer_out : std_logic;
 begin
   addrIn_ready <= addrIn_ready_inner and tfifo_ready;
-  tfifo_n_ready <= dataOut_valid and dataOut_ready;
+  transfer_in <= addrIn_valid and addrIn_ready_inner;
+  transfer_out <= dataOut_valid and dataOut_ready;
 
-  [EXTRA_SIGNAL_LOGIC]
+{concat_signal_logic}
 
   tfifo : entity work.{tfifo_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-      ins => tfifo_ins_inner,
-      ins_valid => addrIn_valid and addrIn_ready_inner,
+      ins => addrIn_inner,
+      ins_valid => transfer_in,
       ins_ready => tfifo_ready,
-      outs => tfifo_outs_inner,
+      outs => dataOut_inner,
       outs_valid => open,
-      outs_ready => tfifo_n_ready
+      outs_ready => transfer_out
     );
 
   inner : entity work.{inner_name}(arch)
@@ -169,16 +184,5 @@ begin
     );
 end architecture;
 """
-
-  # Concatenate data and extra signals based on extra signal mapping
-  ins_conversion = generate_ins_concat_statements_dataless(
-      "addrIn", "tfifo_ins_inner", extra_signal_mapping)
-  outs_conversion = generate_outs_concat_statements_dataless(
-      "dataOut", "tfifo_outs_inner", extra_signal_mapping)
-
-  architecture = architecture.replace(
-      "  [EXTRA_SIGNAL_LOGIC]",
-      ins_conversion + outs_conversion
-  )
 
   return dependencies + entity + architecture
