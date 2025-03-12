@@ -244,6 +244,7 @@ architecture arch of handshake_mux_0 is
 begin
   -- Assign spec bits for inputs without them
   ins_0_spec <= "0";
+
   -- Concatenate data and extra signals
   ins_inner(0)(32 - 1 downto 0) <= ins(0);
   ins_inner(0)(32 downto 32) <= ins_0_spec;
@@ -314,7 +315,7 @@ architecture arch of handshake_load_0 is
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
-  -- addrIn is ready only when addrIn from inner load is ready and tfifo is ready
+  -- addrIn is ready only when inner load and tfifo are ready
   addrIn_ready <= addrIn_ready_inner and tfifo_ready;
 
   -- Transfer signal assignments
