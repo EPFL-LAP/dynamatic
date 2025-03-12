@@ -271,7 +271,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
--- Architecture of signal manager (normal)
+-- Architecture of signal manager (buffered)
 architecture arch of {name} is
   signal buff_in, buff_out : std_logic_vector({extra_signals_bitwidth} - 1 downto 0);
   signal transfer_in, transfer_out : std_logic;
