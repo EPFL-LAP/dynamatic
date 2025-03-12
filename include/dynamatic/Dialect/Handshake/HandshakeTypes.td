@@ -324,7 +324,7 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same data type",
   CPred<[{
-    [](llvm::ArrayRef<Type> dataTypes) {
+    [](std::vector<Type> dataTypes) {
       if (dataTypes.empty())
         return true;
 

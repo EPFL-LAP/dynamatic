@@ -65,7 +65,7 @@ inline bool operator!=(const ExtraSignal &lhs, const ExtraSignal &rhs) {
 /// signal name.
 bool doesExtraSignalsMatchExcept(
     const llvm::StringRef &except,
-    llvm::ArrayRef<llvm::ArrayRef<ExtraSignal>> extraSignalArrays);
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 llvm::hash_code hash_value(const ExtraSignal &signal);
