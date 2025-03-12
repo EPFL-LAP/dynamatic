@@ -1,4 +1,3 @@
-from generators.support.signal_manager.buffer import generate_buffer_like_signal_manager, generate_buffer_like_signal_manager_dataless
 from generators.support.signal_manager import generate_signal_manager
 from generators.support.utils import get_concat_extra_signals_bitwidth
 
