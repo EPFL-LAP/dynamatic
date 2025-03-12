@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_entity
+from generators.support.signal_manager import generate_entity, generate_inner_port_forwarding
 
 
 def generate_store(name, params):
@@ -62,10 +62,9 @@ end architecture;
 
 def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   inner_name = f"{name}_inner"
+  inner = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
 
-  dependencies = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
-
-  entity = generate_entity(name, [{
+  in_ports = [{
       "name": "dataIn",
       "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
@@ -73,7 +72,9 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
       "name": "addrIn",
       "bitwidth": addr_bitwidth,
       "extra_signals": extra_signals
-  }], [{
+  }]
+
+  out_ports = [{
       "name": "dataToMem",
       "bitwidth": data_bitwidth,
       "extra_signals": {}
@@ -81,7 +82,11 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
       "name": "addrOut",
       "bitwidth": addr_bitwidth,
       "extra_signals": {}
-  }])
+  }]
+
+  entity = generate_entity(name, in_ports, out_ports)
+
+  forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of store signal manager
@@ -91,20 +96,9 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      dataIn => dataIn,
-      dataIn_valid => dataIn_valid,
-      dataIn_ready => dataIn_ready,
-      addrIn => addrIn,
-      addrIn_valid => addrIn_valid,
-      addrIn_ready => addrIn_ready_inner,
-      dataToMem => dataToMem,
-      dataToMem_valid => dataToMem_valid,
-      dataToMem_ready => dataToMem_ready,
-      addrOut => addrOut,
-      addrOut_valid => addrOut_valid,
-      addrOut_ready => addrOut_ready
+{forwarding}
     );
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return inner + entity + architecture

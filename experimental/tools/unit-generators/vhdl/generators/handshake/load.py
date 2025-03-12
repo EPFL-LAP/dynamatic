@@ -90,18 +90,18 @@ end architecture;
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
-  inner_name = f"{name}_inner"
-  tfifo_name = f"{name}_tfifo"
-
   # Construct extra signal mapping to concatenate extra signals
   extra_signal_mapping = ExtraSignalMapping()
   for signal_name, signal_type in extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
+  inner_name = f"{name}_inner"
+  inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
+
   # Generate tfifo to store extra signals for in-flight memory requests
-  dependencies += generate_tfifo(tfifo_name, {
+  tfifo_name = f"{name}_tfifo"
+  tfifo = generate_tfifo(tfifo_name, {
       "bitwidth": extra_signals_total_bitwidth,
       "num_slots": 32  # todo
   })
@@ -124,20 +124,21 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  addrIn_port = {
+  # Only extra signals (not data) are concatenated, so set inner port bitwidth to 0.
+  addrIn_inner_port = {
       "name": "addrIn",
       "bitwidth": 0,
       "extra_signals": extra_signals
   }
-  dataOut_port = {
+  dataOut_inner_port = {
       "name": "dataOut",
       "bitwidth": 0,
       "extra_signals": extra_signals
   }
   concat_signal_decls = generate_concat_signal_decls(
-      [addrIn_port, dataOut_port], extra_signals_total_bitwidth)
+      [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
   concat_signal_logic = generate_concat_logic(
-      [addrIn_port], [dataOut_port], extra_signal_mapping)
+      [addrIn_inner_port], [dataOut_inner_port], extra_signal_mapping)
 
   architecture = f"""
 -- Architecture of load signal manager
@@ -185,4 +186,4 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+  return inner + tfifo + entity + architecture
