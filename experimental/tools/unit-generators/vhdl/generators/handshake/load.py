@@ -148,7 +148,7 @@ architecture arch of {name} is
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
-  -- addrIn is ready only when addrIn from inner load is ready and tfifo is ready
+  -- addrIn is ready only when inner load and tfifo are ready
   addrIn_ready <= addrIn_ready_inner and tfifo_ready;
 
   -- Transfer signal assignments

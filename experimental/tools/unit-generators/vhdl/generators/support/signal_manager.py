@@ -522,6 +522,7 @@ architecture arch of {name} is
 begin
   -- Assign spec bits for inputs without them
 {"\n".join(lacking_spec_port_assignments)}
+
   -- Concatenate data and extra signals
 {concat_logic}
 
