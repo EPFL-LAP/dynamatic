@@ -149,8 +149,8 @@ class valuesToDataTypes<list<string> names> {
 }
 
 /// Convert variadic to an array of ExtraSignal arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// ExtraSignal arrays.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getExtraSignals(), dataOut1.(...).getExtraSignals()}.
 class variadicToExtraSignalArrays<string variadic> {
   string result = [{
     [&](auto &&variadic) -> std::vector<llvm::ArrayRef<ExtraSignal>> {
@@ -167,8 +167,8 @@ class variadicToExtraSignalArrays<string variadic> {
 }
 
 /// Convert variadic to data type arrays.
-/// e.g., if the variadic has two elements, the result will be an array of two
-/// data types.
+/// e.g., if the variadic has two elements (dataOut0 and dataOut1), the result
+/// will be {dataOut0.(...).getDataType(), dataOut1.(...).getDataType()}.
 class variadicToDataTypes<string variadic> {
   string result = [{
     [&](auto &&variadic) -> std::vector<Type> {
