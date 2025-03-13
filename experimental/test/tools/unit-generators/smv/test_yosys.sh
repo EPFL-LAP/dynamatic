@@ -16,9 +16,9 @@ test_generator () {
   $GENERATOR_CALL $@
 
   REF_FILE="~/dynamatic/data/verilog/handshake/*.v"
-  DEP_FILE="~/dynamatic/data/verilog/handshake/${2}_dataless.v"
+  DEP_FILE="~/dynamatic/data/verilog/support/*.v"
   # yosys -p "read_verilog ${REF_FILE}; prep -top $2; aigmap; flatten; write_smv golden_model.smv"
-  yosys -p "read_verilog ${REF_FILE}; prep -top $2; flatten; write_smv build/golden_model.smv" >> $LOG
+  yosys -p "read_verilog ${REF_FILE} ${DEP_FILE}; prep -top $2; flatten; write_smv build/golden_model.smv" >> $LOG
   sed -i 's/\bIVAR\b/VAR/g' build/golden_model.smv
 
   $TEST_CALL $@
@@ -31,11 +31,11 @@ test_generator () {
   fi
 
   if grep -q "False" $PROPERTIES; then
-    echo "Test failed!"
+    echo "Test $2 FAILED!"
     cat $PROPERTIES
     exit 1
   fi
-  echo "$2 passed!"
+  echo "Test $2 passed!"
 }
 
 echo "Testing br..."
@@ -43,24 +43,24 @@ test_generator -n br_dataless -t br -p in_port_types='{"ins":"!handshake.control
 test_generator -n br -t br -p in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}'
 
 echo -e "\nTesting buffer..."
-test_generator -n oehb_dataless -t buffer -p slots=1 in_port_types='{"ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}' port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:1}>"'
-test_generator -n oehb -t buffer -p slots=1 in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}' timing='"#handshake.timing<{R:1}>"'
-# test_generator -t buffer -p slots=5 port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:1}>"'
-# test_generator -t buffer -p slots=5 port_types='{"outs":"!handshake.channel<i16>"}' timing='"#handshake.timing<{R:1}>"'
-# test_generator -t buffer -p slots=1 port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:0}>"'
-# test_generator -t buffer -p slots=1 port_types='{"outs":"!handshake.channel<i16>"}' timing='"#handshake.timing<{R:0}>"'
-# test_generator -t buffer -p slots=5 port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:0}>"'
-# test_generator -t buffer -p slots=5 port_types='{"outs":"!handshake.channel<i16>"}' timing='"#handshake.timing<{R:0}>"'
+test_generator -n oehb_dataless -t buffer -p slots=1 in_port_types='{"ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}' port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:1,D:0,V:0}>"'
+test_generator -n oehb -t buffer -p slots=1 in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}' timing='"#handshake.timing<{R:1,D:0,V:0}>"'
+test_generator -n ofifo_dataless -t buffer -p slots=5 in_port_types='{"ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}' port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:1,D:0,V:0}>"'
+# test_generator -n ofifo -t buffer -p slots=2 in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}' timing='"#handshake.timing<{R:1,D:0,V:0}>"'
+test_generator -n tehb_dataless -t buffer -p slots=1 in_port_types='{"ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}' port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:0,D:1,V:1}>"'
+test_generator -n tehb -t buffer -p slots=1 in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}' timing='"#handshake.timing<{R:0,D:1,V:1}>"'
+test_generator -n tfifo_dataless -t buffer -p slots=2 in_port_types='{"ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}' port_types='{"outs":"!handshake.control<>"}' timing='"#handshake.timing<{R:0,D:1,V:1}>"'
+# test_generator -n ofifo -t buffer -p slots=2 in_port_types='{"ins":"!handshake.channel<ui32>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}' port_types='{"outs":"!handshake.channel<ui32>"}' timing='"#handshake.timing<{R:1,D:0,V:0}>"'
 
-# echo -e "\nTesting cond_br..."
-# test_generator -t cond_br -p port_types='{"data":"!handshake.control<>"}'
-# test_generator -t cond_br -p port_types='{"data":"!handshake.channel<i16>"}'
+echo -e "\nTesting cond_br..."
+test_generator -n cond_br_dataless -t cond_br -p port_types='{"data":"!handshake.control<>"}' in_port_types='{"data":"!handshake.control<>","condition":"!handshake.channel<ui1>"}' out_port_types='{"trueOut":"!handshake.control<>","falseOut":"!handshake.control<>"}'
+test_generator -n cond_br -t cond_br -p port_types='{"data":"!handshake.channel<ui32>"}' in_port_types='{"data":"!handshake.channel<ui32>","condition":"!handshake.channel<ui1>"}' out_port_types='{"trueOut":"!handshake.channel<ui32>","falseOut":"!handshake.channel<ui32>"}'
 
 # echo -e "\nTesting constant..."
-# test_generator -t constant -p value=42 port_types='{"outs":"!handshake.control<>"}'
+test_generator -n constant -t constant -p value=42 port_types='{"outs":"!handshake.channel<ui32>"}' in_port_types='{"ctrl":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.channel<ui32>"}'
 
 # echo -e "\nTesting control_merge..."
-# test_generator -t control_merge -p size=2 port_types='{"index":"!handshake.channel<i16>","outs":"!handshake.control<>"}'
+test_generator -n control_merge_dataless -t control_merge -p size=2  port_types='{"index":"!handshake.channel<ui1>","outs":"!handshake.control<>"}' in_port_types='{"index":"!handshake.channel<ui1>","ins":"!handshake.control<>"}' out_port_types='{"outs":"!handshake.control<>"}'
 # test_generator -t control_merge -p size=2 port_types='{"index":"!handshake.channel<i16>","outs":"!handshake.channel<i16>"}'
 
 # echo -e "\nTesting fork..."
