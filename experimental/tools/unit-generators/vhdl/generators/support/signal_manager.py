@@ -484,7 +484,7 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  # Declare and assign spec bits for inputs without them
+  # Declare and assign default spec bits for inputs without them
   lacking_spec_ports = [
       i for i in range(size) if i not in spec_inputs
   ]
@@ -527,7 +527,7 @@ architecture arch of {name} is
   -- Concatenated data and extra signals
 {concat_signal_decls}
 begin
-  -- Assign spec bits for inputs without them
+  -- Assign default spec bit values if not provided
 {"\n".join(lacking_spec_port_assignments)}
 
   -- Concatenate data and extra signals
