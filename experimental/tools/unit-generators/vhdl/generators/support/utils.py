@@ -1,4 +1,4 @@
-class ExtraSignalMapping:
+class ConcatenationInfo:
   # List of tuples of (extra_signal_name, (msb, lsb))
   mapping: list[tuple[str, tuple[int, int]]]
   total_bitwidth: int

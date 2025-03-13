@@ -1,5 +1,5 @@
 from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic
-from generators.support.utils import ExtraSignalMapping
+from generators.support.utils import ConcatenationInfo
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 
@@ -91,7 +91,7 @@ end architecture;
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping(extra_signals)
+  extra_signal_mapping = ConcatenationInfo(extra_signals)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
   inner_name = f"{name}_inner"
