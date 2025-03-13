@@ -447,6 +447,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
 
     // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
     // input.
+    // The information may overlap with other parameters, but it is provided to
+    // give the generator easier access to the data.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
@@ -466,6 +468,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
 
     // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
     // input.
+    // The information may overlap with other parameters, but it is provided to
+    // give the generator easier access to the data.
     std::string extraSignalsListValue;
     llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
     extraSignalsList << "'[";
