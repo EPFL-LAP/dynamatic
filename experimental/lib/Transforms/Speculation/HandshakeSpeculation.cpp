@@ -407,7 +407,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   // SCBranchControl discards the commit-like signal when speculation is correct
   auto branchDiscardCondNonMisspec =
       builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardCondNonSpec.getLoc(), specOp.getSCBranchCtrl(),
+          branchDiscardCondNonSpec.getLoc(), specOp.getSCIsMisspec(),
           branchDiscardCondNonSpec.getTrueResult());
   inheritBB(specOp, branchDiscardCondNonMisspec);
 
