@@ -105,6 +105,7 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
       # Generate extra signal declarations for each item in the 2d input port
       for i in range(size):
         if use_extra_signals_list:
+          # Use different extra signals for different ports
           current_extra_signals = port["extra_signals_list"][i]
         else:
           # Use the same extra signals for all items
@@ -133,12 +134,19 @@ end entity;
 """
 
 
+def _get_forwarding_method(signal_name: str) -> str:
+  if signal_name == "spec":
+    return " or "
+
+  raise ValueError(
+      f"Unsupported forwarding method for extra signal: {signal_name}")
+
+
 def _forward_extra_signals(extra_signals: dict[str, int], in_ports) -> dict[str, str]:
   """
   Calculate how each extra signal is forwarded to the output ports.
-  We assume that all extra signals are ORed currently.
   Result is a dict of extra signal names to VHDL expressions.
-  e.g., {"spec": "lhs_spec or rhs_spec", "tag0": "lhs_tag0 or rhs_tag0"}
+  e.g., {"spec": "lhs_spec or rhs_spec", "tag0": "lhs_tag0 (op) rhs_tag0"}
   If no inputs are provided, we use the default values.
   e.g., {"spec": "\"0\"", "tag0": "\"0\""}
   """
@@ -158,8 +166,9 @@ def _forward_extra_signals(extra_signals: dict[str, int], in_ports) -> dict[str,
         port_name = in_port["name"]
         in_extra_signals.append(f"{port_name}_{signal_name}")
 
-      # OR all extra signals from input ports
-      forwarded_extra_signals[signal_name] = f" or ".join(in_extra_signals)
+      # Forward all input extra signals with the specified method
+      forwarded_extra_signals[signal_name] = _get_forwarding_method(
+          signal_name).join(in_extra_signals)
 
   return forwarded_extra_signals
 
