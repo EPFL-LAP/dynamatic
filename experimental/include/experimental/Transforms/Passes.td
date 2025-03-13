@@ -71,7 +71,7 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   let summary = "Place Speculation operations";
   let description = [{
   }];
-  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculationV2()";
+  let constructor = "dynamatic::experimental::speculationv2::createHandshakeSpeculationV2()";
   let options = [];
 }
 

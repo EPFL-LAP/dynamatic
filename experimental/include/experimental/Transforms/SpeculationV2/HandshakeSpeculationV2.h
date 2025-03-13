@@ -14,13 +14,10 @@
 #define DYNAMATIC_TRANSFORMS_SPECULATION_PASS_V2_H
 
 #include "dynamatic/Support/DynamaticPass.h"
-#include "dynamatic/Support/LLVM.h"
-#include "mlir/Pass/Pass.h"
-#include <string>
 
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
+namespace speculationv2 {
 
 std::unique_ptr<dynamatic::DynamaticPass> createHandshakeSpeculationV2();
 
@@ -28,7 +25,7 @@ std::unique_ptr<dynamatic::DynamaticPass> createHandshakeSpeculationV2();
 #define GEN_PASS_DEF_HANDSHAKESPECULATIONV2
 #include "experimental/Transforms/Passes.h.inc"
 
-} // namespace speculation
+} // namespace speculationv2
 } // namespace experimental
 } // namespace dynamatic
 

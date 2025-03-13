@@ -18,12 +18,12 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
+using namespace dynamatic::experimental::speculationv2;
 
 namespace {
 
 struct HandshakeSpeculationV2Pass
-    : public dynamatic::experimental::speculation::impl::
+    : public dynamatic::experimental::speculationv2::impl::
           HandshakeSpeculationV2Base<HandshakeSpeculationV2Pass> {
   HandshakeSpeculationV2Pass() {}
 
@@ -34,6 +34,6 @@ struct HandshakeSpeculationV2Pass
 void HandshakeSpeculationV2Pass::runDynamaticPass() {}
 
 std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::speculation::createHandshakeSpeculationV2() {
+dynamatic::experimental::speculationv2::createHandshakeSpeculationV2() {
   return std::make_unique<HandshakeSpeculationV2Pass>();
 }
