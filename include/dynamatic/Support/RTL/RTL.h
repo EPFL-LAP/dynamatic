@@ -294,6 +294,22 @@ public:
   /// (generation_params in the future)
   void registerParameters(hw::HWModuleExternOp &modOp);
 
+  void registerPortTypesParameter(hw::HWModuleExternOp &modOp,
+                                  llvm::StringRef modName,
+                                  hw::ModuleType &modType);
+  void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                 llvm::StringRef modName,
+                                 hw::ModuleType &modType);
+  void registerTransparentParameter(hw::HWModuleExternOp &modOp,
+                                    llvm::StringRef modName,
+                                    hw::ModuleType &modType);
+  void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                     llvm::StringRef modName,
+                                     hw::ModuleType &modType);
+  void registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
+                                  llvm::StringRef modName,
+                                  hw::ModuleType &modType);
+
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
   /// output directory while generated components are produced by the
