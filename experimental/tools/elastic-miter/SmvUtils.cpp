@@ -84,10 +84,20 @@ int runNuXmv(const std::filesystem::path &cmdPath,
   return executeWithRedirect(command, stdoutFile);
 }
 
+// For the equivalence checking to work a modified NuSMV is required.
+// Install with:
+// bash utils/get-NuSMV.sh
 int runNuSMV(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
-  std::string command = "NuSMV -source " + cmdPath.string();
-  return executeWithRedirect(command, stdoutFile);
+  std::string command = "ext/NuSMV -source " + cmdPath.string();
+  int exitCode = executeWithRedirect(command, stdoutFile);
+
+  // Check if bits 15-8 are set to 0x7F. In this case the command was not found.
+  if ((exitCode & 0x7F00) == 0x7F00) {
+    llvm::errs() << "NuSMV not found. Run \"bash utils/get-NuSMV.sh\" to "
+                    "install NuSMV.\n";
+  }
+  return exitCode;
 }
 
 int runSmvCmd(const std::filesystem::path &cmdPath,
