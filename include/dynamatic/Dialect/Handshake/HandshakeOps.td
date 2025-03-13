@@ -577,11 +577,10 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
   let results = (outs HandshakeType:$tagOut);
 
   //let assemblyFormat = "$tagOperands `:` $tagOut";
-
 }
 
 def TaggerOp : Handshake_Op<"tagger", [
-  Pure
+  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Tagger operation for tagging data with tag signals.";
   let description = [{
@@ -602,10 +601,22 @@ def TaggerOp : Handshake_Op<"tagger", [
   let results = (outs Variadic<HandshakeType>:$dataOut);
 
   //let assemblyFormat = "$dataOperands `,` $tagOperand `:` $dataOut";
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "tagIn";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
+  
 }
 
 def UntaggerOp : Handshake_Op<"untagger", [
-  Pure
+  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Untagger operation for extracting tag signals and forwarding data.";
   let description = [{
@@ -625,6 +636,17 @@ def UntaggerOp : Handshake_Op<"untagger", [
   );
 
   //let assemblyFormat = "$dataOperands `:` $dataOut `,` $tagOut ";
+
+    let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return "ins";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return idx == 0 ? "outs" : "tagOut";
+    }
+  }];
 }
 
 

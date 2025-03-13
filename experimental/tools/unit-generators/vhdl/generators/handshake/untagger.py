@@ -4,8 +4,8 @@ from generators.support.join import generate_join
 def generate_untagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs_0"])
-  tag_bitwidth = VhdlScalarType(port_types["outs_1"]).bitwidth
+  data_type = VhdlScalarType(port_types["outs"])
+  tag_bitwidth = VhdlScalarType(port_types["tagOut"]).bitwidth
 
   if data_type.has_extra_signals():
     return _generate_untagger_signal_manager(name, size, data_type, tag_bitwidth)
@@ -32,17 +32,19 @@ use IEEE.math_real.all;
 entity {name} is
 port(
   clk, rst      : in  std_logic;
-  pValidArray : in std_logic_vector({size} - 1 downto 0);
+  ins_valid : in std_logic_vector({size} - 1 downto 0);
 
-  nReadyArray : in std_logic_vector({size} downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
-  validArray : out std_logic_vector({size} downto 0);
+  outs_ready : in std_logic_vector({size} - 1 downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
+  outs_valid : out std_logic_vector({size} - 1 downto 0);
 
-  readyArray : out std_logic_vector({size} - 1 downto 0);
+  ins_ready : out std_logic_vector({size} - 1 downto 0);
 
-  dataInArray   : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
-  dataOutArray  : out data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
+  ins   : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
+  outs  : out data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
 
-  freeTag_data : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut_valid : in  std_logic;
+  tagOut_ready : out std_logic;
 
   tagInArray : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
@@ -53,37 +55,45 @@ end {name};
 architecture arch of {name} is
 signal join_valid : std_logic;
 signal join_nReady : std_logic;
+signal combined_valid : std_logic_vector({size} downto 0);
+signal combined_ready : std_logic_vector({size} downto 0);
 constant all_one : std_logic_vector({size}-1 downto 0) := (others => '1');
 
-signal join_readyArray : std_logic_vector({size} downto 0);
+signal join_ins_ready : std_logic_vector({size} downto 0);
 
 begin
-    
+    -- Combine tagOut_valid and ins_valid
+    combined_valid <= tagOut_valid & ins_valid;
+
     j : entity work.{join_name}(arch)
-                port map(   pValidArray,
-                            join_nReady, --nReadyArray(0),
+                port map(   combined_valid,
+                            join_nReady, --outs_ready(0),
                             join_valid,
-                            readyArray);
+                            combined_ready);
+    
+    -- Split combined_ready into ins_ready and tagOut_ready
+    ins_ready   <= combined_ready({size}-1 downto 0);
+    tagOut_ready <= combined_ready({size});
 
-    dataOutArray <= dataInArray;
+    outs <= ins;
 
-    freeTag_data <= tagInArray(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
+    tagOut <= tagInArray(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
 
     process(join_valid)
     begin
         if(join_valid = '1') then 
-            validArray <= (others => '1');
+            outs_valid <= (others => '1');
         else
-            validArray <= (others => '0');
+            outs_valid <= (others => '0');
         end if;
     end process;
 
-    process (nReadyArray)
+    process (outs_ready)
         variable check : std_logic := '1';
     begin
         check := '1';
-        for I in 0 to {size} loop
-            check := check and nReadyArray(I);
+        for I in 0 to {size}-1 loop
+            check := check and outs_ready(I);
         end loop;
         if(check = '1') then
             join_nReady <= '1';
@@ -119,17 +129,19 @@ entity {name} is
 port(
   clk, rst      : in  std_logic;
   [EXTRA_SIGNAL_PORTS]
-  pValidArray : in std_logic_vector({size} - 1 downto 0);
+  ins_valid : in std_logic_vector({size} - 1 downto 0);
 
-  nReadyArray : in std_logic_vector({size} downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
-  validArray : out std_logic_vector({size} downto 0);
+  outs_ready : in std_logic_vector({size} downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
+  outs_valid : out std_logic_vector({size} downto 0);
 
-  readyArray : out std_logic_vector({size} - 1 downto 0);
+  ins_ready : out std_logic_vector({size} - 1 downto 0);
 
-  dataInArray   : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
-  dataOutArray  : out data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
+  ins   : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
+  outs  : out data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
 
-  freeTag_data : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut_valid : in  std_logic;
+  tagOut_ready : out std_logic;
 
   tagInArray : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
@@ -137,8 +149,8 @@ end {name};
 """
   # Add extra signal ports
   extra_signal_ports = generate_extra_signal_ports_arrays([
-      ("dataInArray", "in", size),
-      ("dataOutArray", "out", size)
+      ("ins", "in", size),
+      ("outs", "out", size)
   ], data_type.extra_signals)
   entity = entity.replace("  [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
@@ -154,13 +166,15 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      pValidArray => pValidArray,
-      nReadyArray => nReadyArray,
-      validArray => validArray,
-      readyArray => readyArray,
-      dataInArray => dataInArray,
-      dataOutArray => dataOutArray,
-      freeTag_data => freeTag_data,
+      ins_valid => ins_valid,
+      outs_ready => outs_ready,
+      outs_valid => outs_valid,
+      ins_ready => ins_ready,
+      ins => ins,
+      outs => outs,
+      tagOut => tagOut,
+      tagOut_valid => tagOut_valid,
+      tagOut_ready => tagOut_ready,
       tagInArray => tagInArray
     );
 
@@ -169,9 +183,9 @@ begin
 end architecture;
 """
   ins_conversion = generate_ins_concat_statements_dataless(
-      "dataInArray", "ins_inner", extra_signal_mapping)
+      "ins", "ins_inner", extra_signal_mapping)
   outs_conversion = generate_outs_concat_statements_dataless(
-      "dataOutArray", "outs_inner", extra_signal_mapping)
+      "outs", "outs_inner", extra_signal_mapping)
 
   architecture = architecture.replace(
       "  [EXTRA_SIGNAL_LOGIC]",

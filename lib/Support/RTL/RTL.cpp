@@ -257,14 +257,12 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
     if (!first)
       portTypes << ", ";
     first = false;
-
     portTypes << "\"" << port.name.str() << "\": \"";
     // TODO: Escape "" in the port type (if needed)
     port.type.print(portTypes);
     portTypes << "\"";
   }
   portTypes << "}'"; // End of the JSON object
-
   // Register PORT_TYPES parameter
   serializedParams["PORT_TYPES"] = portTypes.str();
 }

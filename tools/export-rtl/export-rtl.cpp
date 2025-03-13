@@ -755,6 +755,8 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
       ArrayRef<std::string> signals(signalNames);
       for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
         os << port.first << "(" << idx << ") => " << sig << ",\n";
+      llvm::errs() << port.first << "(" << signals.size() - 1 << ") => "
+                   << signals.back() << "\n";
       os << port.first << "(" << std::to_string(signals.size() - 1) << ") => "
          << signals.back();
     };

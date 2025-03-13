@@ -729,6 +729,7 @@ void HWModuleOp::insertOutputs(unsigned index,
   SmallVector<std::pair<unsigned, PortInfo>> indexedNewPorts;
   for (auto &[name, value] : outputs) {
     PortInfo port;
+    llvm::errs() << "name: " << name << "\n";
     port.name = name;
     port.dir = ModulePort::Direction::Output;
     port.type = value.getType();
@@ -1648,7 +1649,7 @@ ParseResult ArrayCreateOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.parseType(elemType))
     return failure();
 
-  if (operands.size() == 0)
+  if (operands.empty())
     return parser.emitError(inputOperandsLoc,
                             "Cannot construct an array of length 0");
   result.addTypes({ArrayType::get(elemType, operands.size())});
@@ -1668,7 +1669,7 @@ void ArrayCreateOp::print(OpAsmPrinter &p) {
 
 void ArrayCreateOp::build(OpBuilder &b, OperationState &state,
                           ValueRange values) {
-  assert(values.size() > 0 && "Cannot build array of zero elements");
+  assert(!values.empty() && "Cannot build array of zero elements");
   Type elemType = values[0].getType();
   assert(llvm::all_of(
              values,
@@ -1834,7 +1835,7 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
   if (!offsetOpt)
     return failure();
 
-  auto inputOp = op.getInput().getDefiningOp();
+  auto *inputOp = op.getInput().getDefiningOp();
   if (auto inputSlice = dyn_cast_or_null<ArraySliceOp>(inputOp)) {
     // slice(slice(a, n), m) -> slice(a, n + m)
     if (inputSlice == op)
@@ -1900,7 +1901,7 @@ LogicalResult ArraySliceOp::canonicalize(ArraySliceOp op,
         break;
     }
 
-    assert(chunks.size() > 0 && "missing sliced items");
+    assert(!chunks.empty() && "missing sliced items");
     if (chunks.size() == 1)
       rewriter.replaceOp(op, chunks[0]);
     else
@@ -2425,7 +2426,7 @@ OpFoldResult StructExtractOp::fold(FoldAdaptor adaptor) {
 
 LogicalResult StructExtractOp::canonicalize(StructExtractOp op,
                                             PatternRewriter &rewriter) {
-  auto inputOp = op.getInput().getDefiningOp();
+  auto *inputOp = op.getInput().getDefiningOp();
 
   // b = extract(inject(x["a"], v0)["b"]) => extract(x, "b")
   if (auto structInject = dyn_cast_or_null<StructInjectOp>(inputOp)) {
