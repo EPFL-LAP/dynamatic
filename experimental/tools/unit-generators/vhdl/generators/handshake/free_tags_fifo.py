@@ -26,12 +26,12 @@ use work.types.all;
 entity {name} is 
 port (
         clk, rst      : in  std_logic;
-        dataIn        : in  std_logic_vector({bitwidth} - 1 downto 0);
-        dataOut       : out std_logic_vector({bitwidth} - 1 downto 0);
-        pValid        : in  std_logic;
-        nReady        : in  std_logic;
-        valid         : out std_logic;
-        ready         : out std_logic
+        ins        : in  std_logic_vector({bitwidth} - 1 downto 0);
+        outs       : out std_logic_vector({bitwidth} - 1 downto 0);
+        ins_valid        : in  std_logic;
+        outs_ready        : in  std_logic;
+        outs_valid         : out std_logic;
+        ins_ready         : out std_logic
 );
 end entity;
 """
@@ -44,22 +44,22 @@ architecture arch of {name} is
     signal fifo_in, fifo_out: std_logic_vector({bitwidth}-1 downto 0);
 begin
     
-    process (mux_sel, fifo_out, dataIn) is
+    process (mux_sel, fifo_out, ins) is
         begin
             if (mux_sel = '1') then
-                dataOut <= fifo_out;
+                outs <= fifo_out;
             else
-                dataOut <= dataIn;
+                outs <= ins;
             end if;
     end process;
 
-    valid <= pValid or fifo_valid;    --fifo_valid is 0 only if fifo is empty
-    ready <= fifo_ready or nReady;
-    fifo_pvalid <= pValid and (not nReady or fifo_valid); --store in FIFO if next is not ready or FIFO is already outputting something
+    outs_valid <= ins_valid or fifo_valid;    --fifo_valid is 0 only if fifo is empty
+    ins_ready <= fifo_ready or outs_ready;
+    fifo_pvalid <= ins_valid and (not outs_ready or fifo_valid); --store in FIFO if next is not ins_ready or FIFO is already outputting something
     mux_sel <= fifo_valid;
 
-    fifo_nready <= nReady;
-    fifo_in <= dataIn;
+    fifo_nready <= outs_ready;
+    fifo_in <= ins;
 
     fifo: entity work.{fifo_name}(arch)
         port map (
