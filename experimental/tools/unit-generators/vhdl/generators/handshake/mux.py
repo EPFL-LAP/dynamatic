@@ -214,6 +214,7 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inpu
       "data_in_name": "ins",
       "index_name": "index",
       "index_dir": "in",
+      "index_extra_signals": index_extra_signals,
       "out_extra_signals": output_extra_signals,
       "spec_inputs": spec_inputs
   }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
@@ -245,6 +246,7 @@ def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extr
       "data_in_name": "ins",
       "index_name": "index",
       "index_dir": "in",
+      "index_extra_signals": index_extra_signals,
       "out_extra_signals": output_extra_signals,
       "spec_inputs": spec_inputs
   }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth))
