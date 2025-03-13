@@ -46,7 +46,7 @@ port(
   tagOut_valid : in  std_logic;
   tagOut_ready : out std_logic;
 
-  tagInArray : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+  ins_tag : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
 end {name};
 """
@@ -77,7 +77,7 @@ begin
 
     outs <= ins;
 
-    tagOut <= tagInArray(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
+    tagOut <= ins_tag(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
 
     process(join_valid)
     begin
@@ -143,7 +143,7 @@ port(
   tagOut_valid : in  std_logic;
   tagOut_ready : out std_logic;
 
-  tagInArray : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+  ins_tag : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
 end {name};
 """
@@ -175,7 +175,7 @@ begin
       tagOut => tagOut,
       tagOut_valid => tagOut_valid,
       tagOut_ready => tagOut_ready,
-      tagInArray => tagInArray
+      ins_tag => ins_tag
     );
 
     outs_inner <= ins_inner;

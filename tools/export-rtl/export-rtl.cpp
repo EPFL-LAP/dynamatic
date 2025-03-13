@@ -352,7 +352,14 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
 /// Returns the internal signal name for an extra channel signal.
 static std::string getExtraSignalName(StringRef baseName,
                                       const ExtraSignal &extra) {
-  return baseName.str() + "_" + extra.name.str();
+  std::string extraName = extra.name.str();
+
+  // Check if extraName starts with "tag"
+  if (extraName.rfind("tag", 0) == 0) {
+    return baseName.str() + "_tag";
+  }
+
+  return baseName.str() + "_" + extraName;
 }
 
 void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
@@ -755,8 +762,6 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
       ArrayRef<std::string> signals(signalNames);
       for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
         os << port.first << "(" << idx << ") => " << sig << ",\n";
-      llvm::errs() << port.first << "(" << signals.size() - 1 << ") => "
-                   << signals.back() << "\n";
       os << port.first << "(" << std::to_string(signals.size() - 1) << ") => "
          << signals.back();
     };
@@ -893,8 +898,8 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
         return;
       }
 
-      // Signals are stored in increasing port index order but the port mapping
-      // expects them in the opposite order, so we reverse the list
+      // Signals are stored in increasing port index order but the port
+      // mapping expects them in the opposite order, so we reverse the list
       os << "{";
       ArrayRef<std::string> signals(signalNames);
       for (StringRef sig : llvm::reverse(signals.drop_front()))

@@ -49,7 +49,7 @@ entity {name} is
     tagIn_valid : in  std_logic;
     tagIn_ready : out std_logic;
 
-    tagOut : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+    outs_tag : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
   );
 end {name};
 """
@@ -86,7 +86,7 @@ begin
     tagging_process : process (freeTag_data)
     begin
       for I in 0 to {size} - 1 loop
-        tagOut(I)({tag_bitwidth}-1 downto 0) <= freeTag_data;
+        outs_tag(I)({tag_bitwidth}-1 downto 0) <= freeTag_data;
       end loop;
     end process;
 
@@ -147,7 +147,7 @@ entity {name} is
     tagIn_valid : in  std_logic;
     tagIn_ready : out std_logic;
 
-    tagOut : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+    outs_tag : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
   );
 end {name};
 """
@@ -179,7 +179,7 @@ begin
       tagIn => tagIn,
       tagIn_valid => tagIn_valid,
       tagIn_ready => tagIn_ready,
-      tagOut => tagOut
+      outs_tag => outs_tag
     );
 
     outs_inner <= ins_inner;
