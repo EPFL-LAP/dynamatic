@@ -296,6 +296,7 @@ begin
     );
 
   -- Generate ofifo to store extra signals
+  -- num_slots = {latency}, bitwidth = {extra_signals_bitwidth}
   buff : entity work.{buff_name}(arch)
     port map(
       clk => clk,
