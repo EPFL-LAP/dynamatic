@@ -493,47 +493,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   }
 }
 
-LogicalResult RTLMatch::concretize(const RTLRequest &request,
-                                   StringRef dynamaticPath,
-                                   StringRef outputDir) const {
-  // Consolidate reserved and regular parameters in a single map to perform
-  // text substitutions
-  ParameterMappings allParams(serializedParams);
-  allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
-  allParams[RTLParameter::OUTPUT_DIR] = outputDir;
-
-  if (component->isGeneric()) {
-    std::string inputFile = substituteParams(component->generic, allParams);
-    HDL hdl = component->hdl;
-    std::string outputFile = outputDir.str() +
-                             sys::path::get_separator().str() + moduleName +
-                             "." + getHDLExtension(hdl).str();
-
-    // Just copy the file to the output location
-    if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
-      return emitError(request.loc)
-             << "Failed to copy generic RTL implementation from \"" << inputFile
-             << "\" to \"" << outputFile << "\"\n"
-             << ec.message();
-    }
-    return success();
-  }
-  assert(!component->generator.empty() && "generator is empty");
-
-  if (component->jsonConfig && failed(request.paramsToJSON(substituteParams(
-                                   *(component->jsonConfig), allParams))))
-    return failure();
-
-  // The implementation needs to be generated
-  std::string cmd = substituteParams(component->generator, allParams);
-  if (int ret = std::system(cmd.c_str()); ret != 0) {
-    return emitError(request.loc)
-           << "Failed to generate component, generator failed with status "
-           << ret << ": " << cmd << "\n";
-  }
-  return success();
-}
-
 void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
                                           llvm::StringRef modName,
                                           hw::ModuleType &modType) {
@@ -574,6 +533,47 @@ void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
     specInputs << "]'";
     serializedParams["SPEC_INPUTS"] = specInputs.str();
   }
+}
+
+LogicalResult RTLMatch::concretize(const RTLRequest &request,
+                                   StringRef dynamaticPath,
+                                   StringRef outputDir) const {
+  // Consolidate reserved and regular parameters in a single map to perform
+  // text substitutions
+  ParameterMappings allParams(serializedParams);
+  allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
+  allParams[RTLParameter::OUTPUT_DIR] = outputDir;
+
+  if (component->isGeneric()) {
+    std::string inputFile = substituteParams(component->generic, allParams);
+    HDL hdl = component->hdl;
+    std::string outputFile = outputDir.str() +
+                             sys::path::get_separator().str() + moduleName +
+                             "." + getHDLExtension(hdl).str();
+
+    // Just copy the file to the output location
+    if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
+      return emitError(request.loc)
+             << "Failed to copy generic RTL implementation from \"" << inputFile
+             << "\" to \"" << outputFile << "\"\n"
+             << ec.message();
+    }
+    return success();
+  }
+  assert(!component->generator.empty() && "generator is empty");
+
+  if (component->jsonConfig && failed(request.paramsToJSON(substituteParams(
+                                   *(component->jsonConfig), allParams))))
+    return failure();
+
+  // The implementation needs to be generated
+  std::string cmd = substituteParams(component->generator, allParams);
+  if (int ret = std::system(cmd.c_str()); ret != 0) {
+    return emitError(request.loc)
+           << "Failed to generate component, generator failed with status "
+           << ret << ": " << cmd << "\n";
+  }
+  return success();
 }
 
 bool RTLParameter::fromJSON(const ljson::Value &value, ljson::Path path) {
