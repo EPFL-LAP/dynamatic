@@ -277,10 +277,8 @@ static std::string serializePortTypes(hw::ModuleType &mod) {
   return portTypes.str();
 }
 
-static std::string serializeExtraSignals(const Type &type, bool quote = true) {
+static std::string serializeExtraSignalsInner(const Type &type) {
   if (!type.isa<handshake::ExtraSignalsTypeInterface>()) {
-    if (quote)
-      return "'{}'";
     return "{}";
   }
   handshake::ExtraSignalsTypeInterface extraSignalsType =
@@ -289,8 +287,6 @@ static std::string serializeExtraSignals(const Type &type, bool quote = true) {
   std::string extraSignalsValue;
   llvm::raw_string_ostream extraSignals(extraSignalsValue);
 
-  if (quote)
-    extraSignals << "'";
   extraSignals << "{";
   bool first = true;
   for (const handshake::ExtraSignal &extraSignal :
@@ -303,10 +299,12 @@ static std::string serializeExtraSignals(const Type &type, bool quote = true) {
     extraSignals << extraSignal.getBitWidth();
   }
   extraSignals << "}";
-  if (quote)
-    extraSignals << "'";
 
   return extraSignals.str();
+}
+
+static std::string serializeExtraSignals(const Type &type) {
+  return "'" + serializeExtraSignalsInner(type) + "'";
 }
 
 /// Returns the bitwidth of the type as string.
@@ -425,7 +423,7 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     for (size_t i = 0; i < mod.getNumInputs() - 2; i++) {
       if (i != 0)
         extraSignalsList << ", ";
-      extraSignalsList << serializeExtraSignals(mod.getInputType(i), false);
+      extraSignalsList << serializeExtraSignalsInner(mod.getInputType(i));
     }
     extraSignalsList << "]'";
     serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
@@ -444,7 +442,7 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     for (size_t i = 1; i < mod.getNumInputs() - 2; i++) {
       if (i != 1)
         extraSignalsList << ", ";
-      extraSignalsList << serializeExtraSignals(mod.getInputType(i), false);
+      extraSignalsList << serializeExtraSignalsInner(mod.getInputType(i));
     }
     extraSignalsList << "]'";
     serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
