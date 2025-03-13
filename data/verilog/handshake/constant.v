@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
-module ENTITY_NAME #(
-  parameter DATA_WIDTH = 32  // Default set to 32 bits
+module constant #(
+  parameter DATA_WIDTH = 32,  // Default set to 32 bits
+  parameter VALUE = 42
 ) (
   input                       clk,
   input                       rst,
