@@ -6,12 +6,22 @@ from generators.handshake.fork import generate_fork
 
 
 def generate_control_merge(name, params):
+  # Number of data input ports
   size = params["size"]
+
   data_bitwidth = params["data_bitwidth"]
   index_bitwidth = params["index_bitwidth"]
+
+  # List of extra signals for each data input port
+  # Each element is a dictionary where key: extra signal name, value: bitwidth
+  # e.g., [{"tag0": 8, "spec": 1}, {"tag0": 8}]
   input_extra_signals_list = params["input_extra_signals_list"]
+  # e.g., {"tag0": 8, "spec": 1}
   output_extra_signals = params["output_extra_signals"]
   index_extra_signals = params["index_extra_signals"]
+
+  # List of indices of input ports that have spec bit
+  # e.g., [0]
   spec_inputs = params["spec_inputs"]
 
   if output_extra_signals:

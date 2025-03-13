@@ -5,8 +5,10 @@ from generators.support.eager_fork_register_block import generate_eager_fork_reg
 
 
 def generate_fork(name, params):
-  bitwidth = params["bitwidth"]
+  # Number of output ports
   size = params["size"]
+
+  bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
