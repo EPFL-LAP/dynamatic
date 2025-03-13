@@ -30,7 +30,7 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
     index_name = params["index_name"]
     out_extra_signals = params["out_extra_signals"]
     index_extra_signals = params["index_extra_signals"]
-    index_dir = params.get["index_dir"]
+    index_dir = params["index_dir"]
     spec_inputs = params["spec_inputs"]
     signal_manager = _generate_bbmerge_signal_manager(
         name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner)
