@@ -185,6 +185,7 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
       "out_ports": [{
           "name": "index",
           "bitwidth": index_bitwidth,
+          # Note: Extra signals at index are not supported
           "extra_signals": {}
       }, {
           "name": "outs",
@@ -214,6 +215,7 @@ def _generate_control_merge_signal_manager_dataless(name, size, index_bitwidth, 
       "out_ports": [{
           "name": "index",
           "bitwidth": index_bitwidth,
+          # Note: Extra signals at index are not supported
           "extra_signals": {}
       }, {
           "name": "outs",

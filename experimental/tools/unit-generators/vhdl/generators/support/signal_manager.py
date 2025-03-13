@@ -1,3 +1,5 @@
+# See docs/Specs/SignalManager.md
+
 from collections.abc import Callable
 from generators.support.utils import get_default_extra_signal_value, ExtraSignalMapping
 
@@ -209,7 +211,7 @@ def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, ge
 -- Architecture of signal manager (normal)
 architecture arch of {name} is
 begin
-
+  -- Forward extra signals to output ports
 {"\n".join(extra_signal_assignments)}
 
   inner : entity work.{inner_name}(arch)
@@ -275,13 +277,15 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
--- Architecture of signal manager (normal)
+-- Architecture of signal manager (buffered)
 architecture arch of {name} is
   signal buff_in, buff_out : std_logic_vector({extra_signals_bitwidth} - 1 downto 0);
   signal transfer_in, transfer_out : std_logic;
 begin
+  -- Transfer signal assignments
 {transfer_logic}
 
+  -- Concat/split extra signals for buffer input/output
 {"\n".join(signal_assignments)}
 
   inner : entity work.{inner_name}(arch)
@@ -291,6 +295,7 @@ begin
 {forwarding}
     );
 
+  -- Generate ofifo to store extra signals
   buff : entity work.{buff_name}(arch)
     port map(
       clk => clk,
@@ -453,6 +458,7 @@ architecture arch of {name} is
   -- Concatenated data and extra signals
 {concat_signal_decls}
 begin
+  -- Concatenate data and extra signals
 {concat_logic}
 
   inner : entity work.{inner_name}(arch)
@@ -513,14 +519,17 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
     forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
   architecture = f"""
--- Architecture of signal manager (mergebb)
+-- Architecture of signal manager (bbmerge)
 architecture arch of {name} is
   -- Lacking spec inputs
 {"\n".join(lacking_spec_port_decls)}
   -- Concatenated data and extra signals
 {concat_signal_decls}
 begin
+  -- Assign spec bits for inputs without them
 {"\n".join(lacking_spec_port_assignments)}
+
+  -- Concatenate data and extra signals
 {concat_logic}
 
   inner : entity work.{inner_name}(arch)

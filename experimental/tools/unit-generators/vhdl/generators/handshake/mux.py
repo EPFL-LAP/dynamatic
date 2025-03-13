@@ -191,6 +191,7 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inpu
       }, {
           "name": "index",
           "bitwidth": index_bitwidth,
+          # Note: Extra signals at index are not supported
           "extra_signals": {}
       }],
       "out_ports": [{
@@ -220,6 +221,7 @@ def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extr
       }, {
           "name": "index",
           "bitwidth": index_bitwidth,
+          # Note: Extra signals at index are not supported
           "extra_signals": {}
       }],
       "out_ports": [{
