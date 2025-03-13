@@ -67,6 +67,14 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   ];
 }
 
+def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
+  let summary = "Place Speculation operations";
+  let description = [{
+  }];
+  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculationV2()";
+  let options = [];
+}
+
 def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
   let summary = "Credit-Based Sharing of Functional Units";
   let description = [{ Sharing functional units for better resource utilization.
