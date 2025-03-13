@@ -945,8 +945,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCSaveCtrl">,
   IsSimpleHandshake<"SCCommitCtrl">,
   IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCBranchCtrl">,
-  IsIntSizedChannel<1, "SCBranchCtrl">,
+  IsSimpleHandshake<"SCIsMisspec">,
+  IsIntSizedChannel<1, "SCIsMisspec">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -959,13 +959,13 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ($saveCtrl, $commitCtrl). For save-commit units, three control
     signals are needed. $SCSaveCtrl is connected directly, while 
     $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCBranchCtrl is needed
+    follows and might not reach a save-commit. $SCIsMisspec is needed
     in the replicated branches to discard the latter signal.
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
         <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
     ```
@@ -976,12 +976,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
                       ChannelType:$SCCommitCtrl, 
-                      ChannelType:$SCBranchCtrl);
+                      ChannelType:$SCIsMisspec);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
     type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
-    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCBranchCtrl)
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
   }];
 
   // Infer the type of the control signals
