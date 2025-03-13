@@ -57,7 +57,7 @@ MODULE main
 
   ASSIGN golden_model._rst := 0ub_0;
 
-  {"\n  ".join([f"INVARSPEC model_under_test.{port_name} = {f"bool(golden_model._{port_name})" if port_type == "boolean" else f"golden_model._{port_name}"};" for port_name, port_type in output_ports.items()])}
+  {"\n  ".join([f"INVARSPEC NAME {port_name}_check := model_under_test.{port_name} = {f"bool(golden_model._{port_name})" if port_type == "boolean" else f"golden_model._{port_name}"};" for port_name, port_type in output_ports.items()])}
 """
 
 

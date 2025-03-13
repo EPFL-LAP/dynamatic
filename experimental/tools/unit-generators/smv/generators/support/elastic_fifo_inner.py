@@ -17,8 +17,8 @@ MODULE {name}(ins_valid, outs_ready)
   VAR
   full : boolean;
   empty : boolean;
-  head : 0..({slots - 1});
-  tail : 0..({slots - 1});
+  head : 0..{slots - 1};
+  tail : 0..{slots - 1};
 
   DEFINE
   read_en := outs_ready & !empty;
@@ -61,7 +61,7 @@ MODULE {name}(ins_valid, outs_ready)
 
   // output
   DEFINE
-  ins_ready := !full & outs_ready;
+  ins_ready := !full | outs_ready;
   outs_valid := !empty;
 """
 
@@ -73,8 +73,8 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR
   full : boolean;
   empty : boolean;
-  head : 0..({slots - 1});
-  tail : 0..({slots - 1});
+  head : 0..{slots - 1};
+  tail : 0..{slots - 1};
 
   DEFINE
   read_en := outs_ready & !empty;
@@ -121,7 +121,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
   // output
   DEFINE
-  ins_ready := !full & outs_ready;
+  ins_ready := !full | outs_ready;
   outs_valid := !empty;
   outs := case
     {"\n    ".join([f"head = {n} : mem_{n};" for n in range(slots)])}

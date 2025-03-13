@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module ofifo_dataless #(
-  parameter NUM_SLOTS = 2
+  parameter NUM_SLOTS = 5
 )(
   input  clk,
   input  rst,
