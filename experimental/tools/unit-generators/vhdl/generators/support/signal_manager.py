@@ -29,9 +29,11 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
     data_in_name = params["data_in_name"]
     index_name = params["index_name"]
     out_extra_signals = params["out_extra_signals"]
+    index_extra_signals = params["index_extra_signals"]
+    index_dir = params.get["index_dir"]
     spec_inputs = params["spec_inputs"]
     signal_manager = _generate_bbmerge_signal_manager(
-        name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, spec_inputs, generate_inner)
+        name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
@@ -474,7 +476,7 @@ end architecture;
   return inner + entity + architecture
 
 
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, spec_inputs, generate_inner: Callable[[str], str]):
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Construct extra signal mapping to concatenate extra signals
@@ -519,6 +521,16 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
     forwardings.append(f"      {port_name}_valid => {port_name}_valid")
     forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
+  # TODO: Extra signals for index port are not tested
+  assign_index_extra_signals = ""
+  if index_dir == "out" and index_extra_signals:
+    assign_index_extra_signals_list = []
+    assign_index_extra_signals_list.append("  -- Assign index extra signals")
+    for signal_name in index_extra_signals:
+      assign_index_extra_signals_list.append(
+          f"  {index_name}_{signal_name} <= {get_default_extra_signal_value(signal_name)};")
+    assign_index_extra_signals = "\n".join(assign_index_extra_signals_list)
+
   architecture = f"""
 -- Architecture of signal manager (bbmerge)
 architecture arch of {name} is
@@ -532,6 +544,8 @@ begin
 
   -- Concatenate data and extra signals
 {concat_logic}
+
+{assign_index_extra_signals}
 
   inner : entity work.{inner_name}(arch)
     port map(

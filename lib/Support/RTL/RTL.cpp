@@ -413,6 +413,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   } else if (name == "handshake.control_merge") {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
+    serializedParams["INDEX_EXTRA_SIGNALS"] =
+        serializeExtraSignals(mod.getOutputType(1));
 
     // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
     // input.
@@ -430,6 +432,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   } else if (name == "handshake.mux") {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(mod.getOutputType(0));
+    serializedParams["INDEX_EXTRA_SIGNALS"] =
+        serializeExtraSignals(mod.getInputType(0));
 
     // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
     // input.
