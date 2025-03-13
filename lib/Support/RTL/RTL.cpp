@@ -278,9 +278,9 @@ static std::string serializePortTypes(hw::ModuleType &mod) {
 }
 
 static std::string serializeExtraSignalsInner(const Type &type) {
-  if (!type.isa<handshake::ExtraSignalsTypeInterface>()) {
-    return "{}";
-  }
+  assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
+         "type should be ChannelType or ControlType");
+
   handshake::ExtraSignalsTypeInterface extraSignalsType =
       type.cast<handshake::ExtraSignalsTypeInterface>();
 
