@@ -1,7 +1,7 @@
 # See docs/Specs/SignalManager.md
 
 from collections.abc import Callable
-from generators.support.utils import get_default_extra_signal_value, ExtraSignalMapping
+from generators.support.utils import get_default_extra_signal_value, ConcatenationInfo
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) -> str:
@@ -241,7 +241,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
       extra_signals, in_ports)
 
   # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping(extra_signals)
+  extra_signal_mapping = ConcatenationInfo(extra_signals)
   extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
 
   # Generate buffer to store (concatenated) extra signals
@@ -429,7 +429,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
   entity = generate_entity(name, in_ports, out_ports)
 
   # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping(extra_signals)
+  extra_signal_mapping = ConcatenationInfo(extra_signals)
   extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
 
   inner_name = f"{name}_inner"
@@ -480,7 +480,7 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
   entity = generate_entity(name, in_ports, out_ports)
 
   # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping(out_extra_signals)
+  extra_signal_mapping = ConcatenationInfo(out_extra_signals)
   extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
 
   inner_name = f"{name}_inner"
