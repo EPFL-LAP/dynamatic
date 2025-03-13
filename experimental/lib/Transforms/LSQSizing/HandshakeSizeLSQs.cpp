@@ -408,23 +408,20 @@ HandshakeSizeLSQsPass::getPhiNodes(CFDFCGraph graph,
   // Insert start_node as a candidate for cases where there is only 1 bb (will
   // be choosen anyway for other cases, but looks cleaner then special
   // handling)
-  std::optional<unsigned> startNodeBB = getLogicBB(startNode);
-  assert(startNodeBB && "Start Node must belong to basic block");
-  phiNodeCandidates.insert({*startNodeBB, {startNode}});
+  unsigned startNodeBB = getLogicBB(startNode);
+  phiNodeCandidates.insert({startNodeBB, {startNode}});
 
   // Go trought ops and find connected ops
   for (auto &srcOp : graph.getOperations()) {
-    std::optional<unsigned> srcBB = getLogicBB(srcOp);
-    assert(srcBB && "Src Op must belong to basic block");
+    unsigned srcBB = getLogicBB(srcOp);
     // For each connected Op, check if its in a different BB and add it to the
     // candidates
     for (auto &destOp : graph.getConnectedOps(srcOp)) {
-      std::optional<unsigned> destBB = getLogicBB(destOp);
-      assert(destBB && "Dest Op must belong to basic block");
-      if (*destBB != *srcBB) {
-        if (phiNodeCandidates.find(*destBB) == phiNodeCandidates.end())
-          phiNodeCandidates.insert({*destBB, std::vector<mlir::Operation *>()});
-        phiNodeCandidates.at(*destBB).push_back(destOp);
+      unsigned destBB = getLogicBB(destOp);
+      if (destBB != srcBB) {
+        if (phiNodeCandidates.find(destBB) == phiNodeCandidates.end())
+          phiNodeCandidates.insert({destBB, std::vector<mlir::Operation *>()});
+        phiNodeCandidates.at(destBB).push_back(destOp);
       }
     }
   }
@@ -456,9 +453,8 @@ std::unordered_map<mlir::Operation *, int> HandshakeSizeLSQsPass::getAllocTimes(
 
   // Go trough all ops and find the latency to the phi node of the ops BB
   for (auto &op : ops) {
-    std::optional<unsigned> bb = getLogicBB(op);
-    assert(bb && "Load/Store Op must belong to basic block");
-    mlir::Operation *phiNode = phiNodes[*bb];
+    unsigned bb = getLogicBB(op);
+    mlir::Operation *phiNode = phiNodes[bb];
     assert(phiNode && "Phi node not found for BB");
     int latency = graph.getEarliestStartTime(phiNode) + allocEntryLatency;
     allocTimes.insert({op, latency});
@@ -665,9 +661,8 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
   // Iterate over all provided ops and add an edge from the phi node of the
   // ops BB to the op
   for (auto &op : ops) {
-    std::optional<unsigned> bb = getLogicBB(op);
-    assert(bb && "Load/Store Op must belong to basic block");
-    mlir::Operation *phiNode = phiNodes[*bb];
+    unsigned bb = getLogicBB(op);
+    mlir::Operation *phiNode = phiNodes[bb];
     graph.addEdge(phiNode, op);
   }
 }
