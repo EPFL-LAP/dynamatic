@@ -246,7 +246,7 @@ architecture arch of handshake_mux_0 is
   signal ins_inner : data_array(2 - 1 downto 0)(33 - 1 downto 0);
   signal outs_inner : std_logic_vector(33 - 1 downto 0);
 begin
-  -- Assign spec bits for inputs without them
+  -- Assign default spec bit values if not provided
   ins_0_spec <= "0";
 
   -- Concatenate data and extra signals
