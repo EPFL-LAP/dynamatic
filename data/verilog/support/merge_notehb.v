@@ -17,18 +17,20 @@ module merge_notehb #(
   reg [INPUTS - 1 : 0] tmp_ready_out;
   reg [DATA_TYPE - 1 : 0] tmp_data_out;
 	integer i;
+  integer cont;
 
 	always @(*) begin
 		tmp_valid_out = 0;
     tmp_ready_out = {INPUTS{1'b0}}; 
     tmp_data_out = data_in_bus[0 * DATA_TYPE +: DATA_TYPE];
 
-		for (i = 0; i < N; i = i + 1) begin
-			if (ins_valid[i]) begin
+    cont = 1;
+		for (i = 0; i < INPUTS; i = i + 1) begin
+			if (cont == 1 && ins_valid[i]) begin
         tmp_data_out = ins[i * DATA_IN_SIZE +: DATA_IN_SIZE];
 				tmp_valid_out = 1;
         tmp_ready_out[i] = outs_ready;
-        break;
+        cont = 0;
 			end
 		end
 	end
