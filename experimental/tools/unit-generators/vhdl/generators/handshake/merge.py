@@ -5,6 +5,7 @@ from generators.handshake.tehb import generate_tehb
 
 
 def generate_merge(name, params):
+  # Number of intput ports
   size = params["size"]
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
