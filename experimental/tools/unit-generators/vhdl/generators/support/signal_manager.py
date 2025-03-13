@@ -3,22 +3,24 @@ from generators.support.utils import get_default_extra_signal_value, ExtraSignal
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) -> str:
+  debugging_info = f"-- signal manager generated info: {name}, {params}\n"
+
   in_ports = params["in_ports"]
   out_ports = params["out_ports"]
   type = params["type"]
 
   if type == "normal":
     extra_signals = params["extra_signals"]
-    return _generate_normal_signal_manager(
+    signal_manager = _generate_normal_signal_manager(
         name, in_ports, out_ports, extra_signals, generate_inner)
   elif type == "buffered":
     extra_signals = params["extra_signals"]
     latency = params["latency"]
-    return _generate_buffered_signal_manager(
+    signal_manager = _generate_buffered_signal_manager(
         name, in_ports, out_ports, extra_signals, generate_inner, latency)
   elif type == "concat":
     extra_signals = params["extra_signals"]
-    return _generate_concat_signal_manager(
+    signal_manager = _generate_concat_signal_manager(
         name, in_ports, out_ports, extra_signals, generate_inner)
   elif type == "bbmerge":
     size = params["size"]
@@ -26,10 +28,12 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
     index_name = params["index_name"]
     out_extra_signals = params["out_extra_signals"]
     spec_inputs = params["spec_inputs"]
-    return _generate_bbmerge_signal_manager(
+    signal_manager = _generate_bbmerge_signal_manager(
         name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, spec_inputs, generate_inner)
+  else:
+    raise ValueError(f"Unsupported signal manager type: {type}")
 
-  raise ValueError(f"Unsupported signal manager type: {type}")
+  return signal_manager + debugging_info
 
 
 def generate_entity(entity_name, in_ports, out_ports) -> str:
