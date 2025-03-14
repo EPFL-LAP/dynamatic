@@ -117,9 +117,10 @@ run_ninja() {
 #### Parse arguments ####
 
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
-CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
-CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
-CMAKE_EXTRA_DYNAMATIC="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_LLVM_OPT="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_POLYGEIST_OPT="-DPOLYGEIST_USE_LINKER=lld"
+CMAKE_DYNAMATIC_OPT="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_EXTRA_DYNAMATIC=""
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
@@ -156,9 +157,9 @@ do
       case "$arg" in
           "--disable-build-opt" | "-o")
               CMAKE_COMPILERS=""
-              CMAKE_EXTRA_LLVM=""
-              CMAKE_EXTRA_POLYGEIST=""
-              CMAKE_EXTRA_DYNAMATIC=""
+              CMAKE_LLVM_OPT=""
+              CMAKE_POLYGEIST_OPT=""
+              CMAKE_DYNAMATIC_OPT=""
               ;;
           "--force" | "-f")
               FORCE_CMAKE=1
@@ -225,7 +226,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
-        $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
+        $CMAKE_COMPILERS $CMAKE_LLVM_OPT
     exit_on_fail "Failed to cmake polygeist/llvm-project"
   fi
 
@@ -246,7 +247,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
         -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-        $CMAKE_COMPILERS $CMAKE_EXTRA_POLYGEIST
+        $CMAKE_COMPILERS $CMAKE_POLYGEIST_OPT
     exit_on_fail "Failed to cmake polygeist"
   fi
 
@@ -327,7 +328,7 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS $CMAKE_EXTRA_DYNAMATIC
+      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_OPT $CMAKE_EXTRA_DYNAMATIC
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
