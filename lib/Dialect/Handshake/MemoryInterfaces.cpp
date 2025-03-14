@@ -86,14 +86,13 @@ bool MemoryOpLowering::renameDependencies(Operation *topLevelOp) {
 //===----------------------------------------------------------------------===//
 
 void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
-  std::optional<unsigned> bb = getLogicBB(portOp);
-  assert(bb && "MC port must belong to basic block");
+  unsigned bb = getLogicBB(portOp);
   if (isa<handshake::LoadOp>(portOp)) {
     ++mcNumLoads;
   } else {
     assert(isa<handshake::StoreOp>(portOp) && "invalid MC port");
   }
-  mcPorts[*bb].push_back(portOp);
+  mcPorts[bb].push_back(portOp);
 }
 
 void MemoryInterfaceBuilder::addLSQPort(unsigned group,
@@ -239,10 +238,8 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     // First, determine the group's control signal, which is dictated by the BB
     // of the first memory port in the group
     Operation *firstOpInGroup = lsqGroupOps.front();
-    std::optional<unsigned> block = getLogicBB(firstOpInGroup);
-    if (!block)
-      return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
-    Value groupCtrl = getCtrl(*block);
+    unsigned block = getLogicBB(firstOpInGroup);
+    Value groupCtrl = getCtrl(block);
     if (!groupCtrl)
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
@@ -267,10 +264,8 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
   for (auto &[_, lsqGroupOps] : lsqPorts) {
     for (Operation *lsqOp : lsqGroupOps) {
       if (isa<handshake::StoreOp>(lsqOp)) {
-        std::optional<unsigned> block = getLogicBB(lsqOp);
-        if (!block)
-          return lsqOp->emitError() << "LSQ port must belong to a BB.";
-        ++lsqStoresPerBlock[*block];
+        unsigned block = getLogicBB(lsqOp);
+        ++lsqStoresPerBlock[block];
       }
     }
   }
@@ -396,20 +391,19 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
     unsigned numLoadEntries = groupPorts.getNumPorts<LoadPort>()
-                              ? groupPorts.getNumPorts<LoadPort>()
-                              : 1;
-
+                                  ? groupPorts.getNumPorts<LoadPort>()
+                                  : 1;
 
     // ldOrderOfOneGroup: the ldOrder of all the loads in one group
     // Example: ldOrder = [
-    //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this vector
-    //    [1]     
+    //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this
+    //    vector [1]
     // ]
     SmallVector<unsigned> ldOrderOfOneGroup(numLoadEntries, 0);
 
     // This for loop has two purposes:
     // 1. It iterates through all the LDs/STs in a group, for each LD/ST:
-    //   If it is an LD, then it saves how many STs have to 
+    //   If it is an LD, then it saves how many STs have to
     //   complete before it
     // 2. It records the IDs of the LDs/STs in a group.
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {

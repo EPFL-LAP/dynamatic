@@ -41,10 +41,9 @@ static bool areCstCtrlEquivalent(Value ctrl, Value otherCtrl) {
   Operation *otherDefOp = otherCtrl.getDefiningOp();
   if (!otherDefOp || !isa<handshake::SourceOp>(otherDefOp))
     return false;
-  std::optional<unsigned> block = getLogicBB(defOp);
-  std::optional<unsigned> otherBlock = getLogicBB(otherDefOp);
-  return block.has_value() && otherBlock.has_value() &&
-         block.value() == otherBlock.value();
+  unsigned block = getLogicBB(defOp);
+  unsigned otherBlock = getLogicBB(otherDefOp);
+  return block == otherBlock;
 }
 
 handshake::ConstantOp static findEquivalentCst(TypedAttr valueAttr,
@@ -123,7 +122,7 @@ struct MinimizeConstantBitwidth
 
   MinimizeConstantBitwidth(bool optNegatives, MLIRContext *ctx)
       : OpRewritePattern<handshake::ConstantOp>(ctx),
-        optNegatives(optNegatives) {};
+        optNegatives(optNegatives){};
 
   LogicalResult matchAndRewrite(handshake::ConstantOp cstOp,
                                 PatternRewriter &rewriter) const override {

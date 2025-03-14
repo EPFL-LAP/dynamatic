@@ -187,11 +187,7 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
-    unsigned srcBB;
-    if (auto optBB = getLogicBB(&op); !optBB.has_value())
-      continue;
-    else
-      srcBB = *optBB;
+    unsigned srcBB = getLogicBB(&op);
 
     // The basic block the operation belongs to must be selected
     if (!cycle.contains(srcBB))
@@ -205,11 +201,7 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 
       // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
-        continue;
-      else
-        dstBB = *optBB;
+      unsigned dstBB = getLogicBB(user);
 
       if (srcBB != dstBB) {
         // The channel is in the CFDFC if it belongs belong to a selected arch
@@ -244,17 +236,17 @@ bool CFDFC::isCFDFCBackedge(Value val) {
     return false;
 
   Operation *defOp = val.getDefiningOp();
-  std::optional<unsigned> srcBB = getLogicBB(defOp);
-  std::optional<unsigned> dstBB = getLogicBB(*val.getUsers().begin());
+  unsigned srcBB = getLogicBB(defOp);
+  unsigned dstBB = getLogicBB(*val.getUsers().begin());
 
   // If the edge is between operations in the same block, the source operation
   // must be a conditional branch
-  if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB)
+  if (srcBB == dstBB)
     return isa<handshake::ConditionalBranchOp>(defOp);
 
   // Otherwise the edge must be between different blocks, where the destination
   // can be out of all blocks
-  return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
+  return srcBB != dstBB;
 }
 
 CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {

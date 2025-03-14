@@ -426,36 +426,36 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
 
     // Determine the subgraph in which to insert the operation
     DOTGraph::Subgraph *bbSub = root;
-    std::optional<unsigned> bb = getLogicBB(&op);
-    if (bb) {
-      if (auto subIt = bbSubgraphs.find(*bb); subIt != bbSubgraphs.end()) {
+    if (hasLogicBB(&op)) {
+      unsigned bb = getLogicBB(&op);
+      if (auto subIt = bbSubgraphs.find(bb); subIt != bbSubgraphs.end()) {
         bbSub = subIt->second;
       } else {
-        std::string name = "cluster" + std::to_string(*bb);
+        std::string name = "cluster" + std::to_string(bb);
         bbSub = &builder.addSubgraph(name, *root);
-        bbSub->addAttr("label", "BB " + std::to_string(*bb));
-        bbSubgraphs.insert({*bb, bbSub});
+        bbSub->addAttr("label", "BB " + std::to_string(bb));
+        bbSubgraphs.insert({bb, bbSub});
+      }
+
+      // Create an edge for each use of each result of the operation
+      for (OpResult res : op.getResults()) {
+        for (OpOperand &oprd : res.getUses()) {
+          // Determine the subgraph in which to insert the edge
+          DOTGraph::Subgraph *edgeSub = root;
+          if (bbSub != root) {
+            Operation *userOp = oprd.getOwner();
+            std::optional<unsigned> userBB = tryGetLogicBB(userOp);
+            if (userBB && bb == userBB && !isa<handshake::EndOp>(userOp))
+              edgeSub = bbSub;
+          }
+          addEdge(oprd, *edgeSub);
+        }
       }
     }
 
     // Create a node for the operation
     if (failed(addNode(&op, *bbSub)))
       return failure();
-
-    // Create an edge for each use of each result of the operation
-    for (OpResult res : op.getResults()) {
-      for (OpOperand &oprd : res.getUses()) {
-        // Determine the subgraph in which to insert the edge
-        DOTGraph::Subgraph *edgeSub = root;
-        if (bbSub != root) {
-          Operation *userOp = oprd.getOwner();
-          std::optional<unsigned> userBB = getLogicBB(userOp);
-          if (userBB && bb == userBB && !isa<handshake::EndOp>(userOp))
-            edgeSub = bbSub;
-        }
-        addEdge(oprd, *edgeSub);
-      }
-    }
   }
 
   return success();

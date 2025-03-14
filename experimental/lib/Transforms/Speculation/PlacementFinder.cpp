@@ -79,13 +79,9 @@ LogicalResult PlacementFinder::findSavePositions() {
   markSpeculativePathsForSaves(specPos.getOwner(), specValues);
 
   // Iterate all operations in the speculation BB
-  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
-  if (!specBB) {
-    specPos.getOwner()->emitError("Operation does not have a BB.");
-    return failure();
-  }
+  unsigned specBB = getLogicBB(specPos.getOwner());
 
-  for (Operation *blockOp : handshakeBlocks.blocks[specBB.value()]) {
+  for (Operation *blockOp : handshakeBlocks.blocks[specBB]) {
     // Create a save if an operation has both spec and non-spec operands
     bool hasNonSpecInput = false;
     bool hasSpecInput = false;
@@ -248,10 +244,6 @@ void PlacementFinder::findCommitsBetweenBBs() {
 
 LogicalResult PlacementFinder::findCommitPositions() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
-  if (!getLogicBB(specPos.getOwner())) {
-    specPos.getOwner()->emitError("Operation does not have a BB.");
-    return failure();
-  }
 
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
@@ -280,13 +272,13 @@ void PlacementFinder::findSaveCommitsTraversal(
     return;
 
   OpOperand &specPos = placements.getSpeculatorPlacement();
-  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
+  unsigned specBB = getLogicBB(specPos.getOwner());
 
   // Verify conditions to stop the traversal on the current path
   auto stopTraversalConditions = [&](OpOperand &dstOpOperand) -> bool {
     // Stop traversal if we go outside the speculation BB
-    std::optional<unsigned> succOpBB = getLogicBB(dstOpOperand.getOwner());
-    if (!succOpBB || succOpBB != specBB)
+    unsigned succOpBB = getLogicBB(dstOpOperand.getOwner());
+    if (succOpBB != specBB)
       return true;
 
     // End traversal if the path is already cut by a commit or save-commit
@@ -327,11 +319,7 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
   auto funcOp = specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
 
-  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
-  if (!specBB) {
-    specPos.getOwner()->emitError("Operation does not have a BB.");
-    return failure();
-  }
+  unsigned specBB = getLogicBB(specPos.getOwner());
 
   // If a save-commit is placed, then for correctness, every path from entry
   // points to exit points in the Speculator BB should cross either the
@@ -340,8 +328,7 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
     bool foundControlMerge = false;
     // Every BB starts at a control merge
     for (auto controlMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
-      if (auto mergeBB = getLogicBB(controlMergeOp);
-          !mergeBB || mergeBB != specBB)
+      if (getLogicBB(controlMergeOp) != specBB)
         continue;
 
       // Found a control merge in the speculation BB
