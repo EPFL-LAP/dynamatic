@@ -1,7 +1,17 @@
+from generators.support.signal_manager import generate_signal_manager
+from generators.support.utils import get_concat_extra_signals_bitwidth
+
+
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if bitwidth == 0:
+  if extra_signals:
+    if bitwidth == 0:
+      return _generate_tehb_signal_manager_dataless(name, extra_signals)
+    else:
+      return _generate_tehb_signal_manager(name, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_tehb_dataless(name)
   else:
     return _generate_tehb(name, bitwidth)
@@ -123,3 +133,39 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth))
+
+
+def _generate_tehb_signal_manager_dataless(name, extra_signals):
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": 0,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": 0,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_tehb(name, extra_signals_bitwidth))

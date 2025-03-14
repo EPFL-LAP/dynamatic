@@ -2,6 +2,7 @@ from generators.support.logic import generate_and_n
 
 
 def generate_join(name, params):
+  # Number of input ports
   size = params["size"]
 
   and_n_module_name = f"{name}_and_n"
