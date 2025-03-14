@@ -352,14 +352,7 @@ static std::string getInternalSignalName(StringRef baseName, SignalType type) {
 /// Returns the internal signal name for an extra channel signal.
 static std::string getExtraSignalName(StringRef baseName,
                                       const ExtraSignal &extra) {
-  std::string extraName = extra.name.str();
-
-  // Check if extraName starts with "tag"
-  if (extraName.rfind("tag", 0) == 0) {
-    return baseName.str() + "_tag";
-  }
-
-  return baseName.str() + "_" + extraName;
+  return baseName.str() + "_" + extra.name.str();
 }
 
 void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
@@ -752,9 +745,15 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
                                     ArrayRef<std::string> signalNames,
                                     raw_indented_ostream &os) {
       assert(!signalNames.empty() && "no signal name associated to port");
+
+      // if (!port.second || (!signalNames.empty() &&
+      //                    signalNames.front().rfind("untagger", 0) == 0)) {
       if (!port.second) {
         assert(signalNames.size() == 1 &&
                "more than one signal for non-array port");
+        // llvm::errs() << "Inside If\n";
+        // llvm::errs() << "     " << port.first << " => " <<
+        // signalNames.front();
         os << port.first << " => " << signalNames.front();
         return;
       }
@@ -762,6 +761,10 @@ void VHDLWriter::writeModuleInstantiations(WriteModData &data) const {
       ArrayRef<std::string> signals(signalNames);
       for (auto [idx, sig] : llvm::enumerate(signals.drop_back()))
         os << port.first << "(" << idx << ") => " << sig << ",\n";
+      // llvm::errs() << "Outide If\n";
+      // llvm::errs() << "     " << port.first << " - " << port.second <<
+      // "\n";
+
       os << port.first << "(" << std::to_string(signals.size() - 1) << ") => "
          << signals.back();
     };

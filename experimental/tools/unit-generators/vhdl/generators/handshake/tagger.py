@@ -5,19 +5,34 @@ from generators.handshake.fork import _generate_fork
 def generate_tagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["ins"])
+  data_in_type = VhdlScalarType(port_types["ins"])
+  data_out_type = VhdlScalarType(port_types["outs"])
   tag_bitwidth = VhdlScalarType(port_types["tagIn"]).bitwidth
 
-  if data_type.has_extra_signals():
-    return _generate_tagger_signal_manager(name, size, data_type, tag_bitwidth)
-  else:
-    return _generate_tagger(name, size, data_type, tag_bitwidth)
+    # Get extra signals from input data type
+  input_extra_signals = data_in_type.extra_signals
 
-def _generate_tagger(name, size, data_type, tag_bitwidth):
+  # Get extra signals from output data type
+  output_extra_signals = data_out_type.extra_signals
+
+  # Get the current tag that was added by the tagger by viewing the difference of tags between the input and output data types
+  unique_data_out_signals = {
+    name: bitwidth
+    for name, bitwidth in output_extra_signals.items()
+    if name not in input_extra_signals
+  }
+  current_tag = next(iter(unique_data_out_signals))
+
+  if data_in_type.has_extra_signals():
+    return _generate_tagger_signal_manager(name, size, data_in_type, current_tag, tag_bitwidth)
+  else:
+    return _generate_tagger(name, size, data_in_type, current_tag, tag_bitwidth)
+
+def _generate_tagger(name, size, data_in_type, current_tag, tag_bitwidth):
   join_name = f"{name}_join"
   fork_name = f"{name}_fork"
 
-  data_bitwidth = data_type.bitwidth
+  data_bitwidth = data_in_type.bitwidth
 
   dependencies = \
       generate_join(join_name, {
@@ -49,7 +64,7 @@ entity {name} is
     tagIn_valid : in  std_logic;
     tagIn_ready : out std_logic;
 
-    outs_tag : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+    outs_{current_tag} : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
   );
 end {name};
 """
@@ -83,10 +98,10 @@ begin
     ins_ready   <= combined_ready({size}-1 downto 0);
     tagIn_ready <= combined_ready({size});
 
-    tagging_process : process (freeTag_data)
+    tagging_process : process (tagIn)
     begin
       for I in 0 to {size} - 1 loop
-        outs_tag(I)({tag_bitwidth}-1 downto 0) <= freeTag_data;
+        outs_{current_tag}(I)({tag_bitwidth}-1 downto 0) <= tagIn;
       end loop;
     end process;
 
@@ -110,17 +125,17 @@ end architecture;
 """
   return dependencies + entity + architecture
 
-def _generate_tagger_signal_manager(name, size, data_type, tag_bitwidth):
+def _generate_tagger_signal_manager(name, size, data_in_type, current_tag, tag_bitwidth):
   inner_name = f"{name}_inner"
 
-  data_bitwidth = data_type.bitwidth  
+  data_bitwidth = data_in_type.bitwidth  
 
   extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_type in data_type.extra_signals.items():
+  for signal_name, signal_type in data_in_type.extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_tagger(inner_name, size, data_type, tag_bitwidth)
+  dependencies = _generate_tagger(inner_name, size, data_in_type, tag_bitwidth)
 
   entity = f"""
 library ieee;
@@ -138,7 +153,7 @@ entity {name} is
     outs_ready : in std_logic_vector({size} - 1 downto 0);
     outs_valid : out std_logic_vector({size} - 1 downto 0);
 
-    ins_ready : out std_logic_vector({size}-1 downto 0); -- doesnot have a -1 because it includes the pValid of the freeTag_data input too
+    ins_ready : out std_logic_vector({size}-1 downto 0);
 
     ins   : in  data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
     outs  : out data_array({size} - 1 downto 0)({data_bitwidth} - 1 downto 0);
@@ -147,15 +162,15 @@ entity {name} is
     tagIn_valid : in  std_logic;
     tagIn_ready : out std_logic;
 
-    outs_tag : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+    outs_{current_tag} : out data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
   );
 end {name};
 """
-  # Add extra signal ports
+  # Add extra signals ports
   extra_signal_ports = generate_extra_signal_ports_arrays([
       ("ins", "in", {size}),
       ("outs", "out", {size})
-  ], data_type.extra_signals)
+  ], data_in_type.extra_signals)
   entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
 
   architecture = f"""
@@ -179,7 +194,7 @@ begin
       tagIn => tagIn,
       tagIn_valid => tagIn_valid,
       tagIn_ready => tagIn_ready,
-      outs_tag => outs_tag
+      outs_{current_tag} => outs_{current_tag}
     );
 
     outs_inner <= ins_inner;

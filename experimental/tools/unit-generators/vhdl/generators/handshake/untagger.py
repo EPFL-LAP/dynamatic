@@ -4,22 +4,38 @@ from generators.support.join import generate_join
 def generate_untagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["outs"])
+  data_in_type = VhdlScalarType(port_types["ins"])
+  data_out_type = VhdlScalarType(port_types["outs"])
   tag_bitwidth = VhdlScalarType(port_types["tagOut"]).bitwidth
 
-  if data_type.has_extra_signals():
-    return _generate_untagger_signal_manager(name, size, data_type, tag_bitwidth)
-  else:
-    return _generate_untagger(name, size, data_type, tag_bitwidth)
 
-def _generate_untagger(name, size, data_type, tag_bitwidth):
+    # Get extra signals from input data type
+  input_extra_signals = data_in_type.extra_signals
+
+  # Get extra signals from output data type
+  output_extra_signals = data_out_type.extra_signals
+
+  # Get the current tag that was removed by the tagger by viewing the difference of tags between the input and output data types
+  unique_data_out_signals = {
+    name: bitwidth
+    for name, bitwidth in input_extra_signals.items()
+    if name not in output_extra_signals
+  }
+  current_tag = next(iter(unique_data_out_signals))
+
+  if data_out_type.has_extra_signals():
+    return _generate_untagger_signal_manager(name, size, data_out_type, current_tag, tag_bitwidth)
+  else:
+    return _generate_untagger(name, size, data_out_type, current_tag, tag_bitwidth)
+
+def _generate_untagger(name, size, data_out_type, current_tag, tag_bitwidth):
   join_name = f"{name}_join"
 
-  data_bitwidth = data_type.bitwidth
+  data_bitwidth = data_out_type.bitwidth
 
   dependencies = \
       generate_join(join_name, {
-          "size": size
+          "size": size +1
       })
 
   entity = f"""
@@ -34,7 +50,7 @@ port(
   clk, rst      : in  std_logic;
   ins_valid : in std_logic_vector({size} - 1 downto 0);
 
-  outs_ready : in std_logic_vector({size} - 1 downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
+  outs_ready : in std_logic_vector({size} - 1 downto 0); 
   outs_valid : out std_logic_vector({size} - 1 downto 0);
 
   ins_ready : out std_logic_vector({size} - 1 downto 0);
@@ -46,7 +62,7 @@ port(
   tagOut_valid : in  std_logic;
   tagOut_ready : out std_logic;
 
-  ins_tag : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+  ins_{current_tag} : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
 end {name};
 """
@@ -77,7 +93,7 @@ begin
 
     outs <= ins;
 
-    tagOut <= ins_tag(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
+    tagOut <= ins_{current_tag}(0)({tag_bitwidth}-1 downto 0);  -- take the tag of any of the inputs; they are all guaranteed to be the same
 
     process(join_valid)
     begin
@@ -106,17 +122,17 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_untagger_signal_manager(name, size, data_type, tag_bitwidth):
+def _generate_untagger_signal_manager(name, size, data_out_type, current_tag, tag_bitwidth):
   inner_name = f"{name}_inner"
 
-  data_bitwidth = data_type.bitwidth  
+  data_bitwidth = data_out_type.bitwidth  
 
   extra_signal_mapping = ExtraSignalMapping()
-  for signal_name, signal_type in data_type.extra_signals.items():
+  for signal_name, signal_type in data_out_type.extra_signals.items():
     extra_signal_mapping.add(signal_name, signal_type)
   extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
 
-  dependencies = _generate_untagger(inner_name, size, data_type, tag_bitwidth) 
+  dependencies = _generate_untagger(inner_name, size, data_out_type, tag_bitwidth) 
 
   entity = f"""
 library ieee;
@@ -131,8 +147,8 @@ port(
   [EXTRA_SIGNAL_PORTS]
   ins_valid : in std_logic_vector({size} - 1 downto 0);
 
-  outs_ready : in std_logic_vector({size} downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
-  outs_valid : out std_logic_vector({size} downto 0);
+  outs_ready : in std_logic_vector({size} - 1 downto 0);  -- this signal and the one after include the extra output of the UNTAGGER that carries the freed up tag
+  outs_valid : out std_logic_vector({size} -1 downto 0);
 
   ins_ready : out std_logic_vector({size} - 1 downto 0);
 
@@ -143,7 +159,7 @@ port(
   tagOut_valid : in  std_logic;
   tagOut_ready : out std_logic;
 
-  ins_tag : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
+  ins_{current_tag} : in data_array ({size} - 1 downto 0)({tag_bitwidth}-1 downto 0) 
 );
 end {name};
 """
@@ -151,7 +167,7 @@ end {name};
   extra_signal_ports = generate_extra_signal_ports_arrays([
       ("ins", "in", size),
       ("outs", "out", size)
-  ], data_type.extra_signals)
+  ], data_out_type.extra_signals)
   entity = entity.replace("  [EXTRA_SIGNAL_PORTS]", extra_signal_ports)
 
   architecture = f"""
@@ -175,7 +191,7 @@ begin
       tagOut => tagOut,
       tagOut_valid => tagOut_valid,
       tagOut_ready => tagOut_ready,
-      ins_tag => ins_tag
+      ins_{current_tag} => ins_{current_tag}
     );
 
     outs_inner <= ins_inner;

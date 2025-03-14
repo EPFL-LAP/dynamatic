@@ -31,6 +31,7 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::outoforder;
 
 int numTags = 4;
+int numTagsOuter = 8;
 
 namespace {
 struct OutOfOrderExecutionPass
@@ -69,10 +70,6 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     handshake::TaggerOp taggerOp = builder.create<handshake::TaggerOp>(
         loadOp.getLoc(), addrInput.getType(), addrInput, fifo.getTagOut());
 
-    // addrInput.print(llvm::errs());
-    // llvm::errs() << "\n";
-    // llvm::errs() << addrInput.getType() << "\n";
-
     // Connect the tagger to the load
     loadOp.getOperation()->replaceUsesOfWith(addrInput,
                                              taggerOp.getDataOut().front());
@@ -91,9 +88,42 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     }
 
     // Connet the free tag from the untagger to the fifo
-    fifo.getOperation()->replaceUsesOfWith(startValue, untaggerOp.getTagOut());
-  }
 
+    fifo.getOperation()->replaceUsesOfWith(startValue, untaggerOp.getTagOut());
+
+    /*
+    // Add other tagger and untagger operations for nested subgraphs case
+    auto tagTypeOuter = builder.getIntegerType(ceil(log2(numTagsOuter)));
+
+    FreeTagsFifoOp fifoOuter = builder.create<handshake::FreeTagsFifoOp>(
+        loadOp.getLoc(), handshake::ChannelType::get(tagTypeOuter), startValue);
+
+    // Create the outer Tagger fed from the inputs of the inner Tagger
+    handshake::TaggerOp taggerOpOuter = builder.create<handshake::TaggerOp>(
+        taggerOp.getLoc(), taggerOp.getDataOperands().getTypes(),
+        taggerOp.getDataOperands(), fifoOuter.getTagOut());
+
+    // Connect the outer tagger to the inner tagger
+    for (int i = 0; i < taggerOp.getDataOperands().size(); i++) {
+      taggerOp.getOperation()->replaceUsesOfWith(taggerOp.getDataOperands()[i],
+                                                 taggerOpOuter.getDataOut()[i]);
+    }
+
+    // Create the outer Untagger fed from the inputs of the inner Untagger
+    // Create the untagegr and connect it to teh load
+    UntaggerOp untaggerOpOuter = builder.create<handshake::UntaggerOp>(
+        untaggerOp.getLoc(), untaggerOp.getDataOut().getTypes(),
+        fifoOuter.getTagOut().getType(), untaggerOp.getDataOut());
+
+    // Replaces all the connections load->consumer to untagger->consumer
+    Value loadOutput = loadOp.getDataOutput();
+    for (Operation *user : loadOutput.getUsers()) {
+      if (!isa<handshake::UntaggerOp>(user))
+
+        user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut().front());
+    }
+        */
+  }
   return success();
 }
 
@@ -102,8 +132,8 @@ const std::string EXTRA_TAG = "tag0";
 static LogicalResult addTagToValue(Value value) {
   OpBuilder builder(value.getContext());
 
-  // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
-  // or ControlType).
+  // The value type must implement ExtraSignalsTypeInterface (e.g.,
+  // ChannelType or ControlType).
   if (auto valueType =
           value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
     // Skip if the spec tag was already added during the algorithm.
