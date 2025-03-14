@@ -23,7 +23,7 @@ List of options:
   --threads | -t <num-threads>         : number of concurrent threads to build on (by
                                          default, one thread per logical core on the host
                                          machine)
-  --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when 
+  --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when
                                          building llvm (defaults to 2)
   --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
   --experimental-enable-xls            : enable experimental xls integration
@@ -271,7 +271,7 @@ fi
 
 XLS_DIR="$SCRIPT_CWD/xls"
 XLS_UPSTREAM="https://github.com/ETHZ-DYNAMO/xls.git"
-XLS_COMMIT="658010efafb578493b89a112c616c6cd6ab0a118"
+XLS_COMMIT="939eb43c307005caf4af75ed9b8a0dbc6c905386"
 
 if [[ ENABLE_XLS_INTEGRATION -eq 1 || -d "$XLS_DIR" ]]; then
     echo_section "Preparing XLS"
