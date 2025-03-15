@@ -1208,6 +1208,179 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   }];
 }
 
+
+//===----------------------------------------------------------------------===//
+// Speculation V2
+//===----------------------------------------------------------------------===//
+
+def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
+  IsIntSizedChannel<1, "condition">,
+  // HasValidSpecTag<"condition">,
+  IsSimpleHandshake<"trigger">,
+  IsSimpleHandshake<"ctrlOut">,
+  IsSimpleHandshake<"muxCtrl">,
+  IsIntSizedChannel<1, "muxCtrl">,
+  IsSimpleHandshake<"commitCtrl">,
+  IsIntSizedChannel<1, "commitCtrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Central control unit of the speculative circuit.";
+  let description = [{
+    The speculator produces speculative tokens when real data has
+    not yet arrived. The speculator is also responsible for deciding
+    the correctness of its speculation.
+
+    It needs to send control tokens to save units and commit units
+    ($saveCtrl, $commitCtrl). For save-commit units, three control
+    signals are needed. $SCSaveCtrl is connected directly, while
+    $SCCommitCtrl replicates the branches that $dataOut
+    follows and might not reach a save-commit. $SCIsMisspec is needed
+    in the replicated branches to discard the latter signal.
+
+    Example:
+
+    ```mlir
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
+      = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
+        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$condition, ControlType:$trigger);
+  let results = (outs ControlType:$ctrlOut,
+                      ChannelType:$muxCtrl,
+                      ChannelType:$commitCtrl);
+
+  let assemblyFormat = [{
+    `[` $trigger `]` $condition attr-dict `:` type($trigger) `,` type($condition) `,`
+    type($ctrlOut) `,` type($muxCtrl) `,` type($commitCtrl)
+  }];
+
+  // Infer the type of the control signals
+  let builders = [OpBuilder<(ins "Value":$condition, "Value":$trigger), [{
+    $_state.addOperands({condition, trigger});
+
+    ControlType ctrlOutType = ControlType::get($_builder.getContext(), {});
+    ChannelType ctrlSignalsType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(1), {});
+
+    $_state.addTypes({ctrlOutType, ctrlSignalsType, ctrlSignalsType});
+  }]>];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return idx == 0 ? "cond" : "trigger";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      switch (idx) {
+      case 0:
+        return "ctrlOut";
+      case 1:
+        return "muxCtrl";
+      default:
+        return "commitCtrl";
+      }
+    }
+  }];
+}
+
+def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  HasValidSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
+  IsSimpleHandshake<"ctrl">,
+  IsIntSizedChannel<1, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Stall speculative data tokens until they are resolved.";
+  let description = [{
+    Commit units are used to mark the end of the speculation region.
+    Commit units are used to stall speculative tokens until they receive
+    the decision from the speculator. In case the speculation is correct,
+    the speculative tokens are converted into non-speculative tokens and
+    passed on to the rest of the circuit.
+    Otherwise, the speculative tokens are discarded.
+
+    Any non-speculative token can pass through the commit units
+    without any stall.
+
+    Example:
+
+    ```mlir
+    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, !handshake.channel<i1>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return idx == 0 ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
+}
+
+def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
+  AllDataTypesMatch<["nonspecIn", "specIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["nonspecIn", "specIn", "dataOut"]>,
+  HasValidSpecTag<"specIn">,
+  LacksSpecTag<"nonspecIn">,
+  HasValidSpecTag<"dataOut">,
+  IsSimpleHandshake<"index">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "";
+  let description = [{
+    Example:
+
+    ```mlir
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$index,
+                       HandshakeType:$nonspecIn, // TODO: Variadic
+                       HandshakeType:$specIn); // TODO: Variadic
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    $index `[` $nonspecIn `,` $specIn `]` attr-dict `:` type($index) `,`
+    type($nonspecIn) `,` type($specIn) `,` type($dataOut)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      switch (idx) {
+      case 0:
+        return "index";
+      case 1:
+        return "nonspecIn";
+      default:
+        return "specIn";
+      }
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "dataOut";
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Resource sharing
 //===----------------------------------------------------------------------===//
