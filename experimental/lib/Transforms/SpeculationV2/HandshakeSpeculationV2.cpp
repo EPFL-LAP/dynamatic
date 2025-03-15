@@ -240,6 +240,156 @@ static LogicalResult placeCommitUnits(FuncOp &funcOp,
   return success();
 }
 
+const std::string EXTRA_BIT_SPEC = "spec";
+
+static LogicalResult addSpecTagToValue(Value value) {
+  OpBuilder builder(value.getContext());
+
+  // The value type must implement ExtraSignalsTypeInterface (e.g., ChannelType
+  // or ControlType).
+  if (auto valueType =
+          value.getType().dyn_cast<handshake::ExtraSignalsTypeInterface>()) {
+    // Skip if the spec tag was already added during the algorithm.
+    if (!valueType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      llvm::SmallVector<ExtraSignal> newExtraSignals(
+          valueType.getExtraSignals());
+      newExtraSignals.emplace_back(EXTRA_BIT_SPEC, builder.getIntegerType(1));
+      value.setType(valueType.copyWithExtraSignals(newExtraSignals));
+    }
+    return success();
+  }
+  value.getDefiningOp()->emitError("Unexpected type");
+  return failure();
+}
+
+static LogicalResult addSpecTagRecursive(OpOperand &opOperand,
+                                         bool isDownstream,
+                                         llvm::DenseSet<Operation *> &visited) {
+
+  if (failed(addSpecTagToValue(opOperand.get())))
+    return failure();
+
+  Operation *op;
+
+  // Traversal may be either upstream or downstream
+  if (isDownstream) {
+    // Owner is the consumer of the operand
+    op = opOperand.getOwner();
+  } else {
+    // DefiningOp is the producer of the operand
+    op = opOperand.get().getDefiningOp();
+  }
+
+  if (!op) {
+    // As long as the algorithm traverses inside the speculative region,
+    // all operands should have an owner and defining operation.
+    llvm::errs() << "op is nullptr\n";
+    llvm::errs() << "downstream: " << isDownstream << "\n";
+    opOperand.get().dump();
+    return failure();
+  }
+
+  op->dump();
+
+  if (visited.contains(op))
+    return success();
+  visited.insert(op);
+
+  // Exceptional cases
+  if (isa<handshake::SpecCommitV2Op>(op)) {
+    if (isDownstream) {
+      // Stop the traversal at the commit unit
+      return success();
+    }
+
+    // The upstream stream shouldn't reach the commit unit,
+    // as that would indicate it originated outside the speculative region.
+    op->emitError("SpecCommitOp should not be reached from "
+                  "outside the speculative region");
+    return failure();
+  }
+
+  if (isa<handshake::StoreOp>(op)) {
+    op->emitError("StoreOp should not be within the speculative region");
+    return failure();
+  }
+
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+    if (isDownstream) {
+      // Continue traversal to dataOut, skipping ports connected to the memory
+      // controller.
+      for (auto &operand : loadOp->getOpResult(1).getUses()) {
+        if (failed(addSpecTagRecursive(operand, true, visited)))
+          return failure();
+      }
+    } else {
+      // Continue traversal to addrIn, skipping ports connected to the memory
+      // controller.
+      auto &operand = loadOp->getOpOperand(0);
+      if (failed(addSpecTagRecursive(operand, false, visited)))
+        return failure();
+    }
+
+    return success();
+  }
+
+  if (auto specMuxOp = dyn_cast<handshake::SpecMuxV2Op>(op)) {
+    if (isDownstream) {
+      for (auto &operand : specMuxOp.getDataOut().getUses()) {
+        if (failed(addSpecTagRecursive(operand, true, visited)))
+          return failure();
+      }
+    } else {
+      if (failed(addSpecTagRecursive(*specMuxOp.getSpecIn().getUses().begin(),
+                                     false, visited)))
+        return failure();
+    }
+
+    return success();
+  }
+
+  // General case
+
+  // Upstream traversal
+  for (auto &operand : op->getOpOperands()) {
+    // Skip the operand that is the same as the current operand
+    if (isDownstream && &operand == &opOperand)
+      continue;
+    if (failed(addSpecTagRecursive(operand, false, visited)))
+      return failure();
+  }
+
+  // Downstream traversal
+  for (auto result : op->getResults()) {
+    if (result.getUses().empty()) {
+      if (failed(addSpecTagToValue(result)))
+        return failure();
+      continue;
+    }
+    for (auto &operand : result.getUses()) {
+      // Skip the operand that is the same as the current operand
+      if (!isDownstream && &operand == &opOperand)
+        continue;
+      if (failed(addSpecTagRecursive(operand, true, visited)))
+        return failure();
+    }
+  }
+
+  return success();
+}
+
+static LogicalResult addSpecTag(FuncOp &funcOp) {
+  SpeculatorV2Op specOp = getSpecOp(funcOp);
+
+  llvm::DenseSet<Operation *> visited;
+  visited.insert(specOp);
+
+  if (failed(addSpecTagRecursive(*specOp.getCondition().getUses().begin(),
+                                 false, visited)))
+    return failure();
+  return success();
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -262,6 +412,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   std::vector<Value> commitPlacements = {storeOp.getAddress(),
                                          storeOp.getData()};
   if (failed(placeCommitUnits(funcOp, commitPlacements)))
+    return signalPassFailure();
+
+  if (failed(addSpecTag(funcOp)))
     return signalPassFailure();
 }
 

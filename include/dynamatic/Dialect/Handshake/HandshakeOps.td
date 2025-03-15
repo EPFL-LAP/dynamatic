@@ -1215,7 +1215,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
 
 def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
   IsIntSizedChannel<1, "condition">,
-  // HasValidSpecTag<"condition">,
+  HasValidSpecTag<"condition">,
   IsSimpleHandshake<"trigger">,
   IsSimpleHandshake<"ctrlOut">,
   IsSimpleHandshake<"muxCtrl">,
@@ -1289,8 +1289,8 @@ def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
 def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  // HasValidSpecTag<"dataIn">,
-  // LacksSpecTag<"dataOut">,
+  HasValidSpecTag<"dataIn">,
+  LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1337,9 +1337,9 @@ def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
 def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
   AllDataTypesMatch<["nonspecIn", "specIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["nonspecIn", "specIn", "dataOut"]>,
-  // HasValidSpecTag<"specIn">,
-  // LacksSpecTag<"nonspecIn">,
-  // HasValidSpecTag<"dataOut">,
+  HasValidSpecTag<"specIn">,
+  LacksSpecTag<"nonspecIn">,
+  HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"index">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
