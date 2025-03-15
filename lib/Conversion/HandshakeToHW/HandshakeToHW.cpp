@@ -685,6 +685,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
         addUnsigned("FIFO_DEPTH", 16);
       })
+      .Case<handshake::SpeculatorV2Op, handshake::SpecCommitV2Op,
+            handshake::SpecMuxV2Op>([](auto) {
+        // No parameters needed for these operations
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1837,7 +1841,13 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveOp>,
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+
+                    // Speculation-v2 operations
+                    ConvertToHWInstance<handshake::SpeculatorV2Op>,
+                    ConvertToHWInstance<handshake::SpecCommitV2Op>,
+                    ConvertToHWInstance<handshake::SpecMuxV2Op>>(
+
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
