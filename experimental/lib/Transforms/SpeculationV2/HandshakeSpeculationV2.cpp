@@ -223,6 +223,32 @@ static LogicalResult eraseDataBranches(FuncOp &funcOp, unsigned specBB,
   return success();
 }
 
+// static LogicalResult eraseUnusedControlNetwork(FuncOp &funcOp,
+//                                                unsigned specBB) {
+//   // TODO: In some cases control network is still necessary
+//   SmallVector<Operation *> toErase;
+//   for (auto specMuxOp : funcOp.getOps<SpecMuxV2Op>()) {
+//     auto specMuxBB = getLogicBB(specMuxOp);
+//     if (!specMuxBB || *specMuxBB != specBB) {
+//       continue;
+//     }
+//     if (mlir::isa<ControlType>(specMuxOp.getDataOut().getType())) {
+//       toErase.push_back(specMuxOp);
+//       Operation *currentOp = *specMuxOp.getDataOut().getUsers().begin();
+//       while (currentOp != specMuxOp) {
+//         toErase.push_back(currentOp);
+//         currentOp->dump();
+//         currentOp = *currentOp->getResult(0).getUsers().begin();
+//       }
+//     }
+//   }
+
+//   for (auto *op : toErase) {
+//     op->erase();
+//   }
+//   return success();
+// }
+
 static LogicalResult placeCommitUnits(FuncOp &funcOp,
                                       llvm::ArrayRef<Value> placements) {
   SpeculatorV2Op specOp = getSpecOp(funcOp);
@@ -304,7 +330,20 @@ static LogicalResult addSpecTagRecursive(OpOperand &opOperand,
 
     // The upstream stream shouldn't reach the commit unit,
     // as that would indicate it originated outside the speculative region.
-    op->emitError("SpecCommitOp should not be reached from "
+    op->emitError("SpecCommitV2Op should not be reached from "
+                  "outside the speculative region");
+    return failure();
+  }
+
+  if (isa<handshake::SpeculatorV2Op>(op)) {
+    if (isDownstream) {
+      // Stop the traversal at the commit unit
+      return success();
+    }
+
+    // The upstream stream shouldn't reach the commit unit,
+    // as that would indicate it originated outside the speculative region.
+    op->emitError("SpeculatorV2Op should not be reached from "
                   "outside the speculative region");
     return failure();
   }
@@ -379,14 +418,16 @@ static LogicalResult addSpecTagRecursive(OpOperand &opOperand,
 }
 
 static LogicalResult addSpecTag(FuncOp &funcOp) {
-  SpeculatorV2Op specOp = getSpecOp(funcOp);
-
   llvm::DenseSet<Operation *> visited;
-  visited.insert(specOp);
 
-  if (failed(addSpecTagRecursive(*specOp.getCondition().getUses().begin(),
-                                 false, visited)))
-    return failure();
+  for (auto specMuxOp : funcOp.getOps<SpecMuxV2Op>()) {
+    visited.insert(specMuxOp);
+    for (auto &specMuxOpOperand : specMuxOp.getDataOut().getUses()) {
+      if (failed(addSpecTagRecursive(specMuxOpOperand, true, visited)))
+        return failure();
+    }
+  }
+
   return success();
 }
 
@@ -408,9 +449,15 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   if (failed(eraseDataBranches(funcOp, 1, 2)))
     return signalPassFailure();
 
+  // if (failed(eraseUnusedControlNetwork(funcOp, 1)))
+  //   return signalPassFailure();
+
   StoreOp storeOp = mlir::cast<StoreOp>(nameAnalysis.getOp("store1"));
+  MemoryControllerOp memControllerOp =
+      mlir::cast<MemoryControllerOp>(nameAnalysis.getOp("mem_controller3"));
   std::vector<Value> commitPlacements = {storeOp.getAddress(),
-                                         storeOp.getData()};
+                                         storeOp.getData(),
+                                         memControllerOp.getInputs().front()};
   if (failed(placeCommitUnits(funcOp, commitPlacements)))
     return signalPassFailure();
 
