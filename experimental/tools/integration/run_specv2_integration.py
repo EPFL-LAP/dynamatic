@@ -281,17 +281,17 @@ def run_test(c_file, id, timeout):
     else:
       return fail(id, "Failed to lower handshake to hw")
 
-  # # Export hdl
-  # hdl_dir = os.path.join(out_dir, "hdl")
+  # Export hdl
+  hdl_dir = os.path.join(out_dir, "hdl")
 
-  # result = subprocess.run([
-  #     EXPORT_RTL_BIN, hw, hdl_dir, RTL_CONFIG,
-  #     "--dynamatic-path", DYNAMATIC_ROOT, "--hdl", "vhdl"
-  # ])
-  # if result.returncode == 0:
-  #   print("Exported hdl")
-  # else:
-  #   return fail(id, "Failed to export hdl")
+  result = subprocess.run([
+      EXPORT_RTL_BIN, hw, hdl_dir, RTL_CONFIG,
+      "--dynamatic-path", DYNAMATIC_ROOT, "--hdl", "vhdl"
+  ])
+  if result.returncode == 0:
+    print("Exported hdl")
+  else:
+    return fail(id, "Failed to export hdl")
 
   # # Simulate
   # print("Simulator launching")

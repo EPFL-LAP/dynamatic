@@ -124,6 +124,18 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculating_branch -p port_types=$PORT_TYPES spec_tag_bitwidth=$SPEC_TAG_BITWIDTH data_bitwidth=$DATA_BITWIDTH extra_signals_except_spec=$EXTRA_SIGNALS_EXCEPT_SPEC"
   },
   {
+    "name": "handshake.speculator_v2",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator_v2 -p bitwidth=$BITWIDTH"
+  },
+  {
+    "name": "handshake.spec_commit_v2",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_commit_v2 -p bitwidth=$BITWIDTH"
+  },
+  {
+    "name": "handshake.spec_mux_v2",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_mux_v2 -p bitwidth=$BITWIDTH"
+  },
+  {
     "name": "mem_to_bram",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mem_to_bram -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH"
   },

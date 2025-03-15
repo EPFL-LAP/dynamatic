@@ -23,6 +23,9 @@ import generators.handshake.speculating_branch as speculating_branch
 import generators.handshake.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
+import generators.handshake.spec_v2.speculator_v2 as speculator_v2
+import generators.handshake.spec_v2.spec_mux_v2 as spec_mux_v2
+import generators.handshake.spec_v2.spec_commit_v2 as spec_commit_v2
 import generators.support.mem_to_bram as mem_to_bram
 
 
@@ -70,6 +73,12 @@ def generate_code(name, mod_type, parameters):
       return store.generate_store(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
+    case "speculator_v2":
+      return speculator_v2.generate_speculator_v2(name, parameters)
+    case "spec_mux_v2":
+      return spec_mux_v2.generate_spec_mux_v2(name, parameters)
+    case "spec_commit_v2":
+      return spec_commit_v2.generate_spec_commit_v2(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:

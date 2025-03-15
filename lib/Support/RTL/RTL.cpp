@@ -331,10 +331,11 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       name == "handshake.sink" ||
       // the first input has data bitwidth
       name == "handshake.speculator" || name == "handshake.spec_commit" ||
-      name == "handshake.spec_save_commit") {
+      name == "handshake.spec_save_commit" ||
+      name == "handshake.speculator_v2" || name == "handshake.spec_commit_v2") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(0));
-  } else if (name == "handshake.cond_br") {
+  } else if (name == "handshake.cond_br" || name == "handshake.spec_mux_v2") {
     serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.constant") {
     serializedParams["BITWIDTH"] = getBitwidthString(mod.getOutputType(0));
