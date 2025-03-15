@@ -22,6 +22,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -105,10 +106,9 @@ static void placeSpeculator(FuncOp &funcOp, unsigned preBB, unsigned specBB,
   inheritBB(condBrOp, specOp);
 
   ctrlOut.replaceAllUsesWith(specOp.getCtrlOut());
-  // ctrlBackedge.replaceAllUsesWith(condBrOp.getDataOperand());
+  ctrlBackedge.replaceAllUsesWith(condBrOp.getDataOperand());
 
-  // condBrOp->dump();
-  // condBrOp->erase();
+  condBrOp->erase();
 }
 
 static SpeculatorV2Op getSpecOp(FuncOp &funcOp) {
@@ -189,6 +189,39 @@ static LogicalResult placeSpecMux(FuncOp &funcOp, unsigned preBB,
   return success();
 }
 
+static LogicalResult eraseDataBranches(FuncOp &funcOp, unsigned specBB,
+                                       unsigned postBB) {
+  SmallVector<Operation *> toErase;
+  for (auto condBrOp : funcOp.getOps<ConditionalBranchOp>()) {
+    if (mlir::isa<ControlType>(condBrOp.getDataOperand().getType())) {
+      // Control branch is already replaced with speculator's ctrlOut
+      condBrOp->emitError(
+          "Unexpected case: control branch should be already replaced");
+      return failure();
+    }
+    auto condBrBB = getLogicBB(condBrOp);
+    if (!condBrBB || *condBrBB != specBB) {
+      continue;
+    }
+    for (auto result : condBrOp.getResults()) {
+      auto *user = *result.getUsers().begin();
+      auto userBB = getLogicBB(user);
+      if (!userBB || *userBB == postBB) {
+        // todo: anti commit
+        user->erase();
+      } else {
+        result.replaceAllUsesWith(condBrOp.getDataOperand());
+      }
+    }
+    toErase.push_back(condBrOp);
+  }
+
+  for (auto *op : toErase) {
+    op->erase();
+  }
+  return success();
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -201,9 +234,11 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
   placeSpeculator(funcOp, 0, 1, 2);
 
-  if (failed(placeSpecMux(funcOp, 0, 1, 2))) {
+  if (failed(placeSpecMux(funcOp, 0, 1, 2)))
     return signalPassFailure();
-  }
+
+  if (failed(eraseDataBranches(funcOp, 1, 2)))
+    return signalPassFailure();
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
