@@ -18,7 +18,9 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm::sys;
@@ -103,10 +105,88 @@ static void placeSpeculator(FuncOp &funcOp, unsigned preBB, unsigned specBB,
   inheritBB(condBrOp, specOp);
 
   ctrlOut.replaceAllUsesWith(specOp.getCtrlOut());
-  ctrlBackedge.replaceAllUsesWith(condBrOp.getDataOperand());
+  // ctrlBackedge.replaceAllUsesWith(condBrOp.getDataOperand());
 
-  condBrOp->dump();
-  condBrOp->erase();
+  // condBrOp->dump();
+  // condBrOp->erase();
+}
+
+static SpeculatorV2Op getSpecOp(FuncOp &funcOp) {
+  return *funcOp.getOps<SpeculatorV2Op>().begin();
+}
+
+static LogicalResult placeSpecMux(FuncOp &funcOp, unsigned preBB,
+                                  unsigned specBB, unsigned postBB) {
+  SpeculatorV2Op specOp = getSpecOp(funcOp);
+
+  OpBuilder builder(funcOp->getContext());
+  for (auto muxOp : funcOp.getOps<MuxOp>()) {
+    auto muxBB = getLogicBB(muxOp);
+    if (!muxBB || *muxBB != specBB) {
+      continue;
+    }
+    if (muxOp.getDataOperands().size() != 2) {
+      muxOp.emitError("MuxOp should have 2 operands");
+      return failure();
+    }
+    Value nonSpecIn = nullptr;
+    Value specIn = nullptr;
+    for (auto operand : muxOp.getDataOperands()) {
+      auto operandFromBB = getLogicBB(operand.getDefiningOp());
+      if (operandFromBB && *operandFromBB == preBB) {
+        nonSpecIn = operand;
+      } else {
+        specIn = operand;
+      }
+    }
+    if (!nonSpecIn || !specIn) {
+      muxOp.emitError("Could not find the operands");
+      return failure();
+    }
+
+    builder.setInsertionPoint(muxOp);
+    SpecMuxV2Op specMuxOp =
+        builder.create<SpecMuxV2Op>(muxOp.getLoc(), nonSpecIn.getType(),
+                                    specOp.getMuxCtrl(), nonSpecIn, specIn);
+    inheritBB(muxOp, specMuxOp);
+    muxOp.getResult().replaceAllUsesWith(specMuxOp.getResult());
+    muxOp->erase();
+  }
+
+  for (auto cmergeOp : funcOp.getOps<ControlMergeOp>()) {
+    auto cmergeBB = getLogicBB(cmergeOp);
+    if (!cmergeBB || *cmergeBB != specBB) {
+      continue;
+    }
+    if (cmergeOp.getDataOperands().size() != 2) {
+      cmergeOp.emitError("ControlMergeOp should have 2 operands");
+      return failure();
+    }
+    Value nonSpecIn = nullptr;
+    Value specIn = nullptr;
+    for (auto operand : cmergeOp.getDataOperands()) {
+      auto operandFromBB = getLogicBB(operand.getDefiningOp());
+      if (operandFromBB && *operandFromBB == preBB) {
+        nonSpecIn = operand;
+      } else {
+        specIn = operand;
+      }
+    }
+    if (!nonSpecIn || !specIn) {
+      cmergeOp.emitError("Could not find the operands");
+      return failure();
+    }
+
+    builder.setInsertionPoint(cmergeOp);
+    SpecMuxV2Op specMuxOp =
+        builder.create<SpecMuxV2Op>(cmergeOp.getLoc(), nonSpecIn.getType(),
+                                    specOp.getMuxCtrl(), nonSpecIn, specIn);
+    inheritBB(cmergeOp, specMuxOp);
+    cmergeOp.getDataResult().replaceAllUsesWith(specMuxOp.getResult());
+    cmergeOp->erase();
+  }
+
+  return success();
 }
 
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
@@ -115,11 +195,15 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   // Support only one funcOp
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
-  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
-  Value condition = nameAnalysis.getOp("cmpi0")->getResult(0);
+  // Value condition = nameAnalysis.getOp("cmpi0")->getResult(0);
 
   placeSpeculator(funcOp, 0, 1, 2);
+
+  if (failed(placeSpecMux(funcOp, 0, 1, 2))) {
+    return signalPassFailure();
+  }
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
