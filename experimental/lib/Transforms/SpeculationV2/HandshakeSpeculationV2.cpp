@@ -309,13 +309,8 @@ static LogicalResult addSpecTagRecursive(OpOperand &opOperand,
   if (!op) {
     // As long as the algorithm traverses inside the speculative region,
     // all operands should have an owner and defining operation.
-    llvm::errs() << "op is nullptr\n";
-    llvm::errs() << "downstream: " << isDownstream << "\n";
-    opOperand.get().dump();
     return failure();
   }
-
-  op->dump();
 
   if (visited.contains(op))
     return success();
