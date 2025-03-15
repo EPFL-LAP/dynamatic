@@ -1219,7 +1219,7 @@ def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
   IsSimpleHandshake<"trigger">,
   IsSimpleHandshake<"ctrlOut">,
   IsSimpleHandshake<"muxCtrl">,
-  IsIntSizedChannel<1, "muxCtrl">,
+  IsIntSizedChannel<2, "muxCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1261,9 +1261,10 @@ def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
     $_state.addOperands({condition, trigger});
 
     ControlType ctrlOutType = ControlType::get($_builder.getContext(), {});
-    ChannelType ctrlSignalsType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(1), {});
+    ChannelType muxCtrlType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(2), {});
+    ChannelType commitCtrlType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(1), {});
 
-    $_state.addTypes({ctrlOutType, ctrlSignalsType, ctrlSignalsType});
+    $_state.addTypes({ctrlOutType, muxCtrlType, commitCtrlType});
   }]>];
 
   let extraClassDefinition = [{
@@ -1340,7 +1341,8 @@ def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
   HasValidSpecTag<"specIn">,
   LacksSpecTag<"nonspecIn">,
   HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"index">,
+  IsSimpleHandshake<"muxCtrl">,
+  IsIntSizedChannel<2, "muxCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "";
@@ -1351,14 +1353,14 @@ def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$index,
+  let arguments = (ins ChannelType:$muxCtrl,
                        HandshakeType:$nonspecIn, // TODO: Variadic
                        HandshakeType:$specIn); // TODO: Variadic
   let results = (outs HandshakeType:$dataOut);
 
   let assemblyFormat = [{
-    $index `[` $nonspecIn `,` $specIn `]` attr-dict `:` type($index) `,`
-    type($nonspecIn) `,` type($specIn) `,` type($dataOut)
+    `[` $nonspecIn `,` $specIn `]` $muxCtrl attr-dict `:` type($nonspecIn) `,`
+    type($specIn) `,` type($muxCtrl) `,` type($dataOut)
   }];
 
   let extraClassDefinition = [{
@@ -1366,7 +1368,7 @@ def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
       assert(idx < getOperation()->getNumOperands() && "index too high");
       switch (idx) {
       case 0:
-        return "index";
+        return "muxCtrl";
       case 1:
         return "nonspecIn";
       default:
