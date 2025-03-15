@@ -21,6 +21,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -222,13 +223,30 @@ static LogicalResult eraseDataBranches(FuncOp &funcOp, unsigned specBB,
   return success();
 }
 
+static LogicalResult placeCommitUnits(FuncOp &funcOp,
+                                      llvm::ArrayRef<Value> placements) {
+  SpeculatorV2Op specOp = getSpecOp(funcOp);
+
+  OpBuilder builder(funcOp->getContext());
+  for (auto placement : placements) {
+    builder.setInsertionPointAfterValue(placement);
+    SpecCommitV2Op commitOp =
+        builder.create<SpecCommitV2Op>(placement.getLoc(), placement.getType(),
+                                       placement, specOp.getCommitCtrl());
+    inheritBB(placement.getDefiningOp(), commitOp);
+    placement.replaceAllUsesExcept(commitOp.getDataOut(), commitOp);
+  }
+
+  return success();
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
   // Support only one funcOp
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
 
-  // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
   // Value condition = nameAnalysis.getOp("cmpi0")->getResult(0);
 
@@ -238,6 +256,12 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     return signalPassFailure();
 
   if (failed(eraseDataBranches(funcOp, 1, 2)))
+    return signalPassFailure();
+
+  StoreOp storeOp = mlir::cast<StoreOp>(nameAnalysis.getOp("store1"));
+  std::vector<Value> commitPlacements = {storeOp.getAddress(),
+                                         storeOp.getData()};
+  if (failed(placeCommitUnits(funcOp, commitPlacements)))
     return signalPassFailure();
 }
 

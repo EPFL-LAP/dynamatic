@@ -1289,8 +1289,8 @@ def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
 def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasValidSpecTag<"dataIn">,
-  LacksSpecTag<"dataOut">,
+  // HasValidSpecTag<"dataIn">,
+  // LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
