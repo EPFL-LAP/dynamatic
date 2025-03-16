@@ -66,7 +66,7 @@ begin
       falseOut_ready => falseOut_ready
     );
 end architecture;
--- signal manager generated info: handshake_cond_br_2, {'type': 'normal', 'in_ports': [{'name': 'data', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'condition', 'bitwidth': 1, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'trueOut', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'falseOut', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'extra_signals': {'spec': 1}}
+-- Signal manager generation info: handshake_cond_br_2, {'type': 'normal', 'in_ports': [{'name': 'data', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'condition', 'bitwidth': 1, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'trueOut', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'falseOut', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'extra_signals': {'spec': 1}}
 ```
 
 ## `muli` (buffered signal manager)
@@ -142,7 +142,7 @@ begin
       outs_ready => transfer_out
     );
 end architecture;
--- signal manager generated info: handshake_muli_0, {'type': 'buffered', 'latency': 4, 'in_ports': [{'name': 'lhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'rhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'result', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'extra_signals': {'spec': 1}}
+-- Signal manager generation info: handshake_muli_0, {'type': 'buffered', 'latency': 4, 'in_ports': [{'name': 'lhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'rhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'result', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'extra_signals': {'spec': 1}}
 ```
 
 ## `fork` (concat signal manager)
@@ -206,7 +206,7 @@ begin
       outs_ready => outs_ready
     );
 end architecture;
--- signal manager generated info: handshake_fork_1, {'type': 'concat', 'in_ports': [{'name': 'ins', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'spec': 1}, '2d': True, 'size': 4}], 'extra_signals': {'spec': 1}}
+-- Signal manager generation info: handshake_fork_1, {'type': 'concat', 'in_ports': [{'name': 'ins', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'spec': 1}, '2d': True, 'size': 4}], 'extra_signals': {'spec': 1}}
 ```
 
 ## `mux` (bbmerge signal manager)
@@ -276,7 +276,7 @@ begin
       outs_ready => outs_ready
     );
 end architecture;
--- signal manager generated info: handshake_mux_0, {'type': 'bbmerge', 'in_ports': [{'name': 'ins', 'bitwidth': 32, '2d': True, 'size': 2, 'extra_signals_list': [{}, {'spec': 1}]}, {'name': 'index', 'bitwidth': 1, 'extra_signals': {}}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'size': 2, 'data_in_name': 'ins', 'index_name': 'index', 'out_extra_signals': {'spec': 1}, 'spec_inputs': [1]}
+-- Signal manager generation info: handshake_mux_0, {'type': 'bbmerge', 'in_ports': [{'name': 'ins', 'bitwidth': 32, '2d': True, 'size': 2, 'extra_signals_list': [{}, {'spec': 1}]}, {'name': 'index', 'bitwidth': 1, 'extra_signals': {}}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'size': 2, 'data_in_name': 'ins', 'index_name': 'index', 'out_extra_signals': {'spec': 1}, 'spec_inputs': [1]}
 ```
 
 ## `load` (custom signal manager)
