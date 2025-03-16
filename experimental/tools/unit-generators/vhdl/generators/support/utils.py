@@ -1,6 +1,6 @@
 class ConcatenationInfo:
   # List of tuples of (extra_signal_name, (msb, lsb))
-  # e.g., [("spec", 0, 0), ("tag0", 8, 1)]
+  # e.g., [("spec", (0, 0)), ("tag0", (8, 1))]
   mapping: list[tuple[str, tuple[int, int]]]
   total_bitwidth: int
 
