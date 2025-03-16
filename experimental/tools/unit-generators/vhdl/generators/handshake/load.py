@@ -144,7 +144,7 @@ architecture arch of {name} is
   signal addrIn_ready_inner : std_logic;
   signal tfifo_ready : std_logic;
   -- Concatenated signals
-{concat_signal_decls}
+  {concat_signal_decls}
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
@@ -156,7 +156,7 @@ begin
   transfer_out <= dataOut_valid and dataOut_ready;
 
   -- Concatenate extra signals
-{concat_signal_logic}
+  {concat_signal_logic}
 
   -- Buffer to store extra signals for in-flight memory requests
   -- Use tfifo because the latency is unknown
