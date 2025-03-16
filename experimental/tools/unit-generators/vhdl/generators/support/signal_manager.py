@@ -271,7 +271,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   # Concat/split extra signals for buffer input/output.
   signal_assignments = []
 
-  # Iterate over all extra signals
+  # Generate assignments from individual extra signals to single concatenated variable.
   for signal_name, (msb, lsb) in concat_info.mapping:
     # Concat extra signals for buffer input.
     signal_assignments.append(
