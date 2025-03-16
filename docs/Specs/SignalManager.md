@@ -2,6 +2,8 @@
 
 The signal manager wraps each unit (e.g., `addi`, `buffer`, etc.) and forwards extra signals.
 
+As you can see from the source code, typical signal managers can be reused across many ops. You don’t need to reimplement a signal manager every time you introduce a new op. Additionally, when adding a new type of extra signal, you only need to update a small number of signal managers.
+
 The generator code may seem abstract without concrete examples, so here are some generated signal managers.
 
 Comments starting with `Note:` are for clarity and are not part of the generated output.
@@ -144,6 +146,10 @@ begin
 end architecture;
 -- Signal manager generation info: handshake_muli_0, {'type': 'buffered', 'latency': 4, 'in_ports': [{'name': 'lhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}, {'name': 'rhs', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'result', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'extra_signals': {'spec': 1}}
 ```
+
+The illustration of this circuit (by @murphe67) looks like this:
+
+<img src="./figs/SignalManager/muli.png" width="700" />
 
 ## `fork` (concat signal manager)
 
@@ -364,3 +370,9 @@ begin
     );
 end architecture;
 ```
+
+## Signal manager handling multiple extra signals
+
+Here is an illustration (by @murphe67) of the `muli` signal manager handling both `spec` and `tag`. The forwarding behavior differs between them—`spec` ORs two signals, while `tag` takes one and discards the other. You can define the forwarding semantics in **a single place** (`_get_forwarded_expression`), ensuring reuse across all instances.
+
+<img src="./figs/SignalManager/muli_tag.png" />
