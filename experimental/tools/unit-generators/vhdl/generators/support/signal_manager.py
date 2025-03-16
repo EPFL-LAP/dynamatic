@@ -117,6 +117,8 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
           port_decls.append(
               f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 
+  port_decls_str = ";\n".join(port_decls).lstrip()
+
   return f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -128,7 +130,7 @@ entity {entity_name} is
   port(
     clk : in std_logic;
     rst : in std_logic;
-{";\n".join(port_decls)}
+    {port_decls_str}
   );
 end entity;
 """
@@ -193,15 +195,10 @@ def generate_inner_port_forwarding(ports) -> str:
     forwardings.append(f"      {port_name}_valid => {port_name}_valid")
     forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
-  return ",\n".join(forwardings)
+  return ",\n".join(forwardings).lstrip()
 
 
-def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]) -> str:
-  inner_name = f"{name}_inner"
-  inner = generate_inner(inner_name)
-
-  entity = generate_entity(name, in_ports, out_ports)
-
+def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> str:
   forwarded_extra_signals = _forward_extra_signals(
       extra_signals, in_ports)
 
@@ -215,6 +212,17 @@ def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, ge
     for signal_name in extra_signals:
       extra_signal_assignments.append(
           f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+  return "\n".join(extra_signal_assignments).lstrip()
+
+
+def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]) -> str:
+  inner_name = f"{name}_inner"
+  inner = generate_inner(inner_name)
+
+  entity = generate_entity(name, in_ports, out_ports)
+
+  extra_signal_assignments = _generate_normal_signal_assignments(
+      in_ports, out_ports, extra_signals)
 
   inner_port_forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
@@ -223,13 +231,13 @@ def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, ge
 architecture arch of {name} is
 begin
   -- Forward extra signals to output ports
-{"\n".join(extra_signal_assignments)}
+  {extra_signal_assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-{inner_port_forwarding}
+      {inner_port_forwarding}
     );
 end architecture;
 """
@@ -237,36 +245,19 @@ end architecture;
   return inner + entity + architecture
 
 
-def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str], latency: int):
-  # Delayed import to avoid circular dependency
-  from generators.handshake.ofifo import generate_ofifo
-
-  inner_name = f"{name}_inner"
-  inner = generate_inner(inner_name)
-
-  entity = generate_entity(name, in_ports, out_ports)
-
-  forwarded_extra_signals = _forward_extra_signals(
-      extra_signals, in_ports)
-
-  # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
-
-  # Generate buffer to store (concatenated) extra signals
-  buff_name = f"{name}_buff"
-  buff = generate_ofifo(buff_name, {
-      "num_slots": latency,
-      "bitwidth": extra_signals_bitwidth
-  })
-
-  # Generate transfer logic
+def _generate_buffered_transfer_logic(in_ports, out_ports):
   first_in_port_name = in_ports[0]["name"]
   first_out_port_name = out_ports[0]["name"]
   transfer_logic = f"""
   transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
   transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;
-"""
+""".lstrip()
+  return transfer_logic
+
+
+def _generate_buffered_signal_assignments(in_ports, out_ports, concat_info, extra_signals) -> str:
+  forwarded_extra_signals = _forward_extra_signals(
+      extra_signals, in_ports)
 
   # Concat/split extra signals for buffer input/output.
   signal_assignments = []
@@ -285,6 +276,35 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
       signal_assignments.append(
           f"  {port_name}_{signal_name} <= buff_out({msb} downto {lsb});")
 
+  return "\n".join(signal_assignments).lstrip()
+
+
+def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str], latency: int):
+  # Delayed import to avoid circular dependency
+  from generators.handshake.ofifo import generate_ofifo
+
+  inner_name = f"{name}_inner"
+  inner = generate_inner(inner_name)
+
+  entity = generate_entity(name, in_ports, out_ports)
+
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
+
+  # Generate buffer to store (concatenated) extra signals
+  buff_name = f"{name}_buff"
+  buff = generate_ofifo(buff_name, {
+      "num_slots": latency,
+      "bitwidth": extra_signals_bitwidth
+  })
+
+  # Generate transfer logic
+  transfer_logic = _generate_buffered_transfer_logic(in_ports, out_ports)
+
+  signal_assignments = _generate_buffered_signal_assignments(
+      in_ports, out_ports, concat_info, extra_signals)
+
   forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
   architecture = f"""
@@ -294,16 +314,16 @@ architecture arch of {name} is
   signal transfer_in, transfer_out : std_logic;
 begin
   -- Transfer signal assignments
-{transfer_logic}
+  {transfer_logic}
 
   -- Concat/split extra signals for buffer input/output
-{"\n".join(signal_assignments)}
+  {signal_assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-{forwarding}
+      {forwarding}
     );
 
   -- Generate ofifo to store extra signals
@@ -353,7 +373,7 @@ def generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]) -> st
       signal_decls.append(
           f"  signal {port_name}_inner : std_logic_vector({full_bitwidth} - 1 downto 0);")
 
-  return "\n".join(signal_decls)
+  return "\n".join(signal_decls).lstrip()
 
 
 def generate_concat_logic(in_ports, out_ports, concat_info, ignore=[]):
@@ -431,7 +451,23 @@ def generate_concat_logic(in_ports, out_ports, concat_info, ignore=[]):
         concat_logic.append(
             f"  {port_name}_{signal_name} <= {port_name}_inner({msb + port_bitwidth} downto {lsb + port_bitwidth});")
 
-  return "\n".join(concat_logic)
+  return "\n".join(concat_logic).lstrip()
+
+
+def _generate_concat_forwarding(in_ports, out_ports) -> str:
+  # Port forwarding for the inner entity
+  # We can't use _generate_inner_port_forwarding() because:
+  # (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
+  # (2) Data ports must be renamed to `_inner`.
+  forwardings = []
+  for port in in_ports + out_ports:
+    port_name = port["name"]
+
+    forwardings.append(f"      {port_name} => {port_name}_inner")
+    forwardings.append(f"      {port_name}_valid => {port_name}_valid")
+    forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+
+  return ",\n".join(forwardings).lstrip()
 
 
 def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
@@ -453,31 +489,22 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
       in_ports, out_ports, concat_info)
 
   # Port forwarding for the inner entity
-  # We can't use _generate_inner_port_forwarding() because:
-  # (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
-  # (2) Data ports must be renamed to `_inner`.
-  forwardings = []
-  for port in in_ports + out_ports:
-    port_name = port["name"]
-
-    forwardings.append(f"      {port_name} => {port_name}_inner")
-    forwardings.append(f"      {port_name}_valid => {port_name}_valid")
-    forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+  forwardings = _generate_concat_forwarding(in_ports, out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (concat)
 architecture arch of {name} is
   -- Concatenated data and extra signals
-{concat_signal_decls}
+  {concat_signal_decls}
 begin
   -- Concatenate data and extra signals
-{concat_logic}
+  {concat_logic}
 
   inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-{",\n".join(forwardings)}
+      {forwardings}
     );
 end architecture;
 """
@@ -485,16 +512,7 @@ end architecture;
   return inner + entity + architecture
 
 
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner: Callable[[str], str]):
-  entity = generate_entity(name, in_ports, out_ports)
-
-  # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(out_extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
-
-  inner_name = f"{name}_inner"
-  inner = generate_inner(inner_name)
-
+def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
   # Declare and assign default spec bits for inputs without them
   lacking_spec_ports = [
       i for i in range(size) if i not in spec_inputs
@@ -505,15 +523,10 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
   lacking_spec_port_assignments = [
       f"  {data_in_name}_{i}_spec <= {get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
   ]
+  return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
 
-  # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls(
-      in_ports + out_ports, extra_signals_bitwidth, ignore=[index_name])
 
-  # Assign inner concatenated signals
-  concat_logic = generate_concat_logic(
-      in_ports, out_ports, concat_info, ignore=[index_name])
-
+def _generate_bbmerge_forwarding(in_ports, out_ports, index_name):
   # Port forwarding for the inner entity
   # We can't use _generate_inner_port_forwarding() because:
   # (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
@@ -530,37 +543,84 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
     forwardings.append(f"      {port_name}_valid => {port_name}_valid")
     forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
+  return ",\n".join(forwardings).lstrip()
+
+
+def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_signals, index_dir) -> str:
   # TODO: Extra signals for index port are not tested
-  assign_index_extra_signals = ""
   if index_dir == "out" and index_extra_signals:
-    assign_index_extra_signals_list = []
-    assign_index_extra_signals_list.append("  -- Assign index extra signals")
+    index_extra_signals_list = []
     for signal_name in index_extra_signals:
-      assign_index_extra_signals_list.append(
+      index_extra_signals_list.append(
           f"  {index_name}_{signal_name} <= {get_default_extra_signal_value(signal_name)};")
-    assign_index_extra_signals = "\n".join(assign_index_extra_signals_list)
+    return "\n".join(index_extra_signals_list)
+  return ""
+
+
+def _generate_bbmerge_signal_assignments(lacking_spec_port_assignments, concat_logic, index_extra_signal_assignments) -> str:
+  template = f"""
+  -- Assign default spec bit values if not provided
+  {lacking_spec_port_assignments}
+
+  -- Concatenate data and extra signals
+  {concat_logic}
+"""
+
+  if index_extra_signal_assignments:
+    template += f"""
+  -- Assign index extra signals
+  {index_extra_signal_assignments}
+"""
+
+  return template.lstrip()
+
+
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner: Callable[[str], str]):
+  entity = generate_entity(name, in_ports, out_ports)
+
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(out_extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
+
+  inner_name = f"{name}_inner"
+  inner = generate_inner(inner_name)
+
+  lacking_spec_port_decls, lacking_spec_port_assignments = _generate_bbmerge_lacking_spec_statements(
+      spec_inputs, size, data_in_name)
+
+  # Declare inner concatenated signals for all input/output ports
+  concat_signal_decls = generate_concat_signal_decls(
+      in_ports + out_ports, extra_signals_bitwidth, ignore=[index_name])
+
+  # Assign inner concatenated signals
+  concat_logic = generate_concat_logic(
+      in_ports, out_ports, concat_info, ignore=[index_name])
+
+  # Assign index extra signals
+  index_extra_signal_assignments = _generate_bbmerge_index_extra_signal_assignments(
+      index_name, index_extra_signals, index_dir)
+
+  signal_assignments = _generate_bbmerge_signal_assignments(
+      lacking_spec_port_assignments, concat_logic, index_extra_signal_assignments)
+
+  # Port forwarding for the inner entity
+  forwardings = _generate_bbmerge_forwarding(in_ports, out_ports, index_name)
 
   architecture = f"""
 -- Architecture of signal manager (bbmerge)
 architecture arch of {name} is
   -- Lacking spec inputs
-{"\n".join(lacking_spec_port_decls)}
+  {lacking_spec_port_decls}
   -- Concatenated data and extra signals
-{concat_signal_decls}
+  {concat_signal_decls}
 begin
-  -- Assign default spec bit values if not provided
-{"\n".join(lacking_spec_port_assignments)}
-
-  -- Concatenate data and extra signals
-{concat_logic}
-
-{assign_index_extra_signals}
+  {signal_assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-{",\n".join(forwardings)}
+      {forwardings}
     );
 end architecture;
 """
