@@ -199,6 +199,9 @@ def generate_inner_port_forwarding(ports) -> str:
 
 
 def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> str:
+  """
+  e.g., result_spec <= lhs_spec or rhs_spec;
+  """
   forwarded_extra_signals = _forward_extra_signals(
       extra_signals, in_ports)
 
@@ -248,13 +251,16 @@ end architecture;
 def _generate_buffered_transfer_logic(in_ports, out_ports):
   first_in_port_name = in_ports[0]["name"]
   first_out_port_name = out_ports[0]["name"]
-  transfer_logic = f"""
+
+  return f"""
   transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
   transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
-  return transfer_logic
 
 
 def _generate_buffered_signal_assignments(in_ports, out_ports, concat_info, extra_signals) -> str:
+  """
+  e.g., buff_in(0 downto 0) <= lhs_spec or rhs_spec;
+  """
   forwarded_extra_signals = _forward_extra_signals(
       extra_signals, in_ports)
 
@@ -454,10 +460,16 @@ def generate_concat_logic(in_ports, out_ports, concat_info, ignore=[]):
 
 
 def _generate_concat_forwarding(in_ports, out_ports) -> str:
-  # Port forwarding for the inner entity
-  # We can't use _generate_inner_port_forwarding() because:
-  # (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
-  # (2) Data ports must be renamed to `_inner`.
+  """
+  Port forwarding for the inner entity of concat signal manager
+  We can't use `_generate_inner_port_forwarding()` because:
+  (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
+  (2) Data ports must be renamed to `_inner`.
+  e.g., lhs => lhs_inner,
+        lhs_valid => lhs_valid,
+        lhs_ready => lhs_ready
+  """
+
   forwardings = []
   for port in in_ports + out_ports:
     port_name = port["name"]
@@ -512,6 +524,11 @@ end architecture;
 
 
 def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
+  """
+  e.g.,
+  - decls: signal lhs_0_spec : std_logic_vector(0 downto 0);
+  - assigns: lhs_0_spec <= "0";
+  """
   # Declare and assign default spec bits for inputs without them
   lacking_spec_ports = [
       i for i in range(size) if i not in spec_inputs
@@ -526,10 +543,20 @@ def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
 
 
 def _generate_bbmerge_forwarding(in_ports, out_ports, index_name):
-  # Port forwarding for the inner entity
-  # We can't use _generate_inner_port_forwarding() because:
-  # (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
-  # (2) Data ports must be renamed to `_inner`.
+  """
+  Port forwarding for the inner entity
+  We can't use `_generate_inner_port_forwarding()` because:
+  (1) Data is always forwarded, regardless of (port's original) bitwidth, due to the concatenation.
+  (2) Data ports must be renamed to `_inner`.
+  (3) Index port must be forwarded as is.
+  e.g., ins => ins_inner,
+        ins_valid => ins_valid,
+        ins_ready => ins_ready,
+        index => index,
+        index_valid => index_valid,
+        index_ready => index_ready
+  """
+
   forwardings = []
   for port in in_ports + out_ports:
     port_name = port["name"]
@@ -546,6 +573,9 @@ def _generate_bbmerge_forwarding(in_ports, out_ports, index_name):
 
 
 def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_signals, index_dir) -> str:
+  """
+  e.g., index_tag0 <= "0";
+  """
   # TODO: Extra signals for index port are not tested
   if index_dir == "out" and index_extra_signals:
     index_extra_signals_list = []
