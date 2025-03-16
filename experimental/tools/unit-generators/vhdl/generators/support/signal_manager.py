@@ -134,9 +134,9 @@ end entity;
 """
 
 
-def _get_forwarding_method(signal_name: str) -> str:
+def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
-    return " or "
+    return " or ".join(in_extra_signals)
 
   raise ValueError(
       f"Unsupported forwarding method for extra signal: {signal_name}")
@@ -167,8 +167,8 @@ def _forward_extra_signals(extra_signals: dict[str, int], in_ports) -> dict[str,
         in_extra_signals.append(f"{port_name}_{signal_name}")
 
       # Forward all input extra signals with the specified method
-      forwarded_extra_signals[signal_name] = _get_forwarding_method(
-          signal_name).join(in_extra_signals)
+      forwarded_extra_signals[signal_name] = _get_forwarded_expression(
+          signal_name, in_extra_signals)
 
   return forwarded_extra_signals
 
