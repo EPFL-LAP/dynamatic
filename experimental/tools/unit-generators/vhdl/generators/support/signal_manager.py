@@ -249,9 +249,9 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   forwarded_extra_signals = _forward_extra_signals(
       extra_signals, in_ports)
 
-  # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ConcatenationInfo(extra_signals)
-  extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
 
   # Generate buffer to store (concatenated) extra signals
   buff_name = f"{name}_buff"
@@ -272,7 +272,7 @@ def _generate_buffered_signal_manager(name, in_ports, out_ports, extra_signals, 
   signal_assignments = []
 
   # Iterate over all extra signals
-  for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+  for signal_name, (msb, lsb) in concat_info.mapping:
     # Concat extra signals for buffer input.
     signal_assignments.append(
         f"  buff_in({msb} downto {lsb}) <= {forwarded_extra_signals[signal_name]};")
@@ -356,7 +356,7 @@ def generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]) -> st
   return "\n".join(signal_decls)
 
 
-def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
+def generate_concat_logic(in_ports, out_ports, concat_info, ignore=[]):
   """
   Generate concat logic for all input/output ports
   e.g.,
@@ -385,7 +385,7 @@ def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
               f"  {port_name}_inner({i})({port_bitwidth} - 1 downto 0) <= {port_name}({i});")
 
         # Include all extra signals
-        for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+        for signal_name, (msb, lsb) in concat_info.mapping:
           concat_logic.append(
               f"  {port_name}_inner({i})({msb + port_bitwidth} downto {lsb + port_bitwidth}) <= {port_name}_{i}_{signal_name};")
     else:
@@ -395,7 +395,7 @@ def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
             f"  {port_name}_inner({port_bitwidth} - 1 downto 0) <= {port_name};")
 
       # Include all extra signals
-      for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+      for signal_name, (msb, lsb) in concat_info.mapping:
         concat_logic.append(
             f"  {port_name}_inner({msb + port_bitwidth} downto {lsb + port_bitwidth}) <= {port_name}_{signal_name};")
 
@@ -417,7 +417,7 @@ def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
               f"  {port_name}({i}) <= {port_name}_inner({i})({port_bitwidth} - 1 downto 0);")
 
         # Extract all extra signals
-        for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+        for signal_name, (msb, lsb) in concat_info.mapping:
           concat_logic.append(
               f"  {port_name}_{i}_{signal_name} <= {port_name}_inner({i})({msb + port_bitwidth} downto {lsb + port_bitwidth});")
     else:
@@ -427,7 +427,7 @@ def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
             f"  {port_name} <= {port_name}_inner({port_bitwidth} - 1 downto 0);")
 
       # Extract all extra signals
-      for signal_name, (msb, lsb) in extra_signal_mapping.mapping:
+      for signal_name, (msb, lsb) in concat_info.mapping:
         concat_logic.append(
             f"  {port_name}_{signal_name} <= {port_name}_inner({msb + port_bitwidth} downto {lsb + port_bitwidth});")
 
@@ -437,9 +437,9 @@ def generate_concat_logic(in_ports, out_ports, extra_signal_mapping, ignore=[]):
 def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
-  # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ConcatenationInfo(extra_signals)
-  extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
@@ -450,7 +450,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ge
 
   # Assign inner concatenated signals
   concat_logic = generate_concat_logic(
-      in_ports, out_ports, extra_signal_mapping)
+      in_ports, out_ports, concat_info)
 
   # Port forwarding for the inner entity
   # We can't use _generate_inner_port_forwarding() because:
@@ -488,9 +488,9 @@ end architecture;
 def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
-  # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ConcatenationInfo(out_extra_signals)
-  extra_signals_bitwidth = extra_signal_mapping.total_bitwidth
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(out_extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
@@ -512,7 +512,7 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
 
   # Assign inner concatenated signals
   concat_logic = generate_concat_logic(
-      in_ports, out_ports, extra_signal_mapping, ignore=[index_name])
+      in_ports, out_ports, concat_info, ignore=[index_name])
 
   # Port forwarding for the inner entity
   # We can't use _generate_inner_port_forwarding() because:
