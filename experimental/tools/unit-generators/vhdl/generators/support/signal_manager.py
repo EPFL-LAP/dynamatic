@@ -5,7 +5,7 @@ from generators.support.utils import get_default_extra_signal_value, Concatenati
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) -> str:
-  debugging_info = f"-- signal manager generated info: {name}, {params}\n"
+  debugging_info = f"-- Signal manager generation info: {name}, {params}\n"
 
   in_ports = params["in_ports"]
   out_ports = params["out_ports"]
@@ -250,8 +250,7 @@ def _generate_buffered_transfer_logic(in_ports, out_ports):
   first_out_port_name = out_ports[0]["name"]
   transfer_logic = f"""
   transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
-  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;
-""".lstrip()
+  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
   return transfer_logic
 
 
