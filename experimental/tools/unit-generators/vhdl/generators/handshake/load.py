@@ -1,5 +1,4 @@
-from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic
-from generators.support.utils import ConcatenationInfo
+from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic, ConcatenationInfo
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.tfifo import generate_tfifo
 

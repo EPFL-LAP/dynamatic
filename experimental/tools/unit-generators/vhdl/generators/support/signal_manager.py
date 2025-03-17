@@ -1,7 +1,6 @@
 # See docs/Specs/SignalManager.md
 
 from collections.abc import Callable
-from generators.support.utils import get_default_extra_signal_value, ConcatenationInfo
 
 
 def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) -> str:
@@ -136,6 +135,10 @@ end entity;
 """
 
 
+def _get_default_extra_signal_value(extra_signal_name: str):
+  return "\"0\""
+
+
 def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signals)
@@ -160,7 +163,7 @@ def _forward_extra_signals(extra_signals: dict[str, int], in_ports) -> dict[str,
 
     if not in_ports:
       # Use default values for extra signals
-      forwarded_extra_signals[signal_name] = get_default_extra_signal_value(
+      forwarded_extra_signals[signal_name] = _get_default_extra_signal_value(
           signal_name)
     else:
       # Collect extra signals from all input ports
@@ -350,6 +353,35 @@ end architecture;
   return inner + buff + entity + architecture
 
 
+class ConcatenationInfo:
+  # List of tuples of (extra_signal_name, (msb, lsb))
+  # e.g., [("spec", (0, 0)), ("tag0", (8, 1))]
+  mapping: list[tuple[str, tuple[int, int]]]
+  total_bitwidth: int
+
+  def __init__(self, extra_signals: dict[str, int]):
+    self.mapping = []
+    self.total_bitwidth = 0
+
+    for name, bitwidth in extra_signals.items():
+      self.add(name, bitwidth)
+
+  def add(self, name: str, bitwidth: int):
+    self.mapping.append(
+        (name, (self.total_bitwidth + bitwidth - 1, self.total_bitwidth)))
+    self.total_bitwidth += bitwidth
+
+  def has(self, name: str) -> bool:
+    return name in [name for name, _ in self.mapping]
+
+  def get(self, name: str):
+    return self.mapping[[name for name, _ in self.mapping].index(name)]
+
+
+def get_concat_extra_signals_bitwidth(extra_signals: dict[str, int]):
+  return sum(extra_signals.values())
+
+
 def generate_concat_signal_decls(ports, extra_signals_bitwidth, ignore=[]) -> str:
   """
   Declare signals for concatenated data and extra signals
@@ -537,7 +569,7 @@ def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
       f"  signal {data_in_name}_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
   lacking_spec_port_assignments = [
-      f"  {data_in_name}_{i}_spec <= {get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
+      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
   ]
   return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
 
@@ -581,7 +613,7 @@ def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_sig
     index_extra_signals_list = []
     for signal_name in index_extra_signals:
       index_extra_signals_list.append(
-          f"  {index_name}_{signal_name} <= {get_default_extra_signal_value(signal_name)};")
+          f"  {index_name}_{signal_name} <= {_get_default_extra_signal_value(signal_name)};")
     return "\n".join(index_extra_signals_list)
   return ""
 
