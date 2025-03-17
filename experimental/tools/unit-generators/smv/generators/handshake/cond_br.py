@@ -20,10 +20,10 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
   DEFINE
   branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
 
-  // output
+  -- output
   DEFINE
-  data_ready := inner_join.ins_ready_0;
-  condition_ready := inner_join.ins_ready_1;
+  data_ready := inner_join.ins_0_ready;
+  condition_ready := inner_join.ins_1_ready;
   trueOut_valid := condition & inner_join.outs_valid;
   falseOut_valid := !condition & inner_join.outs_valid;
 
@@ -37,7 +37,7 @@ MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, false
   VAR
   inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
 
-  // output
+  -- output
   DEFINE
   data_ready := inner_br.data_ready;
   condition_ready := inner_br.condition_ready;

@@ -19,7 +19,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   init(rand) := {{TRUE, FALSE}};
   next(rand) := outs_valid & outs_ready ? {{TRUE, FALSE}} : rand;
 
-  // output
+  -- output
   DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
   DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
   DEFINE outs_valid := inner_handshake_manager.outs_valid;

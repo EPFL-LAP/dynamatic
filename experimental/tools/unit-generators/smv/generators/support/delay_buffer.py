@@ -17,7 +17,7 @@ def _generate_no_lat_delay_buffer(name):
   return f"""
 MODULE {name}(ins_valid, outs_ready)
 
-  // output
+  -- output
   DEFINE ins_ready := outs_ready;
   DEFINE outs_valid := ins_valid;
 """
@@ -28,7 +28,7 @@ def _generate_single_delay_buffer(name):
 MODULE {name}(ins_valid, outs_ready)
   VAR inner_oehb : {name}__oehb_dataless(ins, ins_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
@@ -48,7 +48,7 @@ MODULE {name}(ins_valid, outs_ready)
   ASSIGN next(v{n + 1}) := inner_oehb.ins_ready ? v{n} : v{n + 1};
 """ for n in range(latency - 1)])}
 
-  // output
+  -- output
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 

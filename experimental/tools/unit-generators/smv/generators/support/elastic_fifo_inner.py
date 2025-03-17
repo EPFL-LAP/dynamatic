@@ -59,7 +59,7 @@ MODULE {name}(ins_valid, outs_ready)
     TRUE : empty;
   esac;
 
-  // output
+  -- output
   DEFINE
   ins_ready := !full | outs_ready;
   outs_valid := !empty;
@@ -119,7 +119,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
     TRUE : empty;
   esac;
 
-  // output
+  -- output
   DEFINE
   ins_ready := !full | outs_ready;
   outs_valid := !empty;
