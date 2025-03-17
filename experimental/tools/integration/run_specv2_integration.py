@@ -211,31 +211,30 @@ def run_test(c_file, id, timeout):
     else:
       return fail(id, "Failed to add speculative units")
 
-  handshake_export = handshake_speculation
-  # buffer_json = os.path.join(c_file_dir, "buffer.json")
-  # handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-  # with open(buffer_json, "r") as f:
-  #   buffers = json.load(f)
-  #   buffer_pass_args = []
-  #   for buffer in buffers:
-  #     buffer_pass_args.append(
-  #         "--handshake-placebuffers-custom=" +
-  #         f"pred={buffer['pred']} " +
-  #         f"outid={buffer['outid']} " +
-  #         f"slots={buffer['slots']} " +
-  #         f"type={buffer['type']}")
-  #   with open(handshake_export, "w") as f:
-  #     result = subprocess.run([
-  #         DYNAMATIC_OPT_BIN, handshake_speculation,
-  #         *buffer_pass_args
-  #     ],
-  #         stdout=f,
-  #         stderr=sys.stdout
-  #     )
-  #     if result.returncode == 0:
-  #       print("Exported Handshake")
-  #     else:
-  #       return fail(id, "Failed to export Handshake")
+  buffer_json = os.path.join(c_file_dir, "buffer_v2.json")
+  handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
+  with open(buffer_json, "r") as f:
+    buffers = json.load(f)
+    buffer_pass_args = []
+    for buffer in buffers:
+      buffer_pass_args.append(
+          "--handshake-placebuffers-custom=" +
+          f"pred={buffer['pred']} " +
+          f"outid={buffer['outid']} " +
+          f"slots={buffer['slots']} " +
+          f"type={buffer['type']}")
+    with open(handshake_export, "w") as f:
+      result = subprocess.run([
+          DYNAMATIC_OPT_BIN, handshake_speculation,
+          *buffer_pass_args
+      ],
+          stdout=f,
+          stderr=sys.stdout
+      )
+      if result.returncode == 0:
+        print("Exported Handshake")
+      else:
+        return fail(id, "Failed to export Handshake")
 
   # Export dot file
   dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
