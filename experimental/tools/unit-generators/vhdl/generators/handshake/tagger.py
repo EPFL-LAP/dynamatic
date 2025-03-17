@@ -6,7 +6,7 @@ def generate_tagger(name, params):
   size = params["size"]
   port_types = params["port_types"]
   data_in_type = VhdlScalarType(port_types["ins"])
-  data_out_type = VhdlScalarType(port_types["outs"])
+  data_out_type = VhdlScalarType(port_types["outs_0"])
   tag_bitwidth = VhdlScalarType(port_types["tagIn"]).bitwidth
 
     # Get extra signals from input data type

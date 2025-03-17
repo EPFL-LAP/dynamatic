@@ -572,11 +572,13 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
     ```
   }];
 
-  let arguments = (ins Variadic<HandshakeType>:$tagOperands);
+  let arguments = (ins HandshakeType:$tagOperand);
 
   let results = (outs HandshakeType:$tagOut);
 
-  //let assemblyFormat = "$tagOperands `:` $tagOut";
+  let assemblyFormat = [{
+    $tagOperand attr-dict `:` type($tagOperand) `,` type($tagOut)
+  }];
 }
 
 def TaggerOp : Handshake_Op<"tagger", [
@@ -600,7 +602,9 @@ def TaggerOp : Handshake_Op<"tagger", [
 
   let results = (outs Variadic<HandshakeType>:$dataOut);
 
-  //let assemblyFormat = "$dataOperands `,` $tagOperand `:` $dataOut";
+  let assemblyFormat = [{
+    `[` $tagOperand `]` $dataOperands attr-dict `:` custom<HandshakeType>(type($dataOperands)) `,` type($tagOperand) `,` custom<HandshakeType>(type($dataOut))
+  }];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
@@ -609,7 +613,7 @@ def TaggerOp : Handshake_Op<"tagger", [
     }
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
-      return "outs";
+      return "outs_0";
     }
   }];
   
@@ -635,9 +639,12 @@ def UntaggerOp : Handshake_Op<"untagger", [
     HandshakeType:$tagOut
   );
 
-  //let assemblyFormat = "$dataOperands `:` $dataOut `,` $tagOut ";
+  //let assemblyFormat = [{
+  // $dataOperands attr-dict `:` 
+  //     type($dataOperands) `:` `(` type($dataOut) `,` type($tagOut) `)`
+  //}];
 
-    let extraClassDefinition = [{
+  let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       return "ins";

@@ -72,7 +72,7 @@ export_dot() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+# rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
 # source -> affine level
 "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
