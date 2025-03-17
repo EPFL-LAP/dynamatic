@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module fork_type #(
+module fork #(
 	parameter SIZE = 2,
 	parameter DATA_TYPE = 32
 )(

@@ -20,7 +20,7 @@ MODULE {name} (ins_valid, outs_ready)
   init(outs_valid_i) := FALSE;
   next(outs_valid_i) := ins_valid | (outs_valid_i & !outs_ready);
 
-  // output
+  -- output
   DEFINE
   ins_ready := !outs_valid_i | outs_ready;
   outs_valid := outs_valid_i;
@@ -41,7 +41,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
     TRUE : data;
   esac;
     
-  // output
+  -- output
   DEFINE
   ins_ready := inner_oehb.ins_ready;
   outs_valid := inner_oehb.outs_valid;
