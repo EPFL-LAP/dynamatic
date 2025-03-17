@@ -17,47 +17,138 @@ def parse_parameters(param_list):
     raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 
-def generate_input_ports(in_port_types, out_port_types):
-  smv_ports = {}
-  for port_name, port_type in in_port_types.items():
-    if SmvScalarType(port_type).bitwidth != 0:
-      smv_ports[port_name] = SmvScalarType(port_type).smv_type
-    smv_ports[port_name + "_valid"] = "boolean"
+def smv_type_from_bitwidth(bitwidth):
+  if bitwidth == 1:
+    return "boolean"
+  return f"unsigned word [{bitwidth}]"
 
-  for port_name, port_type in out_port_types.items():
-    smv_ports[port_name + "_ready"] = "boolean"
-  return smv_ports
 
-def generate_output_ports(in_port_types, out_port_types):
-  smv_ports = {}
-  for port_name, port_type in out_port_types.items():
-    if SmvScalarType(port_type).bitwidth != 0:
-      smv_ports[port_name] = SmvScalarType(port_type).smv_type
-    smv_ports[port_name + "_valid"] = "boolean"
+def create_port_types(ports):
+  port_types = {}
+  for port in ports:
+    if port["direction"] == "in":
+      if port["count"] == 1:
+        if port["bitwidth"] > 0:
+          port_types[port["name"]] = smv_type_from_bitwidth(port["bitwidth"])
+        port_types[port["name"] + "_valid"] = "boolean"
+      else:
+        for i in range(port["count"]):
+          if port["bitwidth"] > 0:
+            port_types[port["name"] + "_" +
+                       str(i)] = smv_type_from_bitwidth(port["bitwidth"])
+          port_types[port["name"] + "_" + str(i) + "_valid"] = "boolean"
+    else:
+      if port["count"] == 1:
+        port_types[port["name"] + "_ready"] = "boolean"
+      else:
+        for i in range(port["count"]):
+          port_types[port["name"] + "_" + str(i) + "_ready"] = "boolean"
+  return port_types
 
-  for port_name, port_type in in_port_types.items():
-    smv_ports[port_name + "_ready"] = "boolean"
-  return smv_ports
+
+def create_input_map(ports):
+  port_map = {}
+  for port in ports:
+    if port["direction"] == "in":
+      if port["count"] == 1:
+        if port["bitwidth"] > 0:
+          port_map[port["name"]] = [port["name"]]
+        port_map[port["name"] + "_valid"] = [port["name"] + "_valid"]
+      else:
+        if port["bitwidth"] > 0:
+          port_map[port["name"]] = []
+          for i in range(port["count"]):
+            port_map[port["name"]].append(port["name"] + "_" + str(i))
+        port_map[port["name"] + "_valid"] = []
+        for i in range(port["count"]):
+          port_map[port["name"] +
+                   "_valid"].append(port["name"] + "_" + str(i) + "_valid")
+    else:
+      if port["count"] == 1:
+        port_map[port["name"] + "_ready"] = [port["name"] + "_ready"]
+      else:
+        port_map[port["name"] + "_ready"] = []
+        for i in range(port["count"]):
+          port_map[port["name"] +
+                   "_ready"].append(port["name"] + "_" + str(i) + "_ready")
+  return port_map
+
+
+def create_output_map(ports):
+  port_map = {}
+  for port in ports:
+    if port["direction"] == "out":
+      if port["count"] == 1:
+        if port["bitwidth"] > 0:
+          port_map[port["name"]] = [port["name"]]
+        port_map[port["name"] + "_valid"] = [port["name"] + "_valid"]
+      else:
+        if port["bitwidth"] > 0:
+          port_map[port["name"]] = []
+          for i in range(port["count"]):
+            port_map[port["name"]].append(port["name"] + "_" + str(i))
+        port_map[port["name"] + "_valid"] = []
+        for i in range(port["count"]):
+          port_map[port["name"] +
+                   "_valid"].append(port["name"] + "_" + str(i) + "_valid")
+    else:
+      if port["count"] == 1:
+        port_map[port["name"] + "_ready"] = [port["name"] + "_ready"]
+      else:
+        port_map[port["name"] + "_ready"] = []
+        for i in range(port["count"]):
+          port_map[port["name"] +
+                   "_ready"].append(port["name"] + "_" + str(i) + "_ready")
+  return port_map
+
+
+def needs_cast(name, ports):
+  extracted_name = re.sub(r'(_valid|_ready)$', '', name)
+  port = next((d for d in ports if d.get("name") == extracted_name), None)
+  if port is not None:
+    if "_valid" in name or "_ready" in name or port["bitwidth"] == 1:
+      return True
+  return False
+
+
+def generate_internal_signals(port_types):
+  return "\n  ".join([f"VAR internal_{port_name} : {port_type};" for port_name, port_type in port_types.items()])
+
+
+def generate_mut_arguments(port_types):
+  return ", ".join([f"internal_{port_name}" for port_name in port_types.keys()])
+
+
+def generate_assignments(port_map, ports):
+  return "\n  ".join([f"ASSIGN golden_model._{gm_port} := {" :: ".join([f"word1(internal_{mut_port})" for mut_port in reversed(mut_port_list)]) if needs_cast(gm_port, ports) else " :: ".join([f"internal_{mut_port}" for mut_port in reversed(mut_port_list)])};" for gm_port, mut_port_list in port_map.items()])
+
+
+def generate_properties(port_map, ports):
+  return "\n  ".join([f"INVARSPEC NAME {gm_port}_check := golden_model._{gm_port} = {" :: ".join([f"word1(model_under_test.{mut_port})" for mut_port in reversed(mut_port_list)]) if needs_cast(gm_port, ports) else " :: ".join([f"model_under_test.{mut_port}" for mut_port in reversed(mut_port_list)])};" for gm_port, mut_port_list in port_map.items()])
 
 
 def generate_test_bench(name, mod_type, parameters):
-  input_ports = generate_input_ports(parameters["in_port_types"], parameters["out_port_types"])
-  output_ports = generate_output_ports(parameters["in_port_types"], parameters["out_port_types"])
+  port_types = create_port_types(parameters["ports"])
+  input_map = create_input_map(parameters["ports"])
+  output_map = create_output_map(parameters["ports"])
+
   return f"""
 #include "{name}.smv"
 #include "golden_model.smv"
 
 
 MODULE main
-  {"\n  ".join([f"VAR internal_{port_name} : {port_type};" for port_name, port_type in input_ports.items()])}
+  {generate_internal_signals(port_types)}
 
-  VAR model_under_test : {name}({", ".join([f"internal_{port_name}" for port_name, _ in input_ports.items()])});
+  VAR model_under_test : {name}({generate_mut_arguments(port_types)});
   VAR golden_model : _{name}();
-  {"\n  ".join([f"ASSIGN golden_model._{port_name} := {f"word1(internal_{port_name})" if port_type == "boolean" else f"internal_{port_name}"};" for port_name, port_type in input_ports.items()])}
 
+  -- input assignments
   ASSIGN golden_model._rst := 0ub_0;
+  {generate_assignments(input_map, parameters["ports"])}
 
-  {"\n  ".join([f"INVARSPEC NAME {port_name}_check := model_under_test.{port_name} = {f"bool(golden_model._{port_name})" if port_type == "boolean" else f"golden_model._{port_name}"};" for port_name, port_type in output_ports.items()])}
+  -- properties
+  {generate_properties(output_map, parameters["ports"])}
 """
 
 
@@ -94,7 +185,7 @@ def main():
     sys.exit(1)
 
   # Printing parameters for diagnostic purposes
-  header = f"// {args.name} : {args.type}({args.parameters})\n\n"
+  header = f"-- {args.name} : {args.type}({args.parameters})\n\n"
 
   with open(args.output, 'w') as file:
     print(header + generate_test_bench(args.name, args.type, parameters), file=file)
