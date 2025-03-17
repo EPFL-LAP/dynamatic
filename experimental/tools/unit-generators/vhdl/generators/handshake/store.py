@@ -96,7 +96,7 @@ begin
     port map(
       clk => clk,
       rst => rst,
-{forwarding}
+      {forwarding}
     );
 end architecture;
 """
