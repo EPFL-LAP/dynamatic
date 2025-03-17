@@ -13,32 +13,37 @@ def generate_merge_notehb(name, params):
 
 def _generate_merge_notehb_dataless(name, size):
   return f"""
-MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
-
+MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
+  
   DEFINE
-  one_valid := {' | '.join([f'ins_valid_{i}' for i in range(size)])};
+  one_valid := {' | '.join([f'ins_{i}_valid' for i in range(size)])};
+  in_ins_0_ready := ins_0_valid ? outs_ready : FALSE;
+  {"\n  ".join([f"in_ins_{n + 1}_ready := (ins_{n + 1}_valid & !({' | '.join([f'in_ins_{i}_ready' for i in range(n + 1)])})) ? outs_ready : FALSE;" for n in range(size - 1)])}
 
-  // output
+
+  -- output
   DEFINE
-  {"\n  ".join([f"ins_ready_{n} := ins_valid_{n} & outs_ready;" for n in range(size)])}
+  {"\n  ".join([f"ins_{n}_ready := in_ins_{n}_ready;" for n in range(size)])}
   outs_valid := one_valid;
 """
 
 
 def _generate_merge_notehb(name, size, data_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
+MODULE {name}({", ".join([f"ins_{n}, ins_{n}_valid" for n in range(size)])}, outs_ready)
 
   DEFINE
-  one_valid := {' | '.join([f'ins_valid_{i}' for i in range(size)])};
+  one_valid := {' | '.join([f'ins_{i}_valid' for i in range(size)])};
+  in_ins_0_ready := ins_0_valid ? outs_ready : FALSE;
+  {"\n  ".join([f"in_ins_{n + 1}_ready := (ins_{n + 1}_valid & !({' | '.join([f'in_ins_{i}_ready' for i in range(n + 1)])})) ? outs_ready : FALSE;" for n in range(size - 1)])}
   data := case
-    {"\n    ".join([f"ins_valid_{n} : ins_{n};" for n in range(size)])}
-    TRUE : FALSE;
+    {"\n    ".join([f"ins_{n}_valid : ins_{n};" for n in range(size)])}
+    TRUE : {data_type.format_constant(0)};
   esac;
 
-  // output
+  -- output
   DEFINE
-  {"\n  ".join([f"ins_ready_{n} := ins_valid_{n} & outs_ready;" for n in range(size)])}
+  {"\n  ".join([f"ins_{n}_ready := in_ins_{n}_ready;" for n in range(size)])}
   outs_valid := one_valid;
   outs := data;
 """

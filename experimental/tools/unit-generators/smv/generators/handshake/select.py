@@ -11,7 +11,7 @@ def _generate_select(name, data_type):
   return f"""
 MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValue, falseValue_valid, result_ready)
   VAR
-  inner_antitoken : antitoken__{name}(false_value_valid, true_value_valid, g1, g0);
+  inner_antitoken : antitoken__{name}(falseValue_valid, trueValue_valid, g1, g0);
 
   DEFINE
   ee := condition_valid & ((!condition & falseValue_valid) | (condition & trueValue_valid));
@@ -19,7 +19,7 @@ MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValu
   g0 := !trueValue_valid & valid_internal & result_ready;
   g1 := !falseValue_valid & valid_internal & result_ready;
 
-  // output
+  -- output
   DEFINE
   trueValue_ready := !trueValue_valid | (valid_internal & result_ready) | inner_antitoken.kill_0;
   falseValue_ready := !falseValue_valid | (valid_internal & result_ready) | inner_antitoken.kill_1;
@@ -43,7 +43,7 @@ MODULE antitoken__{name} (ins_valid_0, ins_valid_1, generate_at_0, generate_at_1
   init(reg_out_1) := FALSE;
   next(reg_out_1) := reg_in_1;
 
-  // output
+  -- output
   DEFINE
   stop_valid := reg_out_0 | reg_out_1;
   kill_0 := generate_at_0 | reg_out_0;
