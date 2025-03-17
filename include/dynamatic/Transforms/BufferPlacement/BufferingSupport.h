@@ -169,21 +169,21 @@ struct Channel {
 /// Holds information about what type of buffer should be placed on a specific
 /// channel.
 struct PlacementResult {
-  /// The number of oehb chain slots that should be placed.
-  unsigned numSlotDV = 0;
-  /// The number of tehb chain slots that should be placed.
-  unsigned numSlotR = 0;
-  /// The number of elasticFifoInner (FIFO that cut D, V) slots that should be placed. 
-  unsigned numSlotDVE = 0;
-  /// The number of transpFifo slots that should be placed.
-  unsigned numSlotT = 0;
-  /// The number of dvr chain slots that should be placed.
-  unsigned numSlotDVR = 0;
+  /// The number of ONE_SLOT_BREAK_DV that should be placed.
+  unsigned numOneSlotDV = 0;
+  /// The number of ONE_SLOT_BREAK_R that should be placed.
+  unsigned numOneSlotR = 0;
+  /// The number of FIFO_BREAK_DV slots that should be placed. 
+  unsigned numFifoDV = 0;
+  /// The number of FIFO_BREAK_NONE slots that should be placed.
+  unsigned numFifoNone = 0;
+  /// The number of ONE_SLOT_BREAK_DVR that should be placed.
+  unsigned numOneSlotDVR = 0;
 
-  /// Prefered order: DV, DVE, T, DVR, R
-  /// Whether opaque slots should be placed transparent slots for placement
-  /// results that include both.
-  bool opaqueBeforeTrans = true;
+  /// Prefered order: 
+  /// {ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_DVR, numOneSlotR}
+  /// bufferOrder = true means the order is as above, otherwise it is reversed.
+  bool bufferOrder = true;
 
   /// Removes pre-existing buffers that may exist as part of the units the
   /// channel connects to from the placement results. These are deducted from

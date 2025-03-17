@@ -79,19 +79,19 @@ struct HandshakePlaceBuffersCustomPass
     StringRef bufferType;
     if (type == "oehb") {
       timing = handshake::TimingInfo::oehb();
-      bufferType = handshake::BufferOp::DV_TYPE;
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
     } else if (type == "tehb") {
       timing = handshake::TimingInfo::tehb();
-      bufferType = handshake::BufferOp::R_TYPE;
-    } else if (type == "dve") {
-      timing = handshake::TimingInfo::dve();
-      bufferType = handshake::BufferOp::DVE_TYPE;
-    } else if (type == "t") {
-      timing = handshake::TimingInfo::t();
-      bufferType = handshake::BufferOp::T_TYPE;
-    } else if (type == "dvr") {
-      timing = handshake::TimingInfo::dvr();
-      bufferType = handshake::BufferOp::DVR_TYPE;
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
+    } else if (type == "fifo_break_dv") {
+      timing = handshake::TimingInfo::fifo_break_dv();
+      bufferType = handshake::BufferOp::FIFO_BREAK_DV;
+    } else if (type == "fifo_break_none") {
+      timing = handshake::TimingInfo::fifo_break_none();
+      bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
+    } else if (type == "one_slot_break_dvr") {
+      timing = handshake::TimingInfo::one_slot_break_dvr();
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();

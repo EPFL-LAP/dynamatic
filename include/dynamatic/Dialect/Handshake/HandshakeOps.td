@@ -235,35 +235,33 @@ def BufferOp : Handshake_Op<"buffer", [
                                            TIMING_ATTR_NAME = "TIMING",
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
     
-    /// DV buffer. A DV buffer cuts DV signal paths. It consists of a chain of OEHBs (Opaque Elastic Half-Buffers).
-    /// Each slot in a DV buffer is an OEHB, which introduces one cycle of latency on DV paths.
-    /// Therefore, the latency on DV paths equals its number of slots.
-    /// A DV buffer does not cut the R signal path and introduces no latency on R.
-    static constexpr ::llvm::StringLiteral DV_TYPE = "DV";
+    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths. 
+    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer), 
+    /// it introduces one cycle of latency on the D and V paths. 
+    /// It does not break the R signal path and adds no latency on R.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DV = "DV";
     
-    /// R buffer. An R buffer cuts the R signal path. 
-    /// It consists of a chain of TEHBs (Transparent Elastic Half-Buffers).
-    /// Each slot introduces one cycle of latency on the R path.
-    /// The latency on R equals its number of slots, while DV paths remain unaffected.
-    static constexpr ::llvm::StringLiteral R_TYPE = "R";
+    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path. 
+    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer), 
+    /// it introduces one cycle of latency on the R path. 
+    /// It does not break the D and V signal path and adds no latency on D and V.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_R = "R";
     
-    /// T (Transparent) Buffer. A T buffer is a DVE equipped with a bypass, 
-    /// introducing no latency on any signal paths.
-    /// Its sole function is to contain tokens.
-    static constexpr ::llvm::StringLiteral T_TYPE = "T";
+    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO), 
+    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths. 
+    /// Its only purpose is to hold tokens.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_NONE = "TFIFO";
     
-    /// DVE (DV Elastic) buffer. A DVE buffer cuts DV paths.
-    /// Unlike a DV buffer, which is composed of concatenated OEHB slots, 
-    /// a DVE has an unsplittable structure.
-    /// It introduces one cycle of latency on DV paths regardless of the 
-    /// number of slots and has no latency on R.
-    static constexpr ::llvm::StringLiteral DVE_TYPE = "DVE";
+    /// FIFO_BREAK_DV: This buffer breaks the D and V paths. 
+    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers, 
+    /// its structure cannot be split. It introduces one cycle of latency on the D and V paths 
+    /// regardless of the number of slots and has no latency on R. 
+    /// It was previously called an 'elastic_fifo_inner'.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_DV = "DVFIFO";
     
-    /// DVR buffer. A DVR buffer cuts both DV and R signal paths.
-    /// It consists of a chain of DVR slots.
-    /// Each slot introduces one cycle of latency on both DV and R paths, 
-    /// so the latency on both equals its number of slots.
-    static constexpr ::llvm::StringLiteral DVR_TYPE = "DVR";
+    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal paths 
+    /// and introduces one cycle of latency on all three.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "DVR";
     
   }];
 

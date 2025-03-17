@@ -68,41 +68,48 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       unsigned actualMinOpaque = std::max(1U, props.minOpaque);
       if (props.maxTrans.has_value() &&
           (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numSlotR = props.maxTrans.value();
-        result.numSlotDV = numSlotsToPlace - result.numSlotR;
+        result.numOneSlotR = props.maxTrans.value();
+        result.numOneSlotDV = numSlotsToPlace - result.numOneSlotR;
       } else {
-        result.numSlotDV = actualMinOpaque;
-        result.numSlotR = numSlotsToPlace - result.numSlotDV;
+        result.numOneSlotDV = actualMinOpaque;
+        result.numOneSlotR = numSlotsToPlace - result.numOneSlotDV;
       }
     } else {
       // All slots should be transparent
-      result.numSlotR = numSlotsToPlace;
+      result.numOneSlotR = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
 
-    // Remap to general buffer types.
-    // 1. For Opaque Slots:
-    // When numslot = 1, map to a 1-slot DV buffer.
-    // When numslot = 2, map to a 1-slot DV buffer plus a 1-slot R buffer.
-    // When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
-    // 2. For Transparent Slots:
-    // When numslot = 1, map to a 1-slot R buffer.
-    // When numslot > 1, map to a numslot-slot T buffer.
-    if (result.numSlotDV == 1){
-      result.numSlotDV = 1;
-    } else if (result.numSlotDV == 2){
-      result.numSlotDV = 1;
-      result.numSlotR = 1;
-    } else if (result.numSlotDV > 2){
-      result.numSlotDVE = result.numSlotDV - 1;
-      result.numSlotR = 1;
-      result.numSlotDV = 0;
+    // 1. For Opaque Buffers:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV.
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
+    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+
+    // 2. For Transparent Buffers:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R.
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+
+    // 3. The previous steps result in the same buffer HDL modules as using timing attributes. 
+    // This step optimizes area usage without affecting functionality:
+    // If the number of ONE_SLOT_BREAK_R exceeds 1, 
+    // convert its additional slots into equivalent FIFO_BREAK_NONE slots. 
+    // Then, if both ONE_SLOT_BREAK_DV/FIFO_BREAK_DV and FIFO_BREAK_NONE are present, 
+    // convert all FIFO_BREAK_NONE slots into equivalent FIFO_BREAK_DV slots.
+    if (result.numOneSlotDV == 1){
+      result.numOneSlotDV = 1;
+    } else if (result.numOneSlotDV == 2){
+      result.numOneSlotDV = 1;
+      result.numOneSlotR = 1;
+    } else if (result.numOneSlotDV > 2){
+      result.numFifoDV = result.numOneSlotDV - 1;
+      result.numOneSlotR = 1;
+      result.numOneSlotDV = 0;
     }
 
-    if (result.numSlotR > 1){
-      result.numSlotT = result.numSlotR;
-      result.numSlotR = 0;
+    if (result.numOneSlotR > 1){
+      result.numFifoNone = result.numOneSlotR;
+      result.numOneSlotR = 0;
     }
 
     placement[channel] = result;

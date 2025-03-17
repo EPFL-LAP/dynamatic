@@ -32,7 +32,7 @@ In addition to the timing attribute to characterize `BufferOp`, we directly repr
 
 - FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO), this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths. Its only purpose is to hold tokens.
 
-- SHIFT_REG_BREAK_DV: This buffer breaks the D and V paths. It has multiple slots that share a single handshake control unit, so all slots stall together or accept inputs simultaneously. This design introduces the same latency as a chain of ONE_SLOT_BREAK_DV buffers with the same slot number. However, when the initiation interval is greater than one, its token capacity is lower than that of ONE_SLOT_BREAK_DV buffers. Its main advantage is a significantly lower area cost when slot number is high.
+- SHIFT_REG_BREAK_DV (Not Implemented): This buffer breaks the D and V paths. It has multiple slots that share a single handshake control unit, so all slots stall together or accept inputs simultaneously. This design introduces the same latency as a chain of ONE_SLOT_BREAK_DV buffers with the same slot number. However, when the initiation interval is greater than one, its token capacity is lower than that of ONE_SLOT_BREAK_DV buffers. Its main advantage is a significantly lower area cost when slot number is high.
 
 > [!NOTE]
 > All six buffer types can be used together in a channel to handle various needs. For the first three types, you can chain multiple modules if you need more slots. The last three types allow multiple slots within their module parameters, so they need not be chained in a channel.

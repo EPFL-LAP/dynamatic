@@ -246,8 +246,8 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -263,16 +263,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb_chain.vhd",
-    "module-name": "oehb_chain_dataless",
-    "dependencies": ["oehb_dataless"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
+    "module-name": "oehb_dataless"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
         "name": "TIMING",
         "type": "timing",
@@ -281,15 +280,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/oehb_chain.vhd",
-    "module-name": "oehb_chain",
-    "dependencies": ["oehb"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/oehb.vhd",
+    "module-name": "oehb",
+    "dependencies": ["oehb_dataless"]
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVFIFO", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -311,7 +310,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVE", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVFIFO", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -329,7 +328,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -345,16 +344,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb_chain.vhd",
-    "module-name": "tehb_chain_dataless",
-    "dependencies": ["tehb_dataless"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
+    "module-name": "tehb_dataless"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
         "name": "TIMING",
         "type": "timing",
@@ -362,15 +360,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/tehb_chain.vhd",
-    "module-name": "tehb_chain",
-    "dependencies": ["tehb"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/tehb.vhd",
+    "module-name": "tehb",
+    "dependencies": ["tehb_dataless"]
   },
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "TFIFO", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -394,8 +392,8 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "T", "generic": false },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "TFIFO", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
         "name": "TIMING",
@@ -413,7 +411,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       {
         "name": "DATA_TYPE",
@@ -431,16 +429,15 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/dvr_chain.vhd",
-    "module-name": "dvr_chain_dataless",
-    "dependencies": ["dvr_dataless"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/one_slot_break_dvr.vhd",
+    "module-name": "one_slot_break_dvr_dataless"
   },
   {
     "name": "handshake.buffer",
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1},
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
         "name": "TIMING",
         "type": "timing",
@@ -450,8 +447,9 @@
         "generic": false
       }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dvr_chain.vhd",
-    "dependencies": ["dvr"]
+    "generic": "$DYNAMATIC/data/vhdl/handshake/one_slot_break_dvr.vhd",
+    "module-name": "one_slot_break_dvr",
+    "dependencies": ["one_slot_break_dvr_dataless"]
   },
   {
     "name": "handshake.ndwire",
@@ -804,33 +802,6 @@
     "generic": "$DYNAMATIC/data/vhdl/handshake/ofifo.vhd",
     "module-name": "ofifo",
     "dependencies": ["tehb", "elastic_fifo_inner"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
-    "module-name": "oehb_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/oehb.vhd",
-    "module-name": "oehb",
-    "dependencies": ["oehb_dataless"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
-    "module-name": "tehb_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/tehb.vhd",
-    "module-name": "tehb",
-    "dependencies": ["tehb_dataless"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/dvr.vhd",
-    "module-name": "dvr_dataless"
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/handshake/dvr.vhd",
-    "module-name": "dvr",
-    "dependencies": ["dvr_dataless"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/logic.vhd"

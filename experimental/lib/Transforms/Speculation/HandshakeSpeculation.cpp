@@ -133,7 +133,7 @@ LogicalResult HandshakeSpeculationPass::placeBuffers() {
     builder.setInsertionPoint(dstOp);
     // Buffer size is set to 16 for now
     handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
-        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16, handshake::BufferOp::R_TYPE);
+        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16, handshake::BufferOp::ONE_SLOT_BREAK_R);
     inheritBB(dstOp, newOp);
 
     // Connect the new BufferOp to dstOp

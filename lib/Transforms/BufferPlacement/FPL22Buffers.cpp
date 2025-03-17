@@ -55,66 +55,69 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       if (props.maxTrans) {
         // We must place enough opaque slots as to not exceed the maximum number
         // of transparent slots
-        result.numSlotDV =
+        result.numOneSlotDV =
             std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
       } else {
         // At least one slot, but no more than necessary
-        result.numSlotDV = std::max(props.minOpaque, 1U);
+        result.numOneSlotDV = std::max(props.minOpaque, 1U);
       }
       // All remaining slots are transparent
-      result.numSlotR = numSlotsToPlace - result.numSlotDV;
+      result.numOneSlotR = numSlotsToPlace - result.numOneSlotDV;
     } else if (placeOpaque) {
       // Place the minimum number of transparent slots; at least the expected
       // minimum and enough to satisfy all our opaque/transparent requirements
       if (props.maxOpaque) {
-        result.numSlotR =
+        result.numOneSlotR =
             std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
       } else {
-        result.numSlotR = props.minTrans;
+        result.numOneSlotR = props.minTrans;
       }
       // All remaining slots are opaque
-      result.numSlotDV = numSlotsToPlace - result.numSlotR;
+      result.numOneSlotDV = numSlotsToPlace - result.numOneSlotR;
     } else {
       // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
       // transparent
-      result.numSlotR = numSlotsToPlace;
+      result.numOneSlotR = numSlotsToPlace;
     }
 
     result.deductInternalBuffers(Channel(channel), timingDB);
 
-    // Remap to general buffer types.
-    // 1. For Opaque Slots:
-    // When numslot = 1, map to a 1-slot DV buffer.
-    // When numslot = 2, map to a 1-slot DV buffer plus a 1-slot R buffer.
-    // When numslot > 2, map to (numslot - 1) DVE buffers plus a 1-slot R buffer.
-    // 2. For Transparent Slots:
-    // When numslot = 1, map to a 1-slot R buffer.
-    // When numslot > 1, map to a numslot-slot T buffer.
-    // 3. After the two steps, if the R slot count exceeds 1, 
-    // convert the additional slots beyond 1 into T buffers.
-    // 4. Then, if both DV/DVE and T buffers are present, 
-    // convert the T buffers into DVE buffers.
-    if (result.numSlotR > 1) {
-      result.numSlotT = result.numSlotR;
-      result.numSlotR = 0;
+    // 1. For Opaque Buffers:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV.
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
+    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+
+    // 2. For Transparent Buffers:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R.
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+
+    // 3. The previous steps result in the same buffer HDL modules as using timing attributes. 
+    // This step optimizes area usage without affecting functionality:
+    // If the number of ONE_SLOT_BREAK_R exceeds 1, 
+    // convert its additional slots into equivalent FIFO_BREAK_NONE slots. 
+    // Then, if both ONE_SLOT_BREAK_DV/FIFO_BREAK_DV and FIFO_BREAK_NONE are present, 
+    // convert all FIFO_BREAK_NONE slots into equivalent FIFO_BREAK_DV slots.
+    if (result.numOneSlotR > 1) {
+      result.numFifoNone = result.numOneSlotR;
+      result.numOneSlotR = 0;
     }
-    if (result.numSlotDV == 2) {
-      if (result.numSlotR == 0){
-        result.numSlotDV = 1;
-        result.numSlotR = 1;
-      } else if (result.numSlotR == 1){
-        result.numSlotDVE = 2;
-        result.numSlotDV = 0;
+    if (result.numOneSlotDV == 2) {
+      if (result.numOneSlotR == 0){
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
+      } else if (result.numOneSlotR == 1){
+        result.numFifoDV = 2;
+        result.numOneSlotDV = 0;
       }
-    } else if (result.numSlotDV > 2){
-      if (result.numSlotR == 0){
-        result.numSlotDVE = result.numSlotDV + result.numSlotT - 1;
-        result.numSlotT = 0;
-        result.numSlotR = 1;
-        result.numSlotDV = 0;
-      } else if (result.numSlotR == 1){
-        result.numSlotDVE = result.numSlotDV;
-        result.numSlotDV = 0;
+    } else if (result.numOneSlotDV > 2){
+      if (result.numOneSlotR == 0){
+        result.numFifoDV = result.numOneSlotDV + result.numFifoNone - 1;
+        result.numFifoNone = 0;
+        result.numOneSlotR = 1;
+        result.numOneSlotDV = 0;
+      } else if (result.numOneSlotR == 1){
+        result.numFifoDV = result.numOneSlotDV;
+        result.numOneSlotDV = 0;
       }
     }
     
