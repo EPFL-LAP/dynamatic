@@ -53,7 +53,7 @@ begin
 
   trigger_ready <= muxCtrl_ready and loop_mode_idle;
 
-  ctrlOut_valid <= loop_mode_exit and muxCtrl_ready;
+  ctrlOut_valid <= loop_mode_exit;
 
   muxCtrl_valid <= (trigger_valid and loop_mode_idle) or
                     (ctrlOut_ready and loop_mode_exit) or
@@ -91,7 +91,7 @@ begin
         spec_mode <= SPEC_DEFAULT;
       else
         if (condition_valid and condition_ready) then
-          if (condition_spec(0)) then
+          if (not condition(0)) then
             spec_mode <= MISSPEC;
           else
             spec_mode <= SPEC_DEFAULT;
