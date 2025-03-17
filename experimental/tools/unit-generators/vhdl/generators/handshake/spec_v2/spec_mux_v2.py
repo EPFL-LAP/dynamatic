@@ -23,11 +23,11 @@ entity {name} is
 
     specIn_valid : in std_logic;
     specIn_ready : out std_logic;
-    specIn_spec : in std_logic; -- not used
+    specIn_spec : in std_logic_vector(0 downto 0); -- not used
 
     dataOut_valid : out std_logic;
     dataOut_ready : in std_logic;
-    dataOut_spec : out std_logic
+    dataOut_spec : out std_logic_vector(0 downto 0)
   );
 end entity;
 
