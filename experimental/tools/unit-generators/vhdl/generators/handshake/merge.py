@@ -11,10 +11,7 @@ def generate_merge(name, params):
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    if bitwidth == 0:
-      return _generate_merge_signal_manager_dataless(name, size, extra_signals)
-    else:
-      return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
+    return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
   elif bitwidth == 0:
     return _generate_merge_dataless(name, size)
   else:
@@ -167,24 +164,3 @@ def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
-
-
-def _generate_merge_signal_manager_dataless(name, size, extra_signals):
-  # Haven't tested this function yet
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": 0,
-          "extra_signals": extra_signals,
-          "2d": True,
-          "size": size
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_merge(name, size, extra_signals_bitwidth))

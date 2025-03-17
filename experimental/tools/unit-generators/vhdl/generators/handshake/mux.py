@@ -23,10 +23,7 @@ def generate_mux(name, params):
   spec_inputs = params["spec_inputs"]
 
   if output_extra_signals:
-    if data_bitwidth == 0:
-      return _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs)
-    else:
-      return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs)
+    return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs)
   elif data_bitwidth == 0:
     return _generate_mux_dataless(name, size, index_bitwidth)
   else:
@@ -218,35 +215,3 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inpu
       "out_extra_signals": output_extra_signals,
       "spec_inputs": spec_inputs
   }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
-
-
-def _generate_mux_signal_manager_dataless(name, size, index_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      output_extra_signals)
-  return generate_signal_manager(name, {
-      "type": "bbmerge",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": 0,
-          "2d": True,
-          "size": size,
-          "extra_signals_list": input_extra_signals_list
-      }, {
-          "name": "index",
-          "bitwidth": index_bitwidth,
-          # TODO: Extra signals for index port are not tested
-          "extra_signals": index_extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": 0,
-          "extra_signals": output_extra_signals
-      }],
-      "size": size,
-      "data_in_name": "ins",
-      "index_name": "index",
-      "index_dir": "in",
-      "index_extra_signals": index_extra_signals,
-      "out_extra_signals": output_extra_signals,
-      "spec_inputs": spec_inputs
-  }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth))
