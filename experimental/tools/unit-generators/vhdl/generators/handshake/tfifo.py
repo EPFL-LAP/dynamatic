@@ -9,10 +9,7 @@ def generate_tfifo(name, params):
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    if bitwidth == 0:
-      return _generate_tfifo_signal_manager_dataless(name, num_slots, extra_signals)
-    else:
-      return _generate_tfifo_signal_manager(name, num_slots, bitwidth, extra_signals)
+    return _generate_tfifo_signal_manager(name, num_slots, bitwidth, extra_signals)
   elif bitwidth == 0:
     return _generate_tfifo_dataless(name, num_slots)
   else:
@@ -162,21 +159,3 @@ def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_tfifo(name, size, bitwidth + extra_signals_bitwidth))
-
-
-def _generate_tfifo_signal_manager_dataless(name, size, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_tfifo(name, size, extra_signals_bitwidth))

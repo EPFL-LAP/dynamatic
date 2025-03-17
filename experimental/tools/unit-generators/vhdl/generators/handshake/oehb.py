@@ -7,10 +7,7 @@ def generate_oehb(name, params):
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    if bitwidth == 0:
-      return _generate_oehb_signal_manager_dataless(name, extra_signals)
-    else:
-      return _generate_oehb_signal_manager(name, bitwidth, extra_signals)
+    return _generate_oehb_signal_manager(name, bitwidth, extra_signals)
   if bitwidth == 0:
     return _generate_oehb_dataless(name)
   else:
@@ -138,21 +135,3 @@ def _generate_oehb_signal_manager(name, bitwidth, extra_signals):
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_oehb(name, bitwidth + extra_signals_bitwidth))
-
-
-def _generate_oehb_signal_manager_dataless(name, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_oehb(name, extra_signals_bitwidth))

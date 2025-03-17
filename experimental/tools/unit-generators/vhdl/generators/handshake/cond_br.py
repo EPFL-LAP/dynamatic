@@ -7,10 +7,7 @@ def generate_cond_br(name, params):
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    if bitwidth == 0:
-      return _generate_cond_br_signal_manager_dataless(name, extra_signals)
-    else:
-      return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
+    return _generate_cond_br_signal_manager(name, bitwidth, extra_signals)
   elif bitwidth == 0:
     return _generate_cond_br_dataless(name)
   else:
@@ -158,29 +155,5 @@ def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
           "extra_signals": extra_signals
       }],
       "extra_signals": extra_signals
-  }, lambda name: _generate_cond_br(name, bitwidth))
-
-
-def _generate_cond_br_signal_manager_dataless(name, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "data",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }, {
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "trueOut",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseOut",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_cond_br_dataless(name))
+  }, lambda name: _generate_cond_br_dataless(name) if bitwidth == 0
+      else _generate_cond_br(name, bitwidth))
