@@ -158,15 +158,11 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optTiming = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-            if (!optTiming)
+            auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType) 
               return "buffer" + numSlotsStr;
-            if (auto timing = dyn_cast<TimingAttr>(optTiming->getValue())) {
-              TimingInfo info = timing.getInfo();
-              if (info == TimingInfo::oehb())
-                return "oehb" + numSlotsStr;
-              if (info == TimingInfo::tehb())
-                return "tehb" + numSlotsStr;
+            if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
+              return bufferTypeAttr.getValue().str() + numSlotsStr;
             }
             return "buffer" + numSlotsStr;
           })

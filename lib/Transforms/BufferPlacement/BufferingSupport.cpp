@@ -118,10 +118,10 @@ void PlacementResult::deductInternalBuffers(const Channel &channel,
   }
 
   // Adjust placement results
-  assert(numTrans >= numTransToDeduct && "not enough transparent slots");
-  assert(numOpaque >= numOpaqueToDeduct && "not enough opaque slots");
-  numTrans -= numTransToDeduct;
-  numOpaque -= numOpaqueToDeduct;
+  assert(numOneSlotR >= numTransToDeduct && "not enough transparent slots");
+  assert(numOneSlotDV >= numOpaqueToDeduct && "not enough opaque slots");
+  numOneSlotR -= numTransToDeduct;
+  numOneSlotDV -= numOpaqueToDeduct;
 }
 
 Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
