@@ -48,9 +48,9 @@ begin
   muxCtrl_valid <= (trigger_valid and (loop_mode = IDLE)) or
                     (ctrlOut_ready and (loop_mode = EXIT)) or
                     (loop_mode = LOOP);
-  muxCtrl <= "01" when (loop_mode = IDLE) else
-             "00" when (loop_mode = EXIT) else
-             "10";
+  muxCtrl <= "10" when (loop_mode = IDLE) else
+             "01" when (loop_mode = EXIT) else
+             "11";
 
   commitCtrl_valid <= condition_valid and ((spec_mode = DEFAULT) or not condition_spec(0)) and (loop_mode = LOOP);
   commitCtrl <= condition;
