@@ -1270,7 +1270,7 @@ def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "cond" : "trigger";
+      return idx == 0 ? "condition" : "trigger";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
@@ -1325,12 +1325,12 @@ def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "ctrl";
+      return idx == 0 ? "dataIn" : "ctrl";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
-      return "outs";
+      return "dataOut";
     }
   }];
 }

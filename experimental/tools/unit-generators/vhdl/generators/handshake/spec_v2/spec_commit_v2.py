@@ -40,7 +40,7 @@ begin
 
   [DATA_ASSIGNMENTS]
   dataOut_valid <= (not dataIn_spec(0) and dataIn_valid) or
-                   (dataIn_spec(0) and not kill_mode and (not ctrl) and ctrl_valid);
+                   (dataIn_spec(0) and not kill_mode and (not ctrl(0)) and ctrl_valid);
 
   kill_mode_proc : process (clk)
   begin
@@ -48,7 +48,7 @@ begin
       if rst = '1' then
         kill_mode <= '0';
       else
-        if ctrl and ctrl_valid then
+        if ctrl(0) and ctrl_valid then
           kill_mode <= '1';
         elsif dataIn_valid and not dataIn_spec(0) then
           kill_mode <= '0';
