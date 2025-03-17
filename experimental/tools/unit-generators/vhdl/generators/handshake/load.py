@@ -90,9 +90,9 @@ end architecture;
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
-  # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ConcatenationInfo(extra_signals)
-  extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(extra_signals)
+  extra_signals_total_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
@@ -136,7 +136,7 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   concat_signal_decls = generate_concat_signal_decls(
       [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
   concat_signal_logic = generate_concat_logic(
-      [addrIn_inner_port], [dataOut_inner_port], extra_signal_mapping)
+      [addrIn_inner_port], [dataOut_inner_port], concat_info)
 
   architecture = f"""
 -- Architecture of load signal manager
