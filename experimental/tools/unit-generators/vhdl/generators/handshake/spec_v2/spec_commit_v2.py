@@ -20,7 +20,7 @@ entity {name} is
 
     ctrl : in std_logic_vector(0 downto 0);
     ctrl_valid : in std_logic;
-    ctrl_ready : out std_logic
+    ctrl_ready : out std_logic;
 
     dataOut_valid : out std_logic;
     dataOut_ready : in std_logic
