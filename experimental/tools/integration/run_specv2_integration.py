@@ -292,16 +292,16 @@ def run_test(c_file, id, timeout):
   else:
     return fail(id, "Failed to export hdl")
 
-  # # Simulate
-  # print("Simulator launching")
-  # result = subprocess.run([
-  #     SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name
-  # ])
+  # Simulate
+  print("Simulator launching")
+  result = subprocess.run([
+      SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name
+  ])
 
-  # if result.returncode == 0:
-  #   print("Simulation succeeded")
-  # else:
-  #   return fail(id, "Failed to simulate")
+  if result.returncode == 0:
+    print("Simulation succeeded")
+  else:
+    return fail(id, "Failed to simulate")
 
   return {
       "id": id,
