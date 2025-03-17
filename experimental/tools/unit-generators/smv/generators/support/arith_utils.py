@@ -17,7 +17,7 @@ def _generate_handshake_manager_no_lat(name):
 MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE lhs_ready := inner_join.ins_ready_0;
   DEFINE rhs_ready := inner_join.ins_ready_1;
   DEFINE outs_valid := inner_join.outs_valid;
@@ -32,7 +32,7 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
   VAR inner_delay_buffer : {name}__delay_buffer(inner_join.outs_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE lhs_ready := inner_join.ins_ready_0;
   DEFINE rhs_ready := inner_join.ins_ready_1;
   DEFINE outs_valid := inner_delay_buffer.outs_valid;
@@ -47,7 +47,7 @@ def generate_binary_op_header(name):
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
   DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
   DEFINE outs_valid := inner_handshake_manager.outs_valid;
@@ -59,7 +59,7 @@ def generate_unanary_op_header(name):
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE ins_ready := inner_delay_buffer.ins_ready;
   DEFINE outs_valid := inner_delay_buffer.outs_valid;
 """

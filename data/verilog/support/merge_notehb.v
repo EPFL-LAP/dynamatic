@@ -27,7 +27,7 @@ module merge_notehb #(
     cont = 1;
 		for (i = 0; i < INPUTS; i = i + 1) begin
 			if (cont == 1 && ins_valid[i]) begin
-        tmp_data_out = ins[i * DATA_IN_SIZE +: DATA_IN_SIZE];
+        tmp_data_out = ins[i * DATA_TYPE +: DATA_TYPE];
 				tmp_valid_out = 1;
         tmp_ready_out[i] = outs_ready;
         cont = 0;
