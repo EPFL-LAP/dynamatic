@@ -372,6 +372,9 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
   // are only related to the network of cmerges
   auto branchOps = funcOp.getOps<handshake::BranchOp>();
 
+  if (branchOps.empty())
+    return;
+
   // Operations that needs to be removed
   DenseSet<Operation *> operationsToRemove;
   // Operations that needs to be traversed via BFS, handled in a FIFO approach
