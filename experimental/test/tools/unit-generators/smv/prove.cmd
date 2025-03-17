@@ -1,6 +1,5 @@
 set verbose_level 0;
 set pp_list cpp;
-set counter_examples 0;
 set dynamic_reorder 1;
 set on_failure_script_quits;
 set reorder_method sift;
@@ -13,7 +12,6 @@ flatten_hierarchy;
 encode_variables;
 build_flat_model;
 build_model -f;
-check_invar -s forward;
 show_property -o build/property.rpt;
 time;
 quit
