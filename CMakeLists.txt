@@ -31,6 +31,19 @@ endif ()
 include(FindPackageHandleStandardArgs)
 find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 
+# Build Dynamatic with ccache if the package is present
+set(DYNAMATIC_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")
+if(DYNAMATIC_CCACHE_BUILD)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+        message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+        set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    else()
+        message(WARNING "ccache not found, but DYNAMATIC_CCACHE_BUILD is ON")
+    endif()
+endif()
+
 #-------------------------------------------------------------------------------
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
