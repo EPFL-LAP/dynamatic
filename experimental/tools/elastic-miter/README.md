@@ -6,7 +6,16 @@ The tool compares two MLIR circuits in the handshake dialect by constructing an 
 
 
 ### Usage
-By default the tool uses NuSMV for the verification. The NuSMV needs to be in the PATH variable. By default NuSMV only supports printing up to 2^16 reachable states. It is recommended to use a version which raises this limit. 
+By default the tool uses NuSMV for the verification. The official version on supports printing 2^16 state spaces. To circumvent this problem a modified binary supporting 2^24 states can be downloaded:
+```bash
+bash utils/get-NuSMV.sh
+```
+
+Currently, the conversion to SMV requires the dot2smv converter. Download with:
+```bash
+bash utils/get-dot2smv.sh
+```
+
 
 The tool supports following options:
 ```bash
