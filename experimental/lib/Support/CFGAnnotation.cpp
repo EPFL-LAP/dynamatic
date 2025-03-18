@@ -169,6 +169,8 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
       // branch
       Operation *conditionOperation =
           condBranchOp.getOperand(0).getDefiningOp();
+      llvm::errs() << "khoda" << condBranchOp << " - " << *conditionOperation
+                   << "\n";
       std::string conditionName = namer.getName(conditionOperation).str();
 
       // Get IDs of both true and false destinations

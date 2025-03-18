@@ -256,6 +256,7 @@ public:
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
+  static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -267,6 +268,7 @@ public:
                "'on-merges' (default option: minimum buffering for "
                "correctness), 'fpga20' (throughput-driven buffering), or "
                "'fpl22' (throughput- and timing-driven buffering)"});
+    addOption({SKIPPABLE_SEQ_N, "Num of Comparators"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
     addFlag({STRAIGHT_TO_QUEUE, "Use straight to queue strategy"});

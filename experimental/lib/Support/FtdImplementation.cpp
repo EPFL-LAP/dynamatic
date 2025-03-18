@@ -15,6 +15,7 @@
 #include "experimental/Support/FtdImplementation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
@@ -144,7 +145,7 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries.
 void experimental::ftd::eliminateCommonBlocks(DenseSet<Block *> &s1,
-                                  DenseSet<Block *> &s2) {
+                                              DenseSet<Block *> &s2) {
 
   SmallVector<Block *> intersection;
   for (auto &e1 : s1) {
@@ -215,9 +216,10 @@ static bool isaMuxLoop(Operation *mux, CFGLoopInfo &li) {
 /// (`end`). "Each path identifies a Boolean product of elementary conditions
 /// expressing the reaching of the target BB from the corresponding member of
 /// the set; the product of all such paths are added".
-BoolExpression *experimental::ftd::enumeratePaths(Block *start, Block *end,
-                                      const ftd::BlockIndexing &bi,
-                                      const DenseSet<Block *> &controlDeps) {
+BoolExpression *
+experimental::ftd::enumeratePaths(Block *start, Block *end,
+                                  const ftd::BlockIndexing &bi,
+                                  const DenseSet<Block *> &controlDeps) {
   // Start with a boolean expression of zero (so that new conditions can be
   // added)
   BoolExpression *sop = BoolExpression::boolZero();
@@ -659,6 +661,10 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
         block->getOperations().front().getLoc(),
         ftd::channelifyType(condition.getType()), condition);
     notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    notOp->setAttr(
+        BB_ATTR_NAME,
+        OpBuilder(block->getOperations().front().getContext())
+            .getUI32IntegerAttr(bi.getIndexFromBlock(block).value()));
     return notOp->getResult(0);
   }
   condition.setType(ftd::channelifyType(condition.getType()));
@@ -677,8 +683,28 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
   // Constant case (either 0 or 1)
   rewriter.setInsertionPointToStart(block);
+  Operation *BBOp = &block->getOperations().back();
+  // llvm::errs() << "this is it: " << *BBOp << "\n";
+  // llvm::errs() << BBOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME) <<
+  // "\n";
+
+  llvm::errs() << "tavajoh" << bi.getIndexFromBlock(block) << "\n";
+
   auto sourceOp = rewriter.create<handshake::SourceOp>(
       block->getOperations().front().getLoc());
+  llvm::errs() << "salam:::" << sourceOp << "\n";
+
+  sourceOp->setAttr(
+      BB_ATTR_NAME,
+      OpBuilder(block->getOperations().front().getContext())
+          .getUI32IntegerAttr(bi.getIndexFromBlock(block).value()));
+
+  llvm::errs() << "salam:::" << block->getOperations().front() << " _ "
+               << block->getOperations().back() << " _ _ _ " << sourceOp
+               << "\n";
+
+  llvm::errs() << "?? " << block->getOperations().size() << "\n";
+
   Value cnstTrigger = sourceOp.getResult();
 
   auto intType = rewriter.getIntegerType(1);
@@ -690,13 +716,16 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
 
   constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
+  inheritBB(&block->getOperations().front(), constOp);
+
   return constOp.getResult();
 }
 
 /// Convert a `BDD` object as obtained from the bdd expansion to a
 /// circuit
-Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                          const ftd::BlockIndexing &bi) {
+Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd,
+                                      Block *block,
+                                      const ftd::BlockIndexing &bi) {
   if (!bdd->inputs.has_value())
     return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
@@ -706,9 +735,9 @@ Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block
   // creates other muxes in a hierarchical way)
   SmallVector<Value> muxOperands;
   muxOperands.push_back(
-    bddToCircuit(rewriter, bdd->inputs.value().first, block, bi));
+      bddToCircuit(rewriter, bdd->inputs.value().first, block, bi));
   muxOperands.push_back(
-    bddToCircuit(rewriter, bdd->inputs.value().second, block, bi));
+      bddToCircuit(rewriter, bdd->inputs.value().second, block, bi));
   Value muxCond =
       boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
 
@@ -716,6 +745,7 @@ Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block
   auto muxOp = rewriter.create<handshake::MuxOp>(
       block->getOperations().front().getLoc(), muxCond, muxOperands);
   muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+  inheritBB(&block->getOperations().front(), muxOp);
 
   return muxOp.getResult();
 }

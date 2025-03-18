@@ -75,7 +75,7 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   sim << "project compileall" << endl;
   sim << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb" << endl;
   sim << "log -r *" << endl;
-  sim << "run -time 500ns -all" << endl;
+  sim << "run -all" << endl;
   sim << "exit" << endl;
   sim.close();
 }

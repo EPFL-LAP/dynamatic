@@ -1,4 +1,5 @@
-//===----------- HandshakeInsertSkippableseq.h -------------------*- C++ -*-===//
+//===----------- HandshakeInsertSkippableseq.h -------------------*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -23,7 +24,8 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEINSERTSKIPPABLESEQ
 #include "dynamatic/Transforms/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeInsertSkippableSeq();
+std::unique_ptr<dynamatic::DynamaticPass>
+createHandshakeInsertSkippableSeq(const unsigned N = 3);
 
 } // namespace dynamatic
 
