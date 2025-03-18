@@ -37,7 +37,7 @@ module antitokens (
 endmodule
 
 
-module selector #(
+module select #(
   parameter DATA_TYPE = 32
 )(
   // inputs
