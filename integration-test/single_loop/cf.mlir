@@ -1,6 +1,6 @@
 module {
   func.func @single_loop(%arg0: memref<1000xi32> {handshake.arg_name = "a"}, %arg1: memref<1000xi32> {handshake.arg_name = "b"}, %arg2: memref<1000xi32> {handshake.arg_name = "c"}) {
-    %c1000_i32 = arith.constant {handshake.name = "constant0"} 1000 : i32
+    %c1000_i32 = arith.constant {handshake.name = "constant0"} 100 : i32
     %c0_i32 = arith.constant {handshake.name = "constant1"} 0 : i32
     %c1_i32 = arith.constant {handshake.name = "constant2"} 1 : i32
     cf.br ^bb1(%c0_i32 : i32) {handshake.name = "br0"}

@@ -4,7 +4,7 @@
 
 void single_loop(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
   int i = 0;
-  int bound = 1000;
+  int bound = 100;
   int sum = 0;
   do {
     sum = a[i] * b[i];

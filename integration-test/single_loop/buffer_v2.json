@@ -30,6 +30,12 @@
     "type": "tehb"
   },
   {
+    "pred": "fork1",
+    "outid": 0,
+    "slots": 1,
+    "type": "tehb"
+  },
+  {
     "pred": "extsi1",
     "outid": 0,
     "slots": 1,
