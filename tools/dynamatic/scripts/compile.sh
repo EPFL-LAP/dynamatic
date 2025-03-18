@@ -179,12 +179,12 @@ fi
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
-  --handshake-speculation="json-path=integration-test/$KERNEL_NAME/spec.json" \
-  --handshake-materialize \
-  --handshake-canonicalize \
-  > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to add speculation to Handshake" "Speculative handshake"
+# "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
+#   --handshake-speculation="json-path=integration-test/$KERNEL_NAME/spec.json" \
+#   --handshake-materialize \
+#   --handshake-canonicalize \
+#   > "$F_HANDSHAKE_EXPORT"
+# exit_on_fail "Failed to add speculation to Handshake" "Speculative handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
