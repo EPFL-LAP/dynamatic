@@ -69,11 +69,7 @@ CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
-    unsigned srcBB;
-    if (auto optBB = getLogicBB(&op); !optBB.has_value())
-      continue;
-    else
-      srcBB = *optBB;
+    unsigned srcBB = getLogicBB(&op);
 
     // The basic block the operation belongs to must be selected
     if (!cfdfcBBs.contains(srcBB))
@@ -88,11 +84,7 @@ CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
 
       // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
-        continue;
-      else
-        dstBB = *optBB;
+      unsigned dstBB = getLogicBB(user);
 
       if (srcBB != dstBB) {
         // The channel is in the CFDFC if it belongs belong to a selected arch

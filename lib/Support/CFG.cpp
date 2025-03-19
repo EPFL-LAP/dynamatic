@@ -12,9 +12,11 @@
 
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -53,10 +55,21 @@ bool dynamatic::inheritBBFromValue(Value val, Operation *dstOp) {
   return true;
 }
 
-std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
+bool dynamatic::hasLogicBB(Operation *op) {
+  return op->hasAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME);
+}
+
+unsigned dynamatic::getLogicBB(Operation *op) {
   if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME))
     return bb.getUInt();
-  return {};
+  op->emitError("operation has no basic block");
+  llvm_unreachable("getLogicBB failed");
+}
+
+std::optional<unsigned> dynamatic::tryGetLogicBB(Operation *op) {
+  if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME))
+    return bb.getUInt();
+  return std::nullopt;
 }
 
 /// Determines whether all operations are in the same basic block. If any
@@ -64,9 +77,7 @@ std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
 static bool areOpsInSameBlock(SmallVector<Operation *> &ops) {
   std::optional<unsigned> uniqueBB;
   for (Operation *op : ops) {
-    std::optional<unsigned> bb = getLogicBB(op);
-    if (!bb.has_value())
-      return false;
+    unsigned bb = getLogicBB(op);
     if (!uniqueBB.has_value())
       uniqueBB = bb;
     else if (*uniqueBB != bb)
@@ -86,9 +97,8 @@ static bool backtrackToBlock(Operation *op, unsigned &bb,
     return false;
 
   // Succeeds if the operation belongs to a basic block
-  std::optional<unsigned> optBB = getLogicBB(op);
-  if (optBB.has_value()) {
-    bb = *optBB;
+  if (hasLogicBB(op)) {
+    bb = getLogicBB(op);
     return true;
   }
 
@@ -120,9 +130,8 @@ static bool backtrackToBlock(Operation *op, unsigned &bb,
 static bool followToBlock(Operation *op, unsigned &bb,
                           SmallPtrSet<Operation *, 4> &visited) {
   // Succeeds if the operation belongs to a basic block
-  std::optional<unsigned> optBB = getLogicBB(op);
-  if (optBB.has_value()) {
-    bb = *optBB;
+  if (hasLogicBB(op)) {
+    bb = getLogicBB(op);
     return true;
   }
 
@@ -255,10 +264,9 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
 
   // Check that the branch and merge are part of the same block indicated by the
   // edge's BB endpoints (should be the case in all non-degenerate cases)
-  std::optional<unsigned> brBB = getLogicBB(brOp);
-  std::optional<unsigned> mergeBB = getLogicBB(mergeOp);
-  return brBB.has_value() && mergeBB.has_value() && *brBB == *mergeBB &&
-         *brBB == bbs.srcBB;
+  unsigned brBB = getLogicBB(brOp);
+  unsigned mergeBB = getLogicBB(mergeOp);
+  return brBB == mergeBB && brBB == bbs.srcBB;
 }
 
 bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
@@ -324,8 +332,7 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
       continue;
 
     // Get the source basic block
-    std::optional<unsigned> srcBB = getLogicBB(&op);
-    assert(srcBB && "source operation must belong to block");
+    unsigned srcBB = getLogicBB(&op);
 
     for (OpResult res : op.getResults()) {
       for (Operation *user : res.getUsers()) {
@@ -333,10 +340,9 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
           continue;
 
         // Get the destination basic block and store the connection
-        std::optional<unsigned> dstBB = getLogicBB(user);
-        assert(dstBB && "destination operation must belong to block");
-        if (*srcBB != *dstBB || isBackedge(res, user))
-          successors[*srcBB].insert(*dstBB);
+        unsigned dstBB = getLogicBB(user);
+        if (srcBB != dstBB || isBackedge(res, user))
+          successors[srcBB].insert(dstBB);
       }
     }
   }
@@ -397,7 +403,7 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
       continue;
 
     // Guaranteed to succeed because of asserts in class constructor
-    unsigned bb = *getLogicBB(ctrlOp);
+    unsigned bb = getLogicBB(ctrlOp);
 
     // This kills of all paths going out of the control network by ignoring all
     // operation types that do not forward the control signal to at least one of
@@ -543,9 +549,8 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
   Operation *defOp = val.getDefiningOp();
   if (!defOp)
     return GIIDStatus::FAIL_ON_PATH;
-  std::optional<unsigned> defBB = getLogicBB(defOp);
-  if (!defBB)
-    return GIIDStatus::FAIL_ON_PATH;
+
+  unsigned defBB = getLogicBB(defOp);
 
   size_t pathSize = path.size();
   if (isBackedge(val, oprd.getOwner())) {
@@ -568,7 +573,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
 
     bool foundOnPath = false;
     for (size_t idx = pathSize; idx > 0; --idx) {
-      if (path[idx - 1] == *defBB) {
+      if (path[idx - 1] == defBB) {
         foundOnPath = true;
         path = path.take_front(idx);
         break;

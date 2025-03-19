@@ -72,7 +72,7 @@ void HandshakeAnalyzeLSQUsagePass::runDynamaticPass() {
   // basic block
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
+      if (!cannotBelongToCFG(&op) && !hasLogicBB(&op)) {
         op.emitError() << "Operation should have basic block attribute.";
         return signalPassFailure();
       }
@@ -122,10 +122,9 @@ static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
   handshake::FuncOp funcOp = loadOp->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "parent of load access must be handshake function");
   SmallVector<CFGPath> allPaths;
-  std::optional<unsigned> loadBB = getLogicBB(loadOp);
-  std::optional<unsigned> storeBB = getLogicBB(storeOp);
-  assert(loadBB && storeBB && "memory accesses must belong to blocks");
-  cfg.getNonCyclicPaths(*loadBB, *storeBB, allPaths);
+  unsigned loadBB = getLogicBB(loadOp);
+  unsigned storeBB = getLogicBB(storeOp);
+  cfg.getNonCyclicPaths(loadBB, storeBB, allPaths);
 
   // There must be a dependence between any operand of the store with the load
   // data result on all CFG paths between them

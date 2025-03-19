@@ -314,10 +314,10 @@ static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
   handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
   auto handshakeBlocks = getLogicBBs(funcOp);
-  unsigned bb = getLogicBB(op).value();
+  unsigned bb = getLogicBB(op);
 
   for (auto condBrOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
+    if (getLogicBB(condBrOp) != bb)
       continue;
 
     for (Value result : condBrOp->getResults()) {
@@ -409,7 +409,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   }
   // If neither trueResult nor falseResult leads to a backedge, handle the error
   else {
-    unsigned bb = getLogicBB(specOp).value();
+    unsigned bb = getLogicBB(specOp);
     controlBranch->emitError()
         << "Could not find the backedge in the Control Branch " << bb << "\n";
     return failure();
@@ -439,7 +439,7 @@ std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
   bool isControlBranchFound = false;
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     // Ignore branches that are not in the speculator's BB
-    if (auto brBB = getLogicBB(branchOp); !brBB || brBB != targetBB)
+    if (getLogicBB(branchOp) != targetBB)
       continue;
 
     // We are looking for the control branch: data should be of control type
@@ -476,14 +476,9 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   assert(funcOp && "op should have parent function");
 
   // Get the BB number of the operation safely
-  std::optional<unsigned> targetBB = getLogicBB(dstOp);
-  if (!targetBB) {
-    dstOp->emitError("Operation does not have a BB.");
-    return failure();
-  }
+  unsigned targetBB = getLogicBB(dstOp);
 
-  std::optional<Value> specTrigger =
-      findControlInputToBB(funcOp, targetBB.value());
+  std::optional<Value> specTrigger = findControlInputToBB(funcOp, targetBB);
   if (not specTrigger.has_value()) {
     dstOp->emitError("Control signal for speculator's trigger not found.");
     return failure();
