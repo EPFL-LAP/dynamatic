@@ -53,9 +53,8 @@ end {name};
   
   architecture = f"""
 architecture arch of {name} is
-signal combined_valid : std_logic_vector(1 downto 0);
-signal combined_ready : std_logic_vector(1 downto 0);
-
+  signal combined_valid : std_logic_vector(1 downto 0);
+  signal combined_ready : std_logic_vector(1 downto 0);
 begin
     -- Combine tagIn_valid and ins_valid
     combined_valid <= tagIn_valid & ins_valid;

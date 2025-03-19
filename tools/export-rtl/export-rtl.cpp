@@ -125,9 +125,11 @@ LogicalResult ExportInfo::concretizeExternalModules() {
   FGenComp concretizeComponent =
       [&](const RTLRequest &request,
           hw::HWModuleExternOp extOp) -> LogicalResult {
+    
     // Try to find a matching component
     RTLMatch *match = config.getMatchingComponent(request);
     if (!match) {
+      extOp.print(llvm::errs());
       return emitError(request.loc)
              << "Failed to find matching RTL component for external module";
     }

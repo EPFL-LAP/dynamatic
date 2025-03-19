@@ -579,7 +579,7 @@ def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
       f"  signal {data_in_name}_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
   lacking_spec_port_assignments = [
-      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
+      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value('spec')};" for i in lacking_spec_ports
   ]
   return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
 

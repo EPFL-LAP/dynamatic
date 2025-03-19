@@ -20,6 +20,7 @@ import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
+import generators.handshake.extui as extui
 import generators.handshake.tagger as tagger
 import generators.handshake.untagger as untagger
 import generators.handshake.free_tags_fifo as fifo
@@ -69,6 +70,8 @@ def generate_code(name, mod_type, parameters):
       return untagger.generate_untagger(name, parameters)
     case "free_tags_fifo":
       return fifo.generate_free_tags_fifo(name, parameters)
+    case "extui":
+      return extui.generate_extui(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

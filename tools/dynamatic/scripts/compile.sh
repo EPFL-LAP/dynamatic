@@ -38,6 +38,7 @@ F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
+F_HANDSHAKE_OOE="$COMP_DIR/out_of_order.mlir"
 
 # ============================================================================ #
 # Helper funtions
@@ -126,6 +127,12 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
+# out-of-order-execution transformations
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --out-of-order-execution \
+    > "$F_HANDSHAKE_OOE"
+  exit_on_fail "Failed to apply out-of-order execution transformations" \
+    "Applied out-of-order execution transformations"
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
@@ -139,7 +146,7 @@ fi
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
@@ -162,7 +169,7 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"

@@ -24,14 +24,16 @@ COMP_DIR="$OUTPUT_DIR/comp"
 rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 
 # Set the correct config file
-RTL_CONFIG=""
-if [ "$HDL" == "vhdl" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
-elif [ "$HDL" == "vhdl-spec" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-spec.json"
-elif [ "$HDL" == "verilog" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
-fi
+# RTL_CONFIG=""
+# if [ "$HDL" == "vhdl" ]; then
+#   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
+# elif [ "$HDL" == "vhdl-spec" ]; then
+#   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-spec.json"
+# elif [ "$HDL" == "verilog" ]; then
+#   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
+# fi
+
+RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-spec.json"
 
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
   --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL

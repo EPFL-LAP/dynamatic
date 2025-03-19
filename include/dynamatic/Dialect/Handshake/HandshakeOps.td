@@ -591,6 +591,112 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Out-of-Order Execuion Operations
+//===----------------------------------------------------------------------===//
+
+
+def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
+  Pure
+]> {
+  let summary = "fifo operation for tags.";
+  let description = [{
+    The `free_tags_fifo` operation represents a FIFO queue that supports multiple inputs and a single output. 
+    It takes free tags as input and outputs a free tag, giving it to the Tagger when necessary
+    
+    Example:
+
+    ```mlir
+      free_tags_fifo %tagOut {handshake.name = "free_tags_fifo0"} : <i2>, <i2>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$tagOperand);
+
+  let results = (outs HandshakeType:$tagOut);
+
+  let assemblyFormat = [{
+    $tagOperand attr-dict `:`  custom<HandshakeType>(type($tagOperand)) `,`  custom<HandshakeType>(type($tagOut))
+  }];
+}
+
+def TaggerOp : Handshake_Op<"tagger", [
+  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Tagger operation for tagging data with tag signals.";
+  let description = [{
+    The `tagger` operation tags data with tags, where the tag is determined based on the `freeTag_data`.
+    It processes a set of input data arrays and tags them with the provided tag value for each data item.
+
+    Example:
+
+    ```mlir
+    
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataOperand,
+     HandshakeType:$tagOperand   
+  );
+
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    `[` $tagOperand `]` $dataOperand attr-dict `:` type($tagOperand) `,` functional-type($dataOperand, $dataOut)
+  }];
+
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "ins" : "tagIn";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "outs";
+    }
+  }];
+  
+}
+
+def UntaggerOp : Handshake_Op<"untagger", [
+  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Untagger operation for extracting tag signals and forwarding data.";
+  let description = [{
+    The `untagger` operation extracts tags from incoming tagged data while forwarding the data itself. 
+    It processes a set of input data arrays and separates the tag portion, outputting it as `freeTag_data`.
+
+    Example:
+
+    ```mlir
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataOperand);
+
+  let results = (outs HandshakeType:$dataOut,
+    HandshakeType:$tagOut
+  );
+
+  let assemblyFormat = [{
+    $dataOperand attr-dict `:` functional-type($dataOperand, $dataOut) `,`  type($tagOut) 
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "ins";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "outs" : "tagOut";
+    }
+  }];
+}
+
+
+
+//===----------------------------------------------------------------------===//
 // Memory interfaces
 //===----------------------------------------------------------------------===//
 

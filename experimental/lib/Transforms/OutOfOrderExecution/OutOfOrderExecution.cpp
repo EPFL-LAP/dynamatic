@@ -55,7 +55,6 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
                                                    MLIRContext *ctx) {
 
   OpBuilder builder(ctx);
-
   for (auto loadOp : funcOp.getOps<handshake::LoadOp>()) {
     auto startValue = (Value)funcOp.getArguments().back();
     Value addrInput = loadOp.getAddressInput();
@@ -72,7 +71,7 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
 
     // Connect the tagger to the load
     loadOp.getOperation()->replaceUsesOfWith(addrInput,
-                                             taggerOp.getDataOut().front());
+                                             taggerOp.getDataOut());
 
     // Create the untagegr and connect it to teh load
     UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
@@ -83,46 +82,11 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     Value loadOutput = loadOp.getDataOutput();
     for (Operation *user : loadOutput.getUsers()) {
       if (!isa<handshake::UntaggerOp>(user))
-
-        user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut().front());
+        user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut());
     }
 
     // Connet the free tag from the untagger to the fifo
-
     fifo.getOperation()->replaceUsesOfWith(startValue, untaggerOp.getTagOut());
-
-    /*
-    // Add other tagger and untagger operations for nested subgraphs case
-    auto tagTypeOuter = builder.getIntegerType(ceil(log2(numTagsOuter)));
-
-    FreeTagsFifoOp fifoOuter = builder.create<handshake::FreeTagsFifoOp>(
-        loadOp.getLoc(), handshake::ChannelType::get(tagTypeOuter), startValue);
-
-    // Create the outer Tagger fed from the inputs of the inner Tagger
-    handshake::TaggerOp taggerOpOuter = builder.create<handshake::TaggerOp>(
-        taggerOp.getLoc(), taggerOp.getDataOperands().getTypes(),
-        taggerOp.getDataOperands(), fifoOuter.getTagOut());
-
-    // Connect the outer tagger to the inner tagger
-    for (int i = 0; i < taggerOp.getDataOperands().size(); i++) {
-      taggerOp.getOperation()->replaceUsesOfWith(taggerOp.getDataOperands()[i],
-                                                 taggerOpOuter.getDataOut()[i]);
-    }
-
-    // Create the outer Untagger fed from the inputs of the inner Untagger
-    // Create the untagegr and connect it to teh load
-    UntaggerOp untaggerOpOuter = builder.create<handshake::UntaggerOp>(
-        untaggerOp.getLoc(), untaggerOp.getDataOut().getTypes(),
-        fifoOuter.getTagOut().getType(), untaggerOp.getDataOut());
-
-    // Replaces all the connections load->consumer to untagger->consumer
-    Value loadOutput = loadOp.getDataOutput();
-    for (Operation *user : loadOutput.getUsers()) {
-      if (!isa<handshake::UntaggerOp>(user))
-
-        user->replaceUsesOfWith(loadOutput, untaggerOp.getDataOut().front());
-    }
-        */
   }
   return success();
 }
@@ -251,12 +215,14 @@ LogicalResult OutOfOrderExecutionPass::addTagSignals(handshake::FuncOp funcOp,
     // For the speculator, perform downstream traversal to only dataOut,
     // skipping control signals. The upstream dataIn will be handled by the
     // recursive traversal.
-    for (auto taggerResult : taggerOp.getDataOut()) {
+ 
+
+      Value taggerResult = taggerOp.getDataOut();
       for (OpOperand &opOperand : taggerResult.getUses()) {
         if (failed(addTagSignalsRecursive(*ctx, opOperand, true, visited)))
           return failure();
       }
-    }
+    
   }
 
   return success();
