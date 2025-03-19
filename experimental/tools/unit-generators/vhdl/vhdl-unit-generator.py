@@ -20,6 +20,9 @@ import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
+import generators.handshake.tagger as tagger
+import generators.handshake.untagger as untagger
+import generators.handshake.free_tags_fifo as fifo
 
 
 def generate_code(name, mod_type, parameters):
@@ -60,6 +63,12 @@ def generate_code(name, mod_type, parameters):
       return trunci.generate_trunci(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
+    case "tagger":
+      return tagger.generate_tagger(name, parameters)
+    case "untagger":
+      return untagger.generate_untagger(name, parameters)
+    case "free_tags_fifo":
+      return fifo.generate_free_tags_fifo(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

@@ -3,11 +3,11 @@
 
 unsigned loop_multiply(in_int_t a[N]) {
   unsigned x = 2;
-  for (unsigned i = 0; i < N; ++i) {
+  /*for (unsigned i = 0; i < N; ++i) {
     if (a[i] == 0)
       x = x * x;
-  }
-  return x;
+  }*/
+  return x * a[0];
 }
 
 int main(void) {

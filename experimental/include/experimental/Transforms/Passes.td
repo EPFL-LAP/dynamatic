@@ -99,4 +99,16 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Three different cases for memory collsions: none/half/full">];
 }
 
+def OutOfOrderExecution : DynamaticPass<"out-of-order-execution"> {
+  let summary = "Applies the out-of-order execution algorithm.";
+  let description = [{
+    This pass transforms untagged dataflow circuits into tagged ones, enabling independent operations to 
+    execute out of order. It analyzes the circuit to identify operations that can be executed independently 
+    and assigns tags to mark them for out-of-order execution. 
+    Once tagged, the pass allows these operations to be reordered dynamically, executing as soon as 
+    their inputs are ready, rather than following strict program order. 
+  }];
+  let constructor = "dynamatic::experimental::outoforder::createOutOfOrderExecution()";
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
