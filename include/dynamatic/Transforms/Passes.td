@@ -134,6 +134,13 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
     **
   }];
   let constructor = "dynamatic::createHandshakeInsertSkippableSeq()";
+  let options =
+    [Option<"NStr", "NStr", "std::string", "\"3\"",
+            "Num of comparators">,
+    Option<"kernelName", "kernelName", "std::string", "\"histogram\"",
+            "Name">,
+    Option<"optimizeZero", "optimizeZero", "std::string", "\"0\"",
+            "optimize">];
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 

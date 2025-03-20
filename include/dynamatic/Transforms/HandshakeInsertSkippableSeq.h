@@ -25,7 +25,9 @@ namespace dynamatic {
 #include "dynamatic/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeInsertSkippableSeq(const unsigned N = 3);
+createHandshakeInsertSkippableSeq(const std::string &NStr = "3",
+                                  const std::string &kernelName = "histogram",
+                                  const std::string &optimizeZero = "0");
 
 } // namespace dynamatic
 

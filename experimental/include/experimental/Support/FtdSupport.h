@@ -36,6 +36,7 @@ class BlockIndexing {
   DenseMap<Block *, unsigned> blockToIndex;
 
 public:
+  BlockIndexing() {};
   /// Build the map out of a region.
   BlockIndexing(mlir::Region &region);
 

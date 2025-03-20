@@ -18,6 +18,7 @@ USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
 STRAIGHT_TO_QUEUE=${10}
 SKIPPABLE_SEQ_N=${11}
+OPTIMIZE_ZERO=${12}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -159,10 +160,12 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else 
 
+echo $SKIPPABLE_SEQ_N
+
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-inactivate-enforced-deps \
-  --handshake-insert-skippable-seq \
+  --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME optimizeZero=$OPTIMIZE_ZERO" \
   --handshake-replace-memory-interfaces \
   --handshake-minimize-cst-width \
   --handshake-optimize-bitwidths \

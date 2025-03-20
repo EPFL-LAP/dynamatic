@@ -257,6 +257,7 @@ public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
+  static constexpr llvm::StringLiteral OPTIMIZE_ZERO = "optimize-zero";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -270,6 +271,7 @@ public:
                "'fpl22' (throughput- and timing-driven buffering)"});
     addOption({SKIPPABLE_SEQ_N, "Num of Comparators"});
     addFlag({SHARING, "Use credit-based resource sharing"});
+    addFlag({OPTIMIZE_ZERO, "optimize zero conditions"});
     addFlag({FAST_TOKEN_DELIVERY, "Use fast token delivery strategy"});
     addFlag({STRAIGHT_TO_QUEUE, "Use straight to queue strategy"});
   }
@@ -578,6 +580,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
+  std::string optimizeZero = args.flags.contains(OPTIMIZE_ZERO) ? "1" : "0";
+  std::string skippableSeqN = "3";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -593,6 +597,16 @@ CommandResult Compile::execute(CommandArguments &args) {
     }
   }
 
+  if (auto it = args.options.find(SKIPPABLE_SEQ_N); it != args.options.end()) {
+    // if (stoul(it->second.str())) {
+    //   skippableSeqN = it->second;
+    // } else {
+    //   llvm::errs() << "Unknown N";
+    //   return CommandResult::FAIL;
+    // }
+    skippableSeqN = it->second;
+  }
+
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
@@ -600,7 +614,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 fastTokenDelivery, straightToQueue);
+                 fastTokenDelivery, straightToQueue, skippableSeqN,
+                 optimizeZero);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

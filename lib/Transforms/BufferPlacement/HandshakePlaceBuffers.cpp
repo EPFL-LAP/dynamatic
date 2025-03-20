@@ -16,8 +16,8 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -104,6 +104,8 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->targetCP = targetCP;
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
+
+  llvm::errs() << "#####" << algorithm << "##\n";
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -124,6 +126,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+  llvm::errs() << "$$$$$$" << algorithm << "$$$\n";
   // Check that the algorithm exists
   if (!allAlgorithms.contains(algorithm)) {
     llvm::errs() << "Unknown algorithm '" << algorithm

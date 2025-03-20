@@ -146,11 +146,10 @@ static ChannelVal backtrack(ChannelVal val) {
       val = cast<ChannelVal>(defOp->getOperand(0));
     if (auto condOp = dyn_cast<handshake::ConditionalBranchOp>(defOp))
       val = cast<ChannelVal>(condOp.getDataOperand());
-    else if (dyn_cast<handshake::ControlMergeOp>(defOp)){
+    else if (dyn_cast<handshake::ControlMergeOp>(defOp)) {
       return val;
-    }
-    else if (auto mergeLikeOp =
-                 dyn_cast<handshake::MergeLikeOpInterface>(defOp)) {
+    } else if (auto mergeLikeOp =
+                   dyn_cast<handshake::MergeLikeOpInterface>(defOp)) {
       if (auto dataOpr = mergeLikeOp.getDataOperands(); dataOpr.size() == 1)
         val = cast<ChannelVal>(dataOpr[0]);
     } else
@@ -616,8 +615,9 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
             std::max(optWidth, getUsefulResultWidth(cast<ChannelVal>(res)));
     }
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
-    if (optWidth == 0){
-      llvm::errs() << "tof tof tof tof \n" << channelVal << "\n" ;
+    if (optWidth == 0) {
+
+      llvm::errs() << "tof tof tof tof \n" << channelVal << "\n";
     }
     if (optWidth >= dataWidth)
       return failure();
@@ -761,9 +761,9 @@ struct MemInterfaceAddrOpt
     llvm::errs() << "mid0\n";
     FuncMemoryPorts ports = getMemoryPorts(memOp);
     llvm::errs() << "&&&& ???? \n";
-    for (auto ch : ports.interfacePorts){
-      if (ch.getKind() == MemoryPort::Kind::LOAD){
-          llvm::errs() << "&&&& load \n";
+    for (auto ch : ports.interfacePorts) {
+      if (ch.getKind() == MemoryPort::Kind::LOAD) {
+        llvm::errs() << "&&&& load \n";
       }
       llvm::errs() << "&&&& not load \n";
     }
@@ -844,7 +844,6 @@ struct MemInterfaceAddrOpt
 
     llvm::errs() << "^^^^^\n";
 
-    
     for (unsigned resIdx : addrResultIndices) {
       replacementValues[resIdx] = modBitWidth(
           {cast<ChannelVal>(replacementValues[resIdx]), ExtType::LOGICAL},
@@ -891,7 +890,8 @@ struct MemPortAddrOpt
     Value dataIn = portOp.getDataInput();
     Value done = portOp.getDoneInput();
     SmallVector<Value, 3> newOperands{newAddr, dataIn, done};
-    SmallVector<Type, 3> newResultTypes{newAddr.getType(), dataIn.getType(), done.getType()};
+    SmallVector<Type, 3> newResultTypes{newAddr.getType(), dataIn.getType(),
+                                        done.getType()};
 
     // Replace the memory port
     rewriter.setInsertionPoint(portOp);
@@ -903,7 +903,8 @@ struct MemPortAddrOpt
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
         {newPortOp.getAddressOutput(), ExtType::LOGICAL}, addrWidth, rewriter);
-    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput(), newPortOp.getDoneOutput()});
+    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput(),
+                                newPortOp.getDoneOutput()});
     llvm::errs() << "that\n";
     return success();
   }
@@ -1352,10 +1353,10 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
 
     for (auto a : condOp.getResult(0).getUsers())
-        llvm::errs() << "zero " <<  *a << "\n";
+      llvm::errs() << "zero " << *a << "\n";
     llvm::errs() << "--------  ------\n";
     for (auto a : condOp.getResult(1).getUsers())
-        llvm::errs() << "one " << *a << "\n";
+      llvm::errs() << "one " << *a << "\n";
 
     llvm::errs() << "^^" << condOp.getConditionOperand() << "\n";
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
@@ -1364,15 +1365,11 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       llvm::errs() << "RHS: " << cmpOp.getRhs() << "\n";
 
       ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
-            ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
+      ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
       llvm::errs() << "min RHS:" << minRhs << "\n";
-      
+
       ChannelVal minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
-    llvm::errs() << "min LHS:" << minLhs << "\n";
-      
-
-
-
+      llvm::errs() << "min LHS:" << minLhs << "\n";
 
       // One of the two comparison operands must be the data input
       unsigned width;
@@ -1600,6 +1597,8 @@ struct HandshakeOptimizeBitwidthsPass
     llvm::errs() << "pattern end\n";
 
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+      funcOp.print(llvm::errs());
+
       bool fwChanged, bwChanged;
       SmallVector<Operation *> ops;
 
