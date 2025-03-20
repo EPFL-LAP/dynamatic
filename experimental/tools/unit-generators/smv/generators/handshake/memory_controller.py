@@ -3,20 +3,20 @@ from generators.support.utils import *
 
 def generate_memory_controller(name, params):
   addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr"]) if "stAddr" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr"])
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData"]) if "ldData" in params[ATTR_PORT_TYPES].keys() else None
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData"]) if "ldData" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["stData"])
   num_loads = params["num_loads"]
   num_stores = params["num_stores"]
   num_controls = params["num_controls"]
 
   if num_loads == 0:
-    return _generate_mem_controller_loadless(name, num_stores, num_controls, addr_type)
+    return _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type)
   elif num_stores == 0:
     return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type)
   else:
     return _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type)
 
 
-def _generate_mem_controller_loadless(name, num_stores, num_controls, addr_type):
+def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type):
   return f"""
 MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)])}, 
   {", ".join([f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)])}, {", ".join([f"stData_{n}, stData_{n}_valid" for n in range(num_stores)])}, loadData)
@@ -56,7 +56,7 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n
   storeAddr := inner_arbiter.write_address;
   storeData := inner_arbiter.data_to_memory;
 
-  {_generate_write_memory_arbiter(f"{name}__write_memory_arbiter", num_stores)}
+  {_generate_write_memory_arbiter(f"{name}__write_memory_arbiter", num_stores, data_type, addr_type)}
   {_generate_mc_control(f"{name}__mc_control")}
 """
 
@@ -66,7 +66,7 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ldAddr_
 
   VAR
   inner_arbiter : {name}__read_memory_arbiter({", ".join([f"ldAddr_{n}_valid" for n in range(num_loads)])}, {", ".join([f"ldAddr_{n}" for n in range(num_loads)])},
-    {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])}, {", ".join([f"ldData_{n}" for n in range(num_loads)])}, loadData);
+    {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])}, loadData);
   inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, TRUE);
 
   // output
@@ -85,9 +85,9 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ldAddr_
   loadAddr := inner_arbiter.read_address;
   storeEn := FALSE;
   storeAddr := {addr_type.format_constant(0)};
-  storeData := {addr_type.format_constant(0)};
+  storeData := {data_type.format_constant(0)};
 
-  {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type)}
+  {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
   {_generate_mc_control(f"{name}__mc_control")}
 """
 
@@ -127,8 +127,8 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n
   storeAddr := inner_mc_loadless.write_address;
   storeData := inner_mc_loadless.data_to_memory;
 
-  {_generate_mem_controller_loadless(f"{name}__mc_loadless", num_stores, num_controls, addr_type)}
-  {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type)}
+  {_generate_mem_controller_loadless(f"{name}__mc_loadless", num_stores, num_controls, data_type, addr_type)}
+  {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
 """
 
 def _generate_mc_control(name):
@@ -143,20 +143,20 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
   ASSIGN
   init(memStart_ready_in) := TRUE;
   next(memStart_ready_in) := case
-    memStart_valid = TRUE & memStart_ready_in = TRUE : FALSE;
-    memEnd_valid_in = TRUE & memEnd_ready = TRUE : TRUE;
+    memEnd_valid_in & memEnd_ready : TRUE;
+    memStart_valid & memStart_ready_in : FALSE;
     TRUE : memStart_ready_in;
   esac;
   init(memEnd_valid_in) := FALSE;
   next(memEnd_valid_in) := case
-    ctrlEnd_valid = TRUE & all_requests_done = TRUE : TRUE;
-    memEnd_valid_in = TRUE & memEnd_ready = TRUE : FALSE;
+    memEnd_valid_in & memEnd_ready : FALSE;
+    ctrlEnd_valid & all_requests_done : TRUE;
     TRUE : memEnd_valid_in;
   esac;
   init(ctrlEnd_ready_in) := FALSE;
   next(ctrlEnd_ready_in) := case
-    ctrlEnd_valid = TRUE & all_requests_done = TRUE : TRUE;
-    ctrlEnd_valid = TRUE & ctrlEnd_ready_in = TRUE : FALSE;
+    ctrlEnd_valid & ctrlEnd_ready_in : FALSE;
+    ctrlEnd_valid & all_requests_done : TRUE;
     TRUE : ctrlEnd_ready_in;
   esac;
 
@@ -167,75 +167,87 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
   ctrlEnd_ready := ctrlEnd_ready_in;
 """
 
-def _generate_write_memory_arbiter(name, num_stores):
+def _generate_write_memory_arbiter(name, num_stores, data_type, addr_type):
   return f"""
 MODULE {name}({", ".join([f"pValid_{n}" for n in range(num_stores)])}, {", ".join([f"address_in_{n}" for n in range(num_stores)])},
   {", ".join([f"data_in_{n}" for n in range(num_stores)])}, {", ".join([f"nReady_{n}" for n in range(num_stores)])})
 
   VAR
+  priority_gen : {name}__priority({", ".join([f"pValid_{n}, nReady_{n}" for n in range(num_stores)])});
   {"\n  ".join([f"valid_{n}_in : boolean;" for n in range(num_stores)])}
 
   ASSIGN
   {"\n  ".join([f"init(valid_{n}_in) := FALSE;" for n in range(num_stores)])}
-  {"\n  ".join([f"next(valid_{n}_in) :=  que_el_{n};" for n in range(num_stores)])}
+  {"\n  ".join([f"next(valid_{n}_in) :=  priority_gen.priority_{n};" for n in range(num_stores)])}
 
 
   DEFINE
-  que_el_{0} := pValid_{0} & nReady_{0};
-  {"\n  ".join([f"prior_{n + 1} := que_el_{n} | prior_{n};\n  que_el_{n + 1} := pValid_{n + 1} & nReady_{n + 1} & !prior_{n + 1};" for n in range(num_stores - 1)])}
   write_addr_in := case
-    {"\n    ".join([f"que_el_{n} = TRUE : address_in_{n};" for n in range(num_stores)])}
-    TRUE: 0;
+    {"\n    ".join([f"priority_gen.priority_{n} = TRUE : address_in_{n};" for n in range(num_stores)])}
+    TRUE: {addr_type.format_constant(0)};
   esac;
   write_data_in := case
-    {"\n    ".join([f"que_el_{n} = TRUE : data_in_{n};" for n in range(num_stores)])}
-    TRUE: 0;
+    {"\n    ".join([f"priority_gen.priority_{n} = TRUE : data_in_{n};" for n in range(num_stores)])}
+    TRUE: {data_type.format_constant(0)};
   esac;
 
   // output
   DEFINE
-  {"\n  ".join([f"ready_{n} := que_el_{n} & nReady_{n};" for n in range(num_stores)])}
+  {"\n  ".join([f"ready_{n} := priority_gen.priority_{n} & nReady_{n};" for n in range(num_stores)])}
   {"\n  ".join([f"valid_{n} := valid_{n}_in;" for n in range(num_stores)])}
   write_address := write_addr_in;
   data_to_memory := write_data_in;
-  write_enable := {" | ".join([f"que_el_{n}" for n in range(num_stores)])};
+  write_enable := {" | ".join([f"priority_gen.priority_{n}" for n in range(num_stores)])};
   enable := write_enable;
+
+{_generate_priority(f"{name}__priority", num_stores)}
 """
 
-def _generate_read_memory_arbiter(name, num_loads, data_type):
+def _generate_read_memory_arbiter(name, num_loads, data_type, addr_type):
   return f"""
 MODULE {name}({", ".join([f"pValid_{n}" for n in range(num_loads)])}, {", ".join([f"address_in_{n}" for n in range(num_loads)])}, {", ".join([f"nReady_{n}" for n in range(num_loads)])}, data_from_memory)
 
   VAR
+  priority_gen : {name}__priority({", ".join([f"pValid_{n}, nReady_{n}" for n in range(num_loads)])});
   {"\n  ".join([f"valid_{n}_in : boolean;" for n in range(num_loads)])}
   {"\n  ".join([f"sel_prev{n} : boolean;" for n in range(num_loads)])}
   {"\n  ".join([f"out_reg_{n} : {data_type.smv_type};" for n in range(num_loads)])}
 
   ASSIGN
   {"\n  ".join([f"init(valid_{n}_in) := FALSE;" for n in range(num_loads)])}
-  {"\n  ".join([f"next(valid_{n}_in) :=  case\n    que_el_{n} : TRUE;\n    nReady_{n} : FALSE;\n    TRUE : valid_{n}_in;\n  esac;" for n in range(num_loads)])}
+  {"\n  ".join([f"next(valid_{n}_in) :=  case\n    priority_gen.priority_{n} : TRUE;\n    nReady_{n} : FALSE;\n    TRUE : valid_{n}_in;\n  esac;" for n in range(num_loads)])}
 
   {"\n  ".join([f"init(sel_prev{n}) := FALSE;" for n in range(num_loads)])}
-  {"\n  ".join([f"next(sel_prev{n}) := que_el_{n};" for n in range(num_loads)])}
+  {"\n  ".join([f"next(sel_prev{n}) := priority_gen.priority_{n};" for n in range(num_loads)])}
 
   {"\n  ".join([f"init(out_reg_{n}) := {data_type.format_constant(0)};" for n in range(num_loads)])}
   {"\n  ".join([f"next(out_reg_{n}) := sel_prev{n} ? data_from_memory : out_reg_{n};" for n in range(num_loads)])}
 
-
-  DEFINE
-  que_el_{0} := pValid_{0} & nReady_{0};
-  {"\n  ".join([f"prior_{n + 1} := que_el_{n} | prior_{n};\n  que_el_{n + 1} := pValid_{n + 1} & nReady_{n + 1} & !prior_{n + 1};" for n in range(num_loads - 1)])}
-
   // output
   DEFINE
-  {"\n  ".join([f"ready_{n} := que_el_{n} & nReady_{n};" for n in range(num_loads)])}
+  {"\n  ".join([f"ready_{n} := priority_gen.priority_{n} & nReady_{n};" for n in range(num_loads)])}
   {"\n  ".join([f"valid_{n} := valid_{n}_in;" for n in range(num_loads)])}
   {"\n  ".join([f"data_out_{n} := sel_prev{n} ? data_from_memory : out_reg_{n};" for n in range(num_loads)])}
   
-  read_enable := {" | ".join([f"que_el_{n}" for n in range(num_loads)])};
-  read_addr := case
-    {"\n    ".join([f"que_el_{n} = TRUE : address_in_{n};" for n in range(num_loads)])}
-    TRUE: 0;
+  read_enable := {" | ".join([f"priority_gen.priority_{n}" for n in range(num_loads)])};
+  read_address := case
+    {"\n    ".join([f"priority_gen.priority_{n} = TRUE : address_in_{n};" for n in range(num_loads)])}
+    TRUE: {addr_type.format_constant(0)};
   esac;
+
+{_generate_priority(f"{name}__priority", num_loads)}
+"""
+
+def _generate_priority(name, size):
+  return f"""
+MODULE {name}({", ".join([f"req_{n}, data_ready_{n}" for n in range(size)])})
+  DEFINE
+  que_el_{0} := req_{0} & data_ready_{0};
+  prior_0 := que_el_{0};
+  {"\n  ".join([f"prior_{n + 1} := que_el_{n} | prior_{n};\n  que_el_{n + 1} := req_{n + 1} & data_ready_{n + 1} & !prior_{n + 1};" for n in range(size - 1)])}
+
+  // output
+  DEFINE
+  {"\n  ".join([f"priority_{n} := que_el_{n};" for n in range(size)])}
 
 """
