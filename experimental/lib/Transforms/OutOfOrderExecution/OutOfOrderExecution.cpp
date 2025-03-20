@@ -21,7 +21,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include <cmath>
 #include <memory>
-#include <set>
 #include <string>
 
 using namespace llvm;
@@ -49,17 +48,24 @@ private:
   // Step 2: Add the tag signals to the channels in the tagged region
   LogicalResult addTagSignals(handshake::FuncOp funcOp, MLIRContext *ctx);
 
-  // Step 1.1: Identfy dirty nodes
-  LogicalResult identifyDirtyNodes(handshake::FuncOp funcOp, MLIRContext *ctx,
-                                   Operation *outOfOrderOp,
-                                   std::set<Operation *> &dirtyNodes);
+  // Step 1.1: Identify dirty nodes
+  LogicalResult identifyDirtyNodes(Operation *outOfOrderOp,
+                                   llvm::DenseSet<Operation *> &dirtyNodes);
 
   // Step 1.2: Identfy unaligned edges
-  LogicalResult identifyUnalignedEdges(handshake::FuncOp funcOp,
-                                       MLIRContext *ctx,
-                                       Operation *outOfOrderOp,
-                                       std::set<Operation *> &dirtyNodes,
-                                       std::set<Value> &unalignedEdges);
+  LogicalResult identifyUnalignedEdges(llvm::DenseSet<Operation *> &dirtyNodes,
+                                       llvm::DenseSet<Value> &unalignedEdges);
+
+  // Step 1.3: Identify tagged edges; i.e. the edges that should receive a tag
+  LogicalResult identifyTaggedEdges(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                    Operation *outOfOrderOp,
+                                    llvm::DenseSet<Operation *> &dirtyNodes,
+                                    llvm::DenseSet<Value> &unalignedEdges,
+                                    llvm::DenseSet<Value> &taggedEdges);
+
+  // MAIN: Apply the out-of-order execution methodology
+  LogicalResult applyOutOfOrder(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                llvm::DenseSet<Operation *> &outOfOrderNodes);
 };
 } // namespace
 
@@ -85,7 +91,7 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     // Connect the tagger to the load
     loadOp.getOperation()->replaceUsesOfWith(addrInput, taggerOp.getDataOut());
 
-    // Create the untagegr and connect it to teh load
+    // Create the untagegr and connect it to the load
     UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
         loadOp.getLoc(), loadOp.getDataResult().getType(),
         fifo.getTagOut().getType(), loadOp.getDataResult());
@@ -242,8 +248,28 @@ LogicalResult OutOfOrderExecutionPass::addTagSignals(handshake::FuncOp funcOp,
   return success();
 }
 
-static void tarverseGraph(Operation *op, std::set<Operation *> &visited,
-                          std::set<Operation *> &dirtyNodes) {
+LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
+    handshake::FuncOp funcOp, MLIRContext *ctx,
+    llvm::DenseSet<Operation *> &outOfOrderNodes) {
+  for (Operation *op : outOfOrderNodes) {
+    llvm::DenseSet<Operation *> dirtyNodes;
+    if (failed(identifyDirtyNodes(op, dirtyNodes)))
+      return failure();
+
+    llvm::DenseSet<Value> unalignedEdges;
+    if (failed(identifyUnalignedEdges(dirtyNodes, unalignedEdges)))
+      return failure();
+
+    llvm::DenseSet<Value> taggedEdges;
+    if (failed(identifyTaggedEdges(funcOp, ctx, op, dirtyNodes, unalignedEdges,
+                                   taggedEdges)))
+      return failure();
+  }
+  return success();
+}
+
+static void tarverseGraph(Operation *op, llvm::DenseSet<Operation *> &visited,
+                          llvm::DenseSet<Operation *> &dirtyNodes) {
   if (visited.find(op) != visited.end()) {
     return;
   }
@@ -262,39 +288,106 @@ static void tarverseGraph(Operation *op, std::set<Operation *> &visited,
   }
 }
 
-LogicalResult identifyDirtyNodes(handshake::FuncOp funcOp, MLIRContext *ctx,
-                                 Operation *outOfOrderOp,
-                                 std::set<Operation *> &dirtyNodes) {
-  std::set<Operation *> visited;
+LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
+    Operation *outOfOrderOp, llvm::DenseSet<Operation *> &dirtyNodes) {
+  llvm::DenseSet<Operation *> visited;
   tarverseGraph(outOfOrderOp, visited, dirtyNodes);
+  dirtyNodes.erase(outOfOrderOp);
   return success();
 }
 
-LogicalResult identifyUnalignedEdges(handshake::FuncOp funcOp, MLIRContext *ctx,
-                                     Operation *outOfOrderOp,
-                                     std::set<Operation *> &dirtyNodes,
-                                     std::set<Value> &unalignedEdges) {
+LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
+    llvm::DenseSet<Operation *> &dirtyNodes,
+    llvm::DenseSet<Value> &unalignedEdges) {
 
+  // Forward edges from the dirty node
   for (auto *dirtyNode : dirtyNodes) {
+    // Forward edges from the dirty node
     for (auto result : dirtyNode->getResults()) {
       for (OpOperand &edge : result.getUses()) {
         Operation *user = edge.getOwner();
-        // Find egges that connect a nodethat is not in the set Ndirty to a
-        // dirty node from the set.
+        // Identify edges that connect a dirty node to a non-dirty node
         if (dirtyNodes.find(user) == dirtyNodes.end()) {
           unalignedEdges.insert(edge.get());
         }
       }
-      /*
-      for (auto edge : result.getUses()) {
-
-        auto *useOwner = edge.getOwner();
-        if (dirtyNodes.find(user) == dirtyNodes.end()) {
-          unalignedEdges.insert(result);
-        }
-      }*/
     }
   }
+  return success();
+}
+
+LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
+    handshake::FuncOp funcOp, MLIRContext *ctx, Operation *outOfOrderOp,
+    llvm::DenseSet<Operation *> &dirtyNodes,
+    llvm::DenseSet<Value> &unalignedEdges, llvm::DenseSet<Value> &taggedEdges) {
+  // Step 1: Identify the Tagged Edges
+  taggedEdges =
+      llvm::DenseSet<Value>(unalignedEdges.begin(), unalignedEdges.end());
+
+  // Insert input edges (operands of outOfOrderOp)
+  for (Value operand : outOfOrderOp->getOperands()) {
+    taggedEdges.insert(operand);
+  }
+
+  // Remove output edges (results of outOfOrderOp)
+  for (Value result : outOfOrderOp->getResults()) {
+    taggedEdges.erase(result);
+  }
+
+  // Step 2: Add the FIFO that generates the tags
+  OpBuilder builder(ctx);
+  auto tagType = builder.getIntegerType(ceil(log2(numTags)));
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
+      (*taggedEdges.begin()).getLoc(), handshake::ChannelType::get(tagType),
+      startValue);
+
+  // Step 3: Add the Tagger Operations
+  // For each tagged edge, create a Tagger operation that is fed from this
+  // tagged edge and the FIFO
+  for (auto edge : taggedEdges) {
+    handshake::TaggerOp taggerOp = builder.create<handshake::TaggerOp>(
+        edge.getLoc(), edge.getType(), edge, fifo.getTagOut());
+
+    // Connect the tagger to the consumer of the edge
+    //  i.e., replace all the edges producer->consumer to tagger->consumer
+    for (auto *user : edge.getUsers()) {
+      if (user != edge.getDefiningOp() && user != taggerOp) {
+        user->replaceUsesOfWith(edge, taggerOp.getDataOut());
+      }
+    }
+
+    if (unalignedEdges.contains(edge)) {
+      unalignedEdges.erase(edge);
+      unalignedEdges.insert(taggerOp.getDataOut());
+    }
+
+    inheritBB(edge.getDefiningOp(), taggerOp); // TODO: how to get the BB?
+  }
+  // Step 4: Add the Untagger Operations
+  SmallVector<Value> joinOperands;
+  for (auto edge : unalignedEdges) {
+    UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
+        edge.getLoc(), edge.getType(), fifo.getTagOut().getType(), edge);
+
+    for (auto *user : edge.getUsers()) {
+      if (user != edge.getDefiningOp() && user != untaggerOp) {
+        user->replaceUsesOfWith(edge, untaggerOp.getDataOut());
+      }
+    }
+    inheritBB(edge.getDefiningOp(), untaggerOp); // TODO: how to get the BB?
+    joinOperands.push_back(untaggerOp.getTagOut());
+  }
+
+  if (joinOperands.size() > 1) {
+    handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
+        (*joinOperands.begin()).getLoc(), joinOperands);
+    fifo.getOperation()->replaceUsesOfWith(startValue, joinOp.getResult());
+  } else {
+    fifo.getOperation()->replaceUsesOfWith(startValue, (*joinOperands.begin()));
+  }
+
   return success();
 }
 
