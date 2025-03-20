@@ -100,7 +100,7 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   tfifo_name = f"{name}_tfifo"
   tfifo = generate_tfifo(tfifo_name, {
       "bitwidth": extra_signals_total_bitwidth,
-      "num_slots": 32  # todo
+      "num_slots": 1  # todo
   })
 
   entity = generate_entity(name, [{
@@ -148,7 +148,8 @@ architecture arch of {name} is
   signal transfer_in, transfer_out : std_logic;
 begin
   -- addrIn is ready only when inner load and tfifo are ready
-  addrIn_ready <= addrIn_ready_inner and tfifo_ready;
+  -- addrIn_ready <= addrIn_ready_inner and tfifo_ready; -- Conservative
+  addrIn_ready <= addrIn_ready_inner; -- Assuming MC latency is 1 and tfifo is always ready
 
   -- Transfer signal assignments
   transfer_in <= addrIn_valid and addrIn_ready_inner;
