@@ -294,7 +294,8 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   if (name == "handshake.addi" || name == "handshake.buffer" ||
       name == "handshake.cmpi" || name == "handshake.fork" ||
       name == "handshake.merge" || name == "handshake.muli" ||
-      name == "handshake.sink") {
+      name == "handshake.sink" || name == "handshake.speculator" ||
+      name == "handshake.spec_commit" || name == "handshake.spec_save_commit") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(0));
   } else if (name == "handshake.cond_br") {
@@ -317,6 +318,10 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
     serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.store") {
     serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
+  } else if (name == "handshake.speculating_branch") {
+    serializedParams["SPEC_TAG_BITWIDTH"] =
+        getBitwidthString(mod.getInputType(0));
     serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
   } else if (name == "handshake.mem_controller") {
     serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
