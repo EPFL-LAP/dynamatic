@@ -108,11 +108,11 @@
   },
   {
     "name": "handshake.extui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extui -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extui -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.shli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.tagger",

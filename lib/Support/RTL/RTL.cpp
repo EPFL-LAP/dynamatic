@@ -453,6 +453,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.muli" || modName == "handshake.sink" ||
       modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.extui" || modName == "handshake.shli" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store") {
     serializedParams["EXTRA_SIGNALS"] =

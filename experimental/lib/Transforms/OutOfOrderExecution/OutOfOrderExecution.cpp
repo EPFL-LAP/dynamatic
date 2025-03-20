@@ -19,9 +19,9 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include <cmath>
 #include <memory>
+#include <set>
 #include <string>
 
 using namespace llvm;
@@ -48,6 +48,18 @@ private:
 
   // Step 2: Add the tag signals to the channels in the tagged region
   LogicalResult addTagSignals(handshake::FuncOp funcOp, MLIRContext *ctx);
+
+  // Step 1.1: Identfy dirty nodes
+  LogicalResult identifyDirtyNodes(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                   Operation *outOfOrderOp,
+                                   std::set<Operation *> &dirtyNodes);
+
+  // Step 1.2: Identfy unaligned edges
+  LogicalResult identifyUnalignedEdges(handshake::FuncOp funcOp,
+                                       MLIRContext *ctx,
+                                       Operation *outOfOrderOp,
+                                       std::set<Operation *> &dirtyNodes,
+                                       std::set<Value> &unalignedEdges);
 };
 } // namespace
 
@@ -71,8 +83,7 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
         loadOp.getLoc(), addrInput.getType(), addrInput, fifo.getTagOut());
 
     // Connect the tagger to the load
-    loadOp.getOperation()->replaceUsesOfWith(addrInput,
-                                             taggerOp.getDataOut());
+    loadOp.getOperation()->replaceUsesOfWith(addrInput, taggerOp.getDataOut());
 
     // Create the untagegr and connect it to teh load
     UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
@@ -220,16 +231,70 @@ LogicalResult OutOfOrderExecutionPass::addTagSignals(handshake::FuncOp funcOp,
     // For the speculator, perform downstream traversal to only dataOut,
     // skipping control signals. The upstream dataIn will be handled by the
     // recursive traversal.
- 
 
-      Value taggerResult = taggerOp.getDataOut();
-      for (OpOperand &opOperand : taggerResult.getUses()) {
-        if (failed(addTagSignalsRecursive(*ctx, opOperand, true, visited)))
-          return failure();
-      }
-    
+    Value taggerResult = taggerOp.getDataOut();
+    for (OpOperand &opOperand : taggerResult.getUses()) {
+      if (failed(addTagSignalsRecursive(*ctx, opOperand, true, visited)))
+        return failure();
+    }
   }
 
+  return success();
+}
+
+static void tarverseGraph(Operation *op, std::set<Operation *> &visited,
+                          std::set<Operation *> &dirtyNodes) {
+  if (visited.find(op) != visited.end()) {
+    return;
+  }
+  visited.insert(op);
+
+  // Mark the operation as a dirty node
+  if (dirtyNodes.find(op) != dirtyNodes.end()) {
+    dirtyNodes.insert(op);
+  }
+
+  // Traverse the graph
+  for (auto result : op->getResults()) {
+    for (auto *user : result.getUsers()) {
+      tarverseGraph(user, visited, dirtyNodes);
+    }
+  }
+}
+
+LogicalResult identifyDirtyNodes(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                 Operation *outOfOrderOp,
+                                 std::set<Operation *> &dirtyNodes) {
+  std::set<Operation *> visited;
+  tarverseGraph(outOfOrderOp, visited, dirtyNodes);
+  return success();
+}
+
+LogicalResult identifyUnalignedEdges(handshake::FuncOp funcOp, MLIRContext *ctx,
+                                     Operation *outOfOrderOp,
+                                     std::set<Operation *> &dirtyNodes,
+                                     std::set<Value> &unalignedEdges) {
+
+  for (auto *dirtyNode : dirtyNodes) {
+    for (auto result : dirtyNode->getResults()) {
+      for (OpOperand &edge : result.getUses()) {
+        Operation *user = edge.getOwner();
+        // Find egges that connect a nodethat is not in the set Ndirty to a
+        // dirty node from the set.
+        if (dirtyNodes.find(user) == dirtyNodes.end()) {
+          unalignedEdges.insert(edge.get());
+        }
+      }
+      /*
+      for (auto edge : result.getUses()) {
+
+        auto *useOwner = edge.getOwner();
+        if (dirtyNodes.find(user) == dirtyNodes.end()) {
+          unalignedEdges.insert(result);
+        }
+      }*/
+    }
+  }
   return success();
 }
 
