@@ -42,7 +42,7 @@ port(
   ins_valid : in std_logic;
 
   outs_ready : in std_logic; 
-  outs_valid : out std_logic
+  outs_valid : out std_logic;
 
   ins_ready : out std_logic;
 
@@ -60,28 +60,10 @@ end {name};
   
   architecture = f"""
 architecture arch of {name} is
-  signal join_ins_valid : std_logic_vector(0 downto 0);
-  signal join_ins_ready : std_logic_vector(0 downto 0);
-  signal join_ready : std_logic;
-  signal join_valid : std_logic;
 begin
-  -- AND tagOut_ready and outs_ready
-    join_ready <= tagOut_ready and outs_ready;
-
-    join_ins_valid(0) <= ins_valid;
-    
-
-    j : entity work.{join_name}(arch)
-                port map(   join_ins_valid,
-                            join_ready,
-                            join_valid,
-                            join_ins_ready);
-
-    outs_valid   <= join_valid;
-    tagOut_valid <= join_valid;
-
-    ins_ready <= join_ins_ready(0);
-
+    outs_valid<= '1';
+    tagOut_valid<= '1';
+    ins_ready <= '1';
     outs <= ins;
     tagOut <= ins_{current_tag};
 

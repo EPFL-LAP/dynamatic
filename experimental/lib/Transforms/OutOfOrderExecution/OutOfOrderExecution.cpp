@@ -9,6 +9,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -87,6 +88,10 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
 
     // Connet the free tag from the untagger to the fifo
     fifo.getOperation()->replaceUsesOfWith(startValue, untaggerOp.getTagOut());
+
+    inheritBB(loadOp, fifo);
+    inheritBB(loadOp, taggerOp);
+    inheritBB(loadOp, untaggerOp);
   }
   return success();
 }

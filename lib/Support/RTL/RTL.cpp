@@ -411,6 +411,9 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(0));
+  }else if (modName == "handshake.shli") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
   }else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }

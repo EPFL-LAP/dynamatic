@@ -39,7 +39,14 @@ use IEEE.math_real.all;
 entity {name} is
   port(
     clk, rst      : in  std_logic;
-    ins_valid : in std_logic;def _generate_addi_signal_manager(name, bitwidth, extra_signals): downto 0);
+    ins_valid : in std_logic;
+    
+    outs_ready : in std_logic; 
+    outs_valid : out std_logic;
+
+    ins_ready : out std_logic;
+
+    ins   : in  std_logic_vector({data_bitwidth} - 1 downto 0);
     outs  : out std_logic_vector({data_bitwidth} - 1 downto 0);
 
     tagIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
