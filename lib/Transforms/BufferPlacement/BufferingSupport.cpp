@@ -85,45 +85,6 @@ OpOperand &Channel::getOperand() const {
   llvm_unreachable("channel consumer does not have value as operand");
 }
 
-void Channel::addInternalBuffers(const TimingDatabase &timingDB) {
-  // Add slots present at the source unit's output ports
-  if (const TimingModel *model = timingDB.getModel(producer)) {
-    props->minTrans += model->outputModel.transparentSlots;
-    props->minOpaque += model->outputModel.opaqueSlots;
-  }
-
-  // Add slots present at the destination unit's input ports
-  if (const TimingModel *model = timingDB.getModel(consumer)) {
-    props->minTrans += model->inputModel.transparentSlots;
-    props->minOpaque += model->inputModel.opaqueSlots;
-  }
-}
-
-void PlacementResult::deductInternalBuffers(const Channel &channel,
-                                            const TimingDatabase &timingDB) {
-  unsigned numTransToDeduct = 0, numOpaqueToDeduct = 0;
-
-  // Remove slots present at the source unit's output ports. If the channel is a
-  // function argument, the model will be nullptr (since Handshake functions do
-  // not have a timing model) and nothing will happen for the producer
-  if (const TimingModel *model = timingDB.getModel(channel.producer)) {
-    numTransToDeduct += model->outputModel.transparentSlots;
-    numOpaqueToDeduct += model->outputModel.opaqueSlots;
-  }
-
-  // Remove slots present at the destination unit's input ports
-  if (const TimingModel *model = timingDB.getModel(channel.consumer)) {
-    numTransToDeduct += model->inputModel.transparentSlots;
-    numOpaqueToDeduct += model->inputModel.opaqueSlots;
-  }
-
-  // Adjust placement results
-  assert(numTrans >= numTransToDeduct && "not enough transparent slots");
-  assert(numOpaque >= numOpaqueToDeduct && "not enough opaque slots");
-  numTrans -= numTransToDeduct;
-  numOpaque -= numOpaqueToDeduct;
-}
-
 Operation *dynamatic::buffer::getChannelProducer(Value channel, size_t *idx) {
   if (OpResult res = dyn_cast<OpResult>(channel)) {
     if (idx)
@@ -162,9 +123,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       return channel.consumer->emitError() << ss.str();
     }
 
-    // Increase the minimum number of slots if internal buffers are present, and
-    // check for satisfiability
-    channel.addInternalBuffers(timingDB);
+    // Check for satisfiability
     if (!channel.props->isSatisfiable()) {
       std::stringstream ss;
       std::string channelName;
