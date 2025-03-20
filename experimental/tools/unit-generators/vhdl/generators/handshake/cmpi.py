@@ -1,11 +1,16 @@
+from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_cmpi(name, params):
   bitwidth = params["bitwidth"]
   predicate = params["predicate"]
+  extra_signals = params.get("extra_signals", None)
 
-  return _generate_cmpi(name, predicate, bitwidth)
+  if extra_signals:
+    return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
+  else:
+    return _generate_cmpi(name, predicate, bitwidth)
 
 
 def _get_symbol_from_predicate(pred):
@@ -92,3 +97,24 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": 1,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_cmpi(name, predicate, bitwidth))
