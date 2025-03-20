@@ -100,6 +100,16 @@
     "hdl": "smv"
   },
   {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned"},
+      { "name": "NUM_LOADS", "type": "unsigned"},
+      { "name": "NUM_STORES", "type": "unsigned"}
+    ],  
+    "generic": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t memory_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES port_types=$PORT_TYPES",
+    "hdl": "smv"
+  },
+  {
     "name": "handshake.absf",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t absf --abstract-data -p latency=0 port_types=$PORT_TYPES",
     "hdl": "smv"
