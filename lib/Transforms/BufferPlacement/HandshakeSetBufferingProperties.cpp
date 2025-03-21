@@ -116,6 +116,20 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
+  for (handshake::ControlMergeOp cmergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+    if (cmergeOp->getNumOperands() > 1) {
+      Channel channel(cmergeOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+    }
+  }
+
+  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (muxOp->getNumOperands() > 1) {
+      Channel channel(muxOp.getResult(), true);
+      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+    }
+  }
+
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
