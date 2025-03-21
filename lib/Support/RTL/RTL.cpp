@@ -393,7 +393,28 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
-  } else {
+  } else if (modName == "handshake.tagger") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["TAG_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  }else if (modName == "handshake.untagger") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
+    serializedParams["TAG_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(1));    
+  }else if (modName == "handshake.free_tags_fifo") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
+  }else if (modName == "handshake.extui") {
+    serializedParams["INPUT_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["OUTPUT_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
+  }else if (modName == "handshake.shli") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+  }else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
@@ -432,6 +453,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.muli" || modName == "handshake.sink" ||
       modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.extui" || modName == "handshake.shli" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store") {
     serializedParams["EXTRA_SIGNALS"] =
@@ -488,7 +510,13 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
-  } else {
+  } else if (modName == "handshake.tagger" || modName == "handshake.untagger") {
+    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getOutputType(0));
+    serializedParams["INPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
+  }
+  else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }

@@ -17,6 +17,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "experimental/Transforms/OutOfOrderExecution/OutOfOrderExecution.h"
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "mlir/Pass/Pass.h"

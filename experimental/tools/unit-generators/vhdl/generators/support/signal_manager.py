@@ -142,6 +142,16 @@ def _get_default_extra_signal_value(extra_signal_name: str):
 def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signals)
+  
+  """
+  Tags are quaranteed to be the same across all input ports.
+  We can use the first input port's tag for all output ports.
+  """
+  if signal_name.startswith("tag"):
+    if in_extra_signals:
+      return in_extra_signals[0]
+    else:
+      raise ValueError("{signal_name} requires at least one signal")
 
   raise ValueError(
       f"Unsupported forwarding method for extra signal: {signal_name}")
@@ -569,7 +579,7 @@ def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
       f"  signal {data_in_name}_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
   ]
   lacking_spec_port_assignments = [
-      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
+      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value('spec')};" for i in lacking_spec_ports
   ]
   return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
 

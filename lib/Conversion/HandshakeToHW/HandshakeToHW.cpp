@@ -685,6 +685,27 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
         addUnsigned("FIFO_DEPTH", 16);
       })
+      .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
+        // Data bitwidth
+        addType("DATA_TYPE", taggerOp.getDataOperand());
+        addType("TAG_TYPE", taggerOp.getTagOperand());
+      })
+      .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
+        addType("DATA_TYPE", untaggerOp.getDataOperand());
+        addType("TAG_TYPE", untaggerOp.getTagOut());
+      })
+      .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
+        // Tag bitwidth and fifo depth
+        addType("TAG_TYPE", fifo.getTagOut());
+        ChannelType ct =
+            dyn_cast_or_null<ChannelType>(fifo.getTagOut().getType());
+        if (!ct) {
+          op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
+          unsupported = true;
+          return;
+        }
+        addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1802,6 +1823,9 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::TaggerOp>,
+                    ConvertToHWInstance<handshake::UntaggerOp>,
+                    ConvertToHWInstance<handshake::FreeTagsFifoOp>,
 
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
