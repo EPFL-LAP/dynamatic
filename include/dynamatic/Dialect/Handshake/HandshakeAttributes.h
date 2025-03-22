@@ -84,10 +84,6 @@ struct ChannelBufProps {
   unsigned minOpaque;
   /// Maximum number of opaque slots allowed on the channel (inclusive).
   std::optional<unsigned> maxOpaque;
-  /// Number of additional transparent slots on the channel.
-  unsigned extraTrans;
-  /// Number of additional opaque slots on the channel.
-  unsigned extraOpaque;
   /// Combinational delay (in ns) from the output port to the buffer's input, if
   /// a buffer is placed on the channel.
   double inDelay;
@@ -105,8 +101,6 @@ struct ChannelBufProps {
                   std::optional<unsigned> maxTrans = std::nullopt,
                   unsigned minOpaque = 0,
                   std::optional<unsigned> maxOpaque = std::nullopt,
-                  unsigned extraTrans = 0, 
-                  unsigned extraOpaque = 0,
                   double inDelay = 0.0, double outDelay = 0.0,
                   double delay = 0.0);
 
