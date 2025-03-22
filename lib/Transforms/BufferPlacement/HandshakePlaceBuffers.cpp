@@ -538,7 +538,6 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       PlacementResult result;  
       result.numOneSlotDV = props.minOpaque;  
       result.numOneSlotR  = props.minTrans;  
-      result.deductInternalBuffers(Channel(channel), timingDB);
       placement[channel] = result;
     }
     instantiateBuffers(placement);

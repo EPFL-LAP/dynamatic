@@ -78,9 +78,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       // All slots should be transparent
       result.numOneSlotR = numSlotsToPlace;
     }
-
-    result.deductInternalBuffers(Channel(channel), timingDB);
-
+    
     // 1. For Opaque Buffers:
     // When numslot = 1, map to ONE_SLOT_BREAK_DV.
     // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
