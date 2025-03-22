@@ -107,14 +107,6 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 }
 
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
-  // Merges with more than one input should have at least a transparent slot
-  // at their output
-  for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
-    if (mergeOp->getNumOperands() > 1) {
-      Channel channel(mergeOp.getResult(), true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
-    }
-  }
 
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
