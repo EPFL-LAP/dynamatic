@@ -505,8 +505,7 @@
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/mux.vhd",
-    "module-name": "mux_dataless",
-    "dependencies": ["tehb_dataless"]
+    "module-name": "mux_dataless"
   },
   {
     "name": "handshake.mux",
@@ -516,7 +515,7 @@
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/mux.vhd",
-    "dependencies": ["types", "tehb"]
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.control_merge",
@@ -533,7 +532,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/control_merge.vhd",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"]
+    "dependencies": ["merge_dataless", "fork_dataless"]
   },
   {
     "name": "handshake.control_merge",
@@ -558,8 +557,7 @@
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/merge.vhd",
-    "module-name": "merge_dataless",
-    "dependencies": ["tehb_dataless"]
+    "module-name": "merge_dataless"
   },
   {
     "name": "handshake.merge",
@@ -568,7 +566,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/merge.vhd",
-    "dependencies": ["types", "tehb", "merge_notehb"]
+    "dependencies": ["types"]
   },
   {
     "name": "handshake.br",
@@ -754,14 +752,6 @@
   {
     "generic": "$DYNAMATIC/data/vhdl/support/mc_support.vhd",
     "dependencies": ["types"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/merge_notehb.vhd",
-    "dependencies": ["types"]
-  },
-  {
-    "generic": "$DYNAMATIC/data/vhdl/support/dataless/merge_notehb.vhd",
-    "module-name": "merge_notehb_dataless"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"

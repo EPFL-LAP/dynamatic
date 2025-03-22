@@ -52,13 +52,14 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
         channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    if (numSlotsToPlace == 0)
+
+    handshake::ChannelBufProps &props = channelProps[channel];
+
+    if (numSlotsToPlace + props.extraTrans + props.extraOpaque == 0)
       continue;
 
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-
-    handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
     if (placeOpaque) {
@@ -67,18 +68,17 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       unsigned actualMinOpaque = std::max(1U, props.minOpaque);
       if (props.maxTrans.has_value() &&
           (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numTrans = props.maxTrans.value();
-        result.numOpaque = numSlotsToPlace - result.numTrans;
+        result.numTrans = props.maxTrans.value() + props.extraTrans;
+        result.numOpaque = numSlotsToPlace - result.numTrans + props.extraOpaque;
       } else {
-        result.numOpaque = actualMinOpaque;
-        result.numTrans = numSlotsToPlace - result.numOpaque;
+        result.numOpaque = actualMinOpaque + props.extraOpaque;
+        result.numTrans = numSlotsToPlace - result.numOpaque + props.extraTrans;
       }
     } else {
-      // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      result.numOpaque = props.extraOpaque;
+      result.numTrans = numSlotsToPlace + props.extraTrans;
     }
 
-    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 

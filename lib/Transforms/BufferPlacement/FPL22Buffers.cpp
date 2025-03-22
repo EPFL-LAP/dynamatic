@@ -38,7 +38,10 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
         channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    if (numSlotsToPlace == 0)
+    
+    handshake::ChannelBufProps &props = channelProps[channel];
+
+    if (numSlotsToPlace + props.extraTrans + props.extraOpaque == 0)
       continue;
 
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
@@ -47,7 +50,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         channelVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
     if (placeOpaque && placeTransparent) {
       // Place the minumum number of opaque slots; at least one and enough to
@@ -56,31 +58,30 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         // We must place enough opaque slots as to not exceed the maximum number
         // of transparent slots
         result.numOpaque =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
+            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans) + props.extraOpaque;
       } else {
         // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
+        result.numOpaque = std::max(props.minOpaque, 1U) + props.extraOpaque;
       }
       // All remaining slots are transparent
-      result.numTrans = numSlotsToPlace - result.numOpaque;
+      result.numTrans = numSlotsToPlace - result.numOpaque + props.extraTrans;
     } else if (placeOpaque) {
       // Place the minimum number of transparent slots; at least the expected
       // minimum and enough to satisfy all our opaque/transparent requirements
       if (props.maxOpaque) {
         result.numTrans =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
+            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque) + props.extraTrans;
       } else {
-        result.numTrans = props.minTrans;
+        result.numTrans = props.minTrans + props.extraTrans;
       }
       // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
+      result.numOpaque = numSlotsToPlace - result.numTrans + props.extraOpaque;
     } else {
       // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
       // transparent
-      result.numTrans = numSlotsToPlace;
+      result.numTrans = numSlotsToPlace + props.extraTrans;
     }
 
-    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 

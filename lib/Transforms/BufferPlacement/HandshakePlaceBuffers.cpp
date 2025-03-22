@@ -521,7 +521,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+        resProps.minOpaque = std::max(resProps.minOpaque, 2U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
@@ -536,7 +536,6 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     BufferPlacement placement;
     for (auto &[channel, props] : channelProps) {
       PlacementResult result{props.minTrans, props.minOpaque};
-      result.deductInternalBuffers(Channel(channel), timingDB);
       placement[channel] = result;
     }
     instantiateBuffers(placement);

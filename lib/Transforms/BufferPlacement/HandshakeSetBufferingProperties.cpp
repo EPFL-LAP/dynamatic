@@ -107,12 +107,26 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 }
 
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
-  // Merges with more than one input should have at least a transparent slot
+  // Merges/ControlMerges/Muxes with more than one input should have at least a transparent slot
   // at their output
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
       Channel channel(mergeOp.getResult(), true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      channel.props->extraTrans = 1U;
+    }
+  }
+
+  for (handshake::ControlMergeOp cmergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+    if (cmergeOp->getNumOperands() > 1) {
+      Channel channel(cmergeOp.getResult(), true);
+      channel.props->extraTrans = 1U;
+    }
+  }
+
+  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    if (muxOp->getNumOperands() > 1) {
+      Channel channel(muxOp.getResult(), true);
+      channel.props->extraTrans = 1U;
     }
   }
 
