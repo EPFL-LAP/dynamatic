@@ -133,7 +133,8 @@ static const ljson::Array *getAnnotationArray(const ljson::Value &topValue,
 /// Allowed keys for "buffering-properties" attribute type
 static const StringLiteral MINIMUM_TRANS("minimum-trans"),
     MAXIMUM_TRANS("maximum-trans"), MINIMUM_OPAQUE("minimum-opaque"),
-    MAXIMUM_OPAQUE("maximum-opaque"), INPUT_DELAY("input-delay"),
+    MAXIMUM_OPAQUE("maximum-opaque"), EXTRA_TRANS("extra-trans"), 
+    EXTRA_OPAQUE("extra-opaque"), INPUT_DELAY("input-delay"),
     OUTPUT_DELAY("output-delay"), UNBUF_DELAY("unbuf-delay");
 
 /// Deserializes a JSON value into a handshake::ChannelBufPropsAttr. See
@@ -164,6 +165,12 @@ static bool fromJSON(const ljson::Value &value,
   };
   keys[MAXIMUM_OPAQUE] = [&]() {
     return fromJSONIfPresent(*data, MAXIMUM_OPAQUE, props.maxOpaque, path);
+  };
+  keys[EXTRA_TRANS] = [&]() {
+    return fromJSONIfPresent(*data, EXTRA_TRANS, props.extraTrans, path);
+  };
+  keys[EXTRA_OPAQUE] = [&]() {
+    return fromJSONIfPresent(*data, EXTRA_OPAQUE, props.extraOpaque, path);
   };
   keys[INPUT_DELAY] = [&]() {
     return fromJSONIfPresent(*data, INPUT_DELAY, props.inDelay, path);
