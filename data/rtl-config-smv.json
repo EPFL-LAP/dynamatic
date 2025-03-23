@@ -273,5 +273,30 @@
     "name": "handshake.xori",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t xori --abstract-data -p latency=0 port_types=$PORT_TYPES",
     "hdl": "smv"
+  },
+  {
+    "name": "handshake.mem_controller_storeless",
+    "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller_storeless.vhd",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.mem_controller_loadless",
+    "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller_loadless.vhd",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "generic": "$DYNAMATIC/data/vhdl/handshake/mem_controller_storeless.vhd",
+    "hdl": "smv"
+  },
+  {
+    "name": "mem_to_bram",
+    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.lsq",
+    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "hdl": "smv"
   }
 ]
