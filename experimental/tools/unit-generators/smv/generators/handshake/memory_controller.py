@@ -17,14 +17,24 @@ def generate_memory_controller(name, params):
 
 
 def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type):
+  memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
+  control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
+  store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
+  store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
+  mc_in_ports = ", ".join(memory_control_ports + control_ports + store_address_ports + store_data_ports + ["loadData"])
+
+  p_valid_ports = [f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
+  address_ports = [f"stAddr_{n}" for n in range(num_stores)]
+  data_ports = [f"stData_{n}" for n in range(num_stores)]
+  n_valid_ports = [f"TRUE" for _ in range(num_stores)]
+  arbiter_args =  ", ".join(p_valid_ports + address_ports + data_ports + n_valid_ports)
+
   return f"""
-MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)])}, 
-  {", ".join([f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)])}, {", ".join([f"stData_{n}, stData_{n}_valid" for n in range(num_stores)])}, loadData)
+MODULE {name}({mc_in_ports})
 
   VAR
-  inner_arbiter : {name}__write_memory_arbiter({", ".join([f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)])},
-    {", ".join([f"stAddr_{n}" for n in range(num_stores)])}, {", ".join([f"stData_{n}" for n in range(num_stores)])}, {", ".join([f"TRUE" for _ in range(num_stores)])});
-  inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
+  inner_arbiter : {name}__write_memory_arbiter({arbiter_args});
+  inner_mc_control : {name}__mc_control({memory_control_ports[0]}, all_requests_done);
   remainingStores : integer;
 
   ASSIGN
@@ -61,13 +71,22 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n
 """
 
 def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type):
+  memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
+  load_address_ports = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)]
+  load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
+  mc_in_ports = ", ".join(memory_control_ports + load_address_ports + load_data_ports + ["loadData"])
+
+  p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
+  address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
+  n_valid_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
+  arbiter_args =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["loadData"])
+
   return f"""
-MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)])}, {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])}, loadData)
+MODULE {name}({mc_in_ports})
 
   VAR
-  inner_arbiter : {name}__read_memory_arbiter({", ".join([f"ldAddr_{n}_valid" for n in range(num_loads)])}, {", ".join([f"ldAddr_{n}" for n in range(num_loads)])},
-    {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])}, loadData);
-  inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, TRUE);
+  inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
+  inner_mc_control : {name}__mc_control({memory_control_ports[0]}, TRUE);
 
   // output
   DEFINE
@@ -92,16 +111,26 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ldAddr_
 """
 
 def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type):
+  memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
+  control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
+  load_address_ports = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)]
+  load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
+  store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
+  store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
+  mc_in_ports = ", ".join(memory_control_ports + control_ports + load_address_ports + load_data_ports + store_address_ports + store_data_ports + ["loadData"])
+  mc_loadless_in_ports = ", ".join(memory_control_ports + control_ports + store_address_ports + store_data_ports + ["loadData"])
+
+  p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
+  address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
+  n_valid_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
+  arbiter_args =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["loadData"])
+
   return f"""
-MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)])},
-  {", ".join([f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)])}, {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])},
-  {", ".join([f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)])}, {", ".join([f"stData_{n}, stData_{n}_valid" for n in range(num_stores)])}, loadData)
+MODULE {name}({mc_in_ports})
 
   VAR
-  inner_mc_loadless : {name}__mc_loadless(memStart_valid, memEnd_ready, ctrlEnd_valid, {", ".join([f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)])},
-    {", ".join([f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)])}, {", ".join([f"stData_{n}, stData_{n}_valid" for n in range(num_stores)])}, loadData);
-  inner_arbiter : {name}__read_memory_arbiter({", ".join([f"ldAddr_{n}_valid" for n in range(num_loads)])}, {", ".join([f"ldAddr_{n}" for n in range(num_loads)])},
-    {", ".join([f"ldData_{n}_ready" for n in range(num_loads)])}, {", ".join([f"ldData_{n}" for n in range(num_loads)])}, loadData);
+  inner_mc_loadless : {name}__mc_loadless({mc_loadless_in_ports});
+  inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
 
   // outputs
   DEFINE
@@ -168,9 +197,14 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
 """
 
 def _generate_write_memory_arbiter(name, num_stores, data_type, addr_type):
+  p_valid_ports = [f"pValid_{n}" for n in range(num_stores)]
+  address_ports = [f"address_in_{n}" for n in range(num_stores)]
+  data_ports = [f"data_in_{n}" for n in range(num_stores)]
+  n_valid_ports = [f"nReady_{n}" for n in range(num_stores)]
+  arbiter_in_ports =  ", ".join(p_valid_ports + address_ports + data_ports + n_valid_ports)
+
   return f"""
-MODULE {name}({", ".join([f"pValid_{n}" for n in range(num_stores)])}, {", ".join([f"address_in_{n}" for n in range(num_stores)])},
-  {", ".join([f"data_in_{n}" for n in range(num_stores)])}, {", ".join([f"nReady_{n}" for n in range(num_stores)])})
+MODULE {name}({arbiter_in_ports})
 
   VAR
   priority_gen : {name}__priority({", ".join([f"pValid_{n}, nReady_{n}" for n in range(num_stores)])});
@@ -204,8 +238,13 @@ MODULE {name}({", ".join([f"pValid_{n}" for n in range(num_stores)])}, {", ".joi
 """
 
 def _generate_read_memory_arbiter(name, num_loads, data_type, addr_type):
+  p_valid_ports = [f"pValid_{n}" for n in range(num_loads)]
+  address_ports = [f"address_in_{n}" for n in range(num_loads)]
+  n_valid_ports = [f"nReady_{n}" for n in range(num_loads)]
+  arbiter_in_ports =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["data_from_memory"])
+
   return f"""
-MODULE {name}({", ".join([f"pValid_{n}" for n in range(num_loads)])}, {", ".join([f"address_in_{n}" for n in range(num_loads)])}, {", ".join([f"nReady_{n}" for n in range(num_loads)])}, data_from_memory)
+MODULE {name}({arbiter_in_ports})
 
   VAR
   priority_gen : {name}__priority({", ".join([f"pValid_{n}, nReady_{n}" for n in range(num_loads)])});
