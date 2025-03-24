@@ -35,10 +35,10 @@ MODULE {name}({mc_in_ports})
   VAR
   inner_arbiter : {name}__write_memory_arbiter({arbiter_args});
   inner_mc_control : {name}__mc_control({memory_control_ports[0]}, all_requests_done);
-  remainingStores : integer;
+  remainingStores : unsigned word [10];
 
   ASSIGN
-  init(remainingStores) := 0;
+  init(remainingStores) := 0d10_0;
   next(remainingStores) := case
     {"\n    ".join([f"ctrl_{n}_valid = TRUE : remainingStores + toint(ctrl_{n}) - stores_done;" for n in range(num_controls)])}
     TRUE : remainingStores - stores_done;
