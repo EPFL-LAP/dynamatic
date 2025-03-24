@@ -59,55 +59,23 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
-
     PlacementResult result;
     if (placeOpaque) {
-      // We want as many slots as possible to be transparent and at least one
-      // opaque slot, while satisfying all buffering constraints
-      unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-      if (props.maxTrans.has_value() &&
-          (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numOneSlotR = props.maxTrans.value();
-        result.numOneSlotDV = numSlotsToPlace - result.numOneSlotR;
+      if (numSlotsToPlace == 1){
+        result.numOneSlotDV = 1;
+      } else if (numSlotsToPlace == 2){
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else {
-        result.numOneSlotDV = actualMinOpaque;
-        result.numOneSlotR = numSlotsToPlace - result.numOneSlotDV;
+        result.numFifoDV = numSlotsToPlace - 1;
+        result.numOneSlotR = 1;
       }
     } else {
-      // All slots should be transparent
-      result.numOneSlotR = numSlotsToPlace;
-    }
-    
-    // 1. For Opaque Buffers:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV.
-    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
-    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
-
-    // 2. For Transparent Buffers:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R.
-    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
-
-    // 3. The previous steps result in the same buffer HDL modules as using timing attributes. 
-    // This step optimizes area usage without affecting functionality:
-    // If the number of ONE_SLOT_BREAK_R exceeds 1, 
-    // convert its additional slots into equivalent FIFO_BREAK_NONE slots. 
-    // Then, if both ONE_SLOT_BREAK_DV/FIFO_BREAK_DV and FIFO_BREAK_NONE are present, 
-    // convert all FIFO_BREAK_NONE slots into equivalent FIFO_BREAK_DV slots.
-    if (result.numOneSlotDV == 1){
-      result.numOneSlotDV = 1;
-    } else if (result.numOneSlotDV == 2){
-      result.numOneSlotDV = 1;
-      result.numOneSlotR = 1;
-    } else if (result.numOneSlotDV > 2){
-      result.numFifoDV = result.numOneSlotDV - 1;
-      result.numOneSlotR = 1;
-      result.numOneSlotDV = 0;
-    }
-
-    if (result.numOneSlotR > 1){
-      result.numFifoNone = result.numOneSlotR;
-      result.numOneSlotR = 0;
+      if (numSlotsToPlace == 1){
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
     placement[channel] = result;

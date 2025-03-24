@@ -47,78 +47,31 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         channelVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
     if (placeOpaque && placeTransparent) {
-      // Place the minumum number of opaque slots; at least one and enough to
-      // satisfy all our opaque/transparent requirements
-      if (props.maxTrans) {
-        // We must place enough opaque slots as to not exceed the maximum number
-        // of transparent slots
-        result.numOneSlotDV =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
-      } else {
-        // At least one slot, but no more than necessary
-        result.numOneSlotDV = std::max(props.minOpaque, 1U);
-      }
-      // All remaining slots are transparent
-      result.numOneSlotR = numSlotsToPlace - result.numOneSlotDV;
-    } else if (placeOpaque) {
-      // Place the minimum number of transparent slots; at least the expected
-      // minimum and enough to satisfy all our opaque/transparent requirements
-      if (props.maxOpaque) {
-        result.numOneSlotR =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
-      } else {
-        result.numOneSlotR = props.minTrans;
-      }
-      // All remaining slots are opaque
-      result.numOneSlotDV = numSlotsToPlace - result.numOneSlotR;
-    } else {
-      // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
-      // transparent
-      result.numOneSlotR = numSlotsToPlace;
-    }
-
-    // 1. For Opaque Buffers:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV.
-    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
-    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
-
-    // 2. For Transparent Buffers:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R.
-    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
-
-    // 3. The previous steps result in the same buffer HDL modules as using timing attributes. 
-    // This step optimizes area usage without affecting functionality:
-    // If the number of ONE_SLOT_BREAK_R exceeds 1, 
-    // convert its additional slots into equivalent FIFO_BREAK_NONE slots. 
-    // Then, if both ONE_SLOT_BREAK_DV/FIFO_BREAK_DV and FIFO_BREAK_NONE are present, 
-    // convert all FIFO_BREAK_NONE slots into equivalent FIFO_BREAK_DV slots.
-    if (result.numOneSlotR > 1) {
-      result.numFifoNone = result.numOneSlotR;
-      result.numOneSlotR = 0;
-    }
-    if (result.numOneSlotDV == 2) {
-      if (result.numOneSlotR == 0){
+      if (numSlotsToPlace == 1){
+        result.numOneSlotDVR = 1;
+      } else if (numSlotsToPlace == 2){
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
-      } else if (result.numOneSlotR == 1){
-        result.numFifoDV = 2;
-        result.numOneSlotDV = 0;
-      }
-    } else if (result.numOneSlotDV > 2){
-      if (result.numOneSlotR == 0){
-        result.numFifoDV = result.numOneSlotDV + result.numFifoNone - 1;
-        result.numFifoNone = 0;
+      } else {
+        result.numFifoDV = numSlotsToPlace - 1;
         result.numOneSlotR = 1;
-        result.numOneSlotDV = 0;
-      } else if (result.numOneSlotR == 1){
-        result.numFifoDV = result.numOneSlotDV;
-        result.numOneSlotDV = 0;
+      }
+    } else if (placeOpaque) {
+      if (numSlotsToPlace == 1){
+        result.numOneSlotDV = 1;
+      } else {
+        result.numFifoDV = numSlotsToPlace;
+      }
+    } else {
+      if (numSlotsToPlace == 1){
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
       }
     }
-    
+
     placement[channel] = result;
   }
 
