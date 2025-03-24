@@ -41,14 +41,14 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDV = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool placeTransparent =
+    bool forceBreakR =
         channelVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
     PlacementResult result;
-    if (placeOpaque && placeTransparent) {
+    if (forceBreakDV && forceBreakR) {
       if (numSlotsToPlace == 1){
         result.numOneSlotDVR = 1;
       } else if (numSlotsToPlace == 2){
@@ -58,7 +58,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         result.numFifoDV = numSlotsToPlace - 1;
         result.numOneSlotR = 1;
       }
-    } else if (placeOpaque) {
+    } else if (forceBreakDV) {
       if (numSlotsToPlace == 1){
         result.numOneSlotDV = 1;
       } else {

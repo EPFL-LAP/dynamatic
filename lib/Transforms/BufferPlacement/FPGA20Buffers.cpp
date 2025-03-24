@@ -55,12 +55,12 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
-    // placeOpaque == 1 means cut D, V, R; placeOpaque == 0 means cut nothing.
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
+    bool forceBreakDVR = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
 
     PlacementResult result;
-    if (placeOpaque) {
+    if (forceBreakDVR) {
       if (numSlotsToPlace == 1){
         result.numOneSlotDV = 1;
       } else if (numSlotsToPlace == 2){
