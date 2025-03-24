@@ -532,7 +532,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/control_merge.vhd",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_dataless", "fork_dataless"]
+    "dependencies": ["merge_dataless", "tehb", "fork_dataless"]
   },
   {
     "name": "handshake.control_merge",

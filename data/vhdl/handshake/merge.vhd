@@ -23,7 +23,6 @@ end entity;
 
 architecture arch of merge is
 begin
-
   process (ins_valid, ins, outs_ready)
     variable tmp_data_out  : unsigned(DATA_TYPE - 1 downto 0);
     variable tmp_valid_out : std_logic;

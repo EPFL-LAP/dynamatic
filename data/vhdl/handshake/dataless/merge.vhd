@@ -19,7 +19,6 @@ end entity;
 
 architecture arch of merge_dataless is
 begin
-  
   process (ins_valid, outs_ready)
     variable tmp_valid_out : std_logic;
     variable tmp_ready_out : std_logic_vector(SIZE - 1 downto 0);

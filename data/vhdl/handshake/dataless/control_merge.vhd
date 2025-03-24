@@ -23,16 +23,15 @@ entity control_merge_dataless is
 end entity;
 
 architecture arch of control_merge_dataless is
-  
-  signal dataAvailable, readyToFork : std_logic;
-  signal index_internal             : std_logic_vector(INDEX_TYPE - 1 downto 0);
+  signal index_tehb                                               : std_logic_vector (INDEX_TYPE - 1 downto 0);
+  signal dataAvailable, readyToFork, tehbOut_valid, tehbOut_ready : std_logic;
 begin
   process (ins_valid)
   begin
-    index_internal <= (INDEX_TYPE - 1 downto 0 => '0');
+    index_tehb <= (INDEX_TYPE - 1 downto 0 => '0');
     for i in 0 to (SIZE - 1) loop
       if (ins_valid(i) = '1') then
-        index_internal <= std_logic_vector(to_unsigned(i, INDEX_TYPE));
+        index_tehb <= std_logic_vector(to_unsigned(i, INDEX_TYPE));
         exit;
       end if;
     end loop;
@@ -43,18 +42,28 @@ begin
       clk        => clk,
       rst        => rst,
       ins_valid  => ins_valid,
-      outs_ready => readyToFork,
+      outs_ready => tehbOut_ready,
       ins_ready  => ins_ready,
       outs_valid => dataAvailable
     );
 
-  index <= index_internal;
+  tehb : entity work.tehb(arch) generic map (INDEX_TYPE)
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => dataAvailable,
+      outs_ready => readyToFork,
+      outs_valid => tehbOut_valid,
+      ins_ready  => tehbOut_ready,
+      ins        => index_tehb,
+      outs       => index
+    );
 
   fork_valid : entity work.fork_dataless(arch) generic map (2)
     port map(
       clk           => clk,
       rst           => rst,
-      ins_valid     => dataAvailable,
+      ins_valid     => tehbOut_valid,
       outs_ready(0) => outs_ready,
       outs_ready(1) => index_ready,
       ins_ready     => readyToFork,

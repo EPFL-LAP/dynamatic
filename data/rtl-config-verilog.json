@@ -534,7 +534,7 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/control_merge.v",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_dataless", "fork_dataless"],
+    "dependencies": ["merge_dataless", "tehb", "fork_dataless"],
     "hdl": "verilog"
   },
   {
