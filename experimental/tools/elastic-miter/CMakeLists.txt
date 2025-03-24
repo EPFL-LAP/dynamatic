@@ -18,7 +18,6 @@ target_link_libraries(elastic-miter
   DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticLSQSizing
-  DynamaticSpeculation
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake

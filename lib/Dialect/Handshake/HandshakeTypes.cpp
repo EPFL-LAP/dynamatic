@@ -29,6 +29,7 @@
 #include <cctype>
 #include <iostream>
 #include <ostream>
+#include <vector>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -355,22 +356,21 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
 
 bool dynamatic::handshake::doesExtraSignalsMatchExcept(
     const llvm::StringRef &except,
-    std::initializer_list<const llvm::ArrayRef<ExtraSignal>>
-        extraSignalArrays) {
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
 
   // If there are fewer than two arrays, they are trivially considered matching.
   if (extraSignalArrays.size() < 2)
     return true;
 
-  auto *firstArrayIt = extraSignalArrays.begin();
-  auto *secondArrayIt = firstArrayIt + 1;
+  auto firstArrayIt = extraSignalArrays.begin();
+  auto secondArrayIt = firstArrayIt + 1;
 
   // Use the first array as the reference for comparison.
   ArrayRef<ExtraSignal> refArray = *firstArrayIt;
   size_t refArraySize = refArray.size();
 
   // Compare the reference array against all other arrays.
-  for (auto *it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
+  for (auto it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
 
     ArrayRef<ExtraSignal> toCheck = *it;
     size_t toCheckSize = toCheck.size();

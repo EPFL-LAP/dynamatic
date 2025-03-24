@@ -392,11 +392,13 @@ def MergeOp : Handshake_Op<"merge", [
 def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"selectOperand">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
+  // Constraints on spec tag
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
+  LacksSpecTag<"selectOperand">,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {
@@ -431,9 +433,12 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"index">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
+  // Constraints on spec tag
+  HasSpecTagIfPresentIn<"dataOperands", "result">,
+  LacksSpecTag<"index">,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
@@ -962,8 +967,9 @@ def EndOp : Handshake_Op<"end", [
 //===----------------------------------------------------------------------===//
 
 def SpeculatorOp : Handshake_Op<"speculator", [
-  SpeculationOpInterface,
-  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
+  // Expect a spec tag for dataIn, since Speculator is used in a loop.
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
@@ -973,8 +979,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCSaveCtrl">,
   IsSimpleHandshake<"SCCommitCtrl">,
   IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCBranchCtrl">,
-  IsIntSizedChannel<1, "SCBranchCtrl">,
+  IsSimpleHandshake<"SCIsMisspec">,
+  IsIntSizedChannel<1, "SCIsMisspec">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -987,13 +993,13 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ($saveCtrl, $commitCtrl). For save-commit units, three control
     signals are needed. $SCSaveCtrl is connected directly, while 
     $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCBranchCtrl is needed
+    follows and might not reach a save-commit. $SCIsMisspec is needed
     in the replicated branches to discard the latter signal.
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
         <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
     ```
@@ -1004,12 +1010,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
                       ChannelType:$SCCommitCtrl, 
-                      ChannelType:$SCBranchCtrl);
+                      ChannelType:$SCIsMisspec);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
     type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
-    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCBranchCtrl)
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
   }];
 
   // Infer the type of the control signals
@@ -1050,11 +1056,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1097,10 +1102,9 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasSpecTag<"dataIn">,
+  HasValidSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
@@ -1146,7 +1150,8 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
-  SpeculationOpInterface,
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
@@ -1185,11 +1190,10 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
-  HasSpecTag<"tagFromOperand">,
-  HasSpecTag<"dataOperand">,
+  HasValidSpecTag<"tagFromOperand">,
+  HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
