@@ -71,13 +71,14 @@ public:
 
 class HlsVhdlTb {
 public:
-  HlsVhdlTb(const VerificationContext &ctx);
+  HlsVhdlTb(const VerificationContext &ctx, string half_clk_period);
   string generateVhdlTestbench();
   string getInputFilepathForParam(const CFunctionParameter &param);
   string getOutputFilepathForParam(const CFunctionParameter &param);
 
 private:
   VerificationContext ctx;
+  string half_clk_period;
   string duvName;
   string tleName;
   vector<CFunctionParameter> cDuvParams;

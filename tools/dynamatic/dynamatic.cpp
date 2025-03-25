@@ -297,11 +297,14 @@ public:
 
 class Simulate : public Command {
 public:
+  static constexpr llvm::StringLiteral HALF_CLK_PERIOD = "half-clk-period";
   Simulate(FrontendState &state)
       : Command("simulate",
                 "Simulates the VHDL produced during HDL writing using Modelsim "
                 "and the hls-verifier tool",
-                state) {}
+                state) {
+    addOption({HALF_CLK_PERIOD, "half clock period"});
+  }
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -646,9 +649,15 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::string half_clk_period = "2.00";
+
+  if (auto it = args.options.find(HALF_CLK_PERIOD); it != args.options.end()) {
+    half_clk_period = it->second;
+  }
+
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName());
+                 state.getOutputDir(), state.getKernelName(), half_clk_period);
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {

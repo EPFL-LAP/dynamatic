@@ -37,17 +37,19 @@ bool runVhdlVerification(vector<string> args) {
   string cTbPath = args[1];
   string vhdlDuvEntityName = args[2];
   string cFuvFunctionName = args.size() > 3 ? args[3] : vhdlDuvEntityName;
+  string half_clk_period = args[4];
 
   vector<string> otherCPaths;
   VerificationContext ctx(cTbPath, "", cFuvFunctionName, vhdlDuvEntityName,
                           otherCPaths);
-  executeVhdlTestbench(ctx, resourceDir);
+  executeVhdlTestbench(ctx, resourceDir, half_clk_period);
   checkVhdlTestbenchOutputs(ctx);
   return true;
 }
 
-void generateVhdlTestbench(const VerificationContext &ctx) {
-  HlsVhdlTb vhdlTb(ctx);
+void generateVhdlTestbench(const VerificationContext &ctx,
+                           string half_clk_period) {
+  HlsVhdlTb vhdlTb(ctx, half_clk_period);
   ofstream fout(ctx.getVhdlTestbenchPath());
   fout << vhdlTb.generateVhdlTestbench();
   fout.close();
@@ -94,14 +96,15 @@ void checkVhdlTestbenchOutputs(const VerificationContext &ctx) {
 }
 
 void executeVhdlTestbench(const VerificationContext &ctx,
-                          const std::string &resourceDir) {
+                          const std::string &resourceDir,
+                          string half_clk_period) {
   string command;
 
   // Generating VHDL testbench
 
   logInf(LOG_TAG,
          "Generating VHDL testbench for entity " + ctx.getVhdlDuvEntityName());
-  generateVhdlTestbench(ctx);
+  generateVhdlTestbench(ctx, half_clk_period);
 
   // Copying supplementary files
   char sep = std::filesystem::path::preferred_separator;

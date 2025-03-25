@@ -752,7 +752,15 @@ SmallVector<Value> insertSuppressBlock(SmallVector<Value> mainValues,
   inheritBB(predecessorOpPointer, muxOp);
 
   SmallVector<Value> conds;
-  conds.append(effective_N, muxOp.getResult());
+
+  for (int i = 0; i < effective_N; i++) {
+    /// ManualBuff
+    handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
+        predecessorOpPointer->getLoc(), muxOp.getResult(),
+        handshake::TimingInfo::tehb(), 3);
+    inheritBB(predecessorOpPointer, bufferOp);
+    conds.push_back(bufferOp.getResult());
+  }
   return insertBranches(mainValues, conds, predecessorOpPointer, rewriter);
 
   /// OLD

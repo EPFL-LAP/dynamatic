@@ -22,8 +22,8 @@ int main(void) {
 
   n = 1000;
   for (int i = 0; i < 1000; ++i) {
-    // feature[i] = rand() % 1000;
-    feature[i] = i;
+    feature[i] = rand() % 1000;
+    // feature[i] = i;
     // feature[i] = 5;
     weight[i] = rand() % 100;
     hist[i] = rand() % 100;

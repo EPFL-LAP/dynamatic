@@ -30,7 +30,8 @@ bool runVhdlVerification(vector<string> args);
  * Generate the VHDL testbench of the given verification context.
  * @param ctx
  */
-void generateVhdlTestbench(const VerificationContext &ctx);
+void generateVhdlTestbench(const VerificationContext &ctx,
+                           string half_clk_period);
 
 /**
  * Generate ModelSim scripts to run the generated VHDL testbench.
@@ -49,7 +50,8 @@ void checkVhdlTestbenchOutputs(const VerificationContext &ctx);
  * @param ctx verification context
  */
 void executeVhdlTestbench(const VerificationContext &ctx,
-                          const std::string &resourceDir);
+                          const std::string &resourceDir,
+                          string half_clk_period);
 } // namespace hls_verify
 
 #endif // HLS_VERIFIER_HLS_VHDL_VERIFICATION_H

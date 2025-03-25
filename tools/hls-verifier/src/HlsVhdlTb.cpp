@@ -166,12 +166,13 @@ string MemElem::dataDepthParamName = "DEPTH";
 
 // class HlsVhdTb
 
-HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
+HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx, string half_clk_period)
+    : ctx(ctx), half_clk_period(half_clk_period) {
   duvName = ctx.getVhdlDuvEntityName();
   tleName = ctx.getVhdlDuvEntityName() + "_tb";
   cDuvParams = ctx.getFuvParams();
 
-  Constant hcp("HALF_CLK_PERIOD", "TIME", "2.00 ns");
+  Constant hcp("HALF_CLK_PERIOD", "TIME", half_clk_period + " ns");
   constants.push_back(hcp);
 
   int transNum = getTransactionNumberFromInput();

@@ -11,6 +11,7 @@ DYNAMATIC_DIR=$1
 SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
+HALF_CLK_PERIOD=$5
 
 # Generated directories/files
 SIM_DIR="$OUTPUT_DIR/sim"
@@ -68,6 +69,6 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" cover "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
-  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$KERNEL_NAME"_wrapper \
+  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$KERNEL_NAME"_wrapper $HALF_CLK_PERIOD \
   > "../report.txt"
 exit_on_fail "Simulation failed" "Simulation succeeded"

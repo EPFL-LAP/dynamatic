@@ -35,6 +35,7 @@ bool runCoverification(vector<string> args) {
   string cDuvPath = args[2];
   string cFuvFunctionName = args[3];
   string vhdlDuvEntityName = args[4];
+  string half_clk_period = args[5];
 
   vector<string> otherCPaths;
   for (size_t i = 6; i < args.size(); i++)
@@ -42,7 +43,7 @@ bool runCoverification(vector<string> args) {
 
   VerificationContext ctx(cTbPath, cDuvPath, cFuvFunctionName,
                           vhdlDuvEntityName, otherCPaths);
-  executeVhdlTestbench(ctx, resourceDir);
+  executeVhdlTestbench(ctx, resourceDir, half_clk_period);
   return compareCAndVhdlOutputs(ctx);
 }
 
