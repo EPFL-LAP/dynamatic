@@ -109,7 +109,7 @@
   },
   {
     "name": "handshake.spec_commit",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_commit -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals_except_spec=$EXTRA_SIGNALS_EXCEPT_SPEC",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_commit -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["types"]
   },
   {
@@ -121,7 +121,7 @@
   },
   {
     "name": "handshake.speculating_branch",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculating_branch -p port_types=$PORT_TYPES spec_tag_bitwidth=$SPEC_TAG_BITWIDTH data_bitwidth=$DATA_BITWIDTH extra_signals_except_spec=$EXTRA_SIGNALS_EXCEPT_SPEC"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculating_branch -p port_types=$PORT_TYPES spec_tag_bitwidth=$SPEC_TAG_BITWIDTH data_bitwidth=$DATA_BITWIDTH, extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "mem_to_bram",

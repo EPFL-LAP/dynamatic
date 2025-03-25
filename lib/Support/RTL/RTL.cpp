@@ -60,7 +60,7 @@ static constexpr StringLiteral
     ERR_UNKNOWN_PARAM("unknown parameter name"),
     ERR_DUPLICATE_NAME("duplicated parameter name"),
     ERR_RESERVED_NAME("this is a reserved parameter name"),
-    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl" or "verilog")"),
+    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl", "verilog", or "smv)"),
     ERR_INVALID_IO_STYLE(
         R"(unknown IO style: options are "hierarchical" or "flat")");
 
@@ -76,6 +76,8 @@ StringRef dynamatic::getHDLExtension(HDL hdl) {
     return "vhd";
   case HDL::VERILOG:
     return "v";
+  case HDL::SMV:
+    return "smv";
   }
 }
 std::string dynamatic::replaceRegexes(
@@ -483,8 +485,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
   } else if (modName == "handshake.spec_commit" ||
              modName == "handshake.speculating_branch") {
-    serializedParams["EXTRA_SIGNALS_EXCEPT_SPEC"] =
-        serializeExtraSignals(modType.getOutputType(0));
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
@@ -970,6 +972,8 @@ inline bool dynamatic::fromJSON(const ljson::Value &value, HDL &hdl,
     hdl = HDL::VERILOG;
   } else if (hdlStr == "vhdl") {
     hdl = HDL::VHDL;
+  } else if (hdlStr == "smv") {
+    hdl = HDL::SMV;
   } else {
     path.report(ERR_INVALID_HDL);
     return false;
