@@ -113,8 +113,7 @@ def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_da
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals_without_spec
       }],
-      "extra_signals": extra_signals,
-      "ignore_signals": ["spec"]
+      "extra_signals": extra_signals_without_spec
   }, lambda name: _generate_speculating_branch(
       name,
       data_bitwidth + extra_signals_bitwidth - 1,

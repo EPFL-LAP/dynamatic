@@ -203,7 +203,15 @@ def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals):
           "bitwidth": bitwidth,
           "extra_signals": extra_signals_without_spec,
       }],
-      "extra_signals": extra_signals,
-      "ignore_signals": ["spec"],
+      "extra_signals": extra_signals_without_spec,
       "simple_ports": ["ctrl"]
   }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))
+
+
+print(generate_spec_commit("spec_commit", {
+    "bitwidth": 4,
+    "extra_signals": {
+        "spec": 1,
+        "tag": 8
+    }
+}))
