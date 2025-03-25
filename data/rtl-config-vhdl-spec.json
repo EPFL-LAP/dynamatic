@@ -1,26 +1,26 @@
 [
   {
     "name": "handshake.addi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.cmpi",
     "parameters": [
       { "name": "PREDICATE", "type": "string" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpi -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\" bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpi -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\" bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.extsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extsi -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extsi -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.muli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.trunci",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t trunci -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t trunci -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.buffer",
@@ -28,26 +28,26 @@
       { "name": "NUM_SLOTS", "type": "unsigned" },
       { "name": "TIMING", "type": "timing" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\" bitwidth=$BITWIDTH transparent=$TRANSPARENT"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\" bitwidth=$BITWIDTH transparent=$TRANSPARENT extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.fork",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fork -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fork -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["types"]
   },
   {
     "name": "handshake.sink",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sink -p port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sink -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.mux",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS index_extra_signals=$INDEX_EXTRA_SIGNALS spec_inputs=$SPEC_INPUTS",
     "dependencies": ["types"]
   },
   {
@@ -55,7 +55,7 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t control_merge -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t control_merge -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH input_extra_signals_list=$INPUT_EXTRA_SIGNALS_LIST output_extra_signals=$OUTPUT_EXTRA_SIGNALS index_extra_signals=$INDEX_EXTRA_SIGNALS spec_inputs=$SPEC_INPUTS",
     "dependencies": ["types"]
   },
   {
@@ -63,31 +63,31 @@
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t merge -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t merge -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["types"]
   },
   {
     "name": "handshake.cond_br",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cond_br -p port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cond_br -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.source",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t source -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t source -p port_types=$PORT_TYPES extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.constant",
     "parameters": [
       { "name": "VALUE", "type": "string" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t constant -p value=\"'$VALUE'\" port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t constant -p value=\"'$VALUE'\" port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.load",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t load -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t load -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.store",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t store -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t store -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.mem_controller",
