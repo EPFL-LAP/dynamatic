@@ -21,10 +21,9 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
         name, in_ports, out_ports, extra_signals, generate_inner, latency)
   elif type == "concat":
     extra_signals = params["extra_signals"]
-    ignore_signals = params.get("ignore_signals", [])
     simple_ports = params.get("simple_ports", [])
     signal_manager = _generate_concat_signal_manager(
-        name, in_ports, out_ports, extra_signals, ignore_signals, simple_ports, generate_inner)
+        name, in_ports, out_ports, extra_signals, simple_ports, generate_inner)
   elif type == "bbmerge":
     size = params["size"]
     data_in_name = params["data_in_name"]
@@ -493,7 +492,7 @@ def generate_concat_logic(in_ports, out_ports, concat_info, ignore=[]):
   return "\n".join(concat_logic).lstrip()
 
 
-def _generate_concat_forwarding(in_ports, out_ports, ignore_signals, simple_ports) -> str:
+def _generate_concat_forwarding(in_ports, out_ports, handled_extra_signals, simple_ports) -> str:
   """
   Port forwarding for the inner entity of concat signal manager
   We can't use `_generate_inner_port_forwarding()` because:
@@ -517,20 +516,17 @@ def _generate_concat_forwarding(in_ports, out_ports, ignore_signals, simple_port
     forwardings.append(f"      {port_name}_valid => {port_name}_valid")
     forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
-    # Forward ignored extra signals
-    for signal in ignore_signals:
-      if signal in port.get("extra_signals", []):
+    # Forward unhandled extra signals
+    for signal in port.get("extra_signals", {}):
+      if signal not in handled_extra_signals:
         forwardings.append(
             f"      {port_name}_{signal} => {port_name}_{signal}")
 
   return ",\n".join(forwardings).lstrip()
 
 
-def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ignore_signals, simple_ports, generate_inner: Callable[[str], str]):
+def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, simple_ports, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
-
-  filtered_extra_signals = {
-      name: bitwidth for name, bitwidth in extra_signals.items() if name not in ignore_signals}
 
   # Exclude ports without extra signals
   filtered_in_ports = [
@@ -539,7 +535,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ig
       port for port in out_ports if not port["name"] in simple_ports]
 
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(filtered_extra_signals)
+  concat_info = ConcatenationInfo(extra_signals)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
@@ -555,7 +551,7 @@ def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ig
 
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
-      in_ports, out_ports, ignore_signals, simple_ports)
+      in_ports, out_ports, extra_signals, simple_ports)
 
   architecture = f"""
 -- Architecture of signal manager (concat)
@@ -659,7 +655,7 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
 
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
-      in_ports, out_ports, [], [index_name])
+      in_ports, out_ports, out_extra_signals, [index_name])
 
   architecture = f"""
 -- Architecture of signal manager (bbmerge)
