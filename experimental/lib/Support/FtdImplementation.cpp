@@ -714,7 +714,8 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
 
   // Create the multiplxer and add it to the rest of the circuit
   auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxCond, muxOperands);
+      block->getOperations().front().getLoc(), muxOperands[0].getType(),
+      muxCond, muxOperands);
   muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return muxOp.getResult();
