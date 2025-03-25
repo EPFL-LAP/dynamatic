@@ -555,23 +555,23 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
 ]> {
   let summary = "join operation";
   let description = [{
-    A control-only synchronizer.  Produces a valid output when all
+    A  synchronizer with a control-only(dateless) and .  Produces a valid output when all
     inputs become available.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.control
+    %0 = join %a, %b, %c : !handshake.channel<i32>
     ```
   }];
 
-  let arguments = (ins Variadic<ControlType>:$data);
-  let results = (outs ControlType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
+  let arguments = (ins Variadic<HandshakeType>:$data);
+  let results = (outs HandshakeType:$result);
+  let assemblyFormat = "$data attr-dict `:` custom<HandshakeType>(type($result))";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
@@ -641,7 +641,7 @@ def TaggerOp : Handshake_Op<"tagger", [
   let results = (outs HandshakeType:$dataOut);
 
   let assemblyFormat = [{
-    `[` $tagOperand `]` $dataOperand attr-dict `:` type($tagOperand) `,` functional-type($dataOperand, $dataOut)
+    `[` $tagOperand `]` $dataOperand attr-dict `:` functional-type(operands, results)
   }];
 
 
@@ -679,7 +679,7 @@ def UntaggerOp : Handshake_Op<"untagger", [
   );
 
   let assemblyFormat = [{
-    $dataOperand attr-dict `:` functional-type($dataOperand, $dataOut) `,`  type($tagOut) 
+    $dataOperand attr-dict `:` functional-type(operands, results)
   }];
 
   let extraClassDefinition = [{
