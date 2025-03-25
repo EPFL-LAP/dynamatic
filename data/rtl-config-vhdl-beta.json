@@ -121,7 +121,7 @@
   },
   {
     "name": "handshake.speculating_branch",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculating_branch -p port_types=$PORT_TYPES spec_tag_bitwidth=$SPEC_TAG_BITWIDTH data_bitwidth=$DATA_BITWIDTH, extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculating_branch -p port_types=$PORT_TYPES spec_tag_bitwidth=$SPEC_TAG_BITWIDTH data_bitwidth=$DATA_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "mem_to_bram",
