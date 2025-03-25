@@ -1,12 +1,12 @@
+from generators.support.utils import data
+
+
 def generate_spec_save_commit(name, params):
   bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
   # TODO: Support extra signals other than spec
-  if bitwidth == 0:
-    return _generate_spec_save_commit_dataless(name, fifo_depth)
-  else:
-    return _generate_spec_save_commit(name, bitwidth, fifo_depth)
+  return _generate_spec_save_commit(name, bitwidth, fifo_depth)
 
 
 def _generate_spec_save_commit(name, bitwidth, fifo_depth):
@@ -20,14 +20,14 @@ entity {name} is
   port (
     clk, rst : in std_logic;
     -- inputs
-    ins : in std_logic_vector({bitwidth} - 1 downto 0);
+    {data(f"ins : in std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in std_logic;
     ins_spec : in std_logic_vector(0 downto 0);
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
     -- outputs
-    outs : out std_logic_vector({bitwidth} - 1 downto 0);
+    {data(f"outs : out std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     outs_valid : out std_logic;
     outs_spec : out std_logic_vector(0 downto 0);
     ins_ready : out std_logic;
@@ -39,7 +39,6 @@ end entity;
   architecture = f"""
 -- Architecture of spec_save_commit
 architecture arch of {name} is
-
     signal HeadEn   : std_logic := '0';
     signal TailEn  : std_logic := '0';
     signal CurrEn  : std_logic := '0';
@@ -67,7 +66,7 @@ architecture arch of {name} is
     signal bypass : std_logic;
 
 begin
-    specdataInArray <= ins_spec & ins;
+    specdataInArray <= {"ins_spec & ins" if bitwidth else "ins_spec"};
 
     ins_ready <= not Full;
     outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
@@ -128,14 +127,14 @@ output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
     begin
         if PassEn = '1' then
             if bypass = '1' then
-                outs <=  specdataInArray({bitwidth} - 1 downto 0);
+                {data(f"outs <=  specdataInArray({bitwidth} - 1 downto 0);", bitwidth)}
                 outs_spec(0) <= specdataInArray({bitwidth}+1 - 1);
             else
-                outs <=  Memory(Curr)({bitwidth} - 1 downto 0);
+                {data(f"outs <=  Memory(Curr)({bitwidth} - 1 downto 0);", bitwidth)}
                 outs_spec(0) <= Memory(Curr)({bitwidth}+1 - 1);
             end if;
         else
-            outs <=  Memory(Head)({bitwidth} - 1 downto 0);
+            {data(f"outs <=  Memory(Head)({bitwidth} - 1 downto 0);", bitwidth)}
             outs_spec <= "0";
         end if;
     end process;
@@ -327,62 +326,3 @@ end architecture;
 """
 
   return entity + architecture
-
-
-def _generate_spec_save_commit_dataless(name, fifo_depth):
-  inner_name = f"{name}_inner"
-
-  dependencies = _generate_spec_save_commit(inner_name, 1, fifo_depth)
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-use work.types.all;
-
--- Entity of spec_save_commit_dataless
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    -- inputs
-    ins_valid : in std_logic;
-    ins_spec : in std_logic_vector(0 downto 0);
-    ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
-    ctrl_valid : in std_logic;
-    outs_ready : in std_logic;
-    -- outputs
-    outs_valid : out std_logic;
-    outs_spec : out std_logic_vector(0 downto 0);
-    ins_ready : out std_logic;
-    ctrl_ready : out std_logic
-  );
-end entity;
-"""
-
-  architecture = f"""
--- Architecture of spec_save_commit_dataless
-architecture arch of {name} is
-  signal ins_inner : std_logic_vector(0 downto 0);
-  signal outs_inner : std_logic_vector(0 downto 0);
-begin
-  ins_inner(0) <= '0';
-  spec_save_commit_wrapper : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      ins => ins_inner,
-      ins_valid => ins_valid,
-      ins_spec => ins_spec,
-      ctrl => ctrl,
-      ctrl_valid => ctrl_valid,
-      outs => outs_inner,
-      outs_ready => outs_ready,
-      outs_valid => outs_valid,
-      outs_spec => outs_spec,
-      ins_ready => ins_ready,
-      ctrl_ready => ctrl_ready
-    );
-end architecture;
-"""
-
-  return dependencies + entity + architecture

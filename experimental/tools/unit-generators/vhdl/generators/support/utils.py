@@ -1,4 +1,2 @@
 def data(code: str, bitwidth: int) -> str:
-  if bitwidth == 0:
-    return ""
-  return code
+  return code if bitwidth else ""
