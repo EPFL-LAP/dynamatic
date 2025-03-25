@@ -485,8 +485,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
   } else if (modName == "handshake.spec_commit" ||
              modName == "handshake.speculating_branch") {
-    serializedParams["EXTRA_SIGNALS_EXCEPT_SPEC"] =
-        serializeExtraSignals(modType.getOutputType(0));
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
