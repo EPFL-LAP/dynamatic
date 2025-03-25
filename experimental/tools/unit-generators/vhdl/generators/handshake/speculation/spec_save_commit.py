@@ -333,6 +333,9 @@ end architecture;
 
 
 def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals):
+  extra_signals_without_spec = extra_signals.copy()
+  extra_signals_without_spec.pop("spec")
+
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
       extra_signals)
   return generate_signal_manager(name, {
@@ -350,7 +353,6 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
           "bitwidth": bitwidth,
           "extra_signals": extra_signals
       }],
-      "extra_signals": extra_signals,
-      "ignore_signals": ["spec"],
+      "extra_signals": extra_signals_without_spec,
       "simple_ports": ["ctrl"]
   }, lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
