@@ -75,26 +75,6 @@ private:
   SmallVector<std::string> outputs;
 };
 
-namespace detail {
-/// `SameExtraSignalsInterface`'s default `getChannelsWithSameExtraSignals`'s
-/// function (defined as a free function to avoid instantiating an
-/// implementation for every concrete operation type).
-SmallVector<mlir::TypedValue<handshake::ChannelType>>
-getChannelsWithSameExtraSignals(Operation *op);
-
-/// `SameExtraSignalsInterface`'s verification function (defined as a free
-/// function to avoid instantiating an implementation for every concrete
-/// operation type).
-LogicalResult verifySameExtraSignalsInterface(
-    Operation *op, ArrayRef<mlir::TypedValue<ChannelType>> channels);
-
-/// `ReshapableChannelsInterface`'s default `getReshapableChannelType` method
-/// implementation (defined as a free function to avoid instantiating an
-/// implementation for every concrete operation type).
-std::pair<handshake::ChannelType, bool> getReshapableChannelType(Operation *op);
-
-} // namespace detail
-
 class ControlType;
 
 } // end namespace handshake

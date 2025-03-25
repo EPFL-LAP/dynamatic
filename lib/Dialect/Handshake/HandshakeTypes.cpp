@@ -29,6 +29,7 @@
 #include <cctype>
 #include <iostream>
 #include <ostream>
+#include <vector>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -351,6 +352,59 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
                                       const ExtraSignal &rhs) {
   return lhs.name == rhs.name && lhs.type == rhs.type &&
          lhs.downstream == rhs.downstream;
+}
+
+bool dynamatic::handshake::doesExtraSignalsMatchExcept(
+    const llvm::StringRef &except,
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
+
+  // If there are fewer than two arrays, they are trivially considered matching.
+  if (extraSignalArrays.size() < 2)
+    return true;
+
+  auto firstArrayIt = extraSignalArrays.begin();
+  auto secondArrayIt = firstArrayIt + 1;
+
+  // Use the first array as the reference for comparison.
+  ArrayRef<ExtraSignal> refArray = *firstArrayIt;
+  size_t refArraySize = refArray.size();
+
+  // Compare the reference array against all other arrays.
+  for (auto it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
+
+    ArrayRef<ExtraSignal> toCheck = *it;
+    size_t toCheckSize = toCheck.size();
+
+    // Use two indices to traverse both arrays while skipping the `except`
+    // signal.
+    size_t i = 0;
+    size_t j = 0;
+
+    while (i < refArraySize || j < toCheckSize) {
+      // Skip elements in `head` with the excluded name.
+      if (i < refArraySize && refArray[i].name == except) {
+        i++;
+        continue;
+      }
+      // Skip elements in `current` with the excluded name.
+      if (j < toCheckSize && toCheck[j].name == except) {
+        j++;
+        continue;
+      }
+
+      // If one array is fully traversed but the other isn't, they differ.
+      if (i >= refArraySize || j >= toCheckSize)
+        return false;
+
+      // If corresponding signals don't match, the arrays are different.
+      if (refArray[i] != toCheck[j])
+        return false;
+
+      i++;
+      j++;
+    }
+  }
+  return true;
 }
 
 ExtraSignal ExtraSignal::allocateInto(mlir::TypeStorageAllocator &alloc) const {
