@@ -1178,5 +1178,5 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
           "extra_signals": {}
       }],
       "extra_signals": extra_signals_without_spec,
-      "simple_ports": ["ctrl_save", "ctrl_commit", "ctrl_sc_save", "ctrl_sc_commit", "ctrl_sc_branch"]
+      "ignore_ports": ["ctrl_save", "ctrl_commit", "ctrl_sc_save", "ctrl_sc_commit", "ctrl_sc_branch"]
   }, lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
