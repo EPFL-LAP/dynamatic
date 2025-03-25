@@ -25,6 +25,7 @@ import generators.handshake.tagger as tagger
 import generators.handshake.untagger as untagger
 import generators.handshake.free_tags_fifo as fifo
 import generators.handshake.shli as shli
+import generators.handshake.join as join
 
 
 def generate_code(name, mod_type, parameters):
@@ -75,6 +76,8 @@ def generate_code(name, mod_type, parameters):
       return extui.generate_extui(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
+    case "join":
+      return join.generate_join(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

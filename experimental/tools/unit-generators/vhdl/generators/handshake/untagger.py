@@ -22,12 +22,6 @@ def generate_untagger(name, params):
     return _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth)
 
 def _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth):
-  join_name = f"{name}_join"
-
-  dependencies = \
-      generate_join(join_name, {
-          "size": 1
-      })
   
   entity = f"""
 library ieee;
@@ -70,7 +64,7 @@ begin
 end architecture;
 """
   
-  return dependencies + entity + architecture
+  return entity + architecture
 
 def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, extra_signals):
   return generate_signal_manager(name, {

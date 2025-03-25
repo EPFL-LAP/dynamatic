@@ -67,7 +67,9 @@ begin
     combined_valid <= tagIn_valid & ins_valid;
 
     j : entity work.{join_name}
-                port map(   combined_valid,
+                port map(   clk,
+                            rst,
+                            combined_valid,
                             outs_ready,
                             outs_valid,
                             combined_ready);

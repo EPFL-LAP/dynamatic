@@ -156,13 +156,23 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     Operation *fifo = addTagOperations(funcOp, builder, op, dirtyNodes,
                                        unalignedEdges, taggedEdges);
 
-    /*
-if (!fifo)
-return failure();
+    if (!fifo)
+      return failure();
 
-std::string extraTag = "tag" + std::to_string(tagIndex++);
-if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo)))
-return failure(); */
+    std::string extraTag = "tag" + std::to_string(tagIndex++);
+    if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo)))
+      return failure();
+
+    if (LoadOp loadOp = dyn_cast<handshake::LoadOp>(op)) {
+      llvm::errs() << "Address Input type: "
+                   << loadOp.getAddressInput().getType() << "\n";
+      llvm::errs() << "Address Output type: "
+                   << loadOp.getAddressOutput().getType() << "\n";
+      llvm::errs() << "Data Input type: " << loadOp.getDataInput().getType()
+                   << "\n";
+      llvm::errs() << "Data Output type: " << loadOp.getDataOutput().getType()
+                   << "\n";
+    }
   }
   return success();
 }
@@ -256,7 +266,7 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   Backedge cond = beb.get(tagType);
 
   auto startValue = (Value)funcOp.getArguments().back();
-
+  builder.setInsertionPoint(outOfOrderOp);
   FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
       (*taggedEdges.begin()).getLoc(), handshake::ChannelType::get(tagType),
       startValue);
@@ -272,13 +282,6 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   // Step 4: Add the Untagger Operations
   addUntaggers(builder, outOfOrderOp, unalignedEdges, joinOperands, fifo);
 
-  llvm::errs() << "Printing operands\n";
-  for (auto operand : outOfOrderOp->getOperands()) {
-    operand.print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "Done printing operands\n";
-
   // If more than on untagger was created, then join them and feed the result of
   // the join (the free tag) back into the fifo
   // Else, feed the free tag output of the single untagger into the fifo
@@ -286,6 +289,7 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   if (joinOperands.size() > 1) {
     handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
         (*joinOperands.begin()).getLoc(), joinOperands);
+    inheritBB(outOfOrderOp, joinOp);
     fifo.getOperation()->replaceUsesOfWith(startValue, joinOp.getResult());
   } else {
     fifo.getOperation()->replaceUsesOfWith(startValue, (*joinOperands.begin()));
@@ -304,7 +308,7 @@ void OutOfOrderExecutionPass::addTaggers(OpBuilder builder,
   // tagged edge and the FIFO
   for (auto edge : taggedEdges) {
     handshake::TaggerOp taggerOp = builder.create<handshake::TaggerOp>(
-        edge.getLoc(), edge.getType(), edge, fifo.getTagOut());
+        outOfOrderOp->getLoc(), edge.getType(), edge, fifo.getTagOut());
 
     // Connect the tagger to the consumer of the edge
     //  i.e., for each prod that feeds the tagger: replace all the edges
@@ -385,25 +389,26 @@ addTagSignalsRecursive(OpOperand &opOperand,
 
   // Exceptional cases
   // UntaggerOp
-  if (isa<handshake::UntaggerOp>(op)) {
-    if (UntaggerOp untagger = dyn_cast<handshake::UntaggerOp>(op)) {
-      // If this is the untagger corresponding to the current tagged region (by
-      // identifying the fifo it feeds)
-      //  Then we stop traversal
-      for (auto *user : untagger.getTagOut().getUsers()) {
-        if (user == fifo)
-          return success();
+  if (UntaggerOp untagger = dyn_cast<handshake::UntaggerOp>(op)) {
+    // If this is the untagger corresponding to the current tagged region (by
+    // identifying the fifo it feeds), then we stop traversal
+    for (auto *user : untagger.getTagOut().getUsers()) {
+      if (JoinOp join = dyn_cast<handshake::JoinOp>(user)) {
+        for (auto *user : join.getResult().getUsers()) {
+          if (user == fifo)
+            return success();
+        }
       }
-
-      // Else this is an untagger in a nested region and we continue traversal
-      for (auto &operand : untagger.getDataOut().getUses()) {
-        if (failed(addTagSignalsRecursive(operand, visited, extraTag, fifo)))
-          return failure();
-      }
-      return success();
     }
-    return failure();
+
+    // Else this is an untagger in a nested region and we continue traversal
+    for (auto &operand : untagger.getDataOut().getUses()) {
+      if (failed(addTagSignalsRecursive(operand, visited, extraTag, fifo)))
+        return failure();
+    }
+    return success();
   }
+
   // MemPortOp (Load and Store)
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
 
@@ -416,6 +421,10 @@ addTagSignalsRecursive(OpOperand &opOperand,
 
     return success();
   }
+
+  // The tags coming in and out of teh fifo should never be tagged
+  if (dyn_cast<handshake::FreeTagsFifoOp>(op))
+    return failure();
 
   // Downstream traversal
   for (auto result : op->getResults()) {
@@ -469,9 +478,6 @@ void OutOfOrderExecutionPass::runDynamaticPass() {
 
     if (failed(applyOutOfOrder(funcOp, ctx, outOfOrderNodes)))
       signalPassFailure();
-
-    /*if (failed(addTagSignals(funcOp, ctx)))
-      signalPassFailure();*/
   }
 }
 

@@ -339,7 +339,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.addi" || modName == "handshake.buffer" ||
       modName == "handshake.cmpi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.muli" ||
-      modName == "handshake.sink" ||
+      modName == "handshake.sink" || modName == "handshake.join" ||
+      modName == "handshake.shli" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit") {
@@ -398,23 +399,20 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["TAG_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  }else if (modName == "handshake.untagger") {
+  } else if (modName == "handshake.untagger") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(0));
     serializedParams["TAG_BITWIDTH"] =
-        getBitwidthString(modType.getOutputType(1));    
-  }else if (modName == "handshake.free_tags_fifo") {
+        getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.free_tags_fifo") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(0));
-  }else if (modName == "handshake.extui") {
+  } else if (modName == "handshake.extui") {
     serializedParams["INPUT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(0));
-  }else if (modName == "handshake.shli") {
-    serializedParams["DATA_BITWIDTH"] =
-        getBitwidthString(modType.getInputType(0));
-  }else {
+  } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
@@ -515,8 +513,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
         serializeExtraSignals(modType.getOutputType(0));
     serializedParams["INPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  }
-  else {
+  } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }

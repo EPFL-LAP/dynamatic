@@ -34,6 +34,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_TRANSFORMED_2="$COMP_DIR/handshake_transformed_2.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
@@ -122,17 +123,23 @@ exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
   --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
-# out-of-order-execution transformations
+  # out-of-order-execution transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --out-of-order-execution \
     > "$F_HANDSHAKE_OOE"
   exit_on_fail "Failed to apply out-of-order execution transformations" \
     "Applied out-of-order execution transformations"
+
+    # handshake transformations 2
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
+   --handshake-materialize --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED_2"
+exit_on_fail "Failed to apply remaining transformations to handshake" \
+  "Applied remaining transformations to handshake"
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
@@ -146,7 +153,7 @@ fi
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED_2" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components.json" \
     > "$F_HANDSHAKE_BUFFERED"
@@ -169,7 +176,7 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED_2" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"

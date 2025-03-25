@@ -543,6 +543,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::JoinOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
+        addType("DATA_TYPE", op->getResult(0));
       })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
             handshake::NDWireOp>([&](auto) {
