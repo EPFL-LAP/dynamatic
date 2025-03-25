@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
+DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
