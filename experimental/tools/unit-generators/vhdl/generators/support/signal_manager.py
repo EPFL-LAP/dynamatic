@@ -511,15 +511,15 @@ def _generate_concat_forwarding(in_ports, out_ports, ignore_signals, simple_port
     if port["name"] in simple_ports:
       # Forward the original data signal, because it's not concatenated
       forwardings.append(f"      {port_name} => {port_name}")
-      forwardings.append(f"      {port_name}_valid => {port_name}_valid")
-      forwardings.append(f"      {port_name}_ready => {port_name}_ready")
     else:
       forwardings.append(f"      {port_name} => {port_name}_inner")
-      forwardings.append(f"      {port_name}_valid => {port_name}_valid")
-      forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
-      # Forward ignored extra signals
-      for signal in ignore_signals:
+    forwardings.append(f"      {port_name}_valid => {port_name}_valid")
+    forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+
+    # Forward ignored extra signals
+    for signal in ignore_signals:
+      if signal in port.get("extra_signals", []):
         forwardings.append(
             f"      {port_name}_{signal} => {port_name}_{signal}")
 

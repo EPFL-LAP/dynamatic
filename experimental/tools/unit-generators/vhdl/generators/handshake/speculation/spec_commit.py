@@ -7,10 +7,11 @@ from generators.support.utils import data
 
 def generate_spec_commit(name, params):
   bitwidth = params["bitwidth"]
-  extra_signals_except_spec = params["extra_signals_except_spec"]
+  extra_signals = params["extra_signals"]
 
-  if extra_signals_except_spec:
-    return _generate_spec_commit_signal_manager(name,  bitwidth, extra_signals_except_spec)
+  # Always contains spec signal
+  if len(extra_signals) > 1:
+    return _generate_spec_commit_signal_manager(name,  bitwidth, extra_signals)
   return _generate_spec_commit(name, bitwidth)
 
 
@@ -181,18 +182,18 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals_except_spec):
+def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals):
+  extra_signals_without_spec = extra_signals.copy()
+  extra_signals_without_spec.pop("spec")
+
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals_except_spec)
+      extra_signals)
   return generate_signal_manager(name, {
       "type": "concat",
       "in_ports": [{
           "name": "ins",
           "bitwidth": bitwidth,
-          "extra_signals": {
-              **extra_signals_except_spec,
-              "spec": 1
-          }
+          "extra_signals": extra_signals
       }, {
           "name": "ctrl",
           "bitwidth": 1
@@ -200,12 +201,9 @@ def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals_except_sp
       "out_ports": [{
           "name": "outs",
           "bitwidth": bitwidth,
-          "extra_signals": {
-              **extra_signals_except_spec,
-              "spec": 1
-          }
+          "extra_signals": extra_signals_without_spec,
       }],
-      "extra_signals": {**extra_signals_except_spec, "spec": 1},
+      "extra_signals": extra_signals,
       "ignore_signals": ["spec"],
       "simple_ports": ["ctrl"]
-  }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth))
+  }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))
