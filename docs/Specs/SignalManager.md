@@ -319,15 +319,15 @@ end entity;
 -- Architecture of load signal manager
 architecture arch of handshake_load_0 is
   signal addrIn_ready_inner : std_logic;
-  signal tfifo_ready : std_logic;
+  signal ofifo_ready : std_logic;
   -- Concatenated signals
   signal addrIn_inner : std_logic_vector(1 - 1 downto 0);
   signal dataOut_inner : std_logic_vector(1 - 1 downto 0);
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
-  -- addrIn is ready only when inner load and tfifo are ready
-  addrIn_ready <= addrIn_ready_inner and tfifo_ready;
+  -- addrIn_ready <= addrIn_ready_inner and ofifo_ready; -- Conservative
+  addrIn_ready <= addrIn_ready_inner; -- Assuming MC latency is 1 and ofifo is always ready
 
   -- Transfer signal assignments
   transfer_in <= addrIn_valid and addrIn_ready_inner;
@@ -338,14 +338,15 @@ begin
   dataOut_spec <= dataOut_inner(0 downto 0);
 
   -- Buffer to store extra signals for in-flight memory requests
-  -- Use tfifo because the latency is unknown
-  tfifo : entity work.handshake_load_0_tfifo(arch)
+  -- LoadOp is assumed to be connected to a memory controller
+  -- Use ofifo with latency 1 (MC latency)
+  ofifo : entity work.handshake_load_0_ofifo(arch)
     port map(
       clk => clk,
       rst => rst,
       ins => addrIn_inner,
       ins_valid => transfer_in,
-      ins_ready => tfifo_ready,
+      ins_ready => ofifo_ready,
       outs => dataOut_inner,
       outs_valid => open,
       outs_ready => transfer_out
