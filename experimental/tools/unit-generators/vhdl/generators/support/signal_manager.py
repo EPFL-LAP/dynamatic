@@ -528,7 +528,7 @@ def _generate_concat_forwarding(in_ports, out_ports, handled_extra_signals, igno
 def _generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ignore_ports, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
-  # Exclude ports without extra signals
+  # Exclude specified ports for concatenation
   filtered_in_ports = [
       port for port in in_ports if not port["name"] in ignore_ports]
   filtered_out_ports = [
