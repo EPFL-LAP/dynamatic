@@ -58,6 +58,8 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
     bool forceBreakDVR = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
+    
+    handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
     if (forceBreakDVR) {
@@ -67,8 +69,12 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        result.numFifoDV = numSlotsToPlace - 1;
-        result.numOneSlotR = 1;
+        if (props.minOpaque <= 1){
+          result.numFifoDV = numSlotsToPlace;
+        } else {
+          result.numFifoDV = numSlotsToPlace - 1;
+          result.numOneSlotR = 1;
+        }
       }
     } else {
       if (numSlotsToPlace == 1){
