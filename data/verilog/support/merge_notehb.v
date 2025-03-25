@@ -23,12 +23,11 @@ module merge_notehb #(
     tmp_ready_out = {INPUTS{1'b0}}; 
     tmp_data_out = data_in_bus[0 * DATA_TYPE +: DATA_TYPE];
 
-		for (i = 0; i < N; i = i + 1) begin
+		for (i = 0; i < INPUTS; i = i + 1) begin
 			if (ins_valid[i]) begin
         tmp_data_out = ins[i * DATA_IN_SIZE +: DATA_IN_SIZE];
 				tmp_valid_out = 1;
         tmp_ready_out[i] = outs_ready;
-        break;
 			end
 		end
 	end

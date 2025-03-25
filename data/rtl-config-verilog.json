@@ -574,7 +574,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/merge.v",
-    "dependencies": ["tehb"],
+    "dependencies": ["tehb", "merge_notehb"],
     "hdl": "verilog"
   },
   {
