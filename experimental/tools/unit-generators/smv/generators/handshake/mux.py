@@ -37,7 +37,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, index, index
 
 def _generate_mux(name, size, data_type, select_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}, ins_{n}_valid" for n in range(size)])}, index, index_valid, outs_ready)
+MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, index, index_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
 
