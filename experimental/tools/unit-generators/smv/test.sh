@@ -200,11 +200,11 @@ test_generator -t xori -p port_types='{"result":"!handshake.channel<i32>"}' late
 test_generator -t xori --abstract-data -p port_types='{"result":"!handshake.channel<i32>"}' latency=0
 
 echo -e "\nTesting memory_controller..."
-test_generator -t memory_controller -p num_loads=0 num_stores=1 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>","stData":"!handshake.channel<i16>"}'
-test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=1 port_types='{"stAddr":"!handshake.channel<i16>","stData":"!handshake.channel<i16>"}'
-test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=5 port_types='{"stAddr":"!handshake.channel<i16>","stData":"!handshake.channel<i16>"}'
-test_generator -t memory_controller -p num_loads=1 num_stores=0 num_controls=0 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
-test_generator -t memory_controller -p num_loads=5 num_stores=0 num_controls=0 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
-test_generator -t memory_controller -p num_loads=5 num_stores=5 num_controls=5 port_types='{"ldData":"!handshake.channel<i16>","ldAddr":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=1 num_controls=1 port_types='{"stAddr_0":"!handshake.channel<i16>","stData_0":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=1 port_types='{"stAddr_0":"!handshake.channel<i16>","stData_0":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=0 num_stores=5 num_controls=5 port_types='{"stAddr_0":"!handshake.channel<i16>","stData_0":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=1 num_stores=0 num_controls=0 port_types='{"ldData_0":"!handshake.channel<i16>","ldAddr_0":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=5 num_stores=0 num_controls=0 port_types='{"ldData_0":"!handshake.channel<i16>","ldAddr_0":"!handshake.channel<i16>"}'
+test_generator -t memory_controller -p num_loads=5 num_stores=5 num_controls=5 port_types='{"ldData_0":"!handshake.channel<i16>","ldAddr_0":"!handshake.channel<i16>"}'
 
 rm $OUT
