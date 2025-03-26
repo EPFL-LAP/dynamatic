@@ -1,7 +1,7 @@
 [
   {
     "name": "handshake.addf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addf -p port_types=$PORT_TYPES",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addf -p port_types=$PORT_TYPES is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["flopoco_ip_cores"]
   },
   {
@@ -10,14 +10,14 @@
   },
   {
     "name": "handshake.andi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t andi -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t andi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.cmpf",
     "parameters": [
       { "name": "PREDICATE", "type": "string" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\"",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p port_types=$PORT_TYPES is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS predicate=\"'$PREDICATE'\"",
     "dependencies": ["flopoco_ip_cores"]
   },
   {
@@ -60,7 +60,7 @@
   },
   {
     "name": "handshake.mulf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p port_types=$PORT_TYPES",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p port_types=$PORT_TYPES is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["flopoco_ip_cores"]
   },
   {
@@ -82,7 +82,7 @@
   },
   {
     "name": "handshake.shli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.shrsi",
@@ -99,7 +99,7 @@
   },
   {
     "name": "handshake.subi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subi -p port_types=$PORT_TYPES"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.trunci",

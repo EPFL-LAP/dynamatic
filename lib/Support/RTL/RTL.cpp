@@ -338,10 +338,11 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                          hw::ModuleType &modType) {
   if (
       // default (All(Data)TypesMatch)
-      modName == "handshake.addi" || modName == "handshake.buffer" ||
-      modName == "handshake.cmpi" || modName == "handshake.fork" ||
-      modName == "handshake.merge" || modName == "handshake.muli" ||
-      modName == "handshake.sink" ||
+      modName == "handshake.addi" || modName == "handshake.andi" ||
+      modName == "handshake.buffer" || modName == "handshake.cmpi" ||
+      modName == "handshake.fork" || modName == "handshake.merge" ||
+      modName == "handshake.muli" || modName == "handshake.shli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit") {
@@ -393,6 +394,10 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
+  } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
+             modName == "handshake.mulf") {
+    int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
+    serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
   } else {
@@ -427,11 +432,14 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                              hw::ModuleType &modType) {
   if (
       // default (AllExtraSignalsMatch)
-      modName == "handshake.addi" || modName == "handshake.buffer" ||
-      modName == "handshake.cmpi" || modName == "handshake.cond_br" ||
-      modName == "handshake.constant" || modName == "handshake.extsi" ||
-      modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.sink" ||
+      modName == "handshake.addf" || modName == "handshake.addi" ||
+      modName == "handshake.andi" || modName == "handshake.buffer" ||
+      modName == "handshake.cmpf" || modName == "handshake.cmpi" ||
+      modName == "handshake.cond_br" || modName == "handshake.constant" ||
+      modName == "handshake.extsi" || modName == "handshake.fork" ||
+      modName == "handshake.merge" || modName == "handshake.mulf" ||
+      modName == "handshake.muli" || modName == "handshake.shli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
       modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       // the first input has extra signals
