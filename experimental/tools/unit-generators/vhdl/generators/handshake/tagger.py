@@ -94,11 +94,23 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
           "name": "ins",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      }],
+      },{
+          "name": "tagIn",
+          "bitwidth": tag_bitwidth,
+          "extra_signals": {}
+      },
+      ],
       "out_ports": [{
           "name": "outs",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      }],
+      },
+      {
+          "name": f"outs_{current_tag}",
+          "bitwidth": tag_bitwidth,
+          "extra_signals": {},
+          "handshaked": False
+      },
+      ],
       "extra_signals": extra_signals
   }, lambda name: _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth))

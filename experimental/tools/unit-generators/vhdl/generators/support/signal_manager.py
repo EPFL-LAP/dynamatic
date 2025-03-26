@@ -67,6 +67,7 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
     bitwidth = port["bitwidth"]
     extra_signals = port.get("extra_signals", {})
     port_2d = port.get("2d", False)
+    handshaked = port.get("handshaked", True)
 
     if not port_2d:
       # Usual case
@@ -76,8 +77,9 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
         port_decls.append(
             f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
 
-      port_decls.append(f"    {name}_valid : {dir} std_logic")
-      port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+      if handshaked:
+        port_decls.append(f"    {name}_valid : {dir} std_logic")
+        port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
 
       # Generate extra signals for this input port
       for signal_name, signal_bitwidth in extra_signals.items():
@@ -200,13 +202,15 @@ def generate_inner_port_forwarding(ports) -> str:
   for port in ports:
     port_name = port["name"]
     bitwidth = port["bitwidth"]
+    handshaked = port.get("handshaked", True)
 
     # Forward data if present
     if bitwidth > 0:
       forwardings.append(f"      {port_name} => {port_name}")
 
-    forwardings.append(f"      {port_name}_valid => {port_name}_valid")
-    forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+    if handshaked:
+      forwardings.append(f"      {port_name}_valid => {port_name}_valid")
+      forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
   return ",\n".join(forwardings).lstrip()
 
@@ -225,7 +229,7 @@ def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> s
     port_name = out_port["name"]
 
     # Assign all extra signals to this output port
-    for signal_name in extra_signals:
+    for signal_name in out_port["extra_signals"]:
       extra_signal_assignments.append(
           f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
   return "\n".join(extra_signal_assignments).lstrip()

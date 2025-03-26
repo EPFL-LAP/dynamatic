@@ -73,11 +73,22 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
           "name": "ins",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      }],
+      },
+      {
+          "name": f"ins_{current_tag}",
+          "bitwidth": tag_bitwidth,
+          "extra_signals": {},
+          "handshaked": False
+      },],
       "out_ports": [{
           "name": "outs",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      }],
+      },{
+          "name": "tagOut",
+          "bitwidth": tag_bitwidth,
+          "extra_signals": {}
+      },
+      ],
       "extra_signals": extra_signals
   }, lambda name: _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth))
