@@ -46,7 +46,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
 
 def _generate_control_merge(name, size, index_type, data_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}, ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
+  MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready);
 

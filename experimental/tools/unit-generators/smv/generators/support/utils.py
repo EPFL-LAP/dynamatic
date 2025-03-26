@@ -37,6 +37,7 @@ class SmvScalarType:
       self.bitwidth = int(match.group(2))
       if type_prefix == "f":
         self.floating_point = True
+        self.signed = None
         if self.bitwidth != 32 and self.bitwidth != 64:
           raise ValueError(
               f"Bitwidth {self.bitwidth} is not supported for floats")
