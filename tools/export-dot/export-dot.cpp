@@ -162,7 +162,18 @@ static std::string getPrettyNodeLabel(Operation *op) {
             if (!optBufferType) 
               return "buffer" + numSlotsStr;
             if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
-              return bufferTypeAttr.getValue().str() + numSlotsStr;
+              std::string bufferTypeStr = bufferTypeAttr.getValue().str();
+              if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
+                return "DV" + numSlotsStr;
+              } else if (bufferTypeStr == "ONE_SLOT_BREAK_R") {
+                return "R" + numSlotsStr;
+              } else if (bufferTypeStr == "FIFO_BREAK_DV") {
+                return "DV" + numSlotsStr;
+              } else if (bufferTypeStr == "FIFO_BREAK_NONE") {
+                return "NONE" + numSlotsStr;
+              } else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
+                return "DVR" + numSlotsStr;
+              }
             }
             return "buffer" + numSlotsStr;
           })
@@ -266,7 +277,7 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOp>([&](auto) { return "green"; })
+      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })

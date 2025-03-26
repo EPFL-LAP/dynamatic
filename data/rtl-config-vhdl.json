@@ -246,7 +246,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
         "name": "DATA_TYPE",
@@ -269,7 +269,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DV", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
@@ -288,7 +288,7 @@
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVFIFO", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_DV", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -310,7 +310,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVFIFO", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_DV", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -329,7 +329,7 @@
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -350,7 +350,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "R", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
@@ -368,7 +368,7 @@
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "TFIFO", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_NONE", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -392,7 +392,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "TFIFO", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_NONE", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       {
@@ -412,7 +412,7 @@
     "name": "handshake.buffer",
     "parameters": [
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DVR", "generic": false },
       {
         "name": "DATA_TYPE",
         "type": "dataflow",
@@ -435,7 +435,7 @@
   {
     "name": "handshake.buffer",
     "parameters": [
-      { "name": "BUFFER_TYPE", "type": "string", "eq": "DVR", "generic": false },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
       {
