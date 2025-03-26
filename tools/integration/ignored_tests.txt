@@ -12,3 +12,11 @@ covariance
 trisolv
 polyn_mult
 cnn
+fixed
+if_convert
+loop_path
+nested_loop
+single_loop
+sparse
+subdiag
+subdiag_fast
