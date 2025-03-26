@@ -22,10 +22,10 @@ import generators.handshake.mux as mux
 import generators.handshake.shli as shli
 import generators.handshake.sink as sink
 import generators.handshake.source as source
-import generators.handshake.spec_commit as spec_commit
-import generators.handshake.spec_save_commit as spec_save_commit
-import generators.handshake.speculating_branch as speculating_branch
-import generators.handshake.speculator as speculator
+import generators.handshake.speculation.spec_commit as spec_commit
+import generators.handshake.speculation.spec_save_commit as spec_save_commit
+import generators.handshake.speculation.speculating_branch as speculating_branch
+import generators.handshake.speculation.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
@@ -74,6 +74,12 @@ def generate_code(name, mod_type, parameters):
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
+    case "store":
+      return store.generate_store(name, parameters)
+    case "subi":
+      return subi.generate_subi(name, parameters)
+    case "trunci":
+      return trunci.generate_trunci(name, parameters)
     case "spec_commit":
       return spec_commit.generate_spec_commit(name, parameters)
     case "spec_save_commit":
@@ -82,12 +88,6 @@ def generate_code(name, mod_type, parameters):
       return speculating_branch.generate_speculating_branch(name, parameters)
     case "speculator":
       return speculator.generate_speculator(name, parameters)
-    case "store":
-      return store.generate_store(name, parameters)
-    case "subi":
-      return subi.generate_subi(name, parameters)
-    case "trunci":
-      return trunci.generate_trunci(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
     case _:

@@ -238,11 +238,4 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
 def HasClock : NativeOpTrait<"HasClock">;
 
-def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Identifier for operations representing speculative units.
-  }];
-}
-
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

@@ -22,6 +22,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
@@ -548,6 +549,16 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
     iMerge.indexEdge = edgeBuilder.get(handshake::ChannelType::get(idxType));
     addFromAllPredecessors(blockArg.getType());
     Value index = *iMerge.indexEdge;
+
+    for (Value &operand : operands) {
+      assert(operand.getType()
+                     .cast<handshake::ExtraSignalsTypeInterface>()
+                     .getNumExtraSignals() == 0 &&
+             "unexpected extra signals");
+    }
+
+    // Since none of the operands have extra signals, the result type matches
+    // the first operand.
     iMerge.op = rewriter.create<handshake::MuxOp>(
         loc, /*resultType=*/operands[0].getType(), index, operands);
   }
