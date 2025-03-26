@@ -28,7 +28,7 @@ module cond_br_dataless (
 	// Assign individual signals to the vector
 	assign ins_valid_vec = {condition_valid, data_valid};
 
-	join #(
+	join_type #(
 		.SIZE(2)
 	) join_branch (
     .clk        (clk               ),

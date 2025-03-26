@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module join #(
+module join_type #(
 	parameter SIZE = 2 // Default Join input set to 2
 )(
   input  clk,
