@@ -320,7 +320,7 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name){
+                                          StringRef name) {
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -682,7 +682,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
         addUnsigned("FIFO_DEPTH", 16);
       })
-      .Case<handshake::RigidificationOp>([&](auto) {
+      .Case<handshake::RigidifierOp>([&](auto) {
         // Input bitwidth and output bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -1804,7 +1804,7 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
-                    ConvertToHWInstance<handshake::RigidificationOp>,
+                    ConvertToHWInstance<handshake::RigidifierOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
                     // Arith operations

@@ -31,7 +31,7 @@ struct TestRigidificationSupport
   using Base =
       PassWrapper<TestRigidificationSupport, OperationPass<mlir::ModuleOp>>;
 
-  TestRigidificationSupport() : Base(){};
+  TestRigidificationSupport() : Base() {};
   TestRigidificationSupport(const TestRigidificationSupport &other) = default;
 
   StringRef getArgument() const final { return "exp-test-handshake-simulator"; }
@@ -57,7 +57,7 @@ struct TestRigidificationSupport
       for (auto ch : op->getResults()) {
         Type opType = ch.getType();
         if (llvm::dyn_cast<handshake::ChannelType>(opType))
-          rigidifyChannel(&ch, ctx);
+          rigidifyChannel(ch, ctx);
       }
     });
   }

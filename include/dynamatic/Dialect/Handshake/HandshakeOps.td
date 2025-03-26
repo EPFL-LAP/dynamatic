@@ -1393,7 +1393,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasVerifier = 1;
 }
 
-def RigidificationOp : Handshake_Op<"rigidification",[
+def RigidifierOp : Handshake_Op<"rigidifier",[
 SameOperandsAndResultType
 ]> {
   let summary = [{
@@ -1405,6 +1405,10 @@ SameOperandsAndResultType
 
   let arguments = (ins HandshakeType:$channelIn);
   let results = (outs HandshakeType:$channelOut);
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+  }];
 }
 
 def ChannelReshapeTypeAttr : I32EnumAttr<

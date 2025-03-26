@@ -1,0 +1,168 @@
+// test_module : memory_controller(['num_loads=0', 'num_stores=5', 'num_controls=1', 'port_types={"stAddr":"!handshake.channel<i16>","stData":"!handshake.channel<i16>"}'])
+
+
+MODULE test_module(memStart_valid, memEnd_ready, ctrlEnd_valid, ctrl_0, ctrl_0_valid, 
+  stAddr_0, stAddr_0_valid, stAddr_1, stAddr_1_valid, stAddr_2, stAddr_2_valid, stAddr_3, stAddr_3_valid, stAddr_4, stAddr_4_valid, stData_0, stData_0_valid, stData_1, stData_1_valid, stData_2, stData_2_valid, stData_3, stData_3_valid, stData_4, stData_4_valid, loadData)
+
+  VAR
+  inner_arbiter : test_module__write_memory_arbiter(stAddr_0_valid & stData_0_valid, stAddr_1_valid & stData_1_valid, stAddr_2_valid & stData_2_valid, stAddr_3_valid & stData_3_valid, stAddr_4_valid & stData_4_valid,
+    stAddr_0, stAddr_1, stAddr_2, stAddr_3, stAddr_4, stData_0, stData_1, stData_2, stData_3, stData_4, TRUE, TRUE, TRUE, TRUE, TRUE);
+  inner_mc_control : test_module__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
+  remainingStores : integer;
+
+  ASSIGN
+  init(remainingStores) := 0;
+  next(remainingStores) := case
+    ctrl_0_valid = TRUE : remainingStores + toint(ctrl_0) - stores_done;
+    TRUE : remainingStores - stores_done;
+  esac;
+
+  DEFINE
+  stores_done := storeEn ? 1 : 0;
+  all_requests_done := (remainingStores = 0) & (ctrl_0_valid = FALSE);
+
+  // output
+  DEFINE
+  memStart_ready := inner_mc_control.memStart_ready;
+  memEnd_valid := inner_mc_control.memEnd_valid;
+  ctrlEnd_ready := inner_mc_control.ctrlEnd_ready;
+
+  ctrl_0_ready := TRUE;
+
+  stAddr_0_ready := inner_arbiter.ready_0;
+  stAddr_1_ready := inner_arbiter.ready_1;
+  stAddr_2_ready := inner_arbiter.ready_2;
+  stAddr_3_ready := inner_arbiter.ready_3;
+  stAddr_4_ready := inner_arbiter.ready_4;
+
+  stData_0_ready := inner_arbiter.ready_0;
+  stData_1_ready := inner_arbiter.ready_1;
+  stData_2_ready := inner_arbiter.ready_2;
+  stData_3_ready := inner_arbiter.ready_3;
+  stData_4_ready := inner_arbiter.ready_4;
+
+  loadEn := FALSE;
+  loadAddr := 0;
+  storeEn := inner_arbiter.write_enable;
+  storeAddr := inner_arbiter.write_address;
+  storeData := inner_arbiter.data_to_memory;
+
+  
+MODULE test_module__write_memory_arbiter(pValid_0, pValid_1, pValid_2, pValid_3, pValid_4, address_in_0, address_in_1, address_in_2, address_in_3, address_in_4,
+  data_in_0, data_in_1, data_in_2, data_in_3, data_in_4, nReady_0, nReady_1, nReady_2, nReady_3, nReady_4)
+
+  VAR
+  priority_gen : test_module__write_memory_arbiter__priority(pValid_0, nReady_0, pValid_1, nReady_1, pValid_2, nReady_2, pValid_3, nReady_3, pValid_4, nReady_4);
+  valid_0_in : boolean;
+  valid_1_in : boolean;
+  valid_2_in : boolean;
+  valid_3_in : boolean;
+  valid_4_in : boolean;
+
+  ASSIGN
+  init(valid_0_in) := FALSE;
+  init(valid_1_in) := FALSE;
+  init(valid_2_in) := FALSE;
+  init(valid_3_in) := FALSE;
+  init(valid_4_in) := FALSE;
+  next(valid_0_in) :=  priority_gen.priority_0;
+  next(valid_1_in) :=  priority_gen.priority_1;
+  next(valid_2_in) :=  priority_gen.priority_2;
+  next(valid_3_in) :=  priority_gen.priority_3;
+  next(valid_4_in) :=  priority_gen.priority_4;
+
+
+  DEFINE
+  write_addr_in := case
+    priority_gen.priority_0 = TRUE : address_in_0;
+    priority_gen.priority_1 = TRUE : address_in_1;
+    priority_gen.priority_2 = TRUE : address_in_2;
+    priority_gen.priority_3 = TRUE : address_in_3;
+    priority_gen.priority_4 = TRUE : address_in_4;
+    TRUE: 0;
+  esac;
+  write_data_in := case
+    priority_gen.priority_0 = TRUE : data_in_0;
+    priority_gen.priority_1 = TRUE : data_in_1;
+    priority_gen.priority_2 = TRUE : data_in_2;
+    priority_gen.priority_3 = TRUE : data_in_3;
+    priority_gen.priority_4 = TRUE : data_in_4;
+    TRUE: 0;
+  esac;
+
+  // output
+  DEFINE
+  ready_0 := priority_gen.priority_0 & nReady_0;
+  ready_1 := priority_gen.priority_1 & nReady_1;
+  ready_2 := priority_gen.priority_2 & nReady_2;
+  ready_3 := priority_gen.priority_3 & nReady_3;
+  ready_4 := priority_gen.priority_4 & nReady_4;
+  valid_0 := valid_0_in;
+  valid_1 := valid_1_in;
+  valid_2 := valid_2_in;
+  valid_3 := valid_3_in;
+  valid_4 := valid_4_in;
+  write_address := write_addr_in;
+  data_to_memory := write_data_in;
+  write_enable := priority_gen.priority_0 | priority_gen.priority_1 | priority_gen.priority_2 | priority_gen.priority_3 | priority_gen.priority_4;
+  enable := write_enable;
+
+
+MODULE test_module__write_memory_arbiter__priority(req_0, data_ready_0, req_1, data_ready_1, req_2, data_ready_2, req_3, data_ready_3, req_4, data_ready_4)
+  DEFINE
+  que_el_0 := req_0 & data_ready_0;
+  prior_0 := que_el_0;
+  prior_1 := que_el_0 | prior_0;
+  que_el_1 := req_1 & data_ready_1 & !prior_1;
+  prior_2 := que_el_1 | prior_1;
+  que_el_2 := req_2 & data_ready_2 & !prior_2;
+  prior_3 := que_el_2 | prior_2;
+  que_el_3 := req_3 & data_ready_3 & !prior_3;
+  prior_4 := que_el_3 | prior_3;
+  que_el_4 := req_4 & data_ready_4 & !prior_4;
+
+  // output
+  DEFINE
+  priority_0 := que_el_0;
+  priority_1 := que_el_1;
+  priority_2 := que_el_2;
+  priority_3 := que_el_3;
+  priority_4 := que_el_4;
+
+
+
+  
+MODULE test_module__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
+
+  VAR
+  memStart_ready_in : boolean;
+  memEnd_valid_in : boolean;
+  ctrlEnd_ready_in : boolean;
+
+  ASSIGN
+  init(memStart_ready_in) := TRUE;
+  next(memStart_ready_in) := case
+    memEnd_valid_in & memEnd_ready : TRUE;
+    memStart_valid & memStart_ready_in : FALSE;
+    TRUE : memStart_ready_in;
+  esac;
+  init(memEnd_valid_in) := FALSE;
+  next(memEnd_valid_in) := case
+    memEnd_valid_in & memEnd_ready : FALSE;
+    ctrlEnd_valid & all_requests_done : TRUE;
+    TRUE : memEnd_valid_in;
+  esac;
+  init(ctrlEnd_ready_in) := FALSE;
+  next(ctrlEnd_ready_in) := case
+    ctrlEnd_valid & ctrlEnd_ready_in : FALSE;
+    ctrlEnd_valid & all_requests_done : TRUE;
+    TRUE : ctrlEnd_ready_in;
+  esac;
+
+  // outputs
+  DEFINE
+  memStart_ready := memStart_ready_in;
+  memEnd_valid := memEnd_valid_in;
+  ctrlEnd_ready := ctrlEnd_ready_in;
+
+

@@ -1,6 +1,7 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
   HandshakeRigidification.cpp
+  HWRigidification.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen

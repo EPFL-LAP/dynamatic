@@ -16,20 +16,20 @@
 
 using namespace dynamatic;
 
-LogicalResult rigidifyChannel(Value *channel, MLIRContext *ctx) {
-  if (!(llvm::dyn_cast<handshake::ChannelType>(channel->getType())))
+LogicalResult rigidifyChannel(Value &channel, MLIRContext *ctx) {
+  if (!(llvm::dyn_cast<handshake::ChannelType>(channel.getType())))
     return LogicalResult::failure();
 
   OpBuilder builder(ctx);
-  builder.setInsertionPointAfter(channel->getDefiningOp());
-  auto loc = channel->getLoc();
+  builder.setInsertionPointAfter(channel.getDefiningOp());
+  auto loc = channel.getLoc();
 
   auto newRigidificationOp =
-      builder.create<handshake::RigidificationOp>(loc, *channel);
+      builder.create<handshake::RigidifierOp>(loc, channel);
 
   Value rigidificationRes = newRigidificationOp.getResult();
 
-  for (auto &use : llvm::make_early_inc_range(channel->getUses())) {
+  for (auto &use : llvm::make_early_inc_range(channel.getUses())) {
     if (use.getOwner() != newRigidificationOp) {
       use.set(rigidificationRes);
     }

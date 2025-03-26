@@ -15,6 +15,7 @@
 #define EXPERIMENTAL_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Transforms/HWRigidification.h"
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "experimental/Transforms/HandshakeRigidification.h"
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
