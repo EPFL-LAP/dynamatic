@@ -94,7 +94,7 @@
   },
   {
     "name": "handshake.subf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subf -p port_types=$PORT_TYPES",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subf -p port_types=$PORT_TYPES is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["flopoco_ip_cores"]
   },
   {

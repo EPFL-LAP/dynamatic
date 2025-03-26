@@ -27,6 +27,7 @@ import generators.handshake.speculation.spec_save_commit as spec_save_commit
 import generators.handshake.speculation.speculating_branch as speculating_branch
 import generators.handshake.speculation.speculator as speculator
 import generators.handshake.store as store
+import generators.handshake.subf as subf
 import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
@@ -76,6 +77,8 @@ def generate_code(name, mod_type, parameters):
       return source.generate_source(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "subf":
+      return subf.generate_subf(name, parameters)
     case "subi":
       return subi.generate_subi(name, parameters)
     case "trunci":

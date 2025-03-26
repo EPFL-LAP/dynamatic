@@ -395,7 +395,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
-             modName == "handshake.mulf") {
+             modName == "handshake.mulf" || modName == "handshake.subf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
@@ -439,8 +439,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
       modName == "handshake.muli" || modName == "handshake.shli" ||
-      modName == "handshake.sink" || modName == "handshake.subi" ||
-      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.sink" || modName == "handshake.subf" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
