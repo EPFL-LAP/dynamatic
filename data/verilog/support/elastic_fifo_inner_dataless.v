@@ -1,5 +1,4 @@
 `timescale 1ns/1ps
-`define WRAP_AROUND(value, limit) ((value + 1 == limit) ? 0 : value + 1)
 module elastic_fifo_inner_dataless #(
   parameter NUM_SLOTS = 4
 )(
