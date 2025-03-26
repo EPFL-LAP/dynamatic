@@ -2,8 +2,8 @@ from generators.support.utils import *
 
 
 def generate_memory_controller(name, params):
-  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr"]) if "stAddr" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr"])
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData"]) if "ldData" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["stData"])
+  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr_0"]) if "stAddr_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr_0"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"]) if "ldData_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["stData_0"])
   num_loads = params["num_loads"]
   num_stores = params["num_stores"]
   num_controls = params["num_controls"]
@@ -55,7 +55,7 @@ MODULE {name}({mc_in_ports})
   ctrlEnd_ready := inner_mc_control.ctrlEnd_ready;
 
   -- ctrl_*_ready: ready signal of the channel that informs that a BB 
-  -- has "ctrl_*" number of stores. The memory controller's internal counter is
+  -- has "ctrl_*" number of stores. The memory controller s internal counter is
   -- counted up every time when it receives a token from this channel. 
   -- We assume that the number never overflows, therefore this ready 
   -- signal is always TRUE.
@@ -63,7 +63,7 @@ MODULE {name}({mc_in_ports})
 
 
   -- stAddr_*_ready: ready signal for the store address ports. This signal 
-  -- is derived from the arbiter's decision (the store port is ready 
+  -- is derived from the arbiter s decision (the store port is ready 
   -- only if the store port is selected by the arbiter).
   {"\n  ".join([f"stAddr_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_stores)])}
 
@@ -106,7 +106,7 @@ MODULE {name}({mc_in_ports})
   ctrlEnd_ready := inner_mc_control.ctrlEnd_ready;
 
   -- ldAddr_*_ready: ready signal for the store address ports. This signal 
-  -- is derived from the arbiter's decision (the load port is ready 
+  -- is derived from the arbiter s decision (the load port is ready 
   -- only if the load port is selected by the arbiter).
   {"\n  ".join([f"ldAddr_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_loads)])}
 
@@ -158,7 +158,7 @@ MODULE {name}({mc_in_ports})
   {"\n  ".join([f"ctrl_{n}_ready := inner_mc_loadless.ctrl_{n}_ready;" for n in range(num_controls)])}
 
   -- ldAddr_*_ready: ready signal for the store address ports. This signal 
-  -- is derived from the arbiter's decision (the load port is ready 
+  -- is derived from the arbiter s decision (the load port is ready 
   -- only if the load port is selected by the arbiter).
   {"\n  ".join([f"ldAddr_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_loads)])}
 
@@ -168,7 +168,7 @@ MODULE {name}({mc_in_ports})
   {"\n  ".join([f"ldData_{n}_valid := inner_arbiter.valid_{n};" for n in range(num_loads)])}
   
   -- stAddr_*_ready: ready signal for the store address ports. This signal 
-  -- is derived from the arbiter's decision in inner_mc_loadless.
+  -- is derived from the arbiter s decision in inner_mc_loadless.
   {"\n  ".join([f"stAddr_{n}_ready := inner_mc_loadless.ready_{n};" for n in range(num_stores)])}
 
   -- stData_*_ready: ready signal for the store data ports. This signal
