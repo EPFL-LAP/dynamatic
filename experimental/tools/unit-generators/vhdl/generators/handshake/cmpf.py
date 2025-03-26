@@ -303,7 +303,7 @@ def _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals):
       }],
       "out_ports": [{
           "name": "result",
-          "bitwidth": bitwidth,
+          "bitwidth": 1,
           "extra_signals": extra_signals
       }],
       "extra_signals": extra_signals
