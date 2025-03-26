@@ -696,7 +696,8 @@ begin
     data_in_ready <= data_out_ready;
 
     -- Predictor output valid if triggered
-    data_out <= data_reg; -- zeros & '1';
+    -- data_out <= data_reg;
+    data_out <= zeros & '1';
     data_out_valid <= trigger_valid;
 end architecture;
 """
