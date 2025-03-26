@@ -1,16 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
-from generators.support.signal_manager.binary_no_latency import generate_binary_no_latency_signal_manager
-from generators.support.join import generate_join
+from generators.support.signal_manager import generate_signal_manager
+from generators.handshake.join import generate_join
 
 
 def generate_andi(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["result"])
+  bitwidth = params["bitwidth"]
+  extra_signals = params["extra_signals"]
 
-  if data_type.has_extra_signals():
-    return _generate_andi_signal_manager(name, data_type)
+  if extra_signals:
+    return _generate_andi_signal_manager(name, bitwidth, extra_signals)
   else:
-    return _generate_andi(name, data_type.bitwidth)
+    return _generate_andi(name, bitwidth)
 
 
 def _generate_andi(name, bitwidth):
@@ -66,5 +65,22 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_andi_signal_manager(name, data_type):
-  return generate_binary_no_latency_signal_manager(name, data_type, _generate_andi)
+def _generate_andi_signal_manager(name, bitwidth, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_andi(name, bitwidth))

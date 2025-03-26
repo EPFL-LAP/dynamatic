@@ -1,23 +1,15 @@
-from generators.support.utils import VhdlScalarType, generate_extra_signal_ports
-from generators.support.join import generate_join
+from generators.support.signal_manager import generate_signal_manager
+from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
-from generators.support.oehb import generate_oehb
-from generators.support.ofifo import generate_ofifo
+from generators.handshake.oehb import generate_oehb
 
 
 def generate_mulf(name, params):
-  port_types = params["port_types"]
-  data_type = VhdlScalarType(port_types["result"])
+  is_double = params["is_double"]
+  extra_signals = params["extra_signals"]
 
-  if data_type.bitwidth == 32:
-    is_double = False
-  elif data_type.bitwidth == 64:
-    is_double = True
-  else:
-    raise ValueError(f"Unsupported bitwidth {data_type.bitwidth}")
-
-  if data_type.has_extra_signals():
-    return _generate_mulf_signal_manager(name, data_type, is_double)
+  if extra_signals:
+    return _generate_mulf_signal_manager(name, is_double, extra_signals)
   else:
     return _generate_mulf(name, is_double)
 
@@ -41,10 +33,7 @@ def _generate_mulf_single_precision(name):
 
   dependencies = generate_join(join_name, {"size": 2}) + \
       generate_delay_buffer(buff_name, {"slots": _get_latency(is_double=False) - 1}) + \
-      generate_oehb(oehb_name, {"port_types": {
-          "ins": "!handshake.control<>",
-          "outs": "!handshake.control<>"
-      }})
+      generate_oehb(oehb_name, {"bitwidth": 0})
 
   entity = f"""
 library ieee;
@@ -152,7 +141,7 @@ def _generate_mulf_double_precision(name):
   buff_name = f"{name}_buff"
 
   dependencies = generate_join(join_name, {"size": 2}) + \
-      generate_oehb(oehb_name, {"data_type": "!handshake.control<>"}) + \
+      generate_oehb(oehb_name, {"bitwidth": 0}) + \
       generate_delay_buffer(
       buff_name, {"slots": _get_latency(is_double=True) - 1})
 
@@ -258,120 +247,24 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_mulf_signal_manager(name, data_type, is_double):
-  inner_name = f"{name}_inner"
+def _generate_mulf_signal_manager(name, is_double, extra_signals):
   bitwidth = 64 if is_double else 32
-
-  dependencies = _generate_mulf(inner_name, is_double)
-
-  if "spec" in data_type.extra_signals:
-    dependencies += generate_ofifo(f"{name}_spec_ofifo", {
-        "num_slots": _get_latency(is_double),  # todo: correct?
-        "port_types": {
-            "ins": "!handshake.channel<i1>",
-            "outs": "!handshake.channel<i1>"
-        }
-    })
-
-  # Now that the logic depends on the name, this dict is defined inside this function.
-  extra_signal_logic = {
-      "spec": (
-          # First string is for the signal declaration
-          """
-    signal spec_tfifo_in : std_logic_vector(0 downto 0);
-    signal spec_tfifo_out : std_logic_vector(0 downto 0);
-""",
-          # Second string is for the actual logic
-          f"""
-    spec_tfifo_in <= lhs_spec or rhs_spec;
-    spec_tfifo : entity work.{name}_spec_ofifo(arch)
-      port map(
-        clk => clk,
-        rst => rst,
-        ins => spec_tfifo_in,
-        ins_valid => transfer_in,
-        ins_ready => open,
-        outs => spec_tfifo_out,
-        outs_valid => open,
-        outs_ready => transfer_out
-      );
-    result_spec <= spec_tfifo_out;
-""")
-  }
-
-  for signal_name in data_type.extra_signals:
-    if signal_name not in extra_signal_logic:
-      raise ValueError(f"Extra signal {signal_name} is not supported")
-
-  entity = f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of mulf signal manager
-entity {name} is
-  port (
-    [EXTRA_SIGNAL_PORTS]
-    -- inputs
-    clk          : in std_logic;
-    rst          : in std_logic;
-    lhs          : in std_logic_vector({bitwidth} - 1 downto 0);
-    lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector({bitwidth} - 1 downto 0);
-    rhs_valid    : in std_logic;
-    result_ready : in std_logic;
-    -- outputs
-    result       : out std_logic_vector({bitwidth} - 1 downto 0);
-    result_valid : out std_logic;
-    lhs_ready    : out std_logic;
-    rhs_ready    : out std_logic
-  );
-end entity;
-"""
-
-  # Add extra signal ports
-  extra_signal_ports = generate_extra_signal_ports([
-      ("lhs", "in"), ("rhs", "in"),
-      ("result", "out")
-  ], data_type.extra_signals)
-  entity = entity.replace("    [EXTRA_SIGNAL_PORTS]\n", extra_signal_ports)
-
-  architecture = f"""
--- Architecture of mulf signal manager
-architecture arch of {name} is
-  signal transfer_in, transfer_out : std_logic;
-  [EXTRA_SIGNAL_SIGNAL_DECLS]
-begin
-  transfer_in <= lhs_valid and lhs_ready;
-  transfer_out <= result_valid and result_ready;
-
-  -- list of logic for supported extra signals
-  [EXTRA_SIGNAL_LOGIC]
-
-  inner : entity work.{inner_name}(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      lhs => lhs,
-      lhs_valid => lhs_valid,
-      rhs => rhs,
-      rhs_valid => rhs_valid,
-      result_ready => result_ready,
-      result => result,
-      result_valid => result_valid,
-      lhs_ready => lhs_ready,
-      rhs_ready => rhs_ready
-    );
-end architecture;
-"""
-
-  architecture = architecture.replace("  [EXTRA_SIGNAL_SIGNAL_DECLS]",
-                                      "\n".join([
-                                          extra_signal_logic[name][0] for name in data_type.extra_signals
-                                      ]))
-  architecture = architecture.replace("  [EXTRA_SIGNAL_LOGIC]",
-                                      "\n".join([
-                                          extra_signal_logic[name][1] for name in data_type.extra_signals
-                                      ]))
-
-  return dependencies + entity + architecture
+  return generate_signal_manager(name, {
+      "type": "buffered",
+      "latency": _get_latency(is_double),
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_mulf(name, is_double))
