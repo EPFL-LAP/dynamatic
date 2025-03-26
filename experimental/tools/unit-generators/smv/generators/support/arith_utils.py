@@ -18,8 +18,8 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
 
   -- output
-  DEFINE lhs_ready := inner_join.ins_ready_0;
-  DEFINE rhs_ready := inner_join.ins_ready_1;
+  DEFINE lhs_ready := inner_join.ins_0_ready;
+  DEFINE rhs_ready := inner_join.ins_1_ready;
   DEFINE outs_valid := inner_join.outs_valid;
   
   {generate_join(f"{name}__join", {"size": 2})}
@@ -33,8 +33,8 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_delay_buffer : {name}__delay_buffer(inner_join.outs_valid, outs_ready);
 
   -- output
-  DEFINE lhs_ready := inner_join.ins_ready_0;
-  DEFINE rhs_ready := inner_join.ins_ready_1;
+  DEFINE lhs_ready := inner_join.ins_0_ready;
+  DEFINE rhs_ready := inner_join.ins_1_ready;
   DEFINE outs_valid := inner_delay_buffer.outs_valid;
   
   {generate_join(f"{name}__join", {"size": 2})}
@@ -50,7 +50,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   -- output
   DEFINE lhs_ready := inner_handshake_manager.lhs_ready;
   DEFINE rhs_ready := inner_handshake_manager.rhs_ready;
-  DEFINE outs_valid := inner_handshake_manager.outs_valid;
+  DEFINE result_valid := inner_handshake_manager.outs_valid;
 """
 
 
@@ -68,7 +68,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 def generate_abstract_binary_op(name, latency, data_type):
   return f"""
 {generate_binary_op_header(name)}
-  DEFINE outs := {data_type.format_constant(0)};
+  DEFINE result := {data_type.format_constant(0)};
   
   {generate_binary_op_handshake_manager(f"{name}__handshake_manager", {ATTR_LATENCY: latency})}
 """
