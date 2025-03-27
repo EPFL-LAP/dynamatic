@@ -17,6 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of extui
 entity {name} is 
 port (
     clk, rst : in std_logic;

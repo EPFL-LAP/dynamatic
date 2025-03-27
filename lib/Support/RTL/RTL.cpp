@@ -357,7 +357,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (modName == "handshake.extsi" || modName == "handshake.trunci") {
+  } else if (modName == "handshake.extsi" || modName == "handshake.trunci" || modName == "handshake.extui") {
     serializedParams["INPUT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
@@ -394,11 +394,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(1));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
-  } else if (modName == "handshake.extui") {
-    serializedParams["INPUT_BITWIDTH"] =
-        getBitwidthString(modType.getInputType(0));
-    serializedParams["OUTPUT_BITWIDTH"] =
-        getBitwidthString(modType.getOutputType(0));
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
   } else {

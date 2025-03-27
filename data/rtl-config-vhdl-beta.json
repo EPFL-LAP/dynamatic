@@ -109,14 +109,15 @@
   },
   {
     "name": "handshake.shli",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES data_bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.join",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t join -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t join -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH",
+    "dependencies": ["types"]
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
