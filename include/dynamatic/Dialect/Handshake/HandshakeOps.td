@@ -555,7 +555,7 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
 ]> {
   let summary = "join operation";
   let description = [{
