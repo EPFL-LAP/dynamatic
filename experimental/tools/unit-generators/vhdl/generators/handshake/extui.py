@@ -1,5 +1,6 @@
 from generators.support.signal_manager import generate_signal_manager
 
+
 def generate_extui(name, params):
   input_bitwidth = params["input_bitwidth"]
   output_bitwidth = params["output_bitwidth"]
@@ -9,6 +10,7 @@ def generate_extui(name, params):
     return _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
   else:
     return _generate_extui(name, input_bitwidth, output_bitwidth)
+
 
 def _generate_extui(name, input_bitwidth, output_bitwidth):
 
@@ -44,6 +46,7 @@ begin
 end architecture;
 """
   return entity + architecture
+
 
 def _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
   return generate_signal_manager(name, {
