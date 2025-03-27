@@ -86,7 +86,8 @@ private:
                                             Operation *fifo, int numTags);
 
   LogicalResult testNestedRegions(handshake::FuncOp funcOp, OpBuilder builder,
-                                  Operation *outOfOrderOp);
+                                  Operation *outOfOrderOp, Operation *innerFifo,
+                                  const std::string &extraTag);
 
   // MAIN: Apply the out-of-order execution methodology
   LogicalResult
@@ -153,6 +154,22 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     if (failed(identifyTaggedEdges(op, unalignedEdges, taggedEdges)))
       return failure();
 
+    // if (isa<handshake::ShLIOp>(op)) {
+    //   llvm::errs() << "Printing unaligned edges: \n";
+    //   for (Value edge : unalignedEdges) {
+    //     edge.print(llvm::errs());
+    //     llvm::errs() << "\n";
+    //   }
+    //   llvm::errs() << "Done printing unaligned edges\n";
+
+    //   llvm::errs() << "Printing tagged edges: \n";
+    //   for (Value edge : taggedEdges) {
+    //     edge.print(llvm::errs());
+    //     llvm::errs() << "\n";
+    //   }
+    //   llvm::errs() << "Done printing tagged edges\n";
+    // }
+
     OpBuilder builder(ctx);
 
     Operation *fifo = addTagOperations(funcOp, builder, op, dirtyNodes,
@@ -165,7 +182,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo, numTags)))
       return failure();
 
-    if (failed(testNestedRegions(funcOp, builder, op)))
+    if (failed(testNestedRegions(funcOp, builder, op, fifo,
+                                 (extraTag + "_outer"))))
       return failure();
   }
   return success();
@@ -365,9 +383,6 @@ static LogicalResult addTagToValue(Value value, const std::string &extraTag,
 static LogicalResult addTagSignalsRecursive(
     OpOperand &opOperand, llvm::DenseSet<Operation *> &visited,
     const std::string &extraTag, Operation *fifo, int numTags) {
-  // Add the tag to the current operand
-  if (failed(addTagToValue(opOperand.get(), extraTag, numTags)))
-    return failure();
 
   Operation *op;
 
@@ -377,6 +392,16 @@ static LogicalResult addTagSignalsRecursive(
     // As long as the algorithm traverses inside the tagged region,
     // all operands should have an owner and defining operation.
     return failure();
+
+  if (isa<handshake::EndOp>(op))
+    return success();
+
+  // Add the tag to the current operand
+  if (failed(addTagToValue(opOperand.get(), extraTag, numTags)))
+    return failure();
+
+  if (isa<handshake::TaggerOp>(op))
+    llvm::errs() << "Tagged tagger\n";
 
   if (visited.contains(op))
     return success();
@@ -388,11 +413,15 @@ static LogicalResult addTagSignalsRecursive(
     // If this is the untagger corresponding to the current tagged region (by
     // identifying the fifo it feeds), then we stop traversal
     for (auto *user : untagger.getTagOut().getUsers()) {
+      // Case 1: Untagger directly feeds fifo
+      if (user == fifo)
+        return success();
+
+      // Case 2: Untagger feeds Join that feeds fifo
       if (JoinOp join = dyn_cast<handshake::JoinOp>(user)) {
         for (auto *user : join.getResult().getUsers()) {
-          if (user == fifo) {
+          if (user == fifo)
             return success();
-          }
         }
       }
     }
@@ -447,16 +476,21 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
   // A TaggerOp marks the beginning of the tagged region, so we use it as a
   // starting point for tagging
   for (auto taggerOp : funcOp.getOps<handshake::TaggerOp>()) {
-    visited.insert(taggerOp);
-    // For the speculator, perform downstream traversal to only dataOut,
-    // skipping control signals. The upstream dataIn will be handled by the
-    // recursive traversal.
+    // Check if this is a tagger corresponding to the current tagged region (by
+    // identifying the fifo it is fed by), then we start traversal
+    if (taggerOp.getTagOperand() ==
+        dyn_cast<FreeTagsFifoOp>(fifo).getTagOut()) {
+      visited.insert(taggerOp);
+      // For the speculator, perform downstream traversal to only dataOut,
+      // skipping control signals. The upstream dataIn will be handled by the
+      // recursive traversal.
 
-    Value taggerResult = taggerOp.getDataOut();
-    for (OpOperand &opOperand : taggerResult.getUses()) {
-      if (failed(addTagSignalsRecursive(opOperand, visited, extraTag, fifo,
-                                        numTags)))
-        return failure();
+      Value taggerResult = taggerOp.getDataOut();
+      for (OpOperand &opOperand : taggerResult.getUses()) {
+        if (failed(addTagSignalsRecursive(opOperand, visited, extraTag, fifo,
+                                          numTags)))
+          return failure();
+      }
     }
   }
 
@@ -466,7 +500,7 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
 // Nests the existing tagged region inside another tagged region
 static void tarverseNestedGraph(Operation *op, OpBuilder builder,
                                 llvm::DenseSet<Operation *> &visitedNodes,
-                                FreeTagsFifoOp &fifo,
+                                FreeTagsFifoOp &fifo, Operation *innerFifo,
                                 SmallVector<Value> &joinOperands) {
   // Skip Memory Control and End operations
   if (visitedNodes.find(op) != visitedNodes.end() ||
@@ -477,38 +511,58 @@ static void tarverseNestedGraph(Operation *op, OpBuilder builder,
 
   // feed the tagger from a new outer tagger
   if (TaggerOp tagger = dyn_cast<TaggerOp>(op)) {
-    Value edge = tagger.getDataOperand();
-    handshake::TaggerOp outerTagger = builder.create<handshake::TaggerOp>(
-        op->getLoc(), edge.getType(), edge, fifo.getTagOut());
-    edge.replaceAllUsesExcept(outerTagger.getDataOut(), outerTagger);
-    inheritBB(tagger, outerTagger);
-    visitedNodes.insert(outerTagger);
+    if (tagger.getTagOperand() ==
+        dyn_cast<FreeTagsFifoOp>(innerFifo).getTagOut()) {
+      Value edge = tagger.getDataOperand();
+      handshake::TaggerOp outerTagger = builder.create<handshake::TaggerOp>(
+          op->getLoc(), edge.getType(), edge, fifo.getTagOut());
+      edge.replaceAllUsesExcept(outerTagger.getDataOut(), outerTagger);
+      inheritBB(tagger, outerTagger);
+      visitedNodes.insert(outerTagger);
+    }
   }
 
   // feed the untagger into a new outer untagger
   if (UntaggerOp untagger = dyn_cast<UntaggerOp>(op)) {
-    Value edge = untagger.getDataOut();
-    handshake::UntaggerOp outerUntagger = builder.create<handshake::UntaggerOp>(
-        op->getLoc(), edge.getType(), fifo.getTagOut().getType(), edge);
-    edge.replaceAllUsesExcept(outerUntagger.getDataOut(), outerUntagger);
-    inheritBB(untagger, outerUntagger);
-    visitedNodes.insert(outerUntagger);
-    joinOperands.push_back(outerUntagger.getTagOut());
-    for (auto *user : outerUntagger.getDataOut().getUsers()) {
-      tarverseNestedGraph(user, builder, visitedNodes, fifo, joinOperands);
+    bool untaggerForRegion = false;
+    for (auto *user : untagger.getTagOut().getUsers()) {
+      if (user == innerFifo)
+        untaggerForRegion = true;
+      if (JoinOp join = dyn_cast<handshake::JoinOp>(user)) {
+        for (auto *user : join.getResult().getUsers()) {
+          if (user == innerFifo)
+            untaggerForRegion = true;
+        }
+      }
+    }
+    if (untaggerForRegion) {
+      Value edge = untagger.getDataOut();
+      handshake::UntaggerOp outerUntagger =
+          builder.create<handshake::UntaggerOp>(
+              op->getLoc(), edge.getType(), fifo.getTagOut().getType(), edge);
+      edge.replaceAllUsesExcept(outerUntagger.getDataOut(), outerUntagger);
+      inheritBB(untagger, outerUntagger);
+      visitedNodes.insert(outerUntagger);
+      joinOperands.push_back(outerUntagger.getTagOut());
+      for (auto *user : outerUntagger.getDataOut().getUsers()) {
+        tarverseNestedGraph(user, builder, visitedNodes, fifo, innerFifo,
+                            joinOperands);
+      }
     }
   }
 
   // Traverse the graph
   for (auto result : op->getResults()) {
     for (auto *user : result.getUsers()) {
-      tarverseNestedGraph(user, builder, visitedNodes, fifo, joinOperands);
+      tarverseNestedGraph(user, builder, visitedNodes, fifo, innerFifo,
+                          joinOperands);
     }
   }
 }
 
 LogicalResult OutOfOrderExecutionPass::testNestedRegions(
-    handshake::FuncOp funcOp, OpBuilder builder, Operation *outOfOrderOp) {
+    handshake::FuncOp funcOp, OpBuilder builder, Operation *outOfOrderOp,
+    Operation *innerFifo, const std::string &extraTag) {
   auto startValue = (Value)funcOp.getArguments().back();
   builder.setInsertionPoint(outOfOrderOp);
   auto tagType = builder.getIntegerType(ceil(log2(8)));
@@ -520,7 +574,8 @@ LogicalResult OutOfOrderExecutionPass::testNestedRegions(
   // Add the outer taggers+untaggers
   llvm::DenseSet<Operation *> visitedNodes;
   SmallVector<Value> joinOperands;
-  tarverseNestedGraph(outOfOrderOp, builder, visitedNodes, fifo, joinOperands);
+  tarverseNestedGraph(outOfOrderOp, builder, visitedNodes, fifo, innerFifo,
+                      joinOperands);
 
   if (joinOperands.size() > 1) {
     handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
@@ -532,7 +587,6 @@ LogicalResult OutOfOrderExecutionPass::testNestedRegions(
   }
 
   // Tag the chennels of the outer region
-  std::string extraTag = "tagOuter";
   if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo, 8)))
     return failure();
 
@@ -545,12 +599,13 @@ void OutOfOrderExecutionPass::runDynamaticPass() {
 
   for (auto funcOp : module.getOps<handshake::FuncOp>()) {
 
-    // if (failed(createOutOfExecutionGraph(funcOp, ctx)))
-    //   signalPassFailure();
-
     llvm::DenseMap<Operation *, int> outOfOrderNodes;
     for (auto loadOp : funcOp.getOps<handshake::LoadOp>()) {
       outOfOrderNodes.insert({loadOp, 4});
+    }
+
+    for (auto shli : funcOp.getOps<handshake::ShLIOp>()) {
+      outOfOrderNodes.insert({shli, 8});
     }
 
     if (failed(applyOutOfOrder(funcOp, ctx, outOfOrderNodes)))
