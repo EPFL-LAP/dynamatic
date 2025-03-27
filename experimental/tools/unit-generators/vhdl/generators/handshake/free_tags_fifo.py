@@ -1,7 +1,7 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 def generate_free_tags_fifo(name, params):
-  data_bitwidth = params["data_bitwidth"]
+  data_bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
   return _generate_free_tags_fifo(name, data_bitwidth, fifo_depth)
@@ -21,6 +21,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.types.all;
 
+-- Entity of free_tags_fifo
 entity {name} is 
 port (
         clk, rst      : in  std_logic;

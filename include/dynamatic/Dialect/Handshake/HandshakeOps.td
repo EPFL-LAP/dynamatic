@@ -559,7 +559,7 @@ def JoinOp : Handshake_Op<"join", [
 ]> {
   let summary = "join operation";
   let description = [{
-    A  synchronizer with a control-only(dateless) and .  Produces a valid output when all
+    A  synchronizer with a control-only(dateless) and data-loaded version.  Produces a valid output when all
     inputs become available.
 
     Example:

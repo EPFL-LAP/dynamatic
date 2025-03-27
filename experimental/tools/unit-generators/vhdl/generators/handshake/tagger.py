@@ -36,6 +36,7 @@ use work.types.all;
 use ieee.numeric_std.all;
 use IEEE.math_real.all;
 
+-- Entity of tagger
 entity {name} is
   port(
     clk, rst      : in  std_logic;
@@ -59,6 +60,7 @@ end {name};
 """
   
   architecture = f"""
+-- Architecture of tagger
 architecture arch of {name} is
   signal combined_valid : std_logic_vector(1 downto 0);
   signal combined_ready : std_logic_vector(1 downto 0);

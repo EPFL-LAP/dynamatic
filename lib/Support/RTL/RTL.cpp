@@ -348,14 +348,14 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.constant") {
+  } else if (modName == "handshake.constant" || modName == "handshake.free_tags_fifo") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
   } else if (modName == "handshake.control_merge") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (modName == "handshake.extsi" || modName == "handshake.trunci") {
+  } else if (modName == "handshake.extsi" || modName == "handshake.trunci" || modName == "handshake.extui") {
     serializedParams["INPUT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
@@ -404,14 +404,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getOutputType(0));
     serializedParams["TAG_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (modName == "handshake.free_tags_fifo") {
-    serializedParams["DATA_BITWIDTH"] =
-        getBitwidthString(modType.getOutputType(0));
-  } else if (modName == "handshake.extui") {
-    serializedParams["INPUT_BITWIDTH"] =
-        getBitwidthString(modType.getInputType(0));
-    serializedParams["OUTPUT_BITWIDTH"] =
-        getBitwidthString(modType.getOutputType(0));
   } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }

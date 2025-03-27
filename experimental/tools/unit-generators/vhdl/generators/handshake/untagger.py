@@ -30,6 +30,7 @@ use work.types.all;
 use ieee.numeric_std.all;
 use IEEE.math_real.all;
 
+-- Entity of untagger
 entity {name} is
 port(
   clk, rst      : in  std_logic;
@@ -53,6 +54,7 @@ end {name};
 """
   
   architecture = f"""
+-- Architecture of untagger
 architecture arch of {name} is
 begin
     outs_valid<= '1';
