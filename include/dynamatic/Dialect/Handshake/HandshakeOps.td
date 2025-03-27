@@ -555,23 +555,23 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
 ]> {
   let summary = "join operation";
   let description = [{
-    A control-only synchronizer.  Produces a valid output when all
+    A  synchronizer with a control-only(dateless) and data-loaded version.  Produces a valid output when all
     inputs become available.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.control
+    %0 = join %a, %b, %c : !handshake.channel<i32>
     ```
   }];
 
-  let arguments = (ins Variadic<ControlType>:$data);
-  let results = (outs ControlType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
+  let arguments = (ins Variadic<HandshakeType>:$data);
+  let results = (outs HandshakeType:$result);
+  let assemblyFormat = "$data attr-dict `:` custom<HandshakeType>(type($result))";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {

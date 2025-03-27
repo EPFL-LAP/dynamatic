@@ -82,6 +82,8 @@ architecture arch of {name} is
 begin
   join_inputs : entity work.{join_name}(arch)
     port map(
+      clk          => clk,
+      rst          => rst,
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
