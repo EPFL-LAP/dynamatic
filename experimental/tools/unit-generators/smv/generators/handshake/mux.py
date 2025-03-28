@@ -15,7 +15,7 @@ def generate_mux(name, params):
 
 def _generate_mux_dataless(name, size, select_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, index, index_valid, outs_ready)
+MODULE {name}(index, index_valid, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(tehb_ins_valid, outs_ready);
 
@@ -37,7 +37,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, index, index
 
 def _generate_mux(name, size, data_type, select_type):
   return f"""
-MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, index, index_valid, outs_ready)
+MODULE {name}(index, index_valid, {", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
   inner_tehb : {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
 
