@@ -116,7 +116,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       channel.props->minTrans = std::max(channel.props->minTrans, 1U);
     }
   }
-
+  
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
