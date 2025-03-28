@@ -43,17 +43,28 @@ Originally, the MILP result of `FPGA20Buffers` and `FPL22Buffers` produced timin
 
 The mapping is as follows:
 
+For `FPGA20Buffers`,
+
 ```
-1. For Opaque Buffers:
-When numslot = 1, map to ONE_SLOT_BREAK_DV.
-When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R.
-When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+1. If breaking DVR:
+When numslot = 1, map to ONE_SLOT_BREAK_DV;
+When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
 
-2. For Transparent Buffers:
-When numslot = 1, map to ONE_SLOT_BREAK_R.
+2. If breaking none:
+When numslot = 1, map to ONE_SLOT_BREAK_R;
 When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+```
 
-3. The previous steps result in the same buffer HDL modules as using timing attributes. This step optimizes area usage without affecting functionality:
-If the number of ONE_SLOT_BREAK_R exceeds 1, convert its additional slots into equivalent FIFO_BREAK_NONE slots. 
-Then, if both ONE_SLOT_BREAK_DV/FIFO_BREAK_DV and FIFO_BREAK_NONE are present, convert all FIFO_BREAK_NONE slots into equivalent FIFO_BREAK_DV slots.
+For `FPL22Buffers`,
+
+```
+1. If breaking DV:
+When numslot = 1, map to ONE_SLOT_BREAK_DV;
+When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
+
+2. If breaking R:
+When numslot = 1, map to ONE_SLOT_BREAK_R;
+When numslot > 1, map to (numslot - 1) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
 ```
