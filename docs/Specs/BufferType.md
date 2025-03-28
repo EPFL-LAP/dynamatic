@@ -59,12 +59,16 @@ When numslot > 1, map to numslot * FIFO_BREAK_NONE.
 For `FPL22Buffers`,
 
 ```
-1. If breaking DV:
+1. If breaking DV & R:
 When numslot = 1, map to ONE_SLOT_BREAK_DV;
 When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
+When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
 
-2. If breaking R:
+2. If only breaking DV:
+When numslot = 1, map to ONE_SLOT_BREAK_DV;
+When numslot > 1, map to (numslot - 1) * FIFO_BREAK_DV.
+
+3. If only breaking R:
 When numslot = 1, map to ONE_SLOT_BREAK_R;
-When numslot > 1, map to (numslot - 1) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+When numslot > 1, map to numslot * FIFO_BREAK_NONE.
 ```
