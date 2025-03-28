@@ -18,6 +18,7 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.memory_controller as memory_controller
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -140,6 +141,8 @@ def generate_code(name, mod_type, parameters):
       return trunci.generate_trunci(name, parameters)
     case "xori":
       return xori.generate_xori(name, parameters)
+    case "memory_controller":
+      return memory_controller.generate_memory_controller(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
