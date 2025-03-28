@@ -4,27 +4,28 @@ from generators.support.utils import *
 def generate_memory_controller(name, params):
   addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr_0"]) if "stAddr_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr_0"])
   data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"]) if "ldData_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["stData_0"])
+  ctrl_type = SmvScalarType(params[ATTR_PORT_TYPES]["ctrl_0"]) if "ctrl_0" in params[ATTR_PORT_TYPES].keys() else None
+
   num_loads = params["num_loads"]
   num_stores = params["num_stores"]
   num_controls = params["num_controls"]
 
   if num_loads == 0:
-    return _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type)
+    return _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type)
   elif num_stores == 0:
     return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type)
   else:
-    return _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type)
+    return _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type)
 
 
-def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type):
+def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type):
 
   # THE INTERFACE ORDER IS TOTALLY DIFFERENT FROM THE ONE IN lib/dialect/Handshake/HandshakeInterfaces.cpp L238
   memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
   control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
   store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
   store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
-  mc_in_ports = ", ".join(["loadData", "memStart"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
-
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
 
   p_valid_ports = [f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
   address_ports = [f"stAddr_{n}" for n in range(num_stores)]
@@ -39,18 +40,18 @@ MODULE {name}({mc_in_ports})
   VAR
   inner_arbiter : {name}__write_memory_arbiter({arbiter_args});
   inner_mc_control : {name}__mc_control({memory_control_ports[0]}, all_requests_done);
-  remainingStores : unsigned word [10];
+  remainingStores : {ctrl_type.smv_type};
 
   ASSIGN
-  init(remainingStores) := 0d10_0;
+  init(remainingStores) := {ctrl_type.format_constant(0)};
   next(remainingStores) := case
-    {"\n    ".join([f"ctrl_{n}_valid = TRUE : remainingStores + toint(ctrl_{n}) - stores_done;" for n in range(num_controls)])}
+    {"\n    ".join([f"ctrl_{n}_valid = TRUE : remainingStores + ctrl_{n} - stores_done;" for n in range(num_controls)])}
     TRUE : remainingStores - stores_done;
   esac;
 
   DEFINE
-  stores_done := storeEn ? 1 : 0;
-  all_requests_done := (remainingStores = 0) & {" & ".join([f"(ctrl_{n}_valid = FALSE)" for n in range(num_controls)])};
+  stores_done := storeEn ? {ctrl_type.format_constant(1)} : {ctrl_type.format_constant(0)};
+  all_requests_done := (remainingStores = {ctrl_type.format_constant(0)}) & {" & ".join([f"(ctrl_{n}_valid = FALSE)" for n in range(num_controls)])};
 
   // output
   DEFINE
@@ -89,7 +90,7 @@ def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type):
   memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
   load_address_ports = [f"ldAddr_{n}" for n in range(num_loads)] + [f"ldAddr_{n}_valid" for n in range(num_loads)]
   load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
-  mc_in_ports = ", ".join(["loadData", "memStart"] + load_address_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
 
   p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
   address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
@@ -129,14 +130,14 @@ MODULE {name}({mc_in_ports})
   {_generate_mc_control(f"{name}__mc_control")}
 """
 
-def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type):
+def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type):
   control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
   load_address_ports = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)]
   load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
   store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
   store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
-  mc_in_ports = ", ".join(["loadData", "memStart"] + control_ports + load_address_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
-  mc_loadless_in_ports = ", ".join(["loadData", "memStart"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
+  mc_loadless_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
 
   p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
   address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
@@ -172,19 +173,19 @@ MODULE {name}({mc_in_ports})
   
   -- stAddr_*_ready: ready signal for the store address ports. This signal 
   -- is derived from the arbiter s decision in inner_mc_loadless.
-  {"\n  ".join([f"stAddr_{n}_ready := inner_mc_loadless.ready_{n};" for n in range(num_stores)])}
+  {"\n  ".join([f"stAddr_{n}_ready := inner_mc_loadless.stAddr_{n}_ready;" for n in range(num_stores)])}
 
   -- stData_*_ready: ready signal for the store data ports. This signal
   -- is activated the same way as stAddr_*_ready.
-  {"\n  ".join([f"stData_{n}_ready := inner_mc_loadless.ready_{n};" for n in range(num_stores)])}
+  {"\n  ".join([f"stData_{n}_ready := inner_mc_loadless.stData_{n}_ready;" for n in range(num_stores)])}
 
   loadEn := inner_arbiter.read_enable;
   loadAddr := inner_arbiter.read_address;
-  storeEn := inner_mc_loadless.write_enable;
-  storeAddr := inner_mc_loadless.write_address;
-  storeData := inner_mc_loadless.data_to_memory;
+  storeEn := inner_mc_loadless.storeEn;
+  storeAddr := inner_mc_loadless.storeAddr;
+  storeData := inner_mc_loadless.storeData;
 
-  {_generate_mem_controller_loadless(f"{name}__mc_loadless", num_stores, num_controls, data_type, addr_type)}
+  {_generate_mem_controller_loadless(f"{name}__mc_loadless", num_stores, num_controls, data_type, addr_type, ctrl_type)}
   {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
 """
 
