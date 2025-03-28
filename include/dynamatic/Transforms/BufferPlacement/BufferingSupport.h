@@ -149,11 +149,6 @@ struct Channel {
   /// Returns a reference to the operation operand corresponding to the channel.
   OpOperand &getOperand() const;
 
-  /// Adds pre-existing buffers that may exist as part of the units the channel
-  /// connects to the channel's buffering properties. These are added to the
-  /// minimum numbers of transparent and opaque slots for the channel.
-  void addInternalBuffers(const TimingDatabase &timingDB);
-
   /// The lazily-loaded channel buffering properties cannot be safely copied, so
   /// neither can the channel.
   Channel(const Channel &) = delete;
@@ -176,14 +171,6 @@ struct PlacementResult {
   /// Whether opaque slots should be placed transparent slots for placement
   /// results that include both.
   bool opaqueBeforeTrans = true;
-
-  /// Removes pre-existing buffers that may exist as part of the units the
-  /// channel connects to from the placement results. These are deducted from
-  /// the numbers of transparent and opaque slots stored in the placement
-  /// results. The latter are expected to specify more slots than what is going
-  /// to be deducted.
-  void deductInternalBuffers(const Channel &channel,
-                             const TimingDatabase &timingDB);
 };
 
 /// Maps channels to buffer placement decisions.
