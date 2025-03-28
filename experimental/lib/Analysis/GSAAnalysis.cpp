@@ -102,7 +102,8 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
 
       // Analyze the function
       if (!functionsCovered) {
-        convertSSAToGSA(funcOp.getRegion());
+        inputOp = &funcOp.getRegion();
+        convertSSAToGSA(*inputOp);
         functionsCovered++;
       } else {
         llvm::errs() << "[GSA] Too many functions to handle in the module";
