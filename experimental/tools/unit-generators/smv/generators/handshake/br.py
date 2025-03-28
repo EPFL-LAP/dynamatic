@@ -14,7 +14,7 @@ def _generate_br_dataless(name):
   return f"""
 MODULE {name}(ins_valid, outs_ready)
 
-  // output
+  -- output
   DEFINE  
   outs_valid :=  ins_valid;
   ins_ready  :=  outs_ready;
@@ -25,7 +25,7 @@ def _generate_br(name, data_type):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
 
-  // output
+  -- output
   DEFINE
   outs := ins;
   outs_valid :=  ins_valid;

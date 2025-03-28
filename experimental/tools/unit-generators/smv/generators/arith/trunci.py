@@ -10,7 +10,7 @@ def generate_trunci(name, params):
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
-    return generate_abstract_binary_op(name, latency, output_type)
+    return generate_abstract_unary_op(name, latency, output_type)
   else:
     return _generate_trunci(name, latency, input_type, output_type)
 
