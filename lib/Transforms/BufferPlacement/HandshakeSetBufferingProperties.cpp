@@ -136,7 +136,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       }
     }
   }
-
+  
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);

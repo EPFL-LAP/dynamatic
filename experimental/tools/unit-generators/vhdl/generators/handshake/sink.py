@@ -1,6 +1,17 @@
+from generators.support.signal_manager import generate_signal_manager
+
+
 def generate_sink(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
+  if extra_signals:
+    return _generate_sink_signal_manager(name, bitwidth, extra_signals)
+  else:
+    return _generate_sink(name, bitwidth)
+
+
+def _generate_sink(name, bitwidth):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -27,3 +38,16 @@ end architecture;
 """
 
   return entity + architecture
+
+
+def _generate_sink_signal_manager(name, bitwidth, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_sink(name, bitwidth))
