@@ -95,7 +95,7 @@ struct FrontendState {
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -130,7 +130,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
 };
 
 struct CommandArguments {
@@ -195,7 +195,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state){};
+      : Command("exit", "Exits the Dynamatic frontend", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -203,7 +203,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state){};
+      : Command("help", "Displays this help message", state) {};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -251,6 +251,8 @@ public:
 
 class Compile : public Command {
 public:
+  static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
+      "fast-token-delivery";
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
 
@@ -265,6 +267,8 @@ public:
                "correctness), 'fpga20' (throughput-driven buffering), or "
                "'fpl22' (throughput- and timing-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
+    addFlag({FAST_TOKEN_DELIVERY,
+             "Use fast token delivery strategy to build the circuit"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -567,6 +571,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string fastTokenDelivery =
+      args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -588,8 +594,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath,
-                 sharing);
+                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
