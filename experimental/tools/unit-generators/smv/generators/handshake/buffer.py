@@ -6,13 +6,13 @@ from generators.support.oehb import generate_oehb
 
 
 def generate_buffer(name, params):
-  match_r = re.search(r"R:(\d+)", params[ATTR_TIMING])
+  match_r = re.search(r"R:(\d+)", params[ATTR_TIMING].replace(" ", ""))
   timing_r = False if not match_r else bool(int(match_r.group(1)))
-  match_d = re.search(r"D:(\d+)", params[ATTR_TIMING])
+  match_d = re.search(r"D:(\d+)", params[ATTR_TIMING].replace(" ", ""))
   timing_d = False if not match_d else bool(int(match_d.group(1)))
-  match_v = re.search(r"V:(\d+)", params[ATTR_TIMING])
+  match_v = re.search(r"V:(\d+)", params[ATTR_TIMING].replace(" ", ""))
   timing_v = False if not match_v else bool(int(match_v.group(1)))
-  transparent = not timing_r and (timing_d or timing_v)
+  transparent = timing_r
   slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
   mlir_data_type = params[ATTR_PORT_TYPES]["outs"]
 
