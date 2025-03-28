@@ -20,6 +20,9 @@ import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
+import generators.handshake.extui as extui
+import generators.handshake.shli as shli
+import generators.handshake.join as join
 
 
 def generate_code(name, mod_type, parameters):
@@ -60,6 +63,12 @@ def generate_code(name, mod_type, parameters):
       return trunci.generate_trunci(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
+    case "extui":
+      return extui.generate_extui(name, parameters)
+    case "shli":
+      return shli.generate_shli(name, parameters)
+    case "join":
+      return join.generate_join(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
