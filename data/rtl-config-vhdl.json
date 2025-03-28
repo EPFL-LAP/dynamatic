@@ -559,7 +559,7 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/merge.vhd",
     "module-name": "merge_dataless",
-    "dependencies": ["tehb_dataless"]
+    "dependencies": ["tehb_dataless", "merge_notehb_dataless"]
   },
   {
     "name": "handshake.merge",
