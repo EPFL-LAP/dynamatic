@@ -948,7 +948,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
+  // IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
@@ -1034,10 +1034,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
-  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  LacksSpecTag<"dataIn">,
-  HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">,
+  // AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  // LacksSpecTag<"dataIn">,
+  // HasValidSpecTag<"dataOut">,
+  // IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {

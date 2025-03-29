@@ -26,6 +26,7 @@ import generators.handshake.speculation.spec_commit as spec_commit
 import generators.handshake.speculation.spec_save_commit as spec_save_commit
 import generators.handshake.speculation.speculating_branch as speculating_branch
 import generators.handshake.speculation.speculator as speculator
+import generators.handshake.select as select
 import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi
@@ -75,6 +76,8 @@ def generate_code(name, mod_type, parameters):
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
     case "subf":

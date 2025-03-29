@@ -348,7 +348,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.spec_save_commit") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
-  } else if (modName == "handshake.cond_br") {
+  } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.constant") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
@@ -438,9 +438,10 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.cond_br" || modName == "handshake.constant" ||
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
-      modName == "handshake.muli" || modName == "handshake.shli" ||
-      modName == "handshake.sink" || modName == "handshake.subf" ||
-      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
+      modName == "handshake.muli" || modName == "handshake.select" ||
+      modName == "handshake.shli" || modName == "handshake.sink" ||
+      modName == "handshake.subf" || modName == "handshake.subi" ||
+      modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
