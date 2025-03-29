@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity dvr_dataless is 
+entity one_slot_break_dvr_dataless is 
   port (
     clk, rst : in std_logic;
     -- input channel
@@ -14,7 +14,7 @@ entity dvr_dataless is
   );
 end entity;
 
-architecture arch of dvr_dataless is
+architecture arch of one_slot_break_dvr_dataless is
 
   signal enable, stop : std_logic;
   signal outputValid, inputReady : std_logic;

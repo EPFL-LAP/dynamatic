@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity dvr is
+entity one_slot_break_dvr is
   generic (
     DATA_TYPE : integer
   );
@@ -19,12 +19,12 @@ entity dvr is
   );
 end entity;
 
-architecture arch of dvr is
+architecture arch of one_slot_break_dvr is
   signal enable, inputReady : std_logic;
   signal dataReg: std_logic_vector(DATA_TYPE - 1 downto 0);
 begin
 
-  control : entity work.dvr_dataless
+  control : entity work.one_slot_break_dvr_dataless
     port map(
       clk        => clk,
       rst        => rst,

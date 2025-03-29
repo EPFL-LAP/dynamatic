@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module dvr #(
+module one_slot_break_dvr #(
   parameter DATA_TYPE = 32
 ) (
   input  clk,
@@ -16,8 +16,8 @@ module dvr #(
   wire enable, inputReady;
   reg [DATA_TYPE - 1 : 0] dataReg = 0;
   
-  // Instance of dvr_dataless to manage handshaking
-  dvr_dataless control (
+  // Instance of one_slot_break_dvr_dataless to manage handshaking
+  one_slot_break_dvr_dataless control (
     .clk        (clk       ),
     .rst        (rst       ),
     .ins_valid  (ins_valid ),
