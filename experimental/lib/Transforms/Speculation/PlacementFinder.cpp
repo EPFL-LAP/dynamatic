@@ -55,6 +55,10 @@ static void markSpeculativePathsForSaves(Operation *currOp,
   // placed inside the speculation BB
   if (isa<handshake::ConditionalBranchOp>(currOp))
     return;
+  // if (isa<handshake::SpecCommitOp>(currOp) ||
+  //     isa<handshake::ControlMergeOp>(currOp) ||
+  //     isa<handshake::MuxOp>(currOp))
+  //   return;
 
   for (OpResult res : currOp->getResults()) {
     if (specValues.contains(res))
@@ -64,6 +68,17 @@ static void markSpeculativePathsForSaves(Operation *currOp,
       markSpeculativePathsForSaves(succOp, specValues);
     }
   }
+}
+
+static bool isGeneratedBySourceOp(Value value) {
+  Operation *defOp = value.getDefiningOp();
+  if (!defOp)
+    return false;
+  if (isa<handshake::SourceOp>(defOp))
+    return true;
+  return llvm::all_of(defOp->getOpOperands(), [&](OpOperand &operand) {
+    return isGeneratedBySourceOp(operand.get());
+  });
 }
 
 // Save units are needed where speculative tokens can interact with
@@ -88,6 +103,10 @@ LogicalResult PlacementFinder::findSavePositions() {
   }
 
   for (Operation *blockOp : handshakeBlocks.blocks[specBB.value()]) {
+    // if (isa<handshake::ControlMergeOp>(blockOp) ||
+    //     isa<handshake::MuxOp>(blockOp))
+    //   continue;
+
     // Create a save if an operation has both spec and non-spec operands
     bool hasNonSpecInput = false;
     bool hasSpecInput = false;
@@ -103,12 +122,14 @@ LogicalResult PlacementFinder::findSavePositions() {
         // Create a Save for every non-speculative operand
         if (!specValues.contains(operand.get())) {
           // No save needed in front of Source Operations
-          if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
+          if (isGeneratedBySourceOp(operand.get()))
             continue;
 
           // tmp
-          if (isa<handshake::StoreOp>(operand.getOwner()))
+          if (isa<handshake::StoreOp>(operand.getOwner())) {
+            operand.getOwner()->dump();
             continue;
+          }
 
           placements.addSave(operand);
         }
@@ -376,8 +397,8 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  return failure(failed(findSavePositions()) || failed(findCommitPositions()));
-  // return failure(failed(findSavePositions()) || failed(findCommitPositions())
-  // ||
-  //                failed(findSaveCommitPositions()));
+  // return failure(failed(findSavePositions()) ||
+  // failed(findCommitPositions()));
+  return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
+                 failed(findSaveCommitPositions()));
 }
