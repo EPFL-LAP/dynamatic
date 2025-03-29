@@ -1,4 +1,5 @@
 `timescale 1ns/1ps
+`define WRAP_AROUND(value, limit) ((value + 1 == limit) ? 0 : value + 1)
 module elastic_fifo_inner_dataless #(
   parameter NUM_SLOTS = 4
 )(
@@ -12,7 +13,7 @@ module elastic_fifo_inner_dataless #(
 );
   wire ReadEn, WriteEn;
   reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
-  reg Full = 0, Empty = 0, fifo_valid;
+  reg Full = 0, Empty = 1;
 
   // Ready if there is space in the FIFO
   assign ins_ready = ~Full | outs_ready;
@@ -22,24 +23,13 @@ module elastic_fifo_inner_dataless #(
   assign outs_valid = ~Empty;
   assign WriteEn = ins_valid & (~Full | outs_ready);
 
-  // Update FIFO valid
-  always @(posedge clk) begin
-    if (rst) begin
-      fifo_valid <= 0;
-    end else if (ReadEn) begin
-      fifo_valid <= 1;
-    end else if (outs_ready) begin
-      fifo_valid <= 0;
-    end
-  end
-
   // Update Tail
   always @(posedge clk) begin
     if (rst) begin
       Tail <= 0;
     end else begin
       if (WriteEn) begin
-        Tail <= (Tail + 1) % NUM_SLOTS;
+        Tail <= (Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1;
       end
     end  
   end
@@ -50,7 +40,7 @@ module elastic_fifo_inner_dataless #(
       Head <= 0;
     end else begin
       if (ReadEn) begin
-        Head <= (Head + 1) % NUM_SLOTS;
+        Head <= (Head + 1 == NUM_SLOTS) ? 0 : Head + 1;
       end
     end 
   end
@@ -63,7 +53,7 @@ module elastic_fifo_inner_dataless #(
       // If only filling but not emptying
       if (WriteEn & ~ReadEn) begin
         // If new tail index will reach head index
-        if ((Tail + 1) % NUM_SLOTS == Head) begin
+        if (((Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1) == Head) begin
           Full <= 1;
         end
       end else if (~WriteEn & ReadEn) begin
@@ -80,7 +70,7 @@ module elastic_fifo_inner_dataless #(
     end else begin
       // If only emptying but not filling
       if (~WriteEn & ReadEn) begin
-        if ((Head + 1) % NUM_SLOTS == Tail) begin
+        if (((Head + 1 == NUM_SLOTS) ? 0 : Head + 1) == Tail) begin
           Empty <= 1;
         end
       end else if (WriteEn & ~ReadEn) begin
