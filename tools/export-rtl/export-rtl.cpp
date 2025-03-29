@@ -1217,7 +1217,7 @@ void SMVWriter::writeTriggerEquivalence(WriteModData &data,
                                      PairSet &s) {
     if (res.getDefiningOp() != nullptr)
       for (auto otherRes : res.getDefiningOp()->getResults()) {
-        if (otherRes != res) {
+        if (otherRes != res && !isa<IntegerType>(otherRes.getType())) {
           std::string secondSignal =
               data.getSignalNameFunc()(otherRes).str() + VALID_SUFFIX.str();
           s.insert({firstSignal, secondSignal});
@@ -1240,6 +1240,9 @@ void SMVWriter::writeTriggerEquivalence(WriteModData &data,
 
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
     for (auto res : instOp.getResults()) {
+      if (isa<IntegerType>(res.getType()))
+        continue;
+
       std::string validSignalName =
           data.getSignalNameFunc()(res).str() + VALID_SUFFIX.str();
       addPossiblyEquivalentSignals(validSignalName, res, radius, eqSignals);
@@ -1257,6 +1260,8 @@ void SMVWriter::writeTriggerEquivalence(WriteModData &data,
 void SMVWriter::writeAbsenceOfBackPressure(WriteModData &data) const {
   for (hw::InstanceOp instOp : data.modOp.getOps<hw::InstanceOp>()) {
     for (auto res : instOp.getResults()) {
+      if (isa<IntegerType>(res.getType()))
+        continue;
       std::string validSignalName =
           data.getSignalNameFunc()(res).str() + VALID_SUFFIX.str();
       std::string readySignalName;
