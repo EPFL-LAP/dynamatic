@@ -31,6 +31,7 @@ entity {name} is
 
     predict_ins : in std_logic_vector({bitwidth} - 1 downto 0);
     predict_ins_valid : in std_logic;
+    predict_ins_spec : in std_logic_vector(0 downto 0);
     predict_ins_ready : out std_logic;
 
     fifo_ins : in std_logic_vector({bitwidth} - 1 downto 0);
@@ -55,7 +56,7 @@ end entity;
 -- Architecture of specgenCore
 architecture arch of {name} is
 
-type State_type is (PASS, SPEC, NO_CMP, CMP_CORRECT, CMP_WRONG, KILL1, KILL2, KILL3, KILL_SPEC);
+type State_type is (PASS, SPEC, NO_CMP, CMP_CORRECT, CMP_WRONG, KILL);
 type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
 signal State : State_type;
 
@@ -118,14 +119,8 @@ process(State)
                 StateInternal <= "0011";
             when CMP_WRONG => -- 4
                 StateInternal <= "0100";
-            when KILL1 => -- 5
+            when KILL => -- 5
                 StateInternal <= "0101";
-            when KILL2 => -- 6
-                StateInternal <= "0110";
-            when KILL3 => -- 7
-                StateInternal <= "0111";
-            when KILL_SPEC => -- 8
-                StateInternal <= "1000";
 
         end case;
 
@@ -148,7 +143,7 @@ state_proc : process (clk)
                         elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '0') then
                             State <= CMP_WRONG;
                         elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '1') then
-                            State <= KILL1;
+                            State <= KILL;
                         end if;
                     when SPEC =>
                         if (ControlnR = '1') then
@@ -164,38 +159,14 @@ state_proc : process (clk)
                         end if;
                     when CMP_WRONG =>
                         if (ControlnR = '1') then
-                            State <= KILL1;
+                            State <= KILL;
                         end if;
-                    when KILL1 =>
-                        if (DatapV = '1' and ins_spec = "0") then
-                            if (FifoNotEmpty = '0') then
-                                State <= PASS;
-                            else
-                                State <= KILL2;
-                            end if;
-                        elsif (FifoNotEmpty = '0') then
-                            State <= KILL3;
-                        end if;
+                    when KILL =>
+                        if (FifoNotEmpty = '0' and -- Killed all data in FIFO
+                            DatapV = '1' and ins_spec = "0" and -- Killed incoming spec data
+                            PredictpV = '1' and predict_ins_spec = "0") -- Killed incoming spec trigger
+                            then
 
-                    when KILL2 =>
-                        if (FifoNotEmpty = '0') then
-                            State <= PASS;
-                        end if;
-
-                    when KILL3 =>
-                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = "1")) and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
-                            State <= KILL_SPEC;
-                        elsif (DatapV = '1' and ins_spec = "0" and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
-                            State <= SPEC;
-                        elsif (DatapV = '1' and ins_spec = "0") then
-                            State <= PASS;
-                        end if;
-                    when KILL_SPEC =>
-                        if ((DatapV = '0' or (DatapV = '1' and ins_spec = "1")) and ControlnR = '1') then
-                            State <= KILL3;
-                        elsif (DatapV = '1' and ins_spec = "0" and ControlnR = '0') then
-                            State <= SPEC;
-                        elsif (DatapV = '1' and ins_spec = "0" and ControlnR = '1') then
                             State <= PASS;
                         end if;
                 end case;
@@ -204,7 +175,7 @@ state_proc : process (clk)
 
     end process;
 
-output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
+output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
     begin
 
         outs <= ins;
@@ -247,6 +218,7 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                     ControlV <= '1';
                     ControlInternal <= CONTROL_CMP_CORRECT;
                 elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins) then
+                    PredictR <= '0';
                     ControlV <= '1';
                     ControlInternal <= CONTROL_RESEND;
                     outs <= ins;
@@ -300,47 +272,22 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, DatapV, Pred
                 outs <= ins;
                 outs_spec <= "0";
 
-            when KILL1 =>
-                DataR <= DatapV and ins_spec(0);
+            when KILL =>
+                -- Connect FIFO with Control
                 FifoR <= ControlnR;
-                PredictR<= '0';
                 ControlV <= FifoNotEmpty;
-                FifoV <= '0';
 
+                -- Emit kill signal
                 ControlInternal <= CONTROL_KILL;
 
-            when KILL2 =>
-                DataR <= '0';
-                FifoR <= ControlnR;
-                PredictR<= '0';
-                ControlV <= FifoNotEmpty;
+                -- Accepts spec trigger to kill it
+                PredictR <= predict_ins_spec(0);
+
+                -- Accepts spec data to kill it
+                DataR <= ins_spec(0);
+
+                -- Never pushes new data to fifo
                 FifoV <= '0';
-
-                ControlInternal <= CONTROL_KILL;
-
-            when KILL3 =>
-                DataR <= DatapV and ins_spec(0);
-                PredictR <= ControlnR;
-                FifoR <= '0';
-                ControlV <= PredictpV and FifoNotFull;
-                FifoV <= PredictpV;
-
-                ControlInternal <= CONTROL_SPEC;
-
-                outs <= predict_ins;
-                outs_spec <= "1";
-
-            when KILL_SPEC =>
-                DataR <= DatapV and ins_spec(0);
-                PredictR <= ControlnR;
-                FifoR <= '0';
-                ControlV <= '1';
-                FifoV <= '0';
-
-                ControlInternal <= CONTROL_SPEC;
-
-                outs <= predict_ins;
-                outs_spec <= "1";
 
         end case;
 
@@ -655,6 +602,7 @@ entity {name} is
     clk, rst     : in  std_logic;
 
     trigger_valid : in std_logic;
+    trigger_spec : in std_logic_vector(0 downto 0);
     trigger_ready : out std_logic;
 
     data_in      : in std_logic_vector({bitwidth} - 1 downto 0);
@@ -663,6 +611,10 @@ entity {name} is
 
     data_out     : out std_logic_vector({bitwidth} - 1 downto 0);
     data_out_valid : out std_logic;
+
+    -- Whether the data is triggered by spec trigger or not
+    data_out_spec : out std_logic_vector(0 downto 0);
+
     data_out_ready : in std_logic
   );
 end entity;
@@ -678,27 +630,30 @@ begin
 
     zeros <= (others => '0');
 
-    --predicted value is 1 by default and updated to the latest real value
+    -- Predicted value is 1 by default and updated to the latest real value
     process(clk, rst) is
-          begin
-           if (rst = '1') then
-
-            data_reg <= zeros & '1';
-
-            elsif (rising_edge(clk)) then
-                if (data_in_valid = '1') then
-                    data_reg <= data_in;
-                end if;
-            end if;
+    begin
+      if (rst = '1') then
+        data_reg <= zeros & '1';
+        data_out <= zeros & '1';
+      elsif (rising_edge(clk)) then
+        if (data_in_valid = '1') then
+          data_reg <= data_in;
+        end if;
+        if (data_out_ready = '1' and trigger_valid = '1') then
+          -- After handshaking, data_out updates and holds its value until the
+          -- next handshaking, ensuring stability while valid is high.
+          data_out <= data_reg;
+        end if;
+      end if;
     end process;
 
-    trigger_ready <= data_out_ready;
-    data_in_ready <= data_out_ready;
+    data_in_ready <= '1';
 
-    -- Predictor output valid if triggered
-    -- data_out <= data_reg;
-    data_out <= zeros & '1';
     data_out_valid <= trigger_valid;
+    trigger_ready <= data_out_ready;
+
+    data_out_spec <= trigger_spec;
 end architecture;
 """
 
@@ -972,6 +927,7 @@ signal fork_data_outs_ready : std_logic_vector(1 downto 0);
 
 signal predictor_data_out : std_logic_vector({bitwidth} - 1 downto 0);
 signal predictor_data_out_valid : std_logic;
+signal predictor_data_out_spec : std_logic_vector(0 downto 0);
 signal predictor_data_out_ready : std_logic;
 
 signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
@@ -1018,6 +974,7 @@ spengenCore0: entity work.{specGen_name}(arch)
 
     predict_ins => predictor_data_out,
     predict_ins_valid => predictor_data_out_valid,
+    predict_ins_spec => predictor_data_out_spec,
     predict_ins_ready => predictor_data_out_ready,
 
     fifo_ins => predFifo_data_out,
@@ -1042,6 +999,7 @@ predictor0: entity work.{predictor_name}(arch)
     rst => rst,
 
     trigger_valid => trigger_valid,
+    trigger_spec => trigger_spec,
     trigger_ready => trigger_ready,
 
     data_in => fork_data_outs(1),
@@ -1050,6 +1008,7 @@ predictor0: entity work.{predictor_name}(arch)
 
     data_out => predictor_data_out,
     data_out_valid => predictor_data_out_valid,
+    data_out_spec => predictor_data_out_spec,
     data_out_ready => predictor_data_out_ready
   );
 
