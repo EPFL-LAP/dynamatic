@@ -55,172 +55,164 @@ end entity;
   architecture = f"""
 -- Architecture of specgenCore
 architecture arch of {name} is
+  type State_type is (IDLE, KILL);
+  type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
+  signal State : State_type;
 
-type State_type is (IDLE, KILL);
-type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
-signal State : State_type;
+  signal DatapV : std_logic;
+  signal PredictpV : std_logic;
+  signal FifoNotEmpty : std_logic;
+  signal ControlnR : std_logic;
+  signal FifoNotFull : std_logic;
 
-signal DatapV : std_logic;
-signal PredictpV : std_logic;
-signal FifoNotEmpty : std_logic;
-signal ControlnR : std_logic;
-signal FifoNotFull : std_logic;
+  signal DataR : std_logic;
+  signal PredictR : std_logic;
+  signal FifoR : std_logic;
+  signal ControlV : std_logic;
+  signal FifoV : std_logic;
 
-signal DataR : std_logic;
-signal PredictR : std_logic;
-signal FifoR : std_logic;
-signal ControlV : std_logic;
-signal FifoV : std_logic;
-
-signal ControlInternal : Control_type;
-
+  signal ControlInternal : Control_type;
 begin
-    DatapV <= ins_valid;
-    PredictpV <= predict_ins_valid;
-    FifoNotEmpty <= fifo_ins_valid;
-    ControlnR <= control_outs_ready;
-    FifoNotFull <= fifo_outs_ready;
+  DatapV <= ins_valid;
+  PredictpV <= predict_ins_valid;
+  FifoNotEmpty <= fifo_ins_valid;
+  ControlnR <= control_outs_ready;
+  FifoNotFull <= fifo_outs_ready;
 
-    ins_ready <= DataR;
-    predict_ins_ready <= PredictR;
-    fifo_ins_ready <= FifoR;
-    control_outs_valid <= ControlV;
-    fifo_outs_valid <= FifoV;
+  ins_ready <= DataR;
+  predict_ins_ready <= PredictR;
+  fifo_ins_ready <= FifoR;
+  control_outs_valid <= ControlV;
+  fifo_outs_valid <= FifoV;
 
-process(ControlInternal)
-    begin
-        case ControlInternal is
-            when CONTROL_SPEC =>
-                control_outs <= "000";
-            when CONTROL_NO_CMP =>
-                control_outs <= "001";
-            when CONTROL_CMP_CORRECT =>
-                control_outs <= "010";
-            when CONTROL_RESEND =>
-                control_outs <= "011";
-            when CONTROL_KILL =>
-                control_outs <= "100";
-            when CONTROL_CORRECT_SPEC =>
-                control_outs <= "101";
-        end case;
-    end process;
+  process (ControlInternal)
+  begin
+    case ControlInternal is
+      when CONTROL_SPEC =>
+        control_outs <= "000";
+      when CONTROL_NO_CMP =>
+        control_outs <= "001";
+      when CONTROL_CMP_CORRECT =>
+        control_outs <= "010";
+      when CONTROL_RESEND =>
+        control_outs <= "011";
+      when CONTROL_KILL =>
+        control_outs <= "100";
+      when CONTROL_CORRECT_SPEC =>
+        control_outs <= "101";
+    end case;
+  end process;
 
-state_proc : process (clk)
-    begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                State <= IDLE;
-            else
-                case State is
-                    when IDLE =>
-                        if (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '1') then
-                            State <= KILL;
-                        end if;
-                    when KILL =>
-                        if (FifoNotEmpty = '0' and -- Killed all data in FIFO
-                            DatapV = '1' and ins_spec = "0" and -- Killed incoming spec data
-                            PredictpV = '1' and predict_ins_spec = "0") -- Killed incoming spec trigger
-                            then
-
-                            State <= IDLE;
-                        end if;
-                end case;
-            end if;
-        end if;
-
-    end process;
-
-output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
-    begin
-
-        outs <= ins;
-        outs_spec <= "0";
-        fifo_outs <= predict_ins;
-        ControlInternal <= CONTROL_SPEC;
-
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        State <= IDLE;
+      else
         case State is
-            when IDLE =>
-                if (DatapV = '0' and PredictpV = '1' and FifoNotFull = '1') then
-                    DataR <= ControlnR;
-                    PredictR <= ControlnR;
-                    FifoV <= ControlnR;
-                    FifoR <= '0';
+          when IDLE =>
+            if (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '1') then
+              State <= KILL;
+            end if;
+          when KILL =>
+            if (FifoNotEmpty = '0' and -- Killed all data in FIFO
+                DatapV = '1' and ins_spec = "0" and -- Killed incoming spec data
+                PredictpV = '1' and predict_ins_spec = "0") -- Killed incoming spec trigger
+                then
 
-                    ControlV <= '1';
-                    ControlInternal <= CONTROL_SPEC;
-                    outs <= predict_ins;
-                    outs_spec <= "1";
-                elsif (DatapV = '1' and FifoNotEmpty = '0') then
-                    -- TODO: Assert PredictpV = '1'?
-
-                    DataR <= ControlnR;
-                    PredictR <= ControlnR;
-
-                    FifoV <= '0';
-                    FifoR <= '0';
-
-                    ControlV <= '1';
-                    ControlInternal <= CONTROL_NO_CMP;
-                    outs <= ins;
-                    outs_spec <= "0";
-                elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
-                    DataR <= ControlnR;
-                    PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
-
-                    ControlV <= '1';
-                    ControlInternal <= CONTROL_CORRECT_SPEC;
-                    outs <= predict_ins;
-                    outs_spec <= "1";
-                    FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
-                    FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
-                elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
-                    DataR <= ControlnR;
-                    -- TODO: Not Specifying PredictR <= '0' is buggy?
-                    PredictR <= FifoNotFull and ControlnR;
-                    FifoR <= ControlnR;
-
-                    FifoV <= '0';
-
-                    ControlV <= '1';
-                    ControlInternal <= CONTROL_CMP_CORRECT;
-                elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins) then
-                    DataR <= ControlnR;
-                    PredictR <= '0';
-                    FifoV <= '0';
-                    FifoR <= '0';
-                    ControlV <= '1';
-                    ControlInternal <= CONTROL_RESEND;
-                    outs <= ins;
-                    outs_spec <= "0";
-                else
-                    DataR <= ControlnR; -- TODO: '0'?
-                    PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
-                    ControlV <= '0';
-                    FifoR <= '0';
-                    FifoV <= '0';
-                end if;
-
-            when KILL =>
-                -- Connect FIFO with Control
-                FifoR <= ControlnR;
-                ControlV <= FifoNotEmpty;
-
-                -- Emit kill signal
-                ControlInternal <= CONTROL_KILL;
-
-                -- Accepts spec trigger to kill it
-                PredictR <= predict_ins_spec(0);
-
-                -- Accepts spec data to kill it
-                DataR <= ins_spec(0);
-
-                -- Never pushes new data to fifo
-                FifoV <= '0';
-
+              State <= IDLE;
+            end if;
         end case;
+      end if;
+    end if;
+  end process;
 
-    end process;
+  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
+  begin
+    outs <= ins;
+    outs_spec <= "0";
+    fifo_outs <= predict_ins;
+    ControlInternal <= CONTROL_SPEC;
 
+    case State is
+      when IDLE =>
+        if (DatapV = '0' and PredictpV = '1' and FifoNotFull = '1') then
+          DataR <= ControlnR;
+          PredictR <= ControlnR;
+          FifoV <= ControlnR;
+          FifoR <= '0';
+
+          ControlV <= '1';
+          ControlInternal <= CONTROL_SPEC;
+          outs <= predict_ins;
+          outs_spec <= "1";
+        elsif (DatapV = '1' and FifoNotEmpty = '0') then
+          -- TODO: Assert PredictpV = '1'?
+
+          DataR <= ControlnR;
+          PredictR <= ControlnR;
+
+          FifoV <= '0';
+          FifoR <= '0';
+
+          ControlV <= '1';
+          ControlInternal <= CONTROL_NO_CMP;
+          outs <= ins;
+          outs_spec <= "0";
+        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+          DataR <= ControlnR;
+          PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
+
+          ControlV <= '1';
+          ControlInternal <= CONTROL_CORRECT_SPEC;
+          outs <= predict_ins;
+          outs_spec <= "1";
+          FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
+          FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
+        elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
+          DataR <= ControlnR;
+          -- TODO: Not Specifying PredictR <= '0' is buggy?
+          PredictR <= FifoNotFull and ControlnR;
+          FifoR <= ControlnR;
+
+          FifoV <= '0';
+
+          ControlV <= '1';
+          ControlInternal <= CONTROL_CMP_CORRECT;
+        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins) then
+          DataR <= ControlnR;
+          PredictR <= '0';
+          FifoV <= '0';
+          FifoR <= '0';
+          ControlV <= '1';
+          ControlInternal <= CONTROL_RESEND;
+          outs <= ins;
+          outs_spec <= "0";
+        else
+          DataR <= ControlnR; -- TODO: '0'?
+          PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
+          ControlV <= '0';
+          FifoR <= '0';
+          FifoV <= '0';
+        end if;
+      when KILL =>
+        -- Connect FIFO with Control
+        FifoR <= ControlnR;
+        ControlV <= FifoNotEmpty;
+
+        -- Emit kill signal
+        ControlInternal <= CONTROL_KILL;
+
+        -- Accepts spec trigger to kill it
+        PredictR <= predict_ins_spec(0);
+
+        -- Accepts spec data to kill it
+        DataR <= ins_spec(0);
+
+        -- Never pushes new data to fifo
+        FifoV <= '0';
+    end case;
+  end process;
 end architecture;
 """
 
@@ -250,36 +242,34 @@ end entity;
   architecture = f"""
 -- Architecture of decodeSave
 architecture arch of {name} is
-
 begin
-    process (control_in, control_in_valid, control_out_ready)
-    begin
-        if (control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
-            control_in_ready <= control_out_ready;
-        else
-            control_in_ready <= '1';
-        end if;
+  process (control_in, control_in_valid, control_out_ready)
+  begin
+    if (control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
+      control_in_ready <= control_out_ready;
+    else
+      control_in_ready <= '1';
+    end if;
 
-        control_out_valid <= '0';
+    control_out_valid <= '0';
+    control_out(0) <= '0';
+
+    if (control_in_valid = '1') then
+      if control_in = "001" then -- no cmp
+        control_out_valid <= '1';
+        control_out(0) <= '1';
+      elsif control_in = "010" then -- cmp correct
+        control_out_valid <= '1';
+        control_out(0) <= '1';
+      elsif control_in = "101" then -- correct-spec
+        control_out_valid <= '1';
+        control_out(0) <= '1';
+      elsif control_in = "011" then --cmp wrong
+        control_out_valid <= '1';
         control_out(0) <= '0';
-
-        if (control_in_valid = '1') then
-            if control_in = "001" then -- no cmp
-                control_out_valid <= '1';
-                control_out(0) <= '1';
-            elsif control_in = "010" then -- cmp correct
-                control_out_valid <= '1';
-                control_out(0) <= '1';
-            elsif control_in = "101" then -- correct-spec
-                control_out_valid <= '1';
-                control_out(0) <= '1';
-            elsif control_in = "011" then --cmp wrong
-                control_out_valid <= '1';
-                control_out(0) <= '0';
-            end if;
-        end if;
-
-    end process;
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -310,31 +300,30 @@ end entity;
 -- Architecture of decodeCommit
 architecture arch of {name} is
 begin
-    process (control_in, control_in_valid, control_out_ready)
-    begin
-        if (control_in = "010" or control_in = "100" or control_in = "101") then
-            control_in_ready <= control_out_ready;
-        else
-            control_in_ready <= '1';
-        end if;
+  process (control_in, control_in_valid, control_out_ready)
+  begin
+    if (control_in = "010" or control_in = "100" or control_in = "101") then
+      control_in_ready <= control_out_ready;
+    else
+      control_in_ready <= '1';
+    end if;
 
-        control_out_valid <= '0';
+    control_out_valid <= '0';
+    control_out(0) <= '0';
+
+    if (control_in_valid = '1') then
+      if control_in = "010" then -- cmp correct
+        control_out_valid <= '1';
         control_out(0) <= '0';
-
-        if (control_in_valid = '1') then
-            if control_in = "010" then -- cmp correct
-                control_out_valid <= '1';
-                control_out(0) <= '0';
-            elsif control_in = "101" then -- correct-spec
-                control_out_valid <= '1';
-                control_out(0) <= '0';
-            elsif control_in = "100" then -- cmp wrong
-                control_out_valid <= '1';
-                control_out(0) <= '1';
-            end if;
-        end if;
-
-    end process;
+      elsif control_in = "101" then -- correct-spec
+        control_out_valid <= '1';
+        control_out(0) <= '0';
+      elsif control_in = "100" then -- cmp wrong
+        control_out_valid <= '1';
+        control_out(0) <= '1';
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -365,31 +354,30 @@ end entity;
 -- Architecture of decodeBranch
 architecture arch of {name} is
 begin
-    process (control_in, control_in_valid, control_out_ready)
-    begin
-        if (control_in = "010" or control_in = "100" or control_in = "101") then
-            control_in_ready <= control_out_ready;
-        else
-            control_in_ready <= '1';
-        end if;
+  process (control_in, control_in_valid, control_out_ready)
+  begin
+    if (control_in = "010" or control_in = "100" or control_in = "101") then
+      control_in_ready <= control_out_ready;
+    else
+      control_in_ready <= '1';
+    end if;
 
-        control_out_valid <= '0';
+    control_out_valid <= '0';
+    control_out(0) <= '0';
+
+    if (control_in_valid = '1') then
+      if control_in = "010" then -- cmp correct
+        control_out_valid <= '1';
         control_out(0) <= '0';
-
-        if (control_in_valid = '1') then
-            if control_in = "010" then -- cmp correct
-                control_out_valid <= '1';
-                control_out(0) <= '0';
-            elsif control_in = "101" then -- correct-spec
-                control_out_valid <= '1';
-                control_out(0) <= '0';
-            elsif control_in = "100" then --cmp wrong
-                control_out_valid <= '1';
-                control_out(0) <= '1';
-            end if;
-        end if;
-
-    end process;
+      elsif control_in = "101" then -- correct-spec
+        control_out_valid <= '1';
+        control_out(0) <= '0';
+      elsif control_in = "100" then --cmp wrong
+        control_out_valid <= '1';
+        control_out(0) <= '1';
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -424,42 +412,41 @@ end entity;
 -- Architecture of decodeSC
 architecture arch of {name} is
 begin
-    process (control_in, control_in_valid, control_out0_ready, control_out1_ready)
-    begin
-        if (control_in = "000" or control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
-            control_in_ready <= control_out0_ready;
-        else
-            control_in_ready <= control_out1_ready;
-        end if;
+  process (control_in, control_in_valid, control_out0_ready, control_out1_ready)
+  begin
+    if (control_in = "000" or control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
+      control_in_ready <= control_out0_ready;
+    else
+      control_in_ready <= control_out1_ready;
+    end if;
 
-        control_out0_valid <= '0';
-        control_out1_valid <= '0';
+    control_out0_valid <= '0';
+    control_out1_valid <= '0';
+    control_out0 <= "000";
+    control_out1 <= "000";
+
+    if (control_in_valid = '1') then
+      if control_in = "000" then -- spec
+        control_out0_valid <= '1';
         control_out0 <= "000";
-        control_out1 <= "000";
-
-        if (control_in_valid = '1') then
-            if control_in = "000" then -- spec
-                control_out0_valid <= '1';
-                control_out0 <= "000";
-            elsif control_in = "001" then -- no cmp
-                control_out0_valid <= '1';
-                control_out0 <= "100";
-            elsif control_in = "010" then -- cmp correct
-                control_out0_valid <= '1';
-                control_out0 <= "001";
-            elsif control_in = "101" then -- correct-spec
-                control_out0_valid <= '1';
-                control_out0 <= "011";
-            elsif control_in = "011" then -- cmp wrong resend
-                control_out0_valid <= '1';
-                control_out0 <= "010";
-            elsif control_in = "100" then -- cmp wrong kill
-                control_out1_valid <= '1';
-                control_out1 <= "001";
-            end if;
-        end if;
-
-    end process;
+      elsif control_in = "001" then -- no cmp
+        control_out0_valid <= '1';
+        control_out0 <= "100";
+      elsif control_in = "010" then -- cmp correct
+        control_out0_valid <= '1';
+        control_out0 <= "001";
+      elsif control_in = "101" then -- correct-spec
+        control_out0_valid <= '1';
+        control_out0 <= "011";
+      elsif control_in = "011" then -- cmp wrong resend
+        control_out0_valid <= '1';
+        control_out0 <= "010";
+      elsif control_in = "100" then -- cmp wrong kill
+        control_out1_valid <= '1';
+        control_out1 <= "001";
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -489,29 +476,28 @@ end entity;
 -- Architecture of decodeOutput
 architecture arch of {name} is
 begin
-    process (control_in, control_in_valid, out_ready)
-    begin
-        if (control_in = "000" or control_in = "001" or control_in = "011" or control_in = "101") then
-            control_in_ready <= out_ready;
-        else
-            control_in_ready <= '1';
-        end if;
+  process (control_in, control_in_valid, out_ready)
+  begin
+    if (control_in = "000" or control_in = "001" or control_in = "011" or control_in = "101") then
+      control_in_ready <= out_ready;
+    else
+      control_in_ready <= '1';
+    end if;
 
-        out_valid <= '0';
+    out_valid <= '0';
 
-        if (control_in_valid = '1') then
-            if control_in = "000" then -- spec
-                out_valid <= '1';
-            elsif control_in = "101" then -- correct-spec
-                out_valid <= '1';
-            elsif control_in = "001" then -- no cmp
-                out_valid <= '1';
-            elsif control_in = "011" then -- cmp wrong resend
-                out_valid <= '1';
-            end if;
-        end if;
-
-    end process;
+    if (control_in_valid = '1') then
+      if control_in = "000" then -- spec
+        out_valid <= '1';
+      elsif control_in = "101" then -- correct-spec
+        out_valid <= '1';
+      elsif control_in = "001" then -- no cmp
+        out_valid <= '1';
+      elsif control_in = "011" then -- cmp wrong resend
+        out_valid <= '1';
+      end if;
+    end if;
+  end process;
 end architecture;
 """
 
@@ -551,37 +537,35 @@ end entity;
   architecture = f"""
 -- Architecture of predictor
 architecture arch of {name} is
-    signal zeros : std_logic_vector({bitwidth}-2 downto 0);
-    signal data_reg: std_logic_vector({bitwidth}-1 downto 0);
-
+  signal zeros : std_logic_vector({bitwidth}-2 downto 0);
+  signal data_reg: std_logic_vector({bitwidth}-1 downto 0);
 begin
+  zeros <= (others => '0');
 
-    zeros <= (others => '0');
-
-    -- Predicted value is 1 by default and updated to the latest real value
-    process(clk, rst) is
-    begin
-      if (rst = '1') then
-        data_reg <= zeros & '1';
-        data_out <= zeros & '1';
-      elsif (rising_edge(clk)) then
-        if (data_in_valid = '1') then
-          data_reg <= data_in;
-        end if;
-        if (data_out_ready = '1' and trigger_valid = '1') then
-          -- After handshaking, data_out updates and holds its value until the
-          -- next handshaking, ensuring stability while valid is high.
-          data_out <= data_reg;
-        end if;
+  -- Predicted value is 1 by default and updated to the latest real value
+  process(clk, rst) is
+  begin
+    if (rst = '1') then
+      data_reg <= zeros & '1';
+      data_out <= zeros & '1';
+    elsif (rising_edge(clk)) then
+      if (data_in_valid = '1') then
+        data_reg <= data_in;
       end if;
-    end process;
+      if (data_out_ready = '1' and trigger_valid = '1') then
+        -- After handshaking, data_out updates and holds its value until the
+        -- next handshaking, ensuring stability while valid is high.
+        data_out <= data_reg;
+      end if;
+    end if;
+  end process;
 
-    data_in_ready <= '1';
+  data_in_ready <= '1';
 
-    data_out_valid <= trigger_valid;
-    trigger_ready <= data_out_ready;
+  data_out_valid <= trigger_valid;
+  trigger_ready <= data_out_ready;
 
-    data_out_spec <= trigger_spec;
+  data_out_spec <= trigger_spec;
 end architecture;
 """
 
@@ -613,158 +597,125 @@ end entity;
   architecture = f"""
 -- Architecture of predFifo
 architecture arch of {name} is
-    signal HeadEn   : std_logic := '0';
-    signal TailEn  : std_logic := '0';
+  signal HeadEn   : std_logic := '0';
+  signal TailEn  : std_logic := '0';
 
-    signal Tail : natural range 0 to {fifo_depth} - 1;
-    signal Head : natural range 0 to {fifo_depth} - 1;
+  signal Tail : natural range 0 to {fifo_depth} - 1;
+  signal Head : natural range 0 to {fifo_depth} - 1;
 
-    signal Empty    : std_logic;
-    signal Full : std_logic;
+  signal Empty    : std_logic;
+  signal Full : std_logic;
 
-    type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth}-1 downto 0);
-    signal Memory : FIFO_Memory;
-
-
+  type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth}-1 downto 0);
+  signal Memory : FIFO_Memory;
 begin
-    data_out_valid <= not Empty;
-    data_in_ready <= not Full;
+  data_out_valid <= not Empty;
+  data_in_ready <= not Full;
 
-    TailEn <= not Full and data_in_valid;
-    HeadEn <= not Empty and data_out_ready;
-    data_out <= Memory(Head);
+  TailEn <= not Full and data_in_valid;
+  HeadEn <= not Empty and data_out_ready;
+  data_out <= Memory(Head);
 
-----------------------------------------------------------------
+  ----------------------------------------------------------------
+  -- Sequential Process
+  ----------------------------------------------------------------
 
--- Sequential Process
-
-----------------------------------------------------------------
-
--------------------------------------------
--- process for writing data
-fifo_proc : process (clk)
-
-     begin
-        if rising_edge(clk) then
-          if rst = '1' then
-
-          else
-
-            if (TailEn = '1' ) then
-                -- Write Data to Memory
-                Memory(Tail) <= data_in;
-
-            end if;
-
-          end if;
-        end if;
-    end process;
-
-
-
--------------------------------------------
--- process for updating tail
-TailUpdate_proc : process (clk)
-
-      begin
-        if rising_edge(clk) then
-
-            if rst = '1' then
-               Tail <= 0;
-            else
-
-                if (TailEn = '1') then
-
-                    Tail  <= (Tail + 1) mod {fifo_depth};
-
-                end if;
-
-            end if;
-        end if;
-    end process;
-
--------------------------------------------
--- process for updating head
-HeadUpdate_proc : process (clk)
-
+  -------------------------------------------
+  -- process for writing data
+  -------------------------------------------
+  fifo_proc : process (clk)
   begin
-  if rising_edge(clk) then
-
-    if rst = '1' then
-       Head <= 0;
-    else
-
-        if (HeadEn = '1') then
-
-            Head  <= (Head + 1) mod {fifo_depth};
-
+    if rising_edge(clk) then
+      if rst = '1' then
+        -- TODO: Nothing??
+      else
+        if (TailEn = '1' ) then
+          -- Write Data to Memory
+          Memory(Tail) <= data_in;
         end if;
-
+      end if;
     end if;
-  end if;
-end process;
+  end process;
 
--------------------------------------------
--- process for updating full
-FullUpdate_proc : process (clk)
-
+  -------------------------------------------
+  -- process for updating tail
+  ----------------------------------------------------------------
+  TailUpdate_proc : process (clk)
   begin
-  if rising_edge(clk) then
+    if rising_edge(clk) then
+      if rst = '1' then
+        Tail <= 0;
+      else
+        if (TailEn = '1') then
+          Tail  <= (Tail + 1) mod {fifo_depth};
+        end if;
+      end if;
+    end if;
+  end process;
 
-    if rst = '1' then
-       Full <= '0';
-    else
+  -------------------------------------------
+  -- process for updating head
+  -------------------------------------------
+  HeadUpdate_proc : process (clk)
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        Head <= 0;
+      else
+        if (HeadEn = '1') then
+          Head  <= (Head + 1) mod {fifo_depth};
+        end if;
+      end if;
+    end if;
+  end process;
 
+  -------------------------------------------
+  -- process for updating full
+  -------------------------------------------
+  FullUpdate_proc : process (clk)
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        Full <= '0';
+      else
         -- if only filling but not emptying
         if (TailEn = '1') and (HeadEn = '0') then
-
-            -- if new tail index will reach head index
-            if ((Tail +1) mod {fifo_depth} = Head) then
-
-                Full  <= '1';
-
-            end if;
-        -- if only emptying but not filling
+          -- if new tail index will reach head index
+          if ((Tail +1) mod {fifo_depth} = Head) then
+            Full  <= '1';
+          end if;
         elsif (TailEn = '0') and (HeadEn = '1') then
-                Full <= '0';
+          -- if only emptying but not filling
+          Full <= '0';
         -- otherwise, nothing is happening or simultaneous read and write
-
         end if;
-
+      end if;
     end if;
-  end if;
-end process;
+  end process;
 
- -------------------------------------------
--- process for updating empty
-EmptyUpdate_proc : process (clk)
-
+  -------------------------------------------
+  -- process for updating empty
+  -------------------------------------------
+  EmptyUpdate_proc : process (clk)
   begin
-  if rising_edge(clk) then
-
-    if rst = '1' then
-       Empty <= '1';
-    else
+    if rising_edge(clk) then
+      if rst = '1' then
+        Empty <= '1';
+      else
         -- if only emptying but not filling
         if (TailEn = '0') and (HeadEn = '1') then
-
-            -- if new head index will reach tail index
-            if ((Head +1) mod {fifo_depth} = Tail) then
-
-                Empty  <= '1';
-
-            end if;
-        -- if only filling but not emptying
+          -- if new head index will reach tail index
+          if ((Head +1) mod {fifo_depth} = Tail) then
+            Empty  <= '1';
+          end if;
         elsif (TailEn = '1') and (HeadEn = '0') then
-                Empty <= '0';
-       -- otherwise, nothing is happening or simultaneous read and write
-
+          -- if only filling but not emptying
+            Empty <= '0';
+        -- otherwise, nothing is happening or simultaneous read and write
         end if;
-
+      end if;
     end if;
-  end if;
-end process;
-
+  end process;
 end architecture;
 """
 
@@ -848,175 +799,174 @@ end entity;
   architecture = f"""
 -- Architecture of speculator
 architecture arch of {name} is
-signal fork_data_outs : data_array(1 downto 0)({bitwidth} - 1 downto 0);
-signal fork_data_outs_valid : std_logic_vector(1 downto 0);
-signal fork_data_outs_0_spec : std_logic_vector(0 downto 0);
-signal fork_data_outs_ready : std_logic_vector(1 downto 0);
+  signal fork_data_outs : data_array(1 downto 0)({bitwidth} - 1 downto 0);
+  signal fork_data_outs_valid : std_logic_vector(1 downto 0);
+  signal fork_data_outs_0_spec : std_logic_vector(0 downto 0);
+  signal fork_data_outs_ready : std_logic_vector(1 downto 0);
 
-signal predictor_data_out : std_logic_vector({bitwidth} - 1 downto 0);
-signal predictor_data_out_valid : std_logic;
-signal predictor_data_out_spec : std_logic_vector(0 downto 0);
-signal predictor_data_out_ready : std_logic;
+  signal predictor_data_out : std_logic_vector({bitwidth} - 1 downto 0);
+  signal predictor_data_out_valid : std_logic;
+  signal predictor_data_out_spec : std_logic_vector(0 downto 0);
+  signal predictor_data_out_ready : std_logic;
 
-signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
-signal specgenCore_fifo_outs_valid : std_logic;
-signal specgenCore_fifo_outs_ready : std_logic;
+  signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal specgenCore_fifo_outs_valid : std_logic;
+  signal specgenCore_fifo_outs_ready : std_logic;
 
-signal specgenCore_control_outs : std_logic_vector(2 downto 0);
-signal specgenCore_control_outs_valid : std_logic;
-signal specgenCore_control_outs_ready : std_logic;
+  signal specgenCore_control_outs : std_logic_vector(2 downto 0);
+  signal specgenCore_control_outs_valid : std_logic;
+  signal specgenCore_control_outs_ready : std_logic;
 
-signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
-signal predFifo_data_out_valid : std_logic;
-signal predFifo_data_out_ready : std_logic;
+  signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
+  signal predFifo_data_out_valid : std_logic;
+  signal predFifo_data_out_ready : std_logic;
 
-signal fork_control_outs : data_array(4 downto 0)(2 downto 0);
-signal fork_control_outs_valid : std_logic_vector(4 downto 0);
-signal fork_control_outs_ready : std_logic_vector(4 downto 0);
+  signal fork_control_outs : data_array(4 downto 0)(2 downto 0);
+  signal fork_control_outs_valid : std_logic_vector(4 downto 0);
+  signal fork_control_outs_ready : std_logic_vector(4 downto 0);
 begin
+  data_fork: entity work.{data_fork_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins,
+      ins_valid => ins_valid,
+      ins_spec => ins_spec,
+      ins_ready => ins_ready,
+      outs => fork_data_outs,
+      outs_valid => fork_data_outs_valid,
+      outs_0_spec => fork_data_outs_0_spec,
+      outs_1_spec => open,
+      outs_ready => fork_data_outs_ready
+    );
 
-data_fork: entity work.{data_fork_name}(arch)
-  port map(
-    clk => clk,
-    rst => rst,
-    ins => ins,
-    ins_valid => ins_valid,
-    ins_spec => ins_spec,
-    ins_ready => ins_ready,
-    outs => fork_data_outs,
-    outs_valid => fork_data_outs_valid,
-    outs_0_spec => fork_data_outs_0_spec,
-    outs_1_spec => open,
-    outs_ready => fork_data_outs_ready
+  spengenCore0: entity work.{specGen_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+
+      ins => fork_data_outs(0),
+      ins_valid => fork_data_outs_valid(0),
+      ins_spec => fork_data_outs_0_spec,
+      ins_ready => fork_data_outs_ready(0),
+
+      predict_ins => predictor_data_out,
+      predict_ins_valid => predictor_data_out_valid,
+      predict_ins_spec => predictor_data_out_spec,
+      predict_ins_ready => predictor_data_out_ready,
+
+      fifo_ins => predFifo_data_out,
+      fifo_ins_valid => predFifo_data_out_valid,
+      fifo_ins_ready => predFifo_data_out_ready,
+
+      outs => outs,
+      outs_spec => outs_spec,
+
+      fifo_outs => specgenCore_fifo_outs,
+      fifo_outs_valid => specgenCore_fifo_outs_valid,
+      fifo_outs_ready => specgenCore_fifo_outs_ready,
+
+      control_outs => specgenCore_control_outs,
+      control_outs_valid => specgenCore_control_outs_valid,
+      control_outs_ready => specgenCore_control_outs_ready
+    );
+
+  predictor0: entity work.{predictor_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+
+      trigger_valid => trigger_valid,
+      trigger_spec => trigger_spec,
+      trigger_ready => trigger_ready,
+
+      data_in => fork_data_outs(1),
+      data_in_valid => fork_data_outs_valid(1),
+      data_in_ready => fork_data_outs_ready(1),
+
+      data_out => predictor_data_out,
+      data_out_valid => predictor_data_out_valid,
+      data_out_spec => predictor_data_out_spec,
+      data_out_ready => predictor_data_out_ready
+    );
+
+  predFifo0: entity work.{predFifo_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+
+      data_in => specgenCore_fifo_outs,
+      data_in_valid => specgenCore_fifo_outs_valid,
+      data_in_ready => specgenCore_fifo_outs_ready,
+
+      data_out => predFifo_data_out,
+      data_out_valid => predFifo_data_out_valid,
+      data_out_ready => predFifo_data_out_ready
+    );
+
+  fork0: entity work.{control_fork_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      ins => specgenCore_control_outs,
+      ins_valid => specgenCore_control_outs_valid,
+      ins_ready => specgenCore_control_outs_ready,
+      outs => fork_control_outs,
+      outs_valid => fork_control_outs_valid,
+      outs_ready => fork_control_outs_ready
+    );
+
+  decodeSave0: entity work.{decodeSave_name}(arch)
+    port map (
+      control_in => fork_control_outs(3),
+      control_in_valid => fork_control_outs_valid(3),
+      control_in_ready => fork_control_outs_ready(3),
+      control_out => ctrl_save,
+      control_out_valid => ctrl_save_valid,
+      control_out_ready => ctrl_save_ready
+    );
+
+  decodeCommit0: entity work.{decodeCommit_name}(arch)
+    port map (
+      control_in => fork_control_outs(2),
+      control_in_valid => fork_control_outs_valid(2),
+      control_in_ready => fork_control_outs_ready(2),
+      control_out => ctrl_commit,
+      control_out_valid => ctrl_commit_valid,
+      control_out_ready => ctrl_commit_ready
   );
 
-spengenCore0: entity work.{specGen_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
+  decodeSC0: entity work.{decodeSC_name}(arch)
+    port map (
+      control_in => fork_control_outs(1),
+      control_in_valid => fork_control_outs_valid(1),
+      control_in_ready => fork_control_outs_ready(1),
+      control_out0 => ctrl_sc_save,
+      control_out0_valid => ctrl_sc_save_valid,
+      control_out0_ready => ctrl_sc_save_ready,
+      control_out1 => ctrl_sc_commit,
+      control_out1_valid => ctrl_sc_commit_valid,
+      control_out1_ready => ctrl_sc_commit_ready
+    );
 
-    ins => fork_data_outs(0),
-    ins_valid => fork_data_outs_valid(0),
-    ins_spec => fork_data_outs_0_spec,
-    ins_ready => fork_data_outs_ready(0),
+  decodeOutput0: entity work.{decodeOutput_name}(arch)
+    port map (
+      control_in => fork_control_outs(4),
+      control_in_valid => fork_control_outs_valid(4),
+      control_in_ready => fork_control_outs_ready(4),
+      out_valid => outs_valid,
+      out_ready => outs_ready
+    );
 
-    predict_ins => predictor_data_out,
-    predict_ins_valid => predictor_data_out_valid,
-    predict_ins_spec => predictor_data_out_spec,
-    predict_ins_ready => predictor_data_out_ready,
-
-    fifo_ins => predFifo_data_out,
-    fifo_ins_valid => predFifo_data_out_valid,
-    fifo_ins_ready => predFifo_data_out_ready,
-
-    outs => outs,
-    outs_spec => outs_spec,
-
-    fifo_outs => specgenCore_fifo_outs,
-    fifo_outs_valid => specgenCore_fifo_outs_valid,
-    fifo_outs_ready => specgenCore_fifo_outs_ready,
-
-    control_outs => specgenCore_control_outs,
-    control_outs_valid => specgenCore_control_outs_valid,
-    control_outs_ready => specgenCore_control_outs_ready
-  );
-
-predictor0: entity work.{predictor_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-
-    trigger_valid => trigger_valid,
-    trigger_spec => trigger_spec,
-    trigger_ready => trigger_ready,
-
-    data_in => fork_data_outs(1),
-    data_in_valid => fork_data_outs_valid(1),
-    data_in_ready => fork_data_outs_ready(1),
-
-    data_out => predictor_data_out,
-    data_out_valid => predictor_data_out_valid,
-    data_out_spec => predictor_data_out_spec,
-    data_out_ready => predictor_data_out_ready
-  );
-
-predFifo0: entity work.{predFifo_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-
-    data_in => specgenCore_fifo_outs,
-    data_in_valid => specgenCore_fifo_outs_valid,
-    data_in_ready => specgenCore_fifo_outs_ready,
-
-    data_out => predFifo_data_out,
-    data_out_valid => predFifo_data_out_valid,
-    data_out_ready => predFifo_data_out_ready
-  );
-
-fork0: entity work.{control_fork_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    ins => specgenCore_control_outs,
-    ins_valid => specgenCore_control_outs_valid,
-    ins_ready => specgenCore_control_outs_ready,
-    outs => fork_control_outs,
-    outs_valid => fork_control_outs_valid,
-    outs_ready => fork_control_outs_ready
-  );
-
-decodeSave0: entity work.{decodeSave_name}(arch)
-  port map (
-    control_in => fork_control_outs(3),
-    control_in_valid => fork_control_outs_valid(3),
-    control_in_ready => fork_control_outs_ready(3),
-    control_out => ctrl_save,
-    control_out_valid => ctrl_save_valid,
-    control_out_ready => ctrl_save_ready
-  );
-
-decodeCommit0: entity work.{decodeCommit_name}(arch)
-  port map (
-    control_in => fork_control_outs(2),
-    control_in_valid => fork_control_outs_valid(2),
-    control_in_ready => fork_control_outs_ready(2),
-    control_out => ctrl_commit,
-    control_out_valid => ctrl_commit_valid,
-    control_out_ready => ctrl_commit_ready
-);
-
-decodeSC0: entity work.{decodeSC_name}(arch)
-  port map (
-    control_in => fork_control_outs(1),
-    control_in_valid => fork_control_outs_valid(1),
-    control_in_ready => fork_control_outs_ready(1),
-    control_out0 => ctrl_sc_save,
-    control_out0_valid => ctrl_sc_save_valid,
-    control_out0_ready => ctrl_sc_save_ready,
-    control_out1 => ctrl_sc_commit,
-    control_out1_valid => ctrl_sc_commit_valid,
-    control_out1_ready => ctrl_sc_commit_ready
-  );
-
-decodeOutput0: entity work.{decodeOutput_name}(arch)
-  port map (
-    control_in => fork_control_outs(4),
-    control_in_valid => fork_control_outs_valid(4),
-    control_in_ready => fork_control_outs_ready(4),
-    out_valid => outs_valid,
-    out_ready => outs_ready
-  );
-
-decodeBranch0: entity work.{decodeBranch_name}(arch)
-  port map (
-    control_in => fork_control_outs(0),
-    control_in_valid => fork_control_outs_valid(0),
-    control_in_ready => fork_control_outs_ready(0),
-    control_out => ctrl_sc_branch,
-    control_out_valid => ctrl_sc_branch_valid,
-    control_out_ready => ctrl_sc_branch_ready
-  );
+  decodeBranch0: entity work.{decodeBranch_name}(arch)
+    port map (
+      control_in => fork_control_outs(0),
+      control_in_valid => fork_control_outs_valid(0),
+      control_in_ready => fork_control_outs_ready(0),
+      control_out => ctrl_sc_branch,
+      control_out_valid => ctrl_sc_branch_valid,
+      control_out_ready => ctrl_sc_branch_ready
+    );
 end architecture;
 """
 

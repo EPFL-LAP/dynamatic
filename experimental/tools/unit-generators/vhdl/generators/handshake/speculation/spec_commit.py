@@ -65,117 +65,113 @@ end entity;
   architecture = f"""
 -- Architecture of spec_commit
 architecture arch of {name} is
-signal fifo_disc_outs : std_logic_vector(0 downto 0);
-signal fifo_disc_outs_valid : std_logic;
-signal fifo_disc_outs_ready : std_logic;
+  signal fifo_disc_outs : std_logic_vector(0 downto 0);
+  signal fifo_disc_outs_valid : std_logic;
+  signal fifo_disc_outs_ready : std_logic;
 
-signal branch_in_condition : std_logic_vector(0 downto 0);
-signal branch_in_condition_ready : std_logic;
-{data(f"signal branch_in_trueOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
-signal branch_in_trueOut_valid : std_logic;
-signal branch_in_trueOut_ready : std_logic;
-{data(f"signal branch_in_falseOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
-signal branch_in_falseOut_valid : std_logic;
-signal branch_in_falseOut_ready : std_logic;
+  signal branch_in_condition : std_logic_vector(0 downto 0);
+  signal branch_in_condition_ready : std_logic;
+  {data(f"signal branch_in_trueOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
+  signal branch_in_trueOut_valid : std_logic;
+  signal branch_in_trueOut_ready : std_logic;
+  {data(f"signal branch_in_falseOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
+  signal branch_in_falseOut_valid : std_logic;
+  signal branch_in_falseOut_ready : std_logic;
 
-{data(f"signal buff_outs : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
-signal buff_outs_valid : std_logic;
-signal buff_outs_ready : std_logic;
+  {data(f"signal buff_outs : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
+  signal buff_outs_valid : std_logic;
+  signal buff_outs_ready : std_logic;
 
-{data(f"signal branch_disc_trueOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
-signal branch_disc_trueOut_valid : std_logic;
-signal branch_disc_trueOut_ready : std_logic;
-{data(f"signal branch_disc_falseOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
-signal branch_disc_falseOut_valid : std_logic;
-signal branch_disc_falseOut_ready : std_logic;
+  {data(f"signal branch_disc_trueOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
+  signal branch_disc_trueOut_valid : std_logic;
+  signal branch_disc_trueOut_ready : std_logic;
+  {data(f"signal branch_disc_falseOut : std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
+  signal branch_disc_falseOut_valid : std_logic;
+  signal branch_disc_falseOut_ready : std_logic;
 
-{data(f"signal merge_ins : data_array(1 downto 0)({bitwidth} - 1 downto 0);", bitwidth)}
-signal merge_ins_valid : std_logic_vector(1 downto 0);
-signal merge_ins_ready : std_logic_vector(1 downto 0);
-
+  {data(f"signal merge_ins : data_array(1 downto 0)({bitwidth} - 1 downto 0);", bitwidth)}
+  signal merge_ins_valid : std_logic_vector(1 downto 0);
+  signal merge_ins_ready : std_logic_vector(1 downto 0);
 begin
+  -- Design taken directly from the Speculation 2019 paper
+  fifo_disc: entity work.{fifo_disc_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      ins => ctrl,
+      ins_valid => ctrl_valid,
+      ins_ready => ctrl_ready,
+      outs => fifo_disc_outs,
+      outs_valid => fifo_disc_outs_valid,
+      outs_ready => fifo_disc_outs_ready
+    );
 
--- Design taken directly from the Speculation 2019 paper
+  branch_in_condition <= ins_spec;
+  branch_in: entity work.{cond_br_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      {data("data => ins,", bitwidth)}
+      data_valid => ins_valid,
+      data_ready => ins_ready,
+      condition => branch_in_condition,
+      condition_valid => '1', -- always valid
+      condition_ready => branch_in_condition_ready,
+      {data("trueOut => branch_in_trueOut,", bitwidth)}
+      trueOut_valid => branch_in_trueOut_valid,
+      trueOut_ready => branch_in_trueOut_ready,
+      {data("falseOut => branch_in_falseOut,", bitwidth)}
+      falseOut_valid => branch_in_falseOut_valid,
+      falseOut_ready => branch_in_falseOut_ready
+    );
 
-fifo_disc: entity work.{fifo_disc_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    ins => ctrl,
-    ins_valid => ctrl_valid,
-    ins_ready => ctrl_ready,
-    outs => fifo_disc_outs,
-    outs_valid => fifo_disc_outs_valid,
-    outs_ready => fifo_disc_outs_ready
-  );
+  buff: entity work.{buff_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      {data("ins => branch_in_trueOut,", bitwidth)}
+      ins_valid => branch_in_trueOut_valid,
+      ins_ready => branch_in_trueOut_ready,
+      {data("outs => buff_outs,", bitwidth)}
+      outs_valid => buff_outs_valid,
+      outs_ready => buff_outs_ready
+    );
 
-branch_in_condition <= ins_spec;
-branch_in: entity work.{cond_br_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    {data("data => ins,", bitwidth)}
-    data_valid => ins_valid,
-    data_ready => ins_ready,
-    condition => branch_in_condition,
-    condition_valid => '1', -- always valid
-    condition_ready => branch_in_condition_ready,
-    {data("trueOut => branch_in_trueOut,", bitwidth)}
-    trueOut_valid => branch_in_trueOut_valid,
-    trueOut_ready => branch_in_trueOut_ready,
-    {data("falseOut => branch_in_falseOut,", bitwidth)}
-    falseOut_valid => branch_in_falseOut_valid,
-    falseOut_ready => branch_in_falseOut_ready
-  );
+  branch_disc_trueOut_ready <= '1'; -- sink
+  branch_disc: entity work.{cond_br_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      {data("data => buff_outs,", bitwidth)}
+      data_valid => buff_outs_valid,
+      data_ready => buff_outs_ready,
+      condition => fifo_disc_outs,
+      condition_valid => fifo_disc_outs_valid,
+      condition_ready => fifo_disc_outs_ready,
+      {data("trueOut => branch_disc_trueOut,", bitwidth)}
+      trueOut_valid => branch_disc_trueOut_valid,
+      trueOut_ready => branch_disc_trueOut_ready,
+      {data("falseOut => branch_disc_falseOut,", bitwidth)}
+      falseOut_valid => branch_disc_falseOut_valid,
+      falseOut_ready => branch_disc_falseOut_ready
+    );
 
-buff: entity work.{buff_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    {data("ins => branch_in_trueOut,", bitwidth)}
-    ins_valid => branch_in_trueOut_valid,
-    ins_ready => branch_in_trueOut_ready,
-    {data("outs => buff_outs,", bitwidth)}
-    outs_valid => buff_outs_valid,
-    outs_ready => buff_outs_ready
-  );
+  {data("merge_ins <= (branch_disc_falseOut, branch_in_falseOut);", bitwidth)}
+  merge_ins_valid <= (branch_disc_falseOut_valid, branch_in_falseOut_valid);
+  branch_disc_falseOut_ready <= merge_ins_ready(1);
+  branch_in_falseOut_ready <= merge_ins_ready(0);
 
-branch_disc_trueOut_ready <= '1'; -- sink
-branch_disc: entity work.{cond_br_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    {data("data => buff_outs,", bitwidth)}
-    data_valid => buff_outs_valid,
-    data_ready => buff_outs_ready,
-    condition => fifo_disc_outs,
-    condition_valid => fifo_disc_outs_valid,
-    condition_ready => fifo_disc_outs_ready,
-    {data("trueOut => branch_disc_trueOut,", bitwidth)}
-    trueOut_valid => branch_disc_trueOut_valid,
-    trueOut_ready => branch_disc_trueOut_ready,
-    {data("falseOut => branch_disc_falseOut,", bitwidth)}
-    falseOut_valid => branch_disc_falseOut_valid,
-    falseOut_ready => branch_disc_falseOut_ready
-  );
-
-{data("merge_ins <= (branch_disc_falseOut, branch_in_falseOut);", bitwidth)}
-merge_ins_valid <= (branch_disc_falseOut_valid, branch_in_falseOut_valid);
-branch_disc_falseOut_ready <= merge_ins_ready(1);
-branch_in_falseOut_ready <= merge_ins_ready(0);
-
-merge_out: entity work.{merge_name}(arch)
-  port map (
-    clk => clk,
-    rst => rst,
-    {data("ins => merge_ins,", bitwidth)}
-    ins_valid => merge_ins_valid,
-    ins_ready => merge_ins_ready,
-    {data("outs => outs,", bitwidth)}
-    outs_valid => outs_valid,
-    outs_ready => outs_ready
-  );
-
+  merge_out: entity work.{merge_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      {data("ins => merge_ins,", bitwidth)}
+      ins_valid => merge_ins_valid,
+      ins_ready => merge_ins_ready,
+      {data("outs => outs,", bitwidth)}
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+    );
 end architecture;
 """
 
