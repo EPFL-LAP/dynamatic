@@ -12,6 +12,7 @@ enable_testing()
 add_executable(
   integration
   TEST_SUITE.cpp
+  memory/TEST_SUITE.cpp
   util.cpp
 )
 target_link_libraries(
