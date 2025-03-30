@@ -21,4 +21,6 @@ target_link_libraries(
 include(GoogleTest)
 gtest_discover_tests(integration)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")

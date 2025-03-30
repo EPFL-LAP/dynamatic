@@ -25,7 +25,8 @@
       "compilerPath": "/usr/bin/clang",
       "cStandard": "c17",
       "cppStandard": "c++17",
-      "configurationProvider": "llvm-vs-code-extensions.vscode-clangd"
+      "configurationProvider": "llvm-vs-code-extensions.vscode-clangd",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
     }
   ],
   "version": 4
