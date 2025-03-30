@@ -501,10 +501,16 @@ void BufferPlacementMILP::addObjective(ValueRange channels,
   // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
   double slotPenaltyMul = 1e-5;
+  double DVPenaltyMul = 3e-4;
   for (Value channel : channels) {
     ChannelVars &channelVars = vars.channelVars[channel];
     objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
     objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
+
+    handshake::ChannelBufProps &props = channelProps[channel];
+    if (props.minSlots > 0){
+      objective -= maxCoefCFDFC * DVPenaltyMul * channelVars.signalVars[SignalType::DATA].bufPresent;
+    }
   }
 
   // Finally, set the MILP objective
@@ -538,8 +544,6 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     // Extract number and type of slots
     unsigned numSlotsToPlace = static_cast<unsigned>(
         channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
-                           GRB_DoubleAttr_X) > 0;
 
     PlacementResult result = placement[value];
     ChannelBufProps &props = channelProps[value];
@@ -550,11 +554,13 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     std::stringstream propsStr;
     propsStr << props;
     os << "- Buffering constraints: " << propsStr.str() << "\n";
-    os << "- MILP decision: " << numSlotsToPlace << " "
-       << (placeOpaque ? "opaque" : "transparent") << " slot(s)\n";
-    os << "- Placement decision: " << result.numTrans
-       << " transparent slot(s) and " << result.numOpaque
-       << " opaque slot(s)\n";
+    os << "- MILP decision: " << numSlotsToPlace << " slot(s)\n";
+    os << "- Placement decision: \n";
+    os << result.numOneSlotDV << " OneSlotDV slot(s)\n";
+    os << result.numOneSlotR << " OneSlotR slot(s)\n";
+    os << result.numFifoDV << " FifoDV slot(s)\n";
+    os << result.numFifoNone << " FifoNone slot(s)\n";
+    os << result.numOneSlotDVR << " OneSlotDVR slot(s)\n";
     os.unindent();
     os << "\n";
   }

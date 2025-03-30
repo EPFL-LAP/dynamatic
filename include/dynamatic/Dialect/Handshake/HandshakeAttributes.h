@@ -66,6 +66,9 @@ struct TimingInfo {
   /// Returns timing information for a standard TEHB.
   /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
   static TimingInfo tehb();
+  static TimingInfo fifo_break_dv();
+  static TimingInfo fifo_break_none();
+  static TimingInfo one_slot_break_dvr();
 };
 
 bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);
@@ -84,6 +87,8 @@ struct ChannelBufProps {
   unsigned minOpaque;
   /// Maximum number of opaque slots allowed on the channel (inclusive).
   std::optional<unsigned> maxOpaque;
+  /// Minimum number of buffer slots allowed on the channel (inclusive).
+  unsigned minSlots;
   /// Combinational delay (in ns) from the output port to the buffer's input, if
   /// a buffer is placed on the channel.
   double inDelay;
@@ -101,6 +106,7 @@ struct ChannelBufProps {
                   std::optional<unsigned> maxTrans = std::nullopt,
                   unsigned minOpaque = 0,
                   std::optional<unsigned> maxOpaque = std::nullopt,
+                  unsigned minSlots = 0,
                   double inDelay = 0.0, double outDelay = 0.0,
                   double delay = 0.0);
 
@@ -127,7 +133,8 @@ template <typename Os>
 Os &operator<<(Os &os, ChannelBufProps &props) {
   os << "{\n\ttransparent slots: [" << props.minTrans << ", "
      << getMaxStr(props.maxTrans) << "\n\topaque slots: [" << props.minOpaque
-     << ", " << getMaxStr(props.maxOpaque) << "\n\tin/out delays: ("
+     << ", " << getMaxStr(props.maxOpaque) << "\n\tTotal slots: " 
+     << props.minSlots << ", " << "\n\tin/out delays: ("
      << props.inDelay << ", " << props.outDelay << ")"
      << "\n\ttotal delay: " << props.delay << "\n}\n";
   return os;
