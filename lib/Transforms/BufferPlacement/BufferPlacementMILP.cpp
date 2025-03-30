@@ -501,10 +501,16 @@ void BufferPlacementMILP::addObjective(ValueRange channels,
   // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
   double slotPenaltyMul = 1e-5;
+  double DVPenaltyMul = 3e-4;
   for (Value channel : channels) {
     ChannelVars &channelVars = vars.channelVars[channel];
     objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
     objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
+
+    handshake::ChannelBufProps &props = channelProps[channel];
+    if (props.minSlots > 0){
+      objective -= maxCoefCFDFC * DVPenaltyMul * channelVars.signalVars[SignalType::DATA].bufPresent;
+    }
   }
 
   // Finally, set the MILP objective

@@ -72,7 +72,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
     if (forceBreakDVR) {
       if (numSlotsToPlace == 1){
-        result.numOneSlotDVR = 1;
+        result.numOneSlotDV = 1;
       } else if (numSlotsToPlace == 2){
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
