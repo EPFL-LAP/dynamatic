@@ -1018,13 +1018,12 @@ Value LowerFuncToHandshake::getBlockControl(Block *block) const {
 static Value getBlockControl(Operation *op) {
   auto funcOp = op->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "operation should have parent function");
-  std::optional<unsigned> bb = getLogicBB(op);
-  assert(bb && "operation should be tagged with associated basic block");
+  unsigned bb = getLogicBB(op);
 
   if (bb == ENTRY_BB)
     return funcOp.getArguments().back();
   for (auto cMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
-    if (auto cMergeBB = getLogicBB(cMergeOp); cMergeBB && cMergeBB == *bb)
+    if (getLogicBB(cMergeOp) == bb)
       return cMergeOp.getResult();
   }
   llvm_unreachable("cannot find cmerge in block");
