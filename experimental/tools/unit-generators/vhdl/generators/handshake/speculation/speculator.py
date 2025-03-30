@@ -56,7 +56,7 @@ end entity;
 -- Architecture of specgenCore
 architecture arch of {name} is
 
-type State_type is (PASS, SPEC, NO_CMP, CMP_CORRECT, CMP_WRONG, KILL);
+type State_type is (IDLE, KILL);
 type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
 signal State : State_type;
 
@@ -72,7 +72,6 @@ signal FifoR : std_logic;
 signal ControlV : std_logic;
 signal FifoV : std_logic;
 
-signal StateInternal : std_logic_vector(3 downto 0);
 signal ControlInternal : Control_type;
 
 begin
@@ -106,59 +105,15 @@ process(ControlInternal)
         end case;
     end process;
 
-process(State)
-    begin
-        case State is
-            when PASS => -- 0
-                StateInternal <= "0000";
-            when SPEC => -- 1
-                StateInternal <= "0001";
-            when NO_CMP => -- 2
-                StateInternal <= "0010";
-            when CMP_CORRECT => -- 3
-                StateInternal <= "0011";
-            when CMP_WRONG => -- 4
-                StateInternal <= "0100";
-            when KILL => -- 5
-                StateInternal <= "0101";
-
-        end case;
-
-    end process;
-
 state_proc : process (clk)
     begin
         if rising_edge(clk) then
             if rst = '1' then
-                State <= PASS;
+                State <= IDLE;
             else
                 case State is
-                    when PASS =>
-                        if (DatapV = '0' and PredictpV = '1' and FifoNotFull = '1' and ControlnR = '0') then
-                            State <= SPEC;
-                        elsif (DatapV = '1' and FifoNotEmpty = '0' and ControlnR = '0') then
-                            State <= NO_CMP;
-                        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins and ControlnR = '0') then
-                            State <= CMP_CORRECT;
-                        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '0') then
-                            State <= CMP_WRONG;
-                        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '1') then
-                            State <= KILL;
-                        end if;
-                    when SPEC =>
-                        if (ControlnR = '1') then
-                            State <= PASS;
-                        end if;
-                    when NO_CMP =>
-                        if (ControlnR = '1') then
-                            State <= PASS;
-                        end if;
-                    when CMP_CORRECT =>
-                        if (ControlnR = '1') then
-                            State <= PASS;
-                        end if;
-                    when CMP_WRONG =>
-                        if (ControlnR = '1') then
+                    when IDLE =>
+                        if (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins and ControlnR = '1') then
                             State <= KILL;
                         end if;
                     when KILL =>
@@ -167,7 +122,7 @@ state_proc : process (clk)
                             PredictpV = '1' and predict_ins_spec = "0") -- Killed incoming spec trigger
                             then
 
-                            State <= PASS;
+                            State <= IDLE;
                         end if;
                 end case;
             end if;
@@ -184,93 +139,66 @@ output_proc : process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_
         ControlInternal <= CONTROL_SPEC;
 
         case State is
-            when PASS =>
-                DataR <= ControlnR;
-                PredictR <= FifoNotFull and ControlnR;
-
-                if (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
-                    FifoR <= '1';
-                else
-                    FifoR <= '0';
-                end if;
-
-                --FifoV <= not DatapV and PredictpV;
-                FifoV <= '0';
-
+            when IDLE =>
                 if (DatapV = '0' and PredictpV = '1' and FifoNotFull = '1') then
+                    DataR <= ControlnR;
+                    PredictR <= ControlnR;
+                    FifoV <= ControlnR;
+                    FifoR <= '0';
+
                     ControlV <= '1';
                     ControlInternal <= CONTROL_SPEC;
                     outs <= predict_ins;
                     outs_spec <= "1";
-                    FifoV <= '1';
                 elsif (DatapV = '1' and FifoNotEmpty = '0') then
+                    -- TODO: Assert PredictpV = '1'?
+
+                    DataR <= ControlnR;
+                    PredictR <= ControlnR;
+
+                    FifoV <= '0';
+                    FifoR <= '0';
+
                     ControlV <= '1';
                     ControlInternal <= CONTROL_NO_CMP;
                     outs <= ins;
                     outs_spec <= "0";
                 elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+                    DataR <= ControlnR;
+                    PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
+
                     ControlV <= '1';
                     ControlInternal <= CONTROL_CORRECT_SPEC;
                     outs <= predict_ins;
                     outs_spec <= "1";
-                    FifoV <= '1';
+                    FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
+                    FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
                 elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
+                    DataR <= ControlnR;
+                    -- TODO: Not Specifying PredictR <= '0' is buggy?
+                    PredictR <= FifoNotFull and ControlnR;
+                    FifoR <= ControlnR;
+
+                    FifoV <= '0';
+
                     ControlV <= '1';
                     ControlInternal <= CONTROL_CMP_CORRECT;
                 elsif (DatapV = '1' and FifoNotEmpty = '1' and ins /= fifo_ins) then
+                    DataR <= ControlnR;
                     PredictR <= '0';
+                    FifoV <= '0';
+                    FifoR <= '0';
                     ControlV <= '1';
                     ControlInternal <= CONTROL_RESEND;
                     outs <= ins;
                     outs_spec <= "0";
                 else
+                    DataR <= ControlnR; -- TODO: '0'?
+                    PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
                     ControlV <= '0';
+                    FifoR <= '0';
+                    FifoV <= '0';
                 end if;
-
-            when SPEC =>
-                DataR <= '0';
-                PredictR <= ControlnR;
-                FifoR <= '0';
-                ControlV <= '1';
-                FifoV <= '0';
-
-                ControlInternal <= CONTROL_SPEC;
-
-                outs <= predict_ins;
-                outs_spec <= "1";
-
-            when NO_CMP =>
-                DataR <= ControlnR;
-                PredictR <= '0';
-                FifoR <= '0';
-                ControlV <= '1';
-                FifoV <= '0';
-
-                ControlInternal <= CONTROL_NO_CMP;
-
-                outs <= ins;
-                outs_spec <= "0";
-
-            when CMP_CORRECT =>
-                DataR <= ControlnR;
-                PredictR <= '0';
-                FifoR <= '0';
-                ControlV <= '1';
-                FifoV <= '0';
-
-                ControlInternal <= CONTROL_CMP_CORRECT;
-
-            when CMP_WRONG =>
-                DataR <= ControlnR;
-                PredictR <= '0';
-                FifoR <= '0';
-                ControlV <= '1';
-                FifoV <= '0';
-
-                ControlInternal <= CONTROL_RESEND;
-
-                outs <= ins;
-                outs_spec <= "0";
 
             when KILL =>
                 -- Connect FIFO with Control
