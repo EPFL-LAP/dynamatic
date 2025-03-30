@@ -1,13 +1,33 @@
 #include "util.h"
 
+#include <set>
+
 std::vector<fs::path> findTests(const fs::path& start) {
+  std::set<std::string> ignored;
+  fs::path ignorePath = start / "ignored_tests.txt";
+  if (fs::exists(ignorePath)) {
+    std::ifstream in(ignorePath);
+    if (in.is_open()) {
+      std::string line;
+      while (getline(in, line)) {
+        ignored.insert(line);
+      }
+    }
+    else {
+      std::cout << "[WARNING] Failed to open " << ignorePath << std::endl;
+    }
+  }
+
   std::vector<fs::path> ret;
   for (const auto& folder : fs::directory_iterator(start)) {
     if (folder.is_directory()) {
       for (const auto& entry : fs::directory_iterator(folder)) {
-          if (entry.is_regular_file() && entry.path().extension() == ".c") {
-              ret.push_back(entry.path());
-          }
+        if (ignored.find(entry.path().stem()) != ignored.end()) {
+          std::cout << "[INFO] Ignoring " << entry.path() << std::endl;
+        }
+        else if (entry.is_regular_file() && entry.path().extension() == ".c") {
+            ret.push_back(entry.path());
+        }
       }
     }
   }
