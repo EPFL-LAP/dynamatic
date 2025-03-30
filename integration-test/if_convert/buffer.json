@@ -1,11 +1,5 @@
 [
   {
-    "pred": "fork8",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
     "pred": "speculator0",
     "outid": 0,
     "slots": 16,
