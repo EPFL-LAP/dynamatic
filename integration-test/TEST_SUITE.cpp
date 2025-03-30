@@ -6,9 +6,28 @@
 #include <string>
 #include <fstream>
 
-class BasicIntegrationFixture : public testing::TestWithParam<std::string> { };
+namespace fs = std::filesystem;
 
-int runIntegrationTest(const std::string& name) {
+class BasicIntegrationFixture : public testing::TestWithParam<fs::path> { };
+
+std::vector<fs::path> findTests(const fs::path& start) {
+  std::vector<fs::path> ret;
+  for (const auto& folder : fs::directory_iterator(start)) {
+    if (folder.is_directory()) {
+      for (const auto& entry : fs::directory_iterator(folder)) {
+          if (entry.is_regular_file() && entry.path().extension() == ".c") {
+              ret.push_back(entry.path());
+          }
+      }
+    }
+  }
+
+  return ret;
+}
+
+int runIntegrationTest(const fs::path& path) {
+  std::string name = path.stem();
+  std::cout << "Running " << name << std::endl;
   std::string tmpFilename = "tmp_" + name + ".dyn";
   std::ofstream script_file(tmpFilename);
   if (!script_file.is_open()) {
@@ -17,8 +36,7 @@ int runIntegrationTest(const std::string& name) {
   } 
 
   script_file << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
-    << "set-src " << DYNAMATIC_ROOT << "/integration-test/" 
-    << name << "/" << name << ".c" << std::endl
+    << "set-src " << path.string() << std::endl
     << "compile" << std::endl
     << "write-hdl" << std::endl
     << "simulate" << std::endl
@@ -33,16 +51,16 @@ int runIntegrationTest(const std::string& name) {
 }
 
 TEST_P(BasicIntegrationFixture, basicNoFlags) {
-  std::string testName = GetParam();
-  EXPECT_EQ(runIntegrationTest(testName), 0);
+  fs::path testPath = GetParam();
+  EXPECT_EQ(runIntegrationTest(testPath), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(
   BasicIntegration,
   BasicIntegrationFixture,
-  testing::Values(
-    "gcd",
-    "binary_search",
-    "kernel_3mm_float"
+  testing::ValuesIn(
+    findTests(
+      fs::path(DYNAMATIC_ROOT) / fs::path("integration-test")
+    )
   )
 );
