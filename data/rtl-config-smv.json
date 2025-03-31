@@ -291,7 +291,8 @@
   },
   {
     "name": "handshake.lsq",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t lsq -p port_types=$PORT_TYPES config_file=\"'$OUTPUT_DIR/$MODULE_NAME.json'\"",
     "hdl": "smv"
   }
 ]
