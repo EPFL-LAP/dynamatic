@@ -2,14 +2,9 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import Timer, RisingEdge
 import cocotb.runner
-import os
 
 
 def main():
-  base_path = os.path.dirname(os.path.abspath(__file__))
-
-  types_file = os.path.join(base_path, "types.vhd")
-
   runner = cocotb.runner.get_runner("questa")
   runner.build(
       vhdl_sources=[
@@ -31,27 +26,79 @@ def main():
   )
 
 
+async def watcher_nocmp(dut):
+  print("Watching for Values")
+  sc_ctrls = []
+  spec_outs = []
+  sc_outs = []
+  for _ in range(100):
+    if dut.sc.ctrl_valid.value == 1 and dut.sc.ctrl_ready.value == 1:
+      sc_ctrls.append(dut.sc.ctrl.value)
+    if dut.speculator_outs_valid.value == 1 and dut.speculator_outs_ready.value == 1:
+      spec_outs.append(dut.speculator_outs.value)
+    if dut.sc_outs_valid.value == 1 and dut.sc_outs_ready.value == 1:
+      sc_outs.append(dut.sc_outs.value)
+    await RisingEdge(dut.clk)
+  print(sc_ctrls, spec_outs, sc_outs)
+  assert len(spec_outs) == 1
+  assert len(sc_outs) == 1
+
+
 @cocotb.test()
 async def test_nocmp(dut):
   await cocotb.start(Clock(dut.clk, 4, "ns").start())
+  watcher = cocotb.start_soon(watcher_nocmp(dut))
   dut.rst.value = 1
   await Timer(8, "ns")
   dut.rst.value = 0
 
-  cocotb.start
+  # Initial values
+  dut.speculator_ins.value = 0
+  dut.speculator_ins_valid.value = 0
+  dut.speculator_ins_spec.value = 0
+  dut.speculator_trigger_valid.value = 0
+  dut.speculator_trigger_spec.value = 0
+  dut.speculator_outs_ready.value = 1
+  dut.speculator_ctrl_save_ready.value = 1
+  dut.speculator_ctrl_commit_ready.value = 1
+  dut.speculator_ctrl_sc_branch_ready.value = 1
+
+  # Always send a token
+  dut.sc_ins.value = 0
+  dut.sc_ins_valid.value = 1
+  dut.sc_ins_spec.value = 0
+
+  dut.sc_outs_ready.value = 1
+  await RisingEdge(dut.clk)
+
   # Non-spec condition
   dut.speculator_ins.value = 0
   dut.speculator_ins_valid.value = 1
   dut.speculator_ins_spec.value = 0
+  await RisingEdge(dut.clk)
 
-  for i in range(10):
-    print(dut.speculator_ins_ready, dut.speculator_ins_valid, dut.speculator_ins)
+  for _ in range(10):
     if dut.speculator_ins_ready.value == 1:
-      break
+      dut.speculator_ins_valid.value = 0
     await RisingEdge(dut.clk)
 
-  pass
+  # Trigger
+  dut.speculator_trigger_valid.value = 1
+  dut.speculator_trigger_spec.value = 0
+  await RisingEdge(dut.clk)
 
+  for _ in range(10):
+    if dut.speculator_ins_ready.value == 1:
+      dut.speculator_ins_valid.value = 0
+
+    if dut.speculator_trigger_ready.value == 1:
+      dut.speculator_trigger_valid.value = 0
+
+    await RisingEdge(dut.clk)
+
+  # Assert watcher lifetime is long enough
+  assert not watcher.done()
+  await watcher.join()
 
 if __name__ == "__main__":
   main()
