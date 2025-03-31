@@ -1,4 +1,6 @@
 import cocotb
+from cocotb.clock import Clock
+from cocotb.triggers import Timer, RisingEdge
 import cocotb.runner
 import os
 
@@ -21,13 +23,33 @@ def main():
       build_args=["-2008"]
   )
 
-  runner.test(hdl_toplevel="circuit", test_module="test_suite.testbench",
-              testcase=["test_nocmp"])
+  runner.test(
+      hdl_toplevel="circuit",
+      test_module="test_suite.testbench",
+      testcase=["test_nocmp"],
+      waves=True
+  )
 
 
 @cocotb.test()
-def test_nocmp(dut):
-  print(dut)
+async def test_nocmp(dut):
+  await cocotb.start(Clock(dut.clk, 4, "ns").start())
+  dut.rst.value = 1
+  await Timer(8, "ns")
+  dut.rst.value = 0
+
+  cocotb.start
+  # Non-spec condition
+  dut.speculator_ins.value = 0
+  dut.speculator_ins_valid.value = 1
+  dut.speculator_ins_spec.value = 0
+
+  for i in range(10):
+    print(dut.speculator_ins_ready, dut.speculator_ins_valid, dut.speculator_ins)
+    if dut.speculator_ins_ready.value == 1:
+      break
+    await RisingEdge(dut.clk)
+
   pass
 
 
