@@ -20,7 +20,7 @@ def main():
 
   runner.test(
       hdl_toplevel="circuit",
-      test_module="test_suite.testbench",
+      test_module="test_suite.test_nocmp",
       testcase=["test_nocmp"],
       waves=True
   )
