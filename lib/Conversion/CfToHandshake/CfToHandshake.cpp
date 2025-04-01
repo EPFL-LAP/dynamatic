@@ -1302,8 +1302,32 @@ struct CfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
+    //create a File called "handshake.Arguments" where we note extragted arguments
+    std::error_code EC2;
+    llvm::raw_fd_ostream argumentFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/fir/out/comp/handshake_Arguments.txt", EC2);
+    argumentFile << "=== CallOp arguments ===\n";
+
     // Put all non-external functions into maximal SSA form
-    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
+    for (auto funcOp : modOp.getOps<mlir::func::FuncOp>()) {
+      int count = 0;
+      for (unsigned int i = 0; i < funcOp.getNumArguments(); ++i){
+        //auto arg = funcOp.getBody().getArguments()[i];
+        auto nameAttr = funcOp.getArgAttrOfType<mlir::StringAttr>(i,"handshake.arg_name");
+        if(nameAttr){
+          argumentFile << "Argument " << i << ", name:" << nameAttr.getValue() << "\n";
+          if(nameAttr.getValue() == "idx"){
+            argumentFile << "one of the arguments is named idx! \n";
+          }
+          if(nameAttr.getValue().startswith("di")){
+            argumentFile << "Argument " << i << " starts with di! \n";
+            count++;
+          }
+        } 
+      }
+      if(count != 0){
+        argumentFile << count << " Argument(s) start with di! \n";
+      }
+
       if (!funcOp.isExternal()) {
         FuncSSAStrategy strategy;
         if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
@@ -1358,6 +1382,29 @@ struct CfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+  
+    //create a file called handshake_debug.txt where the results of our traversal get printed
+    std::error_code EC;
+    llvm::raw_fd_ostream debugFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/fir/out/comp/handshake_debug.txt", EC);
+    debugFile << "=== IR dump after CfToHandshakePass ===\n";
+    modOp.walk([&](mlir::Operation *op) {
+        debugFile << "Found op: " << op->getName() << "\n";
+        for (auto operand : op->getOperands()) {
+          debugFile << "  Operand: " << operand << "\n";
+        }
+        for (auto result : op->getResults()) {
+          debugFile << "  Result: " << result << " used by:\n";
+          for (auto user : result.getUsers()) {
+              debugFile << "    - " << user->getName() << "\n";
+          }
+        }
+        for (auto attr : op->getAttrs()){
+          debugFile << " Attribute: " << attr.getName().str()
+          << " = " << attr.getValue() << "\n";
+        }
+    });
+    debugFile << "=== End of IR dump ===\n";
+
   }
 };
 } // namespace
