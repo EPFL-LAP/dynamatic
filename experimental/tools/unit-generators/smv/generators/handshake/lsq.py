@@ -1,4 +1,5 @@
 from generators.support.utils import *
+from generators.handshake.ndwire import generate_ndwire
 import json
 
 def generate_lsq(name, params):
@@ -44,33 +45,39 @@ MODULE {name} ({lsq_in_ports})
   io_memEnd_valid :=
 """
 
-def _generate_nd_load_port(name, capacity):
+def _generate_nd_load_port(name, capacity, addr_type, data_type):
     return f"""
 MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
-  VAR inner_input_ndw : nd_wire(ldAddr, ldAddr_valid, inner_capacity.ins_ready);
+  VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid, inner_capacity.ins_ready);
   VAR inner_capacity : capacity(inner_input_ndw.outs, inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
-  VAR inner_output_ndw : nd_wire(data_from_mem, inner_capacity.outs_valid, ldData_ready);
+  VAR inner_output_ndw : {name}__out_ndwire(data_from_mem, inner_capacity.outs_valid, ldData_ready);
 
   -- output
   DEFINE
   ldAddr_ready := inner_input_ndw.ins_ready;
   ldData := inner_output_ndw.outs;
   ldData_valid := inner_output_ndw.outs_valid;
+
+  {generate_ndwire(f"{name}__in_ndwire", {ATTR_PORT_TYPES: {"ins": addr_type.mlir_type}})}
+  {generate_ndwire(f"{name}__out_ndwire", {ATTR_PORT_TYPES: {"ins": data_type.mlir_type}})}
 """
 
-def _generate_nd_store_port(name, capacity):
+def _generate_nd_store_port(name, capacity, addr_type, data_type):
     return f"""
 MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
-  VAR inner_addr_ndw : nd_wire(stAddr, stAddr_valid, inner_addr_capacity.ins_ready);
+  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_capacity.ins_ready);
   VAR inner_addr_capacity : capacity(inner_addr_ndw.stAddr, inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
-  VAR inner_data_ndw : nd_wire(stData, stData_valid, inner_data_capacity.ins_ready);
+  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, inner_data_capacity.ins_ready);
   VAR inner_data_capacity : capacity(inner_data_ndw.stAddr, inner_data_ndw.outs_valid, inner_join.ins_1_ready);
   VAR inner_join : join_dataless(inner_addr_capacity.outs_valid, inner_data_capacity.outs_valid);
-  VAR inner_sink_ndw : nd_wire(inner_data_ndw.outs, inner_join.outs_valid, sink_ins_ready);
+  VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, sink_ins_ready);
   VAR inner_sink : sink(inner_data_ndw.outs, inner_sink_ndw.outs_valid);
 
   -- output
   DEFINE
   stAddr_ready := inner_addr_ndw.ins_ready;
   stData_ready := inner_data_ndw.ins_ready;
+
+  {generate_ndwire(f"{name}__addr_ndwire", {ATTR_PORT_TYPES: {"ins": addr_type.mlir_type}})}
+  {generate_ndwire(f"{name}__data_ndwire", {ATTR_PORT_TYPES: {"ins": data_type.mlir_type}})}
 """
