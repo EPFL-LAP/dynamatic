@@ -217,7 +217,7 @@ end architecture;
 
 ## `spec_commit` (concat signal manager)
 
-When `spec_commit` carries both `spec: i1` and `tag0: i8`, it uses the concat signal manager and forwards the `spec` extra signal to the inner unit:
+When `spec_commit` carries both `spec: i1` and `tag0: i8`, it uses the concat signal manager to forward extra signals except for `spec`. `spec` is propagated to the inner unit.
 
 ```vhdl
 library ieee;
@@ -267,7 +267,7 @@ begin
       ins_ready => ins_ready,
       -- Note: `spec` is forwarded.
       ins_spec => ins_spec,
-      -- Note: Since `ctrl` is in ignore_ports, extra signals are not concatenated, and the original `ctrl` signal is forwarded.
+      -- Note: Since `ctrl` is in `ignore_ports`, extra signals are not concatenated, and the original `ctrl` signal is forwarded.
       ctrl => ctrl,
       ctrl_valid => ctrl_valid,
       ctrl_ready => ctrl_ready,
