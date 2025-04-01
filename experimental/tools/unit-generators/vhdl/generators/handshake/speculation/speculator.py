@@ -146,9 +146,7 @@ begin
           ControlInternal <= CONTROL_SPEC;
           outs <= predict_ins;
           outs_spec <= "1";
-        elsif (DatapV = '1' and FifoNotEmpty = '0') then
-          -- TODO: Assert PredictpV = '1'?
-
+        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '0') then
           DataR <= ControlnR;
           PredictR <= ControlnR;
 
