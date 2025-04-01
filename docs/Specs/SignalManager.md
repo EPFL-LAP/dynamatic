@@ -215,6 +215,71 @@ end architecture;
 -- Signal manager generation info: handshake_fork_1, {'type': 'concat', 'in_ports': [{'name': 'ins', 'bitwidth': 32, 'extra_signals': {'spec': 1}}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'spec': 1}, '2d': True, 'size': 4}], 'extra_signals': {'spec': 1}}
 ```
 
+## `spec_commit` (concat signal manager)
+
+When `spec_commit` carries both `spec: i1` and `tag0: i8`, it uses the concat signal manager and forwards the `spec` extra signal to the inner unit:
+
+```vhdl
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.types.all;
+
+-- Entity of signal manager
+entity spec_commit0 is
+  port(
+    clk : in std_logic;
+    rst : in std_logic;
+    ins : in std_logic_vector(32 - 1 downto 0);
+    ins_valid : in std_logic;
+    ins_ready : out std_logic;
+    ins_spec : in std_logic_vector(1 - 1 downto 0);
+    ins_tag0 : in std_logic_vector(8 - 1 downto 0);
+    ctrl : in std_logic_vector(1 - 1 downto 0);
+    ctrl_valid : in std_logic;
+    ctrl_ready : out std_logic;
+    outs : out std_logic_vector(32 - 1 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in std_logic;
+    outs_tag0 : out std_logic_vector(8 - 1 downto 0)
+  );
+end entity;
+
+-- Architecture of signal manager (concat)
+architecture arch of spec_commit0 is
+  -- Concatenated data and extra signals
+  signal ins_inner : std_logic_vector(40 - 1 downto 0);
+  signal outs_inner : std_logic_vector(40 - 1 downto 0);
+begin
+  -- Concatenate data and extra signals
+  -- Note: Only tag0 is concatenated and spec is not as only tag0 is specified in extra_signals parameter.
+  ins_inner(32 - 1 downto 0) <= ins;
+  ins_inner(39 downto 32) <= ins_tag0;
+  outs <= outs_inner(32 - 1 downto 0);
+  outs_tag0 <= outs_inner(39 downto 32);
+
+  inner : entity work.spec_commit0_inner(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins_inner,
+      ins_valid => ins_valid,
+      ins_ready => ins_ready,
+      -- Note: `spec` is forwarded.
+      ins_spec => ins_spec,
+      -- Note: Since `ctrl` is in ignore_ports, extra signals are not concatenated, and the original `ctrl` signal is forwarded.
+      ctrl => ctrl,
+      ctrl_valid => ctrl_valid,
+      ctrl_ready => ctrl_ready,
+      outs => outs_inner,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
+      -- Note: since `outs` originally lacks `spec`, it is not forwarded.
+    );
+end architecture;
+-- Signal manager generation info: spec_commit0, {'type': 'concat', 'in_ports': [{'name': 'ins', 'bitwidth': 32, 'extra_signals': {'spec': 1, 'tag0': 8}}, {'name': 'ctrl', 'bitwidth': 1}], 'out_ports': [{'name': 'outs', 'bitwidth': 32, 'extra_signals': {'tag0': 8}}], 'extra_signals': {'tag0': 8}, 'ignore_ports': ['ctrl']}
+```
+
 ## `mux` (bbmerge signal manager)
 
 ```vhdl
