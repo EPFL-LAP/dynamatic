@@ -18,6 +18,7 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.ndwire as ndwire
 import generators.handshake.lsq as lsq
 
 import generators.arith.absf as absf
@@ -141,6 +142,8 @@ def generate_code(name, mod_type, parameters):
       return trunci.generate_trunci(name, parameters)
     case "xori":
       return xori.generate_xori(name, parameters)
+    case "ndwire":
+      return ndwire.generate_ndwire(name, parameters)
     case "lsq":
       return lsq.generate_lsq(name, parameters)
     case _:
