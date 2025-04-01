@@ -55,7 +55,7 @@ end entity;
   architecture = f"""
 -- Architecture of specgenCore
 architecture arch of {name} is
-  type State_type is (IDLE, KILL);
+  type State_type is (IDLE, KILL, KILL_ONLY_TOKENS);
   type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
   signal State : State_type;
 
@@ -116,10 +116,17 @@ begin
             end if;
           when KILL =>
             if (FifoNotEmpty = '0' and -- Killed all data in FIFO
-                DatapV = '1' and ins_spec = "0" and -- Killed incoming spec data
-                PredictpV = '1' and predict_ins_spec = "0") -- Killed incoming spec trigger
-                then
-
+                PredictpV = '1' and predict_ins_spec = "0") then -- Killed incoming spec trigger
+                if (DatapV = '1' and ins_spec = "0") then
+                  -- Already killed incoming spec data
+                  State <= IDLE;
+                else
+                  -- Wait for all misspec tokens, but accept new speculation
+                  State <= KILL_ONLY_TOKENS;
+                end if;
+            end if;
+          when KILL_ONLY_TOKENS =>
+            if (DatapV = '1' and ins_spec = "0") then
               State <= IDLE;
             end if;
         end case;
@@ -209,6 +216,24 @@ begin
 
         -- Never pushes new data to fifo
         FifoV <= '0';
+      when KILL_ONLY_TOKENS =>
+        -- Accepts spec data to kill it
+        DataR <= ins_spec(0);
+
+        -- Accepts new speculation if no backpressure
+        PredictR <= ControlnR and FifoNotFull;
+
+        -- New speculation pushes to FIFO and emits a control if no backpressure
+        FifoV <= PredictpV and ControlnR;
+        ControlV <= PredictpV and FifoNotFull;
+
+        -- Control signal is always SPEC
+        ControlInternal <= CONTROL_SPEC;
+        outs <= predict_ins;
+        outs_spec <= "1";
+
+        -- Never pops from FIFO
+        FifoR <= '0';
     end case;
   end process;
 end architecture;
