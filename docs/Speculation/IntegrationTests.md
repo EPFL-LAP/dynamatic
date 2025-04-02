@@ -34,7 +34,7 @@ The full details of the custom compilation flow can be found in the Python scrip
  `tools/integration/run_spec_integration.py`.
  Below is a summary of its characteristics:
 
-- Compilation starts from the `cf` dialect since modifications to the CFG are required under the current frontend (this will be resolved by #311).
+- Compilation starts from the `cf` dialect since modifications to the CFG are required under the current frontend (this will be resolved by [#311](https://github.com/EPFL-LAP/dynamatic/issues/311)).
 - The speculation pass (`HandshakeSpeculation`) runs **after** the buffer placement pass.
 - A **custom buffer placement pass** follows the speculation pass, just before the `HandshakeToHW` pass, ensuring that required buffers for speculation are placed.
 - We use a **Python-based, generation-oriented beta backend**, which supports the signal manager.
@@ -146,7 +146,7 @@ The buffer configuration is defined in `buffer.json` under each integration test
     "slots": 16,
     "type": "tehb"
   },
-  // ...
+  ...
 ]
 ```
 
