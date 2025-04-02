@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
+
 def generate_shli(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
@@ -9,6 +10,7 @@ def generate_shli(name, params):
     return _generate_shli_signal_manager(name, bitwidth, extra_signals)
   else:
     return _generate_shli(name, bitwidth)
+
 
 def _generate_shli(name, bitwidth):
   join_name = f"{name}_join"
@@ -42,7 +44,7 @@ entity {name} is
   );
 end entity;
 """
-  
+
   architecture = f"""
 -- Architecture of shli
 architecture arch of {name} is
@@ -64,8 +66,9 @@ begin
   result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs({bitwidth} - 2 downto 0)))));
 end architecture;
 """
-  
+
   return dependencies + entity + architecture
+
 
 def _generate_shli_signal_manager(name, bitwidth, extra_signals):
   return generate_signal_manager(name, {

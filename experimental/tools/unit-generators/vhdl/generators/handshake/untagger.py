@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
+
 def generate_untagger(name, params):
   data_bitwidth = params["data_bitwidth"]
   tag_bitwidth = params["tag_bitwidth"]
@@ -10,9 +11,9 @@ def generate_untagger(name, params):
 
   # Get the current tag that was removed by the tagger by viewing the difference of tags between the input and output data types
   unique_data_out_signals = {
-    name: bitwidth
-    for name, bitwidth in input_extra_signals.items()
-    if name not in output_extra_signals
+      name: bitwidth
+      for name, bitwidth in input_extra_signals.items()
+      if name not in output_extra_signals
   }
   current_tag = next(iter(unique_data_out_signals))
 
@@ -21,8 +22,9 @@ def generate_untagger(name, params):
   else:
     return _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth)
 
+
 def _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth):
-  
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -52,7 +54,7 @@ port(
 );
 end {name};
 """
-  
+
   architecture = f"""
 -- Architecture of untagger
 architecture arch of {name} is
@@ -65,8 +67,9 @@ begin
 
 end architecture;
 """
-  
+
   return entity + architecture
+
 
 def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, extra_signals):
   return generate_signal_manager(name, {
@@ -76,7 +79,7 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
       },
-      {
+          {
           "name": f"ins_{current_tag}",
           "bitwidth": tag_bitwidth,
           "extra_signals": {},
@@ -86,7 +89,7 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
           "name": "outs",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      },{
+      }, {
           "name": "tagOut",
           "bitwidth": tag_bitwidth,
           "extra_signals": {}

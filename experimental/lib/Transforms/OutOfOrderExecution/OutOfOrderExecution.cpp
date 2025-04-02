@@ -25,6 +25,8 @@
 #include <memory>
 #include <string>
 
+using namespace dynamatic::experimental::outoforder;
+
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
@@ -102,14 +104,15 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
 
   OpBuilder builder(ctx);
   for (auto loadOp : funcOp.getOps<handshake::LoadOp>()) {
-    auto startValue = (Value)funcOp.getArguments().back();
     Value addrInput = loadOp.getAddressInput();
     builder.setInsertionPoint(loadOp);
 
     auto tagType = builder.getIntegerType(ceil(log2(4)));
 
+    BackedgeBuilder beb(builder, loadOp.getLoc());
+    Backedge cond = beb.get(tagType);
     FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
-        loadOp.getLoc(), handshake::ChannelType::get(tagType), startValue);
+        loadOp.getLoc(), handshake::ChannelType::get(tagType), cond);
 
     // Tag the address input of the load of
     handshake::TaggerOp taggerOp = builder.create<handshake::TaggerOp>(
@@ -128,7 +131,7 @@ OutOfOrderExecutionPass::createOutOfExecutionGraph(handshake::FuncOp funcOp,
     loadOutput.replaceAllUsesExcept(untaggerOp.getDataOut(), untaggerOp);
 
     // Connet the free tag from the untagger to the fifo
-    fifo.getOperation()->replaceUsesOfWith(startValue, untaggerOp.getTagOut());
+    fifo.getOperation()->replaceUsesOfWith(cond, untaggerOp.getTagOut());
 
     inheritBB(loadOp, fifo);
     inheritBB(loadOp, taggerOp);
@@ -278,11 +281,10 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   BackedgeBuilder beb(builder, (*taggedEdges.begin()).getLoc());
   Backedge cond = beb.get(tagType);
 
-  auto startValue = (Value)funcOp.getArguments().back();
   builder.setInsertionPoint(outOfOrderOp);
   FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
       (*taggedEdges.begin()).getLoc(), handshake::ChannelType::get(tagType),
-      startValue);
+      cond);
   inheritBB(outOfOrderOp, fifo);
 
   // Step 3: Add the Tagger Operations
@@ -303,9 +305,9 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
     handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
         (*joinOperands.begin()).getLoc(), joinOperands);
     inheritBB(outOfOrderOp, joinOp);
-    fifo.getOperation()->replaceUsesOfWith(startValue, joinOp.getResult());
+    fifo.getOperation()->replaceUsesOfWith(cond, joinOp.getResult());
   } else {
-    fifo.getOperation()->replaceUsesOfWith(startValue, (*joinOperands.begin()));
+    fifo.getOperation()->replaceUsesOfWith(cond, (*joinOperands.begin()));
   }
 
   return fifo.getOperation();
@@ -563,13 +565,14 @@ static void tarverseNestedGraph(Operation *op, OpBuilder builder,
 LogicalResult OutOfOrderExecutionPass::testNestedRegions(
     handshake::FuncOp funcOp, OpBuilder builder, Operation *outOfOrderOp,
     Operation *innerFifo, const std::string &extraTag) {
-  auto startValue = (Value)funcOp.getArguments().back();
   builder.setInsertionPoint(outOfOrderOp);
   auto tagType = builder.getIntegerType(ceil(log2(8)));
 
   // Add the fifo
+  BackedgeBuilder beb(builder, outOfOrderOp->getLoc());
+  Backedge cond = beb.get(tagType);
   FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
-      outOfOrderOp->getLoc(), handshake::ChannelType::get(tagType), startValue);
+      outOfOrderOp->getLoc(), handshake::ChannelType::get(tagType), cond);
 
   // Add the outer taggers+untaggers
   llvm::DenseSet<Operation *> visitedNodes;
@@ -581,9 +584,9 @@ LogicalResult OutOfOrderExecutionPass::testNestedRegions(
     handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
         (*joinOperands.begin()).getLoc(), joinOperands);
     inheritBB(outOfOrderOp, joinOp);
-    fifo.getOperation()->replaceUsesOfWith(startValue, joinOp.getResult());
+    fifo.getOperation()->replaceUsesOfWith(cond, joinOp.getResult());
   } else {
-    fifo.getOperation()->replaceUsesOfWith(startValue, (*joinOperands.begin()));
+    fifo.getOperation()->replaceUsesOfWith(cond, (*joinOperands.begin()));
   }
 
   // Tag the chennels of the outer region

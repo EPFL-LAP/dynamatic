@@ -1,6 +1,7 @@
 from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
+
 def generate_tagger(name, params):
   data_bitwidth = params["data_bitwidth"]
   tag_bitwidth = params["tag_bitwidth"]
@@ -10,9 +11,9 @@ def generate_tagger(name, params):
 
   # Get the current tag that was added by the tagger by viewing the difference of tags between the input and output data types
   unique_data_out_signals = {
-    name: bitwidth
-    for name, bitwidth in output_extra_signals.items()
-    if name not in input_extra_signals
+      name: bitwidth
+      for name, bitwidth in output_extra_signals.items()
+      if name not in input_extra_signals
   }
   current_tag = next(iter(unique_data_out_signals))
 
@@ -21,6 +22,7 @@ def generate_tagger(name, params):
   else:
     return _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth)
 
+
 def _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth):
   join_name = f"{name}_join"
 
@@ -28,7 +30,7 @@ def _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth):
       generate_join(join_name, {
           "size": 2
       })
-  
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -58,7 +60,7 @@ entity {name} is
   );
 end {name};
 """
-  
+
   architecture = f"""
 -- Architecture of tagger
 architecture arch of {name} is
@@ -86,8 +88,9 @@ begin
 
 end architecture;
 """
-  
+
   return dependencies + entity + architecture
+
 
 def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, extra_signals):
   return generate_signal_manager(name, {
@@ -96,7 +99,7 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
           "name": "ins",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
-      },{
+      }, {
           "name": "tagIn",
           "bitwidth": tag_bitwidth,
           "extra_signals": {}
@@ -107,7 +110,7 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
       },
-      {
+          {
           "name": f"outs_{current_tag}",
           "bitwidth": tag_bitwidth,
           "extra_signals": {},

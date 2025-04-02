@@ -1,10 +1,12 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
+
 def generate_free_tags_fifo(name, params):
   data_bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
   return _generate_free_tags_fifo(name, data_bitwidth, fifo_depth)
+
 
 def _generate_free_tags_fifo(name, data_bitwidth, fifo_depth):
   fifo_name = f"{name}_fifo"
@@ -14,7 +16,7 @@ def _generate_free_tags_fifo(name, data_bitwidth, fifo_depth):
           "size": fifo_depth,
           "bitwidth": data_bitwidth
       })
-  
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;

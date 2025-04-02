@@ -13,6 +13,7 @@ def generate_join(name, params):
   else:
     return _generate_join(name, size, bitwidth)
 
+
 def _generate_join_dataless(name, size):
   and_n_module_name = f"{name}_and_n"
   dependencies = generate_and_n(and_n_module_name, {"size": size})
@@ -64,6 +65,7 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
 
 def _generate_join(name, size, bitwidth):
   and_n_module_name = f"{name}_and_n"
