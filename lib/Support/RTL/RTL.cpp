@@ -414,9 +414,9 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::oehb())
+      if (info == handshake::TimingInfo::tehb())
         serializedParams["TRANSPARENT"] = "True";
-      else if (info == handshake::TimingInfo::tehb())
+      else if (info == handshake::TimingInfo::oehb())
         serializedParams["TRANSPARENT"] = "False";
       else {
         llvm_unreachable("Unknown timing info");
