@@ -19,9 +19,11 @@ MODULE {name}(ins_valid, outs_ready)
   init(state) := {{SLEEPING, RUNNING}};
   next(state) := case
     state = SLEEPING : {{SLEEPING, RUNNING}};
-    ins_valid and outs_ready : {{SLEEPING, RUNNING}};
+    ins_valid & outs_ready : {{SLEEPING, RUNNING}};
     TRUE : state;
   esac;
+
+  FAIRNESS state = RUNNING;
 
   // output
   DEFINE  
@@ -33,11 +35,13 @@ MODULE {name}(ins_valid, outs_ready)
 def _generate_ndwire(name, data_type):
   return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
-  VAR inner_ndwire : {name}__ndwire_dataless(ins_valid, outs_ready)
+  VAR inner_ndwire : {name}__ndwire_dataless(ins_valid, outs_ready);
 
   // output
   DEFINE
   outs := ins;
   outs_valid :=  inner_ndwire.outs_valid;
   ins_ready  :=  inner_ndwire.ins_ready;
+
+{_generate_ndwire_dataless(f"{name}__ndwire_dataless")}
 """
