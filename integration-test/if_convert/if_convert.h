@@ -1,8 +1,8 @@
-#ifndef LOOP_PATH_H
-#define LOOP_PATH_H
+#ifndef IF_CONVERT_H
+#define IF_CONVERT_H
 
-#define N 20  // 200
-#define N2 19 // 199
+#define N 200
+#define N2 199
 
 typedef int in_int_t;
 typedef int inout_int_t;
