@@ -1157,6 +1157,9 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto modOp = callOp->getParentOfType<mlir::ModuleOp>();
   assert(modOp && "call should have parent module");
 
+  std::error_code EC;
+  llvm::raw_fd_ostream argFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/float_basic/out/comp/arg_names.txt", EC);
+
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
   SmallVector<Value> operands(adaptor.getOperands());
@@ -1179,6 +1182,43 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
+    SmallVector<unsigned> InstanceOpInputIndices;
+    SmallVector<unsigned> InstanceOpOutputIndices;
+    SmallVector<unsigned> InstanceOpParameterIndices;
+    llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
+    //classify arguments based on naming convention
+    for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
+      auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
+      argFile << "Argument " << i << ": (" << nameAttr.getValue() <<")\n";
+      if(nameAttr.getValue().starts_with("input")){
+        argFile << "classified as Input \n";
+        InstanceOpInputIndices.push_back(i);
+      }
+      else if(nameAttr.getValue().starts_with("output")){
+        argFile << "classified as Output \n";
+        InstanceOpOutputIndices.push_back(i);
+      }
+      else{
+        argFile << "classified as Parameter \n";
+        InstanceOpParameterIndices.push_back(i);
+      }
+    }
+    //for every output indice get its consumer
+    for(unsigned outputId : InstanceOpOutputIndices){
+      //SSA value for the output argument
+      Value outputArg = callOp.getOperand(outputId);
+      //find all MLIR operations that use this argument7value
+      SmallVector<Operation*> fanouts;
+      for(auto &use : outputArg.getUses()){
+        Operation* user = use.getOwner();
+        argFile << "Output "<< outputId << ", User: ";
+        user->print(argFile);
+        argFile << "\n";
+        fanouts.push_back(user);
+      }
+      //saves output index -> consumers, into the dictionary
+      outputConnections[outputId] = fanouts; //should we add the control flag into
+    }
     resultTypes = calledFuncOp.getFunctionType().getResults();
   } else {
     resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
@@ -1192,7 +1232,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands); //here operands includes the call operands and a control op, this needs to be changed
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
@@ -1302,32 +1342,8 @@ struct CfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
-    //create a File called "handshake.Arguments" where we note extragted arguments
-    std::error_code EC2;
-    llvm::raw_fd_ostream argumentFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/fir/out/comp/handshake_Arguments.txt", EC2);
-    argumentFile << "=== CallOp arguments ===\n";
-
     // Put all non-external functions into maximal SSA form
-    for (auto funcOp : modOp.getOps<mlir::func::FuncOp>()) {
-      int count = 0;
-      for (unsigned int i = 0; i < funcOp.getNumArguments(); ++i){
-        //auto arg = funcOp.getBody().getArguments()[i];
-        auto nameAttr = funcOp.getArgAttrOfType<mlir::StringAttr>(i,"handshake.arg_name");
-        if(nameAttr){
-          argumentFile << "Argument " << i << ", name:" << nameAttr.getValue() << "\n";
-          if(nameAttr.getValue() == "idx"){
-            argumentFile << "one of the arguments is named idx! \n";
-          }
-          if(nameAttr.getValue().startswith("di")){
-            argumentFile << "Argument " << i << " starts with di! \n";
-            count++;
-          }
-        } 
-      }
-      if(count != 0){
-        argumentFile << count << " Argument(s) start with di! \n";
-      }
-
+    for (auto funcOp : modOp.getOps<func::FuncOp>()) {
       if (!funcOp.isExternal()) {
         FuncSSAStrategy strategy;
         if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
@@ -1382,29 +1398,6 @@ struct CfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
-  
-    //create a file called handshake_debug.txt where the results of our traversal get printed
-    std::error_code EC;
-    llvm::raw_fd_ostream debugFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/fir/out/comp/handshake_debug.txt", EC);
-    debugFile << "=== IR dump after CfToHandshakePass ===\n";
-    modOp.walk([&](mlir::Operation *op) {
-        debugFile << "Found op: " << op->getName() << "\n";
-        for (auto operand : op->getOperands()) {
-          debugFile << "  Operand: " << operand << "\n";
-        }
-        for (auto result : op->getResults()) {
-          debugFile << "  Result: " << result << " used by:\n";
-          for (auto user : result.getUsers()) {
-              debugFile << "    - " << user->getName() << "\n";
-          }
-        }
-        for (auto attr : op->getAttrs()){
-          debugFile << " Attribute: " << attr.getName().str()
-          << " = " << attr.getValue() << "\n";
-        }
-    });
-    debugFile << "=== End of IR dump ===\n";
-
   }
 };
 } // namespace
