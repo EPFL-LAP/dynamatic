@@ -28,6 +28,21 @@ Since these tests require manual modifications and a custom compilation flow, we
 $ python3 tools/integration/run_spec_integration.py single_loop
 ```
 
+You can run a test without speculation using the custom compilation flow:
+
+```
+$ python3 tools/integration/run_spec_integration.py single_loop --disable-spec
+```
+
+To visualize and confirm the initiation interval, you can simply use the Dynamatic interactive shell:
+
+
+```
+$ ./bin/dynamatic
+> set-src integration-tests/single_loop/single_loop.c
+> visualize
+```
+
 ## Custom Compilation Flow
 
 The full details of the custom compilation flow can be found in the Python script:
