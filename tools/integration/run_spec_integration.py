@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import argparse
 from pathlib import Path
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
@@ -46,31 +47,12 @@ def color_print(string: str, color: str):
   print(f"{color}{string}{TermColors.ENDC}")
 
 
-def fail(id, msg):
-  return {
-      "id": id,
-      "msg": msg,
-      "status": "fail"
-  }
-
-
-def run_test(c_file, id):
+def run_test(c_file: str, spec: bool) -> bool:
   """
   Runs the specified integration test.
-
-  Arguments:
-  `c_file`   -- Path to .c source file of integration test.
-  `id`       -- Index used to identify the test.
-  `timeout`  -- Timeout in seconds for running the test.
-
-  Returns:
-  Dictionary with the following keys:
-  `id`      -- Index of the test that was given as argument.
-  `msg`     -- Message indicating the result of the test.
-  `status`  -- One of 'pass', `fail` or `timeout`.
   """
 
-  print("Running", c_file)
+  print("Running", c_file, "Speculation enabled:", spec)
 
   # Get the c_file directory
   c_file_dir = os.path.dirname(c_file)
@@ -106,7 +88,9 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Applied standard transformations to cf")
     else:
-      return fail(id, "Failed to apply standard transformations to cf")
+      color_print(
+          "Failed to apply standard transformations to cf", TermColors.FAIL)
+      return False
 
   # cf transformations (dynamatic)
   cf_dyn_transformed = os.path.join(comp_out_dir, "cf_dyn_transformed.mlir")
@@ -123,7 +107,9 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Applied Dynamatic transformations to cf")
     else:
-      return fail(id, "Failed to apply Dynamatic transformations to cf")
+      color_print(
+          "Failed to apply Dynamatic transformations to cf", TermColors.FAIL)
+      return False
 
   # cf level -> handshake level
   handshake = os.path.join(comp_out_dir, "handshake.mlir")
@@ -138,7 +124,8 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Compiled cf to handshake")
     else:
-      return fail(id, "Failed to compile cf to handshake")
+      color_print("Failed to compile cf to handshake", TermColors.FAIL)
+      return False
 
   # handshake transformations
   handshake_transformed = os.path.join(
@@ -156,7 +143,9 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Applied transformations to handshake")
     else:
-      return fail(id, "Failed to apply transformations to handshake")
+      color_print("Failed to apply transformations to handshake",
+                  TermColors.FAIL)
+      return False
 
   # Buffer placement (Simple buffer placement)
   handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
@@ -173,7 +162,8 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Placed simple buffers")
     else:
-      return fail(id, "Failed to place simple buffers")
+      color_print("Failed to place simple buffers", TermColors.FAIL)
+      return False
 
   # handshake canonicalization
   handshake_canonicalized = os.path.join(
@@ -190,51 +180,58 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Canonicalized handshake")
     else:
-      return fail(id, "Failed to canonicalize Handshake")
+      color_print("Failed to canonicalize Handshake", TermColors.FAIL)
+      return False
 
-  # Speculation
-  handshake_speculation = os.path.join(
-      comp_out_dir, "handshake_speculation.mlir")
-  spec_json = os.path.join(c_file_dir, "spec.json")
-  with open(handshake_speculation, "w") as f:
-    result = subprocess.run([
-        DYNAMATIC_OPT_BIN, handshake_canonicalized,
-        f"--handshake-speculation=json-path={spec_json}",
-        "--handshake-materialize",
-        "--handshake-canonicalize"
-    ],
-        stdout=f,
-        stderr=sys.stdout
-    )
-    if result.returncode == 0:
-      print("Added speculative units")
-    else:
-      return fail(id, "Failed to add speculative units")
-
-  buffer_json = os.path.join(c_file_dir, "buffer.json")
   handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-  with open(buffer_json, "r") as f:
-    buffers = json.load(f)
-    buffer_pass_args = []
-    for buffer in buffers:
-      buffer_pass_args.append(
-          "--handshake-placebuffers-custom=" +
-          f"pred={buffer['pred']} " +
-          f"outid={buffer['outid']} " +
-          f"slots={buffer['slots']} " +
-          f"type={buffer['type']}")
-    with open(handshake_export, "w") as f:
+  if spec:
+    # Speculation
+    handshake_speculation = os.path.join(
+        comp_out_dir, "handshake_speculation.mlir")
+    spec_json = os.path.join(c_file_dir, "spec.json")
+    with open(handshake_speculation, "w") as f:
       result = subprocess.run([
-          DYNAMATIC_OPT_BIN, handshake_speculation,
-          *buffer_pass_args
+          DYNAMATIC_OPT_BIN, handshake_canonicalized,
+          f"--handshake-speculation=json-path={spec_json}",
+          "--handshake-materialize",
+          "--handshake-canonicalize"
       ],
           stdout=f,
           stderr=sys.stdout
       )
       if result.returncode == 0:
-        print("Exported Handshake")
+        print("Added speculative units")
       else:
-        return fail(id, "Failed to export Handshake")
+        color_print("Failed to add speculative units", TermColors.FAIL)
+        return False
+
+    buffer_json = os.path.join(c_file_dir, "buffer.json")
+    handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
+    with open(buffer_json, "r") as f:
+      buffers = json.load(f)
+      buffer_pass_args = []
+      for buffer in buffers:
+        buffer_pass_args.append(
+            "--handshake-placebuffers-custom=" +
+            f"pred={buffer['pred']} " +
+            f"outid={buffer['outid']} " +
+            f"slots={buffer['slots']} " +
+            f"type={buffer['type']}")
+      with open(handshake_export, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_speculation,
+            *buffer_pass_args
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+          print("Exported Handshake")
+        else:
+          color_print("Failed to export Handshake", TermColors.FAIL)
+          return False
+  else:
+    shutil.copy(handshake_canonicalized, handshake_export)
 
   # Export dot file
   dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
@@ -249,7 +246,8 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Created dot file")
     else:
-      return fail(id, "Failed to export dot file")
+      color_print("Failed to export dot file", TermColors.FAIL)
+      return False
 
   # Convert DOT graph to PNG
   png = os.path.join(comp_out_dir, f"{kernel_name}.png")
@@ -263,7 +261,8 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Created PNG file")
     else:
-      return fail(id, "Failed to create PNG file")
+      color_print("Failed to create PNG file", TermColors.FAIL)
+      return False
 
   # handshake level -> hw level
   hw = os.path.join(comp_out_dir, "hw.mlir")
@@ -278,7 +277,8 @@ def run_test(c_file, id):
     if result.returncode == 0:
       print("Lowered handshake to hw")
     else:
-      return fail(id, "Failed to lower handshake to hw")
+      color_print("Failed to lower handshake to hw", TermColors.FAIL)
+      return False
 
   # Export hdl
   hdl_dir = os.path.join(out_dir, "hdl")
@@ -290,7 +290,8 @@ def run_test(c_file, id):
   if result.returncode == 0:
     print("Exported hdl")
   else:
-    return fail(id, "Failed to export hdl")
+    color_print("Failed to export hdl", TermColors.FAIL)
+    return False
 
   # Simulate
   print("Simulator launching")
@@ -301,13 +302,10 @@ def run_test(c_file, id):
   if result.returncode == 0:
     print("Simulation succeeded")
   else:
-    return fail(id, "Failed to simulate")
+    color_print("Failed to simulate", TermColors.FAIL)
+    return False
 
-  return {
-      "id": id,
-      "msg": "Test passed",
-      "status": "pass"
-  }
+  return True
 
 
 def main():
@@ -315,20 +313,22 @@ def main():
   Entry point for the script.
   """
 
-  if len(sys.argv) != 2:
-    print("Usage: python run_spec_integration.py <test_name>")
-    sys.exit(1)
+  parser = argparse.ArgumentParser(
+      description="Run speculation integration test")
+  parser.add_argument(
+      "test_name", type=str, help="Name of the test to run")
+  parser.add_argument(
+      "--disable-spec", action="store_false", dest="spec",
+      help="Run without speculation (but with custom compilation flow)")
 
-  test_name = sys.argv[1]
+  args = parser.parse_args()
+  test_name = args.test_name
+  spec = args.spec
 
-  result = run_test(INTEGRATION_FOLDER / test_name /
-                    f"{test_name}.c", 0)
-  if result["status"] == "pass":
-    color_print(result["msg"], TermColors.OKGREEN)
-  elif result["status"] == "fail":
-    color_print(result["msg"], TermColors.FAIL)
-  else:
-    color_print(result["msg"], TermColors.WARNING)
+  success = run_test(INTEGRATION_FOLDER / test_name /
+                     f"{test_name}.c",  spec)
+  if success:
+    color_print("Test passed", TermColors.OKGREEN)
 
 
 if __name__ == "__main__":
