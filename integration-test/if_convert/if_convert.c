@@ -21,7 +21,7 @@ int main(void) {
 
   srand(13);
   for (int j = 0; j < N; ++j) {
-    a[j] = rand() % 5000; // 500;
+    a[j] = rand() % 5000;
     b[j] = 0;
   }
 
