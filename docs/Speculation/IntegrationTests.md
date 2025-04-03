@@ -8,7 +8,7 @@ This document explains how to run the speculation integration tests and details 
 
 ## Running the Tests
 
-There are seven speculation integration tests in the `integration-test` folder:
+There are eight speculation integration tests in the `integration-test` folder:
 
 - `single_loop`
 - `loop_path`
@@ -16,6 +16,7 @@ There are seven speculation integration tests in the `integration-test` folder:
 - `subdiag_fast`
 - `fixed`
 - `sparse`
+- `nested_loop`
 - `if_convert` (data speculation)
 
 The `newton` benchmark from Haoran's thesis is excluded because it contains branches within the loop, where the current speculation approach is ineffective.
@@ -175,3 +176,11 @@ For the first item in the example above, the buffer placement looks like this:
 
 In my opinion, buffer positions should be specified by **operand** rather than **result**.
 Operands are always unique, even without materialization, whereas results are not.
+
+## Integration Test Folder
+
+The integration test folders are located at `integration-test/(test-name)/`. Each folder also contains:
+
+- `(test-name)_original.c`: The original program from the thesis.
+- `cfg_modification.png`: A diagram illustrating the CFG modifications applied to the program.
+- `results.md`: The benchmark results.
