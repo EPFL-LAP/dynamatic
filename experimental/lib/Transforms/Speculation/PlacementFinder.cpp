@@ -19,8 +19,10 @@
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iostream>
 
 using namespace mlir;
@@ -55,10 +57,6 @@ static void markSpeculativePathsForSaves(Operation *currOp,
   // placed inside the speculation BB
   if (isa<handshake::ConditionalBranchOp>(currOp))
     return;
-  // if (isa<handshake::SpecCommitOp>(currOp) ||
-  //     isa<handshake::ControlMergeOp>(currOp) ||
-  //     isa<handshake::MuxOp>(currOp))
-  //   return;
 
   for (OpResult res : currOp->getResults()) {
     if (specValues.contains(res))
@@ -79,6 +77,42 @@ static bool isGeneratedBySourceOp(Value value) {
   return llvm::all_of(defOp->getOpOperands(), [&](OpOperand &operand) {
     return isGeneratedBySourceOp(operand.get());
   });
+}
+
+static bool hasCyclicPathInBBRecursive(OpOperand &operand, OpOperand &current,
+                                       llvm::DenseSet<OpOperand *> &visited,
+                                       unsigned bb) {
+  if (visited.count(&current))
+    return true;
+
+  visited.insert(&current);
+
+  std::optional<unsigned> currentBB = getLogicBB(current.getOwner());
+  if (!currentBB)
+    return false;
+  if (currentBB.value() != bb)
+    return false;
+
+  for (OpResult res : current.getOwner()->getResults()) {
+    for (OpOperand &dstOpOperand : res.getUses()) {
+      if (dstOpOperand.get() == operand.get())
+        return true;
+      if (hasCyclicPathInBBRecursive(operand, dstOpOperand, visited, bb))
+        return true;
+    }
+  }
+  return false;
+}
+
+static bool hasCyclicPathInBB(OpOperand &operand) {
+  std::optional<unsigned> bb = getLogicBB(operand.getOwner());
+  if (!bb) {
+    operand.getOwner()->emitError("Operation does not have a BB.");
+    llvm_unreachable("OnCycleInBB Failed");
+  }
+
+  llvm::DenseSet<OpOperand *> visited;
+  return hasCyclicPathInBBRecursive(operand, operand, visited, bb.value());
 }
 
 // Save units are needed where speculative tokens can interact with
@@ -103,10 +137,6 @@ LogicalResult PlacementFinder::findSavePositions() {
   }
 
   for (Operation *blockOp : handshakeBlocks.blocks[specBB.value()]) {
-    // if (isa<handshake::ControlMergeOp>(blockOp) ||
-    //     isa<handshake::MuxOp>(blockOp))
-    //   continue;
-
     // Create a save if an operation has both spec and non-spec operands
     bool hasNonSpecInput = false;
     bool hasSpecInput = false;
@@ -125,11 +155,8 @@ LogicalResult PlacementFinder::findSavePositions() {
           if (isGeneratedBySourceOp(operand.get()))
             continue;
 
-          // tmp
-          if (isa<handshake::StoreOp>(operand.getOwner())) {
-            operand.getOwner()->dump();
+          if (!hasCyclicPathInBB(operand))
             continue;
-          }
 
           placements.addSave(operand);
         }
