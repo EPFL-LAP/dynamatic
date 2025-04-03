@@ -52,7 +52,7 @@ def run_test(c_file: str, spec: bool) -> bool:
   Runs the specified integration test.
   """
 
-  print("Running", c_file, "Speculation enabled:", spec)
+  print("Running", c_file, "Speculation Enabled:", spec)
 
   # Get the c_file directory
   c_file_dir = os.path.dirname(c_file)

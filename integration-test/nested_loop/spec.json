@@ -2,7 +2,5 @@
   "speculator": {
     "operation-name": "fork8",
     "operand-idx": 0
-  },
-  "buffers": [
-  ]
+  }
 }
