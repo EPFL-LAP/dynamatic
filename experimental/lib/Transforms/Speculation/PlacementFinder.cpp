@@ -13,7 +13,6 @@
 
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
@@ -23,7 +22,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <iostream>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -424,8 +422,6 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  // return failure(failed(findSavePositions()) ||
-  // failed(findCommitPositions()));
   return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
                  failed(findSaveCommitPositions()));
 }
