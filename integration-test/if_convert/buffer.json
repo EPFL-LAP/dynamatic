@@ -1,5 +1,29 @@
 [
   {
+    "pred": "fork1",
+    "outid": 3,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork10",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork1",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork5",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
     "pred": "speculator0",
     "outid": 0,
     "slots": 16,
