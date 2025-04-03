@@ -18,7 +18,7 @@ EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
 SIMULATE_SH = DYNAMATIC_ROOT / "tools" / \
     "dynamatic" / "scripts" / "simulate.sh"
 
-RTL_CONFIG = DYNAMATIC_ROOT / "data" / "rtl-config-vhdl-spec.json"
+RTL_CONFIG = DYNAMATIC_ROOT / "data" / "rtl-config-vhdl-beta.json"
 
 
 class TermColors:
