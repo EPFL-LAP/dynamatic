@@ -18,8 +18,10 @@
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Value.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -64,6 +66,53 @@ static void markSpeculativePathsForSaves(Operation *currOp,
   }
 }
 
+static bool isGeneratedBySourceOp(Value value) {
+  Operation *defOp = value.getDefiningOp();
+  if (!defOp)
+    return false;
+  if (isa<handshake::SourceOp>(defOp))
+    return true;
+  return llvm::all_of(defOp->getOpOperands(), [&](OpOperand &operand) {
+    return isGeneratedBySourceOp(operand.get());
+  });
+}
+
+static bool hasCyclicPathInBBRecursive(OpOperand &operand, OpOperand &current,
+                                       llvm::DenseSet<OpOperand *> &visited,
+                                       unsigned bb) {
+  if (visited.count(&current))
+    return true;
+
+  visited.insert(&current);
+
+  std::optional<unsigned> currentBB = getLogicBB(current.getOwner());
+  if (!currentBB)
+    return false;
+  if (currentBB.value() != bb)
+    return false;
+
+  for (OpResult res : current.getOwner()->getResults()) {
+    for (OpOperand &dstOpOperand : res.getUses()) {
+      if (dstOpOperand.get() == operand.get())
+        return true;
+      if (hasCyclicPathInBBRecursive(operand, dstOpOperand, visited, bb))
+        return true;
+    }
+  }
+  return false;
+}
+
+static bool hasCyclicPathInBB(OpOperand &operand) {
+  std::optional<unsigned> bb = getLogicBB(operand.getOwner());
+  if (!bb) {
+    operand.getOwner()->emitError("Operation does not have a BB.");
+    llvm_unreachable("OnCycleInBB Failed");
+  }
+
+  llvm::DenseSet<OpOperand *> visited;
+  return hasCyclicPathInBBRecursive(operand, operand, visited, bb.value());
+}
+
 // Save units are needed where speculative tokens can interact with
 // non-speculative tokens. Updates `placements` with the Save placements
 LogicalResult PlacementFinder::findSavePositions() {
@@ -101,7 +150,10 @@ LogicalResult PlacementFinder::findSavePositions() {
         // Create a Save for every non-speculative operand
         if (!specValues.contains(operand.get())) {
           // No save needed in front of Source Operations
-          if (isa<handshake::SourceOp>(operand.get().getDefiningOp()))
+          if (isGeneratedBySourceOp(operand.get()))
+            continue;
+
+          if (!hasCyclicPathInBB(operand))
             continue;
 
           placements.addSave(operand);
@@ -218,6 +270,13 @@ void PlacementFinder::findCommitsBetweenBBs() {
     if (countSpecInputs > 1) {
       // Potential ordering issue, add commits
       for (const BBArc &pred : predecessorArcs) {
+        if (pred.srcBB == pred.dstBB) {
+          llvm::errs()
+              << "Warning: Skipped placing commit units on the "
+                 "backedge of the innermost loop to preserve speculation. "
+                 "Safe only if the loop's II is 1.\n";
+          continue;
+        }
         for (CFGEdge *edge : pred.edges) {
           // Add a Commit only in front of speculative inputs
           if (speculativeEdges.count(edge))
