@@ -4,8 +4,8 @@ The II could not achieve 1, because of the two load operations on `d` array insi
 
 Additionally, the current implementation of `cmpf` seems to generate output within the same cycle, which is unrealistic. While the change of the `cmpf` implementation does not affect the result in the speculation case, it may worsen the II in the non-speculation case.
 
-|                          | No Speculation   | Speculation       |
-|--------------------------|------------------|-------------------|
-| II (Haoran’s thesis [1]) | 15               | 1                 |
-| II                       | 16               | 2                 |
-| Cycles (Test Bench)      | 1623 (End: 1621) | 230 (End: 224)    |
+|                      | No Speculation   | Speculation       |
+|----------------------|------------------|-------------------|
+| II (Haoran’s thesis) | 15               | 1                 |
+| II                   | 16               | 2                 |
+| Cycles (Test Bench)  | 1623 (End: 1621) | 230 (End: 224)    |
