@@ -31,6 +31,10 @@ import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
+import generators.handshake.speculation.spec_commit as spec_commit
+import generators.handshake.speculation.spec_save_commit as spec_save_commit
+import generators.handshake.speculation.speculating_branch as speculating_branch
+import generators.handshake.speculation.speculator as speculator
 import generators.support.mem_to_bram as mem_to_bram
 
 
