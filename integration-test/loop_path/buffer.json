@@ -6,25 +6,85 @@
     "type": "tehb"
   },
   {
+    "pred": "cmpi2",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork5",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "constant4",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
     "pred": "fork1",
     "outid": 0,
     "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 1,
     "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "constant6",
+    "pred": "fork8",
+    "outid": 2,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
     "outid": 0,
     "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork6",
+    "pred": "speculator0",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 2,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "merge0",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 5,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork7",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork7",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork7",
     "outid": 2,
     "slots": 16,
     "type": "tehb"
@@ -36,25 +96,13 @@
     "type": "tehb"
   },
   {
-    "pred": "fork5",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork5",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork5",
+    "pred": "extsi1",
     "outid": 0,
     "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork3",
+    "pred": "fork4",
     "outid": 0,
     "slots": 16,
     "type": "tehb"
@@ -66,129 +114,99 @@
     "type": "tehb"
   },
   {
-    "pred": "speculator0",
+    "pred": "fork11",
     "outid": 0,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "speculator0",
+    "pred": "fork11",
     "outid": 1,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "speculator0",
+    "pred": "fork10",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork10",
     "outid": 2,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "merge0",
-    "outid": 0,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "speculator0",
-    "outid": 5,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork9",
-    "outid": 0,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork9",
-    "outid": 1,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork8",
-    "outid": 0,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork8",
-    "outid": 2,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 3,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 4,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 5,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 6,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 7,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 8,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 9,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 10,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 11,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 12,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 13,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
+    "pred": "fork10",
     "outid": 14,
-    "slots": 32,
+    "slots": 16,
     "type": "tehb"
   }
 ]
