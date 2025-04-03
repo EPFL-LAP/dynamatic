@@ -84,14 +84,8 @@
     "type": "tehb"
   },
   {
-    "pred": "speculator0",
-    "outid": 3,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "speculator0",
-    "outid": 4,
+    "pred": "merge0",
+    "outid": 0,
     "slots": 32,
     "type": "tehb"
   },

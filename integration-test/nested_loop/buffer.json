@@ -24,14 +24,8 @@
     "type": "tehb"
   },
   {
-    "pred": "speculator0",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "speculator0",
-    "outid": 4,
+    "pred": "merge0",
+    "outid": 0,
     "slots": 16,
     "type": "tehb"
   },
@@ -315,6 +309,42 @@
     "pred": "fork16",
     "outid": 1,
     "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "trunci0",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork14",
+    "outid": 2,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork14",
+    "outid": 7,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork14",
+    "outid": 25,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork14",
+    "outid": 22,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "cmpi0",
+    "outid": 0,
+    "slots": 1,
     "type": "tehb"
   }
 ]
