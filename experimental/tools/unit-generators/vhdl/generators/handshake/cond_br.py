@@ -24,6 +24,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of cond_br_dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -45,6 +46,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br_dataless
 architecture arch of {name} is
   signal branchInputs_valid, branch_ready : std_logic;
 begin
@@ -80,6 +82,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Entity of cond_br
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -104,6 +107,7 @@ end entity;
 """
 
   architecture = f"""
+-- Architecture of cond_br
 architecture arch of {name} is
 begin
   control : entity work.{inner_name}
