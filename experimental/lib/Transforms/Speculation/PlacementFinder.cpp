@@ -101,7 +101,7 @@ static bool hasCyclicPathInBBRecursive(OpOperand &operand, OpOperand &current,
   std::optional<unsigned> currentBB = getLogicBB(current.getOwner());
   if (!currentBB)
     return false;
-  if (currentBB.value() != bb) {
+  if (*currentBB != bb) {
     // Traversal is restricted to the operand's BB.
     return false;
   }
@@ -130,7 +130,7 @@ static bool hasCyclicPathInBB(OpOperand &operand) {
   }
 
   llvm::DenseSet<OpOperand *> visited;
-  return hasCyclicPathInBBRecursive(operand, operand, visited, bb.value());
+  return hasCyclicPathInBBRecursive(operand, operand, visited, *bb);
 }
 
 // Save units are needed where speculative tokens can interact with
