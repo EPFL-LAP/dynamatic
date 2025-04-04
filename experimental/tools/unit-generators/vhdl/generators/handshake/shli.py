@@ -2,59 +2,31 @@ from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
 
-def generate_cmpi(name, params):
+def generate_shli(name, params):
   bitwidth = params["bitwidth"]
-  predicate = params["predicate"]
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
+    return _generate_shli_signal_manager(name, bitwidth, extra_signals)
   else:
-    return _generate_cmpi(name, predicate, bitwidth)
+    return _generate_shli(name, bitwidth)
 
 
-def _get_symbol_from_predicate(pred):
-  match pred:
-    case "eq":
-      return "="
-    case "neq":
-      return "/="
-    case "slt" | "ult":
-      return "<"
-    case "sle" | "ule":
-      return "<="
-    case "sgt" | "ugt":
-      return ">"
-    case "sge" | "uge":
-      return ">="
-    case _:
-      raise ValueError(f"Predicate {pred} not known")
-
-
-def _get_sign_from_predicate(pred):
-  match pred:
-    case "eq" | "neq":
-      return ""
-    case "slt" | "sle" | "sgt" | "sge":
-      return "signed"
-    case "ult" | "ule" | "ugt" | "uge":
-      return "unsigned"
-    case _:
-      raise ValueError(f"Predicate {pred} not known")
-
-
-def _generate_cmpi(name, predicate, bitwidth):
+def _generate_shli(name, bitwidth):
   join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+  dependencies = \
+      generate_join(join_name, {
+          "size": 2
+      })
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of cmpi
-entity {name} is
+-- Entity of shli
+entity {name} is 
   port (
     -- inputs
     clk          : in std_logic;
@@ -65,7 +37,7 @@ entity {name} is
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector(0 downto 0);
+    result       : out std_logic_vector({bitwidth} - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
@@ -73,14 +45,11 @@ entity {name} is
 end entity;
 """
 
-  modifier = _get_sign_from_predicate(predicate)
-  comparator = _get_symbol_from_predicate(predicate)
-
   architecture = f"""
--- Architecture of cmpi
+-- Architecture of shli
 architecture arch of {name} is
 begin
-  join_inputs : entity work.{join_name}(arch)
+  join_inputs : entity work.{join_name}
     port map(
       clk          => clk,
       rst          => rst,
@@ -94,14 +63,14 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  result(0) <= '1' when ({modifier}(lhs) {comparator} {modifier}(rhs)) else '0';
+  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs({bitwidth} - 2 downto 0)))));
 end architecture;
 """
 
   return dependencies + entity + architecture
 
 
-def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
+def _generate_shli_signal_manager(name, bitwidth, extra_signals):
   return generate_signal_manager(name, {
       "type": "normal",
       "in_ports": [{
@@ -115,8 +84,8 @@ def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
       }],
       "out_ports": [{
           "name": "result",
-          "bitwidth": 1,
+          "bitwidth": bitwidth,
           "extra_signals": extra_signals
       }],
       "extra_signals": extra_signals
-  }, lambda name: _generate_cmpi(name, predicate, bitwidth))
+  }, lambda name: _generate_shli(name, bitwidth))
