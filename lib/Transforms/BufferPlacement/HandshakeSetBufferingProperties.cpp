@@ -114,29 +114,29 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     if (mergeOp->getNumOperands() > 1) {
       for (OpResult mergeRes : mergeOp->getResults()) {
         Channel channel(mergeRes, true);
-        if (!mergeRes.use_empty()) {
-          Operation* nextOp = mergeRes.getUses().begin()->getOwner();
-          if (isa<handshake::ForkOp>(nextOp)) {
-            channel.props->minSlots = std::max(channel.props->minSlots, 1U);
-          }
-        }
+        // if (!mergeRes.use_empty()) {
+        //   Operation* nextOp = mergeRes.getUses().begin()->getOwner();
+          // if (isa<handshake::ForkOp>(nextOp)) {
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+          // }
+        // }
       }
     }
   }
 
-  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
-    if (muxOp->getNumOperands() > 1) {
-      for (OpResult muxRes : muxOp->getResults()) {
-        Channel channel(muxRes, true);
-        if (!muxRes.use_empty()) {
-          Operation* nextOp = muxRes.getUses().begin()->getOwner();
-          if (isa<handshake::ForkOp>(nextOp)) {
-            channel.props->minSlots = std::max(channel.props->minSlots, 1U);
-          }
-        }
-      }
-    }
-  }
+  // for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+  //   if (muxOp->getNumOperands() > 1) {
+  //     for (OpResult muxRes : muxOp->getResults()) {
+  //       Channel channel(muxRes, true);
+  //       if (!muxRes.use_empty()) {
+  //         Operation* nextOp = muxRes.getUses().begin()->getOwner();
+  //         if (isa<handshake::ForkOp>(nextOp)) {
+  //           channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
   
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())

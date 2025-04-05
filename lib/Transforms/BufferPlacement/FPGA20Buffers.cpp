@@ -73,6 +73,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (forceBreakDVR) {
       if (numSlotsToPlace == 1){
         result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else if (numSlotsToPlace == 2){
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
