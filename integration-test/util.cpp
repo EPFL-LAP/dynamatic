@@ -27,7 +27,7 @@ std::vector<fs::path> findTests(const fs::path &start) {
           std::cout << "[INFO] Ignoring " << entry.path() << std::endl;
         }
         else if (entry.is_regular_file() && entry.path().extension() == ".c") {
-            ret.push_back(entry.path());
+          ret.push_back(entry.path());
         }
       }
     }
