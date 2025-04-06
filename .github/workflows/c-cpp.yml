@@ -21,8 +21,8 @@ jobs:
 
       - name: integration-test
         run: | 
-          cd tools/integration
-          python3 run_integration.py --ignore ignored_tests.txt
+          cd build/integration-test
+          ctest --output-on-failure --parallel 16
 
       - uses: actions/upload-artifact@v4
         with: 
