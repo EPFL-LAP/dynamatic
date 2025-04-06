@@ -22,7 +22,7 @@ jobs:
       - name: integration-test
         run: | 
           cd build/integration-test
-          ctest --output-on-failure --parallel 16
+          ctest --output-on-failure --parallel
 
       - uses: actions/upload-artifact@v4
         with: 
