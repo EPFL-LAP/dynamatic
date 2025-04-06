@@ -58,7 +58,7 @@ int runIntegrationTest(const fs::path &path, int &outSimTime) {
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
   fs::path dynamaticLogPath = path.parent_path() / "out" / "dynamatic_out.txt";
   if (!fs::exists(dynamaticLogPath.parent_path())) {
-    fs::create_directories(dynamaticLogPath);
+    fs::create_directories(dynamaticLogPath.parent_path());
   }
 
   std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
