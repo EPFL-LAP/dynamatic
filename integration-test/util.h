@@ -10,7 +10,8 @@
 
 namespace fs = std::filesystem;
 
-int runIntegrationTest(const fs::path& name);
-std::vector<fs::path> findTests(const fs::path& start);
+int runIntegrationTest(const fs::path &name, int &outSimTime);
+int getSimulationTime(const fs::path &logFile);
+std::vector<fs::path> findTests(const fs::path &start);
 
 #endif // UTIL_H

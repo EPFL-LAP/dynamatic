@@ -6,7 +6,11 @@ class BasicMemIntegrationFixture : public testing::TestWithParam<fs::path> { };
 
 TEST_P(BasicMemIntegrationFixture, basicMemNoFlags) {
   fs::path testPath = GetParam();
-  EXPECT_EQ(runIntegrationTest(testPath), 0);
+  int simTime = -1;
+  
+  EXPECT_EQ(runIntegrationTest(testPath, simTime), 0);
+
+  RecordProperty("cycles", std::to_string(simTime));
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -14,7 +18,7 @@ INSTANTIATE_TEST_SUITE_P(
   BasicMemIntegrationFixture,
   testing::ValuesIn(
     findTests(
-      fs::path(DYNAMATIC_ROOT) / fs::path("integration-test") / fs::path("memory")
+      fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory"
     )
   )
 );
