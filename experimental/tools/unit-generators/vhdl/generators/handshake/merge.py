@@ -1,12 +1,17 @@
+from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
 
 def generate_merge(name, params):
+  # Number of intput ports
   size = params["size"]
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  if bitwidth == 0:
+  if extra_signals:
+    return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
+  elif bitwidth == 0:
     return _generate_merge_dataless(name, size)
   else:
     return _generate_merge(name, size, bitwidth)
@@ -137,3 +142,24 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
+  # Haven't tested this function yet
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals,
+          "2d": True,
+          "size": size
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
