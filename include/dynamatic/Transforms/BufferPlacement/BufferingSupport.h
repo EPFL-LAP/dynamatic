@@ -176,7 +176,7 @@ struct PlacementResult {
   unsigned numOneSlotDVR = 0;
 
   /// Prefered order: 
-  /// {ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_DVR, numOneSlotR}
+  /// {ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_R}
   /// bufferOrder = true means the order is as above, otherwise it is reversed.
   bool bufferOrder = true;
 };
