@@ -559,13 +559,34 @@ def JoinOp : Handshake_Op<"join", [
 ]> {
   let summary = "join operation";
   let description = [{
-    A  synchronizer with a control-only(dateless) and data-loaded version.  Produces a valid output when all
+    A control-only synchronizer.  Produces a valid output when all
     inputs become available.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.channel<i32>
+    %0 = join %a, %b, %c : !handshake.control
+    ```
+  }];
+
+  let arguments = (ins Variadic<ControlType>:$data);
+  let results = (outs ControlType:$result);
+  let assemblyFormat = "$data attr-dict `:` type($result)";
+}
+
+def BlockerOp : Handshake_Op<"blocker", [
+  SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+]> {
+  let summary = "blocker operation";
+  let description = [{
+    A  data synchronizer. Forwards the firts input when all
+    inputs become available.
+
+    Example:
+
+    ```mlir
+    %0 = blocker %a, %b, %c : !handshake.channel<i32>
     ```
   }];
 

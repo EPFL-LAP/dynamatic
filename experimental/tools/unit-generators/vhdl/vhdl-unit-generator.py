@@ -22,7 +22,7 @@ import generators.handshake.trunci as trunci
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
-import generators.handshake.join as join
+import generators.handshake.blocker as blocker
 
 
 def generate_code(name, mod_type, parameters):
@@ -67,8 +67,8 @@ def generate_code(name, mod_type, parameters):
       return extui.generate_extui(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
-    case "join":
-      return join.generate_join(name, parameters)
+    case "blocker":
+      return blocker.generate_blocker(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

@@ -53,8 +53,6 @@ begin
 
   join : entity work.{join_name}(arch)
     port map(
-      clk          => clk,
-      rst          => rst,
       -- input channels
       ins_valid(0) => data_valid,
       ins_valid(1) => condition_valid,
