@@ -15,6 +15,7 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
+OUT_OF_ORDER_EXECUTION=$9
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -128,18 +129,29 @@ exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
   # out-of-order-execution transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --out-of-order-execution \
-    > "$F_HANDSHAKE_OOE"
-  exit_on_fail "Failed to apply out-of-order execution transformations" \
-    "Applied out-of-order execution transformations"
+if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then
+  echo_info "Running out-of-order execution algorithm for handshake conversion"
 
-    # handshake transformations 2
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
-   --handshake-materialize --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_MATERIALIZED"
-exit_on_fail "Failed to apply materialization transformation" \
-  "Applied materialization transformation"
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+      --out-of-order-execution \
+      > "$F_HANDSHAKE_OOE"
+    exit_on_fail "Failed to apply out-of-order execution transformations" \
+      "Applied out-of-order execution transformations"
+
+  # handshake transformations 2
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_MATERIALIZED"
+  exit_on_fail "Failed to apply materialization transformation" \
+    "Applied materialization transformation"
+else
+  # handshake transformations 2
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_MATERIALIZED"
+  exit_on_fail "Failed to apply materialization transformation" \
+    "Applied materialization transformation"
+fi
 
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
