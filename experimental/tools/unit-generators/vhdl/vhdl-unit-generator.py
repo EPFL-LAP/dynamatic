@@ -20,6 +20,7 @@ import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
 import generators.handshake.shli as shli
+import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.speculation.spec_commit as spec_commit
@@ -52,6 +53,8 @@ def generate_code(name, mod_type, parameters):
       return cmpf.generate_cmpf(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "constant":
@@ -76,6 +79,8 @@ def generate_code(name, mod_type, parameters):
       return mux.generate_mux(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":

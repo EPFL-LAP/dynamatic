@@ -45,20 +45,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extsi -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.extui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extui -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.maximumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t maximumf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.minimumf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minimumf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
     "name": "handshake.mulf",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p port_types=$PORT_TYPES is_double=$IS_DOUBLE extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["flopoco_ip_cores"]
@@ -68,29 +54,12 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t muli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.negf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t negf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.ori",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ori -p port_types=$PORT_TYPES"
-  },
-  {
     "name": "handshake.select",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t select -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.shli",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
-  },
-  {
-    "name": "handshake.shrsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrsi -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.shrui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrui -p port_types=$PORT_TYPES"
   },
   {
     "name": "handshake.subf",

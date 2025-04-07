@@ -278,8 +278,8 @@ begin
         unordered => unordered,
         XltY => XltY,
         XeqY => XeqY,
-        XgtY => XgtY, 
-        XleY => XleY, 
+        XgtY => XgtY,
+        XleY => XleY,
         XgeY => XgeY);
 end architecture;
 """
