@@ -1,5 +1,6 @@
 from generators.handshake.fork import generate_fork
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
 
 
 def generate_speculator(name, params):

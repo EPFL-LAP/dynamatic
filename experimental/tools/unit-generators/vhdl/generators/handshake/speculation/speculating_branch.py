@@ -1,5 +1,6 @@
 from generators.handshake.cond_br import generate_cond_br
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
 from generators.support.utils import data
 
 
