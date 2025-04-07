@@ -115,7 +115,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       channel.props->minTrans = std::max(channel.props->minTrans, 1U);
     }
   }
-  
+
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
@@ -138,6 +138,18 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   // Control paths to LSQs have specific properties
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>())
     setLSQControlConstraints(lsqOp);
+
+  /// Buffer the channels between a Demux and a Mux
+  for (handshake::DemuxOp demux : funcOp.getOps<handshake::DemuxOp>()) {
+    for (auto res : demux.getResults()) {
+      for (auto *user : res.getUsers()) {
+        if (mlir::isa<handshake::MuxOp>(user)) {
+          Channel channel(res, true);
+          channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+        }
+      }
+    }
+  }
 }
 
 namespace {
