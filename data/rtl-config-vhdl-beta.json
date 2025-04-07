@@ -28,19 +28,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpi -p port_types=$PORT_TYPES predicate=\"'$PREDICATE'\" bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.divf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.divsi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divsi -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.divui",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divui -p port_types=$PORT_TYPES"
-  },
-  {
     "name": "handshake.extsi",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extsi -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
@@ -73,33 +60,6 @@
   {
     "name": "handshake.trunci",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t trunci -p port_types=$PORT_TYPES input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH extra_signals=$EXTRA_SIGNALS"
-  },
-  {
-    "name": "handshake.truncf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t truncf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.xori",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t xori -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.sitofp",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sitofp -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.fptosi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p port_types=$PORT_TYPES"
-  },
-  {
-    "name": "handshake.absf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.extf",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extf -p port_types=$PORT_TYPES",
-    "dependencies": ["flopoco_ip_cores"]
   },
   {
     "name": "handshake.buffer",
