@@ -2,8 +2,11 @@ import argparse
 import ast
 import sys
 
+import generators.handshake.addf as addf
 import generators.handshake.addi as addi
+import generators.handshake.andi as andi
 import generators.handshake.buffer as buffer
+import generators.handshake.cmpf as cmpf
 import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
 import generators.handshake.constant as constant
@@ -13,11 +16,15 @@ import generators.handshake.fork as fork
 import generators.handshake.load as load
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
+import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
+import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.subf as subf
+import generators.handshake.subi as subi
 import generators.handshake.trunci as trunci
 import generators.handshake.speculation.spec_commit as spec_commit
 import generators.handshake.speculation.spec_save_commit as spec_save_commit
@@ -28,12 +35,18 @@ import generators.support.mem_to_bram as mem_to_bram
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
+    case "addf":
+      return addf.generate_addf(name, parameters)
     case "addi":
       return addi.generate_addi(name, parameters)
+    case "andi":
+      return andi.generate_andi(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "constant":
@@ -50,16 +63,24 @@ def generate_code(name, mod_type, parameters):
       return mem_controller.generate_mem_controller(name, parameters)
     case "merge":
       return merge.generate_merge(name, parameters)
+    case "mulf":
+      return mulf.generate_mulf(name, parameters)
     case "muli":
       return muli.generate_muli(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
+    case "subf":
+      return subf.generate_subf(name, parameters)
+    case "subi":
+      return subi.generate_subi(name, parameters)
     case "trunci":
       return trunci.generate_trunci(name, parameters)
     case "spec_commit":
