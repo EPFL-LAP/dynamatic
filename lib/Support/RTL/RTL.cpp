@@ -409,9 +409,9 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::oehb() || info == handshake::TimingInfo::one_slot_break_dvr()){
+      if (info == handshake::TimingInfo::tehb() || info == handshake::TimingInfo::fifo_break_none()){
         serializedParams["TRANSPARENT"] = "True";
-      } else if (info == handshake::TimingInfo::tehb() || info == handshake::TimingInfo::fifo_break_none()){
+      } else if (info == handshake::TimingInfo::oehb() || info == handshake::TimingInfo::one_slot_break_dvr()){
         serializedParams["TRANSPARENT"] = "False";
       } else {
         llvm_unreachable("Unknown timing info");
@@ -435,7 +435,9 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       // the first input has extra signals
-      modName == "handshake.load" || modName == "handshake.store") {
+      modName == "handshake.load" || modName == "handshake.store" ||
+      modName == "handshake.spec_commit" ||
+      modName == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
   } else if (modName == "handshake.source") {
@@ -483,10 +485,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     }
     extraSignalsList << "]'";
     serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
-  } else if (modName == "handshake.spec_commit" ||
-             modName == "handshake.speculating_branch") {
-    serializedParams["EXTRA_SIGNALS_EXCEPT_SPEC"] =
-        serializeExtraSignals(modType.getOutputType(0));
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
