@@ -119,22 +119,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     if (failed(identifyTaggedEdges(op, unalignedEdges, taggedEdges)))
       return failure();
 
-    // if (isa<handshake::ShLIOp>(op)) {
-    //   llvm::errs() << "Printing unaligned edges: \n";
-    //   for (Value edge : unalignedEdges) {
-    //     edge.print(llvm::errs());
-    //     llvm::errs() << "\n";
-    //   }
-    //   llvm::errs() << "Done printing unaligned edges\n";
-
-    //   llvm::errs() << "Printing tagged edges: \n";
-    //   for (Value edge : taggedEdges) {
-    //     edge.print(llvm::errs());
-    //     llvm::errs() << "\n";
-    //   }
-    //   llvm::errs() << "Done printing tagged edges\n";
-    // }
-
     OpBuilder builder(ctx);
     llvm::DenseSet<Operation *> untaggers;
     Operation *fifo =
@@ -148,10 +132,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo, untaggers,
                                            numTags)))
       return failure();
-
-    // if (failed(testNestedRegions(funcOp, builder, op, fifo,
-    //                              (extraTag + "_outer"))))
-    //   return failure();
   }
   return success();
 }
