@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
@@ -153,7 +154,7 @@ def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
           "name": "ins",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals,
-          "2d": True,
+          "array": True,
           "size": size
       }],
       "out_ports": [{
