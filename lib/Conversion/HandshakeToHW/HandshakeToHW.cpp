@@ -53,9 +53,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-/// Name of ports representing the clock and reset signals.
-static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
-
 /// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
@@ -138,8 +135,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(CLK_PORT, i1Type);
-    addInput(RST_PORT, i1Type);
+    addInput(dynamatic::hw::CLK_PORT, i1Type);
+    addInput(dynamatic::hw::RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -323,7 +320,7 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name) {
+                                          StringRef name){
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -682,7 +679,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpeculatorOp>([&](auto) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+        addUnsigned("FIFO_DEPTH", 32);
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
             handshake::SpeculatingBranchOp>([&](auto) {
@@ -690,7 +687,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::SpecSaveCommitOp>([&](auto) {
         // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+        addUnsigned("FIFO_DEPTH", 32);
       })
       .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
         // Data bitwidth
@@ -951,9 +948,10 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
+         "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();

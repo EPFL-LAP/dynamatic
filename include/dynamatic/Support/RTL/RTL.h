@@ -29,7 +29,7 @@
 namespace dynamatic {
 
 /// Hardware description languages.
-enum class HDL { VHDL, VERILOG };
+enum class HDL { VHDL, VERILOG, SMV };
 
 /// Returns the file extension (without a leading '.') for files of the HDL.
 StringRef getHDLExtension(HDL hdl);
