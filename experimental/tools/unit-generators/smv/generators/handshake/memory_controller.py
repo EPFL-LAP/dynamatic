@@ -20,8 +20,6 @@ def generate_memory_controller(name, params):
 
 def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type):
 
-  # THE INTERFACE ORDER IS TOTALLY DIFFERENT FROM THE ONE IN lib/dialect/Handshake/HandshakeInterfaces.cpp L238
-  memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
   control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
   store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
   store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
@@ -39,7 +37,7 @@ MODULE {name}({mc_in_ports})
 
   VAR
   inner_arbiter : {name}__write_memory_arbiter({arbiter_args});
-  inner_mc_control : {name}__mc_control({memory_control_ports[0]}, all_requests_done);
+  inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
   remainingStores : {ctrl_type.smv_type};
 
   ASSIGN
@@ -87,7 +85,6 @@ MODULE {name}({mc_in_ports})
 """
 
 def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type):
-  memory_control_ports = ["memStart_valid, memEnd_ready, ctrlEnd_valid"]
   load_address_ports = [f"ldAddr_{n}" for n in range(num_loads)] + [f"ldAddr_{n}_valid" for n in range(num_loads)]
   load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
   mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
@@ -102,7 +99,7 @@ MODULE {name}({mc_in_ports})
 
   VAR
   inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
-  inner_mc_control : {name}__mc_control({memory_control_ports[0]}, TRUE);
+  inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, TRUE);
 
   // output
   DEFINE
@@ -192,9 +189,15 @@ MODULE {name}({mc_in_ports})
 def _generate_mc_control(name):
   return f"""
 MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
-  -- the mc_control manages the signals connected to the memory and controls when to
-  -- start accessing memory and when no more accesses will be made
+  -- The mc_control manages the signals that control when the circuit is allowed to access memory: it controls
+  -- start and end of memory transactions and acknowledges completion.
 
+  -- Handshake Signals:
+  -- - memStart_valid / memStart_ready: Controls the start of memory operations.
+  -- - memEnd_valid / memEnd_ready: Indicates the completion of memory requests.
+  -- - ctrlEnd_valid / ctrlEnd_ready: Used to signal and acknowledge that no more memory requests will be issued.
+  -- - allRequestsDone: Flags that all pending memory operations have completed.
+  
   VAR
   memStart_ready_in : boolean;
   memEnd_valid_in : boolean;
