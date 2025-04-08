@@ -1,4 +1,4 @@
-from .types import Port
+from .types import Port, ExtraSignals
 
 
 def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = None, mapping_extra_signals: list[str] = []) -> list[str]:
@@ -35,3 +35,15 @@ def generate_simple_inner_port_mappings(ports: list[Port]) -> str:
     forwardings += generate_inner_port_mapping(port)
 
   return ",\n".join(forwardings).lstrip()
+
+
+def get_unhandled_extra_signals(ports: list[Port], handled_extra_signals: ExtraSignals) -> list[str]:
+  unhandled_extra_signals: list[str] = []
+  for port in ports:
+    port_extra_signals = port.get("extra_signals", {})
+
+    for signal_name in port_extra_signals:
+      if signal_name not in handled_extra_signals:
+        unhandled_extra_signals.append(signal_name)
+
+  return unhandled_extra_signals
