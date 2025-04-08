@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.bbmerge import generate_cmerge_signal_manager
 from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.merge_notehb import generate_merge_notehb
@@ -181,16 +181,16 @@ end architecture;
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
       output_extra_signals)
-  return generate_signal_manager(name, {
-      "type": "bbmerge",
-      "in_ports": [{
+  return generate_cmerge_signal_manager(
+      name,
+      [{
           "name": "ins",
           "bitwidth": data_bitwidth,
           "array": True,
           "size": size,
           "extra_signals_list": input_extra_signals_list
       }],
-      "out_ports": [{
+      [{
           "name": "index",
           "bitwidth": index_bitwidth,
           # TODO: Extra signals for index port are not tested
@@ -200,11 +200,10 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
           "bitwidth": data_bitwidth,
           "extra_signals": output_extra_signals
       }],
-      "size": size,
-      "data_in_name": "ins",
-      "index_name": "index",
-      "index_dir": "out",
-      "index_extra_signals": index_extra_signals,
-      "out_extra_signals": output_extra_signals,
-      "spec_inputs": spec_inputs
-  }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
+      size,
+      "ins",
+      "index",
+      output_extra_signals,
+      index_extra_signals,
+      spec_inputs,
+      lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
