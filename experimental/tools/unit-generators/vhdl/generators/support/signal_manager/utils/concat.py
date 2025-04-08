@@ -1,5 +1,6 @@
 from typing import cast, TypedDict, NotRequired
 from .types import Port, ArrayPort, Direction
+from .internal_signal import generate_internal_signal_vector, generate_internal_signal_array
 
 
 class ConcatInfo:
@@ -47,7 +48,7 @@ def get_default_port_conversion(port: Port) -> ConcatPortConversion:
       "inner_name": inner_name
   }
 
-  if "array" in port:
+  if port.get("array", False):
     port = cast(ArrayPort, port)
     port_conversion["array_size"] = port["size"]
 
@@ -61,10 +62,9 @@ def generate_concat_signal_decl(port_conversion: ConcatPortConversion, extra_sig
   full_bitwidth = extra_signals_bitwidth + port_conversion["original_bitwidth"]
 
   if array_size > 0:
-    # Inner signal is data_array
-    return f"  signal {port_conversion["inner_name"]} : data_array({array_size} - 1 downto 0)({full_bitwidth} - 1 downto 0);"
+    return generate_internal_signal_array(port_conversion["inner_name"], full_bitwidth, array_size)
   else:
-    return f"  signal {port_conversion["inner_name"]} : std_logic_vector({full_bitwidth} - 1 downto 0);"
+    return generate_internal_signal_vector(port_conversion["inner_name"], full_bitwidth)
 
 
 def generate_concat_signal_decls(port_conversions: list[ConcatPortConversion], extra_signals_bitwidth: int) -> str:
