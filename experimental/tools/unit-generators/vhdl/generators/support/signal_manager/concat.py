@@ -1,7 +1,7 @@
 from typing import cast
 from collections.abc import Callable
 from .types import Port, ArrayPort, Direction
-from .mapping import generate_inner_port_mapping, get_unhandled_extra_signals
+from .mapping import generate_concat_mappings, get_unhandled_extra_signals
 from .entity import generate_entity
 
 
@@ -160,24 +160,6 @@ def generate_concat_port_assignments(in_ports: list[Port], out_ports: list[Port]
     concat_logic += generate_concat_port_assignment(port, dir, concat_info)
 
   return "\n".join(concat_logic).lstrip()
-
-
-def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, mapping_extra_signal_names: list[str] = []) -> str:
-  mappings = []
-  for port in ports:
-    port_name = port["name"]
-
-    mapping_port = port.copy()
-    mapping_port["bitwidth"] += extra_signals_bitwidth
-
-    mapping_port_name = f"{port_name}_inner"
-
-    mappings += generate_inner_port_mapping(
-        mapping_port,
-        mapping_port_name,
-        mapping_extra_signal_names)
-
-  return ",\n".join(mappings).lstrip()
 
 
 def generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):

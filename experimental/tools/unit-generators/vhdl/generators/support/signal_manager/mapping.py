@@ -22,7 +22,7 @@ def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = N
   return mapping
 
 
-def generate_simple_inner_port_mappings(ports: list[Port]) -> str:
+def generate_simple_mappings(ports: list[Port], mapping_extra_signal_names: list[str] = []) -> str:
   """
   Generate port forwarding for inner entity
   e.g.,
@@ -30,11 +30,32 @@ def generate_simple_inner_port_mappings(ports: list[Port]) -> str:
       lhs_valid => lhs_valid,
       lhs_ready => lhs_ready
   """
-  forwardings = []
+  mappings = []
   for port in ports:
-    forwardings += generate_inner_port_mapping(port)
+    mappings += generate_inner_port_mapping(
+        port,
+        port["name"],
+        mapping_extra_signal_names)
 
-  return ",\n".join(forwardings).lstrip()
+  return ",\n".join(mappings).lstrip()
+
+
+def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, mapping_extra_signal_names: list[str] = []) -> str:
+  mappings = []
+  for port in ports:
+    port_name = port["name"]
+
+    mapping_port = port.copy()
+    mapping_port["bitwidth"] += extra_signals_bitwidth
+
+    mapping_port_name = f"{port_name}_inner"
+
+    mappings += generate_inner_port_mapping(
+        mapping_port,
+        mapping_port_name,
+        mapping_extra_signal_names)
+
+  return ",\n".join(mappings).lstrip()
 
 
 def get_unhandled_extra_signals(ports: list[Port], handled_extra_signals: ExtraSignals) -> list[str]:
