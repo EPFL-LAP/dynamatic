@@ -402,8 +402,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              modName == "handshake.mulf" || modName == "handshake.subf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
-  } else if (modName == "handshake.source" || modName == "mem_controller") {
-    // Skip
   } else if (modName == "handshake.tagger") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
@@ -414,6 +412,9 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getOutputType(0));
     serializedParams["TAG_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.source" || modName == "mem_controller" ||
+             modName == "free_tags_fifo") {
+    // Skip
   } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
   }
@@ -515,7 +516,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["INPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
   } else if (modName == "handshake.mem_controller" ||
-             modName == "mem_to_bram") {
+             modName == "mem_to_bram" ||
+             modName == "handshake.free_tags_fifo") {
     // Skip
   } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
