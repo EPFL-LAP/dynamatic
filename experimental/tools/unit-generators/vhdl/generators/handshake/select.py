@@ -1,4 +1,8 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.utils.concat import ConcatInfo
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatPortConversion
+from generators.support.signal_manager.utils.forwarding import generate_forwarding_assignments
+from generators.support.signal_manager.utils.internal_signal import generate_internal_signals_from_port
 
 
 def generate_select(name, parameters):
@@ -136,27 +140,101 @@ end architecture;
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  # TODO: Normal signal manager doesn't work for select op.
-  # I'll fix it after the refactoring of signal manager functions.
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trueValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
+  concat_info = ConcatInfo(extra_signals)
+  extra_signals_total_bitwidth = concat_info.total_bitwidth
+  extra_signal_names = [signal_name for signal_name in extra_signals]
+
+  inner_name = f"{name}_inner"
+  inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
+
+  entity = generate_entity(name, [{
+      "name": "condition",
+      "bitwidth": 1,
       "extra_signals": extra_signals
-  }, lambda name: _generate_select(name, bitwidth))
+  }, {
+      "name": "trueValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": "falseValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }], [{
+      "name": "result",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }])
+
+  result_inner_decl = generate_internal_signals_from_port({
+      "name": "result_inner",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  })
+
+  trueValue_conversion: ConcatPortConversion = {
+      "original_name": "trueValue",
+      "original_bitwidth": bitwidth,
+      "inner_name": "trueValue_inner"
+  }
+  falseValue_conversion: ConcatPortConversion = {
+      "original_name": "falseValue",
+      "original_bitwidth": bitwidth,
+      "inner_name": "falseValue_inner"
+  }
+  result_conversion: ConcatPortConversion = {
+      "original_name": "result_inner",
+      "original_bitwidth": bitwidth,
+      "inner_name": "result_inner_concat"
+  }
+  concat_signal_decls = generate_concat_signal_decls(
+      [trueValue_conversion, falseValue_conversion, result_conversion],
+      extra_signals_total_bitwidth
+  )
+  concat_signal_logic = generate_concat_port_assignments(
+      [trueValue_conversion, falseValue_conversion],
+      [result_conversion],
+      concat_info
+  )
+
+  forwarding_logic = generate_forwarding_assignments(
+      ["condition", "result_inner"],
+      ["result"],
+      extra_signal_names)[0].lstrip()
+
+  architecture = f"""
+-- Architecture of selector signal manager
+architecture arch of {name} is
+  {result_inner_decl}
+  -- Concatenated data and extra signals
+  {concat_signal_decls}
+begin
+  -- Concatenate extra signals
+  {concat_signal_logic}
+
+  -- Forwarding logic
+  {forwarding_logic}
+
+  result_valid <= result_inner_valid;
+  result_inner_ready <= result_ready;
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      condition => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueValue => trueValue_inner,
+      trueValue_valid => trueValue_valid,
+      trueValue_ready => trueValue_ready,
+      falseValue => falseValue_inner,
+      falseValue_valid => falseValue_valid,
+      falseValue_ready => falseValue_ready,
+      result => result_inner_concat,
+      result_ready => result_inner_ready,
+      result_valid => result_inner_valid
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture

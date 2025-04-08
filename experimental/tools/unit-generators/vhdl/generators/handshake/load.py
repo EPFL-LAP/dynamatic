@@ -124,21 +124,21 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   }])
 
   # Only extra signals (not data) are concatenated, so set original port bitwidth to 0.
-  addrIn_inner_port: ConcatPortConversion = {
+  addrIn_conversion: ConcatPortConversion = {
       "original_name": "addrIn",
       "original_bitwidth": 0,
       "inner_name": "addrIn_inner"
   }
-  dataOut_inner_port: ConcatPortConversion = {
+  dataOut_conversion: ConcatPortConversion = {
       "original_name": "dataOut",
       "original_bitwidth": 0,
       "inner_name": "dataOut_inner"
   }
   concat_signal_decls = generate_concat_signal_decls(
-      [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
+      [addrIn_conversion, dataOut_conversion], extra_signals_total_bitwidth)
 
   concat_signal_logic = generate_concat_port_assignments(
-      [addrIn_inner_port], [dataOut_inner_port], concat_info)
+      [addrIn_conversion], [dataOut_conversion], concat_info)
 
   architecture = f"""
 -- Architecture of load signal manager
