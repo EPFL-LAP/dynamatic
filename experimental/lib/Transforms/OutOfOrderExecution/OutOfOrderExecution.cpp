@@ -19,12 +19,16 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include <assert.h>
 #include <cmath>
 #include <memory>
 #include <string>
+#include <utility>
 
 using namespace dynamatic::experimental::outoforder;
 
@@ -57,29 +61,31 @@ private:
                                     llvm::DenseSet<Value> &unalignedEdges,
                                     llvm::DenseSet<Value> &taggedEdges);
 
-  // Step 1.4: Add the tagger operations and connect them to the fifo and
-  // consumers
-  // Returns the output of teh fitrst tagger added to be used as the select of
-  // the Aligner in case of a Controlled Aligner
+  // Step 1.4: Add the tagger operations and connect them to the freeTagsFifo
+  // and consumers Returns the output of teh fitrst tagger added to be used as
+  // the select of the Aligner in case of a Controlled Aligner
   Value addTaggers(OpBuilder builder, Operation *outOfOrderOp,
                    llvm::DenseSet<Value> &unalignedEdges,
-                   llvm::DenseSet<Value> &taggedEdges, FreeTagsFifoOp &fifo);
+                   llvm::DenseSet<Value> &taggedEdges,
+                   FreeTagsFifoOp &freeTagsFifo);
 
   // Add the untagger operations and connect them to consumers
   // DEPRECATED (now part of addAligner)
   void addUntaggers(OpBuilder builder, Operation *outOfOrderOp,
                     llvm::DenseSet<Value> &unalignedEdges,
-                    SmallVector<Value> &joinOperands, FreeTagsFifoOp &fifo);
+                    SmallVector<Value> &joinOperands,
+                    FreeTagsFifoOp &freeTagsFifo);
 
   // Step 1.6: Add the aligner
   void addAligner(OpBuilder builder, Operation *outOfOrderOp, Value select,
                   llvm::DenseSet<Value> &unalignedEdges,
                   SmallVector<Value> &joinOperands,
-                  llvm::DenseSet<Operation *> &untaggers, FreeTagsFifoOp &fifo,
-                  int numTags);
+                  llvm::DenseSet<Operation *> &untaggers,
+                  FreeTagsFifoOp &freeTagsFifo, int numTags);
 
-  // Step 1.7: Adds the FIFO, Tagger and Untagger operations
-  // Returns the FIFO operation which uniquely identifies the tagged region
+  // Step 1.7: Adds the FreeTagsFifo, Tagger and Untagger operations
+  // Returns the FreeTagsFifo operation which uniquely identifies the tagged
+  // region
   Operation *addTagOperations(handshake::FuncOp funcOp, OpBuilder builder,
                               Operation *outOfOrderOp,
                               llvm::DenseSet<Operation *> &dirtyNodes,
@@ -88,10 +94,11 @@ private:
                               llvm::DenseSet<Operation *> &untaggers,
                               int numTags, bool controlled);
 
-  // Step 1.8: TAg the channels in the tagged region
+  // Step 1.8: Tag the channels in the tagged region
   LogicalResult addTagSignalsToTaggedRegion(
-      handshake::FuncOp funcOp, const std::string &extraTag, Operation *fifo,
-      llvm::DenseSet<Operation *> &untaggers, int numTags);
+      handshake::FuncOp funcOp, const std::string &extraTag,
+      Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
+      int numTags);
 
   // MAIN: Apply the out-of-order execution methodology
   LogicalResult applyOutOfOrder(
@@ -121,26 +128,28 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
     OpBuilder builder(ctx);
     llvm::DenseSet<Operation *> untaggers;
-    Operation *fifo =
+    Operation *freeTagsFifo =
         addTagOperations(funcOp, builder, op, dirtyNodes, unalignedEdges,
                          taggedEdges, untaggers, numTags, controlled);
 
-    if (!fifo)
+    if (!freeTagsFifo)
       return failure();
 
     std::string extraTag = "tag" + std::to_string(tagIndex++);
-    if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, fifo, untaggers,
-                                           numTags)))
+    if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, freeTagsFifo,
+                                           untaggers, numTags)))
       return failure();
   }
   return success();
 }
 
-static void tarverseGraph(Operation *op,
+static void traverseGraph(Operation *op,
                           llvm::DenseSet<Operation *> &dirtyNodes) {
-  // Memory Control and End operations should not be marked as illegal
+  // Memory Operations (Memory Controller & LSQ) Control and End operations
+  // should not be marked as illegal
   if (dirtyNodes.find(op) != dirtyNodes.end() ||
-      isa<handshake::MemoryControllerOp>(op) || isa<handshake::EndOp>(op))
+      isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
+      isa<handshake::EndOp>(op))
     return;
 
   dirtyNodes.insert(op);
@@ -148,14 +157,14 @@ static void tarverseGraph(Operation *op,
   // Traverse the graph
   for (auto result : op->getResults()) {
     for (auto *user : result.getUsers()) {
-      tarverseGraph(user, dirtyNodes);
+      traverseGraph(user, dirtyNodes);
     }
   }
 }
 
 LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
     Operation *outOfOrderOp, llvm::DenseSet<Operation *> &dirtyNodes) {
-  tarverseGraph(outOfOrderOp, dirtyNodes);
+  traverseGraph(outOfOrderOp, dirtyNodes);
   dirtyNodes.erase(outOfOrderOp);
   return success();
 }
@@ -174,12 +183,13 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
     }
   }
 
-  // Add all the ouput edges of the out of order node, except those to a MC, to
-  // the unaligned edges
+  // Add all the ouput edges of the out of order node, except those to a MC or
+  // LSQ, to the unaligned edges
   for (auto res : outOfOrderOp->getResults()) {
     bool edgeToMC = false;
     for (auto *user : res.getUsers()) {
-      if (isa<handshake::MemoryControllerOp>(user))
+      if (isa<handshake::MemoryControllerOp>(user) ||
+          isa<handshake::LSQOp>(user))
         edgeToMC = true;
     }
     if (!edgeToMC)
@@ -198,7 +208,8 @@ LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
   // Insert input edges (operands of outOfOrderOp)
   for (Value operand : outOfOrderOp->getOperands()) {
     if (auto *prod = operand.getDefiningOp()) {
-      if (!isa<handshake::MemoryControllerOp>(prod))
+      if (!isa<handshake::MemoryControllerOp>(prod) &&
+          !isa<handshake::LSQOp>(prod))
         taggedEdges.insert(operand);
     }
   }
@@ -211,87 +222,97 @@ LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
   return success();
 }
 
+// Returns the result of the op that does not have an edge to memory (Memory
+// Controller & LSQ)
+static Value returnNonMemoryOutput(Operation *op) {
+  auto result = llvm::find_if(op->getResults(), [](auto res) {
+    bool edgeToMem = llvm::any_of(res.getUsers(), [](auto *user) {
+      return isa<handshake::MemoryControllerOp>(user) ||
+             isa<handshake::LSQOp>(user);
+    });
+    return !edgeToMem; // We want the result where there's no edge to memory
+  });
+
+  if (result != op->getResults().end())
+    return *result;
+
+  return op->getResults().front();
+}
+
 Operation *OutOfOrderExecutionPass::addTagOperations(
     handshake::FuncOp funcOp, OpBuilder builder, Operation *outOfOrderOp,
     llvm::DenseSet<Operation *> &dirtyNodes,
     llvm::DenseSet<Value> &unalignedEdges, llvm::DenseSet<Value> &taggedEdges,
     llvm::DenseSet<Operation *> &untaggers, int numTags, bool controlled) {
 
-  // Step 2: Add the FIFO that generates the tags
+  // Step 2: Add the FreeTagsFifo that generates the tags
 
   auto tagType = builder.getIntegerType(ceil(log2(numTags)));
-  // Create temporary condition that feeds the fifo. THis cond will later be
-  // replaced by the tag output of the untagger
+  // Create temporary condition that feeds the freeTagsFifo. This cond will
+  // later be replaced by the tag output of the untagger
   BackedgeBuilder beb(builder, (*taggedEdges.begin()).getLoc());
   Backedge cond = beb.get(tagType);
 
   builder.setInsertionPoint(outOfOrderOp);
-  FreeTagsFifoOp fifo = builder.create<handshake::FreeTagsFifoOp>(
+  FreeTagsFifoOp freeTagsFifo = builder.create<handshake::FreeTagsFifoOp>(
       (*taggedEdges.begin()).getLoc(), handshake::ChannelType::get(tagType),
       cond);
-  inheritBB(outOfOrderOp, fifo);
+  inheritBB(outOfOrderOp, freeTagsFifo);
 
   // Step 3: Add the Tagger Operations
   // For each tagged edge, create a Tagger operation that is fed from this
-  // tagged edge and the FIFO
-  Value taggedOutput =
-      addTaggers(builder, outOfOrderOp, unalignedEdges, taggedEdges, fifo);
+  // tagged edge and the FreeTagsFifo
+  Value taggedOutput = addTaggers(builder, outOfOrderOp, unalignedEdges,
+                                  taggedEdges, freeTagsFifo);
+  assert(taggedOutput && "At least one tagger should be created");
 
   SmallVector<Value> joinOperands;
   // Step 4: Add the Untagger Operations
-  // addUntaggers(builder, outOfOrderOp, unalignedEdges, joinOperands, fifo);
+  // addUntaggers(builder, outOfOrderOp, unalignedEdges, joinOperands,
+  // freeTagsFifo);
 
   // The select of the Aligner is:
-  // (1) Free Aligner: the ouput of the out of order node
+  // (1) Free Aligner: the ouput of the out-of-order node
   // (2) Controlled Aligner: the output of the first tagger
   Value select = outOfOrderOp->getResults().front();
   if (!controlled) {
-    for (auto res : outOfOrderOp->getResults()) {
-      bool edgeToMC = false;
-      for (auto *user : res.getUsers()) {
-        if (isa<handshake::MemoryControllerOp>(user))
-          edgeToMC = true;
-      }
-      if (!edgeToMC) {
-        select = res;
-        break;
-      }
-    }
-  } else if (taggedOutput) {
+    select = returnNonMemoryOutput(outOfOrderOp);
+  } else {
     select = taggedOutput;
   }
 
   addAligner(builder, outOfOrderOp, select, unalignedEdges, joinOperands,
-             untaggers, fifo, numTags);
+             untaggers, freeTagsFifo, numTags);
 
   // If more than on untagger was created, then join them and feed the
-  // result of the join (the free tag) back into the fifo Else, feed the
-  // free tag output of the single untagger into the fifo
+  // result of the join (the free tag) back into the freeTagsFifo. Else, feed
+  // the free tag output of the single untagger into the freeTagsFifo.
 
   if (joinOperands.size() > 1) {
     handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
         (*joinOperands.begin()).getLoc(), joinOperands);
     inheritBB(outOfOrderOp, joinOp);
-    fifo.getOperation()->replaceUsesOfWith(cond, joinOp.getResult());
+    freeTagsFifo.getOperation()->replaceUsesOfWith(cond, joinOp.getResult());
   } else {
-    fifo.getOperation()->replaceUsesOfWith(cond, (*joinOperands.begin()));
+    freeTagsFifo.getOperation()->replaceUsesOfWith(cond,
+                                                   (*joinOperands.begin()));
   }
 
-  return fifo.getOperation();
+  return freeTagsFifo.getOperation();
 }
 
 Value OutOfOrderExecutionPass::addTaggers(OpBuilder builder,
                                           Operation *outOfOrderOp,
                                           llvm::DenseSet<Value> &unalignedEdges,
                                           llvm::DenseSet<Value> &taggedEdges,
-                                          FreeTagsFifoOp &fifo) {
+                                          FreeTagsFifoOp &freeTagsFifo) {
   // Step 3: Add the Tagger Operations
   // For each tagged edge, create a Tagger operation that is fed from this
-  // tagged edge and the FIFO
+  // tagged edge and the FreeTagsFifo
   Value firstTaggerOutput;
   for (auto edge : taggedEdges) {
     handshake::TaggerOp taggerOp = builder.create<handshake::TaggerOp>(
-        outOfOrderOp->getLoc(), edge.getType(), edge, fifo.getTagOut());
+        outOfOrderOp->getLoc(), edge.getType(), edge, freeTagsFifo.getTagOut());
 
     if (!firstTaggerOutput) {
       firstTaggerOutput = taggerOp.getDataOut();
@@ -318,10 +339,11 @@ Value OutOfOrderExecutionPass::addTaggers(OpBuilder builder,
 void OutOfOrderExecutionPass::addUntaggers(
     OpBuilder builder, Operation *outOfOrderOp,
     llvm::DenseSet<Value> &unalignedEdges, SmallVector<Value> &joinOperands,
-    FreeTagsFifoOp &fifo) {
+    FreeTagsFifoOp &freeTagsFifo) {
   for (auto edge : unalignedEdges) {
     UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
-        edge.getLoc(), edge.getType(), fifo.getTagOut().getType(), edge);
+        edge.getLoc(), edge.getType(), freeTagsFifo.getTagOut().getType(),
+        edge);
 
     // Connect the untagger to the consumer of the edge
     //  i.e., for each prod that feeds the untagger: replace all the edges
@@ -339,27 +361,27 @@ void OutOfOrderExecutionPass::addAligner(OpBuilder builder,
                                          llvm::DenseSet<Value> &unalignedEdges,
                                          SmallVector<Value> &joinOperands,
                                          llvm::DenseSet<Operation *> &untaggers,
-                                         FreeTagsFifoOp &fifo, int numTags) {
+                                         FreeTagsFifoOp &freeTagsFifo,
+                                         int numTags) {
   builder.setInsertionPoint(outOfOrderOp);
   // Untag the select of the aligner to get the tag flow
   UntaggerOp selectUntagger = builder.create<handshake::UntaggerOp>(
-      select.getLoc(), select.getType(), fifo.getTagOut().getType(), select);
-  // TODO: don't feed the tag coming from the select untagger back into fifo.
-  // Need another way to mark it in tagTaggedRegion
-  // joinOperands.push_back(selectUntagger.getTagOut());
+      select.getLoc(), select.getType(), freeTagsFifo.getTagOut().getType(),
+      select);
   inheritBB(outOfOrderOp, selectUntagger);
   untaggers.insert(selectUntagger.getOperation());
 
   for (auto edge : unalignedEdges) {
     // Start by unatagging the edge
     UntaggerOp edgeUntagger = builder.create<handshake::UntaggerOp>(
-        edge.getLoc(), edge.getType(), fifo.getTagOut().getType(), edge);
+        edge.getLoc(), edge.getType(), freeTagsFifo.getTagOut().getType(),
+        edge);
 
     // Feed the output of the edge untagger into a demux, with the select of
     // the demux being the tag of the edge. The number of ouputs of the demux is
     // equal to the number of tags
-    static std::vector<Type> typeStorage;
-    typeStorage.assign(numTags, edgeUntagger.getDataOut().getType());
+    llvm::SmallVector<Type> typeStorage(numTags,
+                                        edgeUntagger.getDataOut().getType());
     TypeRange results(typeStorage);
 
     DemuxOp demux = builder.create<handshake::DemuxOp>(
@@ -411,7 +433,7 @@ static LogicalResult addTagToValue(Value value, const std::string &extraTag,
 static LogicalResult
 addTagSignalsRecursive(OpOperand &opOperand,
                        llvm::DenseSet<Operation *> &visited,
-                       const std::string &extraTag, Operation *fifo,
+                       const std::string &extraTag, Operation *freeTagsFifo,
                        llvm::DenseSet<Operation *> &untaggers, int numTags) {
 
   Operation *op;
@@ -437,30 +459,14 @@ addTagSignalsRecursive(OpOperand &opOperand,
   // Exceptional cases
   // UntaggerOp
   if (UntaggerOp untagger = dyn_cast<handshake::UntaggerOp>(op)) {
-    // If this is the untagger corresponding to the current tagged region (by
-    // identifying the fifo it feeds), then we stop traversal
-    // for (auto *user : untagger.getTagOut().getUsers()) {
-    //   // Case 1: Untagger directly feeds fifo
-    //   if (user == fifo)
-    //     return success();
-
-    //   // Case 2: Untagger feeds Join that feeds fifo
-    //   if (JoinOp join = dyn_cast<handshake::JoinOp>(user)) {
-    //     for (auto *user : join.getResult().getUsers()) {
-    //       if (user == fifo)
-    //         return success();
-    //     }
-    //   }
-    // }
-
     // If this is the untagger corresponding to the current tagged region, then
     // we stop traversal
     if (untaggers.contains(op))
       return success();
     // Else this is an untagger in a nested region and we continue traversal
     for (auto &operand : untagger.getDataOut().getUses()) {
-      if (failed(addTagSignalsRecursive(operand, visited, extraTag, fifo,
-                                        untaggers, numTags)))
+      if (failed(addTagSignalsRecursive(operand, visited, extraTag,
+                                        freeTagsFifo, untaggers, numTags)))
         return failure();
     }
     return success();
@@ -468,19 +474,33 @@ addTagSignalsRecursive(OpOperand &opOperand,
 
   // MemPortOp (Load and Store)
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-
     // Continue traversal to dataOut, skipping ports connected to the memory
     // controller.
     for (auto &operand : loadOp->getOpResult(1).getUses()) {
-      if (failed(addTagSignalsRecursive(operand, visited, extraTag, fifo,
-                                        untaggers, numTags)))
+      if (failed(addTagSignalsRecursive(operand, visited, extraTag,
+                                        freeTagsFifo, untaggers, numTags)))
         return failure();
     }
 
     return success();
   }
 
-  // The tags coming in and out of teh fifo should never be tagged
+  // TODO: Should storeOp be in tagged region?
+  if (auto storeOp = dyn_cast<handshake::StoreOp>(op))
+    return success();
+
+  if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
+    // Only perform traversal to the dataResult
+    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
+    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
+      if (failed(addTagSignalsRecursive(operand, visited, extraTag,
+                                        freeTagsFifo, untaggers, numTags)))
+        return failure();
+    }
+    return success();
+  }
+
+  // The tags coming in and out of the freeTagsFifo should never be tagged
   if (dyn_cast<handshake::FreeTagsFifoOp>(op))
     return failure();
 
@@ -491,8 +511,8 @@ addTagSignalsRecursive(OpOperand &opOperand,
       /*
       if (operand == &opOperand)
         continue;*/
-      if (failed(addTagSignalsRecursive(operand, visited, extraTag, fifo,
-                                        untaggers, numTags)))
+      if (failed(addTagSignalsRecursive(operand, visited, extraTag,
+                                        freeTagsFifo, untaggers, numTags)))
         return failure();
     }
   }
@@ -501,25 +521,23 @@ addTagSignalsRecursive(OpOperand &opOperand,
 }
 
 LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
-    handshake::FuncOp funcOp, const std::string &extraTag, Operation *fifo,
-    llvm::DenseSet<Operation *> &untaggers, int numTags) {
+    handshake::FuncOp funcOp, const std::string &extraTag,
+    Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
+    int numTags) {
   llvm::DenseSet<Operation *> visited;
   // A TaggerOp marks the beginning of the tagged region, so we use it as a
   // starting point for tagging
   for (auto taggerOp : funcOp.getOps<handshake::TaggerOp>()) {
     // Check if this is a tagger corresponding to the current tagged region (by
-    // identifying the fifo it is fed by), then we start traversal
+    // identifying the freeTagsFifo it is fed by), then we start traversal
     if (taggerOp.getTagOperand() ==
-        dyn_cast<FreeTagsFifoOp>(fifo).getTagOut()) {
+        dyn_cast<FreeTagsFifoOp>(freeTagsFifo).getTagOut()) {
       visited.insert(taggerOp);
-      // For the speculator, perform downstream traversal to only dataOut,
-      // skipping control signals. The upstream dataIn will be handled by the
-      // recursive traversal.
 
       Value taggerResult = taggerOp.getDataOut();
       for (OpOperand &opOperand : taggerResult.getUses()) {
-        if (failed(addTagSignalsRecursive(opOperand, visited, extraTag, fifo,
-                                          untaggers, numTags)))
+        if (failed(addTagSignalsRecursive(opOperand, visited, extraTag,
+                                          freeTagsFifo, untaggers, numTags)))
           return failure();
       }
     }
