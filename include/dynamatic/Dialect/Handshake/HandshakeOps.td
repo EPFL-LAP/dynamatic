@@ -640,9 +640,8 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
 }
 
 //===----------------------------------------------------------------------===//
-// Out-of-Order Execuion Operations
+// Out-of-Order Execution Operations
 //===----------------------------------------------------------------------===//
-
 
 def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
   Pure
@@ -655,7 +654,7 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
     Example:
 
     ```mlir
-      free_tags_fifo %tagOut {handshake.name = "free_tags_fifo0"} : <i2>, <i2>
+      free_tags_fifo %tagOut : <i2>, <i2>
     ```
   }];
 
@@ -669,7 +668,9 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
 }
 
 def TaggerOp : Handshake_Op<"tagger", [
-  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  Pure, 
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  HasUniqueTagInSecondOperand<"dataOperand", "dataOut">
 ]> {
   let summary = "Tagger operation for tagging data with tag signals.";
   let description = [{
@@ -678,7 +679,7 @@ def TaggerOp : Handshake_Op<"tagger", [
     Example:
 
     ```mlir
-    
+    %dataOut = tagger[%tagOperand] %dataOperand : (!handshake.channel<i32>, !handshake.channel<i2>) -> !handshake.channel<i32, [tag0: i2]>
     ```
   }];
 
@@ -703,11 +704,12 @@ def TaggerOp : Handshake_Op<"tagger", [
       return "outs";
     }
   }];
-  
 }
 
 def UntaggerOp : Handshake_Op<"untagger", [
-  Pure, DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  Pure, 
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  HasUniqueTagInSecondOperand<"dataOut", "dataOperand">
 ]> {
   let summary = "Untagger operation for extracting tag signals and forwarding data.";
   let description = [{
@@ -716,6 +718,7 @@ def UntaggerOp : Handshake_Op<"untagger", [
     Example:
 
     ```mlir
+    %dataOut, %tagOut = untagger %dataOperand : (!handshake.channel<i32, [tag0: i2]>) -> (!handshake.channel<i32>, !handshake.channel<i2>)
     ```
   }];
 
@@ -740,8 +743,6 @@ def UntaggerOp : Handshake_Op<"untagger", [
     }
   }];
 }
-
-
 
 //===----------------------------------------------------------------------===//
 // Memory interfaces
