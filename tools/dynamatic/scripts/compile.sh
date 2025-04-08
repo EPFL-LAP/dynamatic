@@ -130,13 +130,11 @@ exit_on_fail "Failed to apply transformations to handshake" \
 
   # out-of-order-execution transformations
 if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then
-  echo_info "Running out-of-order execution algorithm for handshake conversion"
-
-    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-      --out-of-order-execution \
-      > "$F_HANDSHAKE_OOE"
-    exit_on_fail "Failed to apply out-of-order execution transformations" \
-      "Applied out-of-order execution transformations"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --out-of-order-execution \
+    > "$F_HANDSHAKE_OOE"
+  exit_on_fail "Failed to apply out-of-order execution transformations" \
+    "Applied out-of-order execution transformations"
 
   # handshake transformations 2
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
