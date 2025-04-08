@@ -2,7 +2,7 @@ from typing import cast, TypedDict, NotRequired
 from .types import Port, ArrayPort, Direction
 
 
-class ConcatenationInfo:
+class ConcatInfo:
   # List of tuples of (extra_signal_name, (msb, lsb))
   # e.g., [("spec", (0, 0)), ("tag0", (8, 1))]
   mapping: list[tuple[str, tuple[int, int]]]
@@ -86,7 +86,7 @@ def generate_concat_signal_decls_from_ports(ports: list[Port], extra_signals_bit
   ], extra_signals_bitwidth)
 
 
-def generate_concat_port_assignment(port_conversion: ConcatPortConversion, dir: Direction, concat_info: ConcatenationInfo):
+def generate_concat_port_assignment(port_conversion: ConcatPortConversion, dir: Direction, concat_info: ConcatInfo):
   original_name = port_conversion["original_name"]
   original_bitwidth = port_conversion["original_bitwidth"]
   inner_name = port_conversion["inner_name"]
@@ -153,7 +153,7 @@ def generate_concat_port_assignment(port_conversion: ConcatPortConversion, dir: 
       return concat_logic
 
 
-def generate_concat_port_assignments(in_port_conversions: list[ConcatPortConversion], out_port_conversions: list[ConcatPortConversion], concat_info: ConcatenationInfo) -> str:
+def generate_concat_port_assignments(in_port_conversions: list[ConcatPortConversion], out_port_conversions: list[ConcatPortConversion], concat_info: ConcatInfo) -> str:
   # Unify input and output ports, and add direction
   unified_port_conversions: list[tuple[ConcatPortConversion, Direction]] = []
   for port_conversion in in_port_conversions:
@@ -169,7 +169,7 @@ def generate_concat_port_assignments(in_port_conversions: list[ConcatPortConvers
   return "\n".join(concat_logic).lstrip()
 
 
-def generate_concat_port_assignments_from_ports(in_ports: list[Port], out_ports: list[Port], concat_info: ConcatenationInfo) -> str:
+def generate_concat_port_assignments_from_ports(in_ports: list[Port], out_ports: list[Port], concat_info: ConcatInfo) -> str:
   return generate_concat_port_assignments(
       [get_default_port_conversion(port) for port in in_ports],
       [get_default_port_conversion(port) for port in out_ports],
