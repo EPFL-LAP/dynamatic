@@ -86,85 +86,85 @@ def generate_concat_signal_decls_from_ports(ports: list[Port], extra_signals_bit
   ], extra_signals_bitwidth)
 
 
-def generate_concat_port_assignment(port_conversion: ConcatPortConversion, dir: Direction, concat_info: ConcatInfo):
+def generate_concat_in_port_assignment(port_conversion: ConcatPortConversion, concat_info: ConcatInfo) -> list[str]:
   original_name = port_conversion["original_name"]
   original_bitwidth = port_conversion["original_bitwidth"]
   inner_name = port_conversion["inner_name"]
   array_size = port_conversion.get("array_size", 0)
 
-  if dir == "in":
-    if array_size > 0:
-      concat_logic = []
-      for i in range(array_size):
-        # Include data if present
-        if original_bitwidth > 0:
-          concat_logic.append(
-              f"  {inner_name}({i})({original_bitwidth} - 1 downto 0) <= {original_name}({i});")
+  concat_logic = []
 
-        # Include all extra signals
-        for signal_name, (msb, lsb) in concat_info.mapping:
-          concat_logic.append(
-              f"  {inner_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{i}_{signal_name};")
-
-      return concat_logic
-    else:
-      concat_logic = []
-
+  if array_size > 0:
+    for i in range(array_size):
       # Include data if present
       if original_bitwidth > 0:
         concat_logic.append(
-            f"  {inner_name}({original_bitwidth} - 1 downto 0) <= {original_name};")
+            f"  {inner_name}({i})({original_bitwidth} - 1 downto 0) <= {original_name}({i});")
 
       # Include all extra signals
       for signal_name, (msb, lsb) in concat_info.mapping:
         concat_logic.append(
-            f"  {inner_name}({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{signal_name};")
+            f"  {inner_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{i}_{signal_name};")
 
-      return concat_logic
   else:
-    if array_size > 0:
-      concat_logic = []
+    # Include data if present
+    if original_bitwidth > 0:
+      concat_logic.append(
+          f"  {inner_name}({original_bitwidth} - 1 downto 0) <= {original_name};")
 
-      for i in range(array_size):
-        # Extract data if present
-        if original_bitwidth > 0:
-          concat_logic.append(
-              f"  {original_name}({i}) <= {inner_name}({i})({original_bitwidth} - 1 downto 0);")
+    # Include all extra signals
+    for signal_name, (msb, lsb) in concat_info.mapping:
+      concat_logic.append(
+          f"  {inner_name}({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{signal_name};")
 
-        # Extract all extra signals
-        for signal_name, (msb, lsb) in concat_info.mapping:
-          concat_logic.append(
-              f"  {original_name}_{i}_{signal_name} <= {inner_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth});")
+  return concat_logic
 
-      return concat_logic
-    else:
-      concat_logic = []
 
+def generate_concat_out_port_assignment(port_conversion: ConcatPortConversion, concat_info: ConcatInfo) -> list[str]:
+  original_name = port_conversion["original_name"]
+  original_bitwidth = port_conversion["original_bitwidth"]
+  inner_name = port_conversion["inner_name"]
+  array_size = port_conversion.get("array_size", 0)
+
+  concat_logic = []
+
+  if array_size > 0:
+
+    for i in range(array_size):
       # Extract data if present
       if original_bitwidth > 0:
         concat_logic.append(
-            f"  {original_name} <= {inner_name}({original_bitwidth} - 1 downto 0);")
+            f"  {original_name}({i}) <= {inner_name}({i})({original_bitwidth} - 1 downto 0);")
 
       # Extract all extra signals
       for signal_name, (msb, lsb) in concat_info.mapping:
         concat_logic.append(
-            f"  {original_name}_{signal_name} <= {inner_name}({msb + original_bitwidth} downto {lsb + original_bitwidth});")
+            f"  {original_name}_{i}_{signal_name} <= {inner_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth});")
 
-      return concat_logic
+  else:
+    concat_logic = []
+
+    # Extract data if present
+    if original_bitwidth > 0:
+      concat_logic.append(
+          f"  {original_name} <= {inner_name}({original_bitwidth} - 1 downto 0);")
+
+    # Extract all extra signals
+    for signal_name, (msb, lsb) in concat_info.mapping:
+      concat_logic.append(
+          f"  {original_name}_{signal_name} <= {inner_name}({msb + original_bitwidth} downto {lsb + original_bitwidth});")
+
+  return concat_logic
 
 
 def generate_concat_port_assignments(in_port_conversions: list[ConcatPortConversion], out_port_conversions: list[ConcatPortConversion], concat_info: ConcatInfo) -> str:
-  # Unify input and output ports, and add direction
-  unified_port_conversions: list[tuple[ConcatPortConversion, Direction]] = []
-  for port_conversion in in_port_conversions:
-    unified_port_conversions.append((port_conversion, "in"))
-  for port_conversion in out_port_conversions:
-    unified_port_conversions.append((port_conversion, "out"))
-
   concat_logic = []
-  for port_conversion, dir in unified_port_conversions:
-    concat_logic += generate_concat_port_assignment(
-        port_conversion, dir, concat_info)
+  for port_conversion in in_port_conversions:
+    concat_logic += generate_concat_in_port_assignment(
+        port_conversion, concat_info)
+  for port_conversion in out_port_conversions:
+    concat_logic += generate_concat_out_port_assignment(
+        port_conversion, concat_info)
 
   return "\n".join(concat_logic).lstrip()
 
