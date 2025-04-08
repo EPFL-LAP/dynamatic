@@ -1162,6 +1162,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
+  //-------------------------------delete these two lines----------------------------------------------------
   SmallVector<Value> operands(adaptor.getOperands());
   operands.push_back(getBlockControl(callOp));
 
@@ -1173,7 +1174,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  TypeRange resultTypes;
+  SmallVector<Type> resultTypes;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   if (!calledHandshakeFuncOp) {
@@ -1219,9 +1220,20 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       //saves output index -> consumers, into the dictionary
       outputConnections[outputId] = fanouts; //should we add the control flag into
     }
-    resultTypes = calledFuncOp.getFunctionType().getResults();
+    //Create resultTypes based on collected Outputs
+    for(auto id : InstanceOpOutputIndices)
+      resultTypes.push_back(callOp.getOperand(id).getType()); 
+    //Create Operands for InstanceOp based on collected Inputs
+    SmallVector<Value> operands;
+    for(auto id : InstanceOpInputIndices)
+      operands.push_back(callOp.getOperand(id));
+    operands.push_back(getBlockControl(callOp));
   } else {
-    resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
+    //Take existing operands and resultType since called function is already lowered to Handshake
+    resultTypes.assign(calledHandshakeFuncOp.getFunctionType().getResults().begin(),
+      calledHandshakeFuncOp.getFunctionType().getResults().end()); 
+    SmallVector<Value> operands(adaptor.getOperands());
+    operands.push_back(getBlockControl(callOp));
   }
   SmallVector<Type> handshakeResultTypes;
   for (auto type : resultTypes)
@@ -1234,6 +1246,10 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands); //here operands includes the call operands and a control op, this needs to be changed
   instOp->setDialectAttrs(callOp->getDialectAttrs());
+  //rewiring (if called function is func::FuncOp)
+  if(!calledHandshakeFuncOp){
+    
+  }
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
