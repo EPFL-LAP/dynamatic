@@ -1,5 +1,5 @@
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatenationInfo
+from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatenationInfo, ConcatPortConversion
 from generators.support.signal_manager.utils.types import Port
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
@@ -123,16 +123,16 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  # Only extra signals (not data) are concatenated, so set inner port bitwidth to 0.
-  addrIn_inner_port: Port = {
-      "name": "addrIn",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
+  # Only extra signals (not data) are concatenated, so set original port bitwidth to 0.
+  addrIn_inner_port: ConcatPortConversion = {
+      "original_name": "addrIn",
+      "original_bitwidth": 0,
+      "inner_name": "addrIn_inner"
   }
-  dataOut_inner_port: Port = {
-      "name": "dataOut",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
+  dataOut_inner_port: ConcatPortConversion = {
+      "original_name": "dataOut",
+      "original_bitwidth": 0,
+      "inner_name": "dataOut_inner"
   }
   concat_signal_decls = generate_concat_signal_decls(
       [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)

@@ -1,10 +1,11 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.concat import ConcatenationInfo, generate_concat_signal_decls, generate_concat_port_assignments
+from .utils.concat import ConcatenationInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_simple_mappings, generate_concat_mappings
+from .utils.types import Port, ExtraSignals
 
 
-def generate_spec_units_signal_manager(name, in_ports, out_ports, extra_signals_without_spec, ctrl_names, generate_inner: Callable[[str], str]):
+def generate_spec_units_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], extra_signals_without_spec: ExtraSignals, ctrl_names: list[str], generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   in_ports_without_ctrl = [
@@ -20,10 +21,10 @@ def generate_spec_units_signal_manager(name, in_ports, out_ports, extra_signals_
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  concat_signal_decls = generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls_from_ports(
       in_ports_without_ctrl + out_ports, extra_signals_bitwidth)
 
-  concat_logic = generate_concat_port_assignments(
+  concat_logic = generate_concat_port_assignments_from_ports(
       in_ports_without_ctrl, out_ports, concat_info)
 
   mappings = generate_concat_mappings(
