@@ -1,8 +1,8 @@
 from collections.abc import Callable
 from .entity import generate_entity
 from .forwarding import get_default_extra_signal_value
-from .concat import generate_concat_signal_decls, ConcatenationInfo, generate_concat_port_assignments, generate_concat_mappings
-from .mapping import generate_inner_port_mapping
+from .concat import generate_concat_signal_decls, ConcatenationInfo, generate_concat_port_assignments
+from .mapping import generate_inner_port_mapping, generate_concat_mappings
 
 
 def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
