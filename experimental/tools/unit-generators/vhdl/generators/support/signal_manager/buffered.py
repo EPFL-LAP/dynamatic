@@ -1,9 +1,9 @@
 from collections.abc import Callable
-from .entity import generate_entity
-from .forwarding import forward_extra_signals
-from .types import Port, ExtraSignals
-from .mapping import generate_simple_mappings, get_unhandled_extra_signals
-from .concat import ConcatenationInfo
+from .utils.entity import generate_entity
+from .utils.forwarding import forward_extra_signals
+from .utils.types import Port, ExtraSignals
+from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
+from .utils.concat import ConcatenationInfo
 
 
 def _generate_buffered_transfer_logic(in_ports: list[Port], out_ports: list[Port], transfer_in_name: str, transfer_out_name: str) -> str:
