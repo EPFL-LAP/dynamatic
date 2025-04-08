@@ -1,4 +1,5 @@
 from .types import Port, ExtraSignals
+from .concat import get_default_inner_name
 
 
 def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = None, mapping_extra_signals: list[str] = []) -> list[str]:
@@ -48,7 +49,7 @@ def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, map
     mapping_port = port.copy()
     mapping_port["bitwidth"] += extra_signals_bitwidth
 
-    mapping_port_name = f"{port_name}_inner"
+    mapping_port_name = get_default_inner_name(port_name)
 
     mappings += generate_inner_port_mapping(
         mapping_port,
