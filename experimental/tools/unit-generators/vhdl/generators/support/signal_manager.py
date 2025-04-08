@@ -78,6 +78,8 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
         port_decls.append(
             f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
 
+      # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+      # because they come from the extra signals of the data
       if handshaked:
         port_decls.append(f"    {name}_valid : {dir} std_logic")
         port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
@@ -145,7 +147,7 @@ def _get_default_extra_signal_value(extra_signal_name: str):
 def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signals)
-  
+
   """
   Tags are quaranteed to be the same across all input ports.
   We can use the first input port's tag for all output ports.
@@ -209,6 +211,8 @@ def generate_inner_port_forwarding(ports) -> str:
     if bitwidth > 0:
       forwardings.append(f"      {port_name} => {port_name}")
 
+    # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+    # because they come from the extra signals of the data
     if handshaked:
       forwardings.append(f"      {port_name}_valid => {port_name}_valid")
       forwardings.append(f"      {port_name}_ready => {port_name}_ready")
