@@ -214,6 +214,7 @@ begin
   -- Forwarding logic
   {forwarding_logic}
 
+  result <= result_inner;
   result_valid <= result_inner_valid;
   result_inner_ready <= result_ready;
 
