@@ -1,8 +1,9 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.forwarding import get_default_extra_signal_value
-from .utils.concat import generate_concat_signal_decls, ConcatenationInfo, generate_concat_port_assignments
+from .utils.concat import generate_concat_signal_decls_from_ports, ConcatenationInfo, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_inner_port_mapping, generate_concat_mappings
+from .utils.types import Port, ExtraSignals
 
 
 def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
@@ -24,7 +25,7 @@ def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
   return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
 
 
-def generate_mux_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, spec_inputs, generate_inner: Callable[[str], str]):
+def generate_mux_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], size: int, data_in_name: str, index_name: str, out_extra_signals: ExtraSignals, index_extra_signals: ExtraSignals, spec_inputs: list[int], generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   in_ports_without_index = [
@@ -43,11 +44,11 @@ def generate_mux_signal_manager(name, in_ports, out_ports, size, data_in_name, i
       spec_inputs, size, data_in_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls_from_ports(
       in_ports_without_index + out_ports, extra_signals_bitwidth)
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments(
+  concat_logic = generate_concat_port_assignments_from_ports(
       in_ports_without_index, out_ports, concat_info)
 
   # Port forwarding for the inner entity
@@ -95,7 +96,7 @@ def _generate_cmerge_index_extra_signal_assignments(index_name, index_extra_sign
   return ""
 
 
-def generate_cmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, spec_inputs, generate_inner: Callable[[str], str]):
+def generate_cmerge_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], size: int, data_in_name: str, index_name: str, out_extra_signals: ExtraSignals, index_extra_signals: ExtraSignals, spec_inputs: list[int], generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   out_ports_without_index = [
@@ -114,11 +115,11 @@ def generate_cmerge_signal_manager(name, in_ports, out_ports, size, data_in_name
       spec_inputs, size, data_in_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls_from_ports(
       in_ports + out_ports_without_index, extra_signals_bitwidth)
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments(
+  concat_logic = generate_concat_port_assignments_from_ports(
       in_ports, out_ports_without_index, concat_info)
 
   # Assign index extra signals

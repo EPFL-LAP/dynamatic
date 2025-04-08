@@ -1,10 +1,11 @@
 from collections.abc import Callable
 from .utils.mapping import generate_concat_mappings, get_unhandled_extra_signals
 from .utils.entity import generate_entity
-from .utils.concat import ConcatenationInfo, generate_concat_signal_decls, generate_concat_port_assignments
+from .utils.concat import ConcatenationInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
+from .utils.types import Port, ExtraSignals
 
 
-def generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]):
+def generate_concat_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], extra_signals: ExtraSignals, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
@@ -15,11 +16,11 @@ def generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, gen
   inner = generate_inner(inner_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls(
+  concat_signal_decls = generate_concat_signal_decls_from_ports(
       in_ports + out_ports, extra_signals_bitwidth)
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments(
+  concat_logic = generate_concat_port_assignments_from_ports(
       in_ports, out_ports, concat_info)
 
   # Port forwarding for the inner entity
