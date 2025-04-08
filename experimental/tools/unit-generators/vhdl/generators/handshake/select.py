@@ -142,7 +142,7 @@ end architecture;
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
   concat_info = ConcatInfo(extra_signals)
   extra_signals_total_bitwidth = concat_info.total_bitwidth
-  extra_signal_names = [signal_name for signal_name in extra_signals]
+  extra_signal_names = list(extra_signals)
 
   inner_name = f"{name}_inner"
   inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
