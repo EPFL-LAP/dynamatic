@@ -163,7 +163,7 @@ def generate_concat_port_assignments(in_ports: list[Port], out_ports: list[Port]
   return "\n".join(concat_logic).lstrip()
 
 
-def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, handled_extra_signals: ExtraSignals, ignore_ports: list[str]) -> str:
+def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, handled_extra_signals: ExtraSignals, ignore_ports: list[str] = []) -> str:
   mappings = []
   for port in ports:
     port_name = port["name"]

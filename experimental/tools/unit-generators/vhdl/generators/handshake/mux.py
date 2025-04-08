@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.bbmerge import generate_mux_signal_manager
 from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.tehb import generate_tehb
 
@@ -188,9 +188,9 @@ end architecture;
 def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
       output_extra_signals)
-  return generate_signal_manager(name, {
-      "type": "bbmerge",
-      "in_ports": [{
+  return generate_mux_signal_manager(
+      name,
+      [{
           "name": "ins",
           "bitwidth": data_bitwidth,
           "array": True,
@@ -202,16 +202,15 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inpu
           # TODO: Extra signals for index port are not tested
           "extra_signals": index_extra_signals
       }],
-      "out_ports": [{
+      [{
           "name": "outs",
           "bitwidth": data_bitwidth,
           "extra_signals": output_extra_signals
       }],
-      "size": size,
-      "data_in_name": "ins",
-      "index_name": "index",
-      "index_dir": "in",
-      "index_extra_signals": index_extra_signals,
-      "out_extra_signals": output_extra_signals,
-      "spec_inputs": spec_inputs
-  }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
+      size,
+      "ins",
+      "index",
+      output_extra_signals,
+      index_extra_signals,
+      spec_inputs,
+      lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
