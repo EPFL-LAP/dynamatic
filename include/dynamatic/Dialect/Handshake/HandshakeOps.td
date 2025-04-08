@@ -649,7 +649,7 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
 ]> {
   let summary = "fifo operation for tags.";
   let description = [{
-    The `free_tags_fifo` operation represents a FIFO queue that supports multiple inputs and a single output. 
+    The `free_tags_fifo` operation represents a FIFO queue that supplies tags ready for reuse.
     It takes free tags as input and outputs a free tag, giving it to the Tagger when necessary
     
     Example:
@@ -673,8 +673,7 @@ def TaggerOp : Handshake_Op<"tagger", [
 ]> {
   let summary = "Tagger operation for tagging data with tag signals.";
   let description = [{
-    The `tagger` operation tags data with tags, where the tag is determined based on the `freeTag_data`.
-    It processes a set of input data arrays and tags them with the provided tag value for each data item.
+    The `tagger` operation attaches extra tag bits as extra signals to the data payload.
 
     Example:
 
@@ -712,8 +711,7 @@ def UntaggerOp : Handshake_Op<"untagger", [
 ]> {
   let summary = "Untagger operation for extracting tag signals and forwarding data.";
   let description = [{
-    The `untagger` operation extracts tags from incoming tagged data while forwarding the data itself. 
-    It processes a set of input data arrays and separates the tag portion, outputting it as `freeTag_data`.
+    The `untagger` operation extracts the extra tag bits previously attached to a data payload by the tagger. 
 
     Example:
 
