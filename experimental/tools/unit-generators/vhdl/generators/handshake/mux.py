@@ -1,5 +1,5 @@
 from generators.support.signal_manager.bbmerge import generate_mux_signal_manager
-from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.tehb import generate_tehb
 
 

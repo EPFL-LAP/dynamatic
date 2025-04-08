@@ -1,6 +1,6 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 from generators.support.signal_manager import generate_signal_manager
-from generators.support.signal_manager.concat import get_concat_extra_signals_bitwidth
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
 def generate_tfifo(name, params):

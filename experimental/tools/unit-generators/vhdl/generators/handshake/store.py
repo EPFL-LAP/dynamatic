@@ -1,6 +1,6 @@
-from generators.support.signal_manager.entity import generate_entity
-from generators.support.signal_manager.mapping import generate_simple_mappings
-from generators.support.signal_manager.types import Port
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.mapping import generate_simple_mappings
+from generators.support.signal_manager.utils.types import Port
 
 
 def generate_store(name, params):

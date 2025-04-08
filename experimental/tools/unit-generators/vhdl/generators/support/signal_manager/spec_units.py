@@ -1,7 +1,7 @@
 from collections.abc import Callable
-from .entity import generate_entity
-from .concat import ConcatenationInfo, generate_concat_signal_decls, generate_concat_port_assignments
-from .mapping import generate_simple_mappings, generate_concat_mappings
+from .utils.entity import generate_entity
+from .utils.concat import ConcatenationInfo, generate_concat_signal_decls, generate_concat_port_assignments
+from .utils.mapping import generate_simple_mappings, generate_concat_mappings
 
 
 def generate_spec_units_signal_manager(name, in_ports, out_ports, extra_signals_without_spec, ctrl_names, generate_inner: Callable[[str], str]):

@@ -1,7 +1,7 @@
 # See docs/Specs/SignalManager.md
 
 from collections.abc import Callable
-from .types import Port, ExtraSignals
+from .utils.types import Port, ExtraSignals
 from .normal import generate_normal_signal_manager
 from .buffered import generate_buffered_signal_manager
 from .concat import generate_concat_signal_manager
