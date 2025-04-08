@@ -73,16 +73,25 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (forceBreakDVR) {
       if (numSlotsToPlace == 1) {
         result.numOneSlotDV = 1;
-        result.numOneSlotR = 1;
       } else if (numSlotsToPlace == 2) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        result.numFifoDV = numSlotsToPlace - 1;
-        result.numOneSlotR = 1;
+        if (props.minOpaque <= 1) {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 1;
+        } else {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 2;
+          result.numOneSlotR = 1;
+        }
       }
     } else {
-      result.numFifoNone = numSlotsToPlace;
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
     placement[channel] = result;
