@@ -19,7 +19,7 @@ int iterative_division(in_int_t dividend, in_int_t divisor) {
     dividend -= divisor;
     quotient++;
   }
-  return sign * quotient;
+  return (sign == -1) ? -quotient : quotient;
 }
 
 int main(void) {
