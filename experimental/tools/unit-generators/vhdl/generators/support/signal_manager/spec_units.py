@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.concat import ConcatenationInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
+from .utils.concat import ConcatInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_simple_mappings, generate_concat_mappings
 from .utils.types import Port, ExtraSignals
 
@@ -15,7 +15,7 @@ def generate_spec_units_signal_manager(name: str, in_ports: list[Port], out_port
   extra_signal_names_without_spec = [
       signal_name for signal_name in extra_signals_without_spec]
 
-  concat_info = ConcatenationInfo(extra_signals_without_spec)
+  concat_info = ConcatInfo(extra_signals_without_spec)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"

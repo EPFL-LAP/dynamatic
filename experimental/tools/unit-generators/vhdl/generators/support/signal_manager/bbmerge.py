@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.forwarding import get_default_extra_signal_value
-from .utils.concat import generate_concat_signal_decls_from_ports, ConcatenationInfo, generate_concat_port_assignments_from_ports
+from .utils.concat import generate_concat_signal_decls_from_ports, ConcatInfo, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_inner_port_mapping, generate_concat_mappings
 from .utils.types import Port, ExtraSignals
 
@@ -34,7 +34,7 @@ def generate_mux_signal_manager(name: str, in_ports: list[Port], out_ports: list
       port for port in in_ports if port["name"] == index_name][0]
 
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(out_extra_signals)
+  concat_info = ConcatInfo(out_extra_signals)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
@@ -105,7 +105,7 @@ def generate_cmerge_signal_manager(name: str, in_ports: list[Port], out_ports: l
       port for port in out_ports if port["name"] == index_name][0]
 
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(out_extra_signals)
+  concat_info = ConcatInfo(out_extra_signals)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
