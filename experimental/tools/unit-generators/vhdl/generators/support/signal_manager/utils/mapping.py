@@ -5,6 +5,7 @@ from .concat import get_default_inner_name
 def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = None, mapping_extra_signals: list[str] = []) -> list[str]:
   mapping: list[str] = []
   port_name = port["name"]
+  port_extra_signals = port.get("extra_signals", {})
 
   if inner_port_data_name is None:
     inner_port_data_name = port_name
@@ -16,7 +17,7 @@ def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = N
   mapping.append(f"      {port_name}_ready => {port_name}_ready")
 
   for signal_name in mapping_extra_signals:
-    if signal_name in port.get("extra_signals", {}):
+    if signal_name in port_extra_signals:
       mapping.append(
           f"      {port_name}_{signal_name} => {port_name}_{signal_name}")
 
