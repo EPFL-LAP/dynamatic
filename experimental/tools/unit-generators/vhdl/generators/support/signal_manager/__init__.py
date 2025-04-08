@@ -25,9 +25,8 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
         name, in_ports, out_ports, extra_signals, generate_inner, latency)
   elif type == "concat":
     extra_signals = params["extra_signals"]
-    ignore_ports = params.get("ignore_ports", [])
     signal_manager = generate_concat_signal_manager(
-        name, in_ports, out_ports, extra_signals, ignore_ports, generate_inner)
+        name, in_ports, out_ports, extra_signals,  generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
