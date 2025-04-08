@@ -108,8 +108,8 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 }
 
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
-  // Merge/Muxes with more than one input should have at least 
-  // a transparent slot at their output
+  // Merges with more than one input should have at least one
+  // buffer slot at their output
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
       for (OpResult mergeRes : mergeOp->getResults()) {
