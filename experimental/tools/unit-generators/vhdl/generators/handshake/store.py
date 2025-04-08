@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_entity, generate_simple_inner_port_mappings
+from generators.support.signal_manager.entity import generate_entity
+from generators.support.signal_manager.mapping import generate_simple_inner_port_mappings
 from generators.support.signal_manager.types import Port
 
 
@@ -75,6 +76,7 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
       "extra_signals": extra_signals
   }]
 
+  # Discard extra signals
   out_ports: list[Port] = [{
       "name": "dataToMem",
       "bitwidth": data_bitwidth,
@@ -87,7 +89,7 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
 
   entity = generate_entity(name, in_ports, out_ports)
 
-  forwarding = generate_simple_inner_port_mappings(in_ports + out_ports)
+  mappings = generate_simple_inner_port_mappings(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of store signal manager
@@ -97,7 +99,7 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      {forwarding}
+      {mappings}
     );
 end architecture;
 """

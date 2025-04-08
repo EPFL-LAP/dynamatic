@@ -1,5 +1,5 @@
-from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, ConcatenationInfo
-from generators.support.signal_manager.concat import generate_concat_port_assignments
+from generators.support.signal_manager.entity import generate_entity
+from generators.support.signal_manager.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatenationInfo
 from generators.support.signal_manager.types import Port
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
@@ -136,6 +136,7 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   }
   concat_signal_decls = generate_concat_signal_decls(
       [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
+
   concat_signal_logic = generate_concat_port_assignments(
       [addrIn_inner_port], [dataOut_inner_port], concat_info)
 

@@ -1,5 +1,9 @@
 from typing import cast
+from collections.abc import Callable
 from .types import Port, ArrayPort, Direction
+from .mapping import generate_inner_port_mapping
+from .entity import generate_entity
+from .types import ExtraSignals
 
 
 class ConcatenationInfo:
@@ -157,3 +161,73 @@ def generate_concat_port_assignments(in_ports: list[Port], out_ports: list[Port]
     concat_logic += generate_concat_port_assignment(port, dir, concat_info)
 
   return "\n".join(concat_logic).lstrip()
+
+
+def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, handled_extra_signals: ExtraSignals, ignore_ports: list[str]) -> str:
+  mappings = []
+  for port in ports:
+    port_name = port["name"]
+    port_extra_signals = port.get("extra_signals", {})
+
+    mapping_port = port.copy()
+    mapping_port["bitwidth"] += extra_signals_bitwidth
+
+    mapping_port_name = port_name if port_name in ignore_ports else f"{port_name}_inner"
+
+    mapping_extra_signals = [signal_name
+                             for signal_name in port_extra_signals
+                             if signal_name not in handled_extra_signals]
+
+    mappings += generate_inner_port_mapping(
+        mapping_port, mapping_port_name, mapping_extra_signals)
+
+  return ",\n".join(mappings).lstrip()
+
+
+def generate_concat_signal_manager(name, in_ports, out_ports, extra_signals, ignore_ports, generate_inner: Callable[[str], str]):
+  entity = generate_entity(name, in_ports, out_ports)
+
+  # Exclude specified ports for concatenation
+  filtered_in_ports = [
+      port for port in in_ports if not port["name"] in ignore_ports]
+  filtered_out_ports = [
+      port for port in out_ports if not port["name"] in ignore_ports]
+
+  # Get concatenation details for extra signals
+  concat_info = ConcatenationInfo(extra_signals)
+  extra_signals_bitwidth = concat_info.total_bitwidth
+
+  inner_name = f"{name}_inner"
+  inner = generate_inner(inner_name)
+
+  # Declare inner concatenated signals for all input/output ports
+  concat_signal_decls = generate_concat_signal_decls(
+      filtered_in_ports + filtered_out_ports, extra_signals_bitwidth)
+
+  # Assign inner concatenated signals
+  concat_logic = generate_concat_port_assignments(
+      filtered_in_ports, filtered_out_ports, concat_info)
+
+  # Port forwarding for the inner entity
+  forwardings = generate_concat_mappings(
+      in_ports + out_ports, extra_signals_bitwidth, extra_signals, ignore_ports)
+
+  architecture = f"""
+-- Architecture of signal manager (concat)
+architecture arch of {name} is
+  -- Concatenated data and extra signals
+  {concat_signal_decls}
+begin
+  -- Concatenate data and extra signals
+  {concat_logic}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      {forwardings}
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture
