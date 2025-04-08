@@ -14,22 +14,25 @@ def generate_lsq(name, params):
   data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"])
   num_load_ports = config["numLoadPorts"]
   num_store_ports = config["numStorePorts"]
+  num_bbs = config["numBBs"]
   capacity = config["fifoDepth"]
   if config["master"]:
-    return _generate_lsq_master(name, addr_type, data_type, num_load_ports, num_store_ports, capacity)
+    return _generate_lsq_master(name, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, capacity)
+  else:
+    return _generate_lsq_slave(name, addr_type, data_type, num_load_ports, num_store_ports, capacity)
 
 
-def _generate_lsq_master(name, addr_type, data_type, num_load_ports, num_store_ports, capacity):
-  ctrl = [f"ctrl_{n}_valid" for n in range(num_load_ports + num_store_ports)]
+def _generate_lsq_master(name, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, capacity):
+  ctrl = [f"ctrl_{n}_valid" for n in range(num_bbs)]
   load_addr = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_load_ports)]
-  store_addr = [f"stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid" for n in range(num_store_ports)]
+  store_addr_data = [f"stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid" for n in range(num_store_ports)]
   load_data = [f"ldData_{n}_ready" for n in range(num_load_ports)]
-  lsq_in_ports = ", ".join(["loadData", "memStart_valid"] + ctrl + load_addr + store_addr + ["ctrlEnd_valid"] + load_data + ["memEnd_ready"])
+  lsq_in_ports = ", ".join(["loadData", "memStart_valid"] + ctrl + load_addr + store_addr_data + ["ctrlEnd_valid"] + load_data + ["memEnd_ready"])
   return f"""
 MODULE {name} ({lsq_in_ports})
 
   {"\n  ".join([f"VAR inner_load_port_{n} : {name}__nd_load_port(ctrl_{n}_valid, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
-  {"\n  ".join([f"VAR inner_store_port_{n} : {name}__nd_store_port(ctrl_{n + num_load_ports}_valid, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_load_ports)])}
+  {"\n  ".join([f"VAR inner_store_port_{n} : {name}__nd_store_port(ctrl_{n + num_load_ports}_valid, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
   VAR inner_mc_control : {name}__mc_control(memStart_valid, ctrlEnd_valid, memEnd_ready, all_requests_done);
 
   -- all_requests_done is true when all the load and store ports have completed the operation
@@ -112,4 +115,40 @@ MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   {generate_ofifo(f"{name}__data_ofifo", {ATTR_SLOTS: capacity, ATTR_DATA_TYPE: data_type.mlir_type})}
   {generate_join(f"{name}__join", {"size": 2})}
   {generate_sink(f"{name}__sink", {ATTR_PORT_TYPES: {"ins": data_type.mlir_type}})}
+"""
+
+def _generate_lsq_slave(name, addr_type, data_type, num_load_ports, num_store_ports, capacity):
+  ctrl = [f"ctrl_{n}_valid" for n in range(num_load_ports + num_store_ports)]
+  load_addr = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_load_ports)]
+  store_addr_data = [f"stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid" for n in range(num_store_ports)]
+  load_data = [f"ldData_{n}_ready" for n in range(num_load_ports)]
+  mc_in_signals = ["ldDataFromMC, ldDataFromMC_valid"]
+  mc_out_signals = ["ldAddrToMC_ready, stAddrToMC_ready, stDataToMC_ready"]
+  lsq_in_ports = ", ".join(ctrl + load_addr + store_addr_data + mc_in_signals + load_data + mc_out_signals)
+  return f"""
+MODULE {name} ({lsq_in_ports})
+
+
+  -- output
+  DEFINE
+  -- We decide not to model these signals as they are connected only to memory, but
+  -- we are now simulating the memory behavior through ndwires
+  stDataToMC := {data_type.format_constant(0)};
+  stDataToMC_valid := TRUE;
+  stAddrToMC := {addr_type.format_constant(0)};
+  stAddrToMC_valid := TRUE;
+  loadAddrfromMC := {addr_type.format_constant(0)};
+  loadAddrfromMC_valid := TRUE;
+  ldDataFromMC_ready := TRUE;
+
+  -- non-deterministic signals from the non-deterministic ports
+  {"\n  ".join([f"ctrl_{n}_ready := inner_load_port_{n}.ctrl_ready;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldAddr_{n}_ready := inner_load_port_{n}.ldAddr_ready;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldData_{n} := inner_load_port_{n}.ldData;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldData_{n}_valid := inner_load_port_{n}.ldData_valid;" for n in range(num_load_ports)])}
+
+  {"\n  ".join([f"ctrl_{n + num_load_ports}_ready := inner_store_port_{n}.ctrl_ready;" for n in range(num_store_ports)])}
+  {"\n  ".join([f"stAddr_{n}_ready := inner_store_port_{n}.stAddr_ready;" for n in range(num_store_ports)])}
+  {"\n  ".join([f"stData_{n}_ready := inner_store_port_{n}.stData_ready;" for n in range(num_store_ports)])}
+
 """
