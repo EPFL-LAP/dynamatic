@@ -1,6 +1,3 @@
-from .types import ExtraSignals, Port
-
-
 def get_default_extra_signal_value(extra_signal_name: str):
   return "\"0\""
 
