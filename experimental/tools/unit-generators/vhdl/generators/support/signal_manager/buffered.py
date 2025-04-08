@@ -2,7 +2,7 @@ from collections.abc import Callable
 from .entity import generate_entity
 from .forwarding import forward_extra_signals
 from .types import Port, ExtraSignals
-from .mapping import generate_simple_inner_port_mappings
+from .mapping import generate_simple_mappings, get_unhandled_extra_signals
 from .concat import ConcatenationInfo
 
 
@@ -74,7 +74,10 @@ def generate_buffered_signal_manager(name: str, in_ports: list[Port], out_ports:
   signal_assignments = _generate_buffered_signal_assignments(
       in_ports, out_ports, concat_info, extra_signals, buff_in_name, buff_out_name)
 
-  mappings = generate_simple_inner_port_mappings(in_ports + out_ports)
+  unhandled_extra_signals = get_unhandled_extra_signals(
+      in_ports + out_ports, extra_signals)
+  mappings = generate_simple_mappings(
+      in_ports + out_ports, unhandled_extra_signals)
 
   architecture = f"""
 -- Architecture of signal manager (buffered)
