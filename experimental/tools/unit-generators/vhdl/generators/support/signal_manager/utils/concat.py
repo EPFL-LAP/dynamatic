@@ -39,13 +39,15 @@ class ConcatPortConversion(TypedDict):
   array_size: NotRequired[int]
 
 
-def get_default_port_conversion(port: Port) -> ConcatPortConversion:
-  inner_name = f"{port['name']}_inner"
+def get_default_inner_name(original_name: str) -> str:
+  return f"{original_name}_inner"
 
+
+def get_default_port_conversion(port: Port) -> ConcatPortConversion:
   port_conversion: ConcatPortConversion = {
       "original_name": port["name"],
       "original_bitwidth": port["bitwidth"],
-      "inner_name": inner_name
+      "inner_name": get_default_inner_name(port["name"])
   }
 
   if port.get("array", False):
