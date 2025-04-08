@@ -1,21 +1,16 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.forwarding import forward_extra_signals
+from .utils.forwarding import generate_forwarding_assignments
 from .utils.types import Port, ExtraSignals
 from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
 
 
 def _generate_normal_signal_assignments(in_ports: list[Port], out_ports: list[Port], extra_signals: ExtraSignals) -> str:
-  in_port_names = [port["name"] for port in in_ports]
-  extra_signal_names = list(extra_signals)
-  forwarding_map = forward_extra_signals(extra_signal_names, in_port_names)
-
-  extra_signal_assignments = []
-  for out_port in out_ports:
-    out_port_name = out_port["name"]
-    for signal_name, expression in forwarding_map.items():
-      extra_signal_assignments.append(
-          f"  {out_port_name}_{signal_name} <= {expression};")
+  extra_signal_assignments = generate_forwarding_assignments(
+      [port["name"] for port in in_ports],
+      [port["name"] for port in out_ports],
+      list(extra_signals)
+  )
 
   return "\n".join(extra_signal_assignments).lstrip()
 
