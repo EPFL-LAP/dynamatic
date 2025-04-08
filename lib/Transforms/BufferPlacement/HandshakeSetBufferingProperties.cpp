@@ -114,12 +114,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     if (mergeOp->getNumOperands() > 1) {
       for (OpResult mergeRes : mergeOp->getResults()) {
         Channel channel(mergeRes, true);
-        // if (!mergeRes.use_empty()) {
-        //   Operation* nextOp = mergeRes.getUses().begin()->getOwner();
-          // if (isa<handshake::ForkOp>(nextOp)) {
         channel.props->minSlots = std::max(channel.props->minSlots, 1U);
-          // }
-        // }
       }
     }
   }
