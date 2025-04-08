@@ -2,7 +2,7 @@ def get_default_extra_signal_value(extra_signal_name: str):
   return "\"0\""
 
 
-def _get_forwarded_expression(signal_name: str, in_extra_signal_names: list[str]) -> str:
+def get_forwarded_expression(signal_name: str, in_extra_signal_names: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signal_names)
 
@@ -22,7 +22,7 @@ def forward_extra_signal(extra_signal_name: str, in_port_names: list[str]) -> st
       in_extra_signals.append(f"{port_name}_{extra_signal_name}")
 
     # Forward all input extra signals with the specified method
-    return _get_forwarded_expression(extra_signal_name, in_extra_signals)
+    return get_forwarded_expression(extra_signal_name, in_extra_signals)
 
 
 ForwardingMap = dict[str, str]
