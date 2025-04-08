@@ -1,8 +1,8 @@
 from collections.abc import Callable
-from .entity import generate_entity
-from .forwarding import forward_extra_signals
-from .types import Port, ExtraSignals
-from .mapping import generate_simple_mappings, get_unhandled_extra_signals
+from .utils.entity import generate_entity
+from .utils.forwarding import forward_extra_signals
+from .utils.types import Port, ExtraSignals
+from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
 
 
 def _generate_normal_signal_assignments(in_ports: list[Port], out_ports: list[Port], extra_signals: ExtraSignals) -> str:

@@ -1,6 +1,6 @@
-from generators.support.signal_manager.entity import generate_entity
-from generators.support.signal_manager.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatenationInfo
-from generators.support.signal_manager.types import Port
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatenationInfo
+from generators.support.signal_manager.utils.types import Port
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
