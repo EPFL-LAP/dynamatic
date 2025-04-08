@@ -12,8 +12,7 @@ def generate_spec_units_signal_manager(name: str, in_ports: list[Port], out_port
       port for port in in_ports if not port["name"] in ctrl_names]
   ctrl_ports = [
       port for port in in_ports if port["name"] in ctrl_names]
-  extra_signal_names_without_spec = [
-      signal_name for signal_name in extra_signals_without_spec]
+  extra_signal_names_without_spec = list(extra_signals_without_spec)
 
   concat_info = ConcatInfo(extra_signals_without_spec)
   extra_signals_bitwidth = concat_info.total_bitwidth
