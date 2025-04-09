@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from .utils.mapping import generate_concat_mappings, get_unhandled_extra_signals
 from .utils.entity import generate_entity
-from .utils.concat import ConcatInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
+from .utils.concat import ConcatLayout, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
 from .utils.types import Port, ExtraSignals
 
 
@@ -9,19 +9,19 @@ def generate_concat_signal_manager(name: str, in_ports: list[Port], out_ports: l
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
-  concat_info = ConcatInfo(extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls_from_ports(
-      in_ports + out_ports, extra_signals_bitwidth)
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
+      in_ports + out_ports, extra_signals_bitwidth))
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments_from_ports(
-      in_ports, out_ports, concat_info)
+  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
+      in_ports, out_ports, concat_layout))
 
   # Port forwarding for the inner entity
   unhandled_extra_signals = get_unhandled_extra_signals(

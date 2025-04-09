@@ -3,7 +3,7 @@ from .utils.entity import generate_entity
 from .utils.forwarding import forward_extra_signals
 from .utils.types import Port, ExtraSignals
 from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
-from .utils.concat import ConcatInfo
+from .utils.concat import ConcatLayout
 
 
 def _generate_buffered_transfer_logic(in_ports: list[Port], out_ports: list[Port], transfer_in_name: str, transfer_out_name: str) -> str:
@@ -15,7 +15,7 @@ def _generate_buffered_transfer_logic(in_ports: list[Port], out_ports: list[Port
   {transfer_out_name} <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
 
 
-def _generate_buffered_signal_assignments(in_ports: list[Port], out_ports: list[Port], concat_info: ConcatInfo, extra_signals: ExtraSignals, buff_in_name: str, buff_out_name: str) -> str:
+def _generate_buffered_signal_assignments(in_ports: list[Port], out_ports: list[Port], concat_layout: ConcatLayout, extra_signals: ExtraSignals, buff_in_name: str, buff_out_name: str) -> str:
   """
   e.g., buff_in(0 downto 0) <= lhs_spec or rhs_spec;
   """
@@ -27,7 +27,7 @@ def _generate_buffered_signal_assignments(in_ports: list[Port], out_ports: list[
   signal_assignments = []
 
   # Generate assignments from individual extra signals to single concatenated variable.
-  for signal_name, (msb, lsb) in concat_info.mapping:
+  for signal_name, (msb, lsb) in concat_layout.mapping:
     # Concat extra signals for buffer input.
     signal_assignments.append(
         f"  {buff_in_name}({msb} downto {lsb}) <= {forwarded_extra_signals[signal_name]};")
@@ -53,8 +53,8 @@ def generate_buffered_signal_manager(name: str, in_ports: list[Port], out_ports:
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
-  concat_info = ConcatInfo(extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
 
   # Generate buffer to store (concatenated) extra signals
   buff_name = f"{name}_buff"
@@ -72,7 +72,7 @@ def generate_buffered_signal_manager(name: str, in_ports: list[Port], out_ports:
   buff_in_name = "buff_in"
   buff_out_name = "buff_out"
   signal_assignments = _generate_buffered_signal_assignments(
-      in_ports, out_ports, concat_info, extra_signals, buff_in_name, buff_out_name)
+      in_ports, out_ports, concat_layout, extra_signals, buff_in_name, buff_out_name)
 
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
