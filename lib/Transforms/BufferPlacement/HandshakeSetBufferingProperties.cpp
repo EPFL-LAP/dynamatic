@@ -69,7 +69,8 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
                                                ctrlPaths.end());
     for (OpResult forkRes : ctrlDefOp->getResults()) {
       // Channels connecting directly to LSQs should be left alone (group
-      // allocation signals have already been rendered unbufferizable before)
+      // allocation signals have already been rendered unbufferizable before,
+      // i.e., in setFPGA20Properties)
       if (isa<handshake::LSQOp>(*forkRes.getUsers().begin()))
         continue;
 
@@ -107,12 +108,14 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 }
 
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
-  // Merges with more than one input should have at least a transparent slot
-  // at their output
+  // Merges with more than one input should have at least one
+  // buffer slot at their output
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
-      Channel channel(mergeOp.getResult(), true);
-      channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      for (OpResult mergeRes : mergeOp->getResults()) {
+        Channel channel(mergeRes, true);
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+      }
     }
   }
   
