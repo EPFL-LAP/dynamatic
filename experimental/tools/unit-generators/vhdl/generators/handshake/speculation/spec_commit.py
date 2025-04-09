@@ -201,5 +201,5 @@ def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals):
           "extra_signals": extra_signals_without_spec,
       }],
       extra_signals_without_spec,
-      "ctrl",
+      ["ctrl"],
       lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))
