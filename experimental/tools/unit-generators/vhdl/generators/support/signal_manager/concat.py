@@ -26,8 +26,8 @@ def generate_concat_signal_manager(name: str, in_ports: list[Port], out_ports: l
   # Port forwarding for the inner entity
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
-  mappings = generate_concat_mappings(
-      in_ports + out_ports, extra_signals_bitwidth, unhandled_extra_signals)
+  mappings = "\n      ".join(generate_concat_mappings(
+      in_ports + out_ports, extra_signals_bitwidth, unhandled_extra_signals))
 
   architecture = f"""
 -- Architecture of signal manager (concat)

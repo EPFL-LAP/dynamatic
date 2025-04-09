@@ -1,8 +1,25 @@
+# Default expression to use when no input ports are present
 def get_default_extra_signal_value(extra_signal_name: str):
+  """
+  Return the default VHDL value for an extra signal
+  when there are no input sources to forward from.
+  """
   return "\"0\""
 
 
-def get_forwarded_expression(signal_name: str, in_extra_signal_names: list[str]) -> str:
+def generate_forwarding_expression_for_signal(signal_name: str, in_extra_signal_names: list[str]) -> str:
+  """
+  Generate a VHDL expression to forward an extra signal
+  based on a list of input extra signal names.
+
+  If the list is empty, a default value is returned.
+  Currently, only the "spec" signal is supported,
+  which is forwarded using a logical OR.
+  """
+
+  if not in_extra_signal_names:
+    return get_default_extra_signal_value(signal_name)
+
   if signal_name == "spec":
     return " or ".join(in_extra_signal_names)
 
@@ -11,18 +28,17 @@ def get_forwarded_expression(signal_name: str, in_extra_signal_names: list[str])
 
 
 def forward_extra_signal(extra_signal_name: str, in_port_names: list[str]) -> str:
-  if not in_port_names:
-    # Use default values for extra signals
-    return get_default_extra_signal_value(extra_signal_name)
-  else:
-    in_extra_signals = []
+  """
+  Construct the forwarding expression for a single extra signal
+  from all input ports.
+  """
 
-    # Collect extra signals from all input ports
-    for port_name in in_port_names:
-      in_extra_signals.append(f"{port_name}_{extra_signal_name}")
+  in_extra_signals = [
+      f"{port_name}_{extra_signal_name}" for port_name in in_port_names
+  ]
 
-    # Forward all input extra signals with the specified method
-    return get_forwarded_expression(extra_signal_name, in_extra_signals)
+  # Forward all input extra signals with the specified method
+  return generate_forwarding_expression_for_signal(extra_signal_name, in_extra_signals)
 
 
 ForwardingMap = dict[str, str]
@@ -30,15 +46,14 @@ ForwardingMap = dict[str, str]
 
 def forward_extra_signals(extra_signal_names: list[str], in_port_names: list[str]) -> ForwardingMap:
   """
-  Calculate how each extra signal is forwarded to the output ports.
-  Result is a dict of extra signal names to VHDL expressions.
-  e.g., {"spec": "lhs_spec or rhs_spec", "tag0": "lhs_tag0 (op) rhs_tag0"}
-  If no inputs are provided, we use the default values.
-  e.g., {"spec": "\"0\"", "tag0": "\"0\""}
-  """
+  Generate a map from extra signal name to forwarding VHDL expression.
 
+  For example:
+    {"spec": "lhs_spec or rhs_spec"}
+    If no inputs: {"spec": "\"0\""}
+  """
   forwarded_extra_signals: dict[str, str] = {}
-  # Calculate forwarded extra signals
+
   for signal_name in extra_signal_names:
     forwarded_extra_signals[signal_name] = forward_extra_signal(
         signal_name, in_port_names)
@@ -48,18 +63,27 @@ def forward_extra_signals(extra_signal_names: list[str], in_port_names: list[str
 
 def generate_forwarding_assignments_from_forwarding_map(out_port_names: list[str], forwarding_map: ForwardingMap) -> list[str]:
   """
-  Generate VHDL assignments for extra signals.
-  e.g., "lhs_spec or rhs_spec" => "result_spec <= lhs_spec or rhs_spec;"
+  Generate a list of VHDL assignments to drive each extra signal
+  on each output port, based on the provided forwarding map.
+
+  Example output:
+    result_spec <= lhs_spec or rhs_spec;
   """
   assignments = []
+
   for out_port_name in out_port_names:
     for signal_name, expression in forwarding_map.items():
-      assignments.append(f"  {out_port_name}_{signal_name} <= {expression};")
+      assignments.append(f"{out_port_name}_{signal_name} <= {expression};")
 
   return assignments
 
 
 def generate_forwarding_assignments(in_port_names: list[str], out_port_names: list[str], extra_signal_names: list[str]) -> list[str]:
+  """
+  High-level helper: generate VHDL forwarding assignments
+  for a list of extra signals and output ports, based on inputs.
+  """
+
   forwarding_map = forward_extra_signals(
       extra_signal_names, in_port_names)
   return generate_forwarding_assignments_from_forwarding_map(

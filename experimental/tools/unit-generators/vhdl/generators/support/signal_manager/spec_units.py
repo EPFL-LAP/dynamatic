@@ -26,9 +26,9 @@ def generate_spec_units_signal_manager(name: str, in_ports: list[Port], out_port
   concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
       in_ports_without_ctrl, out_ports, concat_layout))
 
-  mappings = generate_concat_mappings(
-      in_ports_without_ctrl + out_ports, extra_signals_bitwidth, extra_signal_names_without_spec) + ",\n" + \
-      generate_simple_mappings(ctrl_ports)
+  mappings = "\n      ".join(generate_concat_mappings(
+      in_ports_without_ctrl + out_ports, extra_signals_bitwidth, extra_signal_names_without_spec) +
+      generate_simple_mappings(ctrl_ports))
 
   architecture = f"""
 -- Architecture of signal manager (spec_units)

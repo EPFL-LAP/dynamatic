@@ -199,7 +199,7 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
   forwarding_logic = generate_forwarding_assignments(
       ["condition", "result_inner"],
       ["result"],
-      extra_signal_names)[0].lstrip()
+      extra_signal_names)[0]
 
   architecture = f"""
 -- Architecture of selector signal manager

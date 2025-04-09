@@ -52,9 +52,9 @@ def generate_mux_signal_manager(name: str, in_ports: list[Port], out_ports: list
       in_ports_without_index, out_ports, concat_layout))
 
   # Port forwarding for the inner entity
-  mappings = generate_concat_mappings(
-      in_ports_without_index + out_ports, extra_signals_bitwidth) + ",\n" + \
-      ",\n".join(generate_inner_port_mapping(index_port))
+  mappings = "\n      ".join(generate_concat_mappings(
+      in_ports_without_index + out_ports, extra_signals_bitwidth) +
+      generate_inner_port_mapping(index_port))
 
   architecture = f"""
 -- Architecture of signal manager (mux)
@@ -127,9 +127,9 @@ def generate_cmerge_signal_manager(name: str, in_ports: list[Port], out_ports: l
       index_name, index_extra_signals)
 
   # Port forwarding for the inner entity
-  mappings = generate_concat_mappings(
-      in_ports + out_ports_without_index, extra_signals_bitwidth) + ",\n" + \
-      ",\n".join(generate_inner_port_mapping(index_port))
+  mappings = "\n      ".join(generate_concat_mappings(
+      in_ports + out_ports_without_index, extra_signals_bitwidth) +
+      generate_inner_port_mapping(index_port))
 
   architecture = f"""
 -- Architecture of signal manager (cmerge)
