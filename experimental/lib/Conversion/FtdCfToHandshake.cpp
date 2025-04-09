@@ -165,18 +165,18 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
   // Check whether the current constant can be connected to a source rather than
   // to start.
-  // auto isCstSourcable = [](arith::ConstantOp cstOp) -> bool {
-  //   std::function<bool(Operation *)> isValidUser =
-  //       [&](Operation *user) -> bool {
-  //     if (isa<UnrealizedConversionCastOp>(user))
-  //       return llvm::all_of(user->getUsers(), isValidUser);
-  //     return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-  //                 handshake::LoadOp, handshake::StoreOp, handshake::MergeOp>(
-  //         user);
-  //   };
+  auto isCstSourcable = [](arith::ConstantOp cstOp) -> bool {
+    std::function<bool(Operation *)> isValidUser =
+        [&](Operation *user) -> bool {
+      if (isa<UnrealizedConversionCastOp>(user))
+        return llvm::all_of(user->getUsers(), isValidUser);
+      return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+                  handshake::LoadOp, handshake::StoreOp, handshake::MergeOp>(
+          user);
+    };
 
-  //   return llvm::all_of(cstOp->getUsers(), isValidUser);
-  // };
+    return llvm::all_of(cstOp->getUsers(), isValidUser);
+  };
 
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
@@ -190,11 +190,11 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
     auto controlValue = startValue;
 
-    // if (isCstSourcable(cstOp)) {
-    //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-    //   inheritBB(cstOp, sourceOp);
-    //   controlValue = sourceOp.getResult();
-    // }
+    if (isCstSourcable(cstOp)) {
+      auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+      inheritBB(cstOp, sourceOp);
+      controlValue = sourceOp.getResult();
+    }
 
     // Convert the constant to the handshake equivalent, using the start value
     // as control signal
