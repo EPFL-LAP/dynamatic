@@ -426,6 +426,33 @@ LogicalResult FuncOp::verify() {
   return success();
 }
 
+LogicalResult BufferOp::verify() {
+  auto parametersAttr = (*this)->getAttrOfType<DictionaryAttr>("hw.parameters");
+  if (!parametersAttr)
+    return emitOpError("missing required dictionary attribute 'hw.parameters'");
+
+  auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
+  if (!bufferTypeAttr)
+    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+
+  auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
+  if (!numSlotsAttr)
+    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+
+  StringRef bufferType = bufferTypeAttr.getValue();
+  unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
+
+  if ((bufferType == ONE_SLOT_BREAK_DV ||
+       bufferType == ONE_SLOT_BREAK_R ||
+       bufferType == ONE_SLOT_BREAK_DVR) &&
+      numSlots != 1) {
+    return emitOpError("buffer type '")
+           << bufferType << "' requires NUM_SLOTS = 1, but got " << numSlots;
+  }
+
+  return success();
+}
+
 /// Parses a FuncOp signature using
 /// mlir::function_interface_impl::parseFunctionSignature while getting access
 /// to the parsed SSA names to store as attributes.

@@ -268,6 +268,8 @@ def BufferOp : Handshake_Op<"buffer", [
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
+
+  let hasVerifier = 1;
 }
 
 def InitOp : Handshake_Op<"init", [

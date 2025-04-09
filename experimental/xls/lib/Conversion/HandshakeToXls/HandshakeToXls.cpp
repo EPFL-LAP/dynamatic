@@ -1452,12 +1452,12 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
 
   TimingInfo info = timing.getInfo();
 
-  if ((!(info == TimingInfo::oehb())) && (!(info == TimingInfo::tehb()))) {
+  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r()))) {
     bufOp.emitError() << "unknown buffer";
     return failure();
   }
 
-  bool bypass = info == TimingInfo::tehb();
+  bool bypass = info == TimingInfo::break_r();
   auto newFifoConfig =
       xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
                                /*bypass=*/bypass,

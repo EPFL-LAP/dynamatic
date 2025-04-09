@@ -214,35 +214,28 @@ mlir::ParseResult TimingInfo::parseKey(mlir::AsmParser &odsParser,
   return success();
 }
 
-TimingInfo TimingInfo::oehb() {
+TimingInfo TimingInfo::break_dv() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 1)
       .setLatency(SignalType::VALID, 1)
       .setLatency(SignalType::READY, 0);
 }
 
-TimingInfo TimingInfo::tehb() {
+TimingInfo TimingInfo::break_r() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 0)
       .setLatency(SignalType::VALID, 0)
       .setLatency(SignalType::READY, 1);
 }
 
-TimingInfo TimingInfo::fifo_break_dv() {
-  return TimingInfo()
-      .setLatency(SignalType::DATA, 1)
-      .setLatency(SignalType::VALID, 1)
-      .setLatency(SignalType::READY, 0);
-}
-
-TimingInfo TimingInfo::fifo_break_none() {
+TimingInfo TimingInfo::break_none() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 0)
       .setLatency(SignalType::VALID, 0)
       .setLatency(SignalType::READY, 0);
 }
 
-TimingInfo TimingInfo::one_slot_break_dvr() {
+TimingInfo TimingInfo::break_dvr() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 1)
       .setLatency(SignalType::VALID, 1)
