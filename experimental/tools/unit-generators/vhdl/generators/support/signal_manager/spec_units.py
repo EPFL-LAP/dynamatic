@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.concat import ConcatInfo, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
+from .utils.concat import ConcatLayout, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_simple_mappings, generate_concat_mappings
 from .utils.types import Port, ExtraSignals
 
@@ -14,17 +14,17 @@ def generate_spec_units_signal_manager(name: str, in_ports: list[Port], out_port
       port for port in in_ports if port["name"] in ctrl_names]
   extra_signal_names_without_spec = list(extra_signals_without_spec)
 
-  concat_info = ConcatInfo(extra_signals_without_spec)
-  extra_signals_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals_without_spec)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  concat_signal_decls = generate_concat_signal_decls_from_ports(
-      in_ports_without_ctrl + out_ports, extra_signals_bitwidth)
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
+      in_ports_without_ctrl + out_ports, extra_signals_bitwidth))
 
-  concat_logic = generate_concat_port_assignments_from_ports(
-      in_ports_without_ctrl, out_ports, concat_info)
+  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
+      in_ports_without_ctrl, out_ports, concat_layout))
 
   mappings = generate_concat_mappings(
       in_ports_without_ctrl + out_ports, extra_signals_bitwidth, extra_signal_names_without_spec) + ",\n" + \
