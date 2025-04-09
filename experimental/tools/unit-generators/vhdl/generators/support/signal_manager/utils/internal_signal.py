@@ -15,6 +15,10 @@ def generate_internal_signal_array(name: str, bitwidth: int, size: int) -> str:
 
 
 def generate_internal_signals_from_port(port: Port) -> list[str]:
+  """
+  Generate all internal signal declarations (data, valid/ready, extra signals)
+  for a given port. Supports both scalar and array ports.
+  """
   name = port["name"]
   bitwidth = port["bitwidth"]
   extra_signals = port.get("extra_signals", {})
@@ -22,18 +26,21 @@ def generate_internal_signals_from_port(port: Port) -> list[str]:
 
   signals = []
   if not port_array:
+    # Scalar port
+
     if bitwidth > 0:
       signals.append(generate_internal_signal_vector(name, bitwidth))
 
     signals.append(generate_internal_signal(f"{name}_valid"))
     signals.append(generate_internal_signal(f"{name}_ready"))
 
-    # Generate extra signals for this port
+    # Extra signals
     for signal_name, signal_bitwidth in extra_signals.items():
       signals.append(
           generate_internal_signal_vector(f"{name}_{signal_name}", signal_bitwidth))
 
   else:
+    # Array port
     port = cast(ArrayPort, port)
     size = port["size"]
 
@@ -43,20 +50,17 @@ def generate_internal_signals_from_port(port: Port) -> list[str]:
     signals.append(generate_internal_signal_vector(f"{name}_valid", size))
     signals.append(generate_internal_signal_vector(f"{name}_ready", size))
 
-    # Use extra_signals_list if available to handle per-port extra signals
+    # Use per-port extra signal list if available
     use_extra_signals_list = "extra_signals_list" in port
 
     # Generate extra signal declarations for each item in the 2d input port
     for i in range(size):
-      if use_extra_signals_list:
-        # Use different extra signals for different ports
-        current_extra_signals = port["extra_signals_list"][i]
-      else:
-        # Use the same extra signals for all items
-        current_extra_signals = extra_signals
+      current_extra_signals = (
+          port["extra_signals_list"][i] if use_extra_signals_list
+          else extra_signals
+      )
 
-      # The netlist generator declares extra signals independently for each item,
-      # in contrast to ready/valid signals.
+      # Declare extra signals independently for each array element
       for signal_name, signal_bitwidth in current_extra_signals.items():
         signals.append(
             generate_internal_signal_vector(f"{name}_{i}_{signal_name}", signal_bitwidth))
