@@ -107,10 +107,15 @@ using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 static void channelifyMuxes(handshake::FuncOp &funcOp) {
   // Considering each mux that was added, the inputs and output values must be
   // channellified
-  for (Operation *mux : funcOp.getOps<handshake::MuxOp>()) {
-    mux->getOperand(1).setType(channelifyType(mux->getOperand(1).getType()));
-    mux->getOperand(2).setType(channelifyType(mux->getOperand(2).getType()));
-    mux->getResult(0).setType(channelifyType(mux->getResult(0).getType()));
+  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+    assert(muxOp.getDataOperands().size() == 2 &&
+           "Multiplexers should have two data inputs");
+    muxOp.getDataOperands()[0].setType(
+        channelifyType(muxOp.getDataOperands()[0].getType()));
+    muxOp.getDataOperands()[1].setType(
+        channelifyType(muxOp.getDataOperands()[1].getType()));
+    muxOp.getDataResult().setType(
+        channelifyType(muxOp.getDataResult().getType()));
   }
 }
 
@@ -126,7 +131,7 @@ static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
   // For each undefined value
   auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
 
-  for (auto undefOp : llvm::make_early_inc_range(undefinedValues)) {
+  for (auto undefOp : undefinedValues) {
     // Create an attribute of the appropriate type for the constant
     auto resType = undefOp.getRes().getType();
     TypedAttr cstAttr;
@@ -184,7 +189,7 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
   // For each constant
   auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
-  for (auto cstOp : llvm::make_early_inc_range(constants)) {
+  for (auto cstOp : constants) {
 
     rewriter.setInsertionPoint(cstOp);
 
@@ -198,16 +203,16 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
     // Convert the constant to the handshake equivalent, using the start value
     // as control signal
-    TypedAttr cstAttr = cstOp.getValue();
+    TypedAttr valueAttr = cstOp.getValue();
 
-    if (isa<IndexType>(cstAttr.getType())) {
+    if (isa<IndexType>(valueAttr.getType())) {
       auto intType = rewriter.getIntegerType(32);
-      cstAttr = IntegerAttr::get(
-          intType, cast<IntegerAttr>(cstAttr).getValue().trunc(32));
+      valueAttr = IntegerAttr::get(
+          intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
     }
 
     auto newCstOp = rewriter.create<handshake::ConstantOp>(
-        cstOp.getLoc(), cstAttr, controlValue);
+        cstOp.getLoc(), valueAttr, controlValue);
 
     newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
 
