@@ -77,10 +77,10 @@ struct HandshakePlaceBuffersCustomPass
     builder.setInsertionPoint(succ);
     handshake::TimingInfo timing;
     StringRef bufferType;
-    if (type == "oehb") {
+    if (type == "one_slot_break_dv") {
       timing = handshake::TimingInfo::break_dv();
       bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
-    } else if (type == "tehb") {
+    } else if (type == "one_slot_break_r") {
       timing = handshake::TimingInfo::break_r();
       bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
     } else if (type == "fifo_break_dv") {
