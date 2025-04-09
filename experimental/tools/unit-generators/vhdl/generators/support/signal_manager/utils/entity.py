@@ -3,6 +3,12 @@ from .types import Port, ArrayPort, Direction
 
 
 def generate_port_decl(port: Port, dir: Direction) -> list[str]:
+  """
+  Generate VHDL port declarations for a given port and direction.
+  Handles both scalar and array ports, including data, valid/ready,
+  and extra signals.
+  """
+
   port_decls: list[str] = []
 
   ready_dir = "out" if dir == "in" else "in"
@@ -12,59 +18,59 @@ def generate_port_decl(port: Port, dir: Direction) -> list[str]:
   port_array = port.get("array", False)
 
   if not port_array:
-    # Usual case
+    # Scalar port
 
-    # Generate data signal if present
     if bitwidth > 0:
+      # Declare data signal if present
       port_decls.append(
-          f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
+          f"{name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
 
-    port_decls.append(f"    {name}_valid : {dir} std_logic")
-    port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+    # Declare handshake signals
+    port_decls.append(f"{name}_valid : {dir} std_logic")
+    port_decls.append(f"{name}_ready : {ready_dir} std_logic")
 
-    # Generate extra signals for this input port
+    # Declare extra signals
     for signal_name, signal_bitwidth in extra_signals.items():
       port_decls.append(
-          f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+          f"{name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
   else:
-    # Port is array port
+    # Array port
     port = cast(ArrayPort, port)
     size = port["size"]
 
-    # Generate data_array signal declarations for 2d input port with bitwidth > 0
     if bitwidth > 0:
+      # Declare 2D data array
       port_decls.append(
-          f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+          f"{name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
 
-    # Use std_logic_vector for valid/ready of 2d input port
+    # Handshake signals as 1D vector
     port_decls.append(
-        f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
+        f"{name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
     port_decls.append(
-        f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+        f"{name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
 
-    # Use extra_signals_list if available to handle per-port extra signals
+    # Check for per-index extra signal customization
     use_extra_signals_list = "extra_signals_list" in port
 
-    # Generate extra signal declarations for each item in the 2d input port
     for i in range(size):
-      if use_extra_signals_list:
-        # Use different extra signals for different ports
-        current_extra_signals = port["extra_signals_list"][i]
-      else:
-        # Use the same extra signals for all items
-        current_extra_signals = extra_signals
+      current_extra_signals = (
+          port["extra_signals_list"][i] if use_extra_signals_list
+          else extra_signals
+      )
 
-      # The netlist generator declares extra signals independently for each item,
-      # in contrast to ready/valid signals.
+      # Declare per-item extra signals independently
       for signal_name, signal_bitwidth in current_extra_signals.items():
         port_decls.append(
-            f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+            f"{name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 
   return port_decls
 
 
 def generate_all_port_decls(in_ports: list[Port], out_ports: list[Port]) -> list[str]:
-  # Unify input and output ports, and add direction
+  """
+  Generate VHDL declarations for all input and output ports,
+  combining both directions and delegating to `generate_port_decl`.
+  """
   unified_ports: list[tuple[Port, Direction]] = []
   for port in in_ports:
     unified_ports.append((port, "in"))
@@ -72,7 +78,6 @@ def generate_all_port_decls(in_ports: list[Port], out_ports: list[Port]) -> list
     unified_ports.append((port, "out"))
 
   port_decls = []
-  # Add port declarations for each port
   for port, dir in unified_ports:
     port_decls += generate_port_decl(port, dir)
 
@@ -80,7 +85,11 @@ def generate_all_port_decls(in_ports: list[Port], out_ports: list[Port]) -> list
 
 
 def generate_entity_from_port_decls(entity_name: str, port_decls: list[str]) -> str:
-  port_decls_str = ";\n".join(port_decls).lstrip()
+  """
+  Generate full VHDL entity definition from a given entity name
+  and list of port declarations.
+  """
+  port_decls_str = ";\n    ".join(port_decls)
 
   return f"""
 library ieee;
@@ -101,7 +110,9 @@ end entity;
 
 def generate_entity(entity_name: str, in_ports: list[Port], out_ports: list[Port]) -> str:
   """
-  Generate entity for signal manager, based on input and output ports
+  High-level generator for a signal manager entity.
+  Combines input and output port definitions and emits
+  a full VHDL entity declaration.
   """
 
   port_decls = generate_all_port_decls(in_ports, out_ports)

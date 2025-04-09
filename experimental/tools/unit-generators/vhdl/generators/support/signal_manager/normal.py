@@ -12,7 +12,7 @@ def _generate_normal_signal_assignments(in_ports: list[Port], out_ports: list[Po
       list(extra_signals)
   )
 
-  return "\n".join(extra_signal_assignments).lstrip()
+  return "\n  ".join(extra_signal_assignments)
 
 
 def generate_normal_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], extra_signals: ExtraSignals, generate_inner: Callable[[str], str]) -> str:
@@ -26,8 +26,8 @@ def generate_normal_signal_manager(name: str, in_ports: list[Port], out_ports: l
 
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
-  mappings = generate_simple_mappings(
-      in_ports + out_ports, unhandled_extra_signals)
+  mappings = "\n      ".join(generate_simple_mappings(
+      in_ports + out_ports, unhandled_extra_signals))
 
   architecture = f"""
 -- Architecture of signal manager (normal)
