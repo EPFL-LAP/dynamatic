@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.forwarding import get_default_extra_signal_value
-from .utils.concat import generate_concat_signal_decls_from_ports, ConcatInfo, generate_concat_port_assignments_from_ports
+from .utils.concat import generate_concat_signal_decls_from_ports, ConcatLayout, generate_concat_port_assignments_from_ports
 from .utils.mapping import generate_inner_port_mapping, generate_concat_mappings
 from .utils.types import Port, ExtraSignals
 
@@ -34,8 +34,8 @@ def generate_mux_signal_manager(name: str, in_ports: list[Port], out_ports: list
       port for port in in_ports if port["name"] == index_name][0]
 
   # Get concatenation details for extra signals
-  concat_info = ConcatInfo(out_extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(out_extra_signals)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
@@ -44,12 +44,12 @@ def generate_mux_signal_manager(name: str, in_ports: list[Port], out_ports: list
       spec_inputs, size, data_in_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls_from_ports(
-      in_ports_without_index + out_ports, extra_signals_bitwidth)
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
+      in_ports_without_index + out_ports, extra_signals_bitwidth))
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments_from_ports(
-      in_ports_without_index, out_ports, concat_info)
+  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
+      in_ports_without_index, out_ports, concat_layout))
 
   # Port forwarding for the inner entity
   mappings = generate_concat_mappings(
@@ -105,8 +105,8 @@ def generate_cmerge_signal_manager(name: str, in_ports: list[Port], out_ports: l
       port for port in out_ports if port["name"] == index_name][0]
 
   # Get concatenation details for extra signals
-  concat_info = ConcatInfo(out_extra_signals)
-  extra_signals_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(out_extra_signals)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
@@ -115,12 +115,12 @@ def generate_cmerge_signal_manager(name: str, in_ports: list[Port], out_ports: l
       spec_inputs, size, data_in_name)
 
   # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = generate_concat_signal_decls_from_ports(
-      in_ports + out_ports_without_index, extra_signals_bitwidth)
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
+      in_ports + out_ports_without_index, extra_signals_bitwidth))
 
   # Assign inner concatenated signals
-  concat_logic = generate_concat_port_assignments_from_ports(
-      in_ports, out_ports_without_index, concat_info)
+  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
+      in_ports, out_ports_without_index, concat_layout))
 
   # Assign index extra signals
   index_extra_signal_assignments = _generate_cmerge_index_extra_signal_assignments(

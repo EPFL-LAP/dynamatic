@@ -1,4 +1,4 @@
-from generators.support.signal_manager.utils.concat import ConcatInfo
+from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatPortConversion
 from generators.support.signal_manager.utils.forwarding import generate_forwarding_assignments
@@ -140,8 +140,8 @@ end architecture;
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  concat_info = ConcatInfo(extra_signals)
-  extra_signals_total_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_total_bitwidth = concat_layout.total_bitwidth
   extra_signal_names = list(extra_signals)
 
   inner_name = f"{name}_inner"
@@ -165,36 +165,36 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       "extra_signals": extra_signals
   }])
 
-  result_inner_decl = generate_internal_signals_from_port({
+  result_inner_decl = "\n  ".join(generate_internal_signals_from_port({
       "name": "result_inner",
       "bitwidth": bitwidth,
       "extra_signals": extra_signals
-  })
+  }))
 
   trueValue_conversion: ConcatPortConversion = {
       "original_name": "trueValue",
       "original_bitwidth": bitwidth,
-      "inner_name": "trueValue_inner"
+      "concat_name": "trueValue_inner"
   }
   falseValue_conversion: ConcatPortConversion = {
       "original_name": "falseValue",
       "original_bitwidth": bitwidth,
-      "inner_name": "falseValue_inner"
+      "concat_name": "falseValue_inner"
   }
   result_conversion: ConcatPortConversion = {
       "original_name": "result_inner",
       "original_bitwidth": bitwidth,
-      "inner_name": "result_inner_concat"
+      "concat_name": "result_inner_concat"
   }
-  concat_signal_decls = generate_concat_signal_decls(
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
       [trueValue_conversion, falseValue_conversion, result_conversion],
       extra_signals_total_bitwidth
-  )
-  concat_signal_logic = generate_concat_port_assignments(
+  ))
+  concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
       [trueValue_conversion, falseValue_conversion],
       [result_conversion],
-      concat_info
-  )
+      concat_layout
+  ))
 
   forwarding_logic = generate_forwarding_assignments(
       ["condition", "result_inner"],

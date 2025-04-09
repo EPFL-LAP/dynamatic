@@ -3,18 +3,18 @@ from .types import Port, ArrayPort
 
 
 def generate_internal_signal(name: str) -> str:
-  return f"  signal {name} : std_logic;"
+  return f"signal {name} : std_logic;"
 
 
 def generate_internal_signal_vector(name: str, bitwidth: int) -> str:
-  return f"  signal {name} : std_logic_vector({bitwidth - 1} downto 0);"
+  return f"signal {name} : std_logic_vector({bitwidth - 1} downto 0);"
 
 
 def generate_internal_signal_array(name: str, bitwidth: int, size: int) -> str:
-  return f"  signal {name} : data_array({size - 1} downto 0)({bitwidth - 1} downto 0);"
+  return f"signal {name} : data_array({size - 1} downto 0)({bitwidth - 1} downto 0);"
 
 
-def generate_internal_signals_from_port(port: Port) -> str:
+def generate_internal_signals_from_port(port: Port) -> list[str]:
   name = port["name"]
   bitwidth = port["bitwidth"]
   extra_signals = port.get("extra_signals", {})
@@ -61,4 +61,4 @@ def generate_internal_signals_from_port(port: Port) -> str:
         signals.append(
             generate_internal_signal_vector(f"{name}_{i}_{signal_name}", signal_bitwidth))
 
-  return "\n".join(signals).lstrip()
+  return signals
