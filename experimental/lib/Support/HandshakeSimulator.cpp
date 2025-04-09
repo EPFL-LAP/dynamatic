@@ -1410,9 +1410,9 @@ void Simulator::associateModel(Operation *op) {
         if (auto timing =
                 dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
           auto info = timing.getInfo();
-          if (info == handshake::TimingInfo::oehb())
+          if (info == handshake::TimingInfo::break_dv())
             registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
-          if (info == handshake::TimingInfo::tehb())
+          if (info == handshake::TimingInfo::break_r())
             registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
         }
       })

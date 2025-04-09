@@ -22,26 +22,22 @@ In addition to the timing attribute to characterize `BufferOp`, we directly repr
 
 ## Supported Buffer Types
 
-- ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths. Previously known as a slot of OEHB (Opaque Elastic Half-Buffer), it introduces one cycle of latency on the D and V paths. It does not break the R signal path and adds no latency on R.
-
-- ONE_SLOT_BREAK_R: This buffer breaks the R signal path. Previously known as a slot of TEHB (Transparent Elastic Half-Buffer), it introduces one cycle of latency on the R path. It does not break the D and V signal path and adds no latency on D and V.
-
-- ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal paths and introduces one cycle of latency on all three.
-
-- FIFO_BREAK_DV: This buffer breaks the D and V paths. It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers, its structure cannot be split. It introduces one cycle of latency on the D and V paths regardless of the number of slots and has no latency on R. It was previously called an 'elastic_fifo_inner'.
-
-- FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO), this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths. Its only purpose is to hold tokens.
-
-- SHIFT_REG_BREAK_DV (Not Implemented): This buffer breaks the D and V paths. It has multiple slots that share a single handshake control unit, so all slots stall together or accept inputs simultaneously. This design introduces the same latency as a chain of ONE_SLOT_BREAK_DV buffers with the same slot number. However, when the initiation interval is greater than one, its token capacity is lower than that of ONE_SLOT_BREAK_DV buffers. Its main advantage is a significantly lower area cost when slot number is high.
+| Type name              | Legacy name        |  Latency                    | Timing                    |
+| ---------------------- | ------------------ | --------------------------- | ------------------------- |
+| `ONE_SLOT_BREAK_DV`    | OEHB               | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
+| `ONE_SLOT_BREAK_R`     | TEHB               | Data: 0, Valid: 0, Ready: 1 | Break: R; Bypass: D, V    |
+| `ONE_SLOT_BREAK_DVR`   | N/A                | Data: 1, Valid: 1, Ready: 1 | Break: D, V, R            |
+| `FIFO_BREAK_DV`        | elastic_fifo_inner | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
+| `FIFO_BREAK_NONE`      | TFIFO              | Data: 0, Valid: 0, Ready: 0 | Bypass: D, V, R           |
+| `SHIFT_REG_BREAK_DV`   | N/A                | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
 
 > [!NOTE]
+> `SHIFT_REG_BREAK_DV` is currently not implemented.
 > All six buffer types can be used together in a channel to handle various needs. For the first three types, you can chain multiple modules if you need more slots. The last three types allow multiple slots within their module parameters, so they need not be chained in a channel.
-
+> An assertion is placed in the BufferOp builder to ensure that if the buffer type is ONE_SLOT, then num_slots == 1.
 ## Map MILP Result to Buffer Types
 
-Originally, the MILP result of `FPGA20Buffers` and `FPL22Buffers` produced timing attributes `opaque` and `transparent`, which were then mapped via a JSON file to corresponding buffer HDL modules. In the new approach, the MILP result is mapped to a set of buffer types with specified slot numbers, and each buffer type directly corresponds to an HDL module. In other words, the conversion still produces the same inputs and outputs as before—the only change is that the intermediate representation is now expressed as explicit buffer types rather than timing attributes. Since each buffer type corresponds one-to-one with an HDL module, the Buffer Placement Pass and RTL backend require no additional smart conversion.
-
-The mapping is as follows:
+This section describes how the MILP result is mapped to buffer placement decisions. This mapping logic is specific to each buffer placement algorithm (e.g., FPGA20 and FPL22 have their separate mapping logic).
 
 For `FPGA20Buffers`,
 
@@ -49,7 +45,7 @@ For `FPGA20Buffers`,
 1. If breaking DVR:
 When numslot = 1, map to ONE_SLOT_BREAK_DV;
 When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
 
 2. If breaking none:
 When numslot = 1, map to ONE_SLOT_BREAK_R;
