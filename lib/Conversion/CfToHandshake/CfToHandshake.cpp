@@ -1049,8 +1049,15 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
-    if (auto dataType = dyn_cast<handshake::ChannelType>(type))
+    // In Fast Token Delivery the type of the element might be already a
+    // channel, rather than a simple type. In this case, the type should be
+    // extracted. We also make sure that no extra bits are present at this
+    // compilation stage.
+    if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
+      assert(dataType.getNumExtraSignals() == 0 &&
+             "expected type to have no extra signals");
       type = dataType.getDataType();
+    }
     if (isa<IndexType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
