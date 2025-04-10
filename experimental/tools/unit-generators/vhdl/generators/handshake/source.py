@@ -41,7 +41,7 @@ end architecture;
 
 def _generate_source_signal_manager(name, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [],
       "out_ports": [{
           "name": "outs",
