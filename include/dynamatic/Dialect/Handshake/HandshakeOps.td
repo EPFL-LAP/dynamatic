@@ -516,6 +516,8 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
 def DemuxOp : Handshake_Op<"demux", [
   AllDataTypesMatchWithVariadic<"result", ["dataOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"result", ["dataOperand"]>,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {
   let summary = "demux operation";
@@ -644,7 +646,8 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
 //===----------------------------------------------------------------------===//
 
 def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
-  Pure
+  Pure,
+  //AllDataTypesMatch<["tagOperand", "tagOut"]>
 ]> {
   let summary = "fifo operation for tags.";
   let description = [{
@@ -669,8 +672,8 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
 
 def TaggerOp : Handshake_Op<"tagger", [
   Pure, 
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
-  HasUniqueTagInSecondOperand<"dataOperand", "dataOut">
+  HasUniqueTagInSecondOperand<"dataOperand", "dataOut">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Tagger operation for tagging data with tag signals.";
   let description = [{
@@ -708,8 +711,8 @@ def TaggerOp : Handshake_Op<"tagger", [
 
 def UntaggerOp : Handshake_Op<"untagger", [
   Pure, 
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
-  HasUniqueTagInSecondOperand<"dataOut", "dataOperand">
+  HasUniqueTagInSecondOperand<"dataOut", "dataOperand">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Untagger operation for extracting tag signals and forwarding data.";
   let description = [{

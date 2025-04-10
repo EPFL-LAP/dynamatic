@@ -561,7 +561,7 @@ void OutOfOrderExecutionPass::runDynamaticPass() {
     }
 
     // for (auto shli : funcOp.getOps<handshake::ShLIOp>()) {
-    //   outOfOrderNodes.insert({shli, 8});
+    //   outOfOrderNodes.insert({shli, {8, false}});
     // }
 
     if (failed(applyOutOfOrder(funcOp, ctx, outOfOrderNodes)))
