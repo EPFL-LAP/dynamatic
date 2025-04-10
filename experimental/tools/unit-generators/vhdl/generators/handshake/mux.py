@@ -211,6 +211,5 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inpu
       "ins",
       "index",
       output_extra_signals,
-      index_extra_signals,
       spec_inputs,
       lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
