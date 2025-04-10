@@ -125,7 +125,7 @@ def generate_buffered_signal_manager(
   # Map data ports and untouched extra signals directly to inner component
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
-  mappings = "\n      ".join(generate_simple_mappings(
+  mappings = ",\n      ".join(generate_simple_mappings(
       in_ports + out_ports, unhandled_extra_signals))
 
   architecture = f"""

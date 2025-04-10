@@ -91,7 +91,7 @@ def generate_mux_signal_manager(
   # Map all ports to inner entity:
   #   - Forward concatenated extra signal vectors
   #   - Pass through index port as-is
-  mappings = "\n      ".join(generate_concat_mappings(
+  mappings = ",\n      ".join(generate_concat_mappings(
       in_ports_without_index + out_ports, extra_signals_bitwidth) +
       generate_inner_port_mapping(index_port))
 
@@ -202,7 +202,7 @@ def generate_cmerge_signal_manager(
   # Map all ports to inner entity:
   #   - Forward concatenated extra signal vectors
   #   - Pass through index port as-is
-  mappings = "\n      ".join(generate_concat_mappings(
+  mappings = ",\n      ".join(generate_concat_mappings(
       in_ports + out_ports_without_index, extra_signals_bitwidth) +
       generate_inner_port_mapping(index_port))
 
