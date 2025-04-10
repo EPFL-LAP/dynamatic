@@ -5,10 +5,30 @@ from .utils.concat import ConcatLayout, generate_concat_signal_decls_from_ports,
 from .utils.types import Port, ExtraSignals
 
 
-def generate_concat_signal_manager(name: str, in_ports: list[Port], out_ports: list[Port], extra_signals: ExtraSignals, generate_inner: Callable[[str], str]):
+def generate_concat_signal_manager(
+    name: str,
+    in_ports: list[Port],
+    out_ports: list[Port],
+    extra_signals: ExtraSignals,
+    generate_inner: Callable[[str], str]
+):
+  """
+  Generate a signal manager architecture that handles the concatenation of extra signals
+  for input and output ports, and forwards them to an inner entity.
+
+  Args:
+    name: Name for the signal manager entity.
+    in_ports: List of input ports for the signal manager.
+    out_ports: List of output ports for the signal manager.
+    extra_signals: Dictionary of extra signals (e.g., spec, tag) to be concatenated.
+    generate_inner: Function to generate the inner component.
+
+  Returns:
+    A string representing the complete VHDL architecture for the signal manager.
+  """
   entity = generate_entity(name, in_ports, out_ports)
 
-  # Get concatenation details for extra signals
+  # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals)
   extra_signals_bitwidth = concat_layout.total_bitwidth
 
@@ -23,7 +43,7 @@ def generate_concat_signal_manager(name: str, in_ports: list[Port], out_ports: l
   concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
       in_ports, out_ports, concat_layout))
 
-  # Port forwarding for the inner entity
+  # Map concatenated ports and untouched extra signals to inner component
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
   mappings = "\n      ".join(generate_concat_mappings(
