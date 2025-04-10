@@ -58,7 +58,7 @@ def generate_spec_units_signal_manager(
       in_ports_without_ctrl, out_ports, concat_layout))
 
   # Map control ports, concatenated non-control ports and `spec` signal to inner component
-  mappings = "\n      ".join(generate_concat_mappings(
+  mappings = ",\n      ".join(generate_concat_mappings(
       in_ports_without_ctrl + out_ports, extra_signals_bitwidth, ["spec"]) +
       generate_simple_mappings(ctrl_ports))
 
