@@ -1159,7 +1159,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 
   std::error_code EC;
   llvm::raw_fd_ostream argFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/float_basic/out/comp/arg_names.txt", EC);
-
+  argFile << "this is the beginning\n";
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
   //-------------------------------delete these two lines----------------------------------------------------
@@ -1177,16 +1177,18 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   SmallVector<Type> resultTypes;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
+  // used for rewiring
+  SmallVector<unsigned> InstanceOpInputIndices;
+  SmallVector<unsigned> InstanceOpOutputIndices;
+  SmallVector<unsigned> InstanceOpParameterIndices;
+  llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
+  //argFile << "testt------------------------------"; //
   if (!calledHandshakeFuncOp) {
     // if this is not the case, the function might have been not traversed yet
     // during the conversion
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
-    SmallVector<unsigned> InstanceOpInputIndices;
-    SmallVector<unsigned> InstanceOpOutputIndices;
-    SmallVector<unsigned> InstanceOpParameterIndices;
-    llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
     //classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
@@ -1248,7 +1250,18 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   //rewiring (if called function is func::FuncOp)
   if(!calledHandshakeFuncOp){
-    
+    auto instanceResults = instOp.getResults();
+    unsigned ResultIndice = 0;
+    for(auto OutputIndice : InstanceOpOutputIndices){
+      for(Operation *user : outputConnections[OutputIndice]){//user is mlir::Operation, pass pointer
+        for(OpOperand &operand : user->getOpOperands()){//operands are of class mlir::OpOperands pass address to be able to change
+          if(operand.get() == callOp.getOperand(OutputIndice)){//is this user operand == old output value (SSA)?
+            operand.set(instanceResults[ResultIndice]);//replace old SSA with corresponding SSA of Instance result eg %res0
+          }
+        }
+      }
+      ResultIndice++;
+    }
   }
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
