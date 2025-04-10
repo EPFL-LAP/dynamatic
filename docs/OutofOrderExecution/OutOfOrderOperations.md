@@ -12,7 +12,7 @@ A `FreeTagsFifo` represents a FIFO queue that supplies tags ready for reuse.
 <img alt="FreeTagsFifo diagram" src="./Figures/FreeTagsFifo.png" width="200" />
 
 ## Tagger
-An `Tagger` attaches extra tag bits to the data payload.
+A `Tagger` attaches extra tag bits to the data payload.
 
 <img alt="Tagger diagram" src="./Figures/Tagger.png" width="200" />
 
