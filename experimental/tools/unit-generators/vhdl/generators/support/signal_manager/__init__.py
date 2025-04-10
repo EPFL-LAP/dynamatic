@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from .utils.types import Port, ExtraSignals
-from .normal import generate_normal_signal_manager
+from .default import generate_default_signal_manager
 from .buffered import generate_buffered_signal_manager
 from .concat import generate_concat_signal_manager
 
@@ -14,9 +14,9 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
   out_ports: list[Port] = params["out_ports"]
   type = params["type"]
 
-  if type == "normal":
+  if type == "default":
     extra_signals: ExtraSignals = params["extra_signals"]
-    signal_manager = generate_normal_signal_manager(
+    signal_manager = generate_default_signal_manager(
         name, in_ports, out_ports, extra_signals, generate_inner)
   elif type == "buffered":
     extra_signals = params["extra_signals"]

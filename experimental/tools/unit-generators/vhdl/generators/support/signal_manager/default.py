@@ -5,7 +5,7 @@ from .utils.types import Port, ExtraSignals
 from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
 
 
-def _generate_normal_signal_assignments(
+def _generate_default_signal_assignments(
     in_ports: list[Port],
     out_ports: list[Port],
     extra_signals: ExtraSignals
@@ -22,7 +22,7 @@ def _generate_normal_signal_assignments(
   return "\n  ".join(extra_signal_assignments)
 
 
-def generate_normal_signal_manager(
+def generate_default_signal_manager(
     name: str,
     in_ports: list[Port],
     out_ports: list[Port],
@@ -30,7 +30,7 @@ def generate_normal_signal_manager(
     generate_inner: Callable[[str], str]
 ) -> str:
   """
-  Generate the full VHDL code for a normal signal manager that forwards extra signals from input ports to output ports.
+  Generate the full VHDL code for a default signal manager that forwards extra signals from input ports to output ports.
 
   Args:
     name: Name for the signal manager entity.
@@ -40,7 +40,7 @@ def generate_normal_signal_manager(
     generate_inner: Function to generate the inner component.
 
   Returns:
-    A string representing the complete VHDL architecture for the normal signal manager.
+    A string representing the complete VHDL architecture for the default signal manager.
   """
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
@@ -48,7 +48,7 @@ def generate_normal_signal_manager(
   entity = generate_entity(name, in_ports, out_ports)
 
   # Generate the VHDL assignments for forwarding the extra signals from input to output
-  extra_signal_assignments = _generate_normal_signal_assignments(
+  extra_signal_assignments = _generate_default_signal_assignments(
       in_ports, out_ports, extra_signals)
 
   # Get unhandled extra signals that are not included in the forwarding assignments
@@ -60,7 +60,7 @@ def generate_normal_signal_manager(
       in_ports + out_ports, unhandled_extra_signals))
 
   architecture = f"""
--- Architecture of signal manager (normal)
+-- Architecture of signal manager (default)
 architecture arch of {name} is
 begin
   -- Forward extra signals to output ports
