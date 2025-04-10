@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETYPES_H
+#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETYPES_H
 
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
@@ -61,6 +61,10 @@ inline bool operator!=(const ExtraSignal &lhs, const ExtraSignal &rhs) {
   return !(lhs == rhs);
 }
 
+/// Compares multiple arrays of ExtraSignal elements.
+bool doExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays);
+
 /// Compares multiple arrays of ExtraSignal elements, ignoring a specified
 /// signal name.
 bool doesExtraSignalsMatchExcept(
@@ -91,4 +95,4 @@ class FloatType;
 #define GET_TYPEDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_H
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKETYPES_H

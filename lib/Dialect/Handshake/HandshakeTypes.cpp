@@ -354,6 +354,47 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
          lhs.downstream == rhs.downstream;
 }
 
+bool dynamatic::handshake::doExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
+
+  // If there are fewer than two arrays, they are trivially considered matching.
+  if (extraSignalArrays.size() < 2)
+    return true;
+
+  auto firstArrayIt = extraSignalArrays.begin();
+  auto secondArrayIt = firstArrayIt + 1;
+
+  // Use the first array as the reference for comparison.
+  ArrayRef<ExtraSignal> refArray = *firstArrayIt;
+  size_t refArraySize = refArray.size();
+
+  // Compare the reference array against all other arrays.
+  for (auto it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
+
+    ArrayRef<ExtraSignal> toCheck = *it;
+    size_t toCheckSize = toCheck.size();
+
+    // Use two indices to traverse both arrays while skipping the `except`
+    // signal.
+    size_t i = 0;
+    size_t j = 0;
+
+    while (i < refArraySize || j < toCheckSize) {
+      // If one array is fully traversed but the other isn't, they differ.
+      if (i >= refArraySize || j >= toCheckSize)
+        return false;
+
+      // If corresponding signals don't match, the arrays are different.
+      if (refArray[i] != toCheck[j])
+        return false;
+
+      i++;
+      j++;
+    }
+  }
+  return true;
+}
+
 bool dynamatic::handshake::doesExtraSignalsMatchExcept(
     const llvm::StringRef &except,
     std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
