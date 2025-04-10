@@ -8,13 +8,15 @@ Signal managers are implemented within the framework of the Python-based, genera
 
 When existing signal managers don't fit your needs, we encourage you to create a new one using small, concrete helper functions. These functions are designed to work like Lego bricks, allowing you to easily assemble a custom signal manager tailored to your case.
 
-Rather than extending the few existing signal managers, we recommend *somewhat* reinventing new ones. Extending the current signal managers can lead to highly parameterized, monolithic designs that are difficult to modify and understand. In contrast, this approach promotes modularity and simplicity, improving clarity and maintainability. While reinventing may seem repetitive, the small helper functions can take care of the tedious parts, keeping the implementation concrete and manageable.
+Rather than extending the few existing signal managers, we recommend somewhat *reinventing* new ones. Extending the current signal managers can lead to highly parameterized, monolithic designs that are difficult to modify and understand. In contrast, this approach promotes modularity and simplicity, improving clarity and maintainability. While reinventing may seem repetitive, the small helper functions can take care of the tedious parts, keeping the implementation concrete and manageable.
 
 
 
-## Handling different extra signals
+## Handling Different Extra Signals
 
-Here is an illustration (by @murphe67) of the `muli` signal manager handling both `spec` and `tag`. The forwarding behavior **differs** between them: `spec` ORs two signals, while `tag` takes one and discards the other. Although you are allowed to introduce as many signal managers as needed, since these signal managers use the common helper functions, you can just define the forwarding semantics in **a single place** (`generate_forwarding_expression_for_signal` at `signal_manager/utils/forwarding.py`), ensuring reuse across all instances.
+The following illustration (by @murphe67) shows how the `muli` signal manager handles both `spec` and `tag`. The forwarding behavior **differs** between them: `spec` ORs two signals, while `tag` selects one and discards the other.
+
+Although you can introduce as many signal managers as needed, since they all use common helper functions, you can define the forwarding semantics in **a single place** (`generate_forwarding_expression_for_signal` in `signal_manager/utils/forwarding.py`). This ensures consistency and reuse across all instances.
 
 <img src="./figs/SignalManager/muli_tag.png" />
 
