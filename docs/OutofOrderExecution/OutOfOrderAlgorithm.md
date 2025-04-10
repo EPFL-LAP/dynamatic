@@ -6,7 +6,7 @@ Code: **[2..32] << a[0]**
 
 Out-of-Order Node: LD
 
-<img alt="Example diagram" src="./Figures/Example.png" width="250" />
+<img alt="Example diagram" src="./Figures/Example.png" width="200" />
 
 
 ## Step 1: Create and Connect the Operations
@@ -14,13 +14,13 @@ Out-of-Order Node: LD
 ### 1.1. Identify Dirty Nodes
 Identify all the nodes reachable from the out-of-order node.
 
-<img alt="Step 1.1 diagram" src="./Figures/Step1.1.png" width="250" />
+<img alt="Step 1.1 diagram" src="./Figures/Step1.1.png" width="200" />
 
 
 ### 1.2. Identify Unaligned Edges
 Identify all the edges that can have tokens with different orders (edges between dirty and non-dirty node).
 
-<img alt="Step 1.2 diagram" src="./Figures/Step1.2.png" width="250" />
+<img alt="Step 1.2 diagram" src="./Figures/Step1.2.png" width="200" />
 
 ### 1.3. Identify Tagged Edges
 Identify all the edges that should receive tagged tokens.
@@ -29,7 +29,7 @@ These are the:
 
 &nbsp;&nbsp; *unaligned edges + input edges of the out-of-order node – output edge of the out-of-order node*
 
-<img alt="Step 1.3 diagram" src="./Figures/Step1.3.png" width="250" />
+<img alt="Step 1.3 diagram" src="./Figures/Step1.3.png" width="200" />
 
 ### 1.4. Add Taggers
 For each tagged edge, add a tagger.
