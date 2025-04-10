@@ -1,17 +1,4 @@
-# Out-of-Order Execution Implementation
-
-## Step 1: Create and Connect the Operations
-Out-of-Order Execution Algorithm :
-
-1. Identify dirty nodes
-
-2. Identify unaligned edges
-
-3.  Identify tagged edges
-
-4.  Add taggers
-
-5. Add aligner + untaggers
+# Out-of-Order Execution Algorithm
 
 **Example:**
 
@@ -20,6 +7,9 @@ Code: **[2..32] << a[0]**
 Out-of-Order Node: LD
 
 <img alt="Example diagram" src="./Figures/Example.png" width="250" />
+
+
+## Step 1: Create and Connect the Operations
 
 ### 1.1. Identify Dirty Nodes
 Identify all the nodes reachable from the out-of-order node.
