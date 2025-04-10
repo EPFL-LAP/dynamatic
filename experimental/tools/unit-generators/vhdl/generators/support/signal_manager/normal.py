@@ -56,7 +56,7 @@ def generate_normal_signal_manager(
       in_ports + out_ports, extra_signals)
 
   # Map data ports and untouched extra signals to inner component
-  mappings = "\n      ".join(generate_simple_mappings(
+  mappings = ",\n      ".join(generate_simple_mappings(
       in_ports + out_ports, unhandled_extra_signals))
 
   architecture = f"""

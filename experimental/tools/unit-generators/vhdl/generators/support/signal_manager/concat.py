@@ -46,7 +46,7 @@ def generate_concat_signal_manager(
   # Map concatenated ports and untouched extra signals to inner component
   unhandled_extra_signals = get_unhandled_extra_signals(
       in_ports + out_ports, extra_signals)
-  mappings = "\n      ".join(generate_concat_mappings(
+  mappings = ",\n      ".join(generate_concat_mappings(
       in_ports + out_ports, extra_signals_bitwidth, unhandled_extra_signals))
 
   architecture = f"""
