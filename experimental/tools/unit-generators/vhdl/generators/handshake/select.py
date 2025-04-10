@@ -140,8 +140,10 @@ end architecture;
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
+  # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals)
   extra_signals_total_bitwidth = concat_layout.total_bitwidth
+
   extra_signal_names = list(extra_signals)
 
   inner_name = f"{name}_inner"
@@ -165,12 +167,14 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       "extra_signals": extra_signals
   }])
 
+  # Generate internal signal declarations for the 'result' signal
   result_inner_decl = "\n  ".join(generate_internal_signals_from_port({
       "name": "result_inner",
       "bitwidth": bitwidth,
       "extra_signals": extra_signals
   }))
 
+  # Define conversions for the trueValue, falseValue, and result signals to handle concatenation
   trueValue_conversion: ConcatPortConversion = {
       "original_name": "trueValue",
       "original_bitwidth": bitwidth,
@@ -186,16 +190,21 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       "original_bitwidth": bitwidth,
       "concat_name": "result_inner_concat"
   }
+
+  # Generate the concat signal declarations for all the signals that need concatenation
   concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
       [trueValue_conversion, falseValue_conversion, result_conversion],
       extra_signals_total_bitwidth
   ))
+
+  # Generate the concat logic for the trueValue, falseValue, and result signals
   concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
       [trueValue_conversion, falseValue_conversion],
       [result_conversion],
       concat_layout
   ))
 
+  # Forward extra signals from condition and result_inner to result
   forwarding_logic = generate_forwarding_assignments(
       ["condition", "result_inner"],
       ["result"],

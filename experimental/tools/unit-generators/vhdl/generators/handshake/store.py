@@ -89,7 +89,7 @@ def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sig
 
   entity = generate_entity(name, in_ports, out_ports)
 
-  mappings = "\n      ".join(generate_simple_mappings(in_ports + out_ports))
+  mappings = ",\n      ".join(generate_simple_mappings(in_ports + out_ports))
 
   architecture = f"""
 -- Architecture of store signal manager
