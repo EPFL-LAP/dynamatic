@@ -281,63 +281,35 @@ struct EndpointComparator {
   }
 };
 
+/// Define a map from BBEndpoints to the CFGEdges that connect the BBs
+using BBEndpointsMap =
+    std::map<BBEndpoints, llvm::DenseSet<CFGEdge *>, EndpointComparator>;
 } // namespace
 
-static BBEndpointsOptional getCFGEdgeEndpoints(const CFGEdge &edge) {
-  BBEndpointsOptional endpoints;
-
-  Operation *definingOp = edge.get().getDefiningOp();
-  if (!definingOp) {
-    endpoints.srcBB = std::nullopt;
-  } else {
-    if (auto bb = getLogicBB(definingOp)) {
-      endpoints.srcBB = *bb;
-    } else {
-      endpoints.srcBB = std::nullopt;
-    }
-  }
-
-  if (auto bb = getLogicBB(edge.getOwner())) {
-    endpoints.dstBB = *bb;
-  } else {
-    endpoints.dstBB = std::nullopt;
-  }
-
-  return endpoints;
-}
-
 BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
-  // Join all predecessors of a BB
-  BBtoArcsMap predecessorArcs;
-
+  BBEndpointsMap endpointEdges;
   // Traverse all operations within funcOp to find edges between BBs, including
   // self-edges, and save them in a map from the Endpoints to the edges
   funcOp->walk([&](Operation *op) {
     for (CFGEdge &edge : op->getOpOperands()) {
-      BBEndpointsOptional endpoints = getCFGEdgeEndpoints(edge);
-      if (!endpoints.dstBB || !endpoints.srcBB)
-        continue;
-
+      BBEndpoints endpoints = {0, 0};
       // Store the edge if it is a Backedge or connects two different BBs
-      if (isBackedge(edge.get(), op) || endpoints.srcBB != endpoints.dstBB) {
-        bool isArcFound = false;
-        for (BBArc &arc : predecessorArcs[*endpoints.dstBB]) {
-          if (arc.srcBB == *endpoints.srcBB) {
-            arc.edges.insert(&edge);
-            isArcFound = true;
-            break;
-          }
-        }
-        if (!isArcFound) {
-          BBArc arc;
-          arc.srcBB = *endpoints.srcBB;
-          arc.dstBB = *endpoints.dstBB;
-          arc.edges.insert(&edge);
-          predecessorArcs[*endpoints.dstBB].push_back(arc);
-        }
+      if (isBackedge(edge.get(), op, &endpoints) ||
+          endpoints.srcBB != endpoints.dstBB) {
+        endpointEdges[endpoints].insert(&edge);
       }
     }
   });
+
+  // Join all predecessors of a BB
+  BBtoArcsMap predecessorArcs;
+  for (const auto &[endpoints, edges] : endpointEdges) {
+    BBArc arc;
+    arc.srcBB = endpoints.srcBB;
+    arc.dstBB = endpoints.dstBB;
+    arc.edges = edges;
+    predecessorArcs[endpoints.dstBB].push_back(arc);
+  }
 
   return predecessorArcs;
 }
