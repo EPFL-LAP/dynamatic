@@ -194,14 +194,28 @@ static void
 markSpeculativePathsForCommits(Operation *currOp,
                                SpeculationPlacements &placements,
                                llvm::DenseSet<CFGEdge *> &markedEdges) {
-  for (OpResult res : currOp->getResults()) {
-    for (OpOperand &edge : res.getUses()) {
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
+    // Continue traversal only the data result of the LoadOp, skipping results
+    // connected to the memory controller.
+    for (OpOperand &edge : loadOp.getDataResult().getUses()) {
       if (!markedEdges.count(&edge)) {
         markedEdges.insert(&edge);
         // Stop traversal if a commit is reached
         if (!placements.containsCommit(edge))
           markSpeculativePathsForCommits(edge.getOwner(), placements,
                                          markedEdges);
+      }
+    }
+  } else {
+    for (OpResult res : currOp->getResults()) {
+      for (OpOperand &edge : res.getUses()) {
+        if (!markedEdges.count(&edge)) {
+          markedEdges.insert(&edge);
+          // Stop traversal if a commit is reached
+          if (!placements.containsCommit(edge))
+            markSpeculativePathsForCommits(edge.getOwner(), placements,
+                                           markedEdges);
+        }
       }
     }
   }
