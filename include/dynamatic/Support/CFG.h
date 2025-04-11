@@ -115,9 +115,9 @@ bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 /// two specific and potentially identical basic blocks.
 struct BBArc {
   /// The arc's source basic block.
-  unsigned srcBB;
+  std::optional<unsigned> srcBB;
   /// The arc's destination basic block.
-  unsigned dstBB;
+  std::optional<unsigned> dstBB;
   /// Set of pointers to OpOperands that uniquely identify an edge in the CFG.
   llvm::DenseSet<OpOperand *> edges;
 };
