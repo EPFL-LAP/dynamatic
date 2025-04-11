@@ -1,4 +1,8 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatPortConversion
+from generators.support.signal_manager.utils.forwarding import generate_forwarding_assignments
+from generators.support.signal_manager.utils.internal_signal import generate_internal_signals_from_port
 
 
 def generate_select(name, parameters):
@@ -136,27 +140,111 @@ end architecture;
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  # TODO: Normal signal manager doesn't work for select op.
-  # I'll fix it after the refactoring of signal manager functions.
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trueValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
+  # Layout info for how extra signals are packed into one std_logic_vector
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_total_bitwidth = concat_layout.total_bitwidth
+
+  extra_signal_names = list(extra_signals)
+
+  inner_name = f"{name}_inner"
+  inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
+
+  entity = generate_entity(name, [{
+      "name": "condition",
+      "bitwidth": 1,
       "extra_signals": extra_signals
-  }, lambda name: _generate_select(name, bitwidth))
+  }, {
+      "name": "trueValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": "falseValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }], [{
+      "name": "result",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }])
+
+  # Generate internal signal declarations for the 'result' signal
+  result_inner_decl = "\n  ".join(generate_internal_signals_from_port({
+      "name": "result_inner",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }))
+
+  # Define conversions for the trueValue, falseValue, and result signals to handle concatenation
+  trueValue_conversion: ConcatPortConversion = {
+      "original_name": "trueValue",
+      "original_bitwidth": bitwidth,
+      "concat_name": "trueValue_inner"
+  }
+  falseValue_conversion: ConcatPortConversion = {
+      "original_name": "falseValue",
+      "original_bitwidth": bitwidth,
+      "concat_name": "falseValue_inner"
+  }
+  result_conversion: ConcatPortConversion = {
+      "original_name": "result_inner",
+      "original_bitwidth": bitwidth,
+      "concat_name": "result_inner_concat"
+  }
+
+  # Generate the concat signal declarations for all the signals that need concatenation
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
+      [trueValue_conversion, falseValue_conversion, result_conversion],
+      extra_signals_total_bitwidth
+  ))
+
+  # Generate the concat logic for the trueValue, falseValue, and result signals
+  concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
+      [trueValue_conversion, falseValue_conversion],
+      [result_conversion],
+      concat_layout
+  ))
+
+  # Forward extra signals from condition and result_inner to result
+  forwarding_logic = generate_forwarding_assignments(
+      ["condition", "result_inner"],
+      ["result"],
+      extra_signal_names)[0]
+
+  architecture = f"""
+-- Architecture of selector signal manager
+architecture arch of {name} is
+  {result_inner_decl}
+  -- Concatenated data and extra signals
+  {concat_signal_decls}
+begin
+  -- Concatenate extra signals
+  {concat_signal_logic}
+
+  -- Forwarding logic
+  {forwarding_logic}
+
+  result <= result_inner;
+  result_valid <= result_inner_valid;
+  result_inner_ready <= result_ready;
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      condition => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueValue => trueValue_inner,
+      trueValue_valid => trueValue_valid,
+      trueValue_ready => trueValue_ready,
+      falseValue => falseValue_inner,
+      falseValue_valid => falseValue_valid,
+      falseValue_ready => falseValue_ready,
+      result => result_inner_concat,
+      result_ready => result_inner_ready,
+      result_valid => result_inner_valid
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture

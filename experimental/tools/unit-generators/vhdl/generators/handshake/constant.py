@@ -48,7 +48,7 @@ end architecture;
 
 def _generate_constant_signal_manager(name, value, bitwidth, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [{
           "name": "ctrl",
           "bitwidth": 0,
