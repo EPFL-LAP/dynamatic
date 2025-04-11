@@ -1157,9 +1157,6 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto modOp = callOp->getParentOfType<mlir::ModuleOp>();
   assert(modOp && "call should have parent module");
 
-  std::error_code EC;
-  llvm::raw_fd_ostream argFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/float_basic/out/comp/arg_names.txt", EC);
-
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
   SmallVector<Value> operands(adaptor.getOperands());
