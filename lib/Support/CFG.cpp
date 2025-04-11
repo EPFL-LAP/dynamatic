@@ -315,14 +315,17 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
   funcOp->walk([&](Operation *op) {
     for (CFGEdge &edge : op->getOpOperands()) {
       BBEndpointsOptional endpoints = getCFGEdgeEndpoints(edge);
-      if (!endpoints.dstBB || !endpoints.srcBB)
+      // The dstBB should be always defined (to be consistent with
+      // "BBPredecessorArcs")
+      if (!endpoints.dstBB.has_value())
         continue;
 
       // Store the edge if it is a Backedge or connects two different BBs
       if (isBackedge(edge.get(), op) || endpoints.srcBB != endpoints.dstBB) {
         bool isArcFound = false;
         for (BBArc &arc : predecessorArcs[*endpoints.dstBB]) {
-          if (arc.srcBB == *endpoints.srcBB) {
+          if (arc.srcBB == endpoints.srcBB) {
+            // If the arc already exists, add the edge to it
             arc.edges.insert(&edge);
             isArcFound = true;
             break;
@@ -330,8 +333,8 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
         }
         if (!isArcFound) {
           BBArc arc;
-          arc.srcBB = *endpoints.srcBB;
-          arc.dstBB = *endpoints.dstBB;
+          arc.srcBB = endpoints.srcBB;
+          arc.dstBB = endpoints.dstBB;
           arc.edges.insert(&edge);
           predecessorArcs[*endpoints.dstBB].push_back(arc);
         }
