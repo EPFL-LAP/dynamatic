@@ -6,12 +6,13 @@
 void if_convert(in_int_t a[N], inout_int_t b[N]) {
   int i = 1;
   do {
+    int prev_i = i;
     int tmp = a[i];
     if (i * tmp < 10000) {
       i++;
     }
     i++;
-    b[i] = 1;
+    b[i] = prev_i;
   } while (i < N2);
 }
 

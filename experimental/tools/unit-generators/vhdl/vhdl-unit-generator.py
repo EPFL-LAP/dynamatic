@@ -19,9 +19,15 @@ import generators.handshake.merge as merge
 import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
+import generators.handshake.shli as shli
 import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
+import generators.handshake.speculation.spec_commit as spec_commit
+import generators.handshake.speculation.spec_save_commit as spec_save_commit
+import generators.handshake.speculation.speculating_branch as speculating_branch
+import generators.handshake.speculation.speculator as speculator
+import generators.handshake.select as select
 import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi
@@ -43,6 +49,8 @@ def generate_code(name, mod_type, parameters):
       return andi.generate_andi(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
     case "cmpf":
@@ -69,12 +77,16 @@ def generate_code(name, mod_type, parameters):
       return muli.generate_muli(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
+    case "shli":
+      return shli.generate_shli(name, parameters)
     case "select":
       return select.generate_select(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
     case "subf":
@@ -106,8 +118,7 @@ def parse_parameters(param_list):
         param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
-    raise ValueError(
-        "Invalid parameter format. Use key=value key=value,...\n")
+    raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
