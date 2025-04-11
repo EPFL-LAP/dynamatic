@@ -92,6 +92,12 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
+  // Replaces an existing fanin with a new one.
+  void replaceFanin(Node* oldFanin, Node* newFanin) {
+    fanins.erase(oldFanin);
+    fanins.insert(newFanin);
+  }
+
   // Connects two nodes by setting the pointer of current node to the previous
   // node. This function is used to merge different LogicNetwork objects. Input
   // node of one LogicNetwork object is connected to the output node of
@@ -102,24 +108,21 @@ public:
     }
 
     // Connected nodes are no more input/output nodes in a BLIF file.
-    currentNode->setIOChannel();
-    previousNode->setIOChannel();
+    currentNode->convertIOToChannel();
+    previousNode->convertIOToChannel();
 
     if (previousNode->isBlackboxOutput) {
       previousNode->isInput = true;
     }
 
     for (auto &fanout : currentNode->fanouts) {
-      fanout->fanins.erase(currentNode);
-      fanout->fanins.insert(previousNode);
+      fanout->replaceFanin(currentNode, previousNode);
     }
 
     // Reverse the naming for ready signals
     if (previousNode->name.find("ready") != std::string::npos) {
       previousNode->name = currentNode->name;
     }
-
-    currentNode = previousNode;
   }
 
   // Configures the node based on the type of I/O node.
@@ -136,7 +139,7 @@ public:
 
   // Used to merge I/O nodes. I/O is set false and isChannelEdge is set to true
   // so that the node can be considered as a dataflow graph edge.
-  void setIOChannel();
+  void convertIOToChannel();
 
   std::string str() const { return name; }
 

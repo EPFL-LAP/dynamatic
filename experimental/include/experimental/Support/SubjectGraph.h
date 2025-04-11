@@ -78,8 +78,8 @@ public:
   // SubjectGraph is created.
   std::vector<Operation *> inputModules;
   std::vector<Operation *> outputModules;
-  DenseMap<Operation *, unsigned int> inputModuleToResNum;
-  DenseMap<Operation *, unsigned int> outputModuleToResNum;
+  DenseMap<Operation *, unsigned int> inputModuleToResultNumber;
+  DenseMap<Operation *, unsigned int> outputModuleToResultNumber;
 
   // The populated maps store channel-specific information that connects
   // SubjectGraphs together. Each SubjectGraph has a position in the vector
@@ -91,9 +91,10 @@ public:
   // passed through those connections.
   std::vector<BaseSubjectGraph *> inputSubjectGraphs;
   std::vector<BaseSubjectGraph *> outputSubjectGraphs;
-  DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResNum;
-  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResNum;
+  DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResultNumber;
+  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResultNumber;
 
+  // static map that holds all Operation/Subject Graph Pairs
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
 
   // A vector of all BaseSubjectGraphs. This is not a subset of the Values of
@@ -107,12 +108,12 @@ public:
   LogicNetwork *blifData;
 
   // Gets the MLIR Result Number between two SubjectGraphs
-  static unsigned int getChannelNumber(BaseSubjectGraph *first,
+  static unsigned int getResultNumber(BaseSubjectGraph *first,
                                        BaseSubjectGraph *second);
 
   // Populates inputSubjectGraphs and outputSubjectGraphs after all of the
   // SubjectGraphs are created
-  void replaceOpsBySubjectGraph();
+  void buildSubjectGraphConnections();
 
   virtual ~BaseSubjectGraph() = default;
 

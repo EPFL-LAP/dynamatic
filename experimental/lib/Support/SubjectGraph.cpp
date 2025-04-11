@@ -29,7 +29,6 @@
 
 #include "experimental/Support/SubjectGraph.h"
 #include <algorithm>
-#include <cassert>
 #include <iterator>
 #include <utility>
 
@@ -48,29 +47,24 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
   // Get the input and output modules of the operation. Find the result number
   // of the channel.
   for (Value operand : op->getOperands()) {
-    if (Operation *definingOp = operand.getDefiningOp()) {
+      Operation *definingOp = operand.getDefiningOp();
       unsigned resultNumber = operand.cast<OpResult>().getResultNumber();
       inputModules.push_back(definingOp);
-      inputModuleToResNum[definingOp] = resultNumber;
-    }
+      inputModuleToResultNumber[definingOp] = resultNumber;
   }
 
   for (Value result : op->getResults()) {
     for (Operation *user : result.getUsers()) {
       unsigned resultNumber = result.cast<OpResult>().getResultNumber();
       outputModules.push_back(user);
-      outputModuleToResNum[user] = resultNumber;
+      outputModuleToResultNumber[user] = resultNumber;
     }
   }
 
   moduleType = op->getName().getStringRef();
   // Erase the dialect name from the moduleType
   size_t dotPosition = moduleType.find('.');
-  if (dotPosition != std::string::npos) {
-    moduleType = moduleType.substr(dotPosition + 1);
-  } else {
-    assert(false && "operation unsupported");
-  }
+  moduleType = moduleType.substr(dotPosition + 1);
 }
 
 void BaseSubjectGraph::connectInputNodesHelper(
@@ -81,7 +75,7 @@ void BaseSubjectGraph::connectInputNodesHelper(
   // the result number.
   ChannelSignals &moduleBeforeOutputNodes =
       moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResNum[moduleBeforeSubjectGraph]);
+          inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph]);
 
   // Connect ready and valid singals. Only 1 bit each.
   Node::connectNodes(moduleBeforeOutputNodes.readySignal,
@@ -92,7 +86,7 @@ void BaseSubjectGraph::connectInputNodesHelper(
   if (isBlackbox) {
     // If the module is a blackbox, we don't connect the data signals.
     for (auto *node : currentSignals.dataSignals) {
-      node->setIOChannel();
+      node->convertIOToChannel();
     }
   } else {
     // Connect data signals. Multiple bits.
@@ -115,27 +109,27 @@ void assignSignals(ChannelSignals &signals, Node *node,
   }
 };
 
-void BaseSubjectGraph::replaceOpsBySubjectGraph() {
-  // Populate inputSubjectGraphs and outputSubjectGraphs after all of the
-  // Subject Graphs are created. Retrieves the Result Numbers.
+// Populate inputSubjectGraphs and outputSubjectGraphs after all of the
+// Subject Graphs are created. Retrieves the Result Numbers.
+void BaseSubjectGraph::buildSubjectGraphConnections() {
   for (auto *inputModule : inputModules) {
     auto *inputSubjectGraph = moduleMap[inputModule];
     inputSubjectGraphs.push_back(inputSubjectGraph);
-    inputSubjectGraphToResNum[inputSubjectGraph] =
-        inputModuleToResNum[inputModule];
+    inputSubjectGraphToResultNumber[inputSubjectGraph] =
+        inputModuleToResultNumber[inputModule];
   }
 
   for (auto *outputModule : outputModules) {
     auto *outputSubjectGraph = moduleMap[outputModule];
     outputSubjectGraphs.push_back(outputSubjectGraph);
-    outputSubjectGraphToResNum[outputSubjectGraph] =
-        outputModuleToResNum[outputModule];
+    outputSubjectGraphToResultNumber[outputSubjectGraph] =
+        outputModuleToResultNumber[outputModule];
   }
 }
 
-unsigned int BaseSubjectGraph::getChannelNumber(BaseSubjectGraph *first,
+unsigned int BaseSubjectGraph::getResultNumber(BaseSubjectGraph *first,
                                                 BaseSubjectGraph *second) {
-  return first->outputSubjectGraphToResNum[second];
+  return first->outputSubjectGraphToResultNumber[second];
 }
 
 void changeIO(BaseSubjectGraph *newIO, BaseSubjectGraph *prevIO,
@@ -367,7 +361,7 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
     moduleType += "_dataless";
     fullPath = appendVarsToPath({size, indexType}, moduleType);
   } else {
-    assert(false && "Not supported");
+    op->emitError("Operation Unsupported"); 
   }
 
   experimental::BlifParser parser;
@@ -565,7 +559,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
   fullPath = appendVarsToPath({dataWidth}, moduleType);
 
   if (bitwidth > 64) {
-    cstOp.emitError() << "Not supported";
+    op->emitError("Operation Unsupported"); 
     return;
   }
 
@@ -811,17 +805,17 @@ void BufferSubjectGraph::insertBuffer(BaseSubjectGraph *graph1,
   inputSubjectGraphs.push_back(graph1);
   outputSubjectGraphs.push_back(graph2);
 
-  unsigned int channelNum = getChannelNumber(graph1, graph2);
-  outputSubjectGraphToResNum[graph2] = channelNum;
-  inputSubjectGraphToResNum[graph1] = channelNum;
+  unsigned int channelNum = getResultNumber(graph1, graph2);
+  outputSubjectGraphToResultNumber[graph2] = channelNum;
+  inputSubjectGraphToResultNumber[graph1] = channelNum;
 
   ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
   dataWidth = channel.dataSignals.size();
 
   changeIO(this, graph1, graph2->inputSubjectGraphs,
-           graph2->inputSubjectGraphToResNum);
+           graph2->inputSubjectGraphToResultNumber);
   changeIO(this, graph2, graph1->outputSubjectGraphs,
-           graph1->outputSubjectGraphToResNum);
+           graph1->outputSubjectGraphToResultNumber);
 }
 
 BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,
@@ -867,54 +861,57 @@ SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
 
   funcOp.walk([&](Operation *op) {
     llvm::TypeSwitch<Operation *, void>(op)
-        .Case<handshake::ForkOp, handshake::LazyForkOp>(
-            [&](auto) { subjectGraphs.push_back(new ForkSubjectGraph(op)); })
-        .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-          subjectGraphs.push_back(new MuxSubjectGraph(op));
+        .Case<handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
+              handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
+              handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
+              handshake::MulIOp, handshake::DivSIOp, handshake::DivUIOp>([&](auto) { 
+          subjectGraphs.push_back(new ArithSubjectGraph(op)); 
         })
-        .Case<handshake::ControlMergeOp>(
-            [&](handshake::ControlMergeOp cmergeOp) {
-              subjectGraphs.push_back(new ControlMergeSubjectGraph(op));
-            })
-        .Case<handshake::MergeOp>(
-            [&](auto) { subjectGraphs.push_back(new MergeSubjectGraph(op)); })
         .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
           subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
         })
-        .Case<handshake::BufferOp, handshake::SinkOp>(
-            [&](auto) { subjectGraphs.push_back(new BufferSubjectGraph(op)); })
-        .Case<handshake::ConditionalBranchOp>(
-            [&](handshake::ConditionalBranchOp cbrOp) {
-              subjectGraphs.push_back(new ConditionalBranchSubjectGraph(op));
-            })
-        .Case<handshake::SourceOp>(
-            [&](auto) { subjectGraphs.push_back(new SourceSubjectGraph(op)); })
-        .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-          subjectGraphs.push_back(new LoadSubjectGraph(op));
+        .Case<handshake::BufferOp, handshake::SinkOp>([&](auto) { 
+          subjectGraphs.push_back(new BufferSubjectGraph(op)); 
         })
-        .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
-          subjectGraphs.push_back(new StoreSubjectGraph(op));
+        .Case<handshake::ConditionalBranchOp>([&](handshake::ConditionalBranchOp cbrOp) {
+          subjectGraphs.push_back(new ConditionalBranchSubjectGraph(op));
         })
         .Case<handshake::ConstantOp>([&](handshake::ConstantOp cstOp) {
           subjectGraphs.push_back(new ConstantSubjectGraph(op));
         })
-        .Case<handshake::AddIOp, handshake::AndIOp, handshake::CmpIOp,
-              handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
-              handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
-              handshake::MulIOp, handshake::DivSIOp, handshake::DivUIOp>(
-            [&](auto) { subjectGraphs.push_back(new ArithSubjectGraph(op)); })
-        .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
-          subjectGraphs.push_back(new SelectSubjectGraph(op));
+        .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
+          subjectGraphs.push_back(new ControlMergeSubjectGraph(op));
         })
         .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
               handshake::TruncIOp, handshake::TruncFOp>([&](auto) {
           subjectGraphs.push_back(new ExtTruncSubjectGraph(op));
+        })
+        .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) { 
+          subjectGraphs.push_back(new ForkSubjectGraph(op)); 
+        })
+        .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
+          subjectGraphs.push_back(new MuxSubjectGraph(op));
+        })
+        .Case<handshake::MergeOp>([&](auto) { 
+          subjectGraphs.push_back(new MergeSubjectGraph(op)); 
+        })
+        .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+          subjectGraphs.push_back(new LoadSubjectGraph(op));
+        })
+        .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
+          subjectGraphs.push_back(new SelectSubjectGraph(op));
+        })
+        .Case<handshake::SourceOp>([&](auto) { 
+          subjectGraphs.push_back(new SourceSubjectGraph(op)); 
+        })
+        .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
+          subjectGraphs.push_back(new StoreSubjectGraph(op));
         })
         .Default([&](auto) { return; });
   });
 
   // Populate Subject Graph vectors
   for (auto *module : subjectGraphs) {
-    module->replaceOpsBySubjectGraph();
+    module->buildSubjectGraphConnections();
   }
 }
