@@ -78,42 +78,6 @@ static bool isGeneratedBySourceOp(Value value) {
   });
 }
 
-static bool hasCyclicPathInBBRecursive(OpOperand &operand, OpOperand &current,
-                                       llvm::DenseSet<OpOperand *> &visited,
-                                       unsigned bb) {
-  if (visited.count(&current))
-    return true;
-
-  visited.insert(&current);
-
-  std::optional<unsigned> currentBB = getLogicBB(current.getOwner());
-  if (!currentBB)
-    return false;
-  if (currentBB.value() != bb)
-    return false;
-
-  for (OpResult res : current.getOwner()->getResults()) {
-    for (OpOperand &dstOpOperand : res.getUses()) {
-      if (dstOpOperand.get() == operand.get())
-        return true;
-      if (hasCyclicPathInBBRecursive(operand, dstOpOperand, visited, bb))
-        return true;
-    }
-  }
-  return false;
-}
-
-static bool hasCyclicPathInBB(OpOperand &operand) {
-  std::optional<unsigned> bb = getLogicBB(operand.getOwner());
-  if (!bb) {
-    operand.getOwner()->emitError("Operation does not have a BB.");
-    llvm_unreachable("OnCycleInBB Failed");
-  }
-
-  llvm::DenseSet<OpOperand *> visited;
-  return hasCyclicPathInBBRecursive(operand, operand, visited, bb.value());
-}
-
 // Save units are needed where speculative tokens can interact with
 // non-speculative tokens. Updates `placements` with the Save placements
 LogicalResult PlacementFinder::findSavePositions() {
@@ -152,9 +116,6 @@ LogicalResult PlacementFinder::findSavePositions() {
         if (!specValues.contains(operand.get())) {
           // No save needed in front of Source Operations
           if (isGeneratedBySourceOp(operand.get()))
-            continue;
-
-          if (!hasCyclicPathInBB(operand))
             continue;
 
           placements.addSave(operand);
