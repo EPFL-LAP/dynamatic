@@ -1182,42 +1182,33 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
-    SmallVector<unsigned> InstanceOpInputIndices;
-    SmallVector<unsigned> InstanceOpOutputIndices;
-    SmallVector<unsigned> InstanceOpParameterIndices;
-    llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
-    //classify arguments based on naming convention
+    // Vectors storing Index of classified arguments
+    SmallVector<unsigned> InstanceOpInputIndex;
+    SmallVector<unsigned> InstanceOpOutputIndex;
+    SmallVector<unsigned> InstanceOpParameterIndex;
+    // Maps output argument index -> list of operations that consume its value
+    llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
+    // classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
-      argFile << "Argument " << i << ": (" << nameAttr.getValue() <<")\n";
-      if(nameAttr.getValue().starts_with("input")){
-        argFile << "classified as Input \n";
-        InstanceOpInputIndices.push_back(i);
-      }
-      else if(nameAttr.getValue().starts_with("output")){
-        argFile << "classified as Output \n";
-        InstanceOpOutputIndices.push_back(i);
-      }
-      else{
-        argFile << "classified as Parameter \n";
-        InstanceOpParameterIndices.push_back(i);
-      }
+      if(nameAttr.getValue().starts_with("input_"))
+        InstanceOpInputIndex.push_back(i);
+      else if(nameAttr.getValue().starts_with("output_"))
+        InstanceOpOutputIndex.push_back(i);
+      else
+        InstanceOpParameterIndex.push_back(i);
     }
-    //for every output indice get its consumer
-    for(unsigned outputId : InstanceOpOutputIndices){
-      //SSA value for the output argument
+    // for every output argument index find operations that consume its value,
+    // and save mapping into dictionary OutputConnetions
+    for(unsigned outputId : InstanceOpOutputIndex){
       Value outputArg = callOp.getOperand(outputId);
-      //find all MLIR operations that use this argument7value
       SmallVector<Operation*> fanouts;
       for(auto &use : outputArg.getUses()){
         Operation* user = use.getOwner();
-        argFile << "Output "<< outputId << ", User: ";
-        user->print(argFile);
-        argFile << "\n";
-        fanouts.push_back(user);
+        if(user != callOp)
+          fanouts.push_back(user);
       }
-      //saves output index -> consumers, into the dictionary
-      outputConnections[outputId] = fanouts; //should we add the control flag into
+      OutputConnections[outputId] = fanouts;
     }
     resultTypes = calledFuncOp.getFunctionType().getResults();
   } else {
@@ -1232,7 +1223,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands); //here operands includes the call operands and a control op, this needs to be changed
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0)
