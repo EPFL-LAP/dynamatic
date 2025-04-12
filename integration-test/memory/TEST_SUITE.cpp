@@ -1,3 +1,17 @@
+//===- TEST_SUITE.cpp - Basic integration test suite -----------*- C++-*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines a basic set of parameterized integration tests
+// that run Dynamatic without any special flags/settings.
+// 
+// This set contains various memory-related integration tests.
+//
+//===----------------------------------------------------------------------===//
 #include "../util.h"
 
 #include <gtest/gtest.h>
