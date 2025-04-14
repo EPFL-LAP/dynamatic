@@ -2,9 +2,12 @@ from generators.support.utils import *
 
 
 def generate_memory_controller(name, params):
-  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr_0"]) if "stAddr_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr_0"])
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"]) if "ldData_0" in params[ATTR_PORT_TYPES].keys() else SmvScalarType(params[ATTR_PORT_TYPES]["stData_0"])
-  ctrl_type = SmvScalarType(params[ATTR_PORT_TYPES]["ctrl_0"]) if "ctrl_0" in params[ATTR_PORT_TYPES].keys() else None
+  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr_0"]) if "stAddr_0" in params[ATTR_PORT_TYPES].keys(
+  ) else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr_0"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"]) if "ldData_0" in params[ATTR_PORT_TYPES].keys(
+  ) else SmvScalarType(params[ATTR_PORT_TYPES]["stData_0"])
+  ctrl_type = SmvScalarType(params[ATTR_PORT_TYPES]["ctrl_0"]
+                            ) if "ctrl_0" in params[ATTR_PORT_TYPES].keys() else None
 
   num_loads = params["num_loads"]
   num_stores = params["num_stores"]
@@ -20,17 +23,22 @@ def generate_memory_controller(name, params):
 
 def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type):
 
-  control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
-  store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
-  store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
-  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
+  control_ports = [f"ctrl_{n}" for n in range(
+      num_controls)] + [f"ctrl_{n}_valid" for n in range(num_controls)]
+  store_address_ports = [f"stAddr_{n}" for n in range(
+      num_stores)] + [f"stAddr_{n}_valid" for n in range(num_stores)]
+  store_data_ports = [f"stData_{n}" for n in range(
+      num_stores)] + [f"stData_{n}_valid" for n in range(num_stores)]
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports +
+                          store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
 
-  p_valid_ports = [f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
+  p_valid_ports = [
+      f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
   address_ports = [f"stAddr_{n}" for n in range(num_stores)]
   data_ports = [f"stData_{n}" for n in range(num_stores)]
   n_valid_ports = [f"TRUE" for _ in range(num_stores)]
-  arbiter_args =  ", ".join(p_valid_ports + address_ports + data_ports + n_valid_ports)
-
+  arbiter_args = ", ".join(
+      p_valid_ports + address_ports + data_ports + n_valid_ports)
 
   return f"""
 MODULE {name}({mc_in_ports})
@@ -84,15 +92,19 @@ MODULE {name}({mc_in_ports})
   {_generate_mc_control(f"{name}__mc_control")}
 """
 
+
 def _generate_mem_controller_storeless(name, num_loads, data_type, addr_type):
-  load_address_ports = [f"ldAddr_{n}" for n in range(num_loads)] + [f"ldAddr_{n}_valid" for n in range(num_loads)]
+  load_address_ports = [f"ldAddr_{n}" for n in range(
+      num_loads)] + [f"ldAddr_{n}_valid" for n in range(num_loads)]
   load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
-  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + [
+                          "ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
 
   p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
   address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
   n_valid_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
-  arbiter_args =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["loadData"])
+  arbiter_args = ", ".join(
+      p_valid_ports + address_ports + n_valid_ports + ["loadData"])
 
   return f"""
 MODULE {name}({mc_in_ports})
@@ -127,19 +139,27 @@ MODULE {name}({mc_in_ports})
   {_generate_mc_control(f"{name}__mc_control")}
 """
 
+
 def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type):
-  control_ports = [f"ctrl_{n}, ctrl_{n}_valid" for n in range(num_controls)]
-  load_address_ports = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_loads)]
+  control_ports = [f"ctrl_{n}" for n in range(
+      num_controls)] + [f"ctrl_{n}_valid" for n in range(num_controls)]
+  load_address_ports = [f"ldAddr_{n}" for n in range(
+      num_loads)] + [f"ldAddr_{n}_valid" for n in range(num_loads)]
   load_data_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
-  store_address_ports = [f"stAddr_{n}, stAddr_{n}_valid" for n in range(num_stores)]
-  store_data_ports = [f"stData_{n}, stData_{n}_valid" for n in range(num_stores)]
-  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
-  mc_loadless_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
+  store_address_ports = [f"stAddr_{n}" for n in range(
+      num_stores)] + [f"stAddr_{n}_valid" for n in range(num_stores)]
+  store_data_ports = [f"stData_{n}" for n in range(
+      num_stores)] + [f"stData_{n}_valid" for n in range(num_stores)]
+  mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + load_address_ports +
+                          store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
+  mc_loadless_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports +
+                                   store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
 
   p_valid_ports = [f"ldAddr_{n}_valid" for n in range(num_loads)]
   address_ports = [f"ldAddr_{n}" for n in range(num_loads)]
   n_valid_ports = [f"ldData_{n}_ready" for n in range(num_loads)]
-  arbiter_args =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["loadData"])
+  arbiter_args = ", ".join(
+      p_valid_ports + address_ports + n_valid_ports + ["loadData"])
 
   return f"""
 MODULE {name}({mc_in_ports})
@@ -186,6 +206,7 @@ MODULE {name}({mc_in_ports})
   {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
 """
 
+
 def _generate_mc_control(name):
   return f"""
 MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
@@ -230,12 +251,14 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
   ctrlEnd_ready := ctrlEnd_ready_in;
 """
 
+
 def _generate_write_memory_arbiter(name, num_stores, data_type, addr_type):
   p_valid_ports = [f"pValid_{n}" for n in range(num_stores)]
   address_ports = [f"address_in_{n}" for n in range(num_stores)]
   data_ports = [f"data_in_{n}" for n in range(num_stores)]
   n_valid_ports = [f"nReady_{n}" for n in range(num_stores)]
-  arbiter_in_ports =  ", ".join(p_valid_ports + address_ports + data_ports + n_valid_ports)
+  arbiter_in_ports = ", ".join(
+      p_valid_ports + address_ports + data_ports + n_valid_ports)
 
   return f"""
 MODULE {name}({arbiter_in_ports})
@@ -272,11 +295,13 @@ MODULE {name}({arbiter_in_ports})
 {_generate_priority(f"{name}__priority", num_stores)}
 """
 
+
 def _generate_read_memory_arbiter(name, num_loads, data_type, addr_type):
   p_valid_ports = [f"pValid_{n}" for n in range(num_loads)]
   address_ports = [f"address_in_{n}" for n in range(num_loads)]
   n_valid_ports = [f"nReady_{n}" for n in range(num_loads)]
-  arbiter_in_ports =  ", ".join(p_valid_ports + address_ports + n_valid_ports + ["data_from_memory"])
+  arbiter_in_ports = ", ".join(
+      p_valid_ports + address_ports + n_valid_ports + ["data_from_memory"])
 
   return f"""
 MODULE {name}({arbiter_in_ports})
@@ -315,6 +340,7 @@ MODULE {name}({arbiter_in_ports})
 
 {_generate_priority(f"{name}__priority", num_loads)}
 """
+
 
 def _generate_priority(name, size):
   return f"""
