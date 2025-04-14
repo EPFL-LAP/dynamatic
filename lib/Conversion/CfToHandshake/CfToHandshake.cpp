@@ -1157,9 +1157,6 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto modOp = callOp->getParentOfType<mlir::ModuleOp>();
   assert(modOp && "call should have parent module");
 
-  std::error_code EC;
-  llvm::raw_fd_ostream argFile("/home/ntomic/dynamatic-scripts/dynamatic/integration-test/float_basic/out/comp/arg_names.txt", EC);
-  argFile << "this is the beginning\n";
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
   SmallVector<Value> operands(adaptor.getOperands());
@@ -1176,11 +1173,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   TypeRange resultTypes;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
-  // used for rewiring
-  SmallVector<unsigned> InstanceOpInputIndices;
-  SmallVector<unsigned> InstanceOpOutputIndices;
-  SmallVector<unsigned> InstanceOpParameterIndices;
-  llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
+  // Vectors storing indices of classified arguments
+  SmallVector<unsigned> InstanceOpInputIndex;
+  SmallVector<unsigned> InstanceOpOutputIndex;
+  SmallVector<unsigned> InstanceOpParameterIndex;
+  // Maps output argument index -> list of operations that consume its value
+  llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
   if (!calledHandshakeFuncOp) {
     //print Operands
     llvm::errs() << "Operands:\n";
@@ -1192,44 +1190,32 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
-    //classify arguments based on naming convention
+    // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
       argFile << "Argument " << i << ": (" << nameAttr.getValue() <<")\n";
-      if(nameAttr.getValue().starts_with("input")){
-        argFile << "classified as Input \n";
-        InstanceOpInputIndices.push_back(i);
-      }
-      else if(nameAttr.getValue().starts_with("output")){
-        argFile << "classified as Output \n";
-        InstanceOpOutputIndices.push_back(i);
-      }
-      else{
-        argFile << "classified as Parameter \n";
-        InstanceOpParameterIndices.push_back(i);
-      }
+      if(nameAttr.getValue().starts_with("input"))
+        InstanceOpInputIndex.push_back(i);
+      else if(nameAttr.getValue().starts_with("output"))
+        InstanceOpOutputIndex.push_back(i);
+      else
+        InstanceOpParameterIndex.push_back(i);
     }
-    //for every output indice get its consumer
-    for(unsigned outputId : InstanceOpOutputIndices){
-      //SSA value for the output argument
+    // For each output argument index, find all operations that consume its value
+    // and store the mapping in OutputConnections
+    for(unsigned outputId : InstanceOpOutputIndex){
       Value outputArg = callOp.getOperand(outputId);
-      //find all MLIR operations that use this argument7value
       SmallVector<Operation*> fanouts;
       for(auto &use : outputArg.getUses()){
         Operation* user = use.getOwner();
-        if(user != callOp){
-          argFile << "Output "<< outputId << ", User: ";
-          user->print(argFile);
-          argFile << "\n";
+        if(user != callOp)
           fanouts.push_back(user);
-        }
       }
-      //saves output index -> consumers, into the dictionary
-      outputConnections[outputId] = fanouts; //should we add the control flag into
+      OutputConnections[outputId] = fanouts;
     }
     //Create resultTypes based on collected Outputs
     SmallVector<Type> resultTypesVec;
-    for(auto OutputId : InstanceOpOutputIndices)
+    for(auto OutputId : InstanceOpOutputIndex)
       resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
     resultTypes = TypeRange(resultTypesVec);
 
@@ -1238,7 +1224,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // for every element check if its Index is part of Output/Parameter vector and delete it,
     // else keep it. 
     for(int i = adaptor.getOperands().size() - 1; i >= 0 ; --i){
-      if(llvm::is_contained(InstanceOpOutputIndices, i) || llvm::is_contained(InstanceOpParameterIndices, i)){
+      if(llvm::is_contained(InstanceOpOutputIndex, i) || llvm::is_contained(InstanceOpParameterIndex, i)){
         operands.erase(operands.begin() + i);
         llvm::errs() << "Removed operand at index " << i << "\n";
       }
@@ -1260,21 +1246,22 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
 
   rewriter.setInsertionPoint(callOp);
   auto instOp = rewriter.create<handshake::InstanceOp>(
-      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands); //here operands includes the call operands and a control op, this needs to be changed
+      callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   //rewiring (if called function is func::FuncOp)
   if(!calledHandshakeFuncOp){
-    auto instanceResults = instOp.getResults();
-    unsigned ResultIndice = 0;
-    for(auto OutputIndice : InstanceOpOutputIndices){
-      for(Operation *user : outputConnections[OutputIndice]){//user is mlir::Operation, pass pointer
-        for(OpOperand &operand : user->getOpOperands()){//operands are of class mlir::OpOperands pass address to be able to change
-          if(operand.get() == callOp.getOperand(OutputIndice)){//is this user operand == old output value (SSA)?
-            operand.set(instanceResults[ResultIndice]);//replace old SSA with corresponding SSA of Instance result eg %res0
+    llvm::errs() << "entered rewiring";
+    auto InstanceResults = instOp.getResults();
+    unsigned ResultIndex = 0;
+    for(auto OutputId : InstanceOpOutputIndex){
+      for(Operation *user : OutputConnections[OutputId]){
+        for(OpOperand &operand : user->getOpOperands()){
+          if(operand.get() == callOp.getOperand(OutputId)){
+            operand.set(InstanceResults[ResultIndex]);
           }
         }
       }
-      ResultIndice++;
+      ResultIndex++;
     }
   }
   namer.replaceOp(callOp, instOp);
