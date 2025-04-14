@@ -1,5 +1,5 @@
 from generators.handshake.fork import generate_fork
-from generators.support.signal_manager.spec_units import generate_spec_units_signal_manager
+from generators.support.signal_manager import generate_spec_units_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 

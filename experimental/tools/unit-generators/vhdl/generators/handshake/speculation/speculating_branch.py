@@ -1,5 +1,5 @@
 from generators.handshake.cond_br import generate_cond_br
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.utils import data
 
@@ -94,9 +94,9 @@ def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_da
 
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
       extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
+  return generate_concat_signal_manager(
+      name,
+      [{
           "name": "data",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals
@@ -105,7 +105,7 @@ def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_da
           "bitwidth": spec_tag_data_bitwidth,
           "extra_signals": extra_signals
       }],
-      "out_ports": [{
+      [{
           "name": "trueOut",
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals_without_spec
@@ -114,8 +114,8 @@ def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_da
           "bitwidth": data_bitwidth,
           "extra_signals": extra_signals_without_spec
       }],
-      "extra_signals": extra_signals_without_spec
-  }, lambda name: _generate_speculating_branch(
-      name,
-      data_bitwidth + extra_signals_bitwidth - 1,
-      spec_tag_data_bitwidth + extra_signals_bitwidth - 1))
+      extra_signals_without_spec,
+      lambda name: _generate_speculating_branch(
+          name,
+          data_bitwidth + extra_signals_bitwidth - 1,
+          spec_tag_data_bitwidth + extra_signals_bitwidth - 1))
