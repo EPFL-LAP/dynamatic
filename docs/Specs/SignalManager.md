@@ -228,7 +228,7 @@ end architecture;
 
 ### `mux`
 
-The `mux` unit uses the `mux` signal manager, located in `signal_manager/bbmerge.py`, to concatenate extra signals with the data signal and supply any missing `spec` signals on data input ports.
+The `mux` unit uses a custom signal manager to concatenate extra signals with the data signal and supply any missing `spec` signals on data input ports.
 
 ```vhdl
 library ieee;
