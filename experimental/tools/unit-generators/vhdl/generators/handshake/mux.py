@@ -1,5 +1,8 @@
-from generators.support.signal_manager.bbmerge import generate_mux_signal_manager
-from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import generate_concat_signal_decls_from_ports, ConcatLayout, generate_concat_port_assignments_from_ports
+from generators.support.signal_manager.utils.mapping import generate_inner_port_mapping, generate_concat_mappings
+from generators.support.signal_manager.utils.types import Port, ArrayPort
+from generators.support.signal_manager.utils.bbmerge import generate_bbmerge_lacking_spec_statements
 from generators.handshake.tehb import generate_tehb
 
 
@@ -186,30 +189,81 @@ end architecture;
 
 
 def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      output_extra_signals)
-  return generate_mux_signal_manager(
+  # Declare Ports
+  data_in_port: ArrayPort = {
+      "name": "ins",
+      "bitwidth": data_bitwidth,
+      "array": True,
+      "size": size,
+      "extra_signals_list": input_extra_signals_list
+  }
+  index_port: Port = {
+      "name": "index",
+      "bitwidth": index_bitwidth,
+      # TODO: Extra signals for index port are not tested
+      "extra_signals": index_extra_signals
+  }
+  data_out_port: Port = {
+      "name": "outs",
+      "bitwidth": data_bitwidth,
+      "extra_signals": output_extra_signals
+  }
+
+  # Generate signal manager entity
+  entity = generate_entity(
       name,
-      [{
-          "name": "ins",
-          "bitwidth": data_bitwidth,
-          "array": True,
-          "size": size,
-          "extra_signals_list": input_extra_signals_list
-      }, {
-          "name": "index",
-          "bitwidth": index_bitwidth,
-          # TODO: Extra signals for index port are not tested
-          "extra_signals": index_extra_signals
-      }],
-      [{
-          "name": "outs",
-          "bitwidth": data_bitwidth,
-          "extra_signals": output_extra_signals
-      }],
-      size,
-      "ins",
-      "index",
-      output_extra_signals,
-      spec_inputs,
-      lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
+      [data_in_port, index_port],
+      [data_out_port]
+  )
+
+  # Layout info for how extra signals are packed into one std_logic_vector
+  concat_layout = ConcatLayout(output_extra_signals)
+  extra_signals_bitwidth = concat_layout.total_bitwidth
+
+  inner_name = f"{name}_inner"
+  inner = _generate_mux(inner_name, size, index_bitwidth,
+                        extra_signals_bitwidth + data_bitwidth)
+
+  # Generate default `spec` bits for inputs that lack them
+  lacking_spec_port_decls, lacking_spec_port_assignments = generate_bbmerge_lacking_spec_statements(
+      spec_inputs, size, "ins")
+
+  # Declare inner concatenated signals for all input/output ports
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
+      [data_in_port, data_out_port], extra_signals_bitwidth))
+
+  # Assign inner concatenated signals
+  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
+      [data_in_port], [data_out_port], concat_layout))
+
+  # Map all ports to inner entity:
+  #   - Forward concatenated extra signal vectors
+  #   - Pass through index port as-is
+  mappings = ",\n      ".join(generate_concat_mappings(
+      [data_in_port, data_out_port], extra_signals_bitwidth) +
+      generate_inner_port_mapping(index_port))
+
+  architecture = f"""
+-- Architecture of signal manager (mux)
+architecture arch of {name} is
+  -- Lacking spec inputs
+  {lacking_spec_port_decls}
+  -- Concatenated data and extra signals
+  {concat_signal_decls}
+begin
+  -- Assign default spec bit values if not provided
+  {lacking_spec_port_assignments}
+
+  -- Concatenate data and extra signals
+  {concat_logic}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      {mappings}
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture
