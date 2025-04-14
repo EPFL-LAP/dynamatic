@@ -13,17 +13,17 @@ def generate_cond_br(name, params):
 
 def _generate_cond_br_dataless(name):
   return f"""
-MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
+MODULE {name}(condition, condition_valid, data_valid, trueOut_ready, falseOut_ready)
   VAR
   inner_join : {name}__join(data_valid, condition_valid, branch_ready);
 
   DEFINE
   branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
 
-  // output
+  -- output
   DEFINE
-  data_ready := inner_join.ins_ready_0;
-  condition_ready := inner_join.ins_ready_1;
+  data_ready := inner_join.ins_0_ready;
+  condition_ready := inner_join.ins_1_ready;
   trueOut_valid := condition & inner_join.outs_valid;
   falseOut_valid := !condition & inner_join.outs_valid;
 
@@ -33,11 +33,11 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
 
 def _generate_cond_br(name, data_type):
   return f"""
-MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
+MODULE {name}(condition, condition_valid, data, data_valid, trueOut_ready, falseOut_ready)
   VAR
   inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
 
-  // output
+  -- output
   DEFINE
   data_ready := inner_br.data_ready;
   condition_ready := inner_br.condition_ready;

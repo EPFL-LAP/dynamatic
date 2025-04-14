@@ -10,7 +10,7 @@ def generate_store(name, params):
 
 def _generate_store(name, data_type, addr_type):
   return f"""
-MODULE {name}(dataIn, dataIn_valid, addrIn, addrIn_valid, dataToMem_ready, addrOut_ready)
+MODULE {name}(addrIn, addrIn_valid, dataIn, dataIn_valid, addrOut_ready, dataToMem_ready)
 
   //output
   DEFINE
