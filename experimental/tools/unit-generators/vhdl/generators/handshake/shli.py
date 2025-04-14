@@ -87,4 +87,3 @@ def _generate_shli_signal_manager(name, bitwidth, extra_signals):
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_shli(name, bitwidth))
-  
