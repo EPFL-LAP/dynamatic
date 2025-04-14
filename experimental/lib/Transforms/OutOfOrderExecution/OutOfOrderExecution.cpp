@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include <assert.h>
 #include <cmath>
@@ -79,8 +80,7 @@ private:
   // Step 1.6: Add the aligner
   void addAligner(OpBuilder builder, Operation *outOfOrderOp, Value select,
                   llvm::DenseSet<Value> &unalignedEdges,
-                  SmallVector<Value> &joinOperands,
-                  llvm::DenseSet<Operation *> &untaggers,
+                  SmallVector<Value> &joinOperands, const std::string &extraTag,
                   FreeTagsFifoOp &freeTagsFifo, int numTags);
 
   // Step 1.7: Adds the FreeTagsFifo, Tagger and Untagger operations
@@ -91,14 +91,14 @@ private:
                               llvm::DenseSet<Operation *> &dirtyNodes,
                               llvm::DenseSet<Value> &unalignedEdges,
                               llvm::DenseSet<Value> &taggedEdges,
-                              llvm::DenseSet<Operation *> &untaggers,
-                              int numTags, bool controlled);
+                              const std::string &extraTag, int numTags,
+                              bool controlled);
 
   // Step 1.8: Tag the channels in the tagged region
-  LogicalResult addTagSignalsToTaggedRegion(
-      handshake::FuncOp funcOp, const std::string &extraTag,
-      Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
-      int numTags);
+  LogicalResult addTagSignalsToTaggedRegion(handshake::FuncOp funcOp,
+                                            const std::string &extraTag,
+                                            Operation *freeTagsFifo,
+                                            int numTags);
 
   // MAIN: Apply the out-of-order execution methodology
   LogicalResult applyOutOfOrder(
@@ -106,6 +106,11 @@ private:
       llvm::DenseMap<Operation *, std::pair<int, bool>> &outOfOrderNodes);
 };
 } // namespace
+
+/// Annotation marking the tagged region to which each untagger corresponds.
+/// This is used to halt the tagging process when the untagger corresponding to
+/// the current region is reached.
+constexpr llvm::StringLiteral OOO_UNTAGGER("ooo.untagger");
 
 LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     handshake::FuncOp funcOp, MLIRContext *ctx,
@@ -127,17 +132,17 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
       return failure();
 
     OpBuilder builder(ctx);
-    llvm::DenseSet<Operation *> untaggers;
+    std::string extraTag = "tag" + std::to_string(tagIndex++);
+
     Operation *freeTagsFifo =
         addTagOperations(funcOp, builder, op, dirtyNodes, unalignedEdges,
-                         taggedEdges, untaggers, numTags, controlled);
+                         taggedEdges, extraTag, numTags, controlled);
 
     if (!freeTagsFifo)
       return failure();
 
-    std::string extraTag = "tag" + std::to_string(tagIndex++);
     if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, freeTagsFifo,
-                                           untaggers, numTags)))
+                                           numTags)))
       return failure();
   }
   return success();
@@ -243,7 +248,7 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
     handshake::FuncOp funcOp, OpBuilder builder, Operation *outOfOrderOp,
     llvm::DenseSet<Operation *> &dirtyNodes,
     llvm::DenseSet<Value> &unalignedEdges, llvm::DenseSet<Value> &taggedEdges,
-    llvm::DenseSet<Operation *> &untaggers, int numTags, bool controlled) {
+    const std::string &extraTag, int numTags, bool controlled) {
 
   // Step 2: Add the FreeTagsFifo that generates the tags
 
@@ -282,7 +287,7 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   }
 
   addAligner(builder, outOfOrderOp, select, unalignedEdges, joinOperands,
-             untaggers, freeTagsFifo, numTags);
+             extraTag, freeTagsFifo, numTags);
 
   // If more than on untagger was created, then join them and feed the
   // result of the join (the free tag) back into the freeTagsFifo. Else, feed
@@ -356,20 +361,17 @@ void OutOfOrderExecutionPass::addUntaggers(
   }
 }
 
-void OutOfOrderExecutionPass::addAligner(OpBuilder builder,
-                                         Operation *outOfOrderOp, Value select,
-                                         llvm::DenseSet<Value> &unalignedEdges,
-                                         SmallVector<Value> &joinOperands,
-                                         llvm::DenseSet<Operation *> &untaggers,
-                                         FreeTagsFifoOp &freeTagsFifo,
-                                         int numTags) {
+void OutOfOrderExecutionPass::addAligner(
+    OpBuilder builder, Operation *outOfOrderOp, Value select,
+    llvm::DenseSet<Value> &unalignedEdges, SmallVector<Value> &joinOperands,
+    const std::string &extraTag, FreeTagsFifoOp &freeTagsFifo, int numTags) {
   builder.setInsertionPoint(outOfOrderOp);
   // Untag the select of the aligner to get the tag flow
   UntaggerOp selectUntagger = builder.create<handshake::UntaggerOp>(
       select.getLoc(), select.getType(), freeTagsFifo.getTagOut().getType(),
       select);
   inheritBB(outOfOrderOp, selectUntagger);
-  untaggers.insert(selectUntagger.getOperation());
+  selectUntagger->setAttr(OOO_UNTAGGER, builder.getStringAttr(extraTag));
 
   for (auto edge : unalignedEdges) {
     // Start by unatagging the edge
@@ -404,7 +406,7 @@ void OutOfOrderExecutionPass::addAligner(OpBuilder builder,
     inheritBB(outOfOrderOp, mux);
 
     joinOperands.push_back(edgeUntagger.getTagOut());
-    untaggers.insert(edgeUntagger.getOperation());
+    edgeUntagger->setAttr(OOO_UNTAGGER, builder.getStringAttr(extraTag));
   }
 }
 
@@ -430,11 +432,9 @@ static LogicalResult addTagToValue(Value value, const std::string &extraTag,
   return failure();
 }
 
-static LogicalResult
-addTagSignalsRecursive(OpOperand &opOperand,
-                       llvm::DenseSet<Operation *> &visited,
-                       const std::string &extraTag, Operation *freeTagsFifo,
-                       llvm::DenseSet<Operation *> &untaggers, int numTags) {
+static LogicalResult addTagSignalsRecursive(
+    OpOperand &opOperand, llvm::DenseSet<Operation *> &visited,
+    const std::string &extraTag, Operation *freeTagsFifo, int numTags) {
 
   Operation *op;
 
@@ -461,12 +461,15 @@ addTagSignalsRecursive(OpOperand &opOperand,
   if (UntaggerOp untagger = dyn_cast<handshake::UntaggerOp>(op)) {
     // If this is the untagger corresponding to the current tagged region, then
     // we stop traversal
-    if (untaggers.contains(op))
+    if (untagger->hasAttr(OOO_UNTAGGER) &&
+        untagger->getAttr(OOO_UNTAGGER) ==
+            StringAttr::get(op->getContext(), extraTag))
       return success();
+
     // Else this is an untagger in a nested region and we continue traversal
     for (auto &operand : untagger.getDataOut().getUses()) {
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-                                        freeTagsFifo, untaggers, numTags)))
+                                        freeTagsFifo, numTags)))
         return failure();
     }
     return success();
@@ -478,7 +481,7 @@ addTagSignalsRecursive(OpOperand &opOperand,
     // controller.
     for (auto &operand : loadOp->getOpResult(1).getUses()) {
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-                                        freeTagsFifo, untaggers, numTags)))
+                                        freeTagsFifo, numTags)))
         return failure();
     }
 
@@ -494,7 +497,7 @@ addTagSignalsRecursive(OpOperand &opOperand,
     MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
     for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-                                        freeTagsFifo, untaggers, numTags)))
+                                        freeTagsFifo, numTags)))
         return failure();
     }
     return success();
@@ -512,7 +515,7 @@ addTagSignalsRecursive(OpOperand &opOperand,
       if (operand == &opOperand)
         continue;*/
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-                                        freeTagsFifo, untaggers, numTags)))
+                                        freeTagsFifo, numTags)))
         return failure();
     }
   }
@@ -522,8 +525,7 @@ addTagSignalsRecursive(OpOperand &opOperand,
 
 LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
     handshake::FuncOp funcOp, const std::string &extraTag,
-    Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
-    int numTags) {
+    Operation *freeTagsFifo, int numTags) {
   llvm::DenseSet<Operation *> visited;
   // A TaggerOp marks the beginning of the tagged region, so we use it as a
   // starting point for tagging
@@ -537,7 +539,7 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
       Value taggerResult = taggerOp.getDataOut();
       for (OpOperand &opOperand : taggerResult.getUses()) {
         if (failed(addTagSignalsRecursive(opOperand, visited, extraTag,
-                                          freeTagsFifo, untaggers, numTags)))
+                                          freeTagsFifo, numTags)))
           return failure();
       }
     }
