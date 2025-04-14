@@ -2,8 +2,6 @@
 module join_type #(
 	parameter SIZE = 2 // Default Join input set to 2
 )(
-  input  clk,
-	input  rst,
 	input [SIZE - 1 : 0] ins_valid,
 	input outs_ready,
 
