@@ -43,7 +43,7 @@ end architecture;
 
 def _generate_sink_signal_manager(name, bitwidth, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [{
           "name": "ins",
           "bitwidth": bitwidth,

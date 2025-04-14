@@ -101,7 +101,7 @@ end architecture;
 
 def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [{
           "name": "lhs",
           "bitwidth": bitwidth,

@@ -1,4 +1,6 @@
-from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic, ConcatenationInfo
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatLayout, ConcatPortConversion
+from generators.support.signal_manager.utils.types import Port
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
@@ -90,8 +92,8 @@ end architecture;
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(extra_signals)
-  extra_signals_total_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
@@ -121,21 +123,22 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  # Only extra signals (not data) are concatenated, so set inner port bitwidth to 0.
-  addrIn_inner_port = {
-      "name": "addrIn",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
+  # Only extra signals (not data) are concatenated, so set original port bitwidth to 0.
+  addrIn_conversion: ConcatPortConversion = {
+      "original_name": "addrIn",
+      "original_bitwidth": 0,
+      "concat_name": "addrIn_inner"
   }
-  dataOut_inner_port = {
-      "name": "dataOut",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
+  dataOut_conversion: ConcatPortConversion = {
+      "original_name": "dataOut",
+      "original_bitwidth": 0,
+      "concat_name": "dataOut_inner"
   }
-  concat_signal_decls = generate_concat_signal_decls(
-      [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
-  concat_signal_logic = generate_concat_logic(
-      [addrIn_inner_port], [dataOut_inner_port], concat_info)
+  concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
+      [addrIn_conversion, dataOut_conversion], extra_signals_total_bitwidth))
+
+  concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
+      [addrIn_conversion], [dataOut_conversion], concat_layout))
 
   architecture = f"""
 -- Architecture of load signal manager

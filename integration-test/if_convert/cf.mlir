@@ -13,7 +13,7 @@ module {
     %6 = arith.select %4, %5, %0 {handshake.name = "select0"} : i32
     %7 = arith.addi %6, %c1_i32 {handshake.name = "addi1"} : i32
     %8 = arith.index_cast %7 {handshake.name = "index_cast1"} : i32 to index
-    memref.store %c1_i32, %arg1[%8] {handshake.deps = #handshake<deps[<"store0" (0)>]>, handshake.name = "store0"} : memref<200xi32>
+    memref.store %0, %arg1[%8] {handshake.deps = #handshake<deps[<"store0" (0)>]>, handshake.name = "store0"} : memref<200xi32>
     %9 = arith.cmpi slt, %7, %c199_i32 {handshake.name = "cmpi1"} : i32
     cf.cond_br %9, ^bb1(%7 : i32), ^bb3 {handshake.name = "cond_br0"}
   ^bb3:  // pred: ^bb1

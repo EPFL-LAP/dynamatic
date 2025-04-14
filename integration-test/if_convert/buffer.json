@@ -1,200 +1,146 @@
 [
   {
-    "pred": "fork1",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork10",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork1",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork5",
-    "outid": 0,
+    "pred": "fork7",
+    "outid": 2,
     "slots": 16,
     "type": "tehb"
   },
   {
     "pred": "speculator0",
     "outid": 0,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
     "pred": "speculator0",
     "outid": 1,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
     "pred": "speculator0",
     "outid": 2,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
     "pred": "merge0",
     "outid": 0,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
     "pred": "speculator0",
     "outid": 5,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "fork7",
+    "pred": "cond_br4",
     "outid": 0,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "fork7",
+    "pred": "cond_br0",
     "outid": 1,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "extsi2",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "trunci1",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork4",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork11",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork11",
+    "pred": "cond_br3",
     "outid": 1,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "fork11",
-    "outid": 2,
-    "slots": 16,
+    "pred": "cond_br5",
+    "outid": 0,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "fork11",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
+    "pred": "fork8",
     "outid": 4,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 5,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 6,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 7,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 8,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 9,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 0,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
     "pred": "fork10",
     "outid": 0,
-    "slots": 16,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "speculating_branch0",
-    "outid": 0,
-    "slots": 16,
+    "pred": "fork10",
+    "outid": 1,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "speculating_branch1",
-    "outid": 0,
-    "slots": 16,
+    "pred": "fork10",
+    "outid": 2,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "speculating_branch2",
-    "outid": 0,
-    "slots": 16,
+    "pred": "fork12",
+    "outid": 3,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "speculating_branch3",
-    "outid": 0,
-    "slots": 16,
+    "pred": "fork12",
+    "outid": 4,
+    "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "speculating_branch4",
+    "pred": "fork12",
+    "outid": 5,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork12",
+    "outid": 6,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork12",
+    "outid": 7,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork12",
+    "outid": 8,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
+    "outid": 2,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork12",
     "outid": 0,
-    "slots": 16,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork9",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork12",
+    "outid": 1,
+    "slots": 32,
     "type": "tehb"
   }
 ]

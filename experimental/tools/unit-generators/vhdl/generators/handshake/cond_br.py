@@ -135,7 +135,7 @@ end architecture;
 
 def _generate_cond_br_signal_manager(name, bitwidth, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [{
           "name": "data",
           "bitwidth": bitwidth,

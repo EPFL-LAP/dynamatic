@@ -50,7 +50,7 @@ end architecture;
 
 def _generate_extsi_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
   return generate_signal_manager(name, {
-      "type": "normal",
+      "type": "default",
       "in_ports": [{
           "name": "ins",
           "bitwidth": input_bitwidth,
