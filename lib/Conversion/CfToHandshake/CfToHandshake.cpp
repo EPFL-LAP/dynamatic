@@ -1179,13 +1179,13 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
-    // Vectors storing Index of classified arguments
+    // Vectors storing indices of classified arguments
     SmallVector<unsigned> InstanceOpInputIndex;
     SmallVector<unsigned> InstanceOpOutputIndex;
     SmallVector<unsigned> InstanceOpParameterIndex;
     // Maps output argument index -> list of operations that consume its value
     llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
-    // classify arguments based on naming convention
+    // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
       if(nameAttr.getValue().starts_with("input_"))
@@ -1195,8 +1195,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       else
         InstanceOpParameterIndex.push_back(i);
     }
-    // for every output argument index find operations that consume its value,
-    // and save mapping into dictionary OutputConnetions
+    // For each output argument index, find all operations that consume its value
+    // and store the mapping in OutputConnections
     for(unsigned outputId : InstanceOpOutputIndex){
       Value outputArg = callOp.getOperand(outputId);
       SmallVector<Operation*> fanouts;

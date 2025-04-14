@@ -3,22 +3,12 @@
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-float __tester(float input_a, float output_b, int parameter_BITWIDTH);
-
 void float_basic(in_float_t A[30][30], in_float_t B[30][30], out_float_t y[30],
                  inout_float_t x[30]) {
   int i, j;
-  int bitw = 31;
 
   for (i = 0; i < 30; i++) {
     float t_y = 0;
-
-    float a_val = A[i][0];
-    float b_val = B[i][0];
-    float result;
-    __tester(a_val, b_val, bitw);
-    result = a_val + b_val;
-    t_y += result;
 
     for (j = 0; j < 30; j++) {
       float t_x = x[j];
