@@ -1162,7 +1162,6 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   argFile << "this is the beginning\n";
   // The instance's operands are the same as the call plus an extra
   // control-only start coming from the call's logical basic block
-  //-------------------------------delete these two lines----------------------------------------------------
   SmallVector<Value> operands(adaptor.getOperands());
   operands.push_back(getBlockControl(callOp));
 
@@ -1174,7 +1173,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   Operation *lookup = modOp.lookupSymbol(symbol);
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
-  SmallVector<Type> resultTypes;
+  TypeRange resultTypes;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   // used for rewiring
@@ -1182,8 +1181,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   SmallVector<unsigned> InstanceOpOutputIndices;
   SmallVector<unsigned> InstanceOpParameterIndices;
   llvm::DenseMap<unsigned, SmallVector<Operation*>> outputConnections;
-  //argFile << "testt------------------------------"; //
   if (!calledHandshakeFuncOp) {
+    //print Operands
+    llvm::errs() << "Operands:\n";
+    for (auto operand : operands) {
+      llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
+    }
     // if this is not the case, the function might have been not traversed yet
     // during the conversion
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
@@ -1214,28 +1217,39 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       SmallVector<Operation*> fanouts;
       for(auto &use : outputArg.getUses()){
         Operation* user = use.getOwner();
-        argFile << "Output "<< outputId << ", User: ";
-        user->print(argFile);
-        argFile << "\n";
-        fanouts.push_back(user);
+        if(user != callOp){
+          argFile << "Output "<< outputId << ", User: ";
+          user->print(argFile);
+          argFile << "\n";
+          fanouts.push_back(user);
+        }
       }
       //saves output index -> consumers, into the dictionary
       outputConnections[outputId] = fanouts; //should we add the control flag into
     }
     //Create resultTypes based on collected Outputs
-    for(auto id : InstanceOpOutputIndices)
-      resultTypes.push_back(callOp.getOperand(id).getType()); 
-    //Create Operands for InstanceOp based on collected Inputs
-    SmallVector<Value> operands;
-    for(auto id : InstanceOpInputIndices)
-      operands.push_back(callOp.getOperand(id));
-    operands.push_back(getBlockControl(callOp));
+    SmallVector<Type> resultTypesVec;
+    for(auto OutputId : InstanceOpOutputIndices)
+      resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
+    resultTypes = TypeRange(resultTypesVec);
+
+    // Create Operands for InstanceOp based on collected Inputs
+    // Remember that the control signal is already included in operands so start at size - 1
+    // for every element check if its Index is part of Output/Parameter vector and delete it,
+    // else keep it. 
+    for(int i = adaptor.getOperands().size() - 1; i >= 0 ; --i){
+      if(llvm::is_contained(InstanceOpOutputIndices, i) || llvm::is_contained(InstanceOpParameterIndices, i)){
+        operands.erase(operands.begin() + i);
+        llvm::errs() << "Removed operand at index " << i << "\n";
+      }
+    }
+    //new Operands should only have input and parameters
+    llvm::errs() << "Operands:\n";
+    for (auto operand : operands) {
+      llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
+    }
   } else {
-    //Take existing operands and resultType since called function is already lowered to Handshake
-    resultTypes.assign(calledHandshakeFuncOp.getFunctionType().getResults().begin(),
-      calledHandshakeFuncOp.getFunctionType().getResults().end()); 
-    SmallVector<Value> operands(adaptor.getOperands());
-    operands.push_back(getBlockControl(callOp));
+    resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
   }
   SmallVector<Type> handshakeResultTypes;
   for (auto type : resultTypes)
