@@ -38,7 +38,7 @@ static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
   // Check whether we even need to run inference for the operation
   if (!isLegalForInference(op))
     return false;
-  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
+  if (hasLogicBB(op))
     return false;
 
   // Run the inference logic
@@ -69,7 +69,7 @@ LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
   for (OpResult res : op->getResults()) {
     bool conflict = false;
     for (Operation *user : res.getUsers())
-      if (failed(mergeInferredBB(getLogicBB(user)))) {
+      if (failed(mergeInferredBB(tryGetLogicBB(user)))) {
         conflict = true;
         break;
       }
@@ -90,7 +90,7 @@ LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
   // also belongs to it
   for (Value opr : op->getOperands()) {
     Operation *defOp = opr.getDefiningOp();
-    std::optional<unsigned> oprBB = defOp ? getLogicBB(defOp) : ENTRY_BB;
+    std::optional<unsigned> oprBB = defOp ? tryGetLogicBB(defOp) : ENTRY_BB;
     if (failed(mergeInferredBB(oprBB))) {
       return failure();
     }

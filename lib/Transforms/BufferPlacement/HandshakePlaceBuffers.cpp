@@ -206,14 +206,14 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
   // Store the BB to which each block belongs for quick access later
   DenseMap<Operation *, std::optional<unsigned>> opBlocks;
   for (Operation &op : info.funcOp.getOps())
-    opBlocks[&op] = getLogicBB(&op);
+    opBlocks[&op] = tryGetLogicBB(&op);
 
   for (Operation &op : info.funcOp.getOps()) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
     // all blocks but warn the user
     if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op)) {
-      if (!getLogicBB(&op).has_value()) {
+      if (!hasLogicBB(&op)) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
       }

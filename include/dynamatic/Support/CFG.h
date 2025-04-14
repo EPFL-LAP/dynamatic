@@ -63,8 +63,15 @@ bool inheritBB(Operation *srcOp, Operation *dstOp);
 /// destination operation part of the entry BB.
 bool inheritBBFromValue(Value val, Operation *dstOp);
 
-/// Thin wrapper around an attribute access to the "bb" attribute.
-std::optional<unsigned> getLogicBB(Operation *op);
+/// Returns whether the op has a "bb" attribute.
+bool hasLogicBB(Operation *op);
+
+/// Returns the "bb" attribute of the op.
+/// Emits an error if the op has no "bb" attribute.
+unsigned getLogicBB(Operation *op);
+
+/// Returns the "bb" attribute of the op if present (legacy).
+std::optional<unsigned> tryGetLogicBB(Operation *op);
 
 /// A pair of BB IDs to represent the blocks that a channel connects. In case of
 /// an inner channel, these blocks may be identical.

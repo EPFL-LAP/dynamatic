@@ -82,7 +82,7 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
   // basic block
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
+      if (!cannotBelongToCFG(&op) && !hasLogicBB(&op)) {
         op.emitError() << "Operation should have basic block "
                           "attribute.";
         return signalPassFailure();
