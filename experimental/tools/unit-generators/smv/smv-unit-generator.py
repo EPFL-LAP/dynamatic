@@ -18,7 +18,6 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
-import generators.handshake.memory_controller as memory_controller
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -49,6 +48,8 @@ import generators.arith.subi as subi
 import generators.arith.truncf as truncf
 import generators.arith.trunci as trunci
 import generators.arith.xori as xori
+
+import generators.memory.memory_controller as memory_controller
 
 
 def generate_code(name, mod_type, parameters):
