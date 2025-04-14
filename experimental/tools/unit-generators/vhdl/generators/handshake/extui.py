@@ -63,3 +63,4 @@ def _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_extui(name, input_bitwidth, output_bitwidth))
+  
