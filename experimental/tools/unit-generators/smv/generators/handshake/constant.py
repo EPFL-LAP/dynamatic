@@ -12,7 +12,7 @@ def _generate_constant(name, value, data_type):
   return f"""
 MODULE {name}(ctrl_valid, outs_ready)
 
-  // output
+  -- output
   DEFINE
   ctrl_ready := outs_ready;
   outs_valid := ctrl_valid;

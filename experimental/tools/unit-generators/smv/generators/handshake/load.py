@@ -13,8 +13,8 @@ def _generate_load(name, data_type, addr_type):
   return f"""
 MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_ready, dataOut_ready)
   VAR
-  inner_addr_tehb : {name}__addr_tehb(addr_in, addr_in_valid, addr_out_ready);
-  inner_data_tehb : {name}__data_tehb(data_from_mem, data_from_mem_valid, data_out_ready);
+  inner_addr_tehb : {name}__addr_tehb(addrIn, addrIn_valid, addrOut_ready);
+  inner_data_tehb : {name}__data_tehb(dataFromMem, dataFromMem_valid, dataOut_ready);
 
   //output
   DEFINE
