@@ -6,6 +6,7 @@ from generators.handshake.join import generate_join
 from generators.handshake.sink import generate_sink
 import json
 
+
 def generate_lsq(name, params):
   with open(params["config_file"], "r") as file:
     config = json.load(file)
@@ -18,12 +19,14 @@ def generate_lsq(name, params):
   capacity = config["fifoDepth"]
   load_groups = config["numLoads"]
   store_groups = config["numStores"]
-  lsq_in_signals = get_lsq_ports(params[ATTR_PORT_TYPES], num_load_ports, num_store_ports, num_bbs, config["master"])
+  lsq_in_signals = get_lsq_ports(
+      params[ATTR_PORT_TYPES], num_load_ports, num_store_ports, num_bbs, config["master"])
 
   if config["master"]:
     return _generate_lsq_master(name, lsq_in_signals, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)
   else:
     return _generate_lsq_slave(name, lsq_in_signals, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)
+
 
 def group_index(index, group_list):
   partial_sum = 0
@@ -35,6 +38,8 @@ def group_index(index, group_list):
 # I could try to generate it from config only, but even HandshakeInterfaceOps.cpp doesn't do it.
 # I don't know what the order between loads and stores in a group should be, so I get the order form
 # port types
+
+
 def get_lsq_ports(port_types, num_load_ports, num_store_ports, num_bbs, is_master):
   # Compute the number of signals coming from input channels
   # Load ports: ldAddr ldAddr_valid
@@ -42,7 +47,8 @@ def get_lsq_ports(port_types, num_load_ports, num_store_ports, num_bbs, is_maste
   # Ctrl: ctrl
   # If master lsq: loadData memStart_valid ctrlEnd_valid
   # If slave lsq: ldDataFromMC ldDataFromMC_valid
-  num_input_signals = num_load_ports * 2 + num_store_ports * 4 + num_bbs + (3 if is_master else 2)
+  num_input_signals = num_load_ports * 2 + \
+      num_store_ports * 4 + num_bbs + (3 if is_master else 2)
 
   lsq_ports = []
   for channel, handshake_type in port_types.items():
@@ -58,7 +64,6 @@ def get_lsq_ports(port_types, num_load_ports, num_store_ports, num_bbs, is_maste
         lsq_ports += [f"{channel}_ready"]
   return lsq_ports
 
-  
 
 def _generate_lsq_master(name, lsq_in_signals, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity):
   lsq_in_ports = ", ".join(lsq_in_signals)
@@ -84,6 +89,7 @@ MODULE {name} ({lsq_in_ports})
   {_generate_nd_load_port(f"{name}__nd_load_port", capacity, addr_type, data_type)}
   {_generate_nd_store_port(f"{name}__nd_store_port", capacity, addr_type, data_type)}
 """
+
 
 def _generate_lsq_slave(name, lsq_in_signals, addr_type, data_type, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity):
   lsq_in_ports = ", ".join(lsq_in_signals)
@@ -197,8 +203,9 @@ def _generate_lsq_logic(name, num_load_ports, num_store_ports, num_bbs, load_gro
   {"\n  ".join([f"stData_{n}_ready := inner_store_port_{n}.stData_ready;" for n in range(num_store_ports)])}
 """
 
+
 def _generate_nd_load_port(name, capacity, addr_type, data_type):
-    return f"""
+  return f"""
 MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid & ctrl_valid, inner_capacity.ins_ready);
   VAR inner_capacity : {name}__ofifo(inner_input_ndw.outs, inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
@@ -217,8 +224,9 @@ MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   {generate_ndwire(f"{name}__out_ndwire", {ATTR_PORT_TYPES: {"outs": data_type.mlir_type}})}
 """
 
+
 def _generate_nd_store_port(name, capacity, addr_type, data_type):
-    return f"""
+  return f"""
 MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid & ctrl_valid, inner_addr_capacity.ins_ready);
   VAR inner_addr_capacity : {name}__addr_ofifo(inner_addr_ndw.outs, inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
@@ -242,14 +250,17 @@ MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   {generate_sink(f"{name}__sink", {ATTR_PORT_TYPES: {"ins": data_type.mlir_type}})}
 """
 
+
 def _generate_lsq_slave(name, addr_type, data_type, num_load_ports, num_store_ports, capacity):
   ctrl = [f"ctrl_{n}_valid" for n in range(num_load_ports + num_store_ports)]
   load_addr = [f"ldAddr_{n}, ldAddr_{n}_valid" for n in range(num_load_ports)]
-  store_addr_data = [f"stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid" for n in range(num_store_ports)]
+  store_addr_data = [
+      f"stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid" for n in range(num_store_ports)]
   load_data = [f"ldData_{n}_ready" for n in range(num_load_ports)]
   mc_in_signals = ["ldDataFromMC, ldDataFromMC_valid"]
   mc_out_signals = ["ldAddrToMC_ready, stAddrToMC_ready, stDataToMC_ready"]
-  lsq_in_ports = ", ".join(ctrl + load_addr + store_addr_data + mc_in_signals + load_data + mc_out_signals)
+  lsq_in_ports = ", ".join(
+      ctrl + load_addr + store_addr_data + mc_in_signals + load_data + mc_out_signals)
   return f"""
 MODULE {name} ({lsq_in_ports})
 
