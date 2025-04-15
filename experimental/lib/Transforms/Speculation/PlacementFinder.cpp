@@ -20,6 +20,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -172,15 +173,33 @@ LogicalResult PlacementFinder::findSavePositions() {
 //===----------------------------------------------------------------------===//
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                           OpOperand &currOpOperand) {
+                                           OpOperand &currOpOperand,
+                                           bool allowPassingOverSaveCommit) {
   Operation *currOp = currOpOperand.getOwner();
 
+  if (placements.containsSaveCommit(currOpOperand)) {
+    if (!allowPassingOverSaveCommit)
+      return;
+    // Only one save-commit can be passed over, in order to place commit units
+    // not directly accessible from the speculator.
+    allowPassingOverSaveCommit = false;
+  }
+  if (placements.containsCommit(currOpOperand)) {
+    return;
+  }
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
     // multiple loop speculation, SaveCommit units are used instead of
     // consecutive Commit-Save units.
     placements.addSaveCommit(currOpOperand);
     placements.eraseSave(currOpOperand);
+
+    if (!allowPassingOverSaveCommit)
+      return;
+    // Only one save-commit can be passed over, in order to place commit units
+    // not directly accessible from the speculator.
+    allowPassingOverSaveCommit = false;
+
     // Stop traversal since all commit units must be reachable from the
     // speculator without passing through a save commit.
     return;
@@ -204,12 +223,12 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Continue traversal only the data result of the LoadOp, skipping results
     // connected to the memory controller.
     for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
-      findCommitsTraversal(visited, dstOpOperand);
+      findCommitsTraversal(visited, dstOpOperand, allowPassingOverSaveCommit);
     }
   } else {
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
-        findCommitsTraversal(visited, dstOpOperand);
+        findCommitsTraversal(visited, dstOpOperand, allowPassingOverSaveCommit);
       }
     }
   }
@@ -256,7 +275,7 @@ markSpeculativePathsForCommits(OpOperand &currEdge,
 
 // Find the placements of Commit units in between BBs, that are needed to
 // avoid two control-only tokens going out of order. Updates the `placements`
-void PlacementFinder::findCommitsBetweenBBs() {
+LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   auto funcOp = specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
@@ -266,10 +285,12 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // found
   BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
 
-  // Mark the speculative edges. The set speculativeEdges is passed by
-  // reference
   llvm::DenseSet<Operation *> speculativeOps;
+  // Mark speculative edges from speculator and save-commit units
   markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+  }
 
   // Iterate all BBs to check if commits are needed
   for (const auto &[bb, predecessorArcs] : bbToPredecessorArcs) {
@@ -311,7 +332,11 @@ void PlacementFinder::findCommitsBetweenBBs() {
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
   speculativeOps.clear();
+  // Mark speculative edges from speculator and save-commit units
   markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+  }
 
   // Remove commits that cannot be reached
   llvm::DenseSet<CFGEdge *> toRemove;
@@ -323,9 +348,11 @@ void PlacementFinder::findCommitsBetweenBBs() {
   }
   for (CFGEdge *edge : toRemove)
     placements.eraseCommit(*edge);
+
+  return success();
 }
 
-LogicalResult PlacementFinder::findCommitPositions() {
+LogicalResult PlacementFinder::findCommitsInsideBB() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   if (!getLogicBB(specPos.getOwner())) {
     specPos.getOwner()->emitError("Operation does not have a BB.");
@@ -335,12 +362,7 @@ LogicalResult PlacementFinder::findCommitPositions() {
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsTraversal(visited, specPos);
-
-  // Additionally, if there are many BBs, two control-only tokens can
-  // themselves go out of order. For this reason, additional commits need
-  // to be placed in between BBs
-  findCommitsBetweenBBs();
+  findCommitsTraversal(visited, specPos, true);
 
   return success();
 }
@@ -352,11 +374,12 @@ LogicalResult PlacementFinder::findCommitPositions() {
 // Traverse the speculator's BB from top to bottom (from the control merge
 // until the branches) and adds save-commits in such a way that every path is
 // cut by a save-commit or the speculator itself. Updates `placements`.
-void PlacementFinder::findSaveCommitsTraversal(
-    llvm::DenseSet<Operation *> &visited, Operation *currOp) {
+LogicalResult
+PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                                          Operation *currOp) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
-    return;
+    return success();
 
   OpOperand &specPos = placements.getSpeculatorPlacement();
   std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
@@ -390,12 +413,23 @@ void PlacementFinder::findSaveCommitsTraversal(
       if (isa<handshake::ConditionalBranchOp>(succOp)) {
         // A SaveCommit is needed in front of the branch
         placements.addSaveCommit(dstOpOperand);
+
+        llvm::DenseSet<Operation *> visited;
+        // Add additional commit units
+        // Allow passing over the save-commit unit itself
+        findCommitsTraversal(visited, dstOpOperand, true);
+      } else if (isa<handshake::StoreOp>(succOp)) {
+        succOp->emitError("StoreOp should not be traversed in speculative "
+                          "region");
+        return failure();
       } else {
         // Continue DFS traversal along the path
-        findSaveCommitsTraversal(visited, succOp);
+        if (failed(findSaveCommitsTraversal(visited, succOp)))
+          return failure();
       }
     }
   }
+  return success();
 }
 
 LogicalResult PlacementFinder::findSaveCommitPositions() {
@@ -430,10 +464,11 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
         return controlMergeOp->emitError(
             "Found many control merges in the same BB");
 
-      // Add commits such that all paths are cut by a save-commit or the
+      // Add save-commits such that all paths are cut by a save-commit or the
       // speculator
       llvm::DenseSet<Operation *> visited;
-      findSaveCommitsTraversal(visited, controlMergeOp);
+      if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
+        return failure();
     }
   }
 
@@ -444,6 +479,18 @@ LogicalResult PlacementFinder::findPlacements() {
   // Clear the data structure
   clearPlacements();
 
-  return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
-                 failed(findSaveCommitPositions()));
+  if (failed(findSavePositions()))
+    return failure();
+
+  if (failed(findCommitsInsideBB()))
+    return failure();
+
+  if (failed(findSaveCommitPositions()))
+    return failure();
+
+  // Find additional commits after save-commits placement is finalized
+  if (failed(findCommitsBetweenBBs()))
+    return failure();
+
+  return success();
 }
