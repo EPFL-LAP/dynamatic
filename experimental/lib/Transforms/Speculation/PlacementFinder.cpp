@@ -162,10 +162,6 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Only one save-commit can be passed over, in order to place commit units
     // not directly accessible from the speculator.
     allowPassingOverSaveCommit = false;
-
-    // Stop traversal since all commit units must be reachable from the
-    // speculator without passing through a save commit.
-    return;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
@@ -247,11 +243,15 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   // found
   BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
 
-  llvm::DenseSet<Operation *> speculativeOps;
+  llvm::DenseSet<Operation *> speculativeEdges;
   // Mark speculative edges from speculator and save-commit units
-  markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+    if (placements.containsCommit(*scPos))
+      continue;
+    markSpeculativePathsForCommits(scPos->getOwner(), placements,
+                                   speculativeEdges);
   }
 
   // Iterate all BBs to check if commits are needed
@@ -289,11 +289,15 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   // Now that new commits have been added, some of the already placed commits
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
-  speculativeOps.clear();
+  speculativeEdges.clear();
   // Mark speculative edges from speculator and save-commit units
-  markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+    if (placements.containsCommit(*scPos))
+      continue;
+    markSpeculativePathsForCommits(scPos->getOwner(), placements,
+                                   speculativeEdges);
   }
 
   // Remove commits that cannot be reached
@@ -374,7 +378,7 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         llvm::DenseSet<Operation *> visited;
         // Add additional commit units
         // Allow passing over the save-commit unit itself
-        findCommitsTraversal(visited, dstOpOperand, true);
+        findCommitsTraversal(visited, dstOpOperand, false);
       } else if (isa<handshake::StoreOp>(succOp)) {
         succOp->emitError("StoreOp should not be traversed in speculative "
                           "region");
