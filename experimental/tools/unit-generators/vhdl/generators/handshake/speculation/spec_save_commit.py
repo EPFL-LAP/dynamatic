@@ -148,6 +148,7 @@ begin
   -- Sequential Process
   ----------------------------------------------------------------
 
+  {data("""
   -------------------------------------------
   -- process for writing data
   -------------------------------------------
@@ -157,15 +158,14 @@ begin
       if rst = '1' then
         -- TODO: Nothing??
       else
-        {data("""
         if TailEn = '1' then
           -- Write Data to Memory
           Memory(Tail) <= ins;
         end if;
-        """, bitwidth)}
       end if;
     end if;
   end process;
+  """, bitwidth)}
 
   -------------------------------------------
   -- process for updating tail
