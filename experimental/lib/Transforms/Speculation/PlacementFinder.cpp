@@ -243,7 +243,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   // found
   BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
 
-  llvm::DenseSet<Operation *> speculativeEdges;
+  llvm::DenseSet<CFGEdge *> speculativeEdges;
   // Mark speculative edges from speculator and save-commit units
   markSpeculativePathsForCommits(specPos.getOwner(), placements,
                                  speculativeEdges);
