@@ -727,9 +727,12 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(placeSpeculator()))
     return signalPassFailure();
 
-  // Place Save operations
-  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
-    return signalPassFailure();
+  // Save Placement is no longer supported
+  if (!placements.getPlacements<handshake::SpecSaveOp>().empty()) {
+    llvm_unreachable("Save placement is requested but no longer supported.");
+  }
+  // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
+  //   return signalPassFailure();
 
   // Place SaveCommit operations and the SaveCommit control path
   if (failed(prepareAndPlaceSaveCommits()))
