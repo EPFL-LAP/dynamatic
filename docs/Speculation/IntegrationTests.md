@@ -137,7 +137,7 @@ In this example, the speculator is placed on operand #0 of the `fork4` operation
 
 ### Speculator/Save-Commit FIFO Depth
 
-You also need to specify the FIFO depth for speculator and save-commit units. The FIFO must be deep enough to store all in-flight speculations, from the moment they are made until they are resolved. If the FIFO fills up, the circuit can deadlock.
+You also need to specify the FIFO depth for speculator and save-commit units. The FIFO must be deep enough to store all in-flight speculations, from the moment they are made until they are resolved. If the FIFO fills up, the circuit deadlocks.
 
 Note: The `save-commits-fifo-depth` value is currently shared across all save-commit units.
 
