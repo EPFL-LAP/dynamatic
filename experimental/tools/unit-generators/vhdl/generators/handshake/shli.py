@@ -1,18 +1,18 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_shli(name, params):
-  data_bitwidth = params["bitwidth"]
+  bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    return _generate_shli_signal_manager(name, data_bitwidth, extra_signals)
+    return _generate_shli_signal_manager(name, bitwidth, extra_signals)
   else:
-    return _generate_shli(name, data_bitwidth)
+    return _generate_shli(name, bitwidth)
 
 
-def _generate_shli(name, data_bitwidth):
+def _generate_shli(name, bitwidth):
   join_name = f"{name}_join"
 
   dependencies = \
@@ -26,18 +26,18 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 -- Entity of shli
-entity {name} is
+entity {name} is 
   port (
     -- inputs
     clk          : in std_logic;
     rst          : in std_logic;
-    lhs          : in std_logic_vector({data_bitwidth} - 1 downto 0);
+    lhs          : in std_logic_vector({bitwidth} - 1 downto 0);
     lhs_valid    : in std_logic;
-    rhs          : in std_logic_vector({data_bitwidth} - 1 downto 0);
+    rhs          : in std_logic_vector({bitwidth} - 1 downto 0);
     rhs_valid    : in std_logic;
     result_ready : in std_logic;
     -- outputs
-    result       : out std_logic_vector({data_bitwidth} - 1 downto 0);
+    result       : out std_logic_vector({bitwidth} - 1 downto 0);
     result_valid : out std_logic;
     lhs_ready    : out std_logic;
     rhs_ready    : out std_logic
@@ -49,7 +49,7 @@ end entity;
 -- Architecture of shli
 architecture arch of {name} is
 begin
-  join_inputs : entity work.{join_name}(arch)
+  join_inputs : entity work.{join_name}
     port map(
       -- inputs
       ins_valid(0) => lhs_valid,
@@ -61,7 +61,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs({data_bitwidth} - 2 downto 0)))));
+  result <= std_logic_vector(shift_left(unsigned(lhs), to_integer(unsigned('0' & rhs({bitwidth} - 2 downto 0)))));
 end architecture;
 """
 
@@ -69,9 +69,9 @@ end architecture;
 
 
 def _generate_shli_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
+  return generate_default_signal_manager(
+      name,
+      [{
           "name": "lhs",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals
@@ -80,10 +80,10 @@ def _generate_shli_signal_manager(name, bitwidth, extra_signals):
           "bitwidth": bitwidth,
           "extra_signals": extra_signals
       }],
-      "out_ports": [{
+      [{
           "name": "result",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals
       }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_shli(name, bitwidth))
+      extra_signals,
+      lambda name: _generate_shli(name, bitwidth))

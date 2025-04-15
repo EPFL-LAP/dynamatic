@@ -341,8 +341,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
       modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.shli" ||
-      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.muli" || modName == "handshake.sink" ||
+      modName == "handshake.subi" || modName == "handshake.shli" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit") {
@@ -357,7 +357,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (modName == "handshake.extsi" || modName == "handshake.trunci") {
+  } else if (modName == "handshake.extsi" || modName == "handshake.trunci" ||
+             modName == "handshake.extui") {
     serializedParams["INPUT_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
@@ -439,9 +440,9 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
       modName == "handshake.muli" || modName == "handshake.select" ||
-      modName == "handshake.shli" || modName == "handshake.sink" ||
-      modName == "handshake.subf" || modName == "handshake.subi" ||
-      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.sink" || modName == "handshake.subf" ||
+      modName == "handshake.extui" || modName == "handshake.shli" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
