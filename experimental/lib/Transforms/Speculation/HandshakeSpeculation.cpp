@@ -419,16 +419,18 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   if (placements.getSaveCommitsFifoDepth() == 0) {
     llvm_unreachable("Save Commit FIFO depth cannot be 0");
   }
+
+  // Set the FIFO depth attribute for each SaveCommit
   specOp->getParentOp()->walk([&](Operation *op) {
     if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
-      SmallVector<NamedAttribute> scAttrs;
-      scAttrs.emplace_back(
-          builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-          builder.getIntegerAttr(
-              builder.getIntegerType(32, false),
+      SmallVector<NamedAttribute> scHWParams;
+      scHWParams.emplace_back(
+          /*key=*/builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
+          /*value=*/builder.getIntegerAttr(
+              builder.getIntegerType(/*width=*/32, /*isSigned=*/false),
               static_cast<int64_t>(placements.getSaveCommitsFifoDepth())));
       saveCommitOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
-                            builder.getDictionaryAttr(scAttrs));
+                            builder.getDictionaryAttr(scHWParams));
     }
   });
 
@@ -511,14 +513,16 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   if (placements.getSpeculatorFifoDepth() == 0) {
     llvm_unreachable("Speculator FIFO depth cannot be 0");
   }
-  SmallVector<NamedAttribute> specOpAttrs;
-  specOpAttrs.emplace_back(
-      builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-      builder.getIntegerAttr(
-          builder.getIntegerType(32, false),
+
+  // Set the FIFO depth attribute for the speculator
+  SmallVector<NamedAttribute> specOpHWParams;
+  specOpHWParams.emplace_back(
+      /*key=*/builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
+      /*value=*/builder.getIntegerAttr(
+          builder.getIntegerType(/*width=*/32, /*isSigned=*/false),
           static_cast<int64_t>(placements.getSpeculatorFifoDepth())));
   specOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
-                  builder.getDictionaryAttr(specOpAttrs));
+                  builder.getDictionaryAttr(specOpHWParams));
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
