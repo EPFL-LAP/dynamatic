@@ -53,8 +53,7 @@ private:
   /// units. See the documentation for more details:
   /// docs/Speculation/CommitUnitPlacementAlgorithm.md
   void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                            OpOperand &currOpOperand,
-                            bool allowPassingOverSaveCommit);
+                            OpOperand &currOpOperand);
 
   /// Additional commits are needed to avoid out-of-order tokens in multiple-BB
   /// cases.
