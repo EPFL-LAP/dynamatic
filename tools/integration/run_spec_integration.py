@@ -325,10 +325,21 @@ def main():
   test_name = args.test_name
   spec = args.spec
 
-  success = run_test(INTEGRATION_FOLDER / test_name /
-                     f"{test_name}.c",  spec)
-  if success:
-    color_print("Test passed", TermColors.OKGREEN)
+  test_names = [
+      "single_loop",
+      "loop_path",
+      "subdiag",
+      "subdiag_fast",
+      "fixed",
+      "sparse",
+      "nested_loop",
+      "if_convert"
+  ]
+  for test_name in test_names:
+    path = INTEGRATION_FOLDER / test_name / f"{test_name}.c"
+    success = run_test(str(path),  spec)
+    if success:
+      color_print("Test passed", TermColors.OKGREEN)
 
 
 if __name__ == "__main__":
