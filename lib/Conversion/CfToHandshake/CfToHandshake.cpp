@@ -1171,6 +1171,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
   TypeRange resultTypes;
+  // Vectors storing indices of classified arguments
+  SmallVector<unsigned> InstanceOpInputIndices;
+  SmallVector<unsigned> InstanceOpOutputIndices;
+  SmallVector<unsigned> InstanceOpParameterIndices;
+  // Maps output argument index -> list of operations that consume its value
+  llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   if (!calledHandshakeFuncOp) {
@@ -1179,33 +1185,27 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
-    // Vectors storing indices of classified arguments
-    SmallVector<unsigned> InstanceOpInputIndex;
-    SmallVector<unsigned> InstanceOpOutputIndex;
-    SmallVector<unsigned> InstanceOpParameterIndex;
-    // Maps output argument index -> list of operations that consume its value
-    llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
     // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
       if(nameAttr.getValue().starts_with("input_"))
-        InstanceOpInputIndex.push_back(i);
+        InstanceOpInputIndices.push_back(i);
       else if(nameAttr.getValue().starts_with("output_"))
-        InstanceOpOutputIndex.push_back(i);
+        InstanceOpOutputIndices.push_back(i);
       else
-        InstanceOpParameterIndex.push_back(i);
+        InstanceOpParameterIndices.push_back(i);
     }
     // For each output argument index, find all operations that consume its value
     // and store the mapping in OutputConnections
-    for(unsigned outputId : InstanceOpOutputIndex){
-      Value outputArg = callOp.getOperand(outputId);
+    for(unsigned OutputId : InstanceOpOutputIndices){
+      Value outputArg = callOp.getOperand(OutputId);
       SmallVector<Operation*> fanouts;
       for(auto &use : outputArg.getUses()){
         Operation* user = use.getOwner();
         if(user != callOp)
           fanouts.push_back(user);
       }
-      OutputConnections[outputId] = fanouts;
+      OutputConnections[OutputId] = fanouts;
     }
     resultTypes = calledFuncOp.getFunctionType().getResults();
   } else {
