@@ -116,10 +116,10 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     return;
   arrived.insert(currOp);
 
-  // We assume there is a direct path from the speculator to all commits, and so
-  // traversal ends if we reach a save-commit or a speculator. See detailed
-  // documentation for full explanation of the speculative region and this
-  // assumption.
+  // We assume there is a direct path from the speculator or save-commit to all
+  // commits, and so traversal ends if we reach a save-commit or a speculator.
+  // See detailed documentation for full explanation of the speculative region
+  // and this assumption.
   if (isa<handshake::SpeculatorOp>(currOp))
     return;
   if (isa<handshake::SpecSaveCommitOp>(currOp))
@@ -223,6 +223,16 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
                                 branchTrace);
   }
+  specOp->getParentOp()->walk([&](Operation *op) {
+    if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
+      for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
+        succOpOperand.getOwner()->dump();
+        branchTrace.clear();
+        routeCommitControlRecursive(&getContext(), specOp, arrived,
+                                    succOpOperand, branchTrace);
+      }
+    }
+  });
 
   // Verify that all commits are routed to a control signal
   return success(areAllCommitsRouted(fakeControlForCommits.value()));
@@ -701,10 +711,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
   //   return signalPassFailure();
 
-  // Place Commit operations
-  if (failed(placeCommits()))
-    return signalPassFailure();
-
   if (!placements.getPlacements<SpecSaveCommitOp>().empty()) {
     // Generate Place SaveCommit operations and the SaveCommit control path
     FailureOr<Value> saveCommitCtrl = generateSaveCommitCtrl();
@@ -715,6 +721,10 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     if (failed(placeSaveCommits(saveCommitCtrl.value())))
       return signalPassFailure();
   }
+
+  // Place Commit operations
+  if (failed(placeCommits()))
+    return signalPassFailure();
 
   // After placing all speculative units, route the commit control signals
   if (failed(routeCommitControl()))
