@@ -37,6 +37,9 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
 namespace {
+
+static constexpr const char *FIFO_DEPTH_ATTR_NAME = "FIFO_DEPTH";
+
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
@@ -414,7 +417,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
     if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
       SmallVector<NamedAttribute> scAttrs;
       scAttrs.emplace_back(
-          builder.getStringAttr("FIFO_DEPTH"),
+          builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
           builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
       saveCommitOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                             builder.getDictionaryAttr(scAttrs));
@@ -499,7 +502,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
 
   SmallVector<NamedAttribute> specOpAttrs;
   specOpAttrs.emplace_back(
-      builder.getStringAttr("FIFO_DEPTH"),
+      builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
       builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
   specOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                   builder.getDictionaryAttr(specOpAttrs));
