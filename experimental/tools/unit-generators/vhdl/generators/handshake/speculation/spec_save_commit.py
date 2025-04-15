@@ -125,19 +125,21 @@ begin
   end process;
 
   -------------------------------------------
-  -- comb process for output datlib/Support/RTL/RTL.cppa
+  -- comb process for output data
   -------------------------------------------
   output_proc : process (PassEn, Curr, bypass, {data("ins, Memory, ", bitwidth)}Head)
   begin
     if PassEn = '1' then
+      {data("""
       if bypass = '1' then
-        {data(f"outs <=  ins;", bitwidth)}
+        outs <= ins;
       else
-        {data(f"outs <=  Memory(Curr);", bitwidth)}
+        outs <= Memory(Curr);
       end if;
+      """, bitwidth)}
       outs_spec <= "1";
     else
-      {data(f"outs <=  Memory(Head);", bitwidth)}
+      {data(f"outs <= Memory(Head);", bitwidth)}
       outs_spec <= "0";
     end if;
   end process;
@@ -155,10 +157,12 @@ begin
       if rst = '1' then
         -- TODO: Nothing??
       else
-        if (TailEn = '1' ) then
+        {data("""
+        if TailEn = '1' then
           -- Write Data to Memory
-          {data("Memory(Tail) <= ins;", bitwidth)}
+          Memory(Tail) <= ins;
         end if;
+        """, bitwidth)}
       end if;
     end if;
   end process;
