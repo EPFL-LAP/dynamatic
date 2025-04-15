@@ -33,12 +33,6 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
   assert(specPos.getOwner() && "Speculator position is undefined");
 }
 
-void PlacementFinder::clearPlacements() {
-  // Speculator position is manually set
-  OpOperand &specPosition = placements.getSpeculatorPlacement();
-  this->placements = SpeculationPlacements(specPosition);
-}
-
 //===----------------------------------------------------------------------===//
 // Save Units Finder Methods
 //===----------------------------------------------------------------------===//
@@ -360,9 +354,6 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
 }
 
 LogicalResult PlacementFinder::findPlacements() {
-  // Clear the data structure
-  clearPlacements();
-
   return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
                  failed(findSaveCommitPositions()));
 }
