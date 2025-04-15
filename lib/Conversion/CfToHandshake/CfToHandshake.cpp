@@ -1171,14 +1171,14 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
   TypeRange resultTypes;
-  // check if the function is a handshake function
-  auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   // Vectors storing indices of classified arguments
-  SmallVector<unsigned> InstanceOpInputIndex;
-  SmallVector<unsigned> InstanceOpOutputIndex;
-  SmallVector<unsigned> InstanceOpParameterIndex;
+  SmallVector<unsigned> InstanceOpInputIndices;
+  SmallVector<unsigned> InstanceOpOutputIndices;
+  SmallVector<unsigned> InstanceOpParameterIndices;
   // Maps output argument index -> list of operations that consume its value
   llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
+  // check if the function is a handshake function
+  auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   if (!calledHandshakeFuncOp) {
     //print Operands
     llvm::errs() << "Operands:\n";
@@ -1193,29 +1193,28 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
-      argFile << "Argument " << i << ": (" << nameAttr.getValue() <<")\n";
       if(nameAttr.getValue().starts_with("input"))
-        InstanceOpInputIndex.push_back(i);
+        InstanceOpInputIndices.push_back(i);
       else if(nameAttr.getValue().starts_with("output"))
-        InstanceOpOutputIndex.push_back(i);
+        InstanceOpOutputIndices.push_back(i);
       else
-        InstanceOpParameterIndex.push_back(i);
+        InstanceOpParameterIndices.push_back(i);
     }
     // For each output argument index, find all operations that consume its value
     // and store the mapping in OutputConnections
-    for(unsigned outputId : InstanceOpOutputIndex){
-      Value outputArg = callOp.getOperand(outputId);
+    for(unsigned OutputId : InstanceOpOutputIndices){
+      Value outputArg = callOp.getOperand(OutputId);
       SmallVector<Operation*> fanouts;
       for(auto &use : outputArg.getUses()){
         Operation* user = use.getOwner();
         if(user != callOp)
           fanouts.push_back(user);
       }
-      OutputConnections[outputId] = fanouts;
+      OutputConnections[OutputId] = fanouts;
     }
-    //Create resultTypes based on collected Outputs
+    // Create resultTypes based on collected Outputs
     SmallVector<Type> resultTypesVec;
-    for(auto OutputId : InstanceOpOutputIndex)
+    for(auto OutputId : InstanceOpOutputIndices)
       resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
     resultTypes = TypeRange(resultTypesVec);
 
@@ -1224,12 +1223,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // for every element check if its Index is part of Output/Parameter vector and delete it,
     // else keep it. 
     for(int i = adaptor.getOperands().size() - 1; i >= 0 ; --i){
-      if(llvm::is_contained(InstanceOpOutputIndex, i) || llvm::is_contained(InstanceOpParameterIndex, i)){
+      if(llvm::is_contained(InstanceOpOutputIndices, i) || llvm::is_contained(InstanceOpParameterIndices, i)){
         operands.erase(operands.begin() + i);
         llvm::errs() << "Removed operand at index " << i << "\n";
       }
     }
-    //new Operands should only have input and parameters
+    // new Operands should only have input and parameters
     llvm::errs() << "Operands:\n";
     for (auto operand : operands) {
       llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
@@ -1248,20 +1247,20 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
-  //rewiring (if called function is func::FuncOp)
+  // rewiring (if called function is func::FuncOp)
   if(!calledHandshakeFuncOp){
     llvm::errs() << "entered rewiring";
     auto InstanceResults = instOp.getResults();
-    unsigned ResultIndex = 0;
-    for(auto OutputId : InstanceOpOutputIndex){
+    unsigned ResultId = 0;
+    for(auto OutputId : InstanceOpOutputIndices){
       for(Operation *user : OutputConnections[OutputId]){
         for(OpOperand &operand : user->getOpOperands()){
           if(operand.get() == callOp.getOperand(OutputId)){
-            operand.set(InstanceResults[ResultIndex]);
+            operand.set(InstanceResults[ResultId]);
           }
         }
       }
-      ResultIndex++;
+      ResultId++;
     }
   }
   namer.replaceOp(callOp, instOp);
