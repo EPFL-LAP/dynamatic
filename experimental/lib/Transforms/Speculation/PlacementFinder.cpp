@@ -137,13 +137,6 @@ LogicalResult PlacementFinder::findSavePositions() {
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
-  Operation *currOp = currOpOperand.getOwner();
-
-  // Stop traversal when a Commit or SaveCommit unit is encountered.
-  if (placements.containsCommit(currOpOperand) ||
-      placements.containsSaveCommit(currOpOperand)) {
-    return;
-  }
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
     // multiple loop speculation, SaveCommit units are used instead of
@@ -153,6 +146,8 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Stop traversal when a SaveCommit is encountered
     return;
   }
+
+  Operation *currOp = currOpOperand.getOwner();
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
@@ -172,11 +167,25 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Continue traversal only the data result of the LoadOp, skipping results
     // connected to the memory controller.
     for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
+      // Skip further traversal if Commit, SaveCommit, or Speculator is
+      // encountered.
+      if (placements.containsCommit(dstOpOperand) ||
+          placements.containsSaveCommit(dstOpOperand) ||
+          &placements.getSpeculatorPlacement() == &dstOpOperand)
+        continue;
+
       findCommitsTraversal(visited, dstOpOperand);
     }
   } else {
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
+        // Skip further traversal if Commit, SaveCommit, or Speculator is
+        // encountered.
+        if (placements.containsCommit(dstOpOperand) ||
+            placements.containsSaveCommit(dstOpOperand) ||
+            &placements.getSpeculatorPlacement() == &dstOpOperand)
+          continue;
+
         findCommitsTraversal(visited, dstOpOperand);
       }
     }
@@ -321,7 +330,6 @@ LogicalResult PlacementFinder::findCommitsAndSCsInsideBB() {
 LogicalResult PlacementFinder::findCommitsReachableFromSCs() {
   llvm::DenseSet<Operation *> visited;
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    visited.clear();
     findCommitsTraversal(visited, *scPos);
   }
   return success();
@@ -373,10 +381,6 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
       if (isa<handshake::ConditionalBranchOp>(succOp)) {
         // A SaveCommit is needed in front of the branch
         placements.addSaveCommit(dstOpOperand);
-      } else if (isa<handshake::StoreOp>(succOp)) {
-        succOp->emitError("StoreOp should not be traversed in speculative "
-                          "region");
-        return failure();
       } else {
         // Continue DFS traversal along the path
         if (failed(findSaveCommitsTraversal(visited, succOp)))
