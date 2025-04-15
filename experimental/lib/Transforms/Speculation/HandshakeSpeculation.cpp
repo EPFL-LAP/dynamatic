@@ -284,7 +284,6 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   specOp->getParentOp()->walk([&](Operation *op) {
     if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
       for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
-        succOpOperand.getOwner()->dump();
         branchTrace.clear();
         routeCommitControlRecursive(&getContext(), specOp, arrived,
                                     succOpOperand, branchTrace);
