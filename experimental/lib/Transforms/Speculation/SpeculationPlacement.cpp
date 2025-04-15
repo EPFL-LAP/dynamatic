@@ -89,17 +89,21 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
 }
 
-static inline void parseSpeculatorPlacement(
+static LogicalResult parseSpeculatorPlacement(
     std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
     unsigned int &fifoDepth, const llvm::json::Object *components) {
-  if (components->find("speculator") != components->end()) {
-    const llvm::json::Object *specObj = components->getObject("speculator");
-    StringRef opName = specObj->getString("operation-name").value();
-    unsigned opIdx = specObj->getInteger("operand-idx").value();
-    placements["speculator"].push_back({opName.str(), opIdx});
-    fifoDepth =
-        static_cast<unsigned int>(specObj->getInteger("fifo-depth").value());
-  }
+  // This field is required
+  if (components->find("speculator") == components->end())
+    return failure();
+
+  const llvm::json::Object *specObj = components->getObject("speculator");
+  StringRef opName = specObj->getString("operation-name").value();
+  unsigned opIdx = specObj->getInteger("operand-idx").value();
+  placements["speculator"].push_back({opName.str(), opIdx});
+  fifoDepth =
+      static_cast<unsigned int>(specObj->getInteger("fifo-depth").value());
+
+  return success();
 }
 
 static inline void parseOperationPlacements(
@@ -121,12 +125,13 @@ static LogicalResult
 parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
                           const llvm::json::Object *components) {
   constexpr const char *fifoDepthKey = "save-commits-fifo-depth";
-  if (components->find(fifoDepthKey) != components->end()) {
-    fifoDepth =
-        static_cast<unsigned int>(components->getInteger(fifoDepthKey).value());
-    return success();
-  }
-  return failure();
+  // This field is required
+  if (components->find(fifoDepthKey) == components->end())
+    return failure();
+
+  fifoDepth =
+      static_cast<unsigned int>(components->getInteger(fifoDepthKey).value());
+  return success();
 }
 
 // JSON format example:
@@ -160,25 +165,28 @@ parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
 //     }
 //   ]
 // }
-static bool
+static LogicalResult
 parseJSON(const llvm::json::Value &jsonValue,
           std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
           unsigned int &speculatorFifoDepth,
           unsigned int &saveCommitsFifoDepth) {
   const llvm::json::Object *components = jsonValue.getAsObject();
   if (!components)
-    return false;
+    return failure();
 
-  parseSpeculatorPlacement(placements, speculatorFifoDepth, components);
+  if (failed(parseSpeculatorPlacement(placements, speculatorFifoDepth,
+                                      components)))
+    return failure();
 
   if (failed(parseSaveCommitsFifoDepth(saveCommitsFifoDepth, components)))
-    return false;
+    return failure();
 
   parseOperationPlacements("saves", placements, components);
   parseOperationPlacements("commits", placements, components);
   parseOperationPlacements("save-commits", placements, components);
   parseOperationPlacements("buffers", placements, components);
-  return true;
+
+  return success();
 }
 
 static LogicalResult getOpPlacements(
@@ -258,8 +266,8 @@ SpeculationPlacements::readFromJSON(const std::string &jsonPath,
   std::map<StringRef, llvm::SmallVector<PlacementOperand>> specNameMap;
   unsigned int speculatorFifoDepth = 0;
   unsigned int saveCommitsFifoDepth = 0;
-  if (!parseJSON(*value, specNameMap, speculatorFifoDepth,
-                 saveCommitsFifoDepth))
+  if (failed(parseJSON(*value, specNameMap, speculatorFifoDepth,
+                       saveCommitsFifoDepth)))
     return failure();
 
   placements.setSpeculatorFifoDepth(speculatorFifoDepth);
