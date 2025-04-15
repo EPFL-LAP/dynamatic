@@ -90,6 +90,9 @@ public:
   /// Remove a save (edge) from the save placement map
   void eraseSave(OpOperand &dstOpOperand);
 
+  /// Remove a save-commit (edge) from the save-commit placement map
+  void eraseSaveCommit(OpOperand &dstOpOperand);
+
   /// Get the Placement instance that specifies the Speculator position
   OpOperand &getSpeculatorPlacement();
 

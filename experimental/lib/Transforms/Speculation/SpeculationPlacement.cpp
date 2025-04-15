@@ -70,6 +70,10 @@ void SpeculationPlacements::eraseCommit(OpOperand &dstOpOperand) {
   this->commits.erase(&dstOpOperand);
 }
 
+void SpeculationPlacements::eraseSaveCommit(OpOperand &dstOpOperand) {
+  this->saveCommits.erase(&dstOpOperand);
+}
+
 OpOperand &SpeculationPlacements::getSpeculatorPlacement() {
   return *this->speculator;
 }
