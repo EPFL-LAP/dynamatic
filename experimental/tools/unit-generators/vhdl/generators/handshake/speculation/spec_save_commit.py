@@ -62,16 +62,12 @@ architecture arch of {name} is
   signal Empty     : std_logic;
   signal Full      : std_logic;
 
-  type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} + 1 - 1 downto 0);
-  signal Memory : FIFO_Memory;
-
-  signal specdataInArray : std_logic_vector({bitwidth} + 1 - 1 downto 0);
+  {data(f"type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} - 1 downto 0);", bitwidth)}
+  {data("signal Memory : FIFO_Memory;", bitwidth)}
 
   signal bypass : std_logic;
 
 begin
-  specdataInArray <= {"ins_spec & ins" if bitwidth else "ins_spec"};
-
   ins_ready <= not Full;
   outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
   --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
@@ -129,20 +125,19 @@ begin
   end process;
 
   -------------------------------------------
-  -- comb process for output data
+  -- comb process for output datlib/Support/RTL/RTL.cppa
   -------------------------------------------
-  output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
+  output_proc : process (PassEn, Curr, bypass, {data("ins, Memory, ", bitwidth)}Head)
   begin
     if PassEn = '1' then
       if bypass = '1' then
-        {data(f"outs <=  specdataInArray({bitwidth} - 1 downto 0);", bitwidth)}
-        outs_spec(0) <= specdataInArray({bitwidth}+1 - 1);
+        {data(f"outs <=  ins;", bitwidth)}
       else
-        {data(f"outs <=  Memory(Curr)({bitwidth} - 1 downto 0);", bitwidth)}
-        outs_spec(0) <= Memory(Curr)({bitwidth}+1 - 1);
+        {data(f"outs <=  Memory(Curr);", bitwidth)}
       end if;
+      outs_spec <= "1";
     else
-      {data(f"outs <=  Memory(Head)({bitwidth} - 1 downto 0);", bitwidth)}
+      {data(f"outs <=  Memory(Head);", bitwidth)}
       outs_spec <= "0";
     end if;
   end process;
@@ -162,7 +157,7 @@ begin
       else
         if (TailEn = '1' ) then
           -- Write Data to Memory
-          Memory(Tail) <= specdataInArray;
+          {data("Memory(Tail) <= ins;", bitwidth)}
         end if;
       end if;
     end if;
