@@ -92,7 +92,7 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
 static LogicalResult parseSpeculatorPlacement(
     std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
     unsigned int &fifoDepth, const llvm::json::Object *components) {
-  // This field is required
+  // `speculator` field is required
   if (components->find("speculator") == components->end())
     return failure();
 
@@ -125,7 +125,7 @@ static LogicalResult
 parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
                           const llvm::json::Object *components) {
   constexpr const char *fifoDepthKey = "save-commits-fifo-depth";
-  // This field is required
+  // `save-commits-fifo-depth` field is required
   if (components->find(fifoDepthKey) == components->end())
     return failure();
 
