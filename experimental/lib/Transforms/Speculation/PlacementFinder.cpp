@@ -136,17 +136,9 @@ LogicalResult PlacementFinder::findSavePositions() {
 //===----------------------------------------------------------------------===//
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                           OpOperand &currOpOperand,
-                                           bool allowPassingOverSaveCommit) {
+                                           OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
-  if (placements.containsSaveCommit(currOpOperand)) {
-    if (!allowPassingOverSaveCommit)
-      return;
-    // Only one save-commit can be passed over, in order to place commit units
-    // not directly accessible from the speculator.
-    allowPassingOverSaveCommit = false;
-  }
   if (placements.containsCommit(currOpOperand)) {
     return;
   }
@@ -156,12 +148,6 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // consecutive Commit-Save units.
     placements.addSaveCommit(currOpOperand);
     placements.eraseSave(currOpOperand);
-
-    if (!allowPassingOverSaveCommit)
-      return;
-    // Only one save-commit can be passed over, in order to place commit units
-    // not directly accessible from the speculator.
-    allowPassingOverSaveCommit = false;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
@@ -182,12 +168,12 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Continue traversal only the data result of the LoadOp, skipping results
     // connected to the memory controller.
     for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
-      findCommitsTraversal(visited, dstOpOperand, allowPassingOverSaveCommit);
+      findCommitsTraversal(visited, dstOpOperand);
     }
   } else {
     for (OpResult res : currOp->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
-        findCommitsTraversal(visited, dstOpOperand, allowPassingOverSaveCommit);
+        findCommitsTraversal(visited, dstOpOperand);
       }
     }
   }
@@ -323,7 +309,7 @@ LogicalResult PlacementFinder::findCommitsInsideBB() {
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsTraversal(visited, specPos, true);
+  findCommitsTraversal(visited, specPos);
 
   return success();
 }
@@ -377,8 +363,7 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
 
         llvm::DenseSet<Operation *> visited;
         // Add additional commit units
-        // Allow passing over the save-commit unit itself
-        findCommitsTraversal(visited, dstOpOperand, false);
+        findCommitsTraversal(visited, dstOpOperand);
       } else if (isa<handshake::StoreOp>(succOp)) {
         succOp->emitError("StoreOp should not be traversed in speculative "
                           "region");
