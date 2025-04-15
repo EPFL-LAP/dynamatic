@@ -6,8 +6,11 @@ def generate_inner_port_mapping(port: Port, inner_port_data_name: str | None = N
   """
   Generate VHDL port mappings for a single port.
 
-  If `data_signal_name` is None, defaults to the port's own name.
+  If `inner_port_data_name` is None, defaults to the port's own name.
   Only includes extra signals listed in `mapped_extra_signals`.
+
+  Returns a list of string in the form "(inner_signal) => (outer_signal)".
+  E.g., ["lhs => lhs", "lhs_valid => lhs_valid", "lhs_ready => lhs_ready", "lhs_<extra> => lhs_<extra>"].
   """
   mapping: list[str] = []
   port_name = port["name"]
@@ -57,8 +60,9 @@ def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, map
   """
   Generate port mappings for concatenated ports.
 
-  The original data width is increased by `extra_signal_bitwidth`,
-  and the port name is mapped using `get_default_concat_name(...)`.
+  The bitwidth is increased by `extra_signals_bitwidth` beyond the original data width.
+  Mapped port names are automatically determined using `get_default_concat_name(...)`.
+  E.g., `lhs => lhs_inner` (where `lhs_inner` is returned by `get_default_concat_name`).
   """
   mappings = []
   for port in ports:
@@ -80,6 +84,8 @@ def generate_concat_mappings(ports: list[Port], extra_signals_bitwidth: int, map
 def get_unhandled_extra_signals(ports: list[Port], handled_extra_signals: ExtraSignals) -> list[str]:
   """
   Identify extra signals in ports that are not listed in `handled_extra_signals`.
+
+  Returns a list of unhandled extra signal names.
   """
   unhandled_extra_signals: list[str] = []
   for port in ports:
