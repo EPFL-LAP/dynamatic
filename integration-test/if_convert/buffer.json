@@ -36,32 +36,32 @@
     "type": "tehb"
   },
   {
-    "pred": "cond_br4",
+    "pred": "extsi1",
     "outid": 0,
     "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "cond_br0",
-    "outid": 1,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "cond_br3",
-    "outid": 1,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "cond_br5",
+    "pred": "fork6",
     "outid": 0,
     "slots": 32,
     "type": "tehb"
   },
   {
-    "pred": "fork8",
-    "outid": 4,
+    "pred": "fork6",
+    "outid": 1,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "trunci1",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "spec_save_commit2",
+    "outid": 0,
     "slots": 32,
     "type": "tehb"
   },
@@ -84,38 +84,8 @@
     "type": "tehb"
   },
   {
-    "pred": "fork12",
+    "pred": "fork10",
     "outid": 3,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 4,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 5,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 6,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 7,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 8,
     "slots": 32,
     "type": "tehb"
   },
@@ -126,7 +96,37 @@
     "type": "tehb"
   },
   {
-    "pred": "fork12",
+    "pred": "fork11",
+    "outid": 3,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
+    "outid": 4,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
+    "outid": 5,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
+    "outid": 6,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
+    "outid": 7,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork11",
     "outid": 0,
     "slots": 32,
     "type": "tehb"
@@ -134,12 +134,6 @@
   {
     "pred": "fork9",
     "outid": 0,
-    "slots": 32,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork12",
-    "outid": 1,
     "slots": 32,
     "type": "tehb"
   }
