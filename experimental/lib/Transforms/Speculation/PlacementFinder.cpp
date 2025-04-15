@@ -16,7 +16,6 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/Logging.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -24,7 +23,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -238,36 +236,21 @@ namespace {
 using CFGEdge = OpOperand;
 }
 
-// Perform DFS to mark all operations within the speculative region.
-// If a commit unit is placed between Op A and Op B, only Op A is marked, not Op
-// B.
+// DFS traversal to mark all operations that lead to Commit units
+// The set markedPaths is passed by reference and is updated with
+// the OpPlacements (pair value-operation) that are traversed
 static void
-markSpeculativePathsForCommits(OpOperand &currEdge,
+markSpeculativePathsForCommits(Operation *currOp,
                                SpeculationPlacements &placements,
-                               llvm::DenseSet<Operation *> &markedOps) {
-  // Stop traversal if a commit is reached
-  if (placements.containsCommit(currEdge))
-    return;
-
-  Operation *currOp = currEdge.getOwner();
-  // Stop traversal if currOp is already visited
-  if (markedOps.count(currOp))
-    return;
-
-  markedOps.insert(currOp);
-
-  if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
-    // Continue traversal only to the data result of the LoadOp, skipping
-    // results connected to the memory controller.
-    for (OpOperand edge : loadOp.getDataResult().getUsers()) {
-      markSpeculativePathsForCommits(edge, placements, markedOps);
-    }
-  } else if (isa<handshake::StoreOp>(currOp)) {
-    llvm_unreachable("StoreOp should not be traversed in speculative region");
-  } else {
-    for (OpResult res : currOp->getResults()) {
-      for (OpOperand &edge : res.getUses()) {
-        markSpeculativePathsForCommits(edge, placements, markedOps);
+                               llvm::DenseSet<CFGEdge *> &markedEdges) {
+  for (OpResult res : currOp->getResults()) {
+    for (OpOperand &edge : res.getUses()) {
+      if (!markedEdges.count(&edge)) {
+        markedEdges.insert(&edge);
+        // Stop traversal if a commit is reached
+        if (!placements.containsCommit(edge))
+          markSpeculativePathsForCommits(edge.getOwner(), placements,
+                                         markedEdges);
       }
     }
   }
@@ -285,11 +268,13 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   // found
   BBtoArcsMap bbToPredecessorArcs = getBBPredecessorArcs(funcOp);
 
-  llvm::DenseSet<Operation *> speculativeOps;
+  llvm::DenseSet<CFGEdge *> speculativeEdges;
   // Mark speculative edges from speculator and save-commit units
-  markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+    markSpeculativePathsForCommits(scPos->getOwner(), placements,
+                                   speculativeEdges);
   }
 
   // Iterate all BBs to check if commits are needed
@@ -299,12 +284,8 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
     for (const BBArc &arc : predecessorArcs) {
       // If any of the edges in an arc is speculative, count the input arc as
       // speculative
-      if (llvm::any_of(arc.edges, [&](CFGEdge *p) {
-            // Count as a speculative edge only if both source and destination
-            // ops are speculative.
-            return speculativeOps.count(p->get().getDefiningOp()) &&
-                   speculativeOps.count(p->getOwner());
-          }))
+      if (llvm::any_of(arc.edges,
+                       [&](CFGEdge *p) { return speculativeEdges.count(p); }))
         countSpecInputs++;
     }
 
@@ -320,7 +301,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
         }
         for (CFGEdge *edge : pred.edges) {
           // Add a Commit only in front of speculative inputs
-          if (speculativeOps.count(edge->getOwner()))
+          if (speculativeEdges.count(edge))
             placements.addCommit(*edge);
           // Here, synchronizer operations will be needed in the future
         }
@@ -331,18 +312,19 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   // Now that new commits have been added, some of the already placed commits
   // might be unreachable. Hence, the path to commits is marked again and
   // unreachable commits are removed
-  speculativeOps.clear();
+  speculativeEdges.clear();
   // Mark speculative edges from speculator and save-commit units
-  markSpeculativePathsForCommits(specPos, placements, speculativeOps);
+  markSpeculativePathsForCommits(specPos.getOwner(), placements,
+                                 speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    markSpeculativePathsForCommits(*scPos, placements, speculativeOps);
+    markSpeculativePathsForCommits(scPos->getOwner(), placements,
+                                   speculativeEdges);
   }
 
   // Remove commits that cannot be reached
   llvm::DenseSet<CFGEdge *> toRemove;
   for (CFGEdge *edge : placements.getPlacements<handshake::SpecCommitOp>()) {
-    // If the source op is no longer speculative, remove the commit
-    if (!speculativeOps.count(edge->get().getDefiningOp())) {
+    if (!speculativeEdges.count(edge)) {
       toRemove.insert(edge);
     }
   }
