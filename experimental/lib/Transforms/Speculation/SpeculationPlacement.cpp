@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
 #include <fstream>
 #include <map>
 #include <string>
@@ -90,12 +91,14 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
 
 static inline void parseSpeculatorPlacement(
     std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
-    const llvm::json::Object *components) {
+    unsigned int &fifoDepth, const llvm::json::Object *components) {
   if (components->find("speculator") != components->end()) {
     const llvm::json::Object *specObj = components->getObject("speculator");
     StringRef opName = specObj->getString("operation-name").value();
     unsigned opIdx = specObj->getInteger("operand-idx").value();
     placements["speculator"].push_back({opName.str(), opIdx});
+    fifoDepth =
+        static_cast<unsigned int>(specObj->getInteger("fifo-depth").value());
   }
 }
 
@@ -114,12 +117,26 @@ static inline void parseOperationPlacements(
   }
 }
 
+static LogicalResult
+parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
+                          const llvm::json::Object *components) {
+  constexpr const char *fifoDepthKey = "save-commits-fifo-depth";
+  if (components->find(fifoDepthKey) != components->end()) {
+    fifoDepth =
+        static_cast<unsigned int>(components->getInteger(fifoDepthKey).value());
+    return success();
+  }
+  return failure();
+}
+
 // JSON format example:
 // {
 //   "speculator": {
 //     "operation-name": "fork5",
-//     "operand-idx": 0
+//     "operand-idx": 0,
+//     "fifo-depth": 8,
 //   },
+//   "save-commits-fifo-depth": 8,
 //   "saves": [
 //     {
 //       "operation-name": "mc_load0",
@@ -141,22 +158,22 @@ static inline void parseOperationPlacements(
 //       "operation-name": "buffer10",
 //       "operand-idx": 0
 //     }
-//   ],
-//  "buffers": [
-//     {
-//       "operation-name": "extsi1",
-//       "operand-idx": 0
-//     }
 //   ]
 // }
-static bool parseJSON(
-    const llvm::json::Value &jsonValue,
-    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements) {
+static bool
+parseJSON(const llvm::json::Value &jsonValue,
+          std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
+          unsigned int &speculatorFifoDepth,
+          unsigned int &saveCommitsFifoDepth) {
   const llvm::json::Object *components = jsonValue.getAsObject();
   if (!components)
     return false;
 
-  parseSpeculatorPlacement(placements, components);
+  parseSpeculatorPlacement(placements, speculatorFifoDepth, components);
+
+  if (failed(parseSaveCommitsFifoDepth(saveCommitsFifoDepth, components)))
+    return false;
+
   parseOperationPlacements("saves", placements, components);
   parseOperationPlacements("commits", placements, components);
   parseOperationPlacements("save-commits", placements, components);
@@ -239,8 +256,30 @@ SpeculationPlacements::readFromJSON(const std::string &jsonPath,
   // Deserialize into a dictionary for operation names
   llvm::json::Path::Root jsonRoot(jsonPath);
   std::map<StringRef, llvm::SmallVector<PlacementOperand>> specNameMap;
-  if (!parseJSON(*value, specNameMap))
+  unsigned int speculatorFifoDepth = 0;
+  unsigned int saveCommitsFifoDepth = 0;
+  if (!parseJSON(*value, specNameMap, speculatorFifoDepth,
+                 saveCommitsFifoDepth))
     return failure();
 
+  placements.setSpeculatorFifoDepth(speculatorFifoDepth);
+  placements.setSaveCommitsFifoDepth(saveCommitsFifoDepth);
+
   return getOpPlacements(placements, specNameMap, nameAnalysis);
+}
+
+unsigned int SpeculationPlacements::getSpeculatorFifoDepth() {
+  return this->speculatorFifoDepth;
+}
+
+void SpeculationPlacements::setSpeculatorFifoDepth(unsigned int depth) {
+  this->speculatorFifoDepth = depth;
+}
+
+unsigned int SpeculationPlacements::getSaveCommitsFifoDepth() {
+  return this->saveCommitsFifoDepth;
+}
+
+void SpeculationPlacements::setSaveCommitsFifoDepth(unsigned int depth) {
+  this->saveCommitsFifoDepth = depth;
 }

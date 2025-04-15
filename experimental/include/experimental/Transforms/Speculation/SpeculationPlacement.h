@@ -45,6 +45,9 @@ private:
   llvm::DenseSet<OpOperand *> commits;
   llvm::DenseSet<OpOperand *> saveCommits;
 
+  unsigned int speculatorFifoDepth;
+  unsigned int saveCommitsFifoDepth;
+
 public:
   /// Empty constructor
   SpeculationPlacements() = default;
@@ -91,6 +94,11 @@ public:
   /// Get a set of the existing operation placements
   template <typename T>
   const llvm::DenseSet<OpOperand *> &getPlacements();
+
+  unsigned int getSpeculatorFifoDepth();
+  void setSpeculatorFifoDepth(unsigned int depth);
+  unsigned int getSaveCommitsFifoDepth();
+  void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
 } // namespace speculation
