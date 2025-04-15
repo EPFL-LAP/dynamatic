@@ -143,38 +143,24 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
-  bool exitTraversal = false;
-  bool isSaveCommitPlaced = false;
-
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
     // multiple loop speculation, SaveCommit units are used instead of
     // consecutive Commit-Save units.
     placements.addSaveCommit(currOpOperand);
     placements.eraseSave(currOpOperand);
-    isSaveCommitPlaced = true;
     // Stop traversal since all commit units must be reachable from the
     // speculator without passing through a save commit.
-    exitTraversal = true;
+    return;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
     // A Commit is needed in front of these units
     placements.addCommit(currOpOperand);
-
-    if (isSaveCommitPlaced) {
-      // If SaveCommit is in the same position, eliminate it.
-      // Reduce Commit-Save-Commit to a single Commit.
-      placements.eraseSaveCommit(currOpOperand);
-    }
-
     // Stop traversal.
-    exitTraversal = true;
-  }
-
-  if (exitTraversal)
     return;
+  }
 
   auto [_, isNewOp] = visited.insert(currOp);
 
