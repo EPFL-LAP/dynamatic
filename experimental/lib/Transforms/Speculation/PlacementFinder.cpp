@@ -35,12 +35,6 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
   assert(specPos.getOwner() && "Speculator position is undefined");
 }
 
-void PlacementFinder::clearPlacements() {
-  // Speculator position is manually set
-  OpOperand &specPosition = placements.getSpeculatorPlacement();
-  this->placements = SpeculationPlacements(specPosition);
-}
-
 //===----------------------------------------------------------------------===//
 // Save Units Finder Methods
 //===----------------------------------------------------------------------===//
