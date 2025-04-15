@@ -27,6 +27,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <string>
 
 using namespace llvm::sys;
@@ -413,12 +414,17 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
   if (failed(placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult())))
     return failure();
 
+  if (placements.getSaveCommitsFifoDepth() == 0) {
+    llvm_unreachable("Save Commit FIFO depth cannot be 0");
+  }
   specOp->getParentOp()->walk([&](Operation *op) {
     if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
       SmallVector<NamedAttribute> scAttrs;
       scAttrs.emplace_back(
           builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-          builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
+          builder.getIntegerAttr(
+              builder.getIntegerType(32, false),
+              static_cast<int64_t>(placements.getSaveCommitsFifoDepth())));
       saveCommitOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                             builder.getDictionaryAttr(scAttrs));
     }
@@ -500,10 +506,15 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
       /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
 
+  if (placements.getSpeculatorFifoDepth() == 0) {
+    llvm_unreachable("Speculator FIFO depth cannot be 0");
+  }
   SmallVector<NamedAttribute> specOpAttrs;
   specOpAttrs.emplace_back(
       builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-      builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
+      builder.getIntegerAttr(
+          builder.getIntegerType(32, false),
+          static_cast<int64_t>(placements.getSpeculatorFifoDepth())));
   specOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
                   builder.getDictionaryAttr(specOpAttrs));
 
