@@ -670,17 +670,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
-      .Case<handshake::SpeculatorOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 32);
-      })
-      .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
+      .Case<handshake::SpeculatorOp, handshake::SpecSaveOp,
+            handshake::SpecCommitOp, handshake::SpecSaveCommitOp,
             handshake::SpeculatingBranchOp>([&](auto) {
         // No parameters needed for these operations
-      })
-      .Case<handshake::SpecSaveCommitOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 32);
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
