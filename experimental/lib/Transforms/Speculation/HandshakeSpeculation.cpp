@@ -19,6 +19,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -397,7 +398,21 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // All the control logic is set up, now connect the Save-Commits with
   // the result of mergeOp
-  return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
+  if (failed(placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult())))
+    return failure();
+
+  specOp->getParentOp()->walk([&](Operation *op) {
+    if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
+      SmallVector<NamedAttribute> scAttrs;
+      scAttrs.emplace_back(
+          builder.getStringAttr("FIFO_DEPTH"),
+          builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
+      saveCommitOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
+                            builder.getDictionaryAttr(scAttrs));
+    }
+  });
+
+  return success();
 }
 
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
@@ -472,6 +487,13 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   specOp = builder.create<handshake::SpeculatorOp>(
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
       /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
+
+  SmallVector<NamedAttribute> specOpAttrs;
+  specOpAttrs.emplace_back(
+      builder.getStringAttr("FIFO_DEPTH"),
+      builder.getIntegerAttr(builder.getIntegerType(32, false), 32));
+  specOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
+                  builder.getDictionaryAttr(specOpAttrs));
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
