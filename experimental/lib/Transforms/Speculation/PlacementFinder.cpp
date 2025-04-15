@@ -37,11 +37,9 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
 }
 
 void PlacementFinder::clearPlacements() {
-  // Speculator and buffer positions are manually set
+  // Speculator position is manually set
   OpOperand &specPosition = placements.getSpeculatorPlacement();
-  llvm::DenseSet<OpOperand *> bufferPositions =
-      this->placements.getPlacements<handshake::BufferOp>();
-  this->placements = SpeculationPlacements(specPosition, bufferPositions);
+  this->placements = SpeculationPlacements(specPosition);
 }
 
 //===----------------------------------------------------------------------===//

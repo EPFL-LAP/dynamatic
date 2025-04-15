@@ -42,8 +42,7 @@ NewPlacementFinder::NewPlacementFinder(SpeculationPlacements &placements)
 
 void NewPlacementFinder::clearPlacements() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
-  auto buffers = this->placements.getPlacements<handshake::BufferOp>();
-  this->placements = SpeculationPlacements(specPos, buffers);
+  this->placements = SpeculationPlacements(specPos);
 }
 
 // Recursively traverse the IR in a DFS way to find the placements of Commit
