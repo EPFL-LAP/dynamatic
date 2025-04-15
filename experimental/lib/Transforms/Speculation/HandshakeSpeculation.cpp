@@ -72,9 +72,6 @@ private:
   /// Place the SaveCommit operations and the control path
   LogicalResult prepareAndPlaceSaveCommits();
 
-  /// Place the Buffer operations
-  LogicalResult placeBuffers();
-
   /// Adds a spec tag to the operand/result types in the speculative region.
   /// Traverses both upstream and downstream within the region, starting from
   /// the speculator. Upstream traversal is required to cover SourceOp and
@@ -115,28 +112,6 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // (d) If we apply replaceAllUsesExcept to the value referenced by the
     // save-commit unit, the speculator will also be placed after the
     // save-commit unit, which is undesirable.
-    operand->set(newOp.getResult());
-  }
-
-  return success();
-}
-
-LogicalResult HandshakeSpeculationPass::placeBuffers() {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  for (OpOperand *operand : placements.getPlacements<handshake::BufferOp>()) {
-    Operation *dstOp = operand->getOwner();
-    Value srcOpResult = operand->get();
-
-    // Create a new BufferOp
-    builder.setInsertionPoint(dstOp);
-    // Buffer size is set to 16 for now
-    handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
-        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
-    inheritBB(dstOp, newOp);
-
-    // Connect the new BufferOp to dstOp
     operand->set(newOp.getResult());
   }
 
@@ -725,10 +700,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // speculative region. Skipping this update would lead to a type verification
   // error, as type-checking happens after the pass.
   if (failed(addSpecTagToSpecRegion()))
-    return signalPassFailure();
-
-  // Place Buffer operations
-  if (failed(placeBuffers()))
     return signalPassFailure();
 }
 
