@@ -133,7 +133,9 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
-  if (placements.containsCommit(currOpOperand)) {
+  // Stop traversal when a Commit or SaveCommit unit is encountered.
+  if (placements.containsCommit(currOpOperand) ||
+      placements.containsSaveCommit(currOpOperand)) {
     return;
   }
   if (placements.containsSave(currOpOperand)) {
@@ -142,6 +144,8 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // consecutive Commit-Save units.
     placements.addSaveCommit(currOpOperand);
     placements.eraseSave(currOpOperand);
+    // Stop traversal when a SaveCommit is encountered
+    return;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
@@ -293,7 +297,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsInsideBB() {
+LogicalResult PlacementFinder::findCommitsAndSCsInsideBB() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   if (!getLogicBB(specPos.getOwner())) {
     specPos.getOwner()->emitError("Operation does not have a BB.");
@@ -305,6 +309,15 @@ LogicalResult PlacementFinder::findCommitsInsideBB() {
   llvm::DenseSet<Operation *> visited;
   findCommitsTraversal(visited, specPos);
 
+  return success();
+}
+
+LogicalResult PlacementFinder::findCommitsReachableFromSCs() {
+  llvm::DenseSet<Operation *> visited;
+  for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    visited.clear();
+    findCommitsTraversal(visited, *scPos);
+  }
   return success();
 }
 
@@ -354,10 +367,6 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
       if (isa<handshake::ConditionalBranchOp>(succOp)) {
         // A SaveCommit is needed in front of the branch
         placements.addSaveCommit(dstOpOperand);
-
-        llvm::DenseSet<Operation *> visited;
-        // Add additional commit units
-        findCommitsTraversal(visited, dstOpOperand);
       } else if (isa<handshake::StoreOp>(succOp)) {
         succOp->emitError("StoreOp should not be traversed in speculative "
                           "region");
@@ -372,7 +381,7 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   return success();
 }
 
-LogicalResult PlacementFinder::findSaveCommitPositions() {
+LogicalResult PlacementFinder::findSnapshotSCs() {
   // There already exist save-commits which have been placed instead of
   // consecutive save and commit units. Here, additional save commits are
   // found
@@ -419,13 +428,15 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSavePositions()))
     return failure();
 
-  if (failed(findCommitsInsideBB()))
+  if (failed(findCommitsAndSCsInsideBB()))
     return failure();
 
-  if (failed(findSaveCommitPositions()))
+  if (failed(findSnapshotSCs()))
     return failure();
 
   // Find additional commits after save-commits placement is finalized
+  if (failed(findCommitsReachableFromSCs()))
+    return failure();
   if (failed(findCommitsBetweenBBs()))
     return failure();
 
