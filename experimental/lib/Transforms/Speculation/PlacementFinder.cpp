@@ -158,10 +158,6 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Only one save-commit can be passed over, in order to place commit units
     // not directly accessible from the speculator.
     allowPassingOverSaveCommit = false;
-
-    // Stop traversal since all commit units must be reachable from the
-    // speculator without passing through a save commit.
-    return;
   }
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
@@ -248,6 +244,8 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   markSpeculativePathsForCommits(specPos.getOwner(), placements,
                                  speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    if (placements.containsCommit(*scPos))
+      continue;
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
                                    speculativeEdges);
   }
@@ -292,6 +290,8 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   markSpeculativePathsForCommits(specPos.getOwner(), placements,
                                  speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    if (placements.containsCommit(*scPos))
+      continue;
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
                                    speculativeEdges);
   }
@@ -374,7 +374,7 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         llvm::DenseSet<Operation *> visited;
         // Add additional commit units
         // Allow passing over the save-commit unit itself
-        findCommitsTraversal(visited, dstOpOperand, true);
+        findCommitsTraversal(visited, dstOpOperand, false);
       } else if (isa<handshake::StoreOp>(succOp)) {
         succOp->emitError("StoreOp should not be traversed in speculative "
                           "region");
