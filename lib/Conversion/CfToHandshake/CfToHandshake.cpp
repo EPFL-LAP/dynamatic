@@ -1213,10 +1213,10 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       OutputConnections[OutputId] = fanouts;
     }
     // Create resultTypes based on collected Outputs
-    SmallVector<Type> resultTypesVec;
-    for(auto OutputId : InstanceOpOutputIndices)
-      resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
-    resultTypes = TypeRange(resultTypesVec);
+    //SmallVector<Type> resultTypesVec;
+    //for(auto OutputId : InstanceOpOutputIndices)
+    //  resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
+    //resultTypes = TypeRange(resultTypesVec);
 
     // Create Operands for InstanceOp based on collected Inputs
     // Remember that the control signal is already included in operands so start at size - 1
@@ -1228,7 +1228,25 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         llvm::errs() << "Removed operand at index " << i << "\n";
       }
     }
-    // new Operands should only have input and parameters
+    // Rewriting the Function definition
+    auto calledFuncOpType = calledFuncOp.getFunctionType();
+    SmallVector<Type> newInputs;
+    SmallVector<Type> newResults;
+    for(unsigned i = 0; i < calledFuncOpType.getNumInputs(); ++i){
+      if(llvm::is_contained(InstanceOpInputIndices, i))
+        newInputs.push_back(calledFuncOpType.getInput(i));
+      else if(llvm::is_contained(InstanceOpOutputIndices, i))
+        newResults.push_back(calledFuncOpType.getInput(i));
+    }
+    // keep existing results
+    //newResults.append(calledFuncOpType.getResults().begin(), calledFuncOpType.getResults().end());
+    //create new Type based on newInputs and newResults
+    auto newFuncType = FunctionType::get(calledFuncOpType.getContext(), newInputs, newResults);
+    calledFuncOp.setType(newFuncType);
+
+    resultTypes = calledFuncOp.getFunctionType().getResults();
+
+    // new Operands should only have input (no outputs and paramters)
     llvm::errs() << "Operands:\n";
     for (auto operand : operands) {
       llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
@@ -1249,13 +1267,17 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   // rewiring (if called function is func::FuncOp)
   if(!calledHandshakeFuncOp){
-    llvm::errs() << "entered rewiring";
+    llvm::errs() << "entered rewiring \n";
     auto InstanceResults = instOp.getResults();
     unsigned ResultId = 0;
     for(auto OutputId : InstanceOpOutputIndices){
+      llvm::errs() << "entry 1 \n";
       for(Operation *user : OutputConnections[OutputId]){
+        llvm::errs() << "entry 2 \n";
         for(OpOperand &operand : user->getOpOperands()){
+          llvm::errs() << "entry 3 \n";
           if(operand.get() == callOp.getOperand(OutputId)){
+            llvm::errs() << "entry 4 \n";
             operand.set(InstanceResults[ResultId]);
           }
         }
@@ -1267,7 +1289,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    rewriter.replaceOp(callOp, instOp.getResults().drop_back());
+    //rewriter.replaceOp(callOp, instOp.getResults().drop_back());
+    rewriter.replaceOp(callOp, instOp.getResult(0));
   return success();
 }
 
