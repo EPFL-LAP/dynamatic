@@ -26,7 +26,7 @@ entity {name} is
     -- inputs
     {data(f"ins : in std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in std_logic;
-    ins_spec : in std_logic_vector(0 downto 0);
+    ins_spec : in std_logic_vector(0 downto 0); -- not used
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
