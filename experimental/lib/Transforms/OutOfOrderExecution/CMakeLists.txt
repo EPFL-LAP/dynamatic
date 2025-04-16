@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticOutOfOrderExecution
   OutOfOrderExecution.cpp
+  OutOfOrderClustering.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

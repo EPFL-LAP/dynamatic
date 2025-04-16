@@ -1,4 +1,5 @@
-//===- FtdCfToHandhsake.h - Enable Out-of-Order Execution in Dataflow Circuits
+//===- OutOfOrderExecution.h - Enable Out-of-Order Execution in Dataflow
+// Circuits
 //-*- C++
 //-*-===//
 //
@@ -31,7 +32,6 @@ std::unique_ptr<dynamatic::DynamaticPass> createOutOfOrderExecution();
 
 } // namespace outoforder
 } // namespace experimental
-
 } // namespace dynamatic
 
 #endif // EXPERIMENTAL_TRANSFORMS_OUTOFORDEREXECUTION_OUTOFORDEREXECUTION_H
