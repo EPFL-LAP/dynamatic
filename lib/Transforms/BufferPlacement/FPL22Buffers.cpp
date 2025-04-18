@@ -63,25 +63,23 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     if (forceBreakDV && forceBreakR) {
       if (numSlotsToPlace == 1) {
         result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else if (numSlotsToPlace == 2) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        result.numFifoDV = numSlotsToPlace - 1;
+        result.numOneSlotDV = 1;
+        result.numFifoNone = numSlotsToPlace - 2;
         result.numOneSlotR = 1;
       }
     } else if (forceBreakDV) {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotDV = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numOneSlotDV = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
+    } else if (forceBreakR) {
+      result.numOneSlotR = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
     } else {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotR = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numFifoNone = numSlotsToPlace;
     }
 
     placement[channel] = result;

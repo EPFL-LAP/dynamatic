@@ -118,7 +118,30 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       }
     }
   }
+
+  for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
+    bool connectedToLSQ = false;
+    for (Operation *user : storeOp->getUsers()) {
+      if (isa<handshake::LSQOp>(user)) {
+        connectedToLSQ = true;
+        break;
+      }
+    }
   
+    if (!connectedToLSQ)
+      continue;
+  
+    for (Value operand : storeOp->getOperands()) {
+      Channel channel(operand, true);
+      if (channel.props->maxTrans.value_or(1) > 0) {
+        channel.props->minTrans = std::max(channel.props->minTrans, 2U);
+      } else {
+        storeOp->emitWarning()
+            << "Store input channel (connected to LSQ) should have transparent buffer, but not allowed";
+      }
+    }
+  }
+
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
