@@ -219,7 +219,7 @@ def BufferOp : Handshake_Op<"buffer", [
 ]> {
   let summary = "buffer operation";
   let description = [{
-    Represents an arbitrary buffer whose properties (e.g., type, number of
+    Represents an arbitrary buffer whose properties (e.g., type, latency, and number of
     slots) are dictated by HW parameters. 
   }];
   
