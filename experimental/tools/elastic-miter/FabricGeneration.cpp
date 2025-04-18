@@ -480,10 +480,10 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
     BufferOp lhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), lhsEndNDWireOp.getResult(), TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::ONE_SLOT_BREAK_DV);
+        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
     BufferOp rhsEndBufferOp = builder.create<BufferOp>(
         nextLocation->getLoc(), rhsEndNDWireOp.getResult(), TimingInfo::break_dv(),
-        bufferSlots, dynamatic::handshake::BufferOp::ONE_SLOT_BREAK_DV);
+        bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
     setHandshakeAttributes(builder, lhsEndBufferOp, BB_OUT, lhsBufName);
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
