@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity elastic_fifo_inner_dataless is
   generic (
-    SIZE : integer
+    NUM_SLOTS : integer
   );
   port (
     -- inputs
@@ -21,8 +21,8 @@ architecture arch of elastic_fifo_inner_dataless is
 
   signal ReadEn     : std_logic := '0';
   signal WriteEn    : std_logic := '0';
-  signal Tail       : natural range 0 to SIZE - 1;
-  signal Head       : natural range 0 to SIZE - 1;
+  signal Tail       : natural range 0 to NUM_SLOTS - 1;
+  signal Head       : natural range 0 to NUM_SLOTS - 1;
   signal Empty      : std_logic;
   signal Full       : std_logic;
   signal Bypass     : std_logic;
@@ -65,7 +65,7 @@ begin
         Tail <= 0;
       else
         if (WriteEn = '1') then
-          Tail <= (Tail + 1) mod SIZE;
+          Tail <= (Tail + 1) mod NUM_SLOTS;
         end if;
       end if;
     end if;
@@ -80,7 +80,7 @@ begin
         Head <= 0;
       else
         if (ReadEn = '1') then
-          Head <= (Head + 1) mod SIZE;
+          Head <= (Head + 1) mod NUM_SLOTS;
         end if;
       end if;
     end if;
@@ -97,7 +97,7 @@ begin
         -- if only filling but not emptying
         if (WriteEn = '1') and (ReadEn = '0') then
           -- if new tail index will reach head index
-          if ((Tail + 1) mod SIZE = Head) then
+          if ((Tail + 1) mod NUM_SLOTS = Head) then
             Full <= '1';
           end if;
           -- if only emptying but not filling
@@ -120,7 +120,7 @@ begin
         -- if only emptying but not filling
         if (WriteEn = '0') and (ReadEn = '1') then
           -- if new head index will reach tail index
-          if ((Head + 1) mod SIZE = Tail) then
+          if ((Head + 1) mod NUM_SLOTS = Tail) then
             Empty <= '1';
           end if;
           -- if only filling but not emptying
