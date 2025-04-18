@@ -12,9 +12,10 @@ module delay_buffer #(
   reg [SIZE - 1 : 0] regs = 0;
 
   always @(posedge clk) begin
-    if (ready_in | rst) begin
+    if (rst)
+      regs[0] <= 0;
+    else if (ready_in)
       regs[0] <= valid_in;
-    end
   end
 
   always @(posedge clk) begin
@@ -30,5 +31,4 @@ module delay_buffer #(
   end
 
   assign valid_out = regs[SIZE - 1];
-  
 endmodule
