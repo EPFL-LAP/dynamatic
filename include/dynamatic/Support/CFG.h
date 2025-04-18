@@ -75,6 +75,15 @@ struct BBEndpoints {
   unsigned dstBB;
 };
 
+/// A pair of BB IDs representing the blocks connected by a channel.
+/// The BB ID may be left unspecified.
+struct BBEndpointsOptional {
+  // The source/predecessor basic block.
+  std::optional<unsigned> srcBB;
+  // The destination/successor basic block.
+  std::optional<unsigned> dstBB;
+};
+
 /// Gets the basic block endpoints of a channel (represented as an MLIR value
 /// accompanied by one of its users). These are the blocks which operations
 /// "near" the value belong to (the source block which is reached by
@@ -106,9 +115,9 @@ bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 /// two specific and potentially identical basic blocks.
 struct BBArc {
   /// The arc's source basic block.
-  unsigned srcBB;
+  std::optional<unsigned> srcBB;
   /// The arc's destination basic block.
-  unsigned dstBB;
+  std::optional<unsigned> dstBB;
   /// Set of pointers to OpOperands that uniquely identify an edge in the CFG.
   llvm::DenseSet<OpOperand *> edges;
 };
