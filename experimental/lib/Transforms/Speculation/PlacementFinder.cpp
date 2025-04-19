@@ -275,7 +275,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsAndSCsInsideBB() {
+LogicalResult PlacementFinder::findRegularCommitsAndSCs() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   if (!getLogicBB(specPos.getOwner())) {
     specPos.getOwner()->emitError("Operation does not have a BB.");
@@ -290,7 +290,7 @@ LogicalResult PlacementFinder::findCommitsAndSCsInsideBB() {
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsReachableFromSCs() {
+LogicalResult PlacementFinder::findRegularCommitsFromSCs() {
   llvm::DenseSet<Operation *> visited;
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
     findCommitsTraversal(visited, *scPos);
@@ -404,14 +404,14 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSavePositions()))
     return failure();
 
-  if (failed(findCommitsAndSCsInsideBB()))
+  if (failed(findRegularCommitsAndSCs()))
     return failure();
 
   if (failed(findSnapshotSCs()))
     return failure();
 
   // Find additional commits after save-commits placement is finalized
-  if (failed(findCommitsReachableFromSCs()))
+  if (failed(findRegularCommitsFromSCs()))
     return failure();
   if (failed(findCommitsBetweenBBs()))
     return failure();
