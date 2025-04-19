@@ -46,7 +46,7 @@ private:
   /// the speculator (i.e., without passing through any save-commits). Also
   /// updates the placement of save units to that of save-commits when
   /// encountered during traversal.
-  LogicalResult findCommitsAndSCsInsideBB();
+  LogicalResult findRegularCommitsAndSCs();
 
   /// Recursively traverse the IR in a DFS way to find the placements of commit
   /// units. See the documentation for more details:
@@ -62,7 +62,7 @@ private:
 
   /// Identifies additional commit positions that are reachable only through
   /// certain save-commit units.
-  LogicalResult findCommitsReachableFromSCs();
+  LogicalResult findRegularCommitsFromSCs();
 
   /// Identifies additional save-commit positions, referred to as "snapshots".
   LogicalResult findSnapshotSCs();
