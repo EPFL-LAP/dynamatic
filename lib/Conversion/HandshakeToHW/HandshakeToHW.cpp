@@ -670,10 +670,15 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
-      .Case<handshake::SpeculatorOp, handshake::SpecSaveOp,
-            handshake::SpecCommitOp, handshake::SpecSaveCommitOp,
+      .Case<handshake::SpeculatorOp>([&](handshake::SpeculatorOp speculatorOp) {
+        addUnsigned("FIFO_DEPTH", speculatorOp.getFifoDepth());
+      })
+      .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
             handshake::SpeculatingBranchOp>([&](auto) {
         // No parameters needed for these operations
+      })
+      .Case<handshake::SpecSaveCommitOp>([&](handshake::SpecSaveCommitOp saveCommitOp) {
+        addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
