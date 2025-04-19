@@ -39,8 +39,6 @@ using namespace dynamatic::experimental::speculation;
 
 namespace {
 
-static constexpr const char *FIFO_DEPTH_ATTR_NAME = "FIFO_DEPTH";
-
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
@@ -67,6 +65,8 @@ private:
   /// Place the operation specified in T with the control signal ctrlSignal
   template <typename T>
   LogicalResult placeUnits(Value ctrlSignal);
+
+  LogicalResult placeSaveCommitUnits(Value ctrlSignal);
 
   /// Create the control path for commit signals by replicating branches
   LogicalResult routeCommitControl();
@@ -117,6 +117,36 @@ LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
     // (d) If we apply replaceAllUsesExcept to the value referenced by the
     // save-commit unit, the speculator will also be placed after the
     // save-commit unit, which is undesirable.
+    operand->set(newOp.getResult());
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::placeSaveCommitUnits(Value ctrlSignal) {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  // Get the specified FIFO depth
+  unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
+  if (fifoDepth == 0) {
+    llvm_unreachable("Save Commit FIFO depth cannot be 0");
+  }
+
+  for (OpOperand *operand : placements.getPlacements<SpecSaveCommitOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // Create and connect the new Operation
+    builder.setInsertionPoint(dstOp);
+    // resultType is tentative and will be updated in the addSpecTag algorithm
+    // later.
+    SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
+        dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+        /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal,
+        /*fifoDepth=*/fifoDepth);
+    inheritBB(dstOp, newOp);
+
     operand->set(newOp.getResult());
   }
 
@@ -413,26 +443,12 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // All the control logic is set up, now connect the Save-Commits with
   // the result of mergeOp
-  if (failed(placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult())))
+  if (failed(placeSaveCommitUnits(mergeOp.getResult())))
     return failure();
 
   if (placements.getSaveCommitsFifoDepth() == 0) {
     llvm_unreachable("Save Commit FIFO depth cannot be 0");
   }
-
-  // Set the FIFO depth attribute for each SaveCommit
-  specOp->getParentOp()->walk([&](Operation *op) {
-    if (auto saveCommitOp = dyn_cast<handshake::SpecSaveCommitOp>(op)) {
-      SmallVector<NamedAttribute> scHWParams;
-      scHWParams.emplace_back(
-          /*key=*/builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-          /*value=*/builder.getIntegerAttr(
-              builder.getIntegerType(/*width=*/32, /*isSigned=*/false),
-              static_cast<int64_t>(placements.getSaveCommitsFifoDepth())));
-      saveCommitOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
-                            builder.getDictionaryAttr(scHWParams));
-    }
-  });
 
   return success();
 }
@@ -504,25 +520,17 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
+  // Get the specified FIFO depth
+  unsigned fifoDepth = placements.getSpeculatorFifoDepth();
+  if (fifoDepth == 0) {
+    llvm_unreachable("Speculator FIFO depth cannot be 0");
+  }
+
   // resultType is tentative and will be updated in the addSpecTag algorithm
   // later.
   specOp = builder.create<handshake::SpeculatorOp>(
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
-
-  if (placements.getSpeculatorFifoDepth() == 0) {
-    llvm_unreachable("Speculator FIFO depth cannot be 0");
-  }
-
-  // Set the FIFO depth attribute for the speculator
-  SmallVector<NamedAttribute> specOpHWParams;
-  specOpHWParams.emplace_back(
-      /*key=*/builder.getStringAttr(FIFO_DEPTH_ATTR_NAME),
-      /*value=*/builder.getIntegerAttr(
-          builder.getIntegerType(/*width=*/32, /*isSigned=*/false),
-          static_cast<int64_t>(placements.getSpeculatorFifoDepth())));
-  specOp->setAttr(RTL_PARAMETERS_ATTR_NAME,
-                  builder.getDictionaryAttr(specOpHWParams));
+      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value(), fifoDepth);
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
