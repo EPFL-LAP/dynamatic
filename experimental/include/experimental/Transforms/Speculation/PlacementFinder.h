@@ -39,9 +39,6 @@ private:
   /// Mutable SpeculationPlacements data structure to hold the placements
   SpeculationPlacements &placements;
 
-  /// Remove all existing placements except the Speculator
-  void clearPlacements();
-
   /// Find save operations positions
   LogicalResult findSavePositions();
 
