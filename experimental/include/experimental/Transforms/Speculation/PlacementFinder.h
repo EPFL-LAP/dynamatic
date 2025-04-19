@@ -45,9 +45,11 @@ private:
   /// Find save operations positions
   LogicalResult findSavePositions();
 
-  /// Find commit operations positions. Uses methods findCommitsTraversal and
-  /// findCommitsBetweenBBs
-  LogicalResult findCommitPositions();
+  /// Determines the placement of commit units that are reachable directly from
+  /// the speculator (i.e., without passing through any save-commits). Also
+  /// updates the placement of save units to that of save-commits when
+  /// encountered during traversal.
+  LogicalResult findRegularCommitsAndSCs();
 
   /// Recursively traverse the IR in a DFS way to find the placements of commit
   /// units. See the documentation for more details:
@@ -55,16 +57,22 @@ private:
   void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                             OpOperand &currOpOperand);
 
-  /// Check arcs between BBs to determine if extra commits are needed to solve
-  /// out-of-order tokens
-  void findCommitsBetweenBBs();
+  /// Additional commits are needed to avoid out-of-order tokens in multiple-BB
+  /// cases.
+  /// Check arcs between BBs to determine if extra commits are needed to
+  /// solve out-of-order tokens
+  LogicalResult findCommitsBetweenBBs();
 
-  /// Find save-commit operations positions. Uses findSaveCommitsTraversal
-  LogicalResult findSaveCommitPositions();
+  /// Identifies additional commit positions that are reachable only through
+  /// certain save-commit units.
+  LogicalResult findRegularCommitsFromSCs();
+
+  /// Identifies additional save-commit positions, referred to as "snapshots".
+  LogicalResult findSnapshotSCs();
 
   /// DFS traversal of the speculation BB to find all SaveCommit placements
-  void findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                Operation *currOp);
+  LogicalResult findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                                         Operation *currOp);
 };
 } // namespace speculation
 } // namespace experimental
