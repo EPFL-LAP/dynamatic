@@ -147,6 +147,7 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommitUnits(Value ctrlSignal) {
         /*fifoDepth=*/fifoDepth);
     inheritBB(dstOp, newOp);
 
+    // Connect the new SaveCommitOp to dstOp
     operand->set(newOp.getResult());
   }
 
@@ -443,14 +444,7 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
 
   // All the control logic is set up, now connect the Save-Commits with
   // the result of mergeOp
-  if (failed(placeSaveCommitUnits(mergeOp.getResult())))
-    return failure();
-
-  if (placements.getSaveCommitsFifoDepth() == 0) {
-    llvm_unreachable("Save Commit FIFO depth cannot be 0");
-  }
-
-  return success();
+  return placeSaveCommitUnits(mergeOp.getResult());
 }
 
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,

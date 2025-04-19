@@ -100,8 +100,13 @@ static LogicalResult parseSpeculatorPlacement(
   StringRef opName = specObj->getString("operation-name").value();
   unsigned opIdx = specObj->getInteger("operand-idx").value();
   placements["speculator"].push_back({opName.str(), opIdx});
-  fifoDepth =
-      static_cast<unsigned int>(specObj->getInteger("fifo-depth").value());
+
+  int64_t speculatorFifoDepth = specObj->getInteger("fifo-depth").value();
+  if (speculatorFifoDepth < 0 || speculatorFifoDepth > UINT32_MAX) {
+    llvm::errs() << "Error: Speculator FIFO depth is out of range\n";
+    return failure();
+  }
+  fifoDepth = static_cast<unsigned int>(speculatorFifoDepth);
 
   return success();
 }
@@ -129,8 +134,13 @@ parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
   if (components->find(fifoDepthKey) == components->end())
     return failure();
 
-  fifoDepth =
-      static_cast<unsigned int>(components->getInteger(fifoDepthKey).value());
+  int64_t saveCommitsFifoDepth = components->getInteger(fifoDepthKey).value();
+  if (saveCommitsFifoDepth < 0 || saveCommitsFifoDepth > UINT32_MAX) {
+    llvm::errs() << "Error: Save-Commits FIFO depth is out of range\n";
+    return failure();
+  }
+  fifoDepth = static_cast<unsigned int>(saveCommitsFifoDepth);
+
   return success();
 }
 
