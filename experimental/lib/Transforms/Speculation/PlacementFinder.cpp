@@ -35,14 +35,6 @@ PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
   assert(specPos.getOwner() && "Speculator position is undefined");
 }
 
-void PlacementFinder::clearPlacements() {
-  // Speculator and buffer positions are manually set
-  OpOperand &specPosition = placements.getSpeculatorPlacement();
-  llvm::DenseSet<OpOperand *> bufferPositions =
-      this->placements.getPlacements<handshake::BufferOp>();
-  this->placements = SpeculationPlacements(specPosition, bufferPositions);
-}
-
 //===----------------------------------------------------------------------===//
 // Save Units Finder Methods
 //===----------------------------------------------------------------------===//
@@ -405,9 +397,6 @@ LogicalResult PlacementFinder::findSaveCommitPositions() {
 }
 
 LogicalResult PlacementFinder::findPlacements() {
-  // Clear the data structure
-  clearPlacements();
-
   return failure(failed(findSavePositions()) || failed(findCommitPositions()) ||
                  failed(findSaveCommitPositions()));
 }
