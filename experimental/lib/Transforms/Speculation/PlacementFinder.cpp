@@ -133,6 +133,8 @@ LogicalResult PlacementFinder::findSavePositions() {
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
+  Operation *currOp = currOpOperand.getOwner();
+
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
     // multiple loop speculation, SaveCommit units are used instead of
@@ -142,8 +144,6 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Stop traversal when a SaveCommit is encountered
     return;
   }
-
-  Operation *currOp = currOpOperand.getOwner();
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
