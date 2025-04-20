@@ -52,7 +52,7 @@ public:
   /// Empty constructor
   SpeculationPlacements() = default;
 
-  /// Initializer with operands specifying the speculator position
+  /// Initializer with operand specifying the speculator position
   SpeculationPlacements(OpOperand &speculatorPosition)
       : speculator(&speculatorPosition){};
 
