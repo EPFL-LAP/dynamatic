@@ -51,8 +51,8 @@ private:
   /// Recursively traverse the IR in a DFS way to find the placements of commit
   /// units. See the documentation for more details:
   /// docs/Speculation/CommitUnitPlacementAlgorithm.md
-  void findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                            OpOperand &currOpOperand);
+  void findRegularCommitsAndSCsTraversal(llvm::DenseSet<Operation *> &visited,
+                                         OpOperand &currOpOperand);
 
   /// Additional commits are needed to avoid out-of-order tokens in multiple-BB
   /// cases.
@@ -68,7 +68,7 @@ private:
   LogicalResult findSnapshotSCs();
 
   /// DFS traversal of the speculation BB to find all SaveCommit placements
-  LogicalResult findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+  LogicalResult findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
                                          Operation *currOp);
 };
 } // namespace speculation
