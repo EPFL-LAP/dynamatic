@@ -131,8 +131,8 @@ LogicalResult PlacementFinder::findSavePositions() {
 // Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
-void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                                           OpOperand &currOpOperand) {
+void PlacementFinder::findRegularCommitsAndSCsTraversal(
+    llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
   if (placements.containsSave(currOpOperand)) {
@@ -170,7 +170,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
           &placements.getSpeculatorPlacement() == &dstOpOperand)
         continue;
 
-      findCommitsTraversal(visited, dstOpOperand);
+      findRegularCommitsAndSCsTraversal(visited, dstOpOperand);
     }
   } else {
     for (OpResult res : currOp->getResults()) {
@@ -182,7 +182,7 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
             &placements.getSpeculatorPlacement() == &dstOpOperand)
           continue;
 
-        findCommitsTraversal(visited, dstOpOperand);
+        findRegularCommitsAndSCsTraversal(visited, dstOpOperand);
       }
     }
   }
@@ -318,15 +318,16 @@ LogicalResult PlacementFinder::findRegularCommitsAndSCs() {
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsTraversal(visited, specPos);
+  findRegularCommitsAndSCsTraversal(visited, specPos);
 
   return success();
 }
 
 LogicalResult PlacementFinder::findRegularCommitsFromSCs() {
   llvm::DenseSet<Operation *> visited;
+  // Perform the same traversal from the save-commit unit positions.
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    findCommitsTraversal(visited, *scPos);
+    findRegularCommitsAndSCsTraversal(visited, *scPos);
   }
   return success();
 }
@@ -339,7 +340,7 @@ LogicalResult PlacementFinder::findRegularCommitsFromSCs() {
 // until the branches) and adds save-commits in such a way that every path is
 // cut by a save-commit or the speculator itself. Updates `placements`.
 LogicalResult
-PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
                                           Operation *currOp) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
@@ -379,7 +380,7 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
         placements.addSaveCommit(dstOpOperand);
       } else {
         // Continue DFS traversal along the path
-        if (failed(findSaveCommitsTraversal(visited, succOp)))
+        if (failed(findSnapshotSCsTraversal(visited, succOp)))
           return failure();
       }
     }
@@ -422,7 +423,7 @@ LogicalResult PlacementFinder::findSnapshotSCs() {
       // Add save-commits such that all paths are cut by a save-commit or the
       // speculator
       llvm::DenseSet<Operation *> visited;
-      if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
+      if (failed(findSnapshotSCsTraversal(visited, controlMergeOp)))
         return failure();
     }
   }
