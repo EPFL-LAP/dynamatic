@@ -225,10 +225,13 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
                                 branchTrace);
   }
   // Start traversal from save-commit units
-  for (OpOperand *opOperand : placements.getPlacements<SpecSaveCommitOp>()) {
-    branchTrace.clear();
-    routeCommitControlRecursive(&getContext(), specOp, arrived, *opOperand,
-                                branchTrace);
+  for (auto saveCommitOp :
+       mlir::cast<FuncOp>(specOp->getParentOp()).getOps<SpecSaveCommitOp>()) {
+    for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
+      branchTrace.clear();
+      routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
+                                  branchTrace);
+    }
   }
 
   // Verify that all commits are routed to a control signal
