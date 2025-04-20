@@ -132,6 +132,28 @@ LogicalResult PlacementFinder::findSavePositions() {
 // Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
+/// Returns operands to traverse when placing Commit or SaveCommit.
+/// For LoadOps, only data result uses are included. For others, all result
+/// uses.
+static llvm::SmallVector<OpOperand *>
+getSpecRegionTraversalTargets(Operation *op) {
+  llvm::SmallVector<OpOperand *> targets;
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+    // Continue traversal only the data result of the LoadOp, skipping results
+    // connected to the memory controller.
+    for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
+      targets.push_back(&dstOpOperand);
+    }
+  } else {
+    for (OpResult res : op->getResults()) {
+      for (OpOperand &dstOpOperand : res.getUses()) {
+        targets.push_back(&dstOpOperand);
+      }
+    }
+  }
+  return targets;
+}
+
 void PlacementFinder::findRegularCommitsAndSCsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
@@ -160,32 +182,15 @@ void PlacementFinder::findRegularCommitsAndSCsTraversal(
   if (!isNewOp)
     return;
 
-  if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
-    // Continue traversal only the data result of the LoadOp, skipping results
-    // connected to the memory controller.
-    for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
-      // Skip further traversal if Commit, SaveCommit, or Speculator is
-      // encountered.
-      if (placements.containsCommit(dstOpOperand) ||
-          placements.containsSaveCommit(dstOpOperand) ||
-          &placements.getSpeculatorPlacement() == &dstOpOperand)
-        continue;
+  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
+    // Skip further traversal if Commit, SaveCommit, or Speculator is
+    // encountered.
+    if (placements.containsCommit(*target) ||
+        placements.containsSaveCommit(*target) ||
+        &placements.getSpeculatorPlacement() == target)
+      continue;
 
-      findRegularCommitsAndSCsTraversal(visited, dstOpOperand);
-    }
-  } else {
-    for (OpResult res : currOp->getResults()) {
-      for (OpOperand &dstOpOperand : res.getUses()) {
-        // Skip further traversal if Commit, SaveCommit, or Speculator is
-        // encountered.
-        if (placements.containsCommit(dstOpOperand) ||
-            placements.containsSaveCommit(dstOpOperand) ||
-            &placements.getSpeculatorPlacement() == &dstOpOperand)
-          continue;
-
-        findRegularCommitsAndSCsTraversal(visited, dstOpOperand);
-      }
-    }
+    findRegularCommitsAndSCsTraversal(visited, *target);
   }
 }
 
@@ -200,29 +205,13 @@ static void
 markSpeculativePathsForCommits(Operation *currOp,
                                SpeculationPlacements &placements,
                                llvm::DenseSet<CFGEdge *> &markedEdges) {
-  if (auto loadOp = dyn_cast<handshake::LoadOp>(currOp)) {
-    // Continue traversal only the data result of the LoadOp, skipping results
-    // connected to the memory controller.
-    for (OpOperand &edge : loadOp.getDataResult().getUses()) {
-      if (!markedEdges.count(&edge)) {
-        markedEdges.insert(&edge);
-        // Stop traversal if a commit is reached
-        if (!placements.containsCommit(edge))
-          markSpeculativePathsForCommits(edge.getOwner(), placements,
-                                         markedEdges);
-      }
-    }
-  } else {
-    for (OpResult res : currOp->getResults()) {
-      for (OpOperand &edge : res.getUses()) {
-        if (!markedEdges.count(&edge)) {
-          markedEdges.insert(&edge);
-          // Stop traversal if a commit is reached
-          if (!placements.containsCommit(edge))
-            markSpeculativePathsForCommits(edge.getOwner(), placements,
-                                           markedEdges);
-        }
-      }
+  for (OpOperand *edge : getSpecRegionTraversalTargets(currOp)) {
+    if (!markedEdges.count(edge)) {
+      markedEdges.insert(edge);
+      // Stop traversal if a commit is reached
+      if (!placements.containsCommit(*edge))
+        markSpeculativePathsForCommits(edge->getOwner(), placements,
+                                       markedEdges);
     }
   }
 }
@@ -370,20 +359,18 @@ PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
     return false;
   };
 
-  for (OpResult res : currOp->getResults()) {
-    for (OpOperand &dstOpOperand : res.getUses()) {
-      if (stopTraversalConditions(dstOpOperand))
-        continue;
+  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
+    if (stopTraversalConditions(*target))
+      continue;
 
-      Operation *succOp = dstOpOperand.getOwner();
-      if (isa<handshake::ConditionalBranchOp>(succOp)) {
-        // A SaveCommit is needed in front of the branch
-        placements.addSaveCommit(dstOpOperand);
-      } else {
-        // Continue DFS traversal along the path
-        if (failed(findSnapshotSCsTraversal(visited, succOp)))
-          return failure();
-      }
+    Operation *succOp = target->getOwner();
+    if (isa<handshake::ConditionalBranchOp>(succOp)) {
+      // A SaveCommit is needed in front of the branch
+      placements.addSaveCommit(*target);
+    } else {
+      // Continue DFS traversal along the path
+      if (failed(findSnapshotSCsTraversal(visited, succOp)))
+        return failure();
     }
   }
   return success();
