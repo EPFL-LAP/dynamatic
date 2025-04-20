@@ -128,7 +128,7 @@ LogicalResult PlacementFinder::findSavePositions() {
 }
 
 //===----------------------------------------------------------------------===//
-// Commit Units Finder Methods
+// Commit and Save-Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
 /// Returns operands to traverse when placing Commit or SaveCommit.
@@ -153,11 +153,19 @@ getSpecRegionTraversalTargets(Operation *op) {
   return targets;
 }
 
-/// Returns whether a commit unit is needed in front of `currOp`.
+/// A commit unit is needed in front of certain ops.
 static bool isCommitNeeded(Operation *currOp) {
   return isa<handshake::StoreOp>(currOp) ||
          isa<handshake::MemoryControllerOp>(currOp) ||
          isa<handshake::EndOp>(currOp);
+}
+
+/// Stop commit traversal if Commit, SaveCommit, or Speculator is encountered.
+static bool shouldStopFindingCommitsTraversal(SpeculationPlacements &placements,
+                                              OpOperand *currOpOperand) {
+  return placements.containsCommit(*currOpOperand) ||
+         placements.containsSaveCommit(*currOpOperand) ||
+         &placements.getSpeculatorPlacement() == currOpOperand;
 }
 
 void PlacementFinder::findRegularCommitsAndSCsTraversal(
@@ -186,11 +194,7 @@ void PlacementFinder::findRegularCommitsAndSCsTraversal(
     return;
 
   for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
-    // Skip further traversal if Commit, SaveCommit, or Speculator is
-    // encountered.
-    if (placements.containsCommit(*target) ||
-        placements.containsSaveCommit(*target) ||
-        &placements.getSpeculatorPlacement() == target)
+    if (shouldStopFindingCommitsTraversal(placements, target))
       continue;
 
     findRegularCommitsAndSCsTraversal(visited, *target);
@@ -301,7 +305,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   return success();
 }
 
-LogicalResult PlacementFinder::findRegularCommitsAndSCs() {
+LogicalResult PlacementFinder::findRegularCommitsAndSCsFromSpeculator() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   if (!getLogicBB(specPos.getOwner())) {
     specPos.getOwner()->emitError("Operation does not have a BB.");
@@ -316,18 +320,47 @@ LogicalResult PlacementFinder::findRegularCommitsAndSCs() {
   return success();
 }
 
+LogicalResult PlacementFinder::findRegularCommitsFromSCsTraversal(
+    llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
+  Operation *currOp = currOpOperand.getOwner();
+
+  if (placements.containsSave(currOpOperand)) {
+    currOp->emitError(
+        "Save units should not be reached from the speculative region");
+    return failure();
+  }
+  if (isCommitNeeded(currOp)) {
+    placements.addCommit(currOpOperand);
+    // Stop traversal.
+    return success();
+  }
+
+  auto [_, isNewOp] = visited.insert(currOp);
+
+  // End traversal if currOp is already in visited set
+  if (!isNewOp)
+    return success();
+
+  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
+    if (shouldStopFindingCommitsTraversal(placements, target))
+      continue;
+
+    if (failed(findRegularCommitsFromSCsTraversal(visited, *target)))
+      return failure();
+  }
+
+  return success();
+}
+
 LogicalResult PlacementFinder::findRegularCommitsFromSCs() {
   llvm::DenseSet<Operation *> visited;
   // Perform the same traversal from the save-commit unit positions.
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    findRegularCommitsAndSCsTraversal(visited, *scPos);
+    if (failed(findRegularCommitsFromSCsTraversal(visited, *scPos)))
+      return failure();
   }
   return success();
 }
-
-//===----------------------------------------------------------------------===//
-// SaveCommit Units Finder Methods
-//===----------------------------------------------------------------------===//
 
 // Traverse the speculator's BB from top to bottom (from the control merge
 // until the branches) and adds save-commits in such a way that every path is
@@ -426,7 +459,7 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSavePositions()))
     return failure();
 
-  if (failed(findRegularCommitsAndSCs()))
+  if (failed(findRegularCommitsAndSCsFromSpeculator()))
     return failure();
 
   if (failed(findSnapshotSCs()))
