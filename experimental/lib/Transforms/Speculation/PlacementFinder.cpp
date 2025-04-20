@@ -154,6 +154,13 @@ getSpecRegionTraversalTargets(Operation *op) {
   return targets;
 }
 
+/// Returns whether a commit unit is needed in front of `currOp`.
+static bool isCommitNeeded(Operation *currOp) {
+  return isa<handshake::StoreOp>(currOp) ||
+         isa<handshake::MemoryControllerOp>(currOp) ||
+         isa<handshake::EndOp>(currOp);
+}
+
 void PlacementFinder::findRegularCommitsAndSCsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
@@ -167,10 +174,7 @@ void PlacementFinder::findRegularCommitsAndSCsTraversal(
     // Stop traversal when a SaveCommit is encountered
     return;
   }
-  if (isa<handshake::StoreOp>(currOp) ||
-      isa<handshake::MemoryControllerOp>(currOp) ||
-      isa<handshake::EndOp>(currOp)) {
-    // A Commit is needed in front of these units
+  if (isCommitNeeded(currOp)) {
     placements.addCommit(currOpOperand);
     // Stop traversal.
     return;
