@@ -116,10 +116,10 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     return;
   arrived.insert(currOp);
 
-  // We assume there is a direct path from the speculator or save-commit to all
-  // commits, and so traversal ends if we reach a save-commit or a speculator.
-  // See detailed documentation for full explanation of the speculative region
-  // and this assumption.
+  // We assume there is a direct path to each commit from either the speculator
+  // or a save-commit, and so traversal ends if we reach a save-commit or a
+  // speculator. See detailed documentation for full explanation of the
+  // speculative region and this assumption.
   if (isa<handshake::SpeculatorOp>(currOp))
     return;
   if (isa<handshake::SpecSaveCommitOp>(currOp))

@@ -19,15 +19,12 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
-<<<<<<< HEAD
-=======
 #include "mlir/Support/LogicalResult.h"
-    >>>>>>> 440c575b (place more commit units)
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/ErrorHandling.h"
 
-    using namespace mlir;
+using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
@@ -137,6 +134,8 @@ LogicalResult PlacementFinder::findSavePositions() {
 
 void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                            OpOperand &currOpOperand) {
+  Operation *currOp = currOpOperand.getOwner();
+
   if (placements.containsSave(currOpOperand)) {
     // A Commit is needed in front of Save Operations. To allow for
     // multiple loop speculation, SaveCommit units are used instead of
@@ -146,8 +145,6 @@ void PlacementFinder::findCommitsTraversal(llvm::DenseSet<Operation *> &visited,
     // Stop traversal when a SaveCommit is encountered
     return;
   }
-
-  Operation *currOp = currOpOperand.getOwner();
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
