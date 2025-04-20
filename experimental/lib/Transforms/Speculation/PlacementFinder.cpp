@@ -169,7 +169,7 @@ static bool shouldStopFindingCommitsTraversal(SpeculationPlacements &placements,
          &placements.getSpeculatorPlacement() == currOpOperand;
 }
 
-void PlacementFinder::findCommitsAndSCsFromSpeculatorTraversal(
+void PlacementFinder::findCommitsAndSCsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
@@ -198,7 +198,7 @@ void PlacementFinder::findCommitsAndSCsFromSpeculatorTraversal(
     if (shouldStopFindingCommitsTraversal(placements, target))
       continue;
 
-    findCommitsAndSCsFromSpeculatorTraversal(visited, *target);
+    findCommitsAndSCsTraversal(visited, *target);
   }
 }
 
@@ -306,7 +306,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsAndSCsFromSpeculator() {
+LogicalResult PlacementFinder::findCommitsAndSCs() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   if (!getLogicBB(specPos.getOwner())) {
     specPos.getOwner()->emitError("Operation does not have a BB.");
@@ -316,12 +316,12 @@ LogicalResult PlacementFinder::findCommitsAndSCsFromSpeculator() {
   // We need to place a commit unit before (1) an exit unit; (2) a store
   // unit; (3) a save unit if speculative tokens can reach them.
   llvm::DenseSet<Operation *> visited;
-  findCommitsAndSCsFromSpeculatorTraversal(visited, specPos);
+  findCommitsAndSCsTraversal(visited, specPos);
 
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsFromSCsTraversal(
+LogicalResult PlacementFinder::findCommitsReachableFromSCsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
@@ -346,18 +346,18 @@ LogicalResult PlacementFinder::findCommitsFromSCsTraversal(
     if (shouldStopFindingCommitsTraversal(placements, target))
       continue;
 
-    if (failed(findCommitsFromSCsTraversal(visited, *target)))
+    if (failed(findCommitsReachableFromSCsTraversal(visited, *target)))
       return failure();
   }
 
   return success();
 }
 
-LogicalResult PlacementFinder::findCommitsFromSCs() {
+LogicalResult PlacementFinder::findCommitsReachableFromSCs() {
   llvm::DenseSet<Operation *> visited;
   // Perform the same traversal from the save-commit unit positions.
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    if (failed(findCommitsFromSCsTraversal(visited, *scPos)))
+    if (failed(findCommitsReachableFromSCsTraversal(visited, *scPos)))
       return failure();
   }
   return success();
@@ -460,14 +460,14 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSavePositions()))
     return failure();
 
-  if (failed(findCommitsAndSCsFromSpeculator()))
+  if (failed(findCommitsAndSCs()))
     return failure();
 
   if (failed(findSnapshotSCs()))
     return failure();
 
   // Find additional commits after save-commits placement is finalized
-  if (failed(findCommitsFromSCs()))
+  if (failed(findCommitsReachableFromSCs()))
     return failure();
   if (failed(findCommitsBetweenBBs()))
     return failure();
