@@ -62,20 +62,20 @@ private:
 
   /// Identifies additional commit positions that are reachable only through
   /// certain save-commit units.
-  LogicalResult findCommitsReachableFromSCs();
+  LogicalResult findRegularCommits();
 
   /// Recursively traverse the IR in a DFS way to find the placements of commit
   /// units. Unlike `findRegularCommitsAndSCsTraversal`, it doesn't place new
   /// save-commit units.
   LogicalResult
-  findCommitsReachableFromSCsTraversal(llvm::DenseSet<Operation *> &visited,
-                                       OpOperand &currOpOperand);
+  findRegularCommitsTraversal(llvm::DenseSet<Operation *> &visited,
+                              OpOperand &currOpOperand);
 
   /// Identifies additional save-commit positions, referred to as "snapshots".
-  LogicalResult findSnapshotSCs();
+  LogicalResult findSaveCommits();
 
   /// DFS traversal of the speculation BB to find all SaveCommit placements
-  LogicalResult findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
+  LogicalResult findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                          Operation *currOp);
 };
 } // namespace speculation
