@@ -383,6 +383,14 @@ PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
     if (!succOpBB || succOpBB != specBB)
       return true;
 
+    if (placements.containsSave(dstOpOperand)) {
+      // Convert unhandled save units in the loop to save-commits
+      placements.addSaveCommit(dstOpOperand);
+      placements.eraseSave(dstOpOperand);
+      // The path is cut by the save-commit and stop traversal
+      return true;
+    }
+
     // End traversal if the path is already cut by a commit or save-commit
     if (placements.containsCommit(dstOpOperand) ||
         placements.containsSaveCommit(dstOpOperand))
