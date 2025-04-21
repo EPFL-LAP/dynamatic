@@ -81,7 +81,7 @@ static bool isGeneratedBySourceOp(Value value) {
 
 // Save units are needed where speculative tokens can interact with
 // non-speculative tokens. Updates `placements` with the Save placements
-LogicalResult PlacementFinder::findSavePositions() {
+LogicalResult PlacementFinder::findSaves() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   handshake::FuncOp funcOp =
       specPos.getOwner()->getParentOfType<handshake::FuncOp>();
@@ -403,7 +403,7 @@ LogicalResult PlacementFinder::findSaveCommits() {
 }
 
 LogicalResult PlacementFinder::findPlacements() {
-  if (failed(findSavePositions()))
+  if (failed(findSaves()))
     return failure();
 
   if (failed(findSaveCommits()))

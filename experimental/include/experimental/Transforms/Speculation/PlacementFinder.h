@@ -40,7 +40,7 @@ private:
   SpeculationPlacements &placements;
 
   /// Find save operations positions
-  LogicalResult findSavePositions();
+  LogicalResult findSaves();
 
   /// Determines the placement of commit units that are reachable directly from
   /// the speculator (i.e., without passing through any save-commits). Also
