@@ -129,12 +129,12 @@ LogicalResult PlacementFinder::findSaves() {
 }
 
 //===----------------------------------------------------------------------===//
-// Commit and Save-Commit Units Finder Methods
+// Commit Units Finder Methods
 //===----------------------------------------------------------------------===//
 
-/// Returns operands to traverse when placing Commit or SaveCommit.
-/// For LoadOps, only data result uses are included. For others, all result
-/// uses.
+/// Returns operands to traverse next when placing Commit or SaveCommit.
+/// For LoadOps, only data result uses are included. For StoreOp, no targets.
+/// For others, all result uses.
 static llvm::SmallVector<OpOperand *>
 getSpecRegionTraversalTargets(Operation *op) {
   llvm::SmallVector<OpOperand *> targets;
@@ -168,10 +168,10 @@ LogicalResult PlacementFinder::findRegularCommitsTraversal(
     return failure();
   }
 
-  // A commit unit is needed in front of these ops.
   if (isa<handshake::StoreOp>(currOp) ||
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
+    // A Commit is needed in front of these units
     placements.addCommit(currOpOperand);
     // Stop traversal.
     return success();
@@ -259,6 +259,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
     // edge.
     if (placements.containsCommit(*scPos))
       continue;
+
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
                                    speculativeEdges);
   }
@@ -307,6 +308,7 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
     // edge.
     if (placements.containsCommit(*scPos))
       continue;
+
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
                                    speculativeEdges);
   }
@@ -323,6 +325,10 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
 
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// SaveCommit Units Finder Methods
+//===----------------------------------------------------------------------===//
 
 // Traverse the speculator's BB from top to bottom (from the control merge
 // until the branches) and adds save-commits in such a way that every path is
@@ -390,9 +396,9 @@ LogicalResult PlacementFinder::findSaveCommits() {
       foundControlMerge = true;
     else
       return controlMergeOp->emitError(
-          "Found many control merges in the same BB");
+          "Found multiple control merges in the same BB");
 
-    // Add save-commits such that all paths are cut by a save-commit or the
+    // Add save-commits so that all paths are cut by a save-commit or the
     // speculator
     llvm::DenseSet<Operation *> visited;
     if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
