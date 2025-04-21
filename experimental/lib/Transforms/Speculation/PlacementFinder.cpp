@@ -183,9 +183,9 @@ LogicalResult PlacementFinder::findRegularCommitsTraversal(
   for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
     // Stop further traversal if Commit, SaveCommit, or Speculator is
     // encountered.
-    if (placements.containsCommit(currOpOperand) ||
-        placements.containsSaveCommit(currOpOperand) ||
-        &placements.getSpeculatorPlacement() == &currOpOperand)
+    if (placements.containsCommit(*target) ||
+        placements.containsSaveCommit(*target) ||
+        &placements.getSpeculatorPlacement() == target)
       continue;
 
     if (failed(findRegularCommitsTraversal(visited, *target)))
@@ -385,30 +385,25 @@ LogicalResult PlacementFinder::findSaveCommits() {
     return failure();
   }
 
-  // If a save-commit is placed, then for correctness, every path from entry
-  // points to exit points in the Speculator BB should cross either the
-  // speculator or a save-commit
-  if (!placements.getPlacements<handshake::SpecSaveCommitOp>().empty()) {
-    bool foundControlMerge = false;
-    // Every BB starts at a control merge
-    for (auto controlMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
-      if (auto mergeBB = getLogicBB(controlMergeOp);
-          !mergeBB || mergeBB != specBB)
-        continue;
+  bool foundControlMerge = false;
+  // Every BB starts at a control merge
+  for (auto controlMergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+    if (auto mergeBB = getLogicBB(controlMergeOp);
+        !mergeBB || mergeBB != specBB)
+      continue;
 
-      // Found a control merge in the speculation BB
-      if (!foundControlMerge)
-        foundControlMerge = true;
-      else
-        return controlMergeOp->emitError(
-            "Found many control merges in the same BB");
+    // Found a control merge in the speculation BB
+    if (!foundControlMerge)
+      foundControlMerge = true;
+    else
+      return controlMergeOp->emitError(
+          "Found many control merges in the same BB");
 
-      // Add save-commits such that all paths are cut by a save-commit or the
-      // speculator
-      llvm::DenseSet<Operation *> visited;
-      if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
-        return failure();
-    }
+    // Add save-commits such that all paths are cut by a save-commit or the
+    // speculator
+    llvm::DenseSet<Operation *> visited;
+    if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
+      return failure();
   }
 
   return success();
@@ -421,7 +416,7 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSaveCommits()))
     return failure();
 
-  // Find commits after save-commits placement is finalized
+  // Find commits after save-commit placement is finalized
   if (failed(findRegularCommits()))
     return failure();
   if (failed(findCommitsBetweenBBs()))
