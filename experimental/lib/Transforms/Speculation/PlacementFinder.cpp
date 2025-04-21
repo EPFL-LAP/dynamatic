@@ -153,52 +153,63 @@ getSpecRegionTraversalTargets(Operation *op) {
   return targets;
 }
 
-/// A commit unit is needed in front of certain ops.
-static bool isCommitNeeded(Operation *currOp) {
-  return isa<handshake::StoreOp>(currOp) ||
-         isa<handshake::MemoryControllerOp>(currOp) ||
-         isa<handshake::EndOp>(currOp);
-}
-
-/// Stop commit traversal if Commit, SaveCommit, or Speculator is encountered.
-static bool shouldStopFindingCommitsTraversal(SpeculationPlacements &placements,
-                                              OpOperand *currOpOperand) {
-  return placements.containsCommit(*currOpOperand) ||
-         placements.containsSaveCommit(*currOpOperand) ||
-         &placements.getSpeculatorPlacement() == currOpOperand;
-}
-
-void PlacementFinder::findRegularCommitsAndSCsTraversal(
+LogicalResult PlacementFinder::findRegularCommitsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
+  // All save units inside the speculative region are already converted to
+  // save-commits.
   if (placements.containsSave(currOpOperand)) {
-    // A Commit is needed in front of Save Operations. To allow for
-    // multiple loop speculation, SaveCommit units are used instead of
-    // consecutive Commit-Save units.
-    placements.addSaveCommit(currOpOperand);
-    placements.eraseSave(currOpOperand);
-    // Stop traversal when a SaveCommit is encountered
-    return;
+    currOp->emitError("Save units should not be reached");
+    return failure();
   }
-  if (isCommitNeeded(currOp)) {
+
+  // A commit unit is needed in front of these ops.
+  if (isa<handshake::StoreOp>(currOp) ||
+      isa<handshake::MemoryControllerOp>(currOp) ||
+      isa<handshake::EndOp>(currOp)) {
     placements.addCommit(currOpOperand);
     // Stop traversal.
-    return;
+    return success();
   }
 
   auto [_, isNewOp] = visited.insert(currOp);
 
   // End traversal if currOp is already in visited set
   if (!isNewOp)
-    return;
+    return success();
 
   for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
-    if (shouldStopFindingCommitsTraversal(placements, target))
+    // Stop further traversal if Commit, SaveCommit, or Speculator is
+    // encountered.
+    if (placements.containsCommit(currOpOperand) ||
+        placements.containsSaveCommit(currOpOperand) ||
+        &placements.getSpeculatorPlacement() == &currOpOperand)
       continue;
 
-    findRegularCommitsAndSCsTraversal(visited, *target);
+    if (failed(findRegularCommitsTraversal(visited, *target)))
+      return failure();
   }
+
+  return success();
+}
+
+LogicalResult PlacementFinder::findRegularCommits() {
+  OpOperand &specPos = placements.getSpeculatorPlacement();
+
+  // Share visited set with multiple traversals
+  llvm::DenseSet<Operation *> visited;
+
+  // Perform the traversal from the speculator position
+  if (failed(findRegularCommitsTraversal(visited, specPos)))
+    return failure();
+
+  // Perform the same traversal from the save-commit unit positions.
+  for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    if (failed(findRegularCommitsTraversal(visited, *scPos)))
+      return failure();
+  }
+  return success();
 }
 
 namespace {
@@ -305,68 +316,11 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   return success();
 }
 
-LogicalResult PlacementFinder::findRegularCommitsAndSCsFromSpeculator() {
-  OpOperand &specPos = placements.getSpeculatorPlacement();
-  if (!getLogicBB(specPos.getOwner())) {
-    specPos.getOwner()->emitError("Operation does not have a BB.");
-    return failure();
-  }
-
-  // We need to place a commit unit before (1) an exit unit; (2) a store
-  // unit; (3) a save unit if speculative tokens can reach them.
-  llvm::DenseSet<Operation *> visited;
-  findRegularCommitsAndSCsTraversal(visited, specPos);
-
-  return success();
-}
-
-LogicalResult PlacementFinder::findRegularCommitsFromSCsTraversal(
-    llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
-  Operation *currOp = currOpOperand.getOwner();
-
-  if (placements.containsSave(currOpOperand)) {
-    currOp->emitError(
-        "Save units should not be reached from the speculative region");
-    return failure();
-  }
-  if (isCommitNeeded(currOp)) {
-    placements.addCommit(currOpOperand);
-    // Stop traversal.
-    return success();
-  }
-
-  auto [_, isNewOp] = visited.insert(currOp);
-
-  // End traversal if currOp is already in visited set
-  if (!isNewOp)
-    return success();
-
-  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
-    if (shouldStopFindingCommitsTraversal(placements, target))
-      continue;
-
-    if (failed(findRegularCommitsFromSCsTraversal(visited, *target)))
-      return failure();
-  }
-
-  return success();
-}
-
-LogicalResult PlacementFinder::findRegularCommitsFromSCs() {
-  llvm::DenseSet<Operation *> visited;
-  // Perform the same traversal from the save-commit unit positions.
-  for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
-    if (failed(findRegularCommitsFromSCsTraversal(visited, *scPos)))
-      return failure();
-  }
-  return success();
-}
-
 // Traverse the speculator's BB from top to bottom (from the control merge
 // until the branches) and adds save-commits in such a way that every path is
 // cut by a save-commit or the speculator itself. Updates `placements`.
 LogicalResult
-PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
+PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                           Operation *currOp) {
   // End traversal if currOp is already in visited set
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
@@ -382,9 +336,16 @@ PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
     if (!succOpBB || succOpBB != specBB)
       return true;
 
-    // End traversal if the path is already cut by a commit or save-commit
-    if (placements.containsCommit(dstOpOperand) ||
-        placements.containsSaveCommit(dstOpOperand))
+    if (placements.containsSave(dstOpOperand)) {
+      // Convert save units in the loop to save-commits
+      placements.addSaveCommit(dstOpOperand);
+      placements.eraseSave(dstOpOperand);
+      // The path is cut by the save-commit and stop traversal
+      return true;
+    }
+
+    // End traversal if the path is already cut by another save-commit
+    if (placements.containsSaveCommit(dstOpOperand))
       return true;
 
     // End traversal if the path is already cut by the speculator
@@ -405,17 +366,14 @@ PlacementFinder::findSnapshotSCsTraversal(llvm::DenseSet<Operation *> &visited,
       placements.addSaveCommit(*target);
     } else {
       // Continue DFS traversal along the path
-      if (failed(findSnapshotSCsTraversal(visited, succOp)))
+      if (failed(findSaveCommitsTraversal(visited, succOp)))
         return failure();
     }
   }
   return success();
 }
 
-LogicalResult PlacementFinder::findSnapshotSCs() {
-  // There already exist save-commits which have been placed instead of
-  // consecutive save and commit units. Here, additional save commits are
-  // found
+LogicalResult PlacementFinder::findSaveCommits() {
   OpOperand &specPos = placements.getSpeculatorPlacement();
   auto funcOp = specPos.getOwner()->getParentOfType<handshake::FuncOp>();
   assert(funcOp && "op should have parent function");
@@ -447,7 +405,7 @@ LogicalResult PlacementFinder::findSnapshotSCs() {
       // Add save-commits such that all paths are cut by a save-commit or the
       // speculator
       llvm::DenseSet<Operation *> visited;
-      if (failed(findSnapshotSCsTraversal(visited, controlMergeOp)))
+      if (failed(findSaveCommitsTraversal(visited, controlMergeOp)))
         return failure();
     }
   }
@@ -459,14 +417,11 @@ LogicalResult PlacementFinder::findPlacements() {
   if (failed(findSavePositions()))
     return failure();
 
-  if (failed(findRegularCommitsAndSCsFromSpeculator()))
+  if (failed(findSaveCommits()))
     return failure();
 
-  if (failed(findSnapshotSCs()))
-    return failure();
-
-  // Find additional commits after save-commits placement is finalized
-  if (failed(findRegularCommitsFromSCs()))
+  // Find commits after save-commits placement is finalized
+  if (failed(findRegularCommits()))
     return failure();
   if (failed(findCommitsBetweenBBs()))
     return failure();
