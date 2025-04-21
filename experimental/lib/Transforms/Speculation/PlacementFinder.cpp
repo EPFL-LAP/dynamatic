@@ -144,6 +144,9 @@ getSpecRegionTraversalTargets(Operation *op) {
     for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
       targets.push_back(&dstOpOperand);
     }
+  } else if (isa<handshake::StoreOp>(op)) {
+    // Traversal ends here; edges to the memory controller are skipped
+    return {};
   } else {
     for (OpResult res : op->getResults()) {
       for (OpOperand &dstOpOperand : res.getUses()) {
@@ -327,49 +330,35 @@ PlacementFinder::findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
   if (auto [_, isNewOp] = visited.insert(currOp); !isNewOp)
     return success();
 
-  OpOperand &specPos = placements.getSpeculatorPlacement();
-  std::optional<unsigned> specBB = getLogicBB(specPos.getOwner());
-
-  // Verify conditions to stop the traversal on the current path
-  auto stopTraversalConditions = [&](OpOperand &dstOpOperand) -> bool {
-    // Stop traversal if we go outside the speculation BB
-    std::optional<unsigned> succOpBB = getLogicBB(dstOpOperand.getOwner());
-    if (!succOpBB || succOpBB != specBB)
-      return true;
-
-    if (placements.containsSave(dstOpOperand)) {
+  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
+    if (placements.containsSave(*target)) {
       // Convert save units in the loop to save-commits
-      placements.addSaveCommit(dstOpOperand);
-      placements.eraseSave(dstOpOperand);
+      placements.addSaveCommit(*target);
+      placements.eraseSave(*target);
       // The path is cut by the save-commit and stop traversal
-      return true;
+      continue;
     }
 
     // End traversal if the path is already cut by another save-commit
-    if (placements.containsSaveCommit(dstOpOperand))
-      return true;
+    if (placements.containsSaveCommit(*target))
+      continue;
 
     // End traversal if the path is already cut by the speculator
-    if (&dstOpOperand == &specPos)
-      return true;
-
-    // The traversal should continue on this path
-    return false;
-  };
-
-  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
-    if (stopTraversalConditions(*target))
+    OpOperand &specPos = placements.getSpeculatorPlacement();
+    if (target == &specPos)
       continue;
 
     Operation *succOp = target->getOwner();
     if (isa<handshake::ConditionalBranchOp>(succOp)) {
       // A SaveCommit is needed in front of the branch
       placements.addSaveCommit(*target);
-    } else {
-      // Continue DFS traversal along the path
-      if (failed(findSaveCommitsTraversal(visited, succOp)))
-        return failure();
+      // End traversal
+      continue;
     }
+
+    // Continue DFS traversal along the path
+    if (failed(findSaveCommitsTraversal(visited, succOp)))
+      return failure();
   }
   return success();
 }
