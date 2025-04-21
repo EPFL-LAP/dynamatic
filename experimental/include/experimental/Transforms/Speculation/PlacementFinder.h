@@ -42,11 +42,6 @@ private:
   /// Find save operations positions
   LogicalResult findSaves();
 
-  /// Additional commits prevent token reordering in multiple-BB cases.
-  /// Check arcs between BBs to determine if extra commits are needed to
-  /// solve out-of-order tokens
-  LogicalResult findCommitsBetweenBBs();
-
   /// Identifies positions of regular commits that prevent side effects.
   LogicalResult findRegularCommits();
 
@@ -55,6 +50,11 @@ private:
   LogicalResult
   findRegularCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                               OpOperand &currOpOperand);
+
+  /// Additional commits prevent token reordering in multiple-BB cases.
+  /// Check arcs between BBs to determine if extra commits are needed to
+  /// solve out-of-order tokens
+  LogicalResult findCommitsBetweenBBs();
 
   /// Identifies save-commit positions.
   LogicalResult findSaveCommits();
