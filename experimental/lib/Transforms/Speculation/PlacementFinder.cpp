@@ -255,6 +255,8 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   markSpeculativePathsForCommits(specPos.getOwner(), placements,
                                  speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    // Handle the case where a save-commit and commit are placed on the same
+    // edge.
     if (placements.containsCommit(*scPos))
       continue;
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
@@ -301,6 +303,8 @@ LogicalResult PlacementFinder::findCommitsBetweenBBs() {
   markSpeculativePathsForCommits(specPos.getOwner(), placements,
                                  speculativeEdges);
   for (OpOperand *scPos : placements.getPlacements<SpecSaveCommitOp>()) {
+    // Handle the case where a save-commit and commit are placed on the same
+    // edge.
     if (placements.containsCommit(*scPos))
       continue;
     markSpeculativePathsForCommits(scPos->getOwner(), placements,
