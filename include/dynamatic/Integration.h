@@ -132,12 +132,39 @@ static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4][Size5],
 //===----------------------------------------------------------------------===//
 
 #ifdef PRINT_PROFILING_INFO
+#include "stdint.h"
+#include <cassert>
 #include <iostream>
+#include <sstream>
+#include <string>
+
+template <typename T>
+std::string formatElement(const T &element) {
+  std::ostringstream oss;
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double> ||
+                std::is_same_v<T, int>) {
+    // We can use the default handler for printing float, double, and int.
+    oss << element;
+  } else if constexpr (std::is_same_v<T, int8_t> ||
+                       std::is_same_v<T, uint8_t> ||
+                       std::is_same_v<T, int16_t> ||
+                       std::is_same_v<T, uint16_t>) {
+    // C++ can correctly print the value of int, float, double, etc..  However,
+    // int8_t might be interpreted and printed as a char, so we need to cast it
+    // to an int before printing it to stdout (maybe also size_t?).
+    oss << static_cast<int>(element);
+  } else {
+    assert("false" &&
+           "Unsupported type for dumping argument! Please add it to the "
+           "formatElement function in dynamatic/Integration.h.");
+  }
+  return oss.str();
+}
 
 /// Writes the argument's directly to the stream.
 template <typename T>
 static void scalarPrinter(const T &arg, OS &os) {
-  os << arg << std::endl;
+  os << formatElement(arg) << std::endl;
 }
 
 /// Writes the array's content in row-major-order as a comma-separated list of
@@ -149,8 +176,8 @@ static void arrayPrinter(const T *arrayPtr, size_t size, OS &os) {
     return;
   }
   for (size_t idx = 0; idx < size - 1; ++idx)
-    os << arrayPtr[idx] << ",";
-  os << arrayPtr[size - 1] << std::endl;
+    os << formatElement(arrayPtr[idx]) << ",";
+  os << formatElement(arrayPtr[size - 1]) << std::endl;
 }
 
 /// After dumping the contents of all kernel arguments to stdout, calls the
