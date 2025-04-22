@@ -15,9 +15,8 @@
 #ifndef DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
 #define DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
 
-#include "Constraints.h"
-#include "FabricGeneration.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/MLIRContext.h"
 #include <cstddef>
 #include <filesystem>
 #include <string>
@@ -43,18 +42,11 @@ static constexpr llvm::StringLiteral SINK_READY_NAME("ready0");
 //   capabale of creating an infinite number of tokens will be created.
 // exact: determines if the sequence generator create exactly "nrOfTokens"
 //   tokens, or can non-determinstically create fewer tokens.
-LogicalResult createSmvFormalTestbench(
-    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
-    const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
-    const std::optional<
-        SmallVector<dynamatic::experimental::ElasticMiterConstraint *>>
-        &sequenceConstraints,
+std::string createSmvFormalTestbench(
+    const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
+    const SmallVector<std::pair<std::string, mlir::Type>> &results,
+    const std::string &modelSmvName, size_t nrOfTokens,
     bool generateExactNrOfTokens = false);
-
-// TODO
-LogicalResult createSmvSequenceLengthTestbench(
-    const std::filesystem::path &wrapperPath, const ElasticMiterConfig &config,
-    const std::string &modelSmvName, size_t nrOfTokens);
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
@@ -114,5 +106,43 @@ const std::string SMV_BOOL_INPUT_INF =
     "      TRUE : {TRUE, FALSE};\n"
     "    esac;\n"
     "    DEFINE valid0 := TRUE;\n\n";
+
+// SMV module for a sequence generator with an infinite number of tokens
+const std::string SMV_CTRL_INPUT_INF = "MODULE ctrl_input_inf(nReady0)\n"
+                                       "    DEFINE valid0 := TRUE;\n\n";
+
+// SMV module for a sequence generator with a finite number of tokens. The
+// actual number of generated tokens is non-determinstically set between 0
+// and (inclusive) max_tokens.
+const std::string SMV_CTRL_INPUT =
+    "MODULE bool_input(nReady0, max_tokens)\n"
+    "  VAR counter : 0..31;\n"
+    "  FROZENVAR exact_tokens : 0..max_tokens;\n"
+    "  ASSIGN\n"
+    "    init(counter) := 0;\n"
+    "    next(counter) := case\n"
+    "      nReady0 & counter < exact_tokens : counter + 1;\n"
+    "      TRUE : counter;\n"
+    "    esac;\n"
+    "\n"
+    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+
+// SMV module for a sequence generator with a finite number of tokens. The
+// number of generated tokens is exact_tokens.
+const std::string SMV_CTRL_INPUT_EXACT =
+    "MODULE bool_input_exact(nReady0, exact_tokens)\n"
+    "  VAR counter : 0..31;\n"
+    "  ASSIGN\n"
+    "    init(counter) := 0;\n"
+    "    next(counter) := case\n"
+    "      nReady0 & counter < exact_tokens : counter + 1;\n"
+    "      TRUE : counter;\n"
+    "    esac;\n"
+    "\n"
+    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+
+const std::string SMV_SINK = "MODULE sink(ins_valid)\n"
+                             "  DEFINE ready0 := TRUE;\n\n";
+
 } // namespace dynamatic::experimental
 #endif // DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
