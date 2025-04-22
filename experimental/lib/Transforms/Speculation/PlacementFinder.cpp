@@ -161,7 +161,7 @@ LogicalResult PlacementFinder::findRegularCommitsTraversal(
     llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand) {
   Operation *currOp = currOpOperand.getOwner();
 
-  // All save units inside the speculative region are already converted to
+  // All save units inside the speculative region should already be converted to
   // save-commits.
   if (placements.containsSave(currOpOperand)) {
     currOp->emitError("Save units should not be reached");
