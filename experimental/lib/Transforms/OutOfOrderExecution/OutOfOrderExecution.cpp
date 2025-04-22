@@ -26,6 +26,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include <assert.h>
 #include <cmath>
 #include <memory>
@@ -55,58 +56,70 @@ struct OutOfOrderExecutionPass
 private:
   // Step 1.1: Identify dirty nodes
   LogicalResult identifyDirtyNodes(Operation *outOfOrderOp,
-                                   llvm::DenseSet<Operation *> &dirtyNodes,
+                                   ClusterHierarchyNode *clusterNode,
                                    ClusterPosition position,
-                                   ClusterHierarchyNode *clusterNode);
+                                   llvm::DenseSet<Operation *> &dirtyNodes);
 
   // Step 1.2: Identfy unaligned edges
   LogicalResult identifyUnalignedEdges(Operation *outOfOrderOp,
                                        llvm::DenseSet<Operation *> &dirtyNodes,
                                        llvm::DenseSet<Value> &unalignedEdges);
 
+  LogicalResult
+  identifyUnalignedEdges2(const llvm::DenseSet<Value> &outOfOrderOpInputs,
+                          const llvm::DenseSet<Value> &outOfOrderOpOutputs,
+                          llvm::DenseSet<Operation *> &dirtyNodes,
+                          llvm::DenseSet<Value> &unalignedEdges);
+
   // Step 1.3: Identify tagged edges; i.e. the edges that should receive a tag
   LogicalResult identifyTaggedEdges(Operation *outOfOrderOp,
                                     llvm::DenseSet<Value> &unalignedEdges,
                                     llvm::DenseSet<Value> &taggedEdges);
 
+  LogicalResult
+  identifyTaggedEdges2(const llvm::DenseSet<Value> &outOfOrderOpInputs,
+                       const llvm::DenseSet<Value> &outOfOrderOpOutputs,
+                       llvm::DenseSet<Value> &unalignedEdges,
+                       llvm::DenseSet<Value> &taggedEdges);
+
   // Step 1.4: Add the tagger operations and connect them to the freeTagsFifo
   // and consumers Returns the output of teh fitrst tagger added to be used as
   // the select of the Aligner in case of a Controlled Aligner
-  Value addTaggers(OpBuilder builder, Operation *outOfOrderOp,
+  Value addTaggers(Operation *outOfOrderOp, OpBuilder builder,
+                   FreeTagsFifoOp &freeTagsFifo,
                    llvm::DenseSet<Value> &unalignedEdges,
-                   llvm::DenseSet<Value> &taggedEdges,
-                   FreeTagsFifoOp &freeTagsFifo);
+                   llvm::DenseSet<Value> &taggedEdges);
 
   // Add the untagger operations and connect them to consumers
   // DEPRECATED (now part of addAligner)
-  void addUntaggers(OpBuilder builder, Operation *outOfOrderOp,
+  void addUntaggers(Operation *outOfOrderOp, OpBuilder builder,
+                    FreeTagsFifoOp &freeTagsFifo,
                     llvm::DenseSet<Value> &unalignedEdges,
                     SmallVector<Value> &joinOperands,
-                    llvm::DenseSet<Operation *> &untaggers,
-                    FreeTagsFifoOp &freeTagsFifo);
+                    llvm::DenseSet<Operation *> &untaggers);
 
   // Step 1.6: Add the aligner
-  void addAligner(OpBuilder builder, Operation *outOfOrderOp, Value select,
+  void addAligner(Operation *outOfOrderOp, OpBuilder builder, Value select,
+                  int numTags, FreeTagsFifoOp &freeTagsFifo,
                   llvm::DenseSet<Value> &unalignedEdges,
                   SmallVector<Value> &joinOperands,
-                  llvm::DenseSet<Operation *> &untaggers,
-                  FreeTagsFifoOp &freeTagsFifo, int numTags);
+                  llvm::DenseSet<Operation *> &untaggers);
 
   // Step 1.7: Adds the FreeTagsFifo, Tagger and Untagger operations
   // Returns the FreeTagsFifo operation which uniquely identifies the tagged
   // region
-  Operation *addTagOperations(OpBuilder builder, Operation *outOfOrderOp,
-                              llvm::DenseSet<Operation *> &dirtyNodes,
+  Operation *addTagOperations(Operation *outOfOrderOp, OpBuilder builder,
+                              int numTags, bool controlled,
                               llvm::DenseSet<Value> &unalignedEdges,
                               llvm::DenseSet<Value> &taggedEdges,
-                              llvm::DenseSet<Operation *> &untaggers,
-                              int numTags, bool controlled);
+                              llvm::DenseSet<Operation *> &untaggers);
 
   // Step 1.8: Tag the channels in the tagged region
-  LogicalResult addTagSignalsToTaggedRegion(
-      handshake::FuncOp funcOp, const std::string &extraTag,
-      Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
-      int numTags);
+  LogicalResult
+  addTagSignalsToTaggedRegion(handshake::FuncOp funcOp, Operation *freeTagsFifo,
+                              int numTags, const std::string &extraTag,
+                              llvm::DenseSet<Operation *> &untaggers);
+  ;
 
   // MAIN: Apply the out-of-order execution methodology to all the out-of-order
   // nodes
@@ -117,8 +130,8 @@ private:
   LogicalResult applyClusteringLogic(handshake::FuncOp funcOp, MLIRContext *ctx,
                                      Operation *outOfOrderNode,
                                      ClusterHierarchyNode *clusterNode,
-                                     bool &tagged, int &tagIndex, int numTags,
-                                     bool controlled);
+                                     int numTags, bool controlled, bool &tagged,
+                                     int &tagIndex);
 
   // Apply the out-of-order execution methodology according to the clustering
   // position NoCluster, BeforeCluster, InsideCluster
@@ -164,15 +177,35 @@ dynamatic::experimental::outoforder::createOutOfOrderExecution() {
   return std::make_unique<OutOfOrderExecutionPass>();
 }
 
-static void traverseGraph(Operation *op,
-                          llvm::DenseSet<Operation *> &dirtyNodes,
+/**
+@brief Traverses the graph and marks dirty nodes, respecting cluster
+boundaries based on cluster position.
+@param op The starting operation to traverse from.
+@param dirtyNodes A set of dirty nodes that will be updated with the traversed
+operations.
+@param position The position relative to the cluster where the traversal is
+happening. It can be one of:
+    - ClusterPosition::BeforeCluster: Traverse before a cluster. This means
+      that the traversal will skip the inputs of the cluster and traverse its
+      outputs.
+    - ClusterPosition::InsideCluster: Traverse inside a cluster. Don't cross the
+      cluster's boundaries.
+@param clusterNode The current cluster with its inputs, outputs, and nested
+children.
+
+@note Memory operations (Memory Controller & LSQ), control and end operations
+are excluded from dirty nodes.
+*/
+static void traverseGraph(Operation *op, ClusterHierarchyNode *clusterNode,
                           ClusterPosition position,
-                          ClusterHierarchyNode *clusterNode) {
+                          llvm::DenseSet<Operation *> &dirtyNodes) {
   // Memory Operations (Memory Controller & LSQ) Control and End operations
   // should not be marked as a dirty node
+  // MUXes should also not be marked as dirty nodes because they naturally
+  // allign their inputs according to their select irrespectively of the tags
   if (dirtyNodes.find(op) != dirtyNodes.end() ||
       isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
-      isa<handshake::EndOp>(op))
+      isa<handshake::EndOp>(op) || isa<handshake::MuxOp>(op))
     return;
 
   dirtyNodes.insert(op);
@@ -181,46 +214,64 @@ static void traverseGraph(Operation *op,
   for (auto result : op->getResults()) {
     if (position == ClusterPosition::BeforeCluster) {
       // If the operation is before a cluster and we reach the inputs of the
-      // cluster, then we keep the cluster closed and skip to the outputs of the
-      // cluster
+      // cluster, then we keep the cluster closed and skip to the outputs of
+      // the cluster
       if (clusterNode->cluster.inputs.contains(result)) {
         for (auto clusterOutput : clusterNode->cluster.outputs) {
           for (auto *user : clusterOutput.getUsers()) {
-            traverseGraph(user, dirtyNodes, position, clusterNode);
+            traverseGraph(user, clusterNode, position, dirtyNodes);
           }
         }
       }
     } else {
       if (position == ClusterPosition::InsideCluster) {
-        // If the operation is inside a cluster, we need to stop checking at the
-        // outputs of the cluster
+        // If the operation is inside a cluster, we need to stop checking at
+        // the outputs of the cluster
         if (clusterNode->cluster.outputs.contains(result)) {
           continue;
         }
-        // If the cluster has any chilren cluster nested inside, we need to keep
-        // these clusters closed. So whenever we wncounter an input to anuy of
-        // these clusters, we skip to their outputs
+        // If the cluster has any children clusters nested inside, we need
+        // to keep these clusters closed. So whenever we encounter an input
+        // to any of these clusters, we skip to their outputs
         for (auto *nestedCluster : clusterNode->children) {
           if (nestedCluster->cluster.inputs.contains(result)) {
             for (auto clusterOutput : nestedCluster->cluster.outputs) {
               for (auto *user : clusterOutput.getUsers()) {
-                traverseGraph(user, dirtyNodes, position, clusterNode);
+                traverseGraph(user, clusterNode, position, dirtyNodes);
               }
             }
           }
         }
       }
+      // Continue traversing the graph through the operations reachable from the
+      // current operation This is done by traversing the results of the current
+      // operation and the users of these results
       for (auto *user : result.getUsers()) {
-        traverseGraph(user, dirtyNodes, position, clusterNode);
+        traverseGraph(user, clusterNode, position, dirtyNodes);
       }
     }
   }
 }
 
+/**
+@brief Identifies dirty nodes in the graph relative to a cluster.
+Starts from a given out-of-order operation and traverses the graph to mark the
+reachable nodes, while respecting cluster boundaries.
+
+@param outOfOrderOp The starting operation for traversal.
+@param clusterNode The current cluster with its inputs, outputs, and children.
+@param position The position relative to the cluster (BeforeCluster or
+InsideCluster).
+@param dirtyNodes Set to be populated with operations marked as dirty.
+
+@return Success result.
+@note The starting operation itself is excluded from the dirty set.
+*/
+
 LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
-    Operation *outOfOrderOp, llvm::DenseSet<Operation *> &dirtyNodes,
-    ClusterPosition position, ClusterHierarchyNode *clusterNode) {
-  traverseGraph(outOfOrderOp, dirtyNodes, position, clusterNode);
+    Operation *outOfOrderOp, ClusterHierarchyNode *clusterNode,
+    ClusterPosition position, llvm::DenseSet<Operation *> &dirtyNodes) {
+  traverseGraph(outOfOrderOp, clusterNode, position, dirtyNodes);
   dirtyNodes.erase(outOfOrderOp);
   return success();
 }
@@ -239,7 +290,7 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
     }
   }
 
-  // Add all the ouput edges of the out of order node, except those to a MC or
+  // Add all the output edges of the out of order node, except those to a MC or
   // LSQ, to the unaligned edges
   for (auto res : outOfOrderOp->getResults()) {
     bool edgeToMC = false;
@@ -254,6 +305,63 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
   return success();
 }
 
+/**
+@brief Identifies unaligned edges between dirty and non-dirty nodes.
+Marks operands of dirty nodes that are produced by non-dirty operations, as well
+as outputs of the out-of-order node that are not consumed by memory operations.
+
+@param outOfOrderOp The out-of-order operation being analyzed.
+@param dirtyNodes Set of operations already marked as dirty.
+@param unalignedEdges Set to be populated with values representing unaligned
+edges.
+
+@return Success result.
+@note Edges to memory controllers and LSQs are excluded from unaligned edges.
+*/
+
+LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges2(
+    const llvm::DenseSet<Value> &outOfOrderOpInputs,
+    const llvm::DenseSet<Value> &outOfOrderOpOutputs,
+    llvm::DenseSet<Operation *> &dirtyNodes,
+    llvm::DenseSet<Value> &unalignedEdges) {
+  // Backward edges from the dirty node
+  for (auto *dirtyNode : dirtyNodes) {
+    for (auto operand : dirtyNode->getOperands()) {
+      Operation *producer = operand.getDefiningOp();
+      // Identify edges that connect a non-dirty node to a dirty node
+      if (dirtyNodes.find(producer) == dirtyNodes.end() &&
+          !isa<handshake::MemoryControllerOp>(producer))
+        unalignedEdges.insert(operand);
+    }
+  }
+
+  // Add all the output edges of the out of order node, except those to a MC or
+  // LSQ, to the unaligned edges
+  for (auto res : outOfOrderOpOutputs) {
+    bool edgeToMC = false;
+    for (auto *user : res.getUsers()) {
+      if (isa<handshake::MemoryControllerOp>(user) ||
+          isa<handshake::LSQOp>(user))
+        edgeToMC = true;
+    }
+    if (!edgeToMC)
+      unalignedEdges.insert(res);
+  }
+  return success();
+}
+
+/**
+@brief Identifies which unaligned edges should be tagged for synchronization.
+Starts with unaligned edges, adds valid input edges of the out-of-order
+operation, and removes its outputs to isolate true tagged edges.
+
+@param outOfOrderOp The out-of-order operation being analyzed.
+@param unalignedEdges Set of previously identified unaligned edges.
+@param taggedEdges Set to be populated with values that need tagging.
+
+@return Success result.
+@note Excludes outputs of the out-of-order op and edges to memory operations.
+*/
 LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
     Operation *outOfOrderOp, llvm::DenseSet<Value> &unalignedEdges,
     llvm::DenseSet<Value> &taggedEdges) {
@@ -278,8 +386,39 @@ LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
   return success();
 }
 
-// Returns the result of the op that does not have an edge to memory (Memory
-// Controller & LSQ)
+LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges2(
+    const llvm::DenseSet<Value> &outOfOrderOpInputs,
+    const llvm::DenseSet<Value> &outOfOrderOpOutputs,
+    llvm::DenseSet<Value> &unalignedEdges, llvm::DenseSet<Value> &taggedEdges) {
+  // Step 1: Identify the Tagged Edges
+  taggedEdges =
+      llvm::DenseSet<Value>(unalignedEdges.begin(), unalignedEdges.end());
+
+  // Insert input edges (operands of outOfOrderOp)
+  for (Value operand : outOfOrderOpInputs) {
+    if (auto *prod = operand.getDefiningOp()) {
+      if (!isa<handshake::MemoryControllerOp>(prod) &&
+          !isa<handshake::LSQOp>(prod))
+        taggedEdges.insert(operand);
+    }
+  }
+
+  // Remove output edges (results of outOfOrderOp)
+  for (Value result : outOfOrderOpOutputs) {
+    taggedEdges.erase(result);
+  }
+
+  return success();
+}
+
+/**
+@brief Returns an output of the given operation that is not connected to memory.
+
+@param op The operation whose outputs are being checked.
+
+@return A result value not connected to memory, or the first result as fallback.
+@note Useful for routing tags or control signals away from memory paths.
+*/
 static Value returnNonMemoryOutput(Operation *op) {
   auto result = llvm::find_if(op->getResults(), [](auto res) {
     bool edgeToMem = llvm::any_of(res.getUsers(), [](auto *user) {
@@ -295,11 +434,27 @@ static Value returnNonMemoryOutput(Operation *op) {
   return op->getResults().front();
 }
 
+/**
+@brief Adds tag-related operations around an out-of-order operation to ensure
+synchronized dataflow using tagging logic. Constructs the tag generator,
+taggers, aligner, and untaggers as needed.
+
+@param outOfOrderOp The out-of-order operation being wrapped with tag logic.
+@param builder The OpBuilder used to create new operations.
+@param numTags Number of unique tags available for synchronization.
+@param controlled Whether the aligner should be controlled based on the progrem
+order or free same as out-of-order order
+@param unalignedEdges Set of values representing unaligned edges needing
+tagging.
+@param taggedEdges Set of edges determined to require tagging.
+@param untaggers Set to be populated with created untagger operations.
+
+@return The FreeTagsFifo operation used to generate and recycle tag values.
+*/
 Operation *OutOfOrderExecutionPass::addTagOperations(
-    OpBuilder builder, Operation *outOfOrderOp,
-    llvm::DenseSet<Operation *> &dirtyNodes,
+    Operation *outOfOrderOp, OpBuilder builder, int numTags, bool controlled,
     llvm::DenseSet<Value> &unalignedEdges, llvm::DenseSet<Value> &taggedEdges,
-    llvm::DenseSet<Operation *> &untaggers, int numTags, bool controlled) {
+    llvm::DenseSet<Operation *> &untaggers) {
 
   // Step 1: Add the FreeTagsFifo that generates the tags
 
@@ -318,18 +473,17 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   // Step 2: Add the Tagger Operations
   // For each tagged edge, create a Tagger operation that is fed from this
   // tagged edge and the FreeTagsFifo
-  Value taggedOutput = addTaggers(builder, outOfOrderOp, unalignedEdges,
-                                  taggedEdges, freeTagsFifo);
+  Value taggedOutput = addTaggers(outOfOrderOp, builder, freeTagsFifo,
+                                  unalignedEdges, taggedEdges);
   assert(taggedOutput && "At least one tagger should be created");
 
   SmallVector<Value> joinOperands;
   // Step 4: Add the Untagger Operations
-  // addUntaggers(builder, outOfOrderOp, unalignedEdges, joinOperands,
-  // untaggers,
-  //             freeTagsFifo);
+  // addUntaggers(outOfOrderOp, builder, freeTagsFifo, unalignedEdges,
+  // joinOperands, untaggers);
 
   // The select of the Aligner is:
-  // (1) Free Aligner: the ouput of the out-of-order node
+  // (1) Free Aligner: the output of the out-of-order node
   // (2) Controlled Aligner: the output of the first tagger
   Value select = outOfOrderOp->getResults().front();
   if (!controlled) {
@@ -339,8 +493,8 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   }
 
   // Step 3: Add the Aligner Operation
-  addAligner(builder, outOfOrderOp, select, unalignedEdges, joinOperands,
-             untaggers, freeTagsFifo, numTags);
+  addAligner(outOfOrderOp, builder, select, numTags, freeTagsFifo,
+             unalignedEdges, joinOperands, untaggers);
 
   // If more than on untagger was created, then join them and feed the
   // result of the join (the free tag) back into the freeTagsFifo. Else, feed
@@ -359,11 +513,24 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   return freeTagsFifo.getOperation();
 }
 
-Value OutOfOrderExecutionPass::addTaggers(OpBuilder builder,
-                                          Operation *outOfOrderOp,
+/**
+@brief Creates Tagger operations for all tagged edges and connects them to their
+consumers. Each Tagger pairs the original data with a tag from the FreeTagsFifo
+and replaces direct data uses with the tagged output.
+
+@param outOfOrderOp The operation being wrapped with taggers.
+@param builder The builder used to insert Tagger operations.
+@param freeTagsFifo The tag source providing tag values to taggers.
+@param unalignedEdges Set of unaligned edges to be updated with tagged outputs.
+@param taggedEdges Set of edges that require tagging.
+
+@return The output of the first created Tagger operation.
+*/
+Value OutOfOrderExecutionPass::addTaggers(Operation *outOfOrderOp,
+                                          OpBuilder builder,
+                                          FreeTagsFifoOp &freeTagsFifo,
                                           llvm::DenseSet<Value> &unalignedEdges,
-                                          llvm::DenseSet<Value> &taggedEdges,
-                                          FreeTagsFifoOp &freeTagsFifo) {
+                                          llvm::DenseSet<Value> &taggedEdges) {
   // Step 3: Add the Tagger Operations
   // For each tagged edge, create a Tagger operation that is fed from this
   // tagged edge and the FreeTagsFifo
@@ -394,10 +561,21 @@ Value OutOfOrderExecutionPass::addTaggers(OpBuilder builder,
   return firstTaggerOutput;
 }
 
+/**
+@brief Inserts Untagger operations for all unaligned edges, extracting tags
+to be joined and reused. Rewires data consumers to use untagged outputs.
+
+@param outOfOrderOp The operation around which tagging logic is inserted.
+@param builder The builder used to create Untagger operations.
+@param freeTagsFifo The tag source (used for type consistency).
+@param unalignedEdges The set of edges that must be untagged.
+@param joinOperands A list to be filled with tag outputs of untaggers.
+@param untaggers A set to be populated with created untagger operations.
+*/
 void OutOfOrderExecutionPass::addUntaggers(
-    OpBuilder builder, Operation *outOfOrderOp,
+    Operation *outOfOrderOp, OpBuilder builder, FreeTagsFifoOp &freeTagsFifo,
     llvm::DenseSet<Value> &unalignedEdges, SmallVector<Value> &joinOperands,
-    llvm::DenseSet<Operation *> &untaggers, FreeTagsFifoOp &freeTagsFifo) {
+    llvm::DenseSet<Operation *> &untaggers) {
   for (auto edge : unalignedEdges) {
     UntaggerOp untaggerOp = builder.create<handshake::UntaggerOp>(
         edge.getLoc(), edge.getType(), freeTagsFifo.getTagOut().getType(),
@@ -415,13 +593,24 @@ void OutOfOrderExecutionPass::addUntaggers(
   }
 }
 
-void OutOfOrderExecutionPass::addAligner(OpBuilder builder,
-                                         Operation *outOfOrderOp, Value select,
-                                         llvm::DenseSet<Value> &unalignedEdges,
-                                         SmallVector<Value> &joinOperands,
-                                         llvm::DenseSet<Operation *> &untaggers,
-                                         FreeTagsFifoOp &freeTagsFifo,
-                                         int numTags) {
+/**
+@brief Adds an aligner to synchronize unaligned edges using tag-based routing.
+Each edge is routed through a Demux-Mux pair controlled by tag signals derived
+from the select value and the edge itself.
+
+@param outOfOrderOp The operation being aligned.
+@param builder The builder used to insert the aligner logic.
+@param select The value used as the select signal for the aligner.
+@param numTags The total number of tags used in the tagging scheme.
+@param freeTagsFifo The FIFO providing tag types.
+@param unalignedEdges The set of edges requiring alignment.
+@param joinOperands Populated with tags from edge untaggers for joining.
+@param untaggers Collects all Untagger operations created during alignment.
+*/
+void OutOfOrderExecutionPass::addAligner(
+    Operation *outOfOrderOp, OpBuilder builder, Value select, int numTags,
+    FreeTagsFifoOp &freeTagsFifo, llvm::DenseSet<Value> &unalignedEdges,
+    SmallVector<Value> &joinOperands, llvm::DenseSet<Operation *> &untaggers) {
   builder.setInsertionPoint(outOfOrderOp);
   // Untag the select of the aligner to get the tag flow
   UntaggerOp selectUntagger = builder.create<handshake::UntaggerOp>(
@@ -467,6 +656,18 @@ void OutOfOrderExecutionPass::addAligner(OpBuilder builder,
   }
 }
 
+/**
+@brief Adds a tag signal to a value's type if not already present.
+The tag is appended as an extra signal (e.g., in ChannelType or ControlType).
+
+@param value The value to which the tag signal is to be added.
+@param extraTag The name of the tag signal.
+@param numTags The number of distinct tags; used to compute tag bit width.
+
+@return success if the tag was added or already present, failure otherwise.
+
+@note The value's type must implement ExtraSignalsTypeInterface.
+*/
 static LogicalResult addTagToValue(Value value, const std::string &extraTag,
                                    int numTags) {
   OpBuilder builder(value.getContext());
@@ -489,6 +690,27 @@ static LogicalResult addTagToValue(Value value, const std::string &extraTag,
   return failure();
 }
 
+/**
+@brief Recursively traverses operations starting from a given operand, adding a
+tag signal to each operand's value along the way through.
+
+@param opOperand The operand whose operation will be processed.
+@param visited A set of visited operations to avoid reprocessing the same
+operation.
+@param extraTag The tag signal to be added to operands' values.
+@param freeTagsFifo The operation that provides the free tags for tagging.
+@param untaggers A set of untagger operations to stop the traversal if
+encountered.
+@param numTags The total number of distinct tags; used to determine the tag
+signal size.
+
+@return success if the tag was added to operands recursively, failure if any
+error occurs during the process.
+
+@note The traversal stops if an `EndOp`, `FreeTagsFifoOp`, or an already visited
+operation is encountered. Special handling is provided for specific operation
+types, including `UntaggerOp` and `LoadOp`.
+*/
 static LogicalResult
 addTagSignalsRecursive(OpOperand &opOperand,
                        llvm::DenseSet<Operation *> &visited,
@@ -579,10 +801,26 @@ addTagSignalsRecursive(OpOperand &opOperand,
   return success();
 }
 
+/**
+@brief Adds tag signals to all operands within a tagged region starting from a
+TaggerOp. The traversal continues until all operations
+within the tagged region have been processed, and the tag is applied to their
+operands' values.
+
+@param funcOp The function containing the operations to be processed.
+@param freeTagsFifo The `FreeTagsFifoOp` operation providing free tags used for
+tagging.
+@param numTags The total number of distinct tags; used to determine the size of
+the tag signal.
+@param extraTag The additional tag signal to be added to operands' values.
+@param untaggers A set of untagger operations that should not be tagged.
+
+@return success if the tag signals were successfully added, failure if an error
+occurred during the process.
+*/
 LogicalResult OutOfOrderExecutionPass::addTagSignalsToTaggedRegion(
-    handshake::FuncOp funcOp, const std::string &extraTag,
-    Operation *freeTagsFifo, llvm::DenseSet<Operation *> &untaggers,
-    int numTags) {
+    handshake::FuncOp funcOp, Operation *freeTagsFifo, int numTags,
+    const std::string &extraTag, llvm::DenseSet<Operation *> &untaggers) {
   llvm::DenseSet<Operation *> visited;
   // A TaggerOp marks the beginning of the tagged region, so we use it as a
   // starting point for tagging
@@ -612,14 +850,36 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   // Step 1: Identify the clusters
   std::vector<Cluster> clusters = identifyClusters(funcOp, ctx);
 
+  // llvm::errs() << "Number of clusters: " << clusters.size() << "\n";
+  // llvm::errs() << "Clusters identified: \n";
+  // for (auto &cluster : clusters) {
+  //   cluster.print(llvm::errs());
+  //   llvm::errs() << "\n";
+  //   llvm::errs() << "\n";
+  // }
+
   // Step 2: Check validity of the clusters
   if (failed(verifyClusters(clusters)))
     return failure();
+
+  llvm::errs() << "Number of clusters: " << clusters.size() << "\n";
+  llvm::errs() << "Printing clusters: \n";
+  for (auto &cluster : clusters) {
+    cluster.print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "DOne rinting clusters \n";
 
   // Step 3: Build the cluster hierarchy, returning the leaf nodes (innermost
   // clusters)
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
+
+  // llvm::errs() << "Hierarchy built: \n";
+  // for (auto &clusterNode : hierarchyNodes) {
+  //   clusterNode->cluster.print(llvm::errs());
+  //   llvm::errs() << "\n";
+  // }
 
   // Step 4: Apply the out-of-order execution methodology to each ot-of-order
   // node with respect to each innermost cluster
@@ -629,8 +889,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
     bool tagged = false;
     for (auto &clusterNode : hierarchyNodes) {
-      if (failed(applyClusteringLogic(funcOp, ctx, op, clusterNode, tagged,
-                                      tagIndex, numTags, controlled)))
+      if (failed(applyClusteringLogic(funcOp, ctx, op, clusterNode, numTags,
+                                      controlled, tagged, tagIndex)))
         return failure();
 
       // TODO: check correctness
@@ -648,12 +908,17 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
     }
   }
   return success();
+
+  // Free the cluster hierarchy nodes
+  for (auto &clusterNode : hierarchyNodes) {
+    delete clusterNode;
+  }
 }
 
 LogicalResult OutOfOrderExecutionPass::applyClusteringLogic(
     handshake::FuncOp funcOp, MLIRContext *ctx, Operation *outOfOrderNode,
-    ClusterHierarchyNode *clusterNode, bool &tagged, int &tagIndex, int numTags,
-    bool controlled) {
+    ClusterHierarchyNode *clusterNode, int numTags, bool controlled,
+    bool &tagged, int &tagIndex) {
   Cluster &cluster = clusterNode->cluster;
 
   // Case 1: The out-of-order node is inside a cluster
@@ -667,14 +932,37 @@ LogicalResult OutOfOrderExecutionPass::applyClusteringLogic(
       return failure();
     tagged = true;
 
+    llvm::errs() << "Printing after inner cluster: \n";
+    for (auto *op : clusterNode->cluster.internalNodes) {
+      op->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
+    llvm::errs() << "\n";
+    llvm::errs() << "\n";
+
+    for (auto input : clusterNode->cluster.inputs) {
+      llvm::errs() << "Input: ";
+      input.print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    llvm::errs() << "\n";
+    llvm::errs() << "\n";
+    for (auto output : clusterNode->cluster.outputs) {
+      llvm::errs() << "Output: ";
+      output.print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+
     // After taking care of the out-of-order node, we need to apply the
-    // heirarchical alignment algorithm to the cluster by recrsively considering
-    // the cluster as an out-of-order node inside its parent cluster. This is
-    // done by calling the applyHeirarchicalAlignment
+    // heirarchical alignment algorithm to the cluster by recursively
+    // considering the cluster as an out-of-order node inside its parent
+    // cluster. This is done by calling the applyHeirarchicalAlignment
     if (failed(applyHeirarchicalAlignment(funcOp, ctx, clusterNode,
                                           clusterNode->parent, tagIndex,
                                           numTags, controlled)))
       return failure();
+
   }
 
   // Case 2: The out-of-order node is before a cluster
@@ -689,8 +977,8 @@ LogicalResult OutOfOrderExecutionPass::applyClusteringLogic(
     // where it will fall into the inside cluster case
     if (clusterNode->parent) {
       if (failed(applyClusteringLogic(funcOp, ctx, outOfOrderNode,
-                                      clusterNode->parent, tagged, tagIndex,
-                                      numTags, controlled)))
+                                      clusterNode->parent, numTags, controlled,
+                                      tagged, tagIndex)))
         return failure();
     } else {
       // If the cluster is the outermost one, then we  need to apply
@@ -703,17 +991,15 @@ LogicalResult OutOfOrderExecutionPass::applyClusteringLogic(
         return failure();
       tagged = true;
     }
-
   }
-
   // Case 3: The out-of-order node is after a cluster
   // In this case, there is no relation bwetween the out-of-order node and the
   // cluster, so we go up the heirarchy to the parent cluster and apply the
   // clustering logic there
   else if (clusterNode->parent) {
     if (failed(applyClusteringLogic(funcOp, ctx, outOfOrderNode,
-                                    clusterNode->parent, tagged, tagIndex,
-                                    numTags, controlled)))
+                                    clusterNode->parent, numTags, controlled,
+                                    tagged, tagIndex)))
       return failure();
   }
 
@@ -727,8 +1013,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
 
   // Step 1: Identify the dirty nodes
   llvm::DenseSet<Operation *> dirtyNodes;
-  if (failed(identifyDirtyNodes(outOfOrderNode, dirtyNodes, position,
-                                clusterNode)))
+  if (failed(identifyDirtyNodes(outOfOrderNode, clusterNode, position,
+                                dirtyNodes)))
     return failure();
 
   // Step 2: Identify the unaligned edges
@@ -747,16 +1033,16 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
   OpBuilder builder(ctx);
   llvm::DenseSet<Operation *> untaggers;
   Operation *freeTagsFifo =
-      addTagOperations(builder, outOfOrderNode, dirtyNodes, unalignedEdges,
-                       taggedEdges, untaggers, numTags, controlled);
+      addTagOperations(outOfOrderNode, builder, numTags, controlled,
+                       unalignedEdges, taggedEdges, untaggers);
 
   if (!freeTagsFifo)
     return failure();
 
   // Step 5: Tag the channels in the tagged region
   std::string extraTag = "tag" + std::to_string(tagIndex++);
-  if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, freeTagsFifo,
-                                         untaggers, numTags)))
+  if (failed(addTagSignalsToTaggedRegion(funcOp, freeTagsFifo, numTags,
+                                         extraTag, untaggers)))
     return failure();
 
   return success();
@@ -782,21 +1068,32 @@ LogicalResult OutOfOrderExecutionPass::applyHeirarchicalAlignment(
     Operation *clusterOutputOp = clusterOutput.getDefiningOp();
 
     // Step 1: Identify the dirty nodes
-    if (failed(identifyDirtyNodes(clusterOutputOp, dirtyNodes,
-                                  ClusterPosition::InsideCluster,
-                                  outerCluster)))
+    if (failed(identifyDirtyNodes(clusterOutputOp, outerCluster,
+                                  ClusterPosition::InsideCluster, dirtyNodes)))
       return failure();
 
-    // Step 2: Identify the unaligned edges
-    if (failed(identifyUnalignedEdges(clusterOutputOp, dirtyNodes,
-                                      unalignedEdges)))
-      return failure();
+    // // Step 2: Identify the unaligned edges
+    // if (failed(identifyUnalignedEdges(clusterOutputOp, dirtyNodes,
+    //                                   unalignedEdges)))
+    //   return failure();
 
-    // Step 3: Identify the tagged edges
-    if (failed(
-            identifyTaggedEdges(clusterOutputOp, unalignedEdges, taggedEdges)))
-      return failure();
+    // // Step 3: Identify the tagged edges
+    // if (failed(
+    //         identifyTaggedEdges(clusterOutputOp, unalignedEdges,
+    //         taggedEdges)))
+    //   return failure();
   }
+  // Step 2: Identify the unaligned edges
+  if (failed(identifyUnalignedEdges2(innerCluster->cluster.inputs,
+                                     innerCluster->cluster.outputs, dirtyNodes,
+                                     unalignedEdges)))
+    return failure();
+
+  // Step 3: Identify the tagged edges
+  if (failed(identifyTaggedEdges2(innerCluster->cluster.inputs,
+                                  innerCluster->cluster.outputs, unalignedEdges,
+                                  taggedEdges)))
+    return failure();
 
   // After identifying the tagged and unaligned edges of the cluster, we add the
   // out-of-order operations
@@ -806,16 +1103,16 @@ LogicalResult OutOfOrderExecutionPass::applyHeirarchicalAlignment(
   // Step 4: Add the tagger and untagger operations and connect them to the
   // freeTagsFifo
   Operation *freeTagsFifo = addTagOperations(
-      builder, innerCluster->cluster.outputs.begin()->getDefiningOp(),
-      dirtyNodes, unalignedEdges, taggedEdges, untaggers, numTags, false);
+      innerCluster->cluster.outputs.begin()->getDefiningOp(), builder, numTags,
+      false, unalignedEdges, taggedEdges, untaggers);
 
   if (!freeTagsFifo)
     return failure();
 
   // Step 5: Tag the channels in the tagged region
   std::string extraTag = "tag" + std::to_string(tagIndex++);
-  if (failed(addTagSignalsToTaggedRegion(funcOp, extraTag, freeTagsFifo,
-                                         untaggers, numTags)))
+  if (failed(addTagSignalsToTaggedRegion(funcOp, freeTagsFifo, numTags,
+                                         extraTag, untaggers)))
     return failure();
 
   // Apply the hierearchical alignment recursively to the parent (outer) cluster

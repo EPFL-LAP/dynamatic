@@ -74,6 +74,19 @@ static void findOpsBetweenOpsRecursive(Operation *currentOp,
   if (visited.contains(currentOp))
     return;
 
+  // Memory operations are excluded from the search
+  if (isa<handshake::MemoryControllerOp>(currentOp) ||
+      isa<handshake::LSQOp>(currentOp)) {
+    return;
+  }
+  // llvm::errs() << "Current Op: ";
+  // currentOp->print(llvm::errs());
+  // llvm::errs() << "\n";
+
+  // if (isa<handshake::MergeOp>(currentOp)) {
+  //   llvm::errs() << "MERGE!\n";
+  // }
+
   visited.insert(currentOp);
 
   if (end.contains(currentOp))
@@ -198,8 +211,8 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
 
   // Step 3: Create clusters for each condition
 
-  // IMPORTANT REMARK: THe generators of the condition is considered as an
-  // external to teh cluster and NOT inside it. This is to ensure that the
+  // IMPORTANT REMARK: The generators of the condition are considered as
+  // external to the cluster and NOT inside it. This is to ensure that the
   // clusters relationship property (disjoint, completely nested) is not
   // violated
   for (auto &pair : condToMuxes) {
@@ -239,6 +252,10 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
       }
 
       for (auto branchOp : condToBranches[cond]) {
+        // branchOp.getTrueResult().print(llvm::errs());
+        // llvm::errs() << "\n";
+        // branchOp.getFalseResult().print(llvm::errs());
+        // llvm::errs() << "\n";
         outputs.insert(branchOp.getTrueResult());
         outputs.insert(branchOp.getFalseResult());
       }
@@ -247,8 +264,8 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
       // the inputs and outputs, but this is wrong We need to remove them from
       // the inputs and outputs
 
-      // 1. Find the backward edges aka teh common values between the inputs and
-      // ou
+      // 1. Find the backward edges aka the common values between the inputs and
+      // outputs
       llvm::DenseSet<Value> backwardEdges;
       for (Value v : inputs) {
         if (outputs.contains(v))
@@ -261,8 +278,23 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
         outputs.erase(v);
       }
 
-      Cluster cluster(inputs, outputs, internalNodes);
-      clusters.push_back(cluster);
+      for (auto muxOp : muxOps) {
+        Value select = muxOp.getSelectOperand();
+        if (handshake::MergeOp merge =
+                dyn_cast<handshake::MergeOp>(select.getDefiningOp())) {
+          if (internalNodes.contains(merge.getOperation())) {
+            // If the MUX is fed by a MergeOp, then we need to remove the
+            // MergeOp and teh operations feeding it from the cluster
+            internalNodes.erase(merge.getOperation());
+            for (auto operand : merge.getOperands()) {
+              if (internalNodes.contains(operand.getDefiningOp())) {
+                internalNodes.erase(operand.getDefiningOp());
+              }
+            }
+          }
+        }
+      }
+
     } else {
       // Case 1.2 : if/else statement
       // BRANCHes then MUXes
@@ -332,15 +364,14 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
 }
 
 std::vector<ClusterHierarchyNode *> outoforder::getInnermostNodes(
-    const std::vector<std::unique_ptr<ClusterHierarchyNode>> &nodes) {
+    const std::vector<ClusterHierarchyNode *> &nodes) {
 
   std::vector<ClusterHierarchyNode *> innermostNodes;
 
   // Traverse all nodes and add the leaf nodes
   for (const auto &node : nodes) {
-    if (node->isLeaf()) {
-      innermostNodes.push_back(node.get());
-    }
+    if (node->isLeaf())
+      innermostNodes.push_back(node);
   }
 
   return innermostNodes;
@@ -355,14 +386,14 @@ outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
                return a.internalNodes.size() < b.internalNodes.size();
              });
 
-  std::vector<std::unique_ptr<ClusterHierarchyNode>> nodes;
+  std::vector<ClusterHierarchyNode *> nodes;
 
   // Pre-allocate memory
   nodes.reserve(clusters.size());
 
   // Create node wrappers
   for (const auto &cluster : clusters)
-    nodes.push_back(std::make_unique<ClusterHierarchyNode>(cluster));
+    nodes.push_back(new ClusterHierarchyNode(cluster));
 
   // For each node, find its immediate parent
   // We know that since the clusters are sorted by size, then every 2
@@ -378,13 +409,12 @@ outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
 
         // If so, set the parent of Ci to Cj
         // and add Ci as a child of Cj
-        nodes[i]->parent = nodes[j].get();
-        nodes[j]->children.push_back(nodes[i].get());
+        nodes[i]->parent = nodes[j];
+        nodes[j]->children.push_back(nodes[i]);
         break; // Only one parent possible
       }
     }
   }
 
-  // Now return the innermost nodes (leaf nodes)
   return getInnermostNodes(nodes);
 }

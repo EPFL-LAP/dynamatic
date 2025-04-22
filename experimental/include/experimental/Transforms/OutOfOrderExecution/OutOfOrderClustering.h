@@ -77,6 +77,23 @@ struct Cluster {
 
     return false;
   }
+
+  void print(llvm::raw_ostream &os) const {
+    os << "Cluster: \n";
+    os << "Inputs: ";
+    for (auto input : inputs) {
+      os << input << "\n";
+    }
+    os << "\nOutputs: ";
+    for (auto output : outputs) {
+      os << output << "\n";
+    }
+    os << "\nInternal Nodes: ";
+    for (auto *node : internalNodes) {
+      os << *node << "\n";
+    }
+    os << "\n";
+  }
 };
 
 // This is a tree strcuture to represent the hierarchy of clusters
@@ -111,8 +128,9 @@ LogicalResult verifyClusters(std::vector<Cluster> &clusters);
 // Retrieves the innermost nodes from the cluster hierarchy, which are the nodes
 // that have no children. These nodes represent the lowest level of nesting in
 // the hierarchy.
-std::vector<ClusterHierarchyNode *> getInnermostNodes(
-    const std::vector<std::unique_ptr<ClusterHierarchyNode>> &nodes);
+// Returns a vector of dynamically allocated ClusterHierarchyNode pointers,
+std::vector<ClusterHierarchyNode *>
+getInnermostNodes(const std::vector<ClusterHierarchyNode *> &nodes);
 
 /// Builds a hierarchy of nested clusters from a flat list of clusters.
 ///
@@ -122,6 +140,7 @@ std::vector<ClusterHierarchyNode *> getInnermostNodes(
 /// represents a cluster and links to its nested (child) clusters.
 // The return of this function is the leaf nodes of the hierarchy, which are
 // the innermost clusters.
+// Returns a vector of dynamically allocated ClusterHierarchyNode pointers,
 std::vector<ClusterHierarchyNode *>
 buildClusterHierarchy(std::vector<Cluster> &clusters);
 
