@@ -268,18 +268,18 @@ void BufferPlacementMILP::addBufferTimingConstraints(Value channel,
   
   if (signal == SignalType::DATA || signal == SignalType::VALID) {
     // For DATA and VALID, add READY buffer delay to 'after'
-    if (channelVars.signalVars.count(SignalType::READY)) {
-      bufsAfterDelay = channelVars.signalVars[SignalType::READY].bufPresent * 
+    if (chVars.signalVars.count(SignalType::READY)) {
+      bufsAfterDelay = chVars.signalVars[SignalType::READY].bufPresent * 
                        getCombinationalDelay(channel, SignalType::READY, bufModel);
     }
   } else if (signal == SignalType::READY) {
     // For READY, add DATA and VALID buffer delays to 'before'
-    if (channelVars.signalVars.count(SignalType::DATA)) {
-      bufsBeforeDelay += channelVars.signalVars[SignalType::DATA].bufPresent * 
+    if (chVars.signalVars.count(SignalType::DATA)) {
+      bufsBeforeDelay += chVars.signalVars[SignalType::DATA].bufPresent * 
                          getCombinationalDelay(channel, SignalType::DATA, bufModel);
     }
-    if (channelVars.signalVars.count(SignalType::VALID)) {
-      bufsBeforeDelay += channelVars.signalVars[SignalType::VALID].bufPresent * 
+    if (chVars.signalVars.count(SignalType::VALID)) {
+      bufsBeforeDelay += chVars.signalVars[SignalType::VALID].bufPresent * 
                          getCombinationalDelay(channel, SignalType::VALID, bufModel);
     }
   }
@@ -386,14 +386,13 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
 }
 
 void BufferPlacementMILP::addChannelElasticityConstraints(Value channel) {
-  ChannelVars &channelVars = vars.channelVars[channel];
-  GRBVar &tIn = channelVars.elastic.tIn;
-  GRBVar &tOut = channelVars.elastic.tOut;
-  GRBVar &bufPresent = channelVars.bufPresent;
-  GRBVar &bufNumSlots = channelVars.bufNumSlots;
+  ChannelVars &chVars = vars.channelVars[channel];
+  GRBVar &tIn = chVars.elastic.tIn;
+  GRBVar &tOut = chVars.elastic.tOut;
+  GRBVar &bufNumSlots = chVars.bufNumSlots;
 
-  auto dataIt = channelVars.signalVars.find(SignalType::DATA);
-  if (dataIt != channelVars.signalVars.end()) {
+  auto dataIt = chVars.signalVars.find(SignalType::DATA);
+  if (dataIt != chVars.signalVars.end()) {
     GRBVar &dataBuf = dataIt->second.bufPresent;
     // If there is a data buffer on the channel, the channel elastic
     // arrival time at the output must be greater than at the input
@@ -401,24 +400,24 @@ void BufferPlacementMILP::addChannelElasticityConstraints(Value channel) {
   }
 
   // If DATA and VALID signals both exist, they must be buffered together
-  if (channelVars.signalVars.count(SignalType::DATA) && 
-      channelVars.signalVars.count(SignalType::VALID)) {
-    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
-    GRBVar &validBuf = channelVars.signalVars[SignalType::VALID].bufPresent;
+  if (chVars.signalVars.count(SignalType::DATA) && 
+      chVars.signalVars.count(SignalType::VALID)) {
+    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
     model.addConstr(dataBuf == validBuf, "elastic_data_valid_same");  
   }
 
   // If VALID and READY signals both exist, there must be enough slots for both buffers
   // Note: This will be removed in the future
-  if (channelVars.signalVars.count(SignalType::VALID) && 
-      channelVars.signalVars.count(SignalType::READY)) {
-    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
-    GRBVar &validBuf = channelVars.signalVars[SignalType::VALID].bufPresent;
-    GRBVar &readyBuf = channelVars.signalVars[SignalType::READY].bufPresent;
+  if (chVars.signalVars.count(SignalType::VALID) && 
+      chVars.signalVars.count(SignalType::READY)) {
+    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
+    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     model.addConstr(dataBuf + readyBuf <= bufNumSlots, "elastic_slots");
     model.addConstr(validBuf + readyBuf <= bufNumSlots, "elastic_slots");
   } else {
-    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
     model.addConstr(dataBuf <= bufNumSlots, "elastic_slots");
   }
 }
