@@ -28,7 +28,14 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::outoforder;
 
-// Helper function to check if a value leads to a SinkOp or StoreOp
+/**
+ * @brief Checks if a value eventually leads to a SinkOp or StoreOp.
+ *
+ * @param value     The starting value.
+ * @param visited   Tracks visited values to prevent cycles.
+ *
+ * @return True if a SinkOp or StoreOp is reachable, false otherwise.
+ */
 static bool leadsToSinkOrStore(Value value, llvm::DenseSet<Value> &visited) {
   if (visited.contains(value))
     return false;
@@ -50,7 +57,12 @@ static bool leadsToSinkOrStore(Value value, llvm::DenseSet<Value> &visited) {
   return false;
 }
 
-// Helper function to recursively find reachable operations
+/**
+ * @brief Recursively finds all operations reachable from a given operation.
+ *
+ * @param op       Starting operation.
+ * @param visited  Set of already visited operations.
+ */
 static void findReachableOps(Operation *op,
                              llvm::DenseSet<Operation *> &visited) {
   if (visited.contains(op))
@@ -65,8 +77,14 @@ static void findReachableOps(Operation *op,
   }
 }
 
-// Helper function to find operations between a start operation and a set of end
-// operations recursively
+/**
+ * @brief Recursively finds all operations between a start operation and a set
+ * of end operations.
+ *
+ * @param currentOp The operation to start from.
+ * @param end       Set of end operations to stop traversal.
+ * @param visited   Set to store the discovered intermediate operations.
+ */
 static void findOpsBetweenOpsRecursive(Operation *currentOp,
                                        const llvm::DenseSet<Operation *> &end,
                                        llvm::DenseSet<Operation *> &visited) {
@@ -79,13 +97,6 @@ static void findOpsBetweenOpsRecursive(Operation *currentOp,
       isa<handshake::LSQOp>(currentOp)) {
     return;
   }
-  // llvm::errs() << "Current Op: ";
-  // currentOp->print(llvm::errs());
-  // llvm::errs() << "\n";
-
-  // if (isa<handshake::MergeOp>(currentOp)) {
-  //   llvm::errs() << "MERGE!\n";
-  // }
 
   visited.insert(currentOp);
 
@@ -100,7 +111,15 @@ static void findOpsBetweenOpsRecursive(Operation *currentOp,
   }
 }
 
-// // Helper function to check if a MUX feeds teh select another MUX or a BRANCH
+/**
+ * @brief Checks if a Mux is a Shannon Mux. A Mux is considered a Shannon Mux if
+ * its output drives the select line of another Mux or a ConditionalBranch.
+ *
+ * @param muxOp The Mux operation to check.
+ *
+ * @return True if it's a Shannon Mux, false otherwise.
+ */
+
 static bool isShannonMux(handshake::MuxOp muxOp) {
   Value result = muxOp.getResult();
 
@@ -119,6 +138,29 @@ static bool isShannonMux(handshake::MuxOp muxOp) {
   return false;
 }
 
+/**
+ * @brief Identifies control-flow-based clusters in a handshake function.
+ * This function analyzes the handshake IR to group Muxes and
+ * ConditionalBranches into clusters based on shared control conditions.
+ * Clusters can represent:
+ * - Loops: Muxes selected by a Merge fed by a constant.
+ * - If/Else blocks: branches and muxes sharing a condition.
+ * - If-only statements: branches without corresponding muxes leading to
+ * sinks/stores.
+ *
+ * Each cluster contains:
+ * - Inputs: operands entering the region (excluding condition producers).
+ * - Outputs: values exiting the region.
+ * - Internal nodes: operations within the region, excluding condition
+ * generators.
+ *
+ * Additionally, a global outer cluster covering the full function is added.
+ *
+ * @param funcOp The handshake function to analyze.
+ * @param ctx The MLIR context.
+ *
+ * @return Vector of identified clusters.
+ */
 std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
                                                   MLIRContext *ctx) {
   std::vector<Cluster> clusters;
@@ -326,9 +368,37 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
     clusters.push_back(cluster);
   }
 
+  // Define an outer cluster which is the entire graph
+  // Inputs: start
+  // Outputs: the inputs of EndOp
+  // Internal nodes: all the operations in the graph except the EndOp
+  llvm::DenseSet<Operation *> globalOps;
+  llvm::DenseSet<Value> inputs;
+  llvm::DenseSet<Value> outputs;
+
+  for (auto &op : funcOp.getBody().getOps()) {
+    if (handshake::EndOp end = dyn_cast<handshake::EndOp>(op)) {
+      inputs.insert(end.getOperands().begin(), end.getOperands().end());
+    } else {
+      globalOps.insert(&op);
+    }
+  }
+  inputs.insert((Value)funcOp.getArguments().back());
+  Cluster graphCluster(inputs, outputs, globalOps);
+  clusters.push_back(graphCluster);
+
   return clusters;
 }
 
+/**
+ * @brief Verifies that all clusters are either disjoint or properly nested. Any
+ * partial overlap (i.e., shared operations without full containment) is
+ * considered invalid and results in failure.
+ *
+ * @param clusters Vector of clusters to verify.
+ *
+ * @return Success if all clusters are valid, failure otherwise.
+ */
 LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
   for (size_t i = 0; i < clusters.size(); ++i) {
     const auto &aOps = clusters[i].internalNodes;
@@ -363,20 +433,15 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
   return success();
 }
 
-std::vector<ClusterHierarchyNode *> outoforder::getInnermostNodes(
-    const std::vector<ClusterHierarchyNode *> &nodes) {
-
-  std::vector<ClusterHierarchyNode *> innermostNodes;
-
-  // Traverse all nodes and add the leaf nodes
-  for (const auto &node : nodes) {
-    if (node->isLeaf())
-      innermostNodes.push_back(node);
-  }
-
-  return innermostNodes;
-}
-
+/**
+ * @brief Builds a hierarchy of cluster nodes based on nesting relationships.
+ *
+ * @param clusters The list of disjoint or nested clusters.
+ *
+ * @return A list of ClusterHierarchyNode pointers representing the
+ * hierarchy.
+ * @note Assumes clusters are either disjoint or properly nested.
+ */
 std::vector<ClusterHierarchyNode *>
 outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
   // Sort clusters by size (number of internal nodes)
@@ -416,5 +481,5 @@ outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
     }
   }
 
-  return getInnermostNodes(nodes);
+  return nodes;
 }

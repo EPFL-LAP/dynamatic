@@ -125,13 +125,6 @@ std::vector<Cluster> identifyClusters(handshake::FuncOp funcOp,
 // 2. One cluster is completely enclosing the other
 LogicalResult verifyClusters(std::vector<Cluster> &clusters);
 
-// Retrieves the innermost nodes from the cluster hierarchy, which are the nodes
-// that have no children. These nodes represent the lowest level of nesting in
-// the hierarchy.
-// Returns a vector of dynamically allocated ClusterHierarchyNode pointers,
-std::vector<ClusterHierarchyNode *>
-getInnermostNodes(const std::vector<ClusterHierarchyNode *> &nodes);
-
 /// Builds a hierarchy of nested clusters from a flat list of clusters.
 ///
 /// Assumes that any two clusters are either completely disjoint or one is
