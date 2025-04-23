@@ -16,6 +16,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -85,8 +86,9 @@ struct ChannelState {
   WireState ready = WireState::UNDEFINED;
   std::vector<WireState> data;
 
-  ChannelState(Type type, size_t datawidth)
-      : type(type), data(std::vector{datawidth, WireState::UNDEFINED}) {}
+  ChannelState(Type type)
+      : type(type), data(std::vector{handshake::getHandshakeTypeBitWidth(type),
+                                     WireState::UNDEFINED}) {}
 
   std::string decodeData() const {
     if (data.empty())
@@ -94,10 +96,14 @@ struct ChannelState {
 
     // Build a string from the vector of bits
     std::string dataString;
+    bool partlyUndef = false;
+    unsigned int i = 0;
     for (WireState bit : llvm::reverse(data)) {
       switch (bit) {
       case WireState::UNDEFINED:
-        return "undef";
+	dataString.push_back('u');
+        partlyUndef = true;
+        break;
       case WireState::LOGIC_0:
         dataString.push_back('0');
         break;
@@ -105,15 +111,20 @@ struct ChannelState {
         dataString.push_back('1');
         break;
       }
+      i++;
     }
+    if (partlyUndef)
+      return dataString;
 
-    if (auto intType = dyn_cast<IntegerType>(type)) {
+    auto channelType = cast<handshake::ChannelType>(type);
+    auto dataType = channelType.getDataType();
+    if (auto intType = dyn_cast<IntegerType>(dataType)) {
       APInt intVal(data.size(), dataString, 2);
       if (intType.isSigned())
         return std::to_string(intVal.getSExtValue());
       return std::to_string(intVal.getZExtValue());
     }
-    if (auto floatType = dyn_cast<FloatType>(type)) {
+    if (auto floatType = dyn_cast<FloatType>(dataType)) {
       APFloat floatVal(floatType.getFloatSemantics(), dataString);
       return std::to_string(floatVal.convertToDouble());
     }
@@ -144,13 +155,8 @@ SignalInfo::SignalInfo(Value val, StringRef signalName)
   } else {
     auto arg = cast<BlockArgument>(val);
     auto funcOp = cast<handshake::FuncOp>(arg.getParentBlock()->getParentOp());
-    srcPortID = 0;
-    std::string argName = funcOp.getArgName(arg.getArgNumber()).str();
-    if (argName == "start") {
-      // Legacy contention that the visualizer expects, follow for now
-      argName = "start_0";
-    }
-    srcComponent = argName;
+    srcPortID = arg.getArgNumber();
+    srcComponent = funcOp.getArgName(arg.getArgNumber()).str();
   }
 
   // Derive the destination component's name and ID
@@ -158,31 +164,45 @@ SignalInfo::SignalInfo(Value val, StringRef signalName)
   Operation *consumerOp = oprd.getOwner();
   if (!isa<MemRefType>(oprd.get().getType()))
     dstPortID = oprd.getOperandNumber();
-  dstComponent = getUniqueName(consumerOp);
+  if (isa<handshake::EndOp>(consumerOp)) {
+    auto funcOp = cast<handshake::FuncOp>(val.getParentBlock()->getParentOp());
+    dstComponent = funcOp.getResName(oprd.getOperandNumber()).str();
+  } else {
+    dstComponent = getUniqueName(consumerOp);
+  }
 }
 
 std::optional<WireReference>
 WireReference::fromSignal(StringRef signalName,
                           const llvm::StringMap<Value> &ports) {
   // Check if this is a data signal
-  if (signalName.ends_with(")")) {
-    // Try to extract the vector's indexfrom the signal name
-    size_t idx = signalName.rfind("(");
-    if (idx == std::string::npos)
-      return std::nullopt;
-    StringRef dataIdxStr = signalName.slice(idx + 1, signalName.size() - 1);
-
-    // Try to convert the index to an unsigned
-    unsigned long long dataIdx;
-    if (getAsUnsignedInteger(dataIdxStr, 10, dataIdx))
-      return std::nullopt;
-
-    // Try to match the port's name to an SSA value
-    StringRef portName = signalName.slice(0, idx);
-    auto portIt = ports.find(portName);
+  if (!signalName.contains(StringRef(VALID_SUFFIX))
+      && !signalName.contains(StringRef(READY_SUFFIX))) {
+    // Try to extract the vector's index from the signal name
+    if(signalName.contains("(")) {
+      size_t idx = signalName.rfind("(");
+      if (idx == std::string::npos)
+	return std::nullopt;
+      StringRef dataIdxStr = signalName.slice(idx + 1, signalName.size() - 1);
+      
+      // Try to convert the index to an unsigned
+      unsigned dataIdx;
+      if (dataIdxStr.getAsInteger(10, dataIdx))
+	return std::nullopt;
+      
+      // Try to match the port's name to an SSA value
+      StringRef portName = signalName.slice(0, idx);
+      auto portIt = ports.find(portName);
+      if (portIt == ports.end())
+	return std::nullopt;
+      return WireReference{portIt->second, SignalType::DATA, dataIdx};
+    }
+    
+    auto portIt = ports.find(signalName);
     if (portIt == ports.end())
       return std::nullopt;
-    return WireReference{portIt->second, SignalType::DATA, dataIdx};
+    
+    return WireReference{portIt->second, SignalType::DATA, 0};
   }
 
   auto checkSingleWire = [&](StringRef suffix,
@@ -209,6 +229,10 @@ static WireState wireStateFromLog(StringRef token) {
     return WireState::LOGIC_1;
   if (state == "0")
     return WireState::LOGIC_0;
+  if (state == "St0")
+    return WireState::LOGIC_0;
+  if (state == "St1")
+    return WireState::LOGIC_1;
   return WireState::UNDEFINED;
 }
 
@@ -240,7 +264,7 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
     ports.insert({argNameGen.getInputName(idx), arg});
 
-  // First associate names to each operation's results
+  // Then associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
     handshake::PortNamer resNameGen(&op);
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
@@ -314,12 +338,10 @@ int main(int argc, char **argv) {
   mlir::DenseMap<Value, SignalInfo> valueToSignalInfo;
   mlir::DenseMap<Value, ChannelState> state;
   for (auto &[signalName, val] : signalNameToValue) {
-    valueToSignalInfo.insert({val, SignalInfo{val, signalName}});
-
-    unsigned width = 0;
-    if (isa<IntegerType, FloatType>(val.getType()))
-      width = val.getType().getIntOrFloatBitWidth();
-    state.insert({val, ChannelState{val.getType(), width}});
+    if (isa<MemRefType>(val.getType()))
+      continue;
+    valueToSignalInfo.try_emplace(val, val, signalName);
+    state.try_emplace(val, val.getType());
   }
 
   std::map<size_t, WireReference> wires;
@@ -328,12 +350,18 @@ int main(int argc, char **argv) {
 
   // Read the LOG file line by line
   std::string event;
-  while (std::getline(logFileStream, event)) {
+  for (size_t lineNum = 1; std::getline(logFileStream, event); ++lineNum) {
     // Split the line into space-separated tokens
     SmallVector<StringRef> tokens;
     StringRef{event}.split(tokens, ' ');
     if (tokens.empty())
       continue;
+
+    auto error = [&](const Twine &msg) -> LogicalResult {
+      llvm::errs() << "On line " << lineNum << ": " << msg << "\nIn: " << event
+                   << "\n";
+      return failure();
+    };
 
     using LogCallback = std::function<LogicalResult()>;
     auto handleLogType = [&](StringRef identifier, size_t minNumTokens,
@@ -341,24 +369,20 @@ int main(int argc, char **argv) {
       if (tokens.front() != identifier)
         return false;
       if (tokens.size() < minNumTokens) {
-        llvm::errs() << "Expected at least " << minNumTokens
-                     << " tokens, but got " << tokens.size() << "\n";
+        (void)error("Expected at least " + std::to_string(minNumTokens) +
+                    " tokens, but got " + std::to_string(tokens.size()));
         exit(1);
       }
-      if (failed(callback())) {
-        llvm::errs() << "Failed parsing for log type \"" << identifier
-                     << "\"\n";
+      if (failed(callback()))
         exit(1);
-      }
       return true;
     };
 
     LogCallback setSignalAssociation = [&]() {
-      unsigned long long wireID;
-      if (getAsUnsignedInteger(tokens[2], 10, wireID)) {
-        llvm::errs() << "Expected integer identifier for signal, but got "
-                     << tokens[2] << "\n";
-        return failure();
+      unsigned wireID;
+      if (tokens[2].getAsInteger(10, wireID)) {
+        return error("expected integer identifier for signal, but got " +
+                     tokens[2]);
       }
       StringRef signalName = StringRef{tokens[1]}.drop_front(level.size());
       if (auto wire = WireReference::fromSignal(signalName, signalNameToValue))
@@ -388,28 +412,29 @@ int main(int argc, char **argv) {
                      << info.dstPortID << ", " << dataflowState.str() << ", "
                      << channelState.decodeData() << "\n";
       }
+      
       toUpdate.clear();
 
       // Parse the current simulation time and derive the current cycle number
       std::string timeStr = tokens[1].str();
       timeStr.erase(std::remove(timeStr.begin(), timeStr.end(), '.'),
                     timeStr.end());
-      unsigned long long time;
-      if (getAsUnsignedInteger(timeStr, 10, time)) {
-        llvm::errs() << "Expected integer identifier for time, but got "
-                     << timeStr << "\n";
-        return failure();
+      unsigned time;
+      if (StringRef{timeStr}.getAsInteger(10, time)) {
+        return error("expected integer identifier for time, but got " +
+                     timeStr);
       }
+      
       cycle = (time < PERIOD) ? 0 : (time - HALF_PERIOD) / PERIOD + 1;
+      
       return success();
     };
 
     LogCallback changeWireState = [&]() {
-      unsigned long long wireID;
-      if (getAsUnsignedInteger(tokens[1], 10, wireID)) {
-        llvm::errs() << "Expected integer identifier for signal, but got "
-                     << tokens[1] << "\n";
-        return failure();
+      unsigned wireID;
+      if (tokens[1].getAsInteger(10, wireID)) {
+        return error("expected integer identifier for signal, but got " +
+                     tokens[1]);
       }
 
       // Just ignore wires we don't know
@@ -423,19 +448,47 @@ int main(int argc, char **argv) {
       ChannelState &channelState = channelStateIt->second;
       WireState wireState = wireStateFromLog(tokens[2]);
 
+      const SignalInfo &info = valueToSignalInfo.at(wire.value);
+      
       switch (wire.type) {
       case SignalType::VALID:
-        channelState.valid = wireState;
+	channelState.valid = wireState;
         break;
       case SignalType::READY:
         channelState.ready = wireState;
         break;
       case SignalType::DATA:
-        assert(wire.idx && "index undefined for data wire");
-        assert(*wire.idx < channelState.data.size() && "index out of bounds");
-        channelState.data[*wire.idx] = wireState;
+	if(wireState == WireState::UNDEFINED) {
+	  StringRef state = tokens[2].drop_front(2).drop_back(2);
+	  
+	  for(unsigned int i = 0; i < state.size(); i++) {
+	    unsigned int loc = state.size() - 1 - i;
+	    if (state.data()[i] == '1') {
+	      channelState.data[loc] = WireState::LOGIC_1;
+	    } else if (state.data()[i] == '0') {
+	      channelState.data[loc] = WireState::LOGIC_0;
+	    } else {
+	      channelState.data[loc] = WireState::UNDEFINED;
+	    }
+	  }
+	  
+	  
+	} else {
+	  if (!wire.idx)
+	    return error("index undefined for data wire");
+	  if (*wire.idx >= channelState.data.size()) {
+	    return error("index out of bounds, expected number between 0 and " +
+			 std::to_string(channelState.data.size()) + ", but got " +
+			 std::to_string(*wire.idx));
+	  }
+	  
+	  channelState.data[*wire.idx] = wireState;
+        }
+	
         break;
       }
+      
+      
 
       toUpdate.insert(wire.value);
       return success();
