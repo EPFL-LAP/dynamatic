@@ -87,7 +87,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -355,11 +355,13 @@ void CFDFCUnionBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addSimpleBufferPresenceConstraints(channel, signals);
+    addTargetPeriodConstraints(channel, signals);
+    addBufferTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addBufferTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addBufferTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Elasticity constraints
@@ -374,9 +376,9 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
-    addUnitPathConstraints(unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(unit, channelFilter);
     addUnitElasticityConstraints(unit, channelFilter);
   }
@@ -388,6 +390,7 @@ void CFDFCUnionBuffers::setup() {
     if (!funcInfo.cfdfcs[cfdfc])
       continue;
     addCFDFCVars(*cfdfc);
+    addTokenDistributionConstraints(*cfdfc);
     addChannelThroughputConstraints(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
@@ -470,11 +473,13 @@ void OutOfCycleBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addSimpleBufferPresenceConstraints(channel, signals);
+    addTargetPeriodConstraints(channel, signals);
+    addBufferTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addBufferTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addBufferTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Add elasticity constraints
@@ -495,9 +500,9 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
-    addUnitPathConstraints(&unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(&unit, channelFilter);
     addUnitElasticityConstraints(&unit, channelFilter);
   }

@@ -93,7 +93,7 @@ struct CFDFCVars {
 /// function.
 struct MILPVars {
   /// Mapping between CFDFCs and their related variables.
-  llvm::MapVector<CFDFC *, CFDFCVars> cfVars;
+  llvm::MapVector<CFDFC *, CFDFCVars> cfdfcVars;
   /// Mapping between channels and their related variables.
   llvm::MapVector<Value, ChannelVars> channelVars;
 };
@@ -158,7 +158,7 @@ protected:
     };
 
     /// Returns the combinational delay of the group's buffer for a signal type.
-    double getCombinationalDelay(Value channel, SignalType type) const;
+    double getCombinationalDelay(Value channel, SignalType signal) const;
   };
 
   /// For unit constraints, oracle function determining whether constraints
@@ -198,17 +198,28 @@ protected:
   /// for each CFDFC channel, and an overall CFDFC's throughput variable.
   void addCFDFCVars(CFDFC &cfdfc);
 
-  /// Adds path constraints for a signal of the channel. The `bufModel` should
-  /// characterize a buffer that cuts the signal i.e., the path constraints
-  /// added to the model will assume that the placement of such a buffer on the
-  /// signal cuts the path with a register. The optional lists of buffers
-  /// `before` and `after` the cutting buffer represent the optional presence of
-  /// other buffer types--respectively, in front of or behind the cutting
-  /// buffer--on the channel that only add a combinational delay to the signal.
+  /// Adds buffer presence constraints for the provided signals on the channel. 
+  /// These ensure buffer presence variables are properly linked with signal 
+  /// latency and channel buffer presence.
+  void addSimpleBufferPresenceConstraints(Value channel, ArrayRef<SignalType> signals);
+
+  /// Adds constraints that ensure the arrival times at both ends of the 
+  /// channel are less than or equal to the target clock period.
+  void addTargetPeriodConstraints(Value channel, ArrayRef<SignalType> signals);
+  
+  /// Adds simple delay propagation constraints for the channel. These ensure 
+  /// proper signal propagation along the channel.
   ///
-  /// It is only valid to call this method after having added channel variables
-  /// for the specific signal to the model.
-  void addChannelPathConstraints(Value channel, SignalType signal,
+  /// Choose only one function between 'addSimpleChannelTimingConstraints' 
+  /// and 'addBufferTimingConstraints'.
+  void addSimpleChannelTimingConstraints(Value channel, ArrayRef<SignalType> signals);
+
+  /// Adds constraints for buffer delay propagation on the channel. These account
+  /// for delays introduced by buffers on the signal paths.
+  ///
+  /// Choose only one function between 'addSimpleChannelTimingConstraints' 
+  /// and 'addBufferTimingConstraints'.
+  void addBufferTimingConstraints(Value channel, SignalType signal,
                                  const TimingModel *bufModel,
                                  ArrayRef<BufferingGroup> before = {},
                                  ArrayRef<BufferingGroup> after = {});
@@ -224,21 +235,13 @@ protected:
   /// after having added channel variables to the model for all channels
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
-  void addUnitPathConstraints(Operation *unit, SignalType type,
+  void addUnitTimingConstraints(Operation *unit, SignalType signal,
                               ChannelFilter filter = nullFilter);
 
   /// Adds elasticity constraints for the channel. The buffering groups should
   /// contain all the signal types with which channel variables for the specific
   /// channel were added exactly once. Groups force the MILP to place buffers
-  /// for all signals within each group at the same locations. For example, if
-  /// one can only place two buffer types, one which cuts both the data and
-  /// valid signals and one which cuts the ready signal only, and channel
-  /// variables were created for all those signals, then one should pass two
-  /// groups: one containing tne SignalType::DATA and SignalType::VALID signal
-  /// types and one containing the SignalType::READY signal only.
-  ///
-  /// The order of signals within each group is irrelevant; the resulting
-  /// constraints will be identical modulo a reordering of the terms.
+  /// for all signals within each group at the same locations.
   void addChannelElasticityConstraints(Value channel,
                                        ArrayRef<BufferingGroup> bufGroups);
 
@@ -253,6 +256,13 @@ protected:
   /// `filter` function.
   void addUnitElasticityConstraints(Operation *unit,
                                     ChannelFilter filter = nullFilter);
+
+  /// Adds constraints for token distribution across the CFDFC. These ensure
+  /// proper token flow based on fluid retiming variables.
+  ///
+  /// It is only valid to call this method after having added variables for the
+  /// CFDFC to the model.
+  void addTokenDistributionConstraints(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel

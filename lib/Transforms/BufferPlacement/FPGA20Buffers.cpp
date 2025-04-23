@@ -85,7 +85,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -171,14 +171,16 @@ void FPGA20Buffers::setup() {
     // that are not adjacent to a memory interface
     if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      addChannelPathConstraints(channel, SignalType::DATA, bufModel);
+      addSimpleBufferPresenceConstraints(channel, signals);
+      addTargetPeriodConstraints(channel, signals);
+      addBufferTimingConstraints(channel, SignalType::DATA, bufModel);
       addChannelElasticityConstraints(channel, bufGroups);
     }
   }
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
-    addUnitPathConstraints(&op, SignalType::DATA);
+    addUnitTimingConstraints(&op, SignalType::DATA);
     addUnitElasticityConstraints(&op);
   }
 
@@ -190,6 +192,7 @@ void FPGA20Buffers::setup() {
       continue;
     cfdfcs.push_back(cfdfc);
     addCFDFCVars(*cfdfc);
+    addTokenDistributionConstraints(*cfdfc);
     addChannelThroughputConstraints(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
