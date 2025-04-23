@@ -45,21 +45,36 @@ static std::string instantiateModuleUnderTest(
   for (const auto &[argumentName, argumentType] : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
-    if (!LEGACY_DOT2SMV_COMPATIBLE &&
-        argumentType.isa<handshake::ControlType>()) {
-      inputVariables.push_back("seq_generator_" + argumentName + "." +
-                               SEQUENCE_GENERATOR_VALID_NAME.str());
-    } else {
-      inputVariables.push_back("seq_generator_" + argumentName + "." +
-                               SEQUENCE_GENERATOR_DATA_NAME.str());
-      inputVariables.push_back("seq_generator_" + argumentName + "." +
-                               SEQUENCE_GENERATOR_VALID_NAME.str());
-    }
+    llvm::TypeSwitch<Type, void>(argumentType)
+        .Case<handshake::ControlType>([&](handshake::ControlType) {
+          if (!LEGACY_DOT2SMV_COMPATIBLE) {
+            inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                     SEQUENCE_GENERATOR_VALID_NAME.str());
+          } else {
+            inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                     SEQUENCE_GENERATOR_DATA_NAME.str());
+            inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                     SEQUENCE_GENERATOR_VALID_NAME.str());
+          }
+        })
+        .Case<handshake::ChannelType>([&](handshake::ChannelType) {
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_DATA_NAME.str());
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_VALID_NAME.str());
+        })
+        .Case<IntegerType>([&](IntegerType intType) {
+          if (argumentName != "clk" && argumentName != "rst") {
+            inputVariables.push_back("0s" + std::to_string(intType.getWidth()) +
+                                     "_0");
+          }
+        });
   }
 
-  for (const auto &[resultName, _] : results) {
-    inputVariables.push_back("sink_" + resultName + "." +
-                             SINK_READY_NAME.str());
+  for (const auto &[resultName, type] : results) {
+    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      inputVariables.push_back("sink_" + resultName + "." +
+                               SINK_READY_NAME.str());
   }
 
   std::ostringstream call;
@@ -78,6 +93,7 @@ std::string getPrefixTypeName(std::string smvType) {
     std::string numberStr = smvType.substr(start + 1, end - start - 1);
     return "s" + numberStr;
   }
+  return "";
 }
 
 // SMV module for a sequence generator with a finite number of tokens. The
@@ -172,7 +188,8 @@ static std::string createSupportEntities(
 
   std::unordered_set<std::string> types;
   for (auto [_, type] : arguments)
-    types.insert(convertMLIRTypeToSMV(type));
+    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      types.insert(convertMLIRTypeToSMV(type));
   std::ostringstream supportEntities;
 
   for (const auto &smvType : types) {
@@ -194,10 +211,14 @@ static std::string instantiateSequenceGenerators(
     size_t nrOfTokens, bool generateExactNrOfTokens = false) {
   std::ostringstream sequenceGenerators;
   for (const auto &[argumentName, type] : arguments) {
+    if (!type.isa<handshake::ControlType, handshake::ChannelType>())
+      continue;
+
     std::string typePrefixName =
         llvm::TypeSwitch<Type, std::string>(type)
-            .Case<handshake::ControlType>(
-                [&](handshake::ControlType cType) { return std::string(""); })
+            .Case<handshake::ControlType>([&](handshake::ControlType cType) {
+              return std::string("ctrl");
+            })
             .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
               if (cType.getDataBitWidth() == 1)
                 return std::string("bool");
@@ -241,9 +262,10 @@ instantiateSinks(const std::string &moduleName,
                  size_t nrOfTokens) {
   std::ostringstream sinks;
 
-  for (const auto &[resultName, _] : results) {
-    sinks << "  VAR sink_" << resultName << " : sink_main(" << moduleName << "."
-          << resultName << "_valid);\n";
+  for (const auto &[resultName, type] : results) {
+    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      sinks << "  VAR sink_" << resultName << " : sink_main(" << moduleName
+            << "." << resultName << "_valid);\n";
   }
   return sinks.str();
 }

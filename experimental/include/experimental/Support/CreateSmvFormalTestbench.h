@@ -115,7 +115,7 @@ const std::string SMV_CTRL_INPUT_INF = "MODULE ctrl_input_inf(nReady0)\n"
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
 const std::string SMV_CTRL_INPUT =
-    "MODULE bool_input(nReady0, max_tokens)\n"
+    "MODULE ctrl_input(nReady0, max_tokens)\n"
     "  VAR counter : 0..31;\n"
     "  FROZENVAR exact_tokens : 0..max_tokens;\n"
     "  ASSIGN\n"
@@ -130,7 +130,7 @@ const std::string SMV_CTRL_INPUT =
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
 const std::string SMV_CTRL_INPUT_EXACT =
-    "MODULE bool_input_exact(nReady0, exact_tokens)\n"
+    "MODULE ctrl_input_exact(nReady0, exact_tokens)\n"
     "  VAR counter : 0..31;\n"
     "  ASSIGN\n"
     "    init(counter) := 0;\n"
