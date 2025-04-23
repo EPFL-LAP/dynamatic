@@ -71,8 +71,8 @@ static std::pair<double, double> getPortDelays(Value channel, SignalType signal,
 
 /// Returns the combinational delay for a specific signal type.
 /// If the buffer model is nullptr, delay is assumed to be 0.
-double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
-    Value channel, SignalType signal) const {
+static double getCombinationalDelay(Value channel, SignalType signal,
+                                    const TimingModel *bufModel) {
   if (!bufModel)
     return 0.0;
 
@@ -256,24 +256,33 @@ void BufferPlacementMILP::addSimpleChannelTimingConstraints(
   }
 }
 
-void BufferPlacementMILP::addBufferTimingConstraints(
-    Value channel, SignalType signal, const TimingModel *bufModel,
-    ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
+void BufferPlacementMILP::addBufferTimingConstraints(Value channel, 
+  SignalType signal, const TimingModel *bufModel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
   double bigCst = targetPeriod * 10;
 
-  // Sum up conditional delays of buffers before the one that cuts the path
+  // Sum up conditional delays of buffers before/after the one that cuts the path
   GRBLinExpr bufsBeforeDelay;
-  for (const BufferingGroup &group : before)
-    bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                       group.getCombinationalDelay(channel, signal);
-
-  // Sum up conditional delays of buffers after the one that cuts the path
   GRBLinExpr bufsAfterDelay;
-  for (const BufferingGroup &group : after)
-    bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                      group.getCombinationalDelay(channel, signal);
+  
+  if (signal == SignalType::DATA || signal == SignalType::VALID) {
+    // For DATA and VALID, add READY buffer delay to 'after'
+    if (channelVars.signalVars.count(SignalType::READY)) {
+      bufsAfterDelay = channelVars.signalVars[SignalType::READY].bufPresent * 
+                       getCombinationalDelay(channel, SignalType::READY, bufModel);
+    }
+  } else if (signal == SignalType::READY) {
+    // For READY, add DATA and VALID buffer delays to 'before'
+    if (channelVars.signalVars.count(SignalType::DATA)) {
+      bufsBeforeDelay += channelVars.signalVars[SignalType::DATA].bufPresent * 
+                         getCombinationalDelay(channel, SignalType::DATA, bufModel);
+    }
+    if (channelVars.signalVars.count(SignalType::VALID)) {
+      bufsBeforeDelay += channelVars.signalVars[SignalType::VALID].bufPresent * 
+                         getCombinationalDelay(channel, SignalType::VALID, bufModel);
+    }
+  }
 
   ChannelBufProps &props = channelProps[channel];
   ChannelSignalVars &signalVars = chVars.signalVars[signal];
@@ -376,41 +385,42 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   }
 }
 
-void BufferPlacementMILP::addChannelElasticityConstraints(
-    Value channel, ArrayRef<BufferingGroup> bufGroups) {
-  ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &tIn = chVars.elastic.tIn;
-  GRBVar &tOut = chVars.elastic.tOut;
-  GRBVar &bufNumSlots = chVars.bufNumSlots;
+void BufferPlacementMILP::addChannelElasticityConstraints(Value channel) {
+  ChannelVars &channelVars = vars.channelVars[channel];
+  GRBVar &tIn = channelVars.elastic.tIn;
+  GRBVar &tOut = channelVars.elastic.tOut;
+  GRBVar &bufPresent = channelVars.bufPresent;
+  GRBVar &bufNumSlots = channelVars.bufNumSlots;
 
-  auto dataIt = chVars.signalVars.find(SignalType::DATA);
-  if (dataIt != chVars.signalVars.end()) {
+  auto dataIt = channelVars.signalVars.find(SignalType::DATA);
+  if (dataIt != channelVars.signalVars.end()) {
     GRBVar &dataBuf = dataIt->second.bufPresent;
     // If there is a data buffer on the channel, the channel elastic
-    // arrival time at the ouput must be greater than at the input
+    // arrival time at the output must be greater than at the input
     model.addConstr(tOut >= tIn - largeCst * dataBuf, "elastic_data");
   }
 
-  // Compute the sum of the binary buffer presence over all signals that have
-  // different buffers
-  GRBLinExpr disjointBufPresentSum;
-  for (const BufferingGroup &group : bufGroups) {
-    GRBVar &groupBufPresent =
-        chVars.signalVars[group.getRefSignal()].bufPresent;
-    disjointBufPresentSum += groupBufPresent;
-
-    // For each group, the binary buffer presence variable of different signals
-    // must be equal
-    StringRef refName = getSignalName(group.getRefSignal());
-    for (SignalType sig : group.getOtherSignals()) {
-      StringRef otherName = getSignalName(sig);
-      model.addConstr(groupBufPresent == chVars.signalVars[sig].bufPresent,
-                      "elastic_" + refName.str() + "_same_" + otherName.str());
-    }
+  // If DATA and VALID signals both exist, they must be buffered together
+  if (channelVars.signalVars.count(SignalType::DATA) && 
+      channelVars.signalVars.count(SignalType::VALID)) {
+    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &validBuf = channelVars.signalVars[SignalType::VALID].bufPresent;
+    model.addConstr(dataBuf == validBuf, "elastic_data_valid_same");  
   }
 
-  // There must be enough slots for all disjoint buffers
-  model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
+  // If VALID and READY signals both exist, there must be enough slots for both buffers
+  // Note: This will be removed in the future
+  if (channelVars.signalVars.count(SignalType::VALID) && 
+      channelVars.signalVars.count(SignalType::READY)) {
+    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &validBuf = channelVars.signalVars[SignalType::VALID].bufPresent;
+    GRBVar &readyBuf = channelVars.signalVars[SignalType::READY].bufPresent;
+    model.addConstr(dataBuf + readyBuf <= bufNumSlots, "elastic_slots");
+    model.addConstr(validBuf + readyBuf <= bufNumSlots, "elastic_slots");
+  } else {
+    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
+    model.addConstr(dataBuf <= bufNumSlots, "elastic_slots");
+  }
 }
 
 void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit,

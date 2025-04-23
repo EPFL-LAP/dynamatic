@@ -156,10 +156,6 @@ void FPGA20Buffers::setup() {
   /// null-model to each group, but this hurts our placement's accuracy.
   const TimingModel *bufModel = nullptr;
 
-  // Create buffering groups. In this MILP we only care for the data signal
-  SmallVector<BufferingGroup> bufGroups;
-  bufGroups.emplace_back(ArrayRef<SignalType>{SignalType::DATA}, bufModel);
-
   // Create channel variables and constraints
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
@@ -174,7 +170,7 @@ void FPGA20Buffers::setup() {
       addSimpleBufferPresenceConstraints(channel, signals);
       addTargetPeriodConstraints(channel, signals);
       addBufferTimingConstraints(channel, SignalType::DATA, bufModel);
-      addChannelElasticityConstraints(channel, bufGroups);
+      addChannelElasticityConstraints(channel);
     }
   }
 

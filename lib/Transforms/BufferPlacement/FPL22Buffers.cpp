@@ -139,7 +139,7 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
       // Forbid buffer placement on the channel entirely when no slots are
       // allowed
       model.addConstr(chVars.bufPresent == 0, "custom_noBuffer");
-      model.addConstr(chVars.bufNumSlots == 0, "custom_maxSlots");
+      model.addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
     } else {
       // Restrict the maximum number of slots allowed. If both types are allowed
       // but the MILP decides to only place one type, then the maximum allowed
@@ -332,21 +332,6 @@ void CFDFCUnionBuffers::setup() {
   /// null-model to each group, but this hurts our placement's accuracy.
   const TimingModel *bufModel = nullptr;
 
-  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
-                                bufModel);
-  BufferingGroup readyGroup({SignalType::READY}, bufModel);
-
-  SmallVector<BufferingGroup> bufGroups;
-  bufGroups.push_back(dataValidGroup);
-  bufGroups.push_back(readyGroup);
-
-  // Group signals by matching buffer type for elasticty constraints
-  SmallVector<ArrayRef<SignalType>> signalGroups;
-  SmallVector<SignalType> opaqueGroup{SignalType::DATA, SignalType::VALID};
-  SmallVector<SignalType> transparentGroup{SignalType::READY};
-  signalGroups.push_back(opaqueGroup);
-  signalGroups.push_back(transparentGroup);
-
   // Create channel variables and add custom, path, and elasticity contraints
   // over all channels in the CFDFC union
   for (Value channel : cfUnion.channels) {
@@ -357,15 +342,12 @@ void CFDFCUnionBuffers::setup() {
     // Add single-domain path constraints
     addSimpleBufferPresenceConstraints(channel, signals);
     addTargetPeriodConstraints(channel, signals);
-    addBufferTimingConstraints(channel, SignalType::DATA, bufModel, {},
-                              readyGroup);
-    addBufferTimingConstraints(channel, SignalType::VALID, bufModel, {},
-                              readyGroup);
-    addBufferTimingConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup, {});
+    addBufferTimingConstraints(channel, SignalType::DATA, bufModel);
+    addBufferTimingConstraints(channel, SignalType::VALID, bufModel);
+    addBufferTimingConstraints(channel, SignalType::READY, bufModel);
 
     // Elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addChannelElasticityConstraints(channel);
   }
 
   // For unit constraints, filter out ports that are not part of the CFDFC union
@@ -433,14 +415,6 @@ void OutOfCycleBuffers::setup() {
   /// null-model to each group, but this hurts our placement's accuracy.
   const TimingModel *bufModel = nullptr;
 
-  BufferingGroup dataValidGroup({SignalType::DATA, SignalType::VALID},
-                                bufModel);
-  BufferingGroup readyGroup({SignalType::READY}, bufModel);
-
-  SmallVector<BufferingGroup> bufGroups;
-  bufGroups.push_back(dataValidGroup);
-  bufGroups.push_back(readyGroup);
-
   // Create the expression for the MILP objective
   GRBLinExpr objective;
 
@@ -461,7 +435,7 @@ void OutOfCycleBuffers::setup() {
            !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin());
   };
 
-  // Create variables and  add path and elasticity constraints for all channels
+  // Create variables and add path and elasticity constraints for all channels
   // covered by the MILP. These are the channels that are not part of any CFDFC
   // identified in the Handshake function under consideration
   for (auto [channel, _] : channelProps) {
@@ -475,15 +449,12 @@ void OutOfCycleBuffers::setup() {
     // Add single-domain path constraints
     addSimpleBufferPresenceConstraints(channel, signals);
     addTargetPeriodConstraints(channel, signals);
-    addBufferTimingConstraints(channel, SignalType::DATA, bufModel, {},
-                              readyGroup);
-    addBufferTimingConstraints(channel, SignalType::VALID, bufModel, {},
-                              readyGroup);
-    addBufferTimingConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup, {});
+    addBufferTimingConstraints(channel, SignalType::DATA, bufModel);
+    addBufferTimingConstraints(channel, SignalType::VALID, bufModel);
+    addBufferTimingConstraints(channel, SignalType::READY, bufModel);
 
     // Add elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addChannelElasticityConstraints(channel);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &channelVars = vars.channelVars[channel];
