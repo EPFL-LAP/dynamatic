@@ -116,7 +116,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
                                          ArrayRef<SignalType> signals) {
 
   // Default-initialize channel variables and retrieve a reference
-  ChannelVars &channelVars = vars.channelVars[channel];
+  ChannelVars &chVars = vars.channelVars[channel];
   std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
 
   // Create a Gurobi variable of the given name and type for the channel
@@ -126,7 +126,7 @@ void BufferPlacementMILP::addChannelVars(Value channel,
 
   // Signal-specific variables
   for (SignalType sig : signals) {
-    ChannelSignalVars &signalVars = channelVars.signalVars[sig];
+    ChannelSignalVars &signalVars = chVars.signalVars[sig];
     StringRef name = getSignalName(sig);
     signalVars.path.tIn = createVar(name + "PathIn", GRB_CONTINUOUS);
     signalVars.path.tOut = createVar(name + "PathOut", GRB_CONTINUOUS);
@@ -134,11 +134,11 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   }
 
   // Variables for elasticity constraints
-  channelVars.elastic.tIn = createVar("elasIn", GRB_CONTINUOUS);
-  channelVars.elastic.tOut = createVar("elasOut", GRB_CONTINUOUS);
+  chVars.elastic.tIn = createVar("elasIn", GRB_CONTINUOUS);
+  chVars.elastic.tOut = createVar("elasOut", GRB_CONTINUOUS);
   // Variables for placement information
-  channelVars.bufPresent = createVar("bufPresent", GRB_BINARY);
-  channelVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+  chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
+  chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
