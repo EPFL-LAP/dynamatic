@@ -25,14 +25,11 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
     signal_manager = _generate_concat_signal_manager(
         name, in_ports, out_ports, extra_signals, ignore_ports, generate_inner)
   elif type == "bbmerge":
-    size = params["size"]
-    data_in_name = params["data_in_name"]
+    extra_signals = params["extra_signals"]
     index_name = params["index_name"]
-    out_extra_signals = params["out_extra_signals"]
-    index_extra_signals = params["index_extra_signals"]
     index_dir = params["index_dir"]
     signal_manager = _generate_bbmerge_signal_manager(
-        name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, generate_inner)
+        name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
@@ -602,11 +599,11 @@ def _generate_bbmerge_signal_assignments(concat_logic, index_extra_signal_assign
   return template.lstrip()
 
 
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, generate_inner: Callable[[str], str]):
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(out_extra_signals)
+  concat_info = ConcatenationInfo(extra_signals)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
@@ -622,14 +619,14 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
 
   # Assign index extra signals
   index_extra_signal_assignments = _generate_bbmerge_index_extra_signal_assignments(
-      index_name, index_extra_signals, index_dir)
+      index_name, extra_signals, index_dir)
 
   signal_assignments = _generate_bbmerge_signal_assignments(
       concat_logic, index_extra_signal_assignments)
 
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
-      in_ports, out_ports, out_extra_signals, [index_name])
+      in_ports, out_ports, extra_signals, [index_name])
 
   architecture = f"""
 -- Architecture of signal manager (bbmerge)
