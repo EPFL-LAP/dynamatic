@@ -1,5 +1,29 @@
 [
   {
+    "pred": "fork1",
+    "outid": 3,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "trunci1",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "spec_save_commit3",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "extsi2",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
     "pred": "fork8",
     "outid": 2,
     "slots": 16,
