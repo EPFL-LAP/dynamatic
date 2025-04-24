@@ -1212,8 +1212,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       }
       OutputConnections[OutputId] = fanouts;
     }
-    // Create resultTypes based on collected Outputs
-    //SmallVector<Type> resultTypesVec;
+    // Create resultTypes based on collected Outputs //! not necessary after rewriting function definition
+    //SmallVector<Type> resultTypesVec;              //! these 5 lines can be removed
     //for(auto OutputId : InstanceOpOutputIndices)
     //  resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
     //resultTypes = TypeRange(resultTypesVec);
@@ -1238,8 +1238,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       else if(llvm::is_contained(InstanceOpOutputIndices, i))
         newResults.push_back(calledFuncOpType.getInput(i));
     }
-    // keep existing results
-    //newResults.append(calledFuncOpType.getResults().begin(), calledFuncOpType.getResults().end());
+
     //create new Type based on newInputs and newResults
     auto newFuncType = FunctionType::get(calledFuncOpType.getContext(), newInputs, newResults);
     calledFuncOp.setType(newFuncType);
@@ -1289,8 +1288,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (callOp->getNumResults() == 0)
     rewriter.eraseOp(callOp);
   else
-    //rewriter.replaceOp(callOp, instOp.getResults().drop_back());
-    rewriter.replaceOp(callOp, instOp.getResult(0));
+    //rewriter.replaceOp(callOp, instOp.getResults().drop_back()); //! just for testing!
+    rewriter.replaceOp(callOp, instOp.getResult(0)); //? pick first result?
   return success();
 }
 
