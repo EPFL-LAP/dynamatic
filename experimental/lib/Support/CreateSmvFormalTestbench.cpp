@@ -65,8 +65,8 @@ static std::string instantiateModuleUnderTest(
         })
         .Case<IntegerType>([&](IntegerType intType) {
           if (argumentName != "clk" && argumentName != "rst") {
-            inputVariables.push_back("0s" + std::to_string(intType.getWidth()) +
-                                     "_0");
+            inputVariables.push_back("0sd" +
+                                     std::to_string(intType.getWidth()) + "_0");
           }
         });
   }

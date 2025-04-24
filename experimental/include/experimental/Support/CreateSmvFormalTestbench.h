@@ -27,7 +27,7 @@ namespace dynamatic::experimental {
 
 // The legacy dot2smv conversion also generates dataOut signal even if the
 // output is of type Control
-#define LEGACY_DOT2SMV_COMPATIBLE 1
+#define LEGACY_DOT2SMV_COMPATIBLE 0
 
 static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_VALID_NAME("valid0");
 static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_DATA_NAME("dataOut0");
