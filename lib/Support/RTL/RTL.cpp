@@ -324,7 +324,6 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-  registerSpecPortsParameter(modOp, modName, modType);
 }
 
 void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
@@ -451,98 +450,16 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  } else if (modName == "handshake.source" || modName == "handshake.non_spec") {
+  } else if (modName == "handshake.source" || modName == "handshake.mux" ||
+             modName == "handshake.control_merge" ||
+             modName == "handshake.non_spec") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
-  } else if (modName == "handshake.control_merge") {
-    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getOutputType(0));
-    serializedParams["INDEX_EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getOutputType(1));
-
-    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
-    // input.
-    // The information may overlap with other parameters, but it is provided to
-    // give the generator easier access to the data.
-    std::string extraSignalsListValue;
-    llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
-    extraSignalsList << "'[";
-    // The last two inputs are clk and rst
-    for (size_t i = 0; i < modType.getNumInputs() - 2; i++) {
-      if (i != 0)
-        extraSignalsList << ", ";
-      extraSignalsList << serializeExtraSignalsInner(modType.getInputType(i));
-    }
-    extraSignalsList << "]'";
-    serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
-  } else if (modName == "handshake.mux") {
-    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getOutputType(0));
-    serializedParams["INDEX_EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getInputType(0));
-
-    // Generate INPUT_EXTRA_SIGNALS_LIST, as the extra signals vary for each
-    // input.
-    // The information may overlap with other parameters, but it is provided to
-    // give the generator easier access to the data.
-    std::string extraSignalsListValue;
-    llvm::raw_string_ostream extraSignalsList(extraSignalsListValue);
-    extraSignalsList << "'[";
-    // The first input is index, and the last two inputs are clk and rst
-    for (size_t i = 1; i < modType.getNumInputs() - 2; i++) {
-      if (i != 1)
-        extraSignalsList << ", ";
-      extraSignalsList << serializeExtraSignalsInner(modType.getInputType(i));
-    }
-    extraSignalsList << "]'";
-    serializedParams["INPUT_EXTRA_SIGNALS_LIST"] = extraSignalsList.str();
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
   } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
-  }
-}
-
-void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType) {
-  if (modName == "handshake.control_merge") {
-    std::string specInputsValue;
-    llvm::raw_string_ostream specInputs(specInputsValue);
-    specInputs << "'[";
-    bool isFirst = true;
-    // The last two inputs are clk and rst
-    for (size_t i = 0; i < modType.getNumInputs() - 2; i++) {
-      if (modType.getInputType(i)
-              .cast<handshake::ExtraSignalsTypeInterface>()
-              .hasExtraSignal("spec")) {
-        if (!isFirst)
-          specInputs << ", ";
-        isFirst = false;
-        specInputs << i;
-      }
-    }
-    specInputs << "]'";
-    serializedParams["SPEC_INPUTS"] = specInputs.str();
-  } else if (modName == "handshake.mux") {
-    std::string specInputsValue;
-    llvm::raw_string_ostream specInputs(specInputsValue);
-    specInputs << "'[";
-    bool isFirst = true;
-    // The first input is index, and the last two inputs are clk and rst
-    for (size_t i = 1; i < modType.getNumInputs() - 2; i++) {
-      if (modType.getInputType(i)
-              .cast<handshake::ExtraSignalsTypeInterface>()
-              .hasExtraSignal("spec")) {
-        if (!isFirst)
-          specInputs << ", ";
-        isFirst = false;
-        specInputs << i - 1; // Skip the index input
-      }
-    }
-    specInputs << "]'";
-    serializedParams["SPEC_INPUTS"] = specInputs.str();
   }
 }
 
