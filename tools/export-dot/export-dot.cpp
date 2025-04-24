@@ -283,7 +283,8 @@ static StringRef getNodeColor(Operation *op) {
           [&](auto) { return "tan2"; })
       .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
             handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>(
+          [&](auto) { return "salmon"; })
       .Default([&](auto) { return "moccasin"; });
 }
 
