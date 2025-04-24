@@ -63,8 +63,9 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // 1. If breaking DVR:
     // When numslot = 1, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
     // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
-
+    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+    //
     // 2. If breaking none:
     // Map to numslot * FIFO_BREAK_NONE.
     if (forceBreakDVR) {
