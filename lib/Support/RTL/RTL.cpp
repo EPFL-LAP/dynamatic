@@ -345,7 +345,8 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.subi" || modName == "handshake.shli" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
-      modName == "handshake.spec_save_commit") {
+      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
@@ -450,7 +451,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  } else if (modName == "handshake.source") {
+  } else if (modName == "handshake.source" || modName == "handshake.non_spec") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (modName == "handshake.control_merge") {
@@ -512,7 +513,7 @@ void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
     specInputs << "'[";
     bool isFirst = true;
     // The last two inputs are clk and rst
-    for (size_t i = 1; i < modType.getNumInputs() - 2; i++) {
+    for (size_t i = 0; i < modType.getNumInputs() - 2; i++) {
       if (modType.getInputType(i)
               .cast<handshake::ExtraSignalsTypeInterface>()
               .hasExtraSignal("spec")) {
@@ -530,7 +531,7 @@ void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
     specInputs << "'[";
     bool isFirst = true;
     // The first input is index, and the last two inputs are clk and rst
-    for (size_t i = 0; i < modType.getNumInputs() - 2; i++) {
+    for (size_t i = 1; i < modType.getNumInputs() - 2; i++) {
       if (modType.getInputType(i)
               .cast<handshake::ExtraSignalsTypeInterface>()
               .hasExtraSignal("spec")) {
