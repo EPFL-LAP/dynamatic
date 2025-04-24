@@ -35,7 +35,7 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of spec_commit
+-- Architecture of non_spec
 architecture arch of {name} is
 begin
   {data("dataOut <= dataIn;", bitwidth)}

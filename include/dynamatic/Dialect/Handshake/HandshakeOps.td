@@ -1214,7 +1214,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   HasValidSpecTag<"dataOut">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let summary = "Marks an input as non-speculative.";
+  let summary = "Adds a non-speculative spec bit.";
   let description = [{
     The non-spec operation has an input channel without a spec bit and an output
     channel with a spec bit. The output channel is always marked as

@@ -95,17 +95,10 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
       port_decls.append(
           f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
 
-      # Use extra_signals_list if available to handle per-port extra signals
-      use_extra_signals_list = "extra_signals_list" in port
-
       # Generate extra signal declarations for each item in the 2d input port
       for i in range(size):
-        if use_extra_signals_list:
-          # Use different extra signals for different ports
-          current_extra_signals = port["extra_signals_list"][i]
-        else:
-          # Use the same extra signals for all items
-          current_extra_signals = extra_signals
+        # Use the same extra signals for all items
+        current_extra_signals = extra_signals
 
         # The netlist generator declares extra signals independently for each item,
         # in contrast to ready/valid signals.

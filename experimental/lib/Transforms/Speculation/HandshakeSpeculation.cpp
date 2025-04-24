@@ -646,7 +646,7 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
         }
       }
     } else {
-      // Resume upstream traversal only to the MuxOp's index channel
+      // Continue upstream traversal only to the MuxOp's index channel
       if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
         for (auto &operand : muxOp.getSelectOperand().getUses()) {
           if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
