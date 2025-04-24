@@ -635,16 +635,25 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
   }
 
   if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    if (!isDownstream) {
-      // Stop the upstream traversal at ControlMergeOp or MuxOp
-      return success();
-    }
-
-    // Only perform traversal to the dataResult
-    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
-    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
-        return failure();
+    if (isDownstream) {
+      // Continue normal downstream traversal, including the index channel
+      // (i.e., ControlMergeOp).
+      for (auto result : op->getResults()) {
+        for (auto &operand : result.getUses()) {
+          if (failed(
+                  addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+            return failure();
+        }
+      }
+    } else {
+      // Resume upstream traversal only to the MuxOp's index channel
+      if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+        for (auto &operand : muxOp.getSelectOperand().getUses()) {
+          if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
+                                                     visited)))
+            return failure();
+        }
+      }
     }
 
     return success();

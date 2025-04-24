@@ -314,8 +314,8 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
 class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
   "all of {" # !interleave(names, ", ") # "} should have the same extra " #
   "signals except for " # except,
-  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  "\", " # valuesToExtraSignalArrays<names>.result  # ")">
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    valuesToExtraSignalArrays<names>.result  # ", \"" # except # "\")">
 >;
 
 /// Multi-entity constraint ensuring that the all HandshakeTypes including variadic
