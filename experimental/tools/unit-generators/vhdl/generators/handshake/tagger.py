@@ -19,6 +19,8 @@ def generate_tagger(name, params):
 
   if input_extra_signals:
     return _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, input_extra_signals)
+  elif data_bitwidth == 0:
+    return _generate_tagger_dataless(name, current_tag, tag_bitwidth)
   else:
     return _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth)
 
@@ -79,6 +81,69 @@ begin
                             combined_ready);
 
     outs <= ins;
+
+    -- Split combined_ready into ins_ready and tagIn_ready
+    ins_ready   <= combined_ready(0);
+    tagIn_ready <= combined_ready(1);
+
+    outs_{current_tag} <= tagIn;
+
+end architecture;
+"""
+
+  return dependencies + entity + architecture
+
+def _generate_tagger_dataless(name, current_tag, tag_bitwidth):
+  join_name = f"{name}_join"
+
+  dependencies = \
+      generate_join(join_name, {
+          "size": 2
+      })
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use work.types.all;
+use ieee.numeric_std.all;
+use IEEE.math_real.all;
+
+-- Entity of tagger
+entity {name} is
+  port(
+    clk, rst      : in  std_logic;
+    ins_valid : in std_logic;
+    
+    outs_ready : in std_logic; 
+    outs_valid : out std_logic;
+
+    ins_ready : out std_logic;
+
+    tagIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
+    tagIn_valid : in  std_logic;
+    tagIn_ready : out std_logic;
+
+    outs_{current_tag} : out std_logic_vector({tag_bitwidth}-1 downto 0) 
+  );
+end {name};
+"""
+
+  architecture = f"""
+-- Architecture of tagger
+architecture arch of {name} is
+  signal combined_valid : std_logic_vector(1 downto 0);
+  signal combined_ready : std_logic_vector(1 downto 0);
+begin
+    -- Combine tagIn_valid and ins_valid
+    combined_valid <= tagIn_valid & ins_valid;
+
+    j : entity work.{join_name}
+                port map(   clk,
+                            rst,
+                            combined_valid,
+                            outs_ready,
+                            outs_valid,
+                            combined_ready);
 
     -- Split combined_ready into ins_ready and tagIn_ready
     ins_ready   <= combined_ready(0);

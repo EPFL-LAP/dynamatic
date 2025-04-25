@@ -1,6 +1,5 @@
 from generators.support.signal_manager import generate_signal_manager
-from generators.handshake.join import generate_join
-
+from generators.handshake.fork import generate_fork
 
 def generate_untagger(name, params):
   data_bitwidth = params["data_bitwidth"]
@@ -19,11 +18,16 @@ def generate_untagger(name, params):
 
   if output_extra_signals:
     return _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, output_extra_signals)
+  elif data_bitwidth == 0:
+    return _generate_untagger_dataless(name, current_tag, tag_bitwidth)
   else:
     return _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth)
 
 
 def _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth):
+  fork_name = f"{name}_fork"
+
+  dependencies = generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
   entity = f"""
 library ieee;
@@ -64,7 +68,51 @@ begin
     ins_ready <= '1';
     outs <= ins;
     tagOut <= ins_{current_tag};
+end architecture;
+"""
 
+  return entity + architecture
+
+def _generate_untagger_dataless(name, current_tag, tag_bitwidth):
+  fork_name = f"{name}_fork"
+
+  dependencies = generate_fork(fork_name, {"size": 2, "bitwidth": 0})
+
+  entity = f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use work.types.all;
+use ieee.numeric_std.all;
+use IEEE.math_real.all;
+
+-- Entity of untagger
+entity {name} is
+port(
+  clk, rst      : in  std_logic;
+  ins_valid : in std_logic;
+
+  outs_ready : in std_logic; 
+  outs_valid : out std_logic;
+
+  ins_ready : out std_logic;
+
+  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut_valid : out  std_logic;
+  tagOut_ready : in std_logic;
+
+  ins_{current_tag} : in std_logic_vector({tag_bitwidth}-1 downto 0) 
+);
+end {name};
+"""
+
+  architecture = f"""
+-- Architecture of untagger
+architecture arch of {name} is
+begin
+    outs_valid<= '1';
+    tagOut_valid<= '1';
+    ins_ready <= '1';
+    tagOut <= ins_{current_tag};
 end architecture;
 """
 

@@ -139,32 +139,26 @@ static bool isShannonMux(handshake::MuxOp muxOp) {
 }
 
 /**
- * @brief Identifies control-flow-based clusters in a handshake function.
- * This function analyzes the handshake IR to group Muxes and
- * ConditionalBranches into clusters based on shared control conditions.
- * Clusters can represent:
- * - Loops: Muxes selected by a Merge fed by a constant.
- * - If/Else blocks: branches and muxes sharing a condition.
- * - If-only statements: branches without corresponding muxes leading to
- * sinks/stores.
+ * @brief Retrieves the constant input to a MergeOp.
  *
- * Each cluster contains:
- * - Inputs: operands entering the region (excluding condition producers).
- * - Outputs: values exiting the region.
- * - Internal nodes: operations within the region, excluding condition
- * generators.
+ * @param mergeOp The MergeOp to analyze.
  *
- * Additionally, a global outer cluster covering the full function is added.
- *
- * @param funcOp The handshake function to analyze.
- * @param ctx The MLIR context.
- *
- * @return Vector of identified clusters.
+ * @return The constant input to the MergeOp.
  */
-std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
-                                                  MLIRContext *ctx) {
-  std::vector<Cluster> clusters;
-  // Map each value to all the MUXes that it feeds
+static Value getInitConstantInput(handshake::MergeOp mergeOp) {
+  // Get the constant input to the MergeOp
+  Value constantInput = mergeOp.getOperand(0);
+  if (auto constantOp =
+          dyn_cast<handshake::ConstantOp>(constantInput.getDefiningOp())) {
+    return constantInput;
+  }
+  return mergeOp.getOperand(1);
+}
+
+static llvm::DenseMap<Value,
+                      std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+analyzeMuxConditions(handshake::FuncOp funcOp) {
+  // Map each condition value to all the MUXes that it feeds as the select
   // Each value will then correspond to a cluster
   // All Muxes being fed by the same value or its negation will be in the
   // same cluster
@@ -186,11 +180,12 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
     if (isa<handshake::NotOp>(cond.getDefiningOp()))
       cond = cond.getDefiningOp()->getOperand(0);
 
-    // If a MUX is fed by a MergeOp fed by condition c, then the MUX is a loop
-    // header
-    if (isa<handshake::MergeOp>(cond.getDefiningOp())) {
-      Value op1 = cond.getDefiningOp()->getOperand(0);
-      Value op2 = cond.getDefiningOp()->getOperand(1);
+    // If a MUX is fed by a MergeOp(INIT) fed by condition c, then the MUX is a
+    // loop header
+    if (handshake::MergeOp init =
+            dyn_cast<handshake::MergeOp>(cond.getDefiningOp())) {
+      Value op1 = init->getOperand(0);
+      Value op2 = init->getOperand(1);
 
       // The Merge Op is fed by a constant and the condition c
       if (isa<handshake::ConstantOp>(op1.getDefiningOp())) {
@@ -206,11 +201,31 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
 
     condToMuxes[cond].first.push_back(muxOp);
   }
+  return condToMuxes;
+}
 
+/**
+ * @brief Analyzes the branches and their conditions in a handshake function.
+ * For branches witout corresponding MUXes, this function immediately creates
+ * the "if statement" cluster containing the branch and all the reachable
+ * operations from it.
+ *
+ * @param funcOp The handshake function to analyze.
+ * @param condToMuxes A map of conditions to MUXes.
+ * @param clusters A vector to store the identified clusters.
+ *
+ * @return A map of conditions to branches.
+ */
+static llvm::DenseMap<Value,
+                      llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+analyzeBranchesConditions(
+    handshake::FuncOp funcOp,
+    llvm::DenseMap<Value,
+                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+        &condToMuxes,
+    std::vector<Cluster> &clusters) {
   llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
       condToBranches;
-
-  // Step 2: Find all the branches that are fed by the each condition
   for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
     Value cond = branchOp.getConditionOperand();
 
@@ -250,9 +265,23 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
       clusters.push_back(ifCluster);
     }
   }
+  return condToBranches;
+}
 
-  // Step 3: Create clusters for each condition
-
+/**
+ * @brief Creates clusters based on the identified MUXes and branches.
+ *
+ * @param condToMuxes A map of conditions to MUXes.
+ * @param condToBranches A map of conditions to branches.
+ * @param clusters A vector to store the created clusters.
+ */
+static void createClusters(
+    llvm::DenseMap<Value,
+                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+        &condToMuxes,
+    llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+        &condToBranches,
+    std::vector<Cluster> &clusters) {
   // IMPORTANT REMARK: The generators of the condition are considered as
   // external to the cluster and NOT inside it. This is to ensure that the
   // clusters relationship property (disjoint, completely nested) is not
@@ -281,7 +310,16 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
       for (auto muxOp : muxOps) {
         inputs.insert(muxOp.getDataOperands().begin(),
                       muxOp.getDataOperands().end());
-        inputs.insert(muxOp.getSelectOperand());
+        // inputs.insert(muxOp.getSelectOperand());
+
+        handshake::MergeOp init = dyn_cast<handshake::MergeOp>(
+            muxOp.getSelectOperand().getDefiningOp());
+
+        assert(
+            init &&
+            "The select operand of the MUX in loop header should be a MergeOp");
+
+        inputs.insert(getInitConstantInput(init));
 
         llvm::DenseSet<Operation *> visited;
         auto branchOps = condToBranches[cond];
@@ -320,22 +358,22 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
         outputs.erase(v);
       }
 
-      for (auto muxOp : muxOps) {
-        Value select = muxOp.getSelectOperand();
-        if (handshake::MergeOp merge =
-                dyn_cast<handshake::MergeOp>(select.getDefiningOp())) {
-          if (internalNodes.contains(merge.getOperation())) {
-            // If the MUX is fed by a MergeOp, then we need to remove the
-            // MergeOp and teh operations feeding it from the cluster
-            internalNodes.erase(merge.getOperation());
-            for (auto operand : merge.getOperands()) {
-              if (internalNodes.contains(operand.getDefiningOp())) {
-                internalNodes.erase(operand.getDefiningOp());
-              }
-            }
-          }
-        }
-      }
+      // for (auto muxOp : muxOps) {
+      //   Value select = muxOp.getSelectOperand();
+      //   if (handshake::MergeOp merge =
+      //           dyn_cast<handshake::MergeOp>(select.getDefiningOp())) {
+      //     if (internalNodes.contains(merge.getOperation())) {
+      //       // If the MUX is fed by a MergeOp, then we need to remove the
+      //       // MergeOp and teh operations feeding it from the cluster
+      //       internalNodes.erase(merge.getOperation());
+      //       for (auto operand : merge.getOperands()) {
+      //         if (internalNodes.contains(operand.getDefiningOp())) {
+      //           internalNodes.erase(operand.getDefiningOp());
+      //         }
+      //       }
+      //     }
+      //   }
+      // }
 
     } else {
       // Case 1.2 : if/else statement
@@ -367,11 +405,51 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
     Cluster cluster(inputs, outputs, internalNodes);
     clusters.push_back(cluster);
   }
+}
 
-  // Define an outer cluster which is the entire graph
+/**
+ * @brief Identifies control-flow-based clusters in a handshake function.
+ * This function analyzes the handshake IR to group Muxes and
+ * ConditionalBranches into clusters based on shared control conditions.
+ * Clusters can represent:
+ * - Loops: Muxes selected by a Merge fed by a constant.
+ * - If/Else blocks: branches and muxes sharing a condition.
+ * - If-only statements: branches without corresponding muxes leading to
+ * sinks/stores.
+ *
+ * Each cluster contains:
+ * - Inputs: operands entering the region (excluding condition producers).
+ * - Outputs: values exiting the region.
+ * - Internal nodes: operations within the region, excluding condition
+ * generators.
+ *
+ * Additionally, a global outer cluster covering the full function is added.
+ *
+ * @param funcOp The handshake function to analyze.
+ * @param ctx The MLIR context.
+ *
+ * @return Vector of identified clusters.
+ */
+std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
+                                                  MLIRContext *ctx) {
+  std::vector<Cluster> clusters;
+
+  // Step 1: Identify the MUXes and their conditions
+  llvm::DenseMap<Value, std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+      condToMuxes = analyzeMuxConditions(funcOp);
+
+  // Step 2: Find all the branches that are fed by the each condition
+  llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+      condToBranches = analyzeBranchesConditions(funcOp, condToMuxes, clusters);
+
+  // Step 3: Create clusters for each condition
+  createClusters(condToMuxes, condToBranches, clusters);
+
+  // Step 4: Define an outer cluster which is the entire graph
   // Inputs: start
   // Outputs: the inputs of EndOp
-  // Internal nodes: all the operations in the graph except the EndOp
+  // Internal nodes: all the operations in the graph except the EndOp and Memory
+  // Ops(Memory Controller and LSQ)
   llvm::DenseSet<Operation *> globalOps;
   llvm::DenseSet<Value> inputs;
   llvm::DenseSet<Value> outputs;
@@ -379,6 +457,9 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
   for (auto &op : funcOp.getBody().getOps()) {
     if (handshake::EndOp end = dyn_cast<handshake::EndOp>(op)) {
       inputs.insert(end.getOperands().begin(), end.getOperands().end());
+    } else if (isa<handshake::MemoryControllerOp>(op) ||
+               isa<handshake::LSQOp>(op)) {
+      continue;
     } else {
       globalOps.insert(&op);
     }
@@ -439,7 +520,7 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
  * @param clusters The list of disjoint or nested clusters.
  *
  * @return A list of ClusterHierarchyNode pointers representing the
- * hierarchy.
+ * hierarchy in increasing size of clusters(from innermost to outermost).
  * @note Assumes clusters are either disjoint or properly nested.
  */
 std::vector<ClusterHierarchyNode *>
