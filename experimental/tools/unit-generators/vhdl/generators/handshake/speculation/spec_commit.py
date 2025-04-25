@@ -70,7 +70,9 @@ architecture arch of {name} is
   signal merge_ins_valid : std_logic_vector(1 downto 0);
   signal merge_ins_ready : std_logic_vector(1 downto 0);
 begin
+
   branch_in_condition <= ins_spec;
+
   branch_in: entity work.{cond_br_name}(arch)
     port map (
       clk => clk,
