@@ -1217,8 +1217,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   let summary = "Adds a non-speculative spec bit.";
   let description = [{
     The non-spec operation has an input channel without a spec bit and an output
-    channel with a spec bit. The output channel is always marked as
-    non-speculative.
+    channel with a spec bit. Tokens on the output channel are marked as non-spec.
     It's typically used before a MuxOp or CMergeOp to satisfy their type
     requirements and to indicate the beginning of a speculative region.
 
