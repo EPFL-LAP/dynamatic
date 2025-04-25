@@ -66,6 +66,5 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
           "bitwidth": bitwidth,
           "extra_signals": extra_signals_without_spec,
       }],
-      "extra_signals": extra_signals_without_spec,
-      "ignore_ports": ["ctrl"]
+      "extra_signals": extra_signals_without_spec
   }, lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))
