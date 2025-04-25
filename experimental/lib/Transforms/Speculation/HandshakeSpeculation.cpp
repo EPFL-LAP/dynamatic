@@ -13,6 +13,7 @@
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -82,6 +83,10 @@ private:
   /// See the documentation for more details:
   /// docs/Speculation/AddingSpecTagsToSpecRegion.md
   LogicalResult addSpecTagToSpecRegion();
+
+  // Add NonSpecOps to the non-speculative edges of MuxOp/CMergeOp to satisfy
+  // their type requirements.
+  LogicalResult addNonSpecOp();
 };
 } // namespace
 
@@ -630,16 +635,25 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
   }
 
   if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    if (!isDownstream) {
-      // Stop the upstream traversal at ControlMergeOp or MuxOp
-      return success();
-    }
-
-    // Only perform traversal to the dataResult
-    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
-    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
-        return failure();
+    if (isDownstream) {
+      // Continue normal downstream traversal, including the index channel
+      // (i.e., ControlMergeOp).
+      for (auto result : op->getResults()) {
+        for (auto &operand : result.getUses()) {
+          if (failed(
+                  addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+            return failure();
+        }
+      }
+    } else {
+      // Continue upstream traversal only to the MuxOp's index channel
+      if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+        for (auto &operand : muxOp.getSelectOperand().getUses()) {
+          if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
+                                                     visited)))
+            return failure();
+        }
+      }
     }
 
     return success();
@@ -682,6 +696,44 @@ LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
                                                visited)))
       return failure();
   }
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
+  auto funcOp = cast<FuncOp>(specOp->getParentOp());
+  OpBuilder builder(&getContext());
+
+  for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+    auto dataResultType =
+        mergeLikeOp.getDataResult().getType().cast<ExtraSignalsTypeInterface>();
+
+    if (dataResultType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      // This MuxOp/CMergeOp is within the speculative region.
+
+      // Iterate over the data operands and add NonSpecOps to the
+      // non-speculative edges.
+      for (auto dataOperand : mergeLikeOp.getDataOperands()) {
+        auto dataOperandType =
+            dataOperand.getType().cast<ExtraSignalsTypeInterface>();
+
+        if (!dataOperandType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+          // Create a NonSpecOp to add the spec tag to the data operand
+          builder.setInsertionPointAfterValue(dataOperand);
+          auto nonSpecOp = builder.create<NonSpecOp>(
+              mergeLikeOp.getLoc(), dataOperand.getType(), dataOperand);
+          inheritBB(mergeLikeOp, nonSpecOp);
+
+          // Add the spec tag to the NonSpecOp's result
+          if (failed(addSpecTagToValue(nonSpecOp.getResult())))
+            return failure();
+
+          // Replace the data operand with the NonSpecOp's result
+          dataOperand.replaceAllUsesExcept(nonSpecOp.getResult(), nonSpecOp);
+        }
+      }
+    }
+  }
+
   return success();
 }
 
@@ -734,6 +786,11 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // speculative region. Skipping this update would lead to a type verification
   // error, as type-checking happens after the pass.
   if (failed(addSpecTagToSpecRegion()))
+    return signalPassFailure();
+
+  // Finally, add NonSpecOps to the non-speculative edges of MuxOp/CMergeOp
+  // to satisfy their type requirements.
+  if (failed(addNonSpecOp()))
     return signalPassFailure();
 }
 

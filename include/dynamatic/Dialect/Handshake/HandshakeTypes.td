@@ -314,8 +314,8 @@ class AllExtraSignalsMatch<list<string> names> : AllMatchSameOperatorTrait<
 class AllExtraSignalsMatchExcept<string except, list<string> names> : PredOpTrait<
   "all of {" # !interleave(names, ", ") # "} should have the same extra " #
   "signals except for " # except,
-  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  "\", " # valuesToExtraSignalArrays<names>.result  # ")">
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    valuesToExtraSignalArrays<names>.result  # ", \"" # except # "\")">
 >;
 
 /// Multi-entity constraint ensuring that the all HandshakeTypes including variadic
@@ -342,16 +342,29 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
 >;
 
 /// Multi-entity constraint ensuring that all HandshakeTypes including variadic
+/// have matching extra signals.
+/// The core implementation of this predicate is in C++.
+class AllExtraSignalsMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
+  "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
+  "have the same extra signals except for " # except,
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    concatArrays<"llvm::ArrayRef<ExtraSignal>",
+    variadicToExtraSignalArrays<variadic>.result,
+    valuesToExtraSignalArrays<nonvariadics>.result
+  >.result # ")">
+>;
+
+/// Multi-entity constraint ensuring that all HandshakeTypes including variadic
 /// have matching extra signals, except for any signal with the given `except` name.
 /// The core implementation of this predicate is in C++.
 class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
   "have the same extra signals except for " # except,
-  CPred<"::dynamatic::handshake::doesExtraSignalsMatchExcept(\"" # except #
-  "\", " # concatArrays<"llvm::ArrayRef<ExtraSignal>",
+  CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
+    concatArrays<"llvm::ArrayRef<ExtraSignal>",
     variadicToExtraSignalArrays<variadic>.result,
     valuesToExtraSignalArrays<nonvariadics>.result
-  >.result # ")">
+  >.result # ", \"" # except # "\")">
 >;
 
 /// Constraint to ensure that the variadic has at least one element.
