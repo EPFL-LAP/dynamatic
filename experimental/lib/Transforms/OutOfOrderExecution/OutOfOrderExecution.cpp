@@ -79,9 +79,14 @@ private:
   // inserting sync ops, optionally recursing up the cluster hierarchy.
   void traverseGraph(const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
                      ClusterHierarchyNode *clusterNode,
+                     llvm::DenseSet<Value> &visited,
                      llvm::DenseSet<Operation *> &dirtyNodes);
 
-  // Step 1.3: Identify tagged edges; i.e. the edges that should receive a tag
+  void traverseGraph2(OpOperand &opOperand, ClusterHierarchyNode *clusterNode,
+                      llvm::DenseSet<Operation *> &dirtyNodes);
+
+  // Step 1.3: Identify tagged edges; i.e. the edges that should receive a
+  // tag
   LogicalResult
   identifyTaggedEdges(const llvm::DenseSet<Value> &outOfOrderNodeInputs,
                       const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
@@ -362,11 +367,24 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
 
   // Step 1: Identify the dirty nodes
   llvm::DenseSet<Operation *> dirtyNodes;
+  // llvm::DenseSet<Operation *> outOfOrderNodeOutputsOps;
+  // for (Value output : outOfOrderNodeOutputs) {
+  //   Operation *op = output.getDefiningOp();
+  //   if (op)
+  //     outOfOrderNodeOutputsOps.insert(op);
+  // }
   if (failed(identifyDirtyNodes(outOfOrderNodeOutputs,
                                 outOfOrderNodeInternalOps, clusterNode,
                                 dirtyNodes)))
     return failure();
 
+  llvm::errs() << "Dirty nodes: \n";
+  for (auto *node : dirtyNodes) {
+    llvm::errs() << *node << "\n";
+  }
+  llvm::errs() << "Done printing dirty nodes.\n";
+
+  // If there are no dirty nodes, then we don't need to do anything
   if (dirtyNodes.empty())
     return success();
 
@@ -381,11 +399,23 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
   if (unalignedEdges.size() <= 1)
     return success();
 
+  llvm::errs() << "Unaligned edges: \n";
+  for (auto edge : unalignedEdges) {
+    llvm::errs() << edge << "\n";
+  }
+  llvm::errs() << "Done printing unaligned edges.\n";
+
   // Step 3: Identify the tagged edges
   llvm::DenseSet<Value> taggedEdges;
   if (failed(identifyTaggedEdges(outOfOrderNodeInputs, outOfOrderNodeOutputs,
                                  unalignedEdges, taggedEdges)))
     return failure();
+
+  llvm::errs() << "Tagged edges: \n";
+  for (auto edge : taggedEdges) {
+    llvm::errs() << edge << "\n";
+  }
+  llvm::errs() << "Done printing tagged edges.\n";
 
   // Step 4: Add the tagger and untagger operations and connect them to the
   // freeTagsFifo
@@ -439,7 +469,13 @@ LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
     const llvm::DenseSet<Operation *> &outOfOrderNodeInternalOps,
     ClusterHierarchyNode *clusterNode,
     llvm::DenseSet<Operation *> &dirtyNodes) {
-  traverseGraph(outOfOrderNodeOutputs, clusterNode, dirtyNodes);
+  llvm::DenseSet<Value> visited;
+  for (Value output : outOfOrderNodeOutputs) {
+    for (auto &operand : output.getUses()) {
+      traverseGraph2(operand, clusterNode, dirtyNodes);
+    }
+  }
+  // traverseGraph(outOfOrderNodeOutputs, clusterNode, visited, dirtyNodes);
   for (Operation *op : outOfOrderNodeInternalOps) {
     dirtyNodes.erase(op);
   }
@@ -465,7 +501,7 @@ LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
 */
 void OutOfOrderExecutionPass::traverseGraph(
     const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
-    ClusterHierarchyNode *clusterNode,
+    ClusterHierarchyNode *clusterNode, llvm::DenseSet<Value> &visited,
     llvm::DenseSet<Operation *> &dirtyNodes) {
 
   for (Value output : outOfOrderNodeOutputs) {
@@ -474,12 +510,16 @@ void OutOfOrderExecutionPass::traverseGraph(
     if (!op)
       continue;
 
+    if (visited.contains(output))
+      continue;
+
+    visited.insert(output);
+
     // Memory Operations (Memory Controller & LSQ) Control and End operations
     // should not be marked as a dirty node
     // MUXes should also not be marked as dirty nodes because they naturally
     // allign their inputs according to their select irrespectively of the tags
-    if (dirtyNodes.find(op) != dirtyNodes.end() ||
-        isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
+    if (isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
         isa<handshake::EndOp>(op) || isa<handshake::MuxOp>(op))
       return;
 
@@ -494,19 +534,72 @@ void OutOfOrderExecutionPass::traverseGraph(
       bool inputToChildCluster = false;
       for (auto *childCluster : clusterNode->children) {
         if (childCluster->cluster.inputs.contains(output)) {
-          traverseGraph(childCluster->cluster.outputs, clusterNode, dirtyNodes);
+          traverseGraph(childCluster->cluster.outputs, clusterNode, visited,
+                        dirtyNodes);
           inputToChildCluster = true;
         }
       }
 
       if (!inputToChildCluster) {
         // Case 3:Continue traversing the graph through the operations reachable
-        // from the current operation This is done by traversing the results of
-        // the current operation and the users of these results
+        // from the current value. This is done by traversing the users of the
+        // value
         for (auto *user : output.getUsers()) {
           traverseGraph(llvm::DenseSet<Value>(user->getResults().begin(),
                                               user->getResults().end()),
-                        clusterNode, dirtyNodes);
+                        clusterNode, visited, dirtyNodes);
+        }
+      }
+    }
+  }
+}
+
+void OutOfOrderExecutionPass::traverseGraph2(
+    OpOperand &opOperand, ClusterHierarchyNode *clusterNode,
+    llvm::DenseSet<Operation *> &dirtyNodes) {
+
+  Operation *op = opOperand.getOwner();
+
+  if (!op)
+    return;
+
+  // Memory Operations (Memory Controller & LSQ) Control and End operations
+  // should not be marked as a dirty node
+  // MUXes should also not be marked as dirty nodes because they naturally
+  // allign their inputs according to their select irrespectively of the tags
+  if (dirtyNodes.find(op) != dirtyNodes.end() ||
+      isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
+      isa<handshake::EndOp>(op) || isa<handshake::MuxOp>(op))
+    return;
+
+  // Case 1: We need to stop checking at the outputs of the cluster
+  // Stop DFS at boundaries of teh cluster
+  if (!clusterNode->cluster.outputs.contains(opOperand.get())) {
+    // Case 2: If the cluster has any children clusters nested inside, we need
+    // to keep these clusters closed. So whenever we encounter an input
+    // to any of these clusters, we skip to their outputs
+    bool inputToChildCluster = false;
+    for (auto *childCluster : clusterNode->children) {
+      if (childCluster->cluster.inputs.contains(opOperand.get())) {
+        inputToChildCluster = true;
+
+        for (Value output : childCluster->cluster.outputs) {
+          for (auto &operand : output.getUses()) {
+            traverseGraph2(operand, clusterNode, dirtyNodes);
+          }
+        }
+      }
+    }
+
+    if (!inputToChildCluster) {
+      dirtyNodes.insert(op);
+
+      // Case 3:Continue traversing the graph through the operations reachable
+      // from the current value. This is done by traversing the users of the
+      // value
+      for (Value output : op->getResults()) {
+        for (auto &operand : output.getUses()) {
+          traverseGraph2(operand, clusterNode, dirtyNodes);
         }
       }
     }
@@ -538,6 +631,20 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
   // Backward edges from the dirty node
   for (auto *dirtyNode : dirtyNodes) {
     for (auto operand : dirtyNode->getOperands()) {
+      bool edgeFromCluster = false;
+      // Check if the operand is an output from one of the children clusters
+      for (auto *childCluster : clusterNode->children) {
+        if (childCluster->cluster.outputs.contains(operand)) {
+          edgeFromCluster = true;
+        }
+      }
+
+      // If the operand is an output from one of the children clusters, then the
+      // children cluster is technically a dirtyNode, so thi is a
+      // dirtyNode->dirtNode edge that is aligned
+      if (edgeFromCluster)
+        continue;
+
       Operation *producer = operand.getDefiningOp();
       // Identify edges that connect a non-dirty node to a dirty node
       // Both the consumer and the producers shoud be internal to the cluster
