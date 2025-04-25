@@ -75,15 +75,20 @@ begin
     port map (
       clk => clk,
       rst => rst,
+
       {data("data => ins,", bitwidth)}
       data_valid => ins_valid,
       data_ready => ins_ready,
+
       condition => branch_in_condition,
-      condition_valid => '1', -- always valid
+      -- Handshaking is common with `data`, keep valid high and ignore ready
+      condition_valid => '1',
       condition_ready => open,
+
       {data("trueOut => branch_in_trueOut,", bitwidth)}
       trueOut_valid => branch_in_trueOut_valid,
       trueOut_ready => branch_in_trueOut_ready,
+
       {data("falseOut => branch_in_falseOut,", bitwidth)}
       falseOut_valid => branch_in_falseOut_valid,
       falseOut_ready => branch_in_falseOut_ready
@@ -93,15 +98,20 @@ begin
     port map (
       clk => clk,
       rst => rst,
+
       {data("data => branch_in_trueOut,", bitwidth)}
       data_valid => branch_in_trueOut_valid,
       data_ready => branch_in_trueOut_ready,
+
       condition => ctrl,
       condition_valid => ctrl_valid,
       condition_ready => ctrl_ready,
+
+      -- trueOut sinks
       {data("trueOut => open,", bitwidth)}
       trueOut_valid => open,
-      trueOut_ready => '1', -- sink
+      trueOut_ready => '1',
+
       {data("falseOut => branch_disc_falseOut,", bitwidth)}
       falseOut_valid => branch_disc_falseOut_valid,
       falseOut_ready => branch_disc_falseOut_ready
@@ -116,9 +126,11 @@ begin
     port map (
       clk => clk,
       rst => rst,
+
       {data("ins => merge_ins,", bitwidth)}
       ins_valid => merge_ins_valid,
       ins_ready => merge_ins_ready,
+
       {data("outs => outs,", bitwidth)}
       outs_valid => outs_valid,
       outs_ready => outs_ready
