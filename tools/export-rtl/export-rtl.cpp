@@ -207,6 +207,8 @@ struct WriteModData {
   raw_indented_ostream &os;
   /// Maps SSA values to the name of a corresponding RTL signal.
   llvm::MapVector<Value, std::string> signals;
+  /// List of SSA values feeding the module's input ports.
+  SmallVector<Value> inputs;
   /// List of SSA values feeding the module's output ports.
   SmallVector<Value> outputs;
 
@@ -462,26 +464,22 @@ void WriteModData::writeSignalDeclarations(
 
 void WriteModData::writeSignalAssignments(
     SignalAssignmentWriter writeAssignment) {
-  auto addValidReady = [&](StringRef name, StringRef signal) -> void {
-    writeAssignment(signal + RTLWriter::VALID_SUFFIX,
-                    name + RTLWriter::VALID_SUFFIX, os);
-
-    std::string signalName = signal.str();
-    // Wehn connecting the ready signal of the top level module a proper
-    // internal signal is needed. This signal needs to be named
-    // component_name_port_name instead of component_name.port_name
-    std::replace(signalName.begin(), signalName.end(), '.', '_');
-    writeAssignment(name + RTLWriter::READY_SUFFIX,
-                    signalName + RTLWriter::READY_SUFFIX, os);
+  auto addValid = [&](StringRef dst, StringRef src) -> void {
+    writeAssignment(dst + RTLWriter::VALID_SUFFIX,
+                    src + RTLWriter::VALID_SUFFIX, os);
   };
-  auto addExtraSignals = [&](StringRef name, StringRef signal,
+  auto addReady = [&](StringRef dst, StringRef src) -> void {
+    writeAssignment(dst + RTLWriter::READY_SUFFIX,
+                    src + RTLWriter::READY_SUFFIX, os);
+  };
+  auto addExtraSignals = [&](StringRef dst, StringRef src,
                              ArrayRef<ExtraSignal> extraSignals) -> void {
     for (const ExtraSignal &extra : extraSignals) {
-      std::string srcName = getExtraSignalName(signal, extra);
-      std::string dstName = getExtraSignalName(name, extra);
+      std::string srcName = getExtraSignalName(src, extra);
+      std::string dstName = getExtraSignalName(dst, extra);
       if (!extra.downstream)
         std::swap(srcName, dstName);
-      writeAssignment(srcName, dstName, os);
+      writeAssignment(dstName, srcName, os);
     }
   };
 
@@ -489,18 +487,58 @@ void WriteModData::writeSignalAssignments(
     Value val = std::get<0>(valAndName);
     StringRef name = std::get<1>(valAndName).strref();
     StringRef signal = signals[val];
+    std::string signalName = signal.str();
+    // When connecting the ready signal of the top level module a proper
+    // internal signal is needed. This signal needs to be named
+    // component_name_port_name instead of component_name.port_name
+    std::replace(signalName.begin(), signalName.end(), '.', '_');
+
     llvm::TypeSwitch<Type, void>(val.getType())
         .Case<ChannelType>([&](ChannelType channelType) {
-          writeAssignment(signal, name, os);
-          addValidReady(name, signal);
+          writeAssignment(name, signal, os);
+          addValid(name, signal);
+          addReady(signalName, name);
           addExtraSignals(name, signal, channelType.getExtraSignals());
         })
         .Case<ControlType>([&](auto type) {
-          addValidReady(name, signal);
+          addValid(name, signal);
+          addReady(signalName, name);
           addExtraSignals(name, signal, type.getExtraSignals());
         })
+        .Case<IntegerType>(
+            [&](IntegerType intType) { writeAssignment(name, signal, os); });
+  }
+
+  // Internal signals for input ports are used only for SMV. If in the future
+  // also VHDL and SV will use this feature, this early exit can be removed
+  if (inputs.empty())
+    return;
+
+  for (auto valAndName : llvm::zip(inputs, modOp.getInputNamesStr())) {
+    Value val = std::get<0>(valAndName);
+    StringRef name = std::get<1>(valAndName).strref();
+    StringRef signal = signals[val];
+    std::string signalName = signal.str();
+    // When connecting the input signals of the top level module we
+    // use internal signals with the name of where the signal will go
+    std::replace(signalName.begin(), signalName.end(), '.', '_');
+
+    llvm::TypeSwitch<Type, void>(val.getType())
+        .Case<ChannelType>([&](ChannelType channelType) {
+          writeAssignment(signalName, name, os);
+          addValid(signalName, name);
+          addReady(name, signal);
+          addExtraSignals(signalName, name, channelType.getExtraSignals());
+        })
+        .Case<ControlType>([&](auto type) {
+          addValid(signalName, name);
+          addReady(name, signal);
+          addExtraSignals(signalName, name, type.getExtraSignals());
+        })
         .Case<IntegerType>([&](IntegerType intType) {
-          writeAssignment(signals[val], name, os);
+          if (name.str() != dynamatic::hw::CLK_PORT &&
+              name.str() != dynamatic::hw::RST_PORT)
+            writeAssignment(signalName, name, os);
         });
   }
 }
@@ -743,7 +781,7 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
 
   // Architecture implementation
   data.writeSignalAssignments(
-      [](const llvm::Twine &src, const llvm::Twine &dst,
+      [](const llvm::Twine &dst, const llvm::Twine &src,
          raw_indented_ostream &os) { os << dst << " <= " << src << ";\n"; });
   os << "\n";
   writeModuleInstantiations(data);
@@ -885,7 +923,7 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   });
 
   os << "\n";
-  data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
+  data.writeSignalAssignments([](const llvm::Twine &dst, const llvm::Twine &src,
                                  raw_indented_ostream &os) {
     os << "assign " << dst << " = " << src << ";\n";
   });
@@ -990,6 +1028,7 @@ private:
   void writeModuleInstantiations(WriteModData &data) const;
   /// Writes the preprocessor directives to include the external modules
   void writeIncludes(WriteModData &data) const;
+  std::optional<std::string> getUserSignal(Value val) const;
 };
 
 } // namespace
@@ -1004,14 +1043,50 @@ void SMVWriter::writeIncludes(WriteModData &data) const {
   }
 }
 
-LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
-  // Create the names of all the input signals of the RTL module: i.e., the
-  // block arguments of the HW MLIR
-  for (auto [arg, name] :
-       llvm::zip_equal(data.modOp.getBodyBlock()->getArguments(),
-                       data.modOp.getInputNamesStr())) {
-    data.signals[arg] = name.strref();
+std::optional<std::string> SMVWriter::getUserSignal(Value val) const {
+  auto *userOp = *val.getUsers().begin();
+  unsigned operandIndex = 0;
+  for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
+    auto operand = userOp->getOperand(i);
+    if (operand == val) {
+      operandIndex = i;
+      break;
+    }
   }
+  std::string instName;
+  bool instFound = false;
+  if (auto argNamesAttr =
+          userOp->getAttrOfType<mlir::StringAttr>("instanceName")) {
+    instName = argNamesAttr.getValue().str();
+    instFound = true;
+  }
+  std::string argName;
+  bool argFound = false;
+  if (auto argNamesAttr = userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
+    if (operandIndex < argNamesAttr.size()) {
+      if (auto strAttr =
+              argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+        argName = strAttr.getValue().str();
+        argFound = true;
+      }
+    }
+  }
+  if (instFound && argFound)
+    return instName + "." + argName;
+  return std::nullopt;
+}
+
+LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
+  // Create the names of all the input signals of the RTL module (i.e., the
+  // block arguments of the HW MLIR) by using the user's signal name
+  for (auto arg : data.modOp.getBodyBlock()->getArguments()) {
+    auto signal = getUserSignal(arg);
+    if (signal != std::nullopt)
+      data.signals[arg] = signal.value();
+  }
+
+  llvm::copy(data.modOp.getBodyBlock()->getArguments(),
+             std::back_inserter(data.inputs));
 
   // Create signal names for all operation results
   for (Operation &op : data.modOp.getBodyBlock()->getOperations()) {
@@ -1058,45 +1133,15 @@ void SMVWriter::constructIOMappings(
         getInternalSignalName(signal, SignalType::VALID));
   };
   auto addReady = [&](StringRef port, OpResult res) -> void {
-    // To get the name of the ready signal we can't use the inetrnal signal
+    // To get the name of the ready signal we can't use the internal signal
     // name. We need to get the user of the signal, and search the name of the
     // corresponding port.
     // Example: unit_tx -> [channel] -> unit_rx
     //          The ready signal needs the name of the user unit_rx.ins_ready
-    auto *userOp = *res.getUsers().begin();
-    unsigned operandIndex = 0;
-    for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
-      auto operand = userOp->getOperand(i);
-      if (operand == res) {
-        operandIndex = i;
-        break;
-      }
-    }
-    std::string instName;
-    bool instFound = false;
-    if (auto argNamesAttr =
-            userOp->getAttrOfType<mlir::StringAttr>("instanceName")) {
-      instName = argNamesAttr.getValue().str();
-      instFound = true;
-    }
-    std::string argName;
-    bool argFound = false;
-    if (auto argNamesAttr =
-            userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
-      if (operandIndex < argNamesAttr.size()) {
-        if (auto strAttr =
-                argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
-          argName = strAttr.getValue().str();
-          argFound = true;
-        }
-      }
-    }
-
-    const std::string signal = instName + "." + argName;
-
-    if (instFound && argFound)
+    auto signal = getUserSignal(res);
+    if (signal != std::nullopt)
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
-          getInternalSignalName(signal, SignalType::READY));
+          getInternalSignalName(signal.value(), SignalType::READY));
     else {
       // Connect the ready signal of the top level module: a proper internal
       // signal is needed, with name component_name_port_name instead of
@@ -1115,22 +1160,28 @@ void SMVWriter::constructIOMappings(
     }
   };
 
-  auto addInPortType = [&](Type portType, StringRef port, StringRef signal) {
+  auto addInPortType = [&](Type portType, StringRef port, Value oprd) {
+    auto signal = getValueName(oprd);
+    std::string signalName = signal.str();
+
+    if (oprd.isa<BlockArgument>())
+      std::replace(signalName.begin(), signalName.end(), '.', '_');
+
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) {
           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(
-              getInternalSignalName(signal, SignalType::DATA));
-          addValid(port, signal);
-          addExtraSignals(port, signal, channelType.getExtraSignals());
+              getInternalSignalName(signalName, SignalType::DATA));
+          addValid(port, signalName);
+          addExtraSignals(port, signalName, channelType.getExtraSignals());
         })
         .Case<ControlType>([&](auto type) {
-          addValid(port, signal);
-          addExtraSignals(port, signal, type.getExtraSignals());
+          addValid(port, signalName);
+          addExtraSignals(port, signalName, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (signal.str() != dynamatic::hw::CLK_PORT &&
-              signal.str() != dynamatic::hw::RST_PORT)
-            mappings[getSignalName(port)].push_back(signal.str());
+          if (getSignalName(port).first != dynamatic::hw::CLK_PORT &&
+              getSignalName(port).first != dynamatic::hw::RST_PORT)
+            mappings[getSignalName(port)].push_back(signalName);
         });
   };
 
@@ -1142,7 +1193,8 @@ void SMVWriter::constructIOMappings(
 
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
   for (auto [oprd, portAttr] : ins)
-    addInPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
+    addInPortType(oprd.getType(), portAttr.str(), oprd);
+  // addInPortType(oprd.getType(), portAttr.str(), getValueName(oprd));
 
   auto outs = llvm::zip_equal(instOp.getResults(), modOp.getOutputNamesStr());
   for (auto [oprd, portAttr] : outs)
@@ -1167,13 +1219,15 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
   os << ")\n\n";
 
-  writeModuleInstantiations(data);
-
-  os << "\n// output\n";
-  data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
+  os << "\n// input and output\n";
+  data.writeSignalAssignments([](const llvm::Twine &dst, const llvm::Twine &src,
                                  raw_indented_ostream &os) {
     os << "DEFINE " << dst << " := " << src << ";\n";
   });
+
+  os << "\n\n";
+
+  writeModuleInstantiations(data);
 
   return success();
 }
