@@ -77,13 +77,8 @@ private:
 
   // Applies out-of-order execution by tagging unaligned channels and
   // inserting sync ops, optionally recursing up the cluster hierarchy.
-  void traverseGraph(const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
-                     ClusterHierarchyNode *clusterNode,
-                     llvm::DenseSet<Value> &visited,
+  void traverseGraph(OpOperand &opOperand, ClusterHierarchyNode *clusterNode,
                      llvm::DenseSet<Operation *> &dirtyNodes);
-
-  void traverseGraph2(OpOperand &opOperand, ClusterHierarchyNode *clusterNode,
-                      llvm::DenseSet<Operation *> &dirtyNodes);
 
   // Step 1.3: Identify tagged edges; i.e. the edges that should receive a
   // tag
@@ -331,6 +326,34 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
   return success();
 }
+static bool isBackwardEdgeFromBranch(Value v) {
+  if (auto branchOp = v.getDefiningOp<handshake::ConditionalBranchOp>()) {
+    return true;
+  }
+  if (auto notOp = v.getDefiningOp<handshake::NotOp>()) {
+    return isBackwardEdgeFromBranch(notOp.getOperand());
+  }
+  return false;
+}
+
+static bool isInit(Operation *op) {
+  if (handshake::MergeOp mergeOp = dyn_cast<handshake::MergeOp>(op)) {
+    Value op1 = op->getOperand(0);
+    Value op2 = op->getOperand(1);
+    bool ed1 = isa<handshake::ConstantOp>(op1.getDefiningOp()) &&
+               isBackwardEdgeFromBranch(op2);
+    bool ed2 = isa<handshake::ConstantOp>(op2.getDefiningOp()) &&
+               isBackwardEdgeFromBranch(op1);
+    if (ed1 && ed2) {
+      for (auto *user : mergeOp.getResult().getUsers()) {
+        if (isa<handshake::ConditionalBranchOp>(user)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * @brief Applies the out-of-order execution algorithm within a cluster. The
@@ -472,10 +495,10 @@ LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
   llvm::DenseSet<Value> visited;
   for (Value output : outOfOrderNodeOutputs) {
     for (auto &operand : output.getUses()) {
-      traverseGraph2(operand, clusterNode, dirtyNodes);
+      traverseGraph(operand, clusterNode, dirtyNodes);
     }
   }
-  // traverseGraph(outOfOrderNodeOutputs, clusterNode, visited, dirtyNodes);
+
   for (Operation *op : outOfOrderNodeInternalOps) {
     dirtyNodes.erase(op);
   }
@@ -500,61 +523,6 @@ LogicalResult OutOfOrderExecutionPass::identifyDirtyNodes(
  * should not be marked as a dirty node
 */
 void OutOfOrderExecutionPass::traverseGraph(
-    const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
-    ClusterHierarchyNode *clusterNode, llvm::DenseSet<Value> &visited,
-    llvm::DenseSet<Operation *> &dirtyNodes) {
-
-  for (Value output : outOfOrderNodeOutputs) {
-    Operation *op = output.getDefiningOp();
-
-    if (!op)
-      continue;
-
-    if (visited.contains(output))
-      continue;
-
-    visited.insert(output);
-
-    // Memory Operations (Memory Controller & LSQ) Control and End operations
-    // should not be marked as a dirty node
-    // MUXes should also not be marked as dirty nodes because they naturally
-    // allign their inputs according to their select irrespectively of the tags
-    if (isa<handshake::MemoryControllerOp>(op) || isa<handshake::LSQOp>(op) ||
-        isa<handshake::EndOp>(op) || isa<handshake::MuxOp>(op))
-      return;
-
-    dirtyNodes.insert(op);
-
-    // Case 1: We need to stop checking at the outputs of the cluster
-    // Stop DFS at boundaries of teh cluster
-    if (!clusterNode->cluster.outputs.contains(output)) {
-      // Case 2: If the cluster has any children clusters nested inside, we need
-      // to keep these clusters closed. So whenever we encounter an input
-      // to any of these clusters, we skip to their outputs
-      bool inputToChildCluster = false;
-      for (auto *childCluster : clusterNode->children) {
-        if (childCluster->cluster.inputs.contains(output)) {
-          traverseGraph(childCluster->cluster.outputs, clusterNode, visited,
-                        dirtyNodes);
-          inputToChildCluster = true;
-        }
-      }
-
-      if (!inputToChildCluster) {
-        // Case 3:Continue traversing the graph through the operations reachable
-        // from the current value. This is done by traversing the users of the
-        // value
-        for (auto *user : output.getUsers()) {
-          traverseGraph(llvm::DenseSet<Value>(user->getResults().begin(),
-                                              user->getResults().end()),
-                        clusterNode, visited, dirtyNodes);
-        }
-      }
-    }
-  }
-}
-
-void OutOfOrderExecutionPass::traverseGraph2(
     OpOperand &opOperand, ClusterHierarchyNode *clusterNode,
     llvm::DenseSet<Operation *> &dirtyNodes) {
 
@@ -583,9 +551,12 @@ void OutOfOrderExecutionPass::traverseGraph2(
       if (childCluster->cluster.inputs.contains(opOperand.get())) {
         inputToChildCluster = true;
 
+        dirtyNodes.insert(childCluster->cluster.internalNodes.begin(),
+                          childCluster->cluster.internalNodes.end());
+
         for (Value output : childCluster->cluster.outputs) {
           for (auto &operand : output.getUses()) {
-            traverseGraph2(operand, clusterNode, dirtyNodes);
+            traverseGraph(operand, clusterNode, dirtyNodes);
           }
         }
       }
@@ -599,7 +570,7 @@ void OutOfOrderExecutionPass::traverseGraph2(
       // value
       for (Value output : op->getResults()) {
         for (auto &operand : output.getUses()) {
-          traverseGraph2(operand, clusterNode, dirtyNodes);
+          traverseGraph(operand, clusterNode, dirtyNodes);
         }
       }
     }
@@ -630,6 +601,11 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
     llvm::DenseSet<Value> &unalignedEdges) {
   // Backward edges from the dirty node
   for (auto *dirtyNode : dirtyNodes) {
+    // If the dirty node is an init operation, we don't need to check its
+    // operands because they are already aligned
+    if (isInit(dirtyNode))
+      continue;
+
     for (auto operand : dirtyNode->getOperands()) {
       bool edgeFromCluster = false;
       // Check if the operand is an output from one of the children clusters
