@@ -3,7 +3,6 @@ from generators.support.signal_manager.utils.forwarding import get_default_extra
 from generators.support.signal_manager.utils.concat import generate_concat_signal_decls_from_ports, ConcatLayout, generate_concat_port_assignments_from_ports
 from generators.support.signal_manager.utils.mapping import generate_inner_port_mapping, generate_concat_mappings
 from generators.support.signal_manager.utils.types import Port, ArrayPort, ExtraSignals
-from generators.support.signal_manager.utils.bbmerge import generate_bbmerge_lacking_spec_statements
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
@@ -16,20 +15,11 @@ def generate_control_merge(name, params):
   data_bitwidth = params["data_bitwidth"]
   index_bitwidth = params["index_bitwidth"]
 
-  # List of extra signals for each data input port
-  # Each element is a dictionary where key: extra signal name, value: bitwidth
-  # e.g., [{"tag0": 8, "spec": 1}, {"tag0": 8}]
-  input_extra_signals_list = params["input_extra_signals_list"]
   # e.g., {"tag0": 8, "spec": 1}
-  output_extra_signals = params["output_extra_signals"]
-  index_extra_signals = params["index_extra_signals"]
+  extra_signals = params["extra_signals"]
 
-  # List of indices of input ports that have spec bit
-  # e.g., [0]
-  spec_inputs = params["spec_inputs"]
-
-  if output_extra_signals:
-    return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs)
+  if extra_signals:
+    return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
   elif data_bitwidth == 0:
     return _generate_control_merge_dataless(name, size, index_bitwidth)
   else:
@@ -198,25 +188,25 @@ def _generate_cmerge_index_extra_signal_assignments(index_name: str, index_extra
   return "\n  ".join(index_extra_signals_list)
 
 
-def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
+def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
   # Declare Ports
   data_in_port: ArrayPort = {
       "name": "ins",
       "bitwidth": data_bitwidth,
       "array": True,
       "size": size,
-      "extra_signals_list": input_extra_signals_list
+      "extra_signals": extra_signals
   }
   index_port: Port = {
       "name": "index",
       "bitwidth": index_bitwidth,
       # TODO: Extra signals for index port are not tested
-      "extra_signals": index_extra_signals
+      "extra_signals": extra_signals
   }
   data_out_port: Port = {
       "name": "outs",
       "bitwidth": data_bitwidth,
-      "extra_signals": output_extra_signals
+      "extra_signals": extra_signals
   }
 
   # Generate signal manager entity
@@ -227,16 +217,12 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   )
 
   # Layout info for how extra signals are packed into one std_logic_vector
-  concat_layout = ConcatLayout(output_extra_signals)
+  concat_layout = ConcatLayout(extra_signals)
   extra_signals_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = _generate_control_merge(
       inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
-
-  # Generate default `spec` bits for inputs that lack them
-  lacking_spec_port_decls, lacking_spec_port_assignments = generate_bbmerge_lacking_spec_statements(
-      spec_inputs, size, "ins")
 
   # Declare inner concatenated signals for all input/output ports
   concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
@@ -248,7 +234,7 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
 
   # Assign index extra signals
   index_extra_signal_assignments = _generate_cmerge_index_extra_signal_assignments(
-      "index", index_extra_signals)
+      "index", extra_signals)
 
   # Map all ports to inner entity:
   #   - Forward concatenated extra signal vectors
@@ -260,14 +246,9 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   architecture = f"""
 -- Architecture of signal manager (cmerge)
 architecture arch of {name} is
-  -- Lacking spec inputs
-  {lacking_spec_port_decls}
   -- Concatenated data and extra signals
   {concat_signal_decls}
 begin
-  -- Assign default spec bit values if not provided
-  {lacking_spec_port_assignments}
-
   -- Concatenate data and extra signals
   {concat_logic}
 

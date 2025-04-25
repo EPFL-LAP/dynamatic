@@ -18,6 +18,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
 #include <fstream>
 #include <map>
 #include <string>
@@ -44,10 +45,6 @@ void SpeculationPlacements::addCommit(OpOperand &dstOpOperand) {
 
 void SpeculationPlacements::addSaveCommit(OpOperand &dstOpOperand) {
   this->saveCommits.insert(&dstOpOperand);
-}
-
-void SpeculationPlacements::addBuffer(OpOperand &dstOpOperand) {
-  this->buffers.insert(&dstOpOperand);
 }
 
 bool SpeculationPlacements::containsCommit(OpOperand &dstOpOperand) {
@@ -92,21 +89,26 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
   return this->saveCommits;
 }
 
-template <>
-const llvm::DenseSet<OpOperand *> &
-SpeculationPlacements::getPlacements<handshake::BufferOp>() {
-  return this->buffers;
-}
-
-static inline void parseSpeculatorPlacement(
+static LogicalResult parseSpeculatorPlacement(
     std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
-    const llvm::json::Object *components) {
-  if (components->find("speculator") != components->end()) {
-    const llvm::json::Object *specObj = components->getObject("speculator");
-    StringRef opName = specObj->getString("operation-name").value();
-    unsigned opIdx = specObj->getInteger("operand-idx").value();
-    placements["speculator"].push_back({opName.str(), opIdx});
+    unsigned int &fifoDepth, const llvm::json::Object *components) {
+  // `speculator` field is required
+  if (components->find("speculator") == components->end())
+    return failure();
+
+  const llvm::json::Object *specObj = components->getObject("speculator");
+  StringRef opName = specObj->getString("operation-name").value();
+  unsigned opIdx = specObj->getInteger("operand-idx").value();
+  placements["speculator"].push_back({opName.str(), opIdx});
+
+  int64_t speculatorFifoDepth = specObj->getInteger("fifo-depth").value();
+  if (speculatorFifoDepth < 0 || speculatorFifoDepth > UINT32_MAX) {
+    llvm::errs() << "Error: Speculator FIFO depth is out of range\n";
+    return failure();
   }
+  fifoDepth = static_cast<unsigned int>(speculatorFifoDepth);
+
+  return success();
 }
 
 static inline void parseOperationPlacements(
@@ -124,12 +126,32 @@ static inline void parseOperationPlacements(
   }
 }
 
+static LogicalResult
+parseSaveCommitsFifoDepth(unsigned int &fifoDepth,
+                          const llvm::json::Object *components) {
+  constexpr const char *fifoDepthKey = "save-commits-fifo-depth";
+  // `save-commits-fifo-depth` field is required
+  if (components->find(fifoDepthKey) == components->end())
+    return failure();
+
+  int64_t saveCommitsFifoDepth = components->getInteger(fifoDepthKey).value();
+  if (saveCommitsFifoDepth < 0 || saveCommitsFifoDepth > UINT32_MAX) {
+    llvm::errs() << "Error: Save-Commits FIFO depth is out of range\n";
+    return failure();
+  }
+  fifoDepth = static_cast<unsigned int>(saveCommitsFifoDepth);
+
+  return success();
+}
+
 // JSON format example:
 // {
 //   "speculator": {
 //     "operation-name": "fork5",
-//     "operand-idx": 0
+//     "operand-idx": 0,
+//     "fifo-depth": 8,
 //   },
+//   "save-commits-fifo-depth": 8,
 //   "saves": [
 //     {
 //       "operation-name": "mc_load0",
@@ -151,27 +173,30 @@ static inline void parseOperationPlacements(
 //       "operation-name": "buffer10",
 //       "operand-idx": 0
 //     }
-//   ],
-//  "buffers": [
-//     {
-//       "operation-name": "extsi1",
-//       "operand-idx": 0
-//     }
 //   ]
 // }
-static bool parseJSON(
-    const llvm::json::Value &jsonValue,
-    std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements) {
+static LogicalResult
+parseJSON(const llvm::json::Value &jsonValue,
+          std::map<StringRef, llvm::SmallVector<PlacementOperand>> &placements,
+          unsigned int &speculatorFifoDepth,
+          unsigned int &saveCommitsFifoDepth) {
   const llvm::json::Object *components = jsonValue.getAsObject();
   if (!components)
-    return false;
+    return failure();
 
-  parseSpeculatorPlacement(placements, components);
+  if (failed(parseSpeculatorPlacement(placements, speculatorFifoDepth,
+                                      components)))
+    return failure();
+
+  if (failed(parseSaveCommitsFifoDepth(saveCommitsFifoDepth, components)))
+    return failure();
+
   parseOperationPlacements("saves", placements, components);
   parseOperationPlacements("commits", placements, components);
   parseOperationPlacements("save-commits", placements, components);
   parseOperationPlacements("buffers", placements, components);
-  return true;
+
+  return success();
 }
 
 static LogicalResult getOpPlacements(
@@ -219,13 +244,6 @@ static LogicalResult getOpPlacements(
     placements.addSaveCommit(*dstOpOperand);
   }
 
-  // Add Buffer Operations position
-  for (PlacementOperand &p : specNameMap["buffers"]) {
-    if (failed(getPlacementOps(p)))
-      return failure();
-    placements.addBuffer(*dstOpOperand);
-  }
-
   return success();
 }
 
@@ -256,8 +274,30 @@ SpeculationPlacements::readFromJSON(const std::string &jsonPath,
   // Deserialize into a dictionary for operation names
   llvm::json::Path::Root jsonRoot(jsonPath);
   std::map<StringRef, llvm::SmallVector<PlacementOperand>> specNameMap;
-  if (!parseJSON(*value, specNameMap))
+  unsigned int speculatorFifoDepth = 0;
+  unsigned int saveCommitsFifoDepth = 0;
+  if (failed(parseJSON(*value, specNameMap, speculatorFifoDepth,
+                       saveCommitsFifoDepth)))
     return failure();
 
+  placements.setSpeculatorFifoDepth(speculatorFifoDepth);
+  placements.setSaveCommitsFifoDepth(saveCommitsFifoDepth);
+
   return getOpPlacements(placements, specNameMap, nameAnalysis);
+}
+
+unsigned int SpeculationPlacements::getSpeculatorFifoDepth() {
+  return this->speculatorFifoDepth;
+}
+
+void SpeculationPlacements::setSpeculatorFifoDepth(unsigned int depth) {
+  this->speculatorFifoDepth = depth;
+}
+
+unsigned int SpeculationPlacements::getSaveCommitsFifoDepth() {
+  return this->saveCommitsFifoDepth;
+}
+
+void SpeculationPlacements::setSaveCommitsFifoDepth(unsigned int depth) {
+  this->saveCommitsFifoDepth = depth;
 }
