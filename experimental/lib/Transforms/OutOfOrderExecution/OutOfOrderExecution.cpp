@@ -19,6 +19,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -30,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <assert.h>
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <utility>
@@ -52,6 +54,12 @@ struct OutOfOrderExecutionPass
   void runDynamaticPass() override;
 
 private:
+  // Reads the out-of-order nodes from a fle and find the corresponding
+  // operations in the function
+  LogicalResult readOutOfOrderNodes(
+      handshake::FuncOp funcOp,
+      llvm::DenseMap<Operation *, std::pair<int, bool>> &outOfOrderNodes);
+
   // Step 1.1: Identify dirty nodes
   LogicalResult identifyDirtyNodes(
       const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
@@ -150,27 +158,102 @@ void OutOfOrderExecutionPass::runDynamaticPass() {
   mlir::ModuleOp module = getOperation();
 
   for (auto funcOp : module.getOps<handshake::FuncOp>()) {
-
     // Each out of order node will have:
     // (1) numTags: int representing the number of tags
     // (2) controlled: bool representing wether the aligner is controlled
     llvm::DenseMap<Operation *, std::pair<int, bool>> outOfOrderNodes;
-    for (auto addOp : funcOp.getOps<handshake::AddIOp>()) {
-      outOfOrderNodes.insert({addOp, {4, false}});
-    }
 
-    // for (auto shli : funcOp.getOps<handshake::ShLIOp>()) {
-    //   outOfOrderNodes.insert({shli, {8, false}});
-    // }
-
-    if (failed(applyOutOfOrder(funcOp, ctx, outOfOrderNodes)))
+    // Step 1: Read the out-of-order nodes from the file and find the
+    // corresponding operations in the function
+    if (failed(readOutOfOrderNodes(funcOp, outOfOrderNodes)))
       signalPassFailure();
+
+    // Step 2: Apply the out-of-order execution methodology to each out-of-order
+    // node
+    if (!outOfOrderNodes.empty()) {
+      if (failed(applyOutOfOrder(funcOp, ctx, outOfOrderNodes)))
+        signalPassFailure();
+    }
   }
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::outoforder::createOutOfOrderExecution() {
   return std::make_unique<OutOfOrderExecutionPass>();
+}
+
+/**
+ * @brief Reads the out-of-order nodes from a file and finds the corresponding
+ * operations in the function. The file should contain lines with the format:
+ * <operation_name> <num_tags> <controlled>
+ *
+ * @param funcOp The function operation to which the out-of-order execution
+ *        should be applied.
+ * @param outOfOrderNodes A map of the out-of-order nodes, where the key is the
+ *        operation and the value is a pair containing:
+ *  - An integer specifying the number of tags for out-of-order processing.
+ *  - A boolean flag indicating whether the aligner should be controlled
+ *
+ * @return Success if the out-of-order nodes are successfully read and
+ *         corresponding operations are found, failure otherwise.
+ */
+LogicalResult OutOfOrderExecutionPass::readOutOfOrderNodes(
+    handshake::FuncOp funcOp,
+    llvm::DenseMap<Operation *, std::pair<int, bool>> &outOfOrderNodes) {
+
+  std::ifstream file("experimental/lib/Transforms/"
+                     "OutOfOrderExecution/OutOfOrderOps.txt");
+  if (!file.is_open()) {
+    llvm::errs() << "Error opening file\n";
+    return failure();
+  }
+
+  std::string outOfOrderOpName;
+  int numTags;
+  bool controlled;
+
+  while (file >> outOfOrderOpName >> numTags >> controlled) {
+    // Find the operation in the function by name
+    Operation *outOfOrderOp = nullptr;
+    funcOp.walk([&](Operation *op) -> WalkResult {
+      // Get the name of the current operation
+      StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
+
+      // Continue walking if the name attribute
+      // is missing
+      if (!nameAttr)
+        return WalkResult::advance();
+
+      // Check if the operation name matches the out-of-order operation name
+      if (nameAttr.getValue() == outOfOrderOpName) {
+        outOfOrderOp = op;
+
+        // Stop walking once the operation is found
+        return WalkResult::interrupt();
+      }
+
+      // Continue walking otherwise
+      return WalkResult::advance();
+    });
+
+    // If the operation was not found in the function, then there is an error
+    if (!outOfOrderOp) {
+      return failure();
+    }
+
+    outOfOrderNodes[outOfOrderOp] = {numTags, controlled};
+  }
+
+  if (file.bad()) {
+    llvm::errs() << "I/O error while reading\n";
+    return failure();
+  }
+  if (!file.eof()) {
+    llvm::errs() << "Malformed line or wrong data format\n";
+    return failure();
+  }
+  file.close();
+  return success();
 }
 
 /**
