@@ -106,9 +106,30 @@ struct ClusterHierarchyNode {
   std::vector<ClusterHierarchyNode *> children;
 
   ClusterHierarchyNode(const Cluster &c) : cluster(c) {}
-
-  bool isLeaf() const { return children.empty(); }
 };
+
+// Analyzes the MUXes in a handshake function and groups them by their
+// conditions.
+llvm::DenseMap<Value, std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+analyzeMuxConditions(handshake::FuncOp funcOp);
+
+// Analyzes the branches and their conditions in a handshake function.
+llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+analyzeBranchesConditions(
+    handshake::FuncOp funcOp,
+    llvm::DenseMap<Value,
+                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+        &condToMuxes,
+    std::vector<Cluster> &clusters);
+
+// Creates clusters based on the identified MUXes and branches.
+void createClusters(
+    llvm::DenseMap<Value,
+                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+        &condToMuxes,
+    llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+        &condToBranches,
+    std::vector<Cluster> &clusters);
 
 // Identify the clusters in the graph
 // This is done by
