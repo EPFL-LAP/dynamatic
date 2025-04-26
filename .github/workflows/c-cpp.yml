@@ -26,8 +26,10 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           pip install autopep8==2.3.2
+          echo "Running autopep8..."
           autopep8 --indent-size 2 --max-line-length 200 --diff $(git ls-files '*.py')
           STATUS=$?
+          echo "autopep8 exited with $STATUS"
           deactivate
           exit $STATUS
 
