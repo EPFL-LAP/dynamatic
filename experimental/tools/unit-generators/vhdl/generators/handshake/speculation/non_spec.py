@@ -8,7 +8,7 @@ def generate_non_spec(name, params):
 
   # Always contains spec signal
   if len(extra_signals) > 1:
-    return _generate_non_spec_signal_manager(name,  bitwidth, extra_signals)
+    return _generate_non_spec_signal_manager(name, bitwidth, extra_signals)
   return _generate_non_spec(name, bitwidth)
 
 

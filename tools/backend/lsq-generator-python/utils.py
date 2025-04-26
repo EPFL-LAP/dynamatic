@@ -179,26 +179,26 @@ class VHDLLogicVecType(VHDLLogicType):
 
     if self.type == "w":
       signal_str += (
-          f"\tsignal {self.name} : std_logic_vector({self.size-1} downto 0);\n"
+          f"\tsignal {self.name} : std_logic_vector({self.size - 1} downto 0);\n"
       )
     elif self.type == "r":
       signal_str += (
-          f"\tsignal {self.name}_d : std_logic_vector({self.size-1} downto 0);\n"
+          f"\tsignal {self.name}_d : std_logic_vector({self.size - 1} downto 0);\n"
       )
       signal_str += (
-          f"\tsignal {self.name}_q : std_logic_vector({self.size-1} downto 0);\n"
+          f"\tsignal {self.name}_q : std_logic_vector({self.size - 1} downto 0);\n"
       )
     elif self.type == "i":
       # For the wrapper, we don't add i/o in the port name
       signal_str += ";\n"
       signal_str += (
-          f"\t\t{self.name} : in std_logic_vector({self.size-1} downto 0)"
+          f"\t\t{self.name} : in std_logic_vector({self.size - 1} downto 0)"
       )
     elif self.type == "o":
       # For the wrapper, we don't add i/o in the port name
       signal_str += ";\n"
       signal_str += (
-          f"\t\t{self.name} : out std_logic_vector({self.size-1} downto 0)"
+          f"\t\t{self.name} : out std_logic_vector({self.size - 1} downto 0)"
       )
 
     return signal_str

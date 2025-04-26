@@ -162,16 +162,16 @@ class LogicVec(Logic):
     global signalInitString
     global portInitString
     if self.type == "w":
-      signalInitString += f"\tsignal {self.name + sufix} : std_logic_vector({self.size-1} downto 0);\n"
+      signalInitString += f"\tsignal {self.name + sufix} : std_logic_vector({self.size - 1} downto 0);\n"
     elif self.type == "r":
-      signalInitString += f"\tsignal {self.name + sufix}_d : std_logic_vector({self.size-1} downto 0);\n"
-      signalInitString += f"\tsignal {self.name + sufix}_q : std_logic_vector({self.size-1} downto 0);\n"
+      signalInitString += f"\tsignal {self.name + sufix}_d : std_logic_vector({self.size - 1} downto 0);\n"
+      signalInitString += f"\tsignal {self.name + sufix}_q : std_logic_vector({self.size - 1} downto 0);\n"
     elif self.type == "i":
       portInitString += ";\n"
-      portInitString += f"\t\t{self.name + sufix}_i : in std_logic_vector({self.size-1} downto 0)"
+      portInitString += f"\t\t{self.name + sufix}_i : in std_logic_vector({self.size - 1} downto 0)"
     elif self.type == "o":
       portInitString += ";\n"
-      portInitString += f"\t\t{self.name + sufix}_o : out std_logic_vector({self.size-1} downto 0)"
+      portInitString += f"\t\t{self.name + sufix}_o : out std_logic_vector({self.size - 1} downto 0)"
 
   def regInit(self, enable=None, init=None) -> None:
     global regInitString
@@ -402,7 +402,7 @@ def WrapAdd(out, in_a, in_b, max: int) -> str:
     )
     str_ret += (
         "\t" * tabLevel
-        + f"{out.getNameWrite()} <= {res.getNameRead()}({out.size-1} downto 0);\n"
+        + f"{out.getNameWrite()} <= {res.getNameRead()}({out.size - 1} downto 0);\n"
     )
   str_ret += "\t" * tabLevel + "-- WrapAdd End\n\n"
   return str_ret
@@ -471,7 +471,7 @@ def RotateLogicVec(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{dout.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
   else:
@@ -481,7 +481,7 @@ def RotateLogicVec(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{res.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
     str_ret += "\t" * tabLevel + "-- Layer End\n"
@@ -498,7 +498,7 @@ def RotateLogicArray(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{dout.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
   else:
@@ -508,7 +508,7 @@ def RotateLogicArray(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{res.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
     str_ret += "\t" * tabLevel + "-- Layer End\n"
@@ -525,7 +525,7 @@ def RotateLogicVecArray(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{dout.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
   else:
@@ -535,7 +535,7 @@ def RotateLogicVecArray(dout, din, distance, layer) -> str:
       str_ret += (
           "\t" * tabLevel
           +
-          f"{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} "
+          f"{res.getNameWrite(i)} <= {din.getNameRead((i - 2**layer) % length)} "
           + f"when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n"
       )
     str_ret += "\t" * tabLevel + "-- Layer End\n"
@@ -576,7 +576,7 @@ def ReduceLogicVec(dout, din, operator, length) -> str:
       str_ret += (
           "\t" * tabLevel
           + f"{res.getNameWrite(i)} <= "
-          + f"{din.getNameRead(i)} {operator} {din.getNameRead(i+length)};\n"
+          + f"{din.getNameRead(i)} {operator} {din.getNameRead(i + length)};\n"
       )
     for i in range(din.size - length, length):
       str_ret += (
@@ -810,7 +810,7 @@ def CyclicPriorityMasking(dout, din, base, reverse=False) -> str:
             "\t" * tabLevel
             + f"{dout.getNameWrite(j, i)} <= "
             +
-            f"{double_out.getNameRead(j)} or {double_out.getNameRead(j+size)};\n"
+            f"{double_out.getNameRead(j)} or {double_out.getNameRead(j + size)};\n"
         )
   else:
     if reverse:
@@ -846,9 +846,9 @@ def CyclicPriorityMasking(dout, din, base, reverse=False) -> str:
       for i in range(0, size):
         str_ret += (
             "\t" * tabLevel
-            + f"{dout.getNameWrite(size-1-i)} <= "
+            + f"{dout.getNameWrite(size - 1 - i)} <= "
             +
-            f"{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)};\n"
+            f"{double_out.getNameRead(i)} or {double_out.getNameRead(i + size)};\n"
         )
     else:
       if type(din) == LogicArray:
@@ -883,8 +883,8 @@ def CyclicPriorityMasking(dout, din, base, reverse=False) -> str:
         str_ret += (
             "\t" * tabLevel
             + f"{dout.getNameWrite()} <= "
-            + f"{double_out.getNameRead()}({size-1} downto 0) or "
-            + f"{double_out.getNameRead()}({2*size-1} downto {size});\n"
+            + f"{double_out.getNameRead()}({size - 1} downto 0) or "
+            + f"{double_out.getNameRead()}({2 * size - 1} downto {size});\n"
         )
       else:
         for i in range(0, size):
@@ -892,7 +892,7 @@ def CyclicPriorityMasking(dout, din, base, reverse=False) -> str:
               "\t" * tabLevel
               + f"{dout.getNameWrite(i)} <= "
               +
-              f"{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)};\n"
+              f"{double_out.getNameRead(i)} or {double_out.getNameRead(i + size)};\n"
           )
   str_ret += "\t" * tabLevel + "-- Priority Masking End\n\n"
   return str_ret
@@ -918,7 +918,7 @@ def BitsToOHSub1(dout, din) -> str:
   for i in range(0, dout.size):
     str_ret += (
         "\t" * tabLevel + f"{dout.getNameWrite(i)} <= "
-        f"'1' when {din.getNameRead()} = {IntToBits((i+1) % dout.size, din.size)} else '0';\n"
+        f"'1' when {din.getNameRead()} = {IntToBits((i + 1) % dout.size, din.size)} else '0';\n"
     )
   str_ret += "\t" * tabLevel + "-- Bits To One-Hot End\n\n"
   return str_ret

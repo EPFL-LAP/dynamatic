@@ -10,7 +10,7 @@ def generate_spec_commit(name, params):
 
   # Always contains spec signal
   if len(extra_signals) > 1:
-    return _generate_spec_commit_signal_manager(name,  bitwidth, extra_signals)
+    return _generate_spec_commit_signal_manager(name, bitwidth, extra_signals)
   return _generate_spec_commit(name, bitwidth)
 
 

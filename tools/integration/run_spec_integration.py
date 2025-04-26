@@ -326,7 +326,7 @@ def main():
   spec = args.spec
 
   success = run_test(INTEGRATION_FOLDER / test_name /
-                     f"{test_name}.c",  spec)
+                     f"{test_name}.c", spec)
   if success:
     color_print("Test passed", TermColors.OKGREEN)
 
