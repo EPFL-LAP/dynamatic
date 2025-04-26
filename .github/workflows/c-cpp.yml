@@ -18,7 +18,7 @@ jobs:
 
       - name: check-format-cpp
         run: |
-          git fetch origin/main --no-recurse-submodules
+          git fetch origin main --no-recurse-submodules
           git diff FETCH_HEAD -U0 --no-color | clang-format-diff -p1
 
       - name: check-format-python
