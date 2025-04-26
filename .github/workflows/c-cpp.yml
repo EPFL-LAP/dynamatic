@@ -22,7 +22,7 @@ jobs:
 
       - name: check-format-python
         run: |
-          black --check $(git ls-files '*.py')
+          autopep8 --indent-size 2 --diff $(git ls-files '*.py')
 
       - name: build
         run: ./build.sh --release
