@@ -23,7 +23,7 @@ List of options:
   --threads | -t <num-threads>         : number of concurrent threads to build on (by
                                          default, one thread per logical core on the host
                                          machine)
-  --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when 
+  --llvm-parallel-link-jobs <num-jobs> : maximum number of simultaneous link jobs when
                                          building llvm (defaults to 2)
   --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
   --experimental-enable-xls            : enable experimental xls integration
@@ -117,9 +117,10 @@ run_ninja() {
 #### Parse arguments ####
 
 CMAKE_COMPILERS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
-CMAKE_EXTRA_LLVM="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
-CMAKE_EXTRA_POLYGEIST="-DPOLYGEIST_USE_LINKER=lld"
-CMAKE_EXTRA_DYNAMATIC=""
+CMAKE_LLVM_BUILD_OPTIMIZATIONS="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS="-DPOLYGEIST_USE_LINKER=lld"
+CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS="-DDYNAMATIC_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
+CMAKE_DYNAMATIC_ENABLE_XLS=""
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
@@ -156,8 +157,9 @@ do
       case "$arg" in
           "--disable-build-opt" | "-o")
               CMAKE_COMPILERS=""
-              CMAKE_EXTRA_LLVM=""
-              CMAKE_EXTRA_POLYGEIST=""
+              CMAKE_LLVM_BUILD_OPTIMIZATIONS=""
+              CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS=""
+              CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS=""
               ;;
           "--force" | "-f")
               FORCE_CMAKE=1
@@ -186,7 +188,7 @@ do
               ;;
           "--experimental-enable-xls")
               ENABLE_XLS_INTEGRATION=1
-              CMAKE_EXTRA_DYNAMATIC="-DDYNAMATIC_ENABLE_XLS=ON"
+              CMAKE_DYNAMATIC_ENABLE_XLS="-DDYNAMATIC_ENABLE_XLS=ON"
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -224,7 +226,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
-        $CMAKE_COMPILERS $CMAKE_EXTRA_LLVM
+        $CMAKE_COMPILERS $CMAKE_LLVM_BUILD_OPTIMIZATIONS
     exit_on_fail "Failed to cmake polygeist/llvm-project"
   fi
 
@@ -245,7 +247,7 @@ if [[ $SKIP_POLYGEIST -eq 0 ]]; then
         -DCLANG_DIR=$PWD/../llvm-project/build/lib/cmake/clang \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-        $CMAKE_COMPILERS $CMAKE_EXTRA_POLYGEIST
+        $CMAKE_COMPILERS $CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS
     exit_on_fail "Failed to cmake polygeist"
   fi
 
@@ -271,7 +273,7 @@ fi
 
 XLS_DIR="$SCRIPT_CWD/xls"
 XLS_UPSTREAM="https://github.com/ETHZ-DYNAMO/xls.git"
-XLS_COMMIT="658010efafb578493b89a112c616c6cd6ab0a118"
+XLS_COMMIT="939eb43c307005caf4af75ed9b8a0dbc6c905386"
 
 if [[ ENABLE_XLS_INTEGRATION -eq 1 || -d "$XLS_DIR" ]]; then
     echo_section "Preparing XLS"
@@ -326,7 +328,7 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS $CMAKE_EXTRA_DYNAMATIC
+      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS $CMAKE_DYNAMATIC_ENABLE_XLS
   exit_on_fail "Failed to cmake dynamatic"
 fi
 

@@ -29,6 +29,7 @@
 #include <cctype>
 #include <iostream>
 #include <ostream>
+#include <vector>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -353,24 +354,23 @@ bool dynamatic::handshake::operator==(const ExtraSignal &lhs,
          lhs.downstream == rhs.downstream;
 }
 
-bool dynamatic::handshake::doesExtraSignalsMatchExcept(
-    const llvm::StringRef &except,
-    std::initializer_list<const llvm::ArrayRef<ExtraSignal>>
-        extraSignalArrays) {
+bool dynamatic::handshake::doesExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays,
+    std::optional<llvm::StringRef> except) {
 
   // If there are fewer than two arrays, they are trivially considered matching.
   if (extraSignalArrays.size() < 2)
     return true;
 
-  auto *firstArrayIt = extraSignalArrays.begin();
-  auto *secondArrayIt = firstArrayIt + 1;
+  auto firstArrayIt = extraSignalArrays.begin();
+  auto secondArrayIt = firstArrayIt + 1;
 
   // Use the first array as the reference for comparison.
   ArrayRef<ExtraSignal> refArray = *firstArrayIt;
   size_t refArraySize = refArray.size();
 
   // Compare the reference array against all other arrays.
-  for (auto *it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
+  for (auto it = secondArrayIt; it != extraSignalArrays.end(); ++it) {
 
     ArrayRef<ExtraSignal> toCheck = *it;
     size_t toCheckSize = toCheck.size();
@@ -382,12 +382,13 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
 
     while (i < refArraySize || j < toCheckSize) {
       // Skip elements in `head` with the excluded name.
-      if (i < refArraySize && refArray[i].name == except) {
+      if (except.has_value() && i < refArraySize &&
+          refArray[i].name == except) {
         i++;
         continue;
       }
       // Skip elements in `current` with the excluded name.
-      if (j < toCheckSize && toCheck[j].name == except) {
+      if (except.has_value() && j < toCheckSize && toCheck[j].name == except) {
         j++;
         continue;
       }

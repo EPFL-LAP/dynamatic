@@ -363,37 +363,4 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   return cast<TypedValue<ControlType>>(getOperands().back());
 }
 
-//===----------------------------------------------------------------------===//
-// ReshapableChannelsInterface
-//===----------------------------------------------------------------------===//
-
-std::pair<handshake::ChannelType, bool>
-dynamatic::handshake::detail::getReshapableChannelType(Operation *op) {
-  return {dyn_cast<ChannelType>(op->getOperands().front().getType()), false};
-}
-
-std::pair<ChannelType, bool> MergeOp::getReshapableChannelType() {
-  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
-}
-
-std::pair<ChannelType, bool> MuxOp::getReshapableChannelType() {
-  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
-}
-
-std::pair<ChannelType, bool> ControlMergeOp::getReshapableChannelType() {
-  return {dyn_cast<ChannelType>(getDataOperands().front().getType()), true};
-}
-
-std::pair<ChannelType, bool> BranchOp::getReshapableChannelType() {
-  return {dyn_cast<ChannelType>(getOperand().getType()), true};
-}
-
-std::pair<ChannelType, bool> ConditionalBranchOp::getReshapableChannelType() {
-  return {dyn_cast<ChannelType>(getDataOperand().getType()), true};
-}
-
-std::pair<ChannelType, bool> SelectOp::getReshapableChannelType() {
-  return {getTrueValue().getType(), true};
-}
-
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

@@ -20,7 +20,6 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include <initializer_list>
 
 namespace dynamatic {
 namespace handshake {
@@ -64,9 +63,9 @@ inline bool operator!=(const ExtraSignal &lhs, const ExtraSignal &rhs) {
 
 /// Compares multiple arrays of ExtraSignal elements, ignoring a specified
 /// signal name.
-bool doesExtraSignalsMatchExcept(
-    const llvm::StringRef &except,
-    std::initializer_list<const llvm::ArrayRef<ExtraSignal>> extraSignalArrays);
+bool doesExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays,
+    std::optional<llvm::StringRef> except = std::nullopt);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 llvm::hash_code hash_value(const ExtraSignal &signal);

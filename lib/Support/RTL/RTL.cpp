@@ -13,6 +13,9 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
@@ -20,6 +23,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
@@ -56,7 +60,7 @@ static constexpr StringLiteral
     ERR_UNKNOWN_PARAM("unknown parameter name"),
     ERR_DUPLICATE_NAME("duplicated parameter name"),
     ERR_RESERVED_NAME("this is a reserved parameter name"),
-    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl" or "verilog")"),
+    ERR_INVALID_HDL(R"(unknown hdl: options are "vhdl", "verilog", or "smv)"),
     ERR_INVALID_IO_STYLE(
         R"(unknown IO style: options are "hierarchical" or "flat")");
 
@@ -72,6 +76,8 @@ StringRef dynamatic::getHDLExtension(HDL hdl) {
     return "vhd";
   case HDL::VERILOG:
     return "v";
+  case HDL::SMV:
+    return "smv";
   }
 }
 std::string dynamatic::replaceRegexes(
@@ -240,7 +246,13 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
   return values;
 }
 
-void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
+/// Serializes the module's "port_types", which includes the types of all ports
+/// (operands and results) of the original operation. This is passed to the RTL
+/// generator to help it generate the correct port types. e.g., '{"lhs":
+/// "!handshake.channel<i32, [spec: i1]>",
+// "rhs": "!handshake.channel<i32, [spec: i1]>",
+// "result": "!handshake.channel<i1, [spec: i1]>"}'
+static std::string serializePortTypes(hw::ModuleType &mod) {
   // Prepare a string stream to serialize the port types
   std::string portTypesValue;
   llvm::raw_string_ostream portTypes(portTypesValue);
@@ -249,7 +261,7 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   portTypes << "'{"; // Start of the JSON object
 
   bool first = true;
-  for (const hw::ModulePort &port : modOp.getModuleType().getPorts()) {
+  for (const hw::ModulePort &port : mod.getPorts()) {
     // Skip the clock and reset ports
     if (port.name == "clk" || port.name == "rst")
       continue;
@@ -265,8 +277,190 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp) {
   }
   portTypes << "}'"; // End of the JSON object
 
-  // Register PORT_TYPES parameter
-  serializedParams["PORT_TYPES"] = portTypes.str();
+  return portTypes.str();
+}
+
+static std::string serializeExtraSignalsInner(const Type &type) {
+  assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
+         "type should be ChannelType or ControlType");
+
+  handshake::ExtraSignalsTypeInterface extraSignalsType =
+      type.cast<handshake::ExtraSignalsTypeInterface>();
+
+  std::string extraSignalsValue;
+  llvm::raw_string_ostream extraSignals(extraSignalsValue);
+
+  extraSignals << "{";
+  bool first = true;
+  for (const handshake::ExtraSignal &extraSignal :
+       extraSignalsType.getExtraSignals()) {
+    if (!first)
+      extraSignals << ", ";
+    first = false;
+
+    extraSignals << "\"" << extraSignal.name << "\": ";
+    extraSignals << extraSignal.getBitWidth();
+  }
+  extraSignals << "}";
+
+  return extraSignals.str();
+}
+
+static std::string serializeExtraSignals(const Type &type) {
+  return "'" + serializeExtraSignalsInner(type) + "'";
+}
+
+/// Returns the bitwidth of the type as string.
+/// If the type is a control type, returns "0".
+static std::string getBitwidthString(Type type) {
+  return std::to_string(handshake::getHandshakeTypeBitWidth(type));
+}
+
+void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
+  auto modName =
+      modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
+  auto modType = modOp.getModuleType();
+
+  registerPortTypesParameter(modOp, modName, modType);
+  registerBitwidthParameter(modOp, modName, modType);
+  registerTransparentParameter(modOp, modName, modType);
+  registerExtraSignalParameters(modOp, modName, modType);
+}
+
+void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
+                                          llvm::StringRef modName,
+                                          hw::ModuleType &modType) {
+  serializedParams["PORT_TYPES"] = serializePortTypes(modType);
+}
+
+void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                         llvm::StringRef modName,
+                                         hw::ModuleType &modType) {
+  if (
+      // default (All(Data)TypesMatch)
+      modName == "handshake.addi" || modName == "handshake.andi" ||
+      modName == "handshake.buffer" || modName == "handshake.cmpi" ||
+      modName == "handshake.fork" || modName == "handshake.merge" ||
+      modName == "handshake.muli" || modName == "handshake.sink" ||
+      modName == "handshake.subi" || modName == "handshake.shli" ||
+      // the first input has data bitwidth
+      modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
+      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.non_spec") {
+    // Default
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+  } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.constant") {
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (modName == "handshake.control_merge") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["INDEX_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.extsi" || modName == "handshake.trunci" ||
+             modName == "handshake.extui") {
+    serializedParams["INPUT_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["OUTPUT_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
+  } else if (modName == "handshake.load") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.mux") {
+    serializedParams["INDEX_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.store") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.speculating_branch") {
+    serializedParams["SPEC_TAG_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.mem_controller") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    // Warning: Ports differ from instance to instance.
+    // Therefore, mod.getNumOutputs() is also variable.
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
+  } else if (modName == "mem_to_bram") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(4));
+  } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
+             modName == "handshake.mulf" || modName == "handshake.subf") {
+    int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
+    serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
+  } else if (modName == "handshake.source" || modName == "mem_controller") {
+    // Skip
+  } else {
+    llvm::errs() << "Uncaught module: " << modName << "\n";
+  }
+}
+
+void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
+                                            llvm::StringRef modName,
+                                            hw::ModuleType &modType) {
+  if (modName == "handshake.buffer") {
+    auto params =
+        modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
+      auto info = timing.getInfo();
+      if (info == handshake::TimingInfo::tehb())
+        serializedParams["TRANSPARENT"] = "True";
+      else if (info == handshake::TimingInfo::oehb())
+        serializedParams["TRANSPARENT"] = "False";
+      else {
+        llvm_unreachable("Unknown timing info");
+      }
+    } else {
+      llvm_unreachable("Unknown timing attr");
+    }
+  }
+}
+
+void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                             llvm::StringRef modName,
+                                             hw::ModuleType &modType) {
+  if (
+      // default (AllExtraSignalsMatch)
+      modName == "handshake.addf" || modName == "handshake.addi" ||
+      modName == "handshake.andi" || modName == "handshake.buffer" ||
+      modName == "handshake.cmpf" || modName == "handshake.cmpi" ||
+      modName == "handshake.cond_br" || modName == "handshake.constant" ||
+      modName == "handshake.extsi" || modName == "handshake.fork" ||
+      modName == "handshake.merge" || modName == "handshake.mulf" ||
+      modName == "handshake.muli" || modName == "handshake.select" ||
+      modName == "handshake.sink" || modName == "handshake.subf" ||
+      modName == "handshake.extui" || modName == "handshake.shli" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
+      modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.mux" || modName == "handshake.control_merge" ||
+      // the first input has extra signals
+      modName == "handshake.load" || modName == "handshake.store" ||
+      modName == "handshake.spec_commit" ||
+      modName == "handshake.speculating_branch") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
+  } else if (modName == "handshake.source" || modName == "handshake.non_spec") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getOutputType(0));
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "mem_to_bram") {
+    // Skip
+  } else {
+    llvm::errs() << "Uncaught module: " << modName << "\n";
+  }
 }
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
@@ -704,6 +898,8 @@ inline bool dynamatic::fromJSON(const ljson::Value &value, HDL &hdl,
     hdl = HDL::VERILOG;
   } else if (hdlStr == "vhdl") {
     hdl = HDL::VHDL;
+  } else if (hdlStr == "smv") {
+    hdl = HDL::SMV;
   } else {
     path.report(ERR_INVALID_HDL);
     return false;
