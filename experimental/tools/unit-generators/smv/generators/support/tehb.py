@@ -2,16 +2,16 @@ from generators.support.utils import *
 
 
 def generate_tehb(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
-  if data_type.bitwidth == 0:
-    return _generate_tehb_dataless(name)
-  else:
-    return _generate_tehb(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_tehb_dataless(name)
+    else:
+        return _generate_tehb(name, data_type)
 
 
 def _generate_tehb_dataless(name):
-  return f"""
+    return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
   full : boolean;
@@ -28,7 +28,7 @@ MODULE {name}(ins_valid, outs_ready)
 
 
 def _generate_tehb(name, data_type):
-  return f"""
+    return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(ins_valid, outs_ready);

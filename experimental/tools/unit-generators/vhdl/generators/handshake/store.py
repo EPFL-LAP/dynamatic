@@ -2,18 +2,18 @@ from generators.support.signal_manager import generate_entity, generate_inner_po
 
 
 def generate_store(name, params):
-  data_bitwidth = params["data_bitwidth"]
-  addr_bitwidth = params["addr_bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    data_bitwidth = params["data_bitwidth"]
+    addr_bitwidth = params["addr_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
-  else:
-    return _generate_store(name, data_bitwidth, addr_bitwidth)
+    if extra_signals:
+        return _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
+    else:
+        return _generate_store(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_store(name, data_bitwidth, addr_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -42,7 +42,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of store
 architecture arch of {name} is
 begin
@@ -57,38 +57,38 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
-  inner_name = f"{name}_inner"
-  inner = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
+    inner_name = f"{name}_inner"
+    inner = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
 
-  in_ports = [{
-      "name": "dataIn",
-      "bitwidth": data_bitwidth,
-      "extra_signals": extra_signals
-  }, {
-      "name": "addrIn",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": extra_signals
-  }]
+    in_ports = [{
+        "name": "dataIn",
+        "bitwidth": data_bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "addrIn",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": extra_signals
+    }]
 
-  out_ports = [{
-      "name": "dataToMem",
-      "bitwidth": data_bitwidth,
-      "extra_signals": {}
-  }, {
-      "name": "addrOut",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": {}
-  }]
+    out_ports = [{
+        "name": "dataToMem",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }, {
+        "name": "addrOut",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": {}
+    }]
 
-  entity = generate_entity(name, in_ports, out_ports)
+    entity = generate_entity(name, in_ports, out_ports)
 
-  forwarding = generate_inner_port_forwarding(in_ports + out_ports)
+    forwarding = generate_inner_port_forwarding(in_ports + out_ports)
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of store signal manager
 architecture arch of {name} is
 begin
@@ -101,4 +101,4 @@ begin
 end architecture;
 """
 
-  return inner + entity + architecture
+    return inner + entity + architecture

@@ -4,17 +4,17 @@ from generators.support.tehb import generate_tehb
 
 
 def generate_ofifo(name, params):
-  slots = params[ATTR_SLOTS]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+    slots = params[ATTR_SLOTS]
+    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
-  if data_type.bitwidth == 0:
-    return _generate_ofifo_dataless(name, slots)
-  else:
-    return _generate_ofifo(name, slots, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_ofifo_dataless(name, slots)
+    else:
+        return _generate_ofifo(name, slots, data_type)
 
 
 def _generate_ofifo_dataless(name, slots):
-  return f"""
+    return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(ins_valid, inner_elastic_fifo.ins_ready);
@@ -31,7 +31,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 
 def _generate_ofifo(name, slots, data_type):
-  return f"""
+    return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb(ins, ins_valid, inner_elastic_fifo.ins_ready);

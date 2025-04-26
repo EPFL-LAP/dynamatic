@@ -2,17 +2,17 @@ from generators.support.signal_manager import generate_signal_manager
 
 
 def generate_select(name, parameters):
-  bitwidth = parameters["bitwidth"]
-  extra_signals = parameters["extra_signals"]
+    bitwidth = parameters["bitwidth"]
+    extra_signals = parameters["extra_signals"]
 
-  if extra_signals:
-    return _generate_select_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_select(name, bitwidth)
+    if extra_signals:
+        return _generate_select_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_select(name, bitwidth)
 
 
 def _generate_antitokens(name):
-  return f"""
+    return f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -67,10 +67,10 @@ end architecture;
 
 
 def _generate_select(name, bitwidth):
-  antitokens_name = f"{name}_antitokens"
-  antitokens = _generate_antitokens(antitokens_name)
+    antitokens_name = f"{name}_antitokens"
+    antitokens = _generate_antitokens(antitokens_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -97,7 +97,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of selector
 architecture arch of {name} is
   signal ee, validInternal : std_logic;
@@ -132,31 +132,31 @@ begin
 end architecture;
 """
 
-  return antitokens + entity + architecture
+    return antitokens + entity + architecture
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  # TODO: Normal signal manager doesn't work for select op.
-  # I'll fix it after the refactoring of signal manager functions.
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trueValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_select(name, bitwidth))
+    # TODO: Normal signal manager doesn't work for select op.
+    # I'll fix it after the refactoring of signal manager functions.
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [{
+            "name": "condition",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }, {
+            "name": "trueValue",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "falseValue",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_select(name, bitwidth))

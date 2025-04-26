@@ -4,30 +4,30 @@ from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_ofifo(name, params):
-  bitwidth = params["bitwidth"]
-  num_slots = params["num_slots"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    num_slots = params["num_slots"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_ofifo_signal_manager(name, num_slots, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_ofifo_dataless(name, num_slots)
-  else:
-    return _generate_ofifo(name, num_slots, bitwidth)
+    if extra_signals:
+        return _generate_ofifo_signal_manager(name, num_slots, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_ofifo_dataless(name, num_slots)
+    else:
+        return _generate_ofifo(name, num_slots, bitwidth)
 
 
 def _generate_ofifo(name, size, bitwidth):
-  tehb_name = f"{name}_tehb"
-  fifo_name = f"{name}_fifo"
+    tehb_name = f"{name}_tehb"
+    fifo_name = f"{name}_fifo"
 
-  dependencies = \
-      generate_elastic_fifo_inner(fifo_name, {
-          "size": size,
-          "bitwidth": bitwidth
-      }) + \
-      generate_tehb(tehb_name, {"bitwidth": bitwidth})
+    dependencies = \
+        generate_elastic_fifo_inner(fifo_name, {
+            "size": size,
+            "bitwidth": bitwidth
+        }) + \
+        generate_tehb(tehb_name, {"bitwidth": bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -48,7 +48,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of ofifo
 architecture arch of {name} is
   signal tehb_valid, tehb_ready     : std_logic;
@@ -89,18 +89,18 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_ofifo_dataless(name, size):
-  tehb_name = f"{name}_tehb"
-  fifo_name = f"{name}_fifo"
+    tehb_name = f"{name}_tehb"
+    fifo_name = f"{name}_fifo"
 
-  dependencies = \
-      generate_elastic_fifo_inner(fifo_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"bitwidth": 0})
+    dependencies = \
+        generate_elastic_fifo_inner(fifo_name, {"size": size}) + \
+        generate_tehb(tehb_name, {"bitwidth": 0})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -119,7 +119,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of ofifo_dataless
 architecture arch of {name} is
   signal tehb_valid, tehb_ready : std_logic;
@@ -154,22 +154,22 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_ofifo_signal_manager(name, size, bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_ofifo(name, size, bitwidth + extra_signals_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_ofifo(name, size, bitwidth + extra_signals_bitwidth))

@@ -5,29 +5,29 @@ from generators.support.utils import data
 
 
 def generate_spec_commit(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_spec_commit_signal_manager(name, bitwidth, extra_signals)
-  return _generate_spec_commit(name, bitwidth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_spec_commit_signal_manager(name, bitwidth, extra_signals)
+    return _generate_spec_commit(name, bitwidth)
 
 
 def _generate_spec_commit(name, bitwidth):
-  cond_br_name = f"{name}_cond_br"
-  merge_name = f"{name}_merge"
+    cond_br_name = f"{name}_cond_br"
+    merge_name = f"{name}_merge"
 
-  dependencies = \
-      generate_cond_br(cond_br_name, {
-          "bitwidth": bitwidth,
-      }) + \
-      generate_merge(merge_name, {
-          "size": 2,
-          "bitwidth": bitwidth,
-      })
+    dependencies = \
+        generate_cond_br(cond_br_name, {
+            "bitwidth": bitwidth,
+        }) + \
+        generate_merge(merge_name, {
+            "size": 2,
+            "bitwidth": bitwidth,
+        })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -51,7 +51,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of spec_commit
 architecture arch of {name} is
   signal branch_in_condition : std_logic_vector(0 downto 0);
@@ -140,30 +140,30 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl",
-          "bitwidth": 1
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals_without_spec,
-      }],
-      "extra_signals": extra_signals_without_spec,
-      "ignore_ports": ["ctrl"]
-  }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl",
+            "bitwidth": 1
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals_without_spec,
+        }],
+        "extra_signals": extra_signals_without_spec,
+        "ignore_ports": ["ctrl"]
+    }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))

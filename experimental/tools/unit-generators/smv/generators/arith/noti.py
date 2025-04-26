@@ -3,18 +3,18 @@ from generators.support.utils import *
 
 
 def generate_not(name, params):
-  latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
-  abstract_data = params[ATTR_ABSTRACT_DATA]
+    latency = params[ATTR_LATENCY]
+    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+    abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  if abstract_data:
-    return generate_abstract_unary_op(name, latency, data_type)
-  else:
-    return _generate_not(name, latency, data_type)
+    if abstract_data:
+        return generate_abstract_unary_op(name, latency, data_type)
+    else:
+        return _generate_not(name, latency, data_type)
 
 
 def _generate_not(name, latency, data_type):
-  return f"""
+    return f"""
 {generate_unanary_op_header(name)}
   DEFINE outs := !ins;
   

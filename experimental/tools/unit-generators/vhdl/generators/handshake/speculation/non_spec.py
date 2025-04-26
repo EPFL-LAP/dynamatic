@@ -3,17 +3,17 @@ from generators.support.utils import data
 
 
 def generate_non_spec(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_non_spec_signal_manager(name, bitwidth, extra_signals)
-  return _generate_non_spec(name, bitwidth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_non_spec_signal_manager(name, bitwidth, extra_signals)
+    return _generate_non_spec(name, bitwidth)
 
 
 def _generate_non_spec(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -34,7 +34,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of non_spec
 architecture arch of {name} is
 begin
@@ -45,26 +45,26 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "dataIn",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "dataOut",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals_without_spec,
-      }],
-      "extra_signals": extra_signals_without_spec
-  }, lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "dataIn",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "dataOut",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals_without_spec,
+        }],
+        "extra_signals": extra_signals_without_spec
+    }, lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))

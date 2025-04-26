@@ -5,21 +5,21 @@ from generators.handshake.oehb import generate_oehb
 
 
 def generate_muli(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_muli_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_muli(name, bitwidth)
+    if extra_signals:
+        return _generate_muli_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_muli(name, bitwidth)
 
 
 def _get_latency():
-  return 4
+    return 4
 
 
 def _generate_mul_4_stage(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -35,7 +35,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mul_4_stage
 architecture behav of {name} is
 
@@ -67,22 +67,22 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_muli(name, bitwidth):
-  join_name = f"{name}_join"
-  mul_4_stage_name = f"{name}_mul_4_stage"
-  buff_name = f"{name}_buff"
-  oehb_name = f"{name}_oehb"
+    join_name = f"{name}_join"
+    mul_4_stage_name = f"{name}_mul_4_stage"
+    buff_name = f"{name}_buff"
+    oehb_name = f"{name}_oehb"
 
-  dependencies = \
-      generate_join(join_name, {"size": 2}) + \
-      _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
-      generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
-      generate_oehb(oehb_name, {"bitwidth": bitwidth})
+    dependencies = \
+        generate_join(join_name, {"size": 2}) + \
+        _generate_mul_4_stage(mul_4_stage_name, bitwidth) + \
+        generate_delay_buffer(buff_name, {"slots": _get_latency() - 1}) + \
+        generate_oehb(oehb_name, {"bitwidth": bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -106,7 +106,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of muli
 architecture arch of {name} is
   signal join_valid                         : std_logic;
@@ -157,26 +157,26 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_muli_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "buffered",
-      "latency": _get_latency(),
-      "in_ports": [{
-          "name": "lhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "rhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_muli(name, bitwidth))
+    return generate_signal_manager(name, {
+        "type": "buffered",
+        "latency": _get_latency(),
+        "in_ports": [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_muli(name, bitwidth))
