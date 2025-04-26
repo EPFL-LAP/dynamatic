@@ -2,17 +2,17 @@ from generators.support.utils import *
 
 
 def generate_merge_notehb(name, params):
-    size = params[ATTR_SIZE]
-    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
-    if data_type.bitwidth == 0:
-        return _generate_merge_notehb_dataless(name, size)
-    else:
-        return _generate_merge_notehb(name, size, data_type)
+  if data_type.bitwidth == 0:
+    return _generate_merge_notehb_dataless(name, size)
+  else:
+    return _generate_merge_notehb(name, size, data_type)
 
 
 def _generate_merge_notehb_dataless(name, size):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
   DEFINE
@@ -26,7 +26,7 @@ MODULE {name}({", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
 
 def _generate_merge_notehb(name, size, data_type):
-    return f"""
+  return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_valid_{n}" for n in range(size)])}, outs_ready)
 
   DEFINE

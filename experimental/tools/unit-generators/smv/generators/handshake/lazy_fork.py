@@ -2,17 +2,17 @@ from generators.support.utils import *
 
 
 def generate_lazy_fork(name, params):
-    size = params[ATTR_SIZE]
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
+  size = params[ATTR_SIZE]
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
 
-    if data_type.bitwidth == 0:
-        return _generate_lazy_fork_dataless(name, size)
-    else:
-        return _generate_lazy_fork(name, size, data_type)
+  if data_type.bitwidth == 0:
+    return _generate_lazy_fork_dataless(name, size)
+  else:
+    return _generate_lazy_fork(name, size, data_type)
 
 
 def _generate_lazy_fork_dataless(name, size):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
   DEFINE
@@ -26,7 +26,7 @@ MODULE {name}(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
 
 
 def _generate_lazy_fork(name, size, data_type):
-    return f"""
+  return f"""
 MODULE {name}(ins, ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])})
   VAR
   inner_lazy_fork : {name}__lazy_fork_dataless(ins_valid, {", ".join([f"outs_ready_{n}" for n in range(size)])});

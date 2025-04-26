@@ -2,17 +2,17 @@ from generators.support.utils import *
 
 
 def generate_elastic_fifo_inner(name, params):
-    slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
-    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
+  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
-    if data_type.bitwidth == 0:
-        return _generate_elastic_fifo_inner_dataless(name, slots)
-    else:
-        return _generate_elastic_fifo_inner(name, slots, data_type)
+  if data_type.bitwidth == 0:
+    return _generate_elastic_fifo_inner_dataless(name, slots)
+  else:
+    return _generate_elastic_fifo_inner(name, slots, data_type)
 
 
 def _generate_elastic_fifo_inner_dataless(name, slots):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
   full : boolean;
@@ -67,7 +67,7 @@ MODULE {name}(ins_valid, outs_ready)
 
 
 def _generate_elastic_fifo_inner(name, slots, data_type):
-    return f"""
+  return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   {"\n  ".join([f"VAR mem_{n} : {data_type};" for n in range(slots)])}
   VAR

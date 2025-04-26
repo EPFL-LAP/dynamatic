@@ -3,39 +3,39 @@ from generators.support.utils import *
 
 
 def generate_buffer(name, params):
-    match_r = re.search(r"R: (\d+)", params[ATTR_TIMING])
-    timing_r = False if not match_r else bool(match_r[0])
-    match_d = re.search(r"D: (\d+)", params[ATTR_TIMING])
-    timing_d = False if not match_d else bool(match_d[0])
-    match_v = re.search(r"V: (\d+)", params[ATTR_TIMING])
-    timing_v = False if not match_v else bool(match_v[0])
-    transparent = timing_r and not (timing_d or timing_v)
+  match_r = re.search(r"R: (\d+)", params[ATTR_TIMING])
+  timing_r = False if not match_r else bool(match_r[0])
+  match_d = re.search(r"D: (\d+)", params[ATTR_TIMING])
+  timing_d = False if not match_d else bool(match_d[0])
+  match_v = re.search(r"V: (\d+)", params[ATTR_TIMING])
+  timing_v = False if not match_v else bool(match_v[0])
+  transparent = timing_r and not (timing_d or timing_v)
 
-    slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
 
-    if transparent and slots > 1 and data_type.bitwidth == 0:
-        return _generate_tfifo_dataless(name, slots)
-    elif transparent and slots > 1 and data_type.bitwidth != 0:
-        return _generate_tfifo(name, slots, data_type)
-    elif transparent and slots == 1 and data_type.bitwidth == 0:
-        return _generate_tehb_dataless(name)
-    elif transparent and slots == 1 and data_type.bitwidth != 0:
-        return _generate_tehb(name, data_type)
-    elif not transparent and slots > 1 and data_type.bitwidth == 0:
-        return _generate_ofifo_dataless(name, slots)
-    elif not transparent and slots > 1 and data_type.bitwidth != 0:
-        return _generate_ofifo(name, slots, data_type)
-    elif not transparent and slots == 1 and data_type.bitwidth == 0:
-        return _generate_oehb_dataless(name)
-    elif not transparent and slots == 1 and data_type.bitwidth != 0:
-        return _generate_oehb(name, data_type)
-    else:
-        raise ValueError(f"Buffer implementation nt found")
+  if transparent and slots > 1 and data_type.bitwidth == 0:
+    return _generate_tfifo_dataless(name, slots)
+  elif transparent and slots > 1 and data_type.bitwidth != 0:
+    return _generate_tfifo(name, slots, data_type)
+  elif transparent and slots == 1 and data_type.bitwidth == 0:
+    return _generate_tehb_dataless(name)
+  elif transparent and slots == 1 and data_type.bitwidth != 0:
+    return _generate_tehb(name, data_type)
+  elif not transparent and slots > 1 and data_type.bitwidth == 0:
+    return _generate_ofifo_dataless(name, slots)
+  elif not transparent and slots > 1 and data_type.bitwidth != 0:
+    return _generate_ofifo(name, slots, data_type)
+  elif not transparent and slots == 1 and data_type.bitwidth == 0:
+    return _generate_oehb_dataless(name)
+  elif not transparent and slots == 1 and data_type.bitwidth != 0:
+    return _generate_oehb(name, data_type)
+  else:
+    raise ValueError(f"Buffer implementation nt found")
 
 
 def _generate_oehb_dataless(name):
-    return f"""
+  return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   outs_valid_i : boolean;
@@ -52,7 +52,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 
 def _generate_oehb(name, data_type):
-    return f"""
+  return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_oehb : {name}__oehb_dataless(ins_valid, outs_ready);
@@ -76,7 +76,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
 
 
 def _generate_ofifo_dataless(name, slots):
-    return f"""
+  return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(ins_valid, inner_elastic_fifo.ins_ready);
@@ -93,7 +93,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 
 def _generate_ofifo(name, slots, data_type):
-    return f"""
+  return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb(ins, ins_valid, inner_elastic_fifo.ins_ready);
@@ -111,7 +111,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
 
 
 def _generate_tehb_dataless(name):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR
   full : boolean;
@@ -128,7 +128,7 @@ MODULE {name}(ins_valid, outs_ready)
 
 
 def _generate_tehb(name, data_type):
-    return f"""
+  return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(ins_valid, outs_ready);
@@ -149,7 +149,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
 
 def _generate_tfifo_dataless(name, slots):
-    return f"""
+  return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   inner_elastic_fifo : {name}__elastic_fifo_inner_dataless(fifo_valid, fifo_ready);
@@ -168,7 +168,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 
 def _generate_tfifo(name, slots, data_type):
-    return f"""
+  return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_elastic_fifo : {name}__elastic_fifo_inner(ins, fifo_valid, fifo_ready);

@@ -3,16 +3,16 @@ from generators.support.utils import *
 
 
 def generate_cond_br(name, params):
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data"])
 
-    if data_type.bitwidth == 0:
-        return _generate_cond_br_dataless(name)
-    else:
-        return _generate_cond_br(name, data_type)
+  if data_type.bitwidth == 0:
+    return _generate_cond_br_dataless(name)
+  else:
+    return _generate_cond_br(name, data_type)
 
 
 def _generate_cond_br_dataless(name):
-    return f"""
+  return f"""
 MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
   VAR
   inner_join : {name}__join(data_valid, condition_valid, branch_ready);
@@ -32,7 +32,7 @@ MODULE {name}(data_valid, condition, condition_valid, trueOut_ready, falseOut_re
 
 
 def _generate_cond_br(name, data_type):
-    return f"""
+  return f"""
 MODULE {name}(data, data_valid, condition, condition_valid, trueOut_ready, falseOut_ready)
   VAR
   inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);

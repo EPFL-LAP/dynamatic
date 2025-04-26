@@ -1,7 +1,7 @@
 def generate_and_n(name, params):
-    size = params["size"]
+  size = params["size"]
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -16,7 +16,7 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of and_n
 architecture arch of {name} is
   signal all_ones : std_logic_vector({size} - 1 downto 0) := (others => '1');
@@ -25,13 +25,13 @@ begin
 end architecture;
 """
 
-    return entity + architecture
+  return entity + architecture
 
 
 def generate_or_n(name, params):
-    size = params["size"]
+  size = params["size"]
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -46,7 +46,7 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of or_n
 architecture arch of {name} is
   signal all_zeros : std_logic_vector({size} - 1 downto 0) := (others => '0');
@@ -55,4 +55,4 @@ begin
 end architecture;
 """
 
-    return entity + architecture
+  return entity + architecture

@@ -3,49 +3,49 @@ from generators.support.join import generate_join
 
 
 def generate_cmpi(name, params):
-    port_types = params["port_types"]
-    predicate = params["predicate"]
-    data_type = VhdlScalarType(port_types["lhs"])
+  port_types = params["port_types"]
+  predicate = params["predicate"]
+  data_type = VhdlScalarType(port_types["lhs"])
 
-    return _generate_cmpi(name, predicate, data_type.bitwidth)
+  return _generate_cmpi(name, predicate, data_type.bitwidth)
 
 
 def _get_symbol_from_predicate(pred):
-    match pred:
-        case "eq":
-            return "="
-        case "neq":
-            return "/="
-        case "slt" | "ult":
-            return "<"
-        case "sle" | "ule":
-            return "<="
-        case "sgt" | "ugt":
-            return ">"
-        case "sge" | "uge":
-            return ">="
-        case _:
-            raise ValueError(f"Predicate {pred} not known")
+  match pred:
+    case "eq":
+      return "="
+    case "neq":
+      return "/="
+    case "slt" | "ult":
+      return "<"
+    case "sle" | "ule":
+      return "<="
+    case "sgt" | "ugt":
+      return ">"
+    case "sge" | "uge":
+      return ">="
+    case _:
+      raise ValueError(f"Predicate {pred} not known")
 
 
 def _get_sign_from_predicate(pred):
-    match pred:
-        case "eq" | "neq":
-            return ""
-        case "slt" | "sle" | "sgt" | "sge":
-            return "signed"
-        case "ult" | "ule" | "ugt" | "uge":
-            return "unsigned"
-        case _:
-            raise ValueError(f"Predicate {pred} not known")
+  match pred:
+    case "eq" | "neq":
+      return ""
+    case "slt" | "sle" | "sgt" | "sge":
+      return "signed"
+    case "ult" | "ule" | "ugt" | "uge":
+      return "unsigned"
+    case _:
+      raise ValueError(f"Predicate {pred} not known")
 
 
 def _generate_cmpi(name, predicate, bitwidth):
-    join_name = f"{name}_join"
+  join_name = f"{name}_join"
 
-    dependencies = generate_join(join_name, {"size": 2})
+  dependencies = generate_join(join_name, {"size": 2})
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -70,10 +70,10 @@ entity {name} is
 end entity;
 """
 
-    modifier = _get_sign_from_predicate(predicate)
-    comparator = _get_symbol_from_predicate(predicate)
+  modifier = _get_sign_from_predicate(predicate)
+  comparator = _get_symbol_from_predicate(predicate)
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of cmpi
 architecture arch of {name} is
 begin
@@ -93,4 +93,4 @@ begin
 end architecture;
 """
 
-    return dependencies + entity + architecture
+  return dependencies + entity + architecture

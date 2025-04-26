@@ -2,13 +2,13 @@ from generators.support.utils import *
 
 
 def generate_select(name, params):
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
+  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
 
-    return _generate_select(name, data_type)
+  return _generate_select(name, data_type)
 
 
 def _generate_select(name, data_type):
-    return f"""
+  return f"""
 MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValue, falseValue_valid, result_ready)
   VAR
   inner_antitoken : antitoken__{name}(false_value_valid, true_value_valid, g1, g0);

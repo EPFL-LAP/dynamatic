@@ -2,12 +2,12 @@ from generators.support.logic import generate_and_n
 
 
 def generate_join(name, params):
-    size = params["size"]
+  size = params["size"]
 
-    and_n_module_name = f"{name}_and_n"
-    dependencies = generate_and_n(and_n_module_name, {"size": size})
+  and_n_module_name = f"{name}_and_n"
+  dependencies = generate_and_n(and_n_module_name, {"size": size})
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -24,7 +24,7 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of join
 architecture arch of {name} is
   signal allValid : std_logic;
@@ -51,4 +51,4 @@ begin
 end architecture;
 """
 
-    return dependencies + entity + architecture
+  return dependencies + entity + architecture

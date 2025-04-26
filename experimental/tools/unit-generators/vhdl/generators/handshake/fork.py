@@ -6,25 +6,25 @@ from generators.support.eager_fork_register_block import (
 
 
 def generate_fork(name, params):
-    port_types = params["port_types"]
-    data_type = VhdlScalarType(port_types["ins"])
-    size = params["size"]
+  port_types = params["port_types"]
+  data_type = VhdlScalarType(port_types["ins"])
+  size = params["size"]
 
-    if data_type.is_channel():
-        return _generate_fork(name, size, data_type.bitwidth)
-    else:
-        return _generate_fork_dataless(name, size)
+  if data_type.is_channel():
+    return _generate_fork(name, size, data_type.bitwidth)
+  else:
+    return _generate_fork_dataless(name, size)
 
 
 def _generate_fork_dataless(name, size):
-    or_n_name = f"{name}_or_n"
-    regblock_name = f"{name}_regblock"
+  or_n_name = f"{name}_or_n"
+  regblock_name = f"{name}_regblock"
 
-    dependencies = generate_or_n(
-        or_n_name, {"size": size}
-    ) + generate_eager_fork_register_block(regblock_name)
+  dependencies = generate_or_n(
+      or_n_name, {"size": size}
+  ) + generate_eager_fork_register_block(regblock_name)
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -43,7 +43,7 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of fork_dataless
 architecture arch of {name} is
   signal blockStopArray : std_logic_vector({size} - 1 downto 0);
@@ -77,15 +77,15 @@ begin
 end architecture;
 """
 
-    return dependencies + entity + architecture
+  return dependencies + entity + architecture
 
 
 def _generate_fork(name, size, bitwidth):
-    inner_name = f"{name}_inner"
+  inner_name = f"{name}_inner"
 
-    dependencies = _generate_fork_dataless(inner_name, size)
+  dependencies = _generate_fork_dataless(inner_name, size)
 
-    entity = f"""
+  entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -106,7 +106,7 @@ entity {name} is
 end entity;
 """
 
-    architecture = f"""
+  architecture = f"""
 -- Architecture of fork
 architecture arch of {name} is
 begin
@@ -129,4 +129,4 @@ begin
 end architecture;
 """
 
-    return dependencies + entity + architecture
+  return dependencies + entity + architecture

@@ -1,5 +1,5 @@
 def generate_eager_fork_register_block(name):
-    return f"""
+  return f"""
 MODULE {name}(ins_valid, outs_ready, backpressure)
   VAR
   reg_value : boolean;
