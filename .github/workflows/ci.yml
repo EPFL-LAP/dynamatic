@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: CI
 
 on:
   # Make sure that settings are set to require permission
