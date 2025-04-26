@@ -1312,14 +1312,14 @@ handshake::MemoryOpInterface dynamatic::findMemInterface(Value val) {
 MemoryPort::MemoryPort(Operation *portOp, ArrayRef<unsigned> oprdIndices,
                        ArrayRef<unsigned> resIndices, Kind kind)
     : portOp(portOp), oprdIndices(oprdIndices), resIndices(resIndices),
-      kind(kind){}
+      kind(kind) {}
 
 ControlPort::ControlPort(Operation *ctrlOp, unsigned ctrlInputIdx)
-    : MemoryPort(ctrlOp, {ctrlInputIdx}, {}, Kind::CONTROL){}
+    : MemoryPort(ctrlOp, {ctrlInputIdx}, {}, Kind::CONTROL) {}
 
 LoadPort::LoadPort(handshake::LoadOp loadOp, unsigned addrInputIdx,
                    unsigned dataOutputIdx)
-    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD){}
+    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD) {}
 
 handshake::LoadOp LoadPort::getLoadOp() const {
   return cast<handshake::LoadOp>(portOp);
@@ -1359,8 +1359,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
