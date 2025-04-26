@@ -42,8 +42,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -120,7 +119,6 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[FPGA20_LEGACY] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
@@ -457,11 +455,10 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     env.set(GRB_DoubleParam_TimeLimit, timeout);
   env.start();
 
-  if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {
+  if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP,
-        algorithm != FPGA20);
+        logger, "placement", placement, env, info, timingDB, targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -539,7 +536,6 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     BufferPlacement placement;
     for (auto &[channel, props] : channelProps) {
       PlacementResult result{props.minTrans, props.minOpaque};
-      result.deductInternalBuffers(Channel(channel), timingDB);
       placement[channel] = result;
     }
     instantiateBuffers(placement);

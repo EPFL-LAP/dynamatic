@@ -16,6 +16,17 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple 
+      outputs. This is a simplification which comes immediately after the FTD 
+      logic.
+  }];
+  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
@@ -42,17 +53,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
-def SpecAnnotatePaths : DynamaticPass<"spec-annotate-paths"> {
-  let summary = "Adds an attribute to mark operations in speculative regions";
-  let description = [{
-    The operations within speculative regions need to be marked for
-    VHDL exporting purposes. The pass adds the attribute "speculative" to
-    operations that are found within the speculative region, which is defined from
-    save units and the speculator, to commit units.
-  }];
-  let constructor = "dynamatic::experimental::speculation::createSpecAnnotatePaths()";
-}
-
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of
@@ -75,10 +75,7 @@ def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
   let constructor = "dynamatic::experimental::sharing::createCreditBasedSharing()";
 
   let options = [Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
-      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), "
-      "'fpga20-legacy' (same as fpga-20 but interprets the MILP's results as "
-      "legacy Dynamatic would, placing at most a single buffer type on any given "
-      "channel)">,
+      "Algorithm to use for buffer placement. Choices are: 'fpga20' (default), 'fpl22'.">,
       Option<"frequencies", "frequencies", "std::string", "",
       "Path to CSV-formatted file containing estimated transition frequencies "
       "between basic blocks in the kernel.">,

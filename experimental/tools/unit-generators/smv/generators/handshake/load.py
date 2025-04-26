@@ -1,5 +1,5 @@
 from generators.support.utils import *
-from generators.handshake.buffer import generate_buffer
+from generators.support.tehb import generate_tehb
 
 
 def generate_load(name, params):
@@ -25,6 +25,6 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   dataOut := inner_data_tehb.outs;
   dataOut_valid := inner_data_tehb.outs_valid;
 
-{generate_buffer(f"{name}__addr_tehb", TEHB_BUFFER_PARAMS(addr_type))}
-{generate_buffer(f"{name}__data_tehb", TEHB_BUFFER_PARAMS(data_type))}
+{generate_tehb(f"{name}__addr_tehb", {ATTR_DATA_TYPE: addr_type.mlir_type})}
+{generate_tehb(f"{name}__data_tehb", {ATTR_DATA_TYPE: data_type.mlir_type})}
 """

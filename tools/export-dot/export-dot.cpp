@@ -18,6 +18,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/Utils/Utils.h"
@@ -269,7 +270,7 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+      .Case<handshake::BufferOp>([&](auto) { return "green"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
@@ -280,7 +281,10 @@ static StringRef getNodeColor(Operation *op) {
           [&](auto) { return "lightblue"; })
       .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
           [&](auto) { return "tan2"; })
-      .Case<handshake::SpeculationOpInterface>([&](auto) { return "salmon"; })
+      .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
+            handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>(
+          [&](auto) { return "salmon"; })
       .Default([&](auto) { return "moccasin"; });
 }
 

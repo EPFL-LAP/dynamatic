@@ -109,10 +109,6 @@ public:
     double validDelay = 0.0;
     /// Delay of port's ready wire.
     double readyDelay = 0.0;
-    /// Number of transparent buffer slots on the port.
-    unsigned transparentSlots = 0;
-    /// Number of opaque buffer slots on the port.
-    unsigned opaqueSlots = 0;
   };
 
   /// Operation's latency, depending on its bitwidth.

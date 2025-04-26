@@ -603,10 +603,14 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   if (auto it = args.options.find(HDL); it != args.options.end()) {
     if (it->second == "verilog") {
       hdl = "verilog";
+    } else if (it->second == "smv") {
+      hdl = "smv";
+    } else if (it->second == "vhdl-beta") {
+      hdl = "vhdl-beta";
     } else if (it->second != "vhdl") {
       llvm::errs() << "Unknow HDL '" << it->second
-                   << "', possible options are 'vhdl' and "
-                      "'verilog'.\n";
+                   << "', possible options are 'vhdl', "
+                      "'verilog', and 'smv'.\n";
       return CommandResult::FAIL;
     }
   }

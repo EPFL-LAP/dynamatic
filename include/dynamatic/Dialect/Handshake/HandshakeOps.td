@@ -215,8 +215,7 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
+  HasClock, SameOperandsAndResultType
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -242,9 +241,30 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 }
 
+def InitOp : Handshake_Op<"init", [
+  HasClock, SameOperandsAndResultType
+]> {
+  let summary = "init operation";
+  let description = [{
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
+  }];
+  
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
 def NDWireOp : Handshake_Op<"ndwire", [
-  HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>,
+  HasClock, SameOperandsAndResultType
 ]> {
   let summary = "non-deterministic wire operation";
   let description = [{
@@ -261,8 +281,7 @@ def NDWireOp : Handshake_Op<"ndwire", [
 
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
   Handshake_Op<mnemonic, traits # [
-    Pure, HasClock, SameOperandsAndResultType,
-    DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+    Pure, HasClock, SameOperandsAndResultType
 ]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
@@ -278,14 +297,6 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = [{ 
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
-  }];
-
-  let extraClassDefinition = [{
-    std::pair<handshake::ChannelType, bool>
-    $cppClass::getReshapableChannelType() {
-      return {mlir::dyn_cast<handshake::ChannelType>(getOperand().getType()),
-              true};
-    }
   }];
 }
 
@@ -326,8 +337,7 @@ def MergeOp : Handshake_Op<"merge", [
   // require that the data types match.
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
-  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -353,14 +363,12 @@ def MergeOp : Handshake_Op<"merge", [
 def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"selectOperand">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -393,12 +401,11 @@ def MuxOp : Handshake_Op<"mux", [
 def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
-  MergingExtraSignals<"dataOperands", "result">,
-  AllDataTypesMatchWithVariadic<"dataOperands", "result">,
-  IsSimpleHandshake<"index">,
+  AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
+  // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -435,8 +442,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 }
 
 def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+  Pure, SameOperandsAndResultType
 ]> {
   let summary = "branch operation";
   let description = [{
@@ -465,8 +471,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
-  DeclareOpInterfaceMethods<ReshapableChannelsInterface, ["getReshapableChannelType"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -563,8 +568,7 @@ def JoinOp : Handshake_Op<"join", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType,
-                                 ReshapableChannelsInterface]> {
+def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -928,8 +932,9 @@ def EndOp : Handshake_Op<"end", [
 //===----------------------------------------------------------------------===//
 
 def SpeculatorOp : Handshake_Op<"speculator", [
-  SpeculationOpInterface,
-  // Expect a spec tag for dataIn as well, since Speculator is used in a loop.
+  // Expect a spec tag for dataIn, since Speculator is used in a loop.
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
@@ -939,8 +944,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<3, "SCSaveCtrl">,
   IsSimpleHandshake<"SCCommitCtrl">,
   IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCBranchCtrl">,
-  IsIntSizedChannel<1, "SCBranchCtrl">,
+  IsSimpleHandshake<"SCIsMisspec">,
+  IsIntSizedChannel<1, "SCIsMisspec">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -953,29 +958,37 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ($saveCtrl, $commitCtrl). For save-commit units, three control
     signals are needed. $SCSaveCtrl is connected directly, while 
     $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCBranchCtrl is needed
+    follows and might not reach a save-commit. $SCIsMisspec is needed
     in the replicated branches to discard the latter signal.
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCBranchCtrl
-      = speculator[enable] %dataIn : !handshake.channel<i1>
+    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
+      = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
+        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
     ```
   }];
 
-  let arguments = (ins HandshakeType:$dataIn, ControlType:$enable);
-  let results = (outs HandshakeType:$dataOut,
+  let arguments = (ins ChannelType:$dataIn,
+                       ControlType:$trigger,
+                       UI32Attr:$fifoDepth);
+  let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
                       ChannelType:$SCCommitCtrl, 
-                      ChannelType:$SCBranchCtrl);
+                      ChannelType:$SCIsMisspec);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
+    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
+    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
+  }];
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$enable), [{
-    $_state.addOperands({dataIn, enable});
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger, "unsigned":$fifoDepth), [{
+    $_state.addOperands({dataIn, trigger});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -987,7 +1000,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "enable";
+      return idx == 0 ? "ins" : "trigger";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
@@ -1011,11 +1024,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 }
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
-  HasSpecTag<"dataOut">,
+  HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1058,10 +1070,9 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
 }
 
 def SpecCommitOp : Handshake_Op<"spec_commit", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasSpecTag<"dataIn">,
+  HasValidSpecTag<"dataIn">,
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
@@ -1107,7 +1118,8 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 }
 
 def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
-  SpeculationOpInterface,
+  HasValidSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<3, "ctrl">,
@@ -1126,7 +1138,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn,
+                       ChannelType:$ctrl,
+                       UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
@@ -1146,11 +1160,10 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
 }
 
 def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
-  SpeculationOpInterface,
   AllDataTypesMatch<["dataOperand", "trueResult", "falseResult"]>,
   AllExtraSignalsMatchExcept<"spec", ["tagFromOperand", "dataOperand", "trueResult", "falseResult"]>,
-  HasSpecTag<"tagFromOperand">,
-  HasSpecTag<"dataOperand">,
+  HasValidSpecTag<"tagFromOperand">,
+  HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1190,6 +1203,46 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
+    }
+  }];
+}
+
+def NonSpecOp : Handshake_Op<"non_spec", [
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  LacksSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Adds a non-speculative spec bit.";
+  let description = [{
+    The non-spec operation has an input channel without a spec bit and an output
+    channel with a spec bit. Tokens on the output channel are marked as non-spec.
+    It's typically used before a MuxOp or CMergeOp to satisfy their type
+    requirements and to indicate the beginning of a speculative region.
+
+    Example:
+
+    ```mlir
+    %dataOut = non_spec %dataIn : !handshake.channel<i32> to !handshake.channel<i32, [spec: i1]>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "dataIn";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "dataOut";
     }
   }];
 }
@@ -1377,87 +1430,6 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
-}
-
-def ChannelReshapeTypeAttr : I32EnumAttr<
-    "ChannelReshapeType", "",
-    [
-      I32EnumAttrCase<"MergeData", 0>,
-      I32EnumAttrCase<"SplitData", 1>,
-      I32EnumAttrCase<"MergeExtra", 2>,
-      I32EnumAttrCase<"SplitExtra", 3>
-    ]> {
-  let cppNamespace = "::dynamatic::handshake";
-}
-
-def ReshapeOp : Handshake_Op<"reshape", [Pure]> {
-  let summary = "Reshapes the individual signals of a `handshake::ChannelType`.";
-  let description = [{
-    Reshapes a `ChannelType`'d value to a different form without modifying the
-    channel's actual payload, only rerouting bits to different extra signals or
-    to the channel's data signal. There are currently four reshaping types that
-    match two-by-two to perform reverse reshapings (each reshaping type pair has
-    a dedicated operation builder).
-
-    - `ChannelReshapeType::MergeData` merges all downstream extra signals into
-      the data signal, which becomes an `i<X>` where X is the sum of the
-      bitwidths of all downstream extra signals plus the data signal's bitwidth.
-      If there are no downstream extra signals, the data type is unchanged. All
-      upstream extra signals (if any) are merged into a single one named
-      `MERGED_UP_NAME` with type `i<Y>`, where Y is the sum of the bitwidths
-      of all upstream extra signals. `ChannelReshapeType::SplitData` performs
-      the reverse transformation.
-      
-    - `ChannelReshapeType::MergeExtra` behaves identically to
-      `ChannelReshapeType::MergeData` for extra upstream signals. However,
-      all downstream extra signals (if any) are merged into a single one named
-      `MERGED_DOWN_NAME` with type `i<Z>`, where Z is the sum of the bitwidths
-      of all downstream extra signals. The data type always remain unchanged.
-      `ChannelReshapeType::SplitExtra` performs the reverse transformation.  
-
-    Example:
-
-    ```mlir
-    // Merging into data
-    %reshaped = reshape [MergeData] %channel :
-      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-      -> <i42, [mergedUp: i8 (U)]>
-    
-    // -----
-    
-    // Merging into extra
-    %reshaped = reshape [MergeExtra] %channel :
-      <f32, [down1: i2, up1: i4 (U), up2: i4 (U), down2: i8]>
-      -> <f32, [mergedDowm: i10, mergedUp: i8 (U)]>
-    ```
-  }];
-
-  let arguments = (ins ChannelReshapeTypeAttr:$reshapeType, ChannelType:$channel);
-  let results = (outs ChannelType:$reshaped);
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins 
-      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
-      "bool":$mergeDownstreamIntoData)>,
-    OpBuilder<(ins
-      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>":$channel,
-      "bool":$splitDownstreamFromData, "::mlir::Type":$reshapedType)>,
-  ];
-
-  let assemblyFormat = [{
-    `[` $reshapeType `]` $channel attr-dict `:`
-      type($channel) `->` type($reshaped)
-  }];
-
-  let hasVerifier = 1;
-  let hasFolder = 1;
-  
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral
-      MERGED_DOWN_NAME = ::llvm::StringLiteral("mergedDown"),
-      MERGED_UP_NAME = ::llvm::StringLiteral("mergedUp");
-  }];
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

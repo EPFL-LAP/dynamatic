@@ -44,16 +44,17 @@ private:
   llvm::DenseSet<OpOperand *> saves;
   llvm::DenseSet<OpOperand *> commits;
   llvm::DenseSet<OpOperand *> saveCommits;
-  llvm::DenseSet<OpOperand *> buffers;
+
+  unsigned int speculatorFifoDepth;
+  unsigned int saveCommitsFifoDepth;
 
 public:
   /// Empty constructor
   SpeculationPlacements() = default;
 
-  /// Initializer with operands specifying the speculator and buffer positions
-  SpeculationPlacements(OpOperand &speculatorPosition,
-                        llvm::DenseSet<OpOperand *> &bufferPositions)
-      : speculator(&speculatorPosition), buffers(bufferPositions) {};
+  /// Initializer with operand specifying the speculator position
+  SpeculationPlacements(OpOperand &speculatorPosition)
+      : speculator(&speculatorPosition){};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,
@@ -71,9 +72,6 @@ public:
 
   /// Add the position of a SaveCommit operation
   void addSaveCommit(OpOperand &dstOpOperand);
-
-  /// Add the position of a Buffer operation
-  void addBuffer(OpOperand &dstOpOperand);
 
   /// Check if there is a save in the given OpOperand edge
   bool containsSave(OpOperand &dstOpOperand);
@@ -96,6 +94,11 @@ public:
   /// Get a set of the existing operation placements
   template <typename T>
   const llvm::DenseSet<OpOperand *> &getPlacements();
+
+  unsigned int getSpeculatorFifoDepth();
+  void setSpeculatorFifoDepth(unsigned int depth);
+  unsigned int getSaveCommitsFifoDepth();
+  void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
 } // namespace speculation
