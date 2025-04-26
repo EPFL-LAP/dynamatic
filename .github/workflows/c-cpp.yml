@@ -23,7 +23,7 @@ jobs:
 
       - name: check-format-python
         run: |
-          python -m venv venv
+          python3 -m venv venv
           source venv/bin/activate
           pip install autopep8==2.3.2
           autopep8 --indent-size 2 --max-line-length 200 --diff $(git ls-files '*.py')
