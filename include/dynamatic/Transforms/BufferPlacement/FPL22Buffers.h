@@ -41,7 +41,7 @@ protected:
   /// signature.
   FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {};
+      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod){};
 
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
@@ -49,7 +49,7 @@ protected:
                    const TimingDatabase &timingDB, double targetPeriod,
                    Logger &logger, StringRef milpName)
       : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                            milpName) {};
+                            milpName){};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots

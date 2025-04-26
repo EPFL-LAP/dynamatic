@@ -199,12 +199,12 @@ public:
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
                           logger, milpName),
-        sharingInfo(sharingInfo) {};
+        sharingInfo(sharingInfo){};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion),
-        sharingInfo(sharingInfo) {};
+        sharingInfo(sharingInfo){};
 
 private:
   SharingInfo &sharingInfo;
@@ -289,7 +289,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
                                    bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
-        sharingInfo(sharingInfo) {};
+        sharingInfo(sharingInfo){};
   SharingInfo &sharingInfo;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED

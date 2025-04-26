@@ -27,9 +27,9 @@ static bool isUnsigned(const std::string &str) {
 
 ArchBB::ArchBB(unsigned srcBB, unsigned dstBB, unsigned numTrans,
                bool isBackEdge)
-    : srcBB(srcBB), dstBB(dstBB), numTrans(numTrans), isBackEdge(isBackEdge) {};
+    : srcBB(srcBB), dstBB(dstBB), numTrans(numTrans), isBackEdge(isBackEdge){};
 
-StdProfiler::StdProfiler(mlir::func::FuncOp funcOp) : funcOp(funcOp) {};
+StdProfiler::StdProfiler(mlir::func::FuncOp funcOp) : funcOp(funcOp){};
 
 void StdProfiler::writeStats(bool printDOT) {
   mlir::raw_indented_ostream os(llvm::outs());

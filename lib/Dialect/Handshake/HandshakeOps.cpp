@@ -1312,21 +1312,21 @@ handshake::MemoryOpInterface dynamatic::findMemInterface(Value val) {
 MemoryPort::MemoryPort(Operation *portOp, ArrayRef<unsigned> oprdIndices,
                        ArrayRef<unsigned> resIndices, Kind kind)
     : portOp(portOp), oprdIndices(oprdIndices), resIndices(resIndices),
-      kind(kind) {}
+      kind(kind){}
 
 ControlPort::ControlPort(Operation *ctrlOp, unsigned ctrlInputIdx)
-    : MemoryPort(ctrlOp, {ctrlInputIdx}, {}, Kind::CONTROL) {}
+    : MemoryPort(ctrlOp, {ctrlInputIdx}, {}, Kind::CONTROL){}
 
 LoadPort::LoadPort(handshake::LoadOp loadOp, unsigned addrInputIdx,
                    unsigned dataOutputIdx)
-    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD) {}
+    : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD){}
 
 handshake::LoadOp LoadPort::getLoadOp() const {
   return cast<handshake::LoadOp>(portOp);
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1360,7 +1360,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 //===----------------------------------------------------------------------===//
 
 GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort) {};
+    : ctrlPort(ctrlPort){};
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1477,9 +1477,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group) {};
+    : blockID(blockID), group(group){};
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1515,7 +1515,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);

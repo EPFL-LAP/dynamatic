@@ -191,7 +191,7 @@ private:
   /// Construct an inner symbol table for the given operation,
   /// with pre-populated table contents.
   explicit InnerSymbolTable(Operation *op, TableTy &&table)
-      : innerSymTblOp(op), symbolTable(table) {};
+      : innerSymTblOp(op), symbolTable(table){};
 
   /// This is the operation this table is constructed for, which must have the
   /// InnerSymbolTable trait.
