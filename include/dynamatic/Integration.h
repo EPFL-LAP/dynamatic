@@ -214,6 +214,7 @@ static Res callKernel(Res (*kernel)(void)) {
 /// values of all function arguments to dedicated folders on disk before and
 /// after kernel execution. Also logs the kernel's return value, if it has one.
 #ifdef HLS_VERIFICATION
+#include "stdint.h"
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -235,6 +236,20 @@ static unsigned _transactionID_ = 0;
 static std::string _outPrefix_;
 
 // NOLINTEND(readability-identifier-naming)
+
+/// Specialization of the scalar printer for int8_t.
+template <>
+void scalarPrinter<int8_t>(const int8_t &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
+}
+
+/// Specialization of the scalar printer for uint8_t.
+template <>
+void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
+}
 
 /// Specialization of the scalar printer for float.
 template <>
