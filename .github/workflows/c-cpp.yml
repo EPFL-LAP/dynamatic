@@ -23,7 +23,7 @@ jobs:
 
       - name: check-format-python
         run: |
-          autopep8 --indent-size 2 --diff $(git ls-files '*.py')
+          autopep8 --indent-size 2 --max-line-length 200 --diff $(git ls-files '*.py')
 
       - name: build
         run: ./build.sh --release
