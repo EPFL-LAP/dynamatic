@@ -20,11 +20,9 @@ jobs:
         run: ./build.sh --release
 
       - name: check-dynamatic
-        continue-on-error: true
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
-        continue-on-error: true
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
