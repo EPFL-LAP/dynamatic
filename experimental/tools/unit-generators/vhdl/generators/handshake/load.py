@@ -1,6 +1,5 @@
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatLayout, ConcatPortConversion
-from generators.support.signal_manager.utils.types import Port
+from generators.support.signal_manager.utils.concat import ConcatLayout, generate_concat, generate_slice
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
@@ -123,22 +122,25 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  # Only extra signals (not data) are concatenated, so set original port bitwidth to 0.
-  addrIn_conversion: ConcatPortConversion = {
-      "original_name": "addrIn",
-      "original_bitwidth": 0,
-      "concat_name": "addrIn_inner"
-  }
-  dataOut_conversion: ConcatPortConversion = {
-      "original_name": "dataOut",
-      "original_bitwidth": 0,
-      "concat_name": "dataOut_inner"
-  }
-  concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
-      [addrIn_conversion, dataOut_conversion], extra_signals_total_bitwidth))
+  buff_in_name = "buff_in"
+  concat_assignments = []
+  concat_decls = []
+  assignments, decls = generate_concat(
+      "addrIn", 0, buff_in_name, concat_layout)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
+  concat_assignments = "\n  ".join(concat_assignments)
+  concat_decls = "\n  ".join(concat_decls)
 
-  concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
-      [addrIn_conversion], [dataOut_conversion], concat_layout))
+  buff_out_name = "buff_out"
+  slice_assignments = []
+  slice_decls = []
+  assignments, decls = generate_slice(
+      buff_out_name, "dataOut", 0, concat_layout)
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_assignments = "\n  ".join(slice_assignments)
+  slice_decls = "\n  ".join(slice_decls)
 
   architecture = f"""
 -- Architecture of load signal manager
@@ -146,7 +148,8 @@ architecture arch of {name} is
   signal addrIn_ready_inner : std_logic;
   signal ofifo_ready : std_logic;
   -- Concatenated signals
-  {concat_signal_decls}
+  {concat_decls}
+  {slice_decls}
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
@@ -158,7 +161,8 @@ begin
   transfer_out <= dataOut_valid and dataOut_ready;
 
   -- Concatenate extra signals
-  {concat_signal_logic}
+  {concat_assignments}
+  {slice_assignments}
 
   -- Buffer to store extra signals for in-flight memory requests
   -- LoadOp is assumed to be connected to a memory controller

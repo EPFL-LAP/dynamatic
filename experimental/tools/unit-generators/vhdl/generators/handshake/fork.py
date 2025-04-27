@@ -148,7 +148,6 @@ def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
           "name": "outs",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals,
-          "array": True,
           "size": size
       }],
       extra_signals,

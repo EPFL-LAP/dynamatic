@@ -1,8 +1,6 @@
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.concat import generate_concat_port_assignments, generate_concat_signal_decls, ConcatPortConversion
-from generators.support.signal_manager.utils.forwarding import generate_forwarding_assignments
-from generators.support.signal_manager.utils.internal_signal import generate_internal_signals_from_port
+from generators.support.signal_manager.utils.concat import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
 
 
 def generate_select(name, parameters):
@@ -167,61 +165,69 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       "extra_signals": extra_signals
   }])
 
-  # Generate internal signal declarations for the 'result' signal
-  result_inner_decl = "\n  ".join(generate_internal_signals_from_port({
-      "name": "result_inner",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals
-  }))
+  concat_decls = []
+  concat_assignments = []
+  assignments, decls = generate_concat(
+      "trueValue", bitwidth, "trueValue_inner", concat_layout)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
 
-  # Define conversions for the trueValue, falseValue, and result signals to handle concatenation
-  trueValue_conversion: ConcatPortConversion = {
-      "original_name": "trueValue",
-      "original_bitwidth": bitwidth,
-      "concat_name": "trueValue_inner"
-  }
-  falseValue_conversion: ConcatPortConversion = {
-      "original_name": "falseValue",
-      "original_bitwidth": bitwidth,
-      "concat_name": "falseValue_inner"
-  }
-  result_conversion: ConcatPortConversion = {
-      "original_name": "result_inner",
-      "original_bitwidth": bitwidth,
-      "concat_name": "result_inner_concat"
-  }
+  assignments, decls = generate_handshake_forwarding(
+      "trueValue", "trueValue_inner")
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
 
-  # Generate the concat signal declarations for all the signals that need concatenation
-  concat_signal_decls = "\n  ".join(generate_concat_signal_decls(
-      [trueValue_conversion, falseValue_conversion, result_conversion],
-      extra_signals_total_bitwidth
-  ))
+  assignments, decls = generate_concat(
+      "falseValue", bitwidth, "falseValue_inner", concat_layout)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
 
-  # Generate the concat logic for the trueValue, falseValue, and result signals
-  concat_signal_logic = "\n  ".join(generate_concat_port_assignments(
-      [trueValue_conversion, falseValue_conversion],
-      [result_conversion],
-      concat_layout
-  ))
+  assignments, decls = generate_handshake_forwarding(
+      "falseValue", "falseValue_inner")
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
 
-  # Forward extra signals from condition and result_inner to result
-  forwarding_logic = generate_forwarding_assignments(
-      ["condition", "result_inner"],
-      ["result"],
-      extra_signal_names)[0]
+  concat_assignments = "\n  ".join(concat_assignments)
+  concat_decls = "\n  ".join(concat_decls)
+
+  slice_decls = []
+  slice_assignments = []
+
+  assignments, decls = generate_slice(
+      "result_inner_concat", "result_inner", bitwidth, concat_layout)
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  assignments, decls = generate_handshake_forwarding(
+      "result_inner_concat", "result_inner")
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  slice_assignments = "\n  ".join(slice_assignments)
+  slice_decls = "\n  ".join(slice_decls)
+
+  forwarding_assignments = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    assignments, _ = generate_signal_wise_forwarding(
+        ["condition", "result_inner"], ["result"], signal_name, signal_bitwidth)
+    forwarding_assignments.extend(assignments)
+
+  forwarding_assignments = "\n  ".join(forwarding_assignments)
 
   architecture = f"""
 -- Architecture of selector signal manager
 architecture arch of {name} is
-  {result_inner_decl}
-  -- Concatenated data and extra signals
-  {concat_signal_decls}
+  {concat_decls}
+  {slice_decls}
 begin
   -- Concatenate extra signals
-  {concat_signal_logic}
+  {concat_assignments}
+  {slice_assignments}
 
   -- Forwarding logic
-  {forwarding_logic}
+  {forwarding_assignments}
 
   result <= result_inner;
   result_valid <= result_inner_valid;

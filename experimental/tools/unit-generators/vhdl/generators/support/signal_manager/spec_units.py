@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.concat import ConcatLayout, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
-from .utils.mapping import generate_simple_mappings, generate_concat_mappings
+from .utils.concat import ConcatLayout, generate_concat, generate_slice, generate_mapping, generate_handshake_forwarding
 from .utils.types import Port, ExtraSignals
 
 
@@ -49,18 +48,68 @@ def generate_spec_units_signal_manager(
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  # Declare concatenated signals for all input/output ports excluding control signals
-  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
-      in_ports_without_ctrl + out_ports, extra_signals_bitwidth))
+  mapped_ports = {}
 
-  # Assign inner concatenated signals
-  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
-      in_ports_without_ctrl, out_ports, concat_layout))
+  # Declare concatenated signals for all input/output ports excluding control signals
+  concat_signal_decls = []
+  concat_logic = []
+  for port in in_ports_without_ctrl:
+    channel_name = port["name"]
+    concat_name = f"{channel_name}_concat"
+    channel_bitwidth = port["bitwidth"]
+    channel_size = port.get("size", 0)
+
+    assignments, decls = generate_concat(
+        channel_name, channel_bitwidth, concat_name, concat_layout, channel_size)
+    concat_signal_decls.extend(decls["out"])
+    concat_logic.extend(assignments)
+
+    assignments, decls = generate_handshake_forwarding(
+        channel_name, concat_name, channel_size)
+    concat_signal_decls.extend(decls["out"])
+    concat_logic.extend(assignments)
+
+    mapped_ports[channel_name] = {
+        "name": concat_name,
+        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+        "size": channel_size,
+        "extra_signals": {"spec": 1}
+    }
+
+  for port in out_ports:
+    channel_name = port["name"]
+    concat_name = f"{channel_name}_concat"
+    channel_bitwidth = port["bitwidth"]
+    channel_size = port.get("size", 0)
+
+    assignments, decls = generate_slice(
+        concat_name, channel_name, channel_bitwidth, concat_layout, channel_size)
+    concat_signal_decls.extend(decls["in"])
+    concat_logic.extend(assignments)
+
+    assignments, decls = generate_handshake_forwarding(
+        concat_name, channel_name, channel_size)
+    concat_signal_decls.extend(decls["in"])
+    concat_logic.extend(assignments)
+
+    mapped_ports[channel_name] = {
+        "name": concat_name,
+        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+        "size": channel_size,
+        "extra_signals": {"spec": 1}
+    }
+
+  concat_signal_decls = "\n  ".join(concat_signal_decls)
+  concat_logic = "\n  ".join(concat_logic)
 
   # Map control ports, concatenated non-control ports and `spec` signal to inner component
-  mappings = ",\n      ".join(generate_concat_mappings(
-      in_ports_without_ctrl + out_ports, extra_signals_bitwidth, ["spec"]) +
-      generate_simple_mappings(ctrl_ports))
+  for ctrl_port in ctrl_ports:
+    mapped_ports[ctrl_port["name"]] = ctrl_port
+
+  mappings = []
+  for original_name, mapped_channel in mapped_ports.items():
+    mappings.extend(generate_mapping(mapped_channel, original_name))
+  mappings = ",\n      ".join(mappings)
 
   architecture = f"""
 -- Architecture of signal manager (spec_units)

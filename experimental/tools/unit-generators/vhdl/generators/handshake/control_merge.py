@@ -1,8 +1,7 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
-from generators.support.signal_manager.utils.concat import generate_concat_signal_decls_from_ports, ConcatLayout, generate_concat_port_assignments_from_ports
-from generators.support.signal_manager.utils.mapping import generate_inner_port_mapping, generate_concat_mappings
-from generators.support.signal_manager.utils.types import Port, ArrayPort, ExtraSignals
+from generators.support.signal_manager.utils.concat import ConcatLayout, generate_concat, generate_slice, generate_handshake_forwarding
+from generators.support.signal_manager.utils.types import ExtraSignals
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
@@ -189,32 +188,25 @@ def _generate_cmerge_index_extra_signal_assignments(index_name: str, index_extra
 
 
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
-  # Declare Ports
-  data_in_port: ArrayPort = {
-      "name": "ins",
-      "bitwidth": data_bitwidth,
-      "array": True,
-      "size": size,
-      "extra_signals": extra_signals
-  }
-  index_port: Port = {
-      "name": "index",
-      "bitwidth": index_bitwidth,
-      # TODO: Extra signals for index port are not tested
-      "extra_signals": extra_signals
-  }
-  data_out_port: Port = {
-      "name": "outs",
-      "bitwidth": data_bitwidth,
-      "extra_signals": extra_signals
-  }
-
   # Generate signal manager entity
   entity = generate_entity(
       name,
-      [data_in_port],
-      [index_port, data_out_port]
-  )
+      [{
+          "name": "ins",
+          "bitwidth": data_bitwidth,
+          "size": size,
+          "extra_signals": extra_signals
+      }],
+      [{
+          "name": "index",
+          "bitwidth": index_bitwidth,
+          # TODO: Extra signals for index port are not tested
+          "extra_signals": extra_signals
+      }, {
+          "name": "outs",
+          "bitwidth": data_bitwidth,
+          "extra_signals": extra_signals
+      }])
 
   # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals)
@@ -224,42 +216,71 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   inner = _generate_control_merge(
       inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
 
-  # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
-      [data_in_port, data_out_port], extra_signals_bitwidth))
+  concat_assignments = []
+  concat_decls = []
 
-  # Assign inner concatenated signals
-  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
-      [data_in_port], [data_out_port], concat_layout))
+  assignments, decls = generate_concat(
+      "ins", data_bitwidth, "ins_inner", concat_layout, size)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
+
+  assignments, decls = generate_handshake_forwarding(
+      "ins", "ins_inner", size)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
+
+  concat_assignments = "\n  ".join(concat_assignments)
+  concat_decls = "\n  ".join(concat_decls)
+
+  slice_decls = []
+  slice_assignments = []
+
+  assignments, decls = generate_slice(
+      "outs_inner", "outs", data_bitwidth, concat_layout, size)
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  assignments, decls = generate_handshake_forwarding(
+      "outs_inner", "outs", size)
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  slice_assignments = "\n  ".join(slice_assignments)
+  slice_decls = "\n  ".join(slice_decls)
 
   # Assign index extra signals
   index_extra_signal_assignments = _generate_cmerge_index_extra_signal_assignments(
       "index", extra_signals)
 
-  # Map all ports to inner entity:
-  #   - Forward concatenated extra signal vectors
-  #   - Pass through index port as-is
-  mappings = ",\n      ".join(generate_concat_mappings(
-      [data_in_port, data_out_port], extra_signals_bitwidth) +
-      generate_inner_port_mapping(index_port))
-
   architecture = f"""
 -- Architecture of signal manager (cmerge)
 architecture arch of {name} is
   -- Concatenated data and extra signals
-  {concat_signal_decls}
+  {concat_decls}
+  {slice_decls}
 begin
   -- Concatenate data and extra signals
-  {concat_logic}
+  {concat_assignments}
+  {slice_assignments}
 
-  -- Assign index extra signals (if any)
+  -- Assign index extra signals
   {index_extra_signal_assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-      {mappings}
+      ins => ins_inner,
+      ins_valid => ins_inner_valid,
+      ins_ready => ins_inner_ready,
+      outs => outs_inner,
+      outs_valid => outs_inner_valid,
+      outs_ready => outs_inner_ready,
+      index => index,
+      index_valid => index_valid,
+      index_ready => index_ready
     );
 end architecture;
 """

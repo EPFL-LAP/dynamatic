@@ -154,7 +154,6 @@ def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
           "name": "ins",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals,
-          "array": True,
           "size": size
       }],
       [{

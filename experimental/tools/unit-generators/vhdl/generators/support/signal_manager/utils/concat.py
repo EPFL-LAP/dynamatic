@@ -1,6 +1,6 @@
-from typing import cast, TypedDict, NotRequired
-from .types import Port, ArrayPort, Direction
-from .internal_signal import generate_internal_signal_vector, generate_internal_signal_array
+from .types import Port, ExtraSignals
+from .internal_signal import generate_internal_signal, generate_internal_signal_vector, generate_internal_signal_array
+from .forwarding import generate_forwarding_expression_for_signal
 
 
 # Holds the concatenation layout of extra signals.
@@ -28,178 +28,186 @@ def get_concat_extra_signals_bitwidth(extra_signals: dict[str, int]):
   return sum(extra_signals.values())
 
 
-# Describes how a port is transformed during concatenation.
-# Maps the original port to its new name.
-class ConcatPortConversion(TypedDict):
-  original_name: str
-  original_bitwidth: int
-  concat_name: str
-  # If port is `data_array`, this is the size of the array.
-  array_size: NotRequired[int]
+def generate_handshake_forwarding(in_channel_name: str, out_channel_name: str, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
 
+  assignments.append(f"{out_channel_name}_valid <= {in_channel_name}_valid;")
+  assignments.append(f"{in_channel_name}_ready <= {out_channel_name}_ready;")
 
-def get_default_concat_name(original_name: str) -> str:
-  """Generate the default name used for the internal concatenated signal."""
-  return f"{original_name}_inner"
-
-
-def get_default_port_conversion(port: Port) -> ConcatPortConversion:
-  """
-  Convert a port definition to its ConcatPortConversion form.
-  Adds the default internal name and array size if applicable.
-  """
-  port_conversion: ConcatPortConversion = {
-      "original_name": port["name"],
-      "original_bitwidth": port["bitwidth"],
-      "concat_name": get_default_concat_name(port["name"])
-  }
-
-  # Include array size if the port is an array
-  if port.get("array", False):
-    port = cast(ArrayPort, port)
-    port_conversion["array_size"] = port["size"]
-
-  return port_conversion
-
-
-def generate_concat_signal_decl(port_conversion: ConcatPortConversion, extra_signals_bitwidth: int) -> str:
-  """
-  Generate a signal declaration for a port with extra signals concatenated.
-  e.g., signal dataIn_inner : std_logic_vector(33 - 1 downto 0); // 32 (data) + 1 (spec)
-  """
-  array_size = port_conversion.get("array_size", 0)
-  full_bitwidth = extra_signals_bitwidth + port_conversion["original_bitwidth"]
-
-  if array_size > 0:
-    return generate_internal_signal_array(port_conversion["concat_name"], full_bitwidth, array_size)
+  if array_size == 0:
+    in_declarations.append(
+        generate_internal_signal(f"{in_channel_name}_valid"))
+    in_declarations.append(
+        generate_internal_signal(f"{in_channel_name}_ready"))
+    out_declarations.append(
+        generate_internal_signal(f"{out_channel_name}_valid"))
+    out_declarations.append(
+        generate_internal_signal(f"{out_channel_name}_ready"))
   else:
-    return generate_internal_signal_vector(port_conversion["concat_name"], full_bitwidth)
+    in_declarations.append(
+        generate_internal_signal_vector(f"{in_channel_name}_valid", array_size))
+    in_declarations.append(
+        generate_internal_signal_vector(f"{in_channel_name}_ready", array_size))
+    out_declarations.append(
+        generate_internal_signal_vector(f"{out_channel_name}_valid", array_size))
+    out_declarations.append(
+        generate_internal_signal_vector(f"{out_channel_name}_ready", array_size))
+
+  return assignments, {"in": in_declarations, "out": out_declarations}
 
 
-def generate_concat_signal_decls(port_conversions: list[ConcatPortConversion], extra_signals_bitwidth: int) -> list[str]:
-  """
-  Generate a list of signal declarations for all ports with extra signals concatenated.
-  e.g.,
-  signal dataIn1_inner : std_logic_vector(33 - 1 downto 0); // 32 (data) + 1 (spec)
-  signal dataIn2_inner : std_logic_vector(9 - 1 downto 0); // 8 (data) + 1 (spec)
-  """
-  signal_decls: list[str] = []
-  for port_conversion in port_conversions:
-    signal_decls.append(generate_concat_signal_decl(
-        port_conversion, extra_signals_bitwidth))
-
-  return signal_decls
-
-
-def generate_concat_signal_decls_from_ports(ports: list[Port], extra_signals_bitwidth: int) -> list[str]:
-  """
-  High-level helper: convert ports to port conversions and generate signal declarations.
-  """
-  return generate_concat_signal_decls([
-      get_default_port_conversion(port) for port in ports
-  ], extra_signals_bitwidth)
-
-
-def generate_concat_in_port_assignment(port_conversion: ConcatPortConversion, concat_layout: ConcatLayout) -> list[str]:
-  """
-  Generate VHDL assignments to pack original input signals and extra signals
-  into a single concatenated internal signal.
-  """
-  original_name = port_conversion["original_name"]
-  original_bitwidth = port_conversion["original_bitwidth"]
-  concat_name = port_conversion["concat_name"]
-  array_size = port_conversion.get("array_size", 0)
-
-  concat_logic = []
+def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
 
   if array_size == 0:
     # Include data if present
-    if original_bitwidth > 0:
-      concat_logic.append(
-          f"{concat_name}({original_bitwidth} - 1 downto 0) <= {original_name};")
+    if in_data_bitwidth > 0:
+      assignments.append(
+          f"{out_channel_name}({in_data_bitwidth} - 1 downto 0) <= {in_channel_name};")
+      in_declarations.append(
+          generate_internal_signal_vector(in_channel_name, in_data_bitwidth))
 
     # Include all extra signals
     for signal_name, (msb, lsb) in concat_layout.mapping:
-      concat_logic.append(
-          f"{concat_name}({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{signal_name};")
+      assignments.append(
+          f"{out_channel_name}({msb + in_data_bitwidth} downto {lsb + in_data_bitwidth}) <= {in_channel_name}_{signal_name};")
+      in_declarations.append(
+          generate_internal_signal_vector(f"{in_channel_name}_{signal_name}", msb - lsb + 1))
+
+    out_declarations.append(
+        generate_internal_signal_vector(out_channel_name, in_data_bitwidth + concat_layout.total_bitwidth))
   else:
     # Signal is an array
     for i in range(array_size):
       # Include data if present
-      if original_bitwidth > 0:
-        concat_logic.append(
-            f"{concat_name}({i})({original_bitwidth} - 1 downto 0) <= {original_name}({i});")
+      if in_data_bitwidth > 0:
+        assignments.append(
+            f"{out_channel_name}({i})({in_data_bitwidth} - 1 downto 0) <= {in_channel_name}({i});")
 
       # Include all extra signals
       for signal_name, (msb, lsb) in concat_layout.mapping:
-        concat_logic.append(
-            f"{concat_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth}) <= {original_name}_{i}_{signal_name};")
+        assignments.append(
+            f"{out_channel_name}({i})({msb + in_data_bitwidth} downto {lsb + in_data_bitwidth}) <= {in_channel_name}_{i}_{signal_name};")
+        in_declarations.append(
+            generate_internal_signal_vector(f"{in_channel_name}_{i}_{signal_name}", msb - lsb + 1))
 
-  return concat_logic
+    in_declarations.append(
+        generate_internal_signal_array(in_channel_name, in_data_bitwidth, array_size))
+    out_declarations.append(
+        generate_internal_signal_array(out_channel_name, in_data_bitwidth + concat_layout.total_bitwidth, array_size))
+
+  return assignments, {"in": in_declarations, "out": out_declarations}
 
 
-def generate_concat_out_port_assignment(port_conversion: ConcatPortConversion, concat_layout: ConcatLayout) -> list[str]:
-  """
-  Generate VHDL assignments to unpack data and extra signals
-  from a concatenated internal signal to the original output ports.
-  """
-  original_name = port_conversion["original_name"]
-  original_bitwidth = port_conversion["original_bitwidth"]
-  concat_name = port_conversion["concat_name"]
-  array_size = port_conversion.get("array_size", 0)
-
-  concat_logic = []
+def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
 
   if array_size == 0:
-    # Extract data if present
-    if original_bitwidth > 0:
-      concat_logic.append(
-          f"{original_name} <= {concat_name}({original_bitwidth} - 1 downto 0);")
+    # Include data if present
+    if out_data_bitwidth > 0:
+      assignments.append(
+          f"{out_channel_name} <= {in_channel_name}({out_data_bitwidth} - 1 downto 0);")
+      out_declarations.append(
+          generate_internal_signal_vector(out_channel_name, out_data_bitwidth))
 
-    # Extract all extra signals
+    # Include all extra signals
     for signal_name, (msb, lsb) in concat_layout.mapping:
-      concat_logic.append(
-          f"{original_name}_{signal_name} <= {concat_name}({msb + original_bitwidth} downto {lsb + original_bitwidth});")
+      assignments.append(
+          f"{out_channel_name}_{signal_name} <= {in_channel_name}({msb + out_data_bitwidth} downto {lsb + out_data_bitwidth});")
+      out_declarations.append(
+          generate_internal_signal_vector(f"{out_channel_name}_{signal_name}", msb - lsb + 1))
 
+    in_declarations.append(
+        generate_internal_signal_vector(in_channel_name, out_data_bitwidth + concat_layout.total_bitwidth))
   else:
     # Signal is an array
     for i in range(array_size):
-      # Extract data if present
-      if original_bitwidth > 0:
-        concat_logic.append(
-            f"{original_name}({i}) <= {concat_name}({i})({original_bitwidth} - 1 downto 0);")
+      # Include data if present
+      if out_data_bitwidth > 0:
+        assignments.append(
+            f"{out_channel_name}({i}) <= {in_channel_name}({i})({out_data_bitwidth} - 1 downto 0);")
 
-      # Extract all extra signals
+      # Include all extra signals
       for signal_name, (msb, lsb) in concat_layout.mapping:
-        concat_logic.append(
-            f"{original_name}_{i}_{signal_name} <= {concat_name}({i})({msb + original_bitwidth} downto {lsb + original_bitwidth});")
+        assignments.append(
+            f"{out_channel_name}_{i}_{signal_name} <= {in_channel_name}({i})({msb + out_data_bitwidth} downto {lsb + out_data_bitwidth});")
+        out_declarations.append(
+            generate_internal_signal_vector(f"{out_channel_name}_{i}_{signal_name}", msb - lsb + 1))
 
-  return concat_logic
+    in_declarations.append(
+        generate_internal_signal_array(in_channel_name, out_data_bitwidth + concat_layout.total_bitwidth, array_size))
+    out_declarations.append(
+        generate_internal_signal_array(out_channel_name, out_data_bitwidth, array_size))
 
-
-def generate_concat_port_assignments(in_port_conversions: list[ConcatPortConversion], out_port_conversions: list[ConcatPortConversion], concat_layout: ConcatLayout) -> list[str]:
-  """
-  Generate VHDL assignments for both input and output ports
-  using the given ConcatLayout.
-  """
-  concat_logic = []
-  for port_conversion in in_port_conversions:
-    concat_logic += generate_concat_in_port_assignment(
-        port_conversion, concat_layout)
-  for port_conversion in out_port_conversions:
-    concat_logic += generate_concat_out_port_assignment(
-        port_conversion, concat_layout)
-
-  return concat_logic
+  return assignments, {"in": in_declarations, "out": out_declarations}
 
 
-def generate_concat_port_assignments_from_ports(in_ports: list[Port], out_ports: list[Port], concat_layout: ConcatLayout) -> list[str]:
-  """
-  High-level helper: convert input/output ports to default conversions and
-  generate the full list of concatenation assignments.
-  """
-  return generate_concat_port_assignments(
-      [get_default_port_conversion(port) for port in in_ports],
-      [get_default_port_conversion(port) for port in out_ports],
-      concat_layout
-  )
+def generate_signal_direct_forwarding(in_channel_name: str, out_channel_name: str, signal_name: str, signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
+  assignments = [
+      f"{out_channel_name}_{signal_name} <= {in_channel_name}_{signal_name};"]
+  declarations = {
+      "in": [generate_internal_signal_vector(f"{in_channel_name}_{signal_name}", signal_bitwidth)],
+      "out": [generate_internal_signal_vector(f"{out_channel_name}_{signal_name}", signal_bitwidth)]
+  }
+  return assignments, declarations
+
+
+def subtract_extra_signals(a: ExtraSignals, b: ExtraSignals) -> ExtraSignals:
+  result: ExtraSignals = {}
+  for signal_name in a:
+    if signal_name not in b:
+      result[signal_name] = a[signal_name]
+
+  return result
+
+
+def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
+  mapping: list[str] = []
+  port_name = port["name"]
+  port_extra_signals = port.get("extra_signals", {})
+  port_bitwidth = port["bitwidth"]
+
+  if port_bitwidth > 0:
+    # Mapping for data signal if present
+    mapping.append(f"{inner_channel_name} => {port_name}")
+
+  # Mapping for handshake signals
+  mapping.append(f"{inner_channel_name}_valid => {port_name}_valid")
+  mapping.append(f"{inner_channel_name}_ready => {port_name}_ready")
+
+  for signal_name in port_extra_signals:
+    if signal_name in port_extra_signals:
+      mapping.append(
+          f"{port_name}_{signal_name} => {port_name}_{signal_name}")
+
+  return mapping
+
+
+def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
+
+  in_extra_signal_names = []
+  for in_channel_name in in_channel_names:
+    signal_name = f"{in_channel_name}_{extra_signal_name}"
+    in_extra_signal_names.append(signal_name)
+    in_declarations.append(
+        generate_internal_signal_vector(signal_name, extra_signal_bitwidth))
+
+  expression = generate_forwarding_expression_for_signal(
+      extra_signal_name, in_extra_signal_names)
+
+  for out_channel_name in out_channel_names:
+    signal_name = f"{out_channel_name}_{extra_signal_name}"
+    assignments.append(f"{signal_name} <= {expression};")
+    out_declarations.append(
+        generate_internal_signal_vector(signal_name, extra_signal_bitwidth))
+
+  return assignments, {"in": in_declarations, "out": out_declarations}

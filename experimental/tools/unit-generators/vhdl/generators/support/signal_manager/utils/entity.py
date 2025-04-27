@@ -1,5 +1,4 @@
-from typing import cast
-from .types import Port, ArrayPort, Direction
+from .types import Port, Direction
 
 
 def generate_port_decl(port: Port, dir: Direction) -> list[str]:
@@ -15,9 +14,9 @@ def generate_port_decl(port: Port, dir: Direction) -> list[str]:
   name = port["name"]
   bitwidth = port["bitwidth"]
   extra_signals = port.get("extra_signals", {})
-  port_array = port.get("array", False)
+  array_size = port.get("size", 0)
 
-  if not port_array:
+  if array_size == 0:
     # Scalar port
 
     if bitwidth > 0:
@@ -35,24 +34,22 @@ def generate_port_decl(port: Port, dir: Direction) -> list[str]:
           f"{name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
   else:
     # Array port
-    port = cast(ArrayPort, port)
-    size = port["size"]
 
     if bitwidth > 0:
       # Declare 2D data array
       port_decls.append(
-          f"{name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+          f"{name} : {dir} data_array({array_size} - 1 downto 0)({bitwidth} - 1 downto 0)")
 
     # Handshake signals as 1D vector
     port_decls.append(
-        f"{name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
+        f"{name}_valid : {dir} std_logic_vector({array_size} - 1 downto 0)")
     port_decls.append(
-        f"{name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+        f"{name}_ready : {ready_dir} std_logic_vector({array_size} - 1 downto 0)")
 
     # Check for per-index extra signal customization
     use_extra_signals_list = "extra_signals_list" in port
 
-    for i in range(size):
+    for i in range(array_size):
       current_extra_signals = (
           port["extra_signals_list"][i] if use_extra_signals_list
           else extra_signals

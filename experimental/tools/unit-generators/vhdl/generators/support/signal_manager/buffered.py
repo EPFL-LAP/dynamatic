@@ -1,9 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.forwarding import forward_extra_signals
 from .utils.types import Port, ExtraSignals
-from .utils.mapping import generate_simple_mappings, get_unhandled_extra_signals
-from .utils.concat import ConcatLayout
+from .utils.concat import ConcatLayout, generate_signal_wise_forwarding, generate_signal_direct_forwarding, generate_concat, generate_slice, subtract_extra_signals, generate_mapping
 
 
 def _generate_buffered_transfer_logic(
@@ -23,45 +21,6 @@ def _generate_buffered_transfer_logic(
   return f"""
   {transfer_in_name} <= {first_in_port_name}_valid and {first_in_port_name}_ready;
   {transfer_out_name} <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
-
-
-def _generate_buffered_signal_assignments(
-    in_ports: list[Port],
-    out_ports: list[Port],
-    concat_layout: ConcatLayout,
-    extra_signals: ExtraSignals,
-    buff_in_name: str,
-    buff_out_name: str
-) -> str:
-  """
-  Generate assignments for buffering extra signals:
-  - Forward and concat extra signals from all inputs into a single `buff_in` bus.
-  - Split `buff_out` bus to drive extra signals for all outputs.
-
-  Example:
-    buff_in(0 downto 0) <= lhs_spec or rhs_spec;
-    buff_in(8 downto 1) <= lhs_tag0;
-    out_spec <= buff_out(0 downto 0);
-    out_tag0 <= buff_out(8 downto 1);
-  """
-  forwarded_extra_signals = forward_extra_signals(
-      extra_signal_names=list(extra_signals),
-      in_port_names=[port["name"] for port in in_ports])
-
-  signal_assignments = []
-
-  for signal_name, (msb, lsb) in concat_layout.mapping:
-    # Forward signals from multiple input ports into one concatenated vector
-    signal_assignments.append(
-        f"{buff_in_name}({msb} downto {lsb}) <= {forwarded_extra_signals[signal_name]};")
-
-    # Distribute split buffer outputs to all output ports
-    for out_port in out_ports:
-      port_name = out_port["name"]
-      signal_assignments.append(
-          f"{port_name}_{signal_name} <= {buff_out_name}({msb} downto {lsb});")
-
-  return "\n  ".join(signal_assignments)
 
 
 def generate_buffered_signal_manager(
@@ -117,28 +76,80 @@ def generate_buffered_signal_manager(
       in_ports, out_ports, transfer_in_name, transfer_out_name)
 
   # Assign extra signals to FIFO input/output
+  # buff_in_name = "buff_in"
+  # buff_out_name = "buff_out"
+  # signal_assignments = _generate_buffered_signal_assignments(
+  #     in_ports, out_ports, concat_layout, extra_signals, buff_in_name, buff_out_name)
+  in_channel_names = [port["name"] for port in in_ports]
+  forwarded_name = "forwarded"
+  forwarded_assignments = []
+  forwarded_decls = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    assignments, decls = generate_signal_wise_forwarding(
+        in_channel_names, [forwarded_name], signal_name, signal_bitwidth)
+    forwarded_assignments.extend(assignments)
+    forwarded_decls.extend(decls["out"])
+  forwarded_assignments = "\n  ".join(forwarded_assignments)
+  forwarded_decls = "\n  ".join(forwarded_decls)
+
   buff_in_name = "buff_in"
+  concat_assignments = []
+  concat_decls = []
+  assignments, decls = generate_concat(
+      forwarded_name, 0, buff_in_name, concat_layout)
+  concat_assignments.extend(assignments)
+  concat_decls.extend(decls["out"])
+  concat_assignments = "\n  ".join(concat_assignments)
+  concat_decls = "\n  ".join(concat_decls)
+
   buff_out_name = "buff_out"
-  signal_assignments = _generate_buffered_signal_assignments(
-      in_ports, out_ports, concat_layout, extra_signals, buff_in_name, buff_out_name)
+  sliced_name = "sliced"
+  slice_assignments = []
+  slice_decls = []
+  assignments, decls = generate_slice(
+      buff_out_name, sliced_name, 0, concat_layout)
+  slice_assignments.extend(assignments)
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+  for signal_name, signal_bitwidth in extra_signals.items():
+    for out_port in out_ports:
+      port_name = out_port["name"]
+      assignments, _ = generate_signal_direct_forwarding(
+          sliced_name, port_name, signal_name, signal_bitwidth)
+      slice_assignments.extend(assignments)
+  slice_assignments = "\n  ".join(slice_assignments)
+  slice_decls = "\n  ".join(slice_decls)
 
   # Map data ports and untouched extra signals directly to inner component
-  unhandled_extra_signals = get_unhandled_extra_signals(
-      in_ports + out_ports, extra_signals)
-  mappings = ",\n      ".join(generate_simple_mappings(
-      in_ports + out_ports, unhandled_extra_signals))
+  mapped_ports: list[Port] = []
+  for port in in_ports + out_ports:
+    mapped_ports.append({
+        "name": port["name"],
+        "bitwidth": port["bitwidth"],
+        "size": port.get("size", 0),
+        "extra_signals": subtract_extra_signals(port.get("extra_signals", {}), extra_signals)
+    })
+
+  mappings = []
+  for port in mapped_ports:
+    mappings.extend(generate_mapping(port, port["name"]))
+  mappings = ",\n      ".join(mappings)
 
   architecture = f"""
 -- Architecture of signal manager (buffered)
 architecture arch of {name} is
-  signal {buff_in_name}, {buff_out_name} : std_logic_vector({extra_signals_bitwidth} - 1 downto 0);
+  {forwarded_decls}
+  {concat_decls}
+  {slice_decls}
   signal {transfer_in_name}, {transfer_out_name} : std_logic;
 begin
   -- Transfer signal assignments
   {transfer_logic}
 
   -- Concat/split extra signals for buffer input/output
-  {signal_assignments}
+  {forwarded_assignments}
+  {concat_assignments}
+  {slice_assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(

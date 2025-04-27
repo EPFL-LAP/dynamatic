@@ -1,7 +1,6 @@
 from collections.abc import Callable
-from .utils.mapping import generate_concat_mappings, get_unhandled_extra_signals
 from .utils.entity import generate_entity
-from .utils.concat import ConcatLayout, generate_concat_signal_decls_from_ports, generate_concat_port_assignments_from_ports
+from .utils.concat import ConcatLayout, generate_concat, generate_slice, subtract_extra_signals, generate_signal_direct_forwarding, generate_mapping, generate_handshake_forwarding
 from .utils.types import Port, ExtraSignals
 
 
@@ -35,19 +34,90 @@ def generate_concat_signal_manager(
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  # Declare inner concatenated signals for all input/output ports
-  concat_signal_decls = "\n  ".join(generate_concat_signal_decls_from_ports(
-      in_ports + out_ports, extra_signals_bitwidth))
+  concat_ports = {}
+  concat_signal_decls = []
+  concat_logic = []
+  for in_port in in_ports:
+    channel_name = in_port["name"]
+    concat_name = f"{channel_name}_concat"
+    channel_bitwidth = in_port["bitwidth"]
+    channel_size = in_port.get("size", 0)
+    channel_extra_signals = in_port.get("extra_signals", {})
 
-  # Assign inner concatenated signals
-  concat_logic = "\n  ".join(generate_concat_port_assignments_from_ports(
-      in_ports, out_ports, concat_layout))
+    assignments, declarations = generate_concat(
+        channel_name,
+        channel_bitwidth,
+        concat_name,
+        concat_layout,
+        channel_size
+    )
+    concat_signal_decls.extend(declarations["out"])
+    concat_logic.extend(assignments)
 
-  # Map concatenated ports and untouched extra signals to inner component
-  unhandled_extra_signals = get_unhandled_extra_signals(
-      in_ports + out_ports, extra_signals)
-  mappings = ",\n      ".join(generate_concat_mappings(
-      in_ports + out_ports, extra_signals_bitwidth, unhandled_extra_signals))
+    assignments, declarations = generate_handshake_forwarding(
+        channel_name, concat_name, channel_size)
+    concat_signal_decls.extend(declarations["out"])
+    concat_logic.extend(assignments)
+
+    unhandled_extra_signals = subtract_extra_signals(
+        channel_extra_signals, extra_signals)
+    for signal_name, signal_bitwidth in unhandled_extra_signals.items():
+      assignments, declarations = generate_signal_direct_forwarding(
+          channel_name, concat_name, signal_name, signal_bitwidth)
+      concat_signal_decls.extend(declarations["out"])
+      concat_logic.extend(assignments)
+
+    concat_ports[channel_name] = {
+        "name": concat_name,
+        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+        "size": channel_size,
+        "extra_signals": unhandled_extra_signals
+    }
+
+  for out_port in out_ports:
+    channel_name = out_port["name"]
+    concat_name = f"{channel_name}_concat"
+    channel_bitwidth = out_port["bitwidth"]
+    channel_size = out_port.get("size", 0)
+    channel_extra_signals = out_port.get("extra_signals", {})
+
+    assignments, declarations = generate_slice(
+        concat_name,
+        channel_name,
+        channel_bitwidth,
+        concat_layout,
+        channel_size
+    )
+    concat_signal_decls.extend(declarations["in"])
+    concat_logic.extend(assignments)
+
+    assignments, declarations = generate_handshake_forwarding(
+        concat_name, channel_name, channel_size)
+    concat_signal_decls.extend(declarations["in"])
+    concat_logic.extend(assignments)
+
+    unhandled_extra_signals = subtract_extra_signals(
+        channel_extra_signals, extra_signals)
+    for signal_name, signal_bitwidth in unhandled_extra_signals.items():
+      assignments, declarations = generate_signal_direct_forwarding(
+          concat_name, channel_name, signal_name, signal_bitwidth)
+      concat_signal_decls.extend(declarations["out"])
+      concat_logic.extend(assignments)
+
+    concat_ports[channel_name] = {
+        "name": concat_name,
+        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+        "size": channel_size,
+        "extra_signals": unhandled_extra_signals
+    }
+
+  concat_signal_decls = "\n  ".join(concat_signal_decls)
+  concat_logic = "\n  ".join(concat_logic)
+
+  mappings = []
+  for original_name, concat_channel in concat_ports.items():
+    mappings.extend(generate_mapping(concat_channel, original_name))
+  mappings = ",\n      ".join(mappings)
 
   architecture = f"""
 -- Architecture of signal manager (concat)

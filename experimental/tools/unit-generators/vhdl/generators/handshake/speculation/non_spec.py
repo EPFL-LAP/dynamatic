@@ -1,4 +1,6 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth, _get_default_extra_signal_value
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.utils import data
 
 
@@ -41,7 +43,7 @@ begin
   {data("dataOut <= dataIn;", bitwidth)}
   dataOut_valid <= dataIn_valid;
   dataIn_ready <= dataOut_ready;
-  dataOut_spec <= {_get_default_extra_signal_value("spec")};
+  dataOut_spec <= {get_default_extra_signal_value("spec")};
 end architecture;
 """
 
@@ -54,17 +56,17 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
 
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
       extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
+  return generate_concat_signal_manager(
+      name,
+      [{
           "name": "dataIn",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals
       }],
-      "out_ports": [{
+      [{
           "name": "dataOut",
           "bitwidth": bitwidth,
           "extra_signals": extra_signals_without_spec,
       }],
-      "extra_signals": extra_signals_without_spec
-  }, lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))
+      extra_signals_without_spec,
+      lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))
