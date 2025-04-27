@@ -346,7 +346,7 @@ class AllDataTypesMatchWithVariadic<string variadic, list<string> nonvariadics> 
 /// The core implementation of this predicate is in C++.
 class AllExtraSignalsMatchWithVariadic<string variadic, list<string> nonvariadics> : PredOpTrait<
   "all of {" # variadic # ", " # !interleave(nonvariadics, ", ") # "} should "
-  "have the same extra signals except for " # except,
+  "have the same extra signals",
   CPred<"::dynamatic::handshake::doesExtraSignalsMatch(" #
     concatArrays<"llvm::ArrayRef<ExtraSignal>",
     variadicToExtraSignalArrays<variadic>.result,
