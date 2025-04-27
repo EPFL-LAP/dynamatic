@@ -23,14 +23,17 @@ jobs:
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
+        if: success() || failure()
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
+        if: success() || failure()
         run: | 
           cd tools/integration
           python3 run_integration.py --ignore ignored_tests.txt
 
       - uses: actions/upload-artifact@v4
+        if: success() || failure()
         with: 
           name: integration-report
           path: |
