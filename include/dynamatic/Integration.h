@@ -138,6 +138,11 @@ static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4][Size5],
 #include <sstream>
 #include <string>
 
+// Dummy template for generating a compile-time error when the branch is
+// initiantiated.
+template <typename T>
+inline constexpr bool always_false = false;
+
 template <typename T>
 std::string formatElement(const T &element) {
   std::ostringstream oss;
@@ -150,13 +155,11 @@ std::string formatElement(const T &element) {
                        std::is_same_v<T, int16_t> ||
                        std::is_same_v<T, uint16_t>) {
     // C++ can correctly print the value of int, float, double, etc..  However,
-    // int8_t might be interpreted and printed as a char, so we need to cast it
-    // to an int before printing it to stdout (maybe also size_t?).
+    // int8_t might be interpreted and printed as a char, so we need to convert
+    // it to an int before printing it to stdout.
     oss << static_cast<int>(element);
   } else {
-    assert("false" &&
-           "Unsupported type for dumping argument! Please add it to the "
-           "formatElement function in dynamatic/Integration.h.");
+    static_assert(always_false<T>, "Unsupported type!");
   }
   return oss.str();
 }
@@ -240,6 +243,8 @@ static std::string _outPrefix_;
 /// Specialization of the scalar printer for int8_t.
 template <>
 void scalarPrinter<int8_t>(const int8_t &arg, OS &os) {
+  // Since int8_t only has 8 bits, it is sufficient to print it as a 2-digits
+  // hexadecimal number.
   os << "0x" << std::hex << std::setfill('0') << std::setw(2)
      << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
 }
@@ -247,6 +252,8 @@ void scalarPrinter<int8_t>(const int8_t &arg, OS &os) {
 /// Specialization of the scalar printer for uint8_t.
 template <>
 void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
+  // Since uint8_t only has 8 bits, it is sufficient to print it as a 2-digits
+  // hexadecimal number.
   os << "0x" << std::hex << std::setfill('0') << std::setw(2)
      << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
 }
