@@ -1,10 +1,10 @@
-#include "test_stdint.h"
 #include "dynamatic/Integration.h"
+#include "test_stdint.h"
 #include <stdlib.h>
 
 void test_stdint(inout_int8_t a[N], in_int8_t b) {
   for (unsigned i = 0; i < N; ++i) {
-    int x = a[i];
+    in_int8_t x = a[i];
     a[i] = x * x * x + b;
   }
 }
