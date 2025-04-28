@@ -1061,7 +1061,7 @@ SkipConditionForPair createSkipConditionGenerator(
         /// ManualBuff (store)
         handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
             predecessorOpPointer->getLoc(), predecessorOpAddr,
-            ::TimingInfo::tehb(), 2);
+            ::TimingInfo::tehb(), 20);
         inheritBB(predecessorOpPointer, bufferOp);
         predecessorOpPointer->setOperand(0, bufferOp.getResult());
 

@@ -16,7 +16,7 @@ def generate_initial_design(dynamatic_path, kernel_name, use_ftd):
     if use_ftd:
         script = f"set-src {dynamatic_path}/integration-test/{kernel_name}/{kernel_name}.c; compile --fast-token-delivery --straight-to-queue; exit"
     else:
-        script = f"set-src {dynamatic_path}/integration-test/{kernel_name}/{kernel_name}.c; compile; exit"
+        script = f"set-src {dynamatic_path}/integration-test/{kernel_name}/{kernel_name}.c; compile --skippable-seq-n 20 --optimize-zero; exit"
 
     shell(dynamatic_path / "bin" / "dynamatic", input=str.encode(script))
 
