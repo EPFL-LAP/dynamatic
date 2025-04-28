@@ -364,10 +364,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"selectOperand">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -405,10 +402,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"index">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -1209,6 +1203,46 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
+    }
+  }];
+}
+
+def NonSpecOp : Handshake_Op<"non_spec", [
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  LacksSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Adds a non-speculative spec bit.";
+  let description = [{
+    The non-spec operation has an input channel without a spec bit and an output
+    channel with a spec bit. Tokens on the output channel are marked as non-spec.
+    It's typically used before a MuxOp or CMergeOp to satisfy their type
+    requirements and to indicate the beginning of a speculative region.
+
+    Example:
+
+    ```mlir
+    %dataOut = non_spec %dataIn : !handshake.channel<i32> to !handshake.channel<i32, [spec: i1]>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "dataIn";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "dataOut";
     }
   }];
 }

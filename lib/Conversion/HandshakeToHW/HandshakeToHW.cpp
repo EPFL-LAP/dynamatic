@@ -674,12 +674,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("FIFO_DEPTH", speculatorOp.getFifoDepth());
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) {
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::SpecSaveCommitOp>([&](handshake::SpecSaveCommitOp saveCommitOp) {
-        addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
-      })
+      .Case<handshake::SpecSaveCommitOp>(
+          [&](handshake::SpecSaveCommitOp saveCommitOp) {
+            addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1834,7 +1835,8 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveOp>,
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+                    ConvertToHWInstance<handshake::NonSpecOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
