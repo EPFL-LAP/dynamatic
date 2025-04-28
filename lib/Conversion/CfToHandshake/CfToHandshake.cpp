@@ -1193,27 +1193,29 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
-      if(nameAttr.getValue().starts_with("input"))
+      if (nameAttr.getValue().starts_with("input_")) {
         InstanceOpInputIndices.push_back(i);
-      else if(nameAttr.getValue().starts_with("output"))
+      } else if (nameAttr.getValue().starts_with("output_")) {
         InstanceOpOutputIndices.push_back(i);
-      else
+        // For each output argument index, find all operations that consume its value
+        // and store the mapping in OutputConnections
+        Value outputArg = callOp.getOperand(i);
+        auto &fanouts = OutputConnections[i];
+        for(auto &use : outputArg.getUses()){
+          Operation* user = use.getOwner();
+          if(user != callOp){
+            fanouts.push_back(user);
+          }
+        }
+      } else if (nameAttr.getValue().starts_with("parameter_")) {
         InstanceOpParameterIndices.push_back(i);
-    }
-    // For each output argument index, find all operations that consume its value
-    // and store the mapping in OutputConnections
-    for(unsigned OutputId : InstanceOpOutputIndices){
-      Value outputArg = callOp.getOperand(OutputId);
-      SmallVector<Operation*> fanouts;
-      for(auto &use : outputArg.getUses()){
-        Operation* user = use.getOwner();
-        if(user != callOp)
-          fanouts.push_back(user);
+      } else {
+        llvm::errs() << "Argument " << i << " does not follow the naming convention\n";
+        assert(false && "Invalid argument naming");
       }
-      OutputConnections[OutputId] = fanouts;
     }
     // Create resultTypes based on collected Outputs //! not necessary after rewriting function definition
-    //SmallVector<Type> resultTypesVec;              //! these 5 lines can be removed
+    //SmallVector<Type> resultTypesVec;              //! these 5 lines can be removed but stored
     //for(auto OutputId : InstanceOpOutputIndices)
     //  resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
     //resultTypes = TypeRange(resultTypesVec);
@@ -1229,6 +1231,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       }
     }
     // Rewriting the Function definition
+    //! TODO check if function definition is needed
     auto calledFuncOpType = calledFuncOp.getFunctionType();
     SmallVector<Type> newInputs;
     SmallVector<Type> newResults;
@@ -1271,13 +1274,13 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     unsigned ResultId = 0;
     for(auto OutputId : InstanceOpOutputIndices){
       llvm::errs() << "entry 1 \n";
-      for(Operation *user : OutputConnections[OutputId]){
+      for(Operation *user : OutputConnections[OutputId]){ //! add more users for testing (float_basic)
         llvm::errs() << "entry 2 \n";
-        for(OpOperand &operand : user->getOpOperands()){
+        for(OpOperand &operand : user->getOpOperands()){ //! try if used multiple types add %5, %5
           llvm::errs() << "entry 3 \n";
           if(operand.get() == callOp.getOperand(OutputId)){
             llvm::errs() << "entry 4 \n";
-            operand.set(InstanceResults[ResultId]);
+            operand.set(InstanceResults[ResultId]);//! (write meaningful comment) in case something breaks maybe needs assertion (loops). we do not account for cyclic dependencys might cause problems
           }
         }
       }
@@ -1285,12 +1288,13 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     }
   }
   namer.replaceOp(callOp, instOp);
-  if (callOp->getNumResults() == 0)
+  if (callOp->getNumResults() == 0){ //! when using if always include {} or write on the same line as the condition
     rewriter.eraseOp(callOp);
-  else
+  } else{
     //rewriter.replaceOp(callOp, instOp.getResults().drop_back()); //! just for testing!
-    rewriter.replaceOp(callOp, instOp.getResult(0)); //? pick first result?
-  return success();
+    rewriter.replaceOp(callOp, instOp.getResult(0)); //? pick first result? no use last one also test by using call result somewhere
+  }
+  return success(); //! add comment (why last element)
 }
 
 /// Determines whether it is possible to transform an arith-level constant into
