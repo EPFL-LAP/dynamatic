@@ -72,16 +72,16 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        result.numOneSlotDV = 1;
-        result.numFifoNone = numSlotsToPlace - 2;
+        // result.numOneSlotDV = 1;
+        result.numFifoDV = numSlotsToPlace - 1;
         result.numOneSlotR = 1;
       }
     } else if (forceBreakDV) {
       result.numOneSlotDV = 1;
       result.numFifoNone = numSlotsToPlace - 1;
     } else if (forceBreakR) {
-      result.numOneSlotR = 1;
-      result.numFifoNone = numSlotsToPlace - 1;
+      // result.numOneSlotR = 1;
+      result.numFifoNone = numSlotsToPlace;
     } else {
       result.numFifoNone = numSlotsToPlace;
     }
