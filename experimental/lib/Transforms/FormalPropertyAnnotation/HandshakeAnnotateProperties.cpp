@@ -15,6 +15,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
@@ -24,7 +25,13 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/JSON.h"
+#include <fstream>
+#include <ostream>
 
 using namespace llvm;
 using namespace mlir;
@@ -42,21 +49,99 @@ struct HandshakeAnnotatePropertiesPass
 
   HandshakeAnnotatePropertiesPass(const std::string &jsonPath = "") {
     this->jsonPath = jsonPath;
+    this->uid = 0;
   }
-
-  // HandshakeAnnotatePropertiesPass(StringRef timingModels,
-  //                                 StringRef collisions) {
-  //   this->timingModels = timingModels.str();
-  //   this->collisions = collisions.str();
-  // }
 
   void runDynamaticPass() override;
 
 private:
+  unsigned int uid;
+  json::Array propertyTable;
+
+  LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
+  void addPropertyId(Operation *op, unsigned id);
 };
 } // namespace
 
-void HandshakeAnnotatePropertiesPass::runDynamaticPass() {}
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+      for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
+        if (res.getType()
+                .isa<handshake::ChannelType, handshake::ControlType>()) {
+          if (res.getUsers().empty()) {
+            continue;
+          }
+
+          addPropertyId(&op, uid);
+
+          auto *userOp = *res.getUsers().begin();
+
+          unsigned long operandIndex = userOp->getNumOperands();
+          for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
+            if (arg == res) {
+              operandIndex = j;
+              break;
+            }
+          }
+          if (operandIndex >= userOp->getNumOperands())
+            return failure();
+
+          propertyTable.push_back(json::Value(json::Object{
+              {"id", uid},
+              {"name", "AOB"},
+              {"info",
+               json::Value(json::Object{
+                   {"owner",
+                    op.getAttrOfType<StringAttr>("handshake.name").str()},
+                   {"user",
+                    userOp->getAttrOfType<StringAttr>("handshake.name").str()},
+                   {"result_index", resIndex},
+                   {"operand_index", operandIndex}})},
+              {"tag", "optimization"},
+              {"check", "unchecked"}}));
+          uid++;
+        }
+    }
+  }
+  return success();
+}
+
+void HandshakeAnnotatePropertiesPass::addPropertyId(Operation *op,
+                                                    unsigned id) {
+  auto formalAttr = op->getAttrOfType<FormalPropertiesAttr>("formalProperties");
+
+  SmallVector<unsigned> ids;
+  if (formalAttr) {
+    ids.append(formalAttr.getIDs().begin(), formalAttr.getIDs().end());
+  }
+  ids.push_back(id);
+
+  auto newAttr = FormalPropertiesAttr::get(op->getContext(), ids);
+  op->setAttr("formalProperties", newAttr);
+}
+
+void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
+  ModuleOp modOp = getOperation();
+
+  if (failed(annotateAbsenceOfBackpressure(modOp)))
+    return signalPassFailure();
+
+  llvm::json::Value jsonVal(std::move(propertyTable));
+
+  std::string outString;
+  raw_string_ostream out(outString);
+  out << formatv("{0:2}", jsonVal);
+
+  std::error_code EC;
+  llvm::errs() << jsonPath << "\n\n\n";
+  llvm::raw_fd_ostream jsonOut(jsonPath, EC, llvm::sys::fs::OF_Text);
+  if (EC)
+    return;
+
+  jsonOut << outString;
+}
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::formalprop::createAnnotateProperties(
