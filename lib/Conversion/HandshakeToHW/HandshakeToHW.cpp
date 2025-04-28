@@ -53,9 +53,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-/// Name of ports representing the clock and reset signals.
-static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
-
 /// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
 lowerExtraSignals(ArrayRef<ExtraSignal> extraSignals) {
@@ -138,8 +135,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(CLK_PORT, i1Type);
-    addInput(RST_PORT, i1Type);
+    addInput(dynamatic::hw::CLK_PORT, i1Type);
+    addInput(dynamatic::hw::RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -318,12 +315,12 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name) {
+                                          StringRef name){
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -673,18 +670,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
-      .Case<handshake::SpeculatorOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+      .Case<handshake::SpeculatorOp>([&](handshake::SpeculatorOp speculatorOp) {
+        addUnsigned("FIFO_DEPTH", speculatorOp.getFifoDepth());
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) {
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::SpecSaveCommitOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
-      })
+      .Case<handshake::SpecSaveCommitOp>(
+          [&](handshake::SpecSaveCommitOp saveCommitOp) {
+            addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -923,9 +919,10 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
+         "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
@@ -1481,7 +1478,8 @@ public:
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
                          IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2), IOMapping(8, state.inputIdx, 1)){};
+                         IOMapping(0, 5, 2),
+                         IOMapping(8, state.inputIdx, 1)) {};
 
 private:
   /// Creates, inserts, and returns the external harware module corresponding to
@@ -1837,7 +1835,8 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveOp>,
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+                    ConvertToHWInstance<handshake::NonSpecOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect
