@@ -3,20 +3,20 @@ from generators.support.utils import *
 
 
 def generate_shrsi(name, params):
-  latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
-  abstract_data = params[ATTR_ABSTRACT_DATA]
+    latency = params[ATTR_LATENCY]
+    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
+    abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  if abstract_data:
-    return generate_abstract_binary_op(name, latency, data_type)
-  elif data_type.signed:
-    return _generate_shrsi(name, latency, data_type)
-  else:
-    return _generate_shrsi_cast(name, latency, data_type)
+    if abstract_data:
+        return generate_abstract_binary_op(name, latency, data_type)
+    elif data_type.signed:
+        return _generate_shrsi(name, latency, data_type)
+    else:
+        return _generate_shrsi_cast(name, latency, data_type)
 
 
 def _generate_shrsi(name, latency, data_type):
-  return f"""
+    return f"""
 {generate_binary_op_header(name)}
   DEFINE result := lhs >> rhs;
   
@@ -25,7 +25,7 @@ def _generate_shrsi(name, latency, data_type):
 
 
 def _generate_shrsi_cast(name, latency, data_type):
-  return f"""
+    return f"""
 {generate_binary_op_header(name)}
   DEFINE result := signed(lhs) >> rhs;
   

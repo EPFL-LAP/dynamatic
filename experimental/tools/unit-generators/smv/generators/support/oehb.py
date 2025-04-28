@@ -2,16 +2,16 @@ from generators.support.utils import *
 
 
 def generate_oehb(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
 
-  if data_type.bitwidth == 0:
-    return _generate_oehb_dataless(name)
-  else:
-    return _generate_oehb(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_oehb_dataless(name)
+    else:
+        return _generate_oehb(name, data_type)
 
 
 def _generate_oehb_dataless(name):
-  return f"""
+    return f"""
 MODULE {name} (ins_valid, outs_ready)
   VAR
   outs_valid_i : boolean;
@@ -28,7 +28,7 @@ MODULE {name} (ins_valid, outs_ready)
 
 
 def _generate_oehb(name, data_type):
-  return f"""
+    return f"""
 MODULE {name} (ins, ins_valid, outs_ready)
   VAR
   inner_oehb : {name}__oehb_dataless(ins_valid, outs_ready);

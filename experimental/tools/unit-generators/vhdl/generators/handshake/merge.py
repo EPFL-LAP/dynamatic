@@ -4,27 +4,27 @@ from generators.handshake.tehb import generate_tehb
 
 
 def generate_merge(name, params):
-  # Number of intput ports
-  size = params["size"]
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    # Number of intput ports
+    size = params["size"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_merge_dataless(name, size)
-  else:
-    return _generate_merge(name, size, bitwidth)
+    if extra_signals:
+        return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_merge_dataless(name, size)
+    else:
+        return _generate_merge(name, size, bitwidth)
 
 
 def _generate_merge_dataless(name, size):
-  inner_name = f"{name}_inner"
-  tehb_name = f"{name}_tehb"
+    inner_name = f"{name}_inner"
+    tehb_name = f"{name}_tehb"
 
-  dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"bitwidth": 0, "size": 0})
+    dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
+        generate_tehb(tehb_name, {"bitwidth": 0, "size": 0})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -43,7 +43,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of merge_dataless
 architecture arch of {name} is
   signal tehb_pvalid : std_logic;
@@ -71,21 +71,21 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_merge(name, size, bitwidth):
-  inner_name = f"{name}_inner"
-  tehb_name = f"{name}_tehb"
+    inner_name = f"{name}_inner"
+    tehb_name = f"{name}_tehb"
 
-  dependencies = \
-      generate_merge_notehb(inner_name, {
-          "size": size,
-          "bitwidth": bitwidth,
-      }) + \
-      generate_tehb(tehb_name, {"bitwidth": bitwidth})
+    dependencies = \
+        generate_merge_notehb(inner_name, {
+            "size": size,
+            "bitwidth": bitwidth,
+        }) + \
+        generate_tehb(tehb_name, {"bitwidth": bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -107,7 +107,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of merge
 architecture arch of {name} is
   signal tehb_data_in : std_logic_vector({bitwidth} - 1 downto 0);
@@ -141,25 +141,25 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
-  # Haven't tested this function yet
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals,
-          "2d": True,
-          "size": size
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
+    # Haven't tested this function yet
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "2d": True,
+            "size": size
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))

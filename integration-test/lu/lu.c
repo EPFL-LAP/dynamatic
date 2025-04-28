@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "lu.h"
+#include "dynamatic/Integration.h"
 #include <math.h>
 
 void lu(in_float_t A[N][N], inout_float_t L[N][N], inout_float_t U[N][N],

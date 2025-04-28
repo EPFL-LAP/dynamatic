@@ -4,19 +4,19 @@ from generators.support.utils import *
 
 
 def generate_extsi(name, params):
-  latency = params[ATTR_LATENCY]
-  input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
-  output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
-  abstract_data = params[ATTR_ABSTRACT_DATA]
+    latency = params[ATTR_LATENCY]
+    input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
+    output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+    abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  if abstract_data:
-    return generate_abstract_binary_op(name, latency, output_type)
-  else:
-    return _generate_extsi(name, latency, input_type, output_type)
+    if abstract_data:
+        return generate_abstract_binary_op(name, latency, output_type)
+    else:
+        return _generate_extsi(name, latency, input_type, output_type)
 
 
 def _generate_extsi(name, latency, input_type, output_type):
-  return f"""
+    return f"""
 {generate_unanary_op_header(name)}
   DEFINE outs := extend(ins, {output_type.bitwidth - input_type.bitwidth});
   

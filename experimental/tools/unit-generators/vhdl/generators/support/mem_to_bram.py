@@ -1,8 +1,8 @@
 def generate_mem_to_bram(name, params):
-  data_bitwidth = params["data_bitwidth"]
-  addr_bitwidth = params["addr_bitwidth"]
+    data_bitwidth = params["data_bitwidth"]
+    addr_bitwidth = params["addr_bitwidth"]
 
-  return f"""
+    return f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

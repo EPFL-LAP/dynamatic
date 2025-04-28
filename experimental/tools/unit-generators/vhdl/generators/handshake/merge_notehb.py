@@ -1,17 +1,17 @@
 def generate_merge_notehb(name, params):
-  # Number of input ports
-  size = params["size"]
+    # Number of input ports
+    size = params["size"]
 
-  bitwidth = params.get("bitwidth", 0)
+    bitwidth = params.get("bitwidth", 0)
 
-  if bitwidth == 0:
-    return _generate_merge_notehb_dataless(name, size)
-  else:
-    return _generate_merge_notehb(name, size, bitwidth)
+    if bitwidth == 0:
+        return _generate_merge_notehb_dataless(name, size)
+    else:
+        return _generate_merge_notehb(name, size, bitwidth)
 
 
 def _generate_merge_notehb_dataless(name, size):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -30,7 +30,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of merge_notehb_dataless
 architecture arch of {name} is
 begin
@@ -56,11 +56,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_merge_notehb(name, size, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -82,7 +82,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of merge_notehb
 architecture arch of {name} is
 begin
@@ -112,4 +112,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture

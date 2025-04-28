@@ -4,16 +4,16 @@ from generators.support.utils import *
 
 
 def generate_binary_op_handshake_manager(name, params):
-  latency = params[ATTR_LATENCY]
+    latency = params[ATTR_LATENCY]
 
-  if latency == 0:
-    return _generate_handshake_manager_no_lat(name)
-  else:
-    return _generate_handshake_manager(name, latency)
+    if latency == 0:
+        return _generate_handshake_manager_no_lat(name)
+    else:
+        return _generate_handshake_manager(name, latency)
 
 
 def _generate_handshake_manager_no_lat(name):
-  return f"""
+    return f"""
 MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
 
@@ -27,7 +27,7 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
 
 
 def _generate_handshake_manager(name, latency):
-  return f"""
+    return f"""
 MODULE {name}(lhs_valid, rhs_valid, outs_ready)
   VAR inner_join : {name}__join(lhs_valid, rhs_valid, outs_ready);
   VAR inner_delay_buffer : {name}__delay_buffer(inner_join.outs_valid, outs_ready);
@@ -43,7 +43,7 @@ MODULE {name}(lhs_valid, rhs_valid, outs_ready)
 
 
 def generate_binary_op_header(name):
-  return f"""
+    return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, outs_ready);
 
@@ -55,7 +55,7 @@ MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, outs_ready)
 
 
 def generate_unanary_op_header(name):
-  return f"""
+    return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR inner_delay_buffer : {name}__delay_buffer(ins_valid, outs_ready);
 
@@ -66,7 +66,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
 
 def generate_abstract_binary_op(name, latency, data_type):
-  return f"""
+    return f"""
 {generate_binary_op_header(name)}
   DEFINE outs := {data_type.format_constant(0)};
   
@@ -75,7 +75,7 @@ def generate_abstract_binary_op(name, latency, data_type):
 
 
 def generate_abstract_unary_op(name, latency, data_type):
-  return f"""
+    return f"""
 {generate_unanary_op_header(name)}
   DEFINE outs := {data_type.format_constant(0)};
   

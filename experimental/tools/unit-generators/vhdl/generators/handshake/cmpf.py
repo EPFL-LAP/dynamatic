@@ -4,14 +4,14 @@ from generators.handshake.oehb import generate_oehb
 
 
 def generate_cmpf(name, params):
-  is_double = params["is_double"]
-  extra_signals = params["extra_signals"]
-  predicate = params["predicate"]
+    is_double = params["is_double"]
+    extra_signals = params["extra_signals"]
+    predicate = params["predicate"]
 
-  if extra_signals:
-    return _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals)
-  else:
-    return _generate_cmpf(name, is_double, predicate)
+    if extra_signals:
+        return _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals)
+    else:
+        return _generate_cmpf(name, is_double, predicate)
 
 
 _expression_from_predicate = {
@@ -32,14 +32,14 @@ _expression_from_predicate = {
 
 
 def _generate_cmpf(name, is_double, predicate):
-  inner_name = f"{name}_inner"
-  bitwidth = 64 if is_double else 32
-  if is_double:
-    dependencies = _generate_cmpf_double_precision(inner_name)
-  else:
-    dependencies = _generate_cmpf_single_precision(inner_name)
+    inner_name = f"{name}_inner"
+    bitwidth = 64 if is_double else 32
+    if is_double:
+        dependencies = _generate_cmpf_double_precision(inner_name)
+    else:
+        dependencies = _generate_cmpf_single_precision(inner_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -64,7 +64,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cmpf
 architecture arch of {name} is
   signal unordered : std_logic;
@@ -98,19 +98,19 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _get_latency(is_double):
-  return 1  # todo
+    return 1  # todo
 
 
 def _generate_cmpf_single_precision(name):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+    dependencies = generate_join(join_name, {"size": 2})
 
-  entity = f"""
+    entity = f"""
 
 
 library ieee;
@@ -142,7 +142,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cmpf_single_precision
 architecture arch of {name} is
   signal ip_lhs: std_logic_vector(32 + 1 downto 0);
@@ -189,17 +189,17 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cmpf_double_precision(name):
-  join_name = f"{name}_join"
-  oehb_name = f"{name}_oehb"
+    join_name = f"{name}_join"
+    oehb_name = f"{name}_oehb"
 
-  dependencies = generate_join(join_name, {"size": 2}) + \
-      generate_oehb(oehb_name, {"bitwidth": 0})
+    dependencies = generate_join(join_name, {"size": 2}) + \
+        generate_oehb(oehb_name, {"bitwidth": 0})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -224,7 +224,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cmpf_double_precision
 architecture arch of {name} is
   signal join_valid: std_logic;
@@ -284,27 +284,27 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cmpf_signal_manager(name, is_double, predicate, extra_signals):
-  bitwidth = 64 if is_double else 32
-  return generate_signal_manager(name, {
-      "type": "buffered",
-      "latency": _get_latency(is_double),
-      "in_ports": [{
-          "name": "lhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "rhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_cmpf(name, is_double, predicate))
+    bitwidth = 64 if is_double else 32
+    return generate_signal_manager(name, {
+        "type": "buffered",
+        "latency": _get_latency(is_double),
+        "in_ports": [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "result",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_cmpf(name, is_double, predicate))
