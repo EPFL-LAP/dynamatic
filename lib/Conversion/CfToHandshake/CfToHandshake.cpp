@@ -1188,24 +1188,26 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
-      if(nameAttr.getValue().starts_with("input_"))
+      if (nameAttr.getValue().starts_with("input_")) {
         InstanceOpInputIndices.push_back(i);
-      else if(nameAttr.getValue().starts_with("output_"))
+      } else if (nameAttr.getValue().starts_with("output_")) {
         InstanceOpOutputIndices.push_back(i);
-      else
+        // For each output argument index, find all operations that consume its value
+        // and store the mapping in OutputConnections
+        Value outputArg = callOp.getOperand(i);
+        auto &fanouts = OutputConnections[i];
+        for(auto &use : outputArg.getUses()){
+          Operation* user = use.getOwner();
+          if(user != callOp){
+            fanouts.push_back(user);
+          }
+        }
+      } else if (nameAttr.getValue().starts_with("parameter_")) {
         InstanceOpParameterIndices.push_back(i);
-    }
-    // For each output argument index, find all operations that consume its value
-    // and store the mapping in OutputConnections
-    for(unsigned OutputId : InstanceOpOutputIndices){
-      Value outputArg = callOp.getOperand(OutputId);
-      SmallVector<Operation*> fanouts;
-      for(auto &use : outputArg.getUses()){
-        Operation* user = use.getOwner();
-        if(user != callOp)
-          fanouts.push_back(user);
+      } else {
+        llvm::errs() << "Argument " << i << " does not follow the naming convention\n";
+        assert(false && "Invalid argument naming");
       }
-      OutputConnections[OutputId] = fanouts;
     }
     resultTypes = calledFuncOp.getFunctionType().getResults();
   } else {
