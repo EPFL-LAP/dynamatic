@@ -1007,7 +1007,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$trigger);
+  let arguments = (ins ChannelType:$dataIn,
+                       ControlType:$trigger,
+                       UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
@@ -1021,8 +1023,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }];
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger, "unsigned":$fifoDepth), [{
     $_state.addOperands({dataIn, trigger});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -1172,7 +1175,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn,
+                       ChannelType:$ctrl,
+                       UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
