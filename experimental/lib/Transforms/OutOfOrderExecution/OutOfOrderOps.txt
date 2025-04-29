@@ -1,1 +1,1 @@
-constant3 4 0
+muli0 4 0

@@ -335,6 +335,7 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
   return success();
 }
+
 static bool isBackwardEdgeFromBranch(Value v) {
   if (auto branchOp = v.getDefiningOp<handshake::ConditionalBranchOp>()) {
     return true;
@@ -432,7 +433,7 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
 
     // If there are no unaligned edges, then we don't need to do
     // anything
-    if (unalignedEdges.size() > 1) {
+    if ((!controlled && unalignedEdges.size() > 1) || controlled) {
 
       // llvm::errs() << "Unaligned edges: \n";
       // for (auto edge : unalignedEdges) {
@@ -446,12 +447,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                                      outOfOrderNodeOutputs, unalignedEdges,
                                      taggedEdges)))
         return failure();
-
-      // llvm::errs() << "Tagged edges: \n";
-      // for (auto edge : taggedEdges) {
-      //   llvm::errs() << edge << "\n";
-      // }
-      // llvm::errs() << "Done printing tagged edges.\n";
 
       // Step 4: Add the tagger and untagger operations and connect them to the
       // freeTagsFifo
@@ -866,11 +861,14 @@ Value OutOfOrderExecutionPass::addTaggers(
     //  i.e., for each prod that feeds the tagger: replace all the edges
     //  producer->consumer to untagger->consumer, where the consumer is either a
     //  dirty node or an out-of-order node
+    llvm::DenseSet<Operation *> usersToReplace;
     for (auto *user : edge.getUsers()) {
       if (dirtyNodes.contains(user) || outOfOrderNodeInternalOps.contains(user))
-        user->replaceUsesOfWith(edge, taggerOp.getDataOut());
+        usersToReplace.insert(user);
     }
-    // edge.replaceAllUsesExcept(taggerOp.getDataOut(), taggerOp);
+    for (Operation *user : usersToReplace) {
+      user->replaceUsesOfWith(edge, taggerOp.getDataOut());
+    }
 
     // For the unaligner and untagger, replace all the edges that go through the
     // tagger from prod->cons to tagger->cons
