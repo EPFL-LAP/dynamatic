@@ -429,7 +429,7 @@ LogicalResult FuncOp::verify() {
 LogicalResult BufferOp::verify() {
   auto parametersAttr = (*this)->getAttrOfType<DictionaryAttr>("hw.parameters");
   if (!parametersAttr)
-    return emitOpError("missing required dictionary attribute 'hw.parameters'");
+    return success();
 
   auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
   if (!bufferTypeAttr)

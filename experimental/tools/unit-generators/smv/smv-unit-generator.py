@@ -49,6 +49,8 @@ import generators.arith.truncf as truncf
 import generators.arith.trunci as trunci
 import generators.arith.xori as xori
 
+import generators.memory.memory_controller as memory_controller
+
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -140,6 +142,8 @@ def generate_code(name, mod_type, parameters):
       return trunci.generate_trunci(name, parameters)
     case "xori":
       return xori.generate_xori(name, parameters)
+    case "memory_controller":
+      return memory_controller.generate_memory_controller(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
@@ -192,7 +196,7 @@ def main():
   parameters[ATTR_ABSTRACT_DATA] = args.abstract_data
 
   # Printing parameters for diagnostic purposes
-  header = f"// {args.name} : {args.type}({args.parameters})\n\n"
+  header = f"-- {args.name} : {args.type}({args.parameters})\n\n"
 
   with open(args.output, 'w') as file:
     print(header + generate_code(args.name, args.type, parameters), file=file)

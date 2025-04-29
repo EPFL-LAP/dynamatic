@@ -117,13 +117,13 @@ handshake.func @invalidSourceAndConstantWithExtraSignal(%ctrl : !handshake.contr
 
 handshake.func @invalidMuxWithDifferentDataTypesOutput(
     %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e3: i6]>,
-    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
   // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i1, [e1: i2, e3: i6, e2: i4]>
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>] to <i1, [spec: i1]>
   end %ctrl : !handshake.control<>
 }
 
@@ -131,55 +131,41 @@ handshake.func @invalidMuxWithDifferentDataTypesOutput(
 
 handshake.func @invalidMuxWithDifferentDataTypesVariadic(
     %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e3: i6]>,
-    %data4 : !handshake.channel<i1, [e1: i2, e2: i4]>) -> !handshake.control<> {
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1]>,
+    %data4 : !handshake.channel<i1, [spec: i1]>) -> !handshake.control<> {
   // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i1, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4]>
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>, <i1, [spec: i1]>] to <i32, [spec: i1]>
   end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidMuxWithMoreExtraSignal(
+handshake.func @invalidMuxWithDifferentExtraSignals(
     %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e3: i6]>,
-    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6, e2: i4, e4: i8]>
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1, tag: i8]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1, tag: i8]>, <i32, [spec: i1]>] to <i32, [spec: i1]>
   end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidMuxWithLessExtraSignal(
+handshake.func @invalidMuxWithConflictingExtraSignals(
     %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e3: i6]>,
-    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e3: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e3: i6]>
-  end %ctrl : !handshake.control<>
-}
-
-// -----
-
-handshake.func @invalidMuxWithConflictingExtraSignal(
-    %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [e1: i2]>,
-    %data3 : !handshake.channel<i32, [e2: i6]>,
-    %data4 : !handshake.channel<i32, [e1: i2, e2: i4]>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals except for spec}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [e1: i2]>, <i32, [e2: i6]>, <i32, [e1: i2, e2: i4]>] to <i32, [e1: i2, e2: i6]>
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i2]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i2]>, <i32, [spec: i1]>] to <i32, [spec: i1]>
   end %ctrl : !handshake.control<>
 }
 
@@ -190,20 +176,6 @@ handshake.func @invalidMuxWithNoDataInputs(
     %sel : !handshake.channel<i2>) -> !handshake.control<> {
   // expected-error @below {{'handshake.mux' op failed to verify that the variadic dataOperands should have at least one element}}
   %data = mux %sel [] : <i2>, [] to <i32>
-  end %ctrl : !handshake.control<>
-}
-
-// -----
-
-handshake.func @invalidMuxWithoutSpecTagForOutput(
-    %ctrl : !handshake.control<>,
-    %sel : !handshake.channel<i2>,
-    %data1 : !handshake.channel<i32>,
-    %data2 : !handshake.channel<i32, [spec: i1]>,
-    %data3 : !handshake.channel<i32>,
-    %data4 : !handshake.channel<i32>) -> !handshake.control<> {
-  // expected-error @below {{'handshake.mux' op failed to verify that result should have a spec tag iff any of dataOperands has it}}
-  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2>, [<i32>, <i32, [spec: i1]>, <i32>, <i32>] to <i32>
   end %ctrl : !handshake.control<>
 }
 

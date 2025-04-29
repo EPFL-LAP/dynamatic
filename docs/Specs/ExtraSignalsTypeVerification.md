@@ -11,9 +11,9 @@ This document is structured as follows:
 
 Since these rules differ from operation to operation, we describe them in this document.
 
-### Operations Within a Basic Block
+### Default
 
-Here, operations are considered within a basic block if all their operands and results are used exclusively within that block. With a few exceptions, most operations within a basic block are required to have consistent extra signals across all their inputs and outputs.
+Most operations are expected to have consistent extra signals across all their inputs and outputs.
 
 To further specify the meaning of "consistent extra signals across all their inputs and outputs", we provide an example: if one of the inputs to `addi` carries an extra signal, such as `spec: i1`, then the other input and the output must also have the same extra signal, `spec: i1`.
 
@@ -27,25 +27,11 @@ Note that the *values* of these extra signals do not necessarily need to match; 
 
 This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226).
 
-### MuxOp and CMergeOp
-
-For these operations, all operands and results must have the same extra signals, including the `selector` port, **except for the spec tag**. The spec tag is present on some inputs but not others, depending on their origin.
-
-As a result, the Mux and CMerge operations follow this structure:
-
-<img alt="the IO of Mux and Cmerge" src="./figs/ExtraSignalsTypeVerification/mux_cmerge.png" width="600" />
-
-All operands and results include a `tag`, while only some have a `spec` tag.
-
-This design decision was discussed in [Issue #226](https://github.com/EPFL-LAP/dynamatic/issues/226) and [a discussion in #225](https://github.com/EPFL-LAP/dynamatic/pull/225/files/a03fde5071f21978e0a00c1a43981508d1ff590a#r1956407375).
-
 ### MemPortOp (Load and Store)
 
 The `MemPortOp` operations, such as load and store, communicate directly with a memory controller or a load-store queue (LSQ). The ports connected to these operations must be simple, meaning they should not carry any extra signals.
 
 This design ensures that the memory controller can focus solely on managing memory access, while the responsibility for handling extra signals lies with the `MemPortOp`.
-
-Note that these operations can also be considered to reside at the boundary of a basic block, as memory controllers are typically placed outside of any basic block.
 
 For the load operation, the structure is as follows:
 
@@ -65,7 +51,7 @@ This design decision was discussed in the issue [#214](https://github.com/EPFL-L
 
 ### ConstantOp
 
-While this operation falls under the category of "operations within a basic block," it’s worth highlighting due to the non-trivial way it handles control tokens with extra signals that trigger the emission of a constant value.
+While this operation falls under the default category, it’s worth highlighting due to the non-trivial way it handles control tokens with extra signals that trigger the emission of a constant value.
 
 `ConstantOp` has one input (a `ControlType` to trigger the emission) and one output (a `ChannelType`). Like other operations, the extra signals of the input and output should match.
 

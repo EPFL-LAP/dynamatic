@@ -16,7 +16,7 @@ module elastic_fifo_inner #(
   // Internal Signal Definition
   wire ReadEn, WriteEn;
   reg [$clog2(NUM_SLOTS) - 1 : 0] Tail = 0, Head = 0;
-  reg Full = 0, Empty = 0;
+  reg Full = 0, Empty = 1;
   reg [DATA_TYPE - 1 : 0] Memory[0 : NUM_SLOTS - 1];
   integer i;
   
@@ -50,7 +50,7 @@ module elastic_fifo_inner #(
       Tail <= 0;
     end else begin
       if (WriteEn) begin
-        Tail <= (Tail + 1) % NUM_SLOTS;
+        Tail <= (Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1;
       end
     end  
   end
@@ -61,7 +61,7 @@ module elastic_fifo_inner #(
       Head <= 0;
     end else begin
       if (ReadEn) begin
-        Head <= (Head + 1) % NUM_SLOTS;
+        Head <= (Head + 1 == NUM_SLOTS) ? 0 : Head + 1;
       end
     end 
   end
@@ -74,7 +74,7 @@ module elastic_fifo_inner #(
       // If only filling but not emptying
       if (WriteEn & ~ReadEn) begin
         // If new tail index will reach head index
-        if ((Tail + 1) % NUM_SLOTS == Head) begin
+        if (((Tail + 1 == NUM_SLOTS) ? 0 : Tail + 1) == Head) begin
           Full <= 1;
         end
       end else if (~WriteEn & ReadEn) begin
@@ -91,7 +91,7 @@ module elastic_fifo_inner #(
     end else begin
       // If only emptying but not filling
       if (~WriteEn & ReadEn) begin
-        if ((Head + 1) % NUM_SLOTS == Tail) begin
+        if (((Head + 1 == NUM_SLOTS) ? 0 : Head + 1) == Tail) begin
           Empty <= 1;
         end
       end else if (WriteEn & ~ReadEn) begin

@@ -1452,7 +1452,8 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
 
   TimingInfo info = timing.getInfo();
 
-  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r()))) {
+  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
+      (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
     bufOp.emitError() << "unknown buffer";
     return failure();
   }
