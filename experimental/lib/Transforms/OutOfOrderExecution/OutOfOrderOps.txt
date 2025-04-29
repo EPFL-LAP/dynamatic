@@ -1,1 +1,1 @@
-load0 4 0
+constant3 4 0

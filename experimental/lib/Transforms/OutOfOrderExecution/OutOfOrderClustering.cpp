@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <cstddef>
 #include <memory>
@@ -41,7 +42,7 @@ using namespace dynamatic::experimental::outoforder;
  * Each cluster contains:
  * - Inputs: operands entering the region (excluding condition producers).
  * - Outputs: values exiting the region.
- * - Internal nodes: operations within the region, excluding condition
+ * - Internal ops: operations within the region, excluding condition
  * generators.
  *
  * Additionally, a global outer cluster covering the full function is added.
@@ -69,7 +70,7 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
   // Step 4: Define an outer cluster which is the entire graph
   // Inputs: start
   // Outputs: the inputs of EndOp
-  // Internal nodes: all the operations in the graph except the EndOp and Memory
+  // Internal ops: all the operations in the graph except the EndOp and Memory
   // Ops(Memory Controller and LSQ)
   llvm::DenseSet<Operation *> globalOps;
   llvm::DenseSet<Value> inputs;
@@ -282,7 +283,7 @@ outoforder::analyzeBranchesConditions(
       // Create a cluster for the branch with:
       // Inputs: the data operand of the branch
       // Outputs: none
-      // Internal nodes: all the reachable operations from the branch
+      // Internal ops: all the reachable operations from the branch
       Cluster ifCluster(llvm::DenseSet<Value>{branchOp.getDataOperand()},
                         llvm::DenseSet<Value>(), reachableOps);
       clusters.push_back(ifCluster);
@@ -309,37 +310,54 @@ static Value getInitConstantInput(handshake::MergeOp mergeOp) {
 }
 
 /**
- * @brief Recursively finds all operations between a start operation and a set
- * of end operations.
+ * @brief Recursively finds all operations(paths) that ultimately lead to any of
+ * the specified end operations.
  *
- * @param currentOp The operation to start from.
- * @param end       Set of end operations to stop traversal.
- * @param visited   Set to store the discovered intermediate operations.
+ * @param currentOp  The operation to start from.
+ * @param end        Set of end operations to reach.
+ * @param paths      Set to store only the operations on a path to an end op.
+ * @param visited    Set used to memoize visited paths to avoid recomputation.
+ * @return true if currentOp leads to an end op, false otherwise.
  */
-static void findOpsBetweenOpsRecursive(Operation *currentOp,
-                                       const llvm::DenseSet<Operation *> &end,
-                                       llvm::DenseSet<Operation *> &visited) {
+static bool findPathsBetweenOps(Operation *currentOp,
+                                const llvm::DenseSet<Operation *> &end,
+                                llvm::DenseSet<Operation *> &visited,
+                                llvm::DenseSet<Operation *> &paths) {
 
+  if (!currentOp)
+    return false;
+
+  // already known result
   if (visited.contains(currentOp))
-    return;
+    return paths.contains(currentOp);
 
-  // Memory operations are excluded from the search
-  if (isa<handshake::MemoryControllerOp>(currentOp) ||
-      isa<handshake::LSQOp>(currentOp)) {
-    return;
-  }
-
+  // Memoization
   visited.insert(currentOp);
 
-  if (end.contains(currentOp))
-    return;
+  if (isa<handshake::MemoryControllerOp>(currentOp) ||
+      isa<handshake::LSQOp>(currentOp)) {
+    visited.insert(currentOp);
+    return false;
+  }
 
-  // Recurse through users of each result
+  if (end.contains(currentOp)) {
+    paths.insert(currentOp);
+    visited.insert(currentOp);
+    return true;
+  }
+
+  bool leadsToEnd = false;
   for (Value result : currentOp->getResults()) {
     for (Operation *user : result.getUsers()) {
-      findOpsBetweenOpsRecursive(user, end, visited);
+      leadsToEnd |= findPathsBetweenOps(user, end, visited, paths);
     }
   }
+
+  // include only if a path leads to one of the end operations
+  if (leadsToEnd)
+    paths.insert(currentOp);
+
+  return leadsToEnd;
 }
 
 /**
@@ -370,7 +388,7 @@ void outoforder::createClusters(
 
     llvm::DenseSet<Value> inputs;
     llvm::DenseSet<Value> outputs;
-    llvm::DenseSet<Operation *> internalNodes;
+    llvm::DenseSet<Operation *> internalOps;
 
     // Case 1.1 : loop cluster
     // Muxes then branches
@@ -378,13 +396,22 @@ void outoforder::createClusters(
       // Create a cluster for the condition with:
       // Inputs: the data operands and the selects of the MUXes
       // Outputs: the true and false outputs of the BRANCHes
-      // Internal nodes: all the muxes and branches that are fed by this
+      // Internal ops: all the muxes and branches that are fed by this
       // condition along with the operations between them
+
+      llvm::DenseSet<Operation *> branchOpPtrs;
+      for (auto branchOp : condToBranches[cond]) {
+        branchOpPtrs.insert(branchOp.getOperation());
+      }
 
       for (auto muxOp : muxOps) {
         inputs.insert(muxOp.getDataOperands().begin(),
                       muxOp.getDataOperands().end());
         // inputs.insert(muxOp.getSelectOperand());
+
+        assert(
+            isa<handshake::MergeOp>(muxOp.getSelectOperand().getDefiningOp()) &&
+            "Loop MUX must be fed by INIT");
 
         handshake::MergeOp init = dyn_cast<handshake::MergeOp>(
             muxOp.getSelectOperand().getDefiningOp());
@@ -395,14 +422,33 @@ void outoforder::createClusters(
 
         inputs.insert(getInitConstantInput(init));
 
-        llvm::DenseSet<Operation *> visited;
-        auto branchOps = condToBranches[cond];
-        llvm::DenseSet<Operation *> branchOpPtrs;
-        for (auto branchOp : condToBranches[cond]) {
-          branchOpPtrs.insert(branchOp.getOperation());
-        }
-        findOpsBetweenOpsRecursive(muxOp.getOperation(), branchOpPtrs, visited);
-        internalNodes.insert(visited.begin(), visited.end());
+        // First add all the operations between the MUXes and the BRANCHes
+        llvm::DenseSet<Operation *> visitedMuxesToBranches;
+        llvm::DenseSet<Operation *> pathsMuxesToBranches;
+
+        findPathsBetweenOps(muxOp.getOperation(), branchOpPtrs,
+                            visitedMuxesToBranches, pathsMuxesToBranches);
+
+        internalOps.insert(pathsMuxesToBranches.begin(),
+                           pathsMuxesToBranches.end());
+      }
+
+      llvm::DenseSet<Operation *> muxOpPtrs;
+      for (auto muxOp : muxOps) {
+        muxOpPtrs.insert(muxOp.getOperation());
+      }
+
+      // Then add all the operations between the BRANCHes and the MUXes
+      // This is necessary for the while loop case where there are operations
+      // along the backward edges from the BRANCHes to the MUXes
+      for (auto *branchOp : branchOpPtrs) {
+        llvm::DenseSet<Operation *> visitedBranchesToMuxes;
+        llvm::DenseSet<Operation *> pathsBranchesToMuxes;
+
+        findPathsBetweenOps(branchOp, muxOpPtrs, visitedBranchesToMuxes,
+                            pathsBranchesToMuxes);
+        internalOps.insert(pathsBranchesToMuxes.begin(),
+                           pathsBranchesToMuxes.end());
       }
 
       for (auto branchOp : condToBranches[cond]) {
@@ -414,11 +460,11 @@ void outoforder::createClusters(
       // the inputs and outputs, but this is wrong We need to remove them from
       // the inputs and outputs
 
-      // 1. Find the backward edges aka the common values between the inputs and
-      // outputs
+      // 1. Find the backward edges aka the inputs being generated by internal
+      // nodes
       llvm::DenseSet<Value> backwardEdges;
       for (Value v : inputs) {
-        if (outputs.contains(v))
+        if (internalOps.contains(v.getDefiningOp()))
           backwardEdges.insert(v);
       }
 
@@ -435,7 +481,7 @@ void outoforder::createClusters(
       // Create a cluster for the condition with:
       // Inputs: the data operands and the select of the BRANCHes
       // Outputs: the outputs of the MUXes
-      // Internal nodes: all the MUXes and BRANCHes that are fed by this
+      // Internal ops: all the MUXes and BRANCHes that are fed by this
       // condition along with the operations between them
 
       for (auto branchOp : condToBranches[cond]) {
@@ -443,19 +489,20 @@ void outoforder::createClusters(
         inputs.insert(branchOp.getConditionOperand());
 
         llvm::DenseSet<Operation *> visited;
+        llvm::DenseSet<Operation *> paths;
         llvm::DenseSet<Operation *> muxOpPtrs;
         for (auto muxOp : muxOps) {
           muxOpPtrs.insert(muxOp.getOperation());
         }
-        findOpsBetweenOpsRecursive(branchOp.getOperation(), muxOpPtrs, visited);
-        internalNodes.insert(visited.begin(), visited.end());
+        findPathsBetweenOps(branchOp.getOperation(), muxOpPtrs, visited, paths);
+        internalOps.insert(paths.begin(), paths.end());
       }
 
       for (auto muxOp : muxOps) {
         outputs.insert(muxOp.getResult());
       }
     }
-    Cluster cluster(inputs, outputs, internalNodes);
+    Cluster cluster(inputs, outputs, internalOps);
     clusters.push_back(cluster);
   }
 }
@@ -471,10 +518,10 @@ void outoforder::createClusters(
  */
 LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
   for (size_t i = 0; i < clusters.size(); ++i) {
-    const auto &aOps = clusters[i].internalNodes;
+    const auto &aOps = clusters[i].internalOps;
     for (size_t j = i + 1; j < clusters.size(); ++j) {
 
-      const auto &bOps = clusters[j].internalNodes;
+      const auto &bOps = clusters[j].internalOps;
 
       // Check intersection: if two clusters share any operations
       bool intersects = false;
@@ -514,11 +561,11 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
  */
 std::vector<ClusterHierarchyNode *>
 outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
-  // Sort clusters by size (number of internal nodes)
+  // Sort clusters by size (number of Internal ops)
   // This is important to ensure that the innermost clusters are processed first
   llvm::sort(clusters.begin(), clusters.end(),
              [](const Cluster &a, const Cluster &b) {
-               return a.internalNodes.size() < b.internalNodes.size();
+               return a.internalOps.size() < b.internalOps.size();
              });
 
   std::vector<ClusterHierarchyNode *> nodes;
@@ -538,8 +585,8 @@ outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
   for (size_t i = 0; i < nodes.size(); ++i) {
     for (size_t j = i + 1; j < nodes.size(); ++j) {
       // Check if Ci is completely enclosed inside Cj
-      if (llvm::all_of(nodes[i]->cluster.internalNodes, [&](Operation *op) {
-            return nodes[j]->cluster.internalNodes.contains(op);
+      if (llvm::all_of(nodes[i]->cluster.internalOps, [&](Operation *op) {
+            return nodes[j]->cluster.internalOps.contains(op);
           })) {
 
         // If so, set the parent of Ci to Cj

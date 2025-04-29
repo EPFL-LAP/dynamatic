@@ -28,25 +28,23 @@ namespace outoforder {
 struct Cluster {
   llvm::DenseSet<Value> inputs;
   llvm::DenseSet<Value> outputs;
-  llvm::DenseSet<Operation *> internalNodes;
+  llvm::DenseSet<Operation *> internalOps;
 
   Cluster(llvm::DenseSet<Value> inputs, llvm::DenseSet<Value> outputs,
-          llvm::DenseSet<Operation *> internalNodes)
+          llvm::DenseSet<Operation *> internalOps)
       : inputs(std::move(inputs)), outputs(std::move(outputs)),
-        internalNodes(std::move(internalNodes)) {}
+        internalOps(std::move(internalOps)) {}
   Cluster() = default;
   Cluster(const Cluster &other) = default;
   Cluster &operator=(const Cluster &other) = default;
 
   bool operator==(const Cluster &other) const {
     return inputs == other.inputs && outputs == other.outputs &&
-           internalNodes == other.internalNodes;
+           internalOps == other.internalOps;
   }
 
   // Checks if the operation is inside the cluster
-  bool isInsideCluster(Operation *op) const {
-    return internalNodes.contains(op);
-  }
+  bool isInsideCluster(Operation *op) const { return internalOps.contains(op); }
 
   // Checks if the operation is before the cluster
   // This is done by checking if starting from the operation, we can reach the
@@ -78,6 +76,9 @@ struct Cluster {
     return false;
   }
 
+  // Adds an operation to the cluster by inserting it into its internal ops
+  void addInternalOp(Operation *op) { internalOps.insert(op); }
+
   void print(llvm::raw_ostream &os) const {
     os << "Cluster: \n";
     os << "Inputs: ";
@@ -89,7 +90,7 @@ struct Cluster {
       os << output << "\n";
     }
     os << "\nInternal Nodes: ";
-    for (auto *node : internalNodes) {
+    for (auto *node : internalOps) {
       os << *node << "\n";
     }
     os << "\n";
@@ -106,6 +107,14 @@ struct ClusterHierarchyNode {
   std::vector<ClusterHierarchyNode *> children;
 
   ClusterHierarchyNode(const Cluster &c) : cluster(c) {}
+
+  // Adds op to this cluster and all ancestor clusters
+  void addInternalOp(Operation *op) {
+    cluster.addInternalOp(op);
+
+    if (parent)
+      parent->addInternalOp(op);
+  }
 };
 
 // Analyzes the MUXes in a handshake function and groups them by their
