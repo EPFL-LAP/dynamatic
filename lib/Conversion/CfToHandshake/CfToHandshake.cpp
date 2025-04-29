@@ -1214,8 +1214,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         assert(false && "Invalid argument naming");
       }
     }
-    // Create resultTypes based on collected Outputs //! not necessary after rewriting function definition
-    //SmallVector<Type> resultTypesVec;              //! these 5 lines can be removed but stored
+    // Create resultTypes based on collected Outputs //! Will use this implementation in case function
+    //SmallVector<Type> resultTypesVec;              //! definiton wont be used later on (see TODO)
     //for(auto OutputId : InstanceOpOutputIndices)
     //  resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
     //resultTypes = TypeRange(resultTypesVec);
@@ -1290,9 +1290,10 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0){ //! when using if always include {} or write on the same line as the condition
     rewriter.eraseOp(callOp);
-  } else{
-    //rewriter.replaceOp(callOp, instOp.getResults().drop_back()); //! just for testing!
-    rewriter.replaceOp(callOp, instOp.getResult(0)); //? pick first result? no use last one also test by using call result somewhere
+  } else if (!calledHandshakeFuncOp) {
+    rewriter.replaceOp(callOp, instOp.getResult(instOp.getResults().size() - 1)); //? pick first result? no use last one also test by using call result somewhere
+  } else {
+    rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   }
   return success(); //! add comment (why last element)
 }
