@@ -1,0 +1,194 @@
+[
+  {
+    "pred": "control_merge0",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork1",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "constant6",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork6",
+    "outid": 2,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "extsi1",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork5",
+    "outid": 2,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork5",
+    "outid": 1,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork5",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork3",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "trunci0",
+    "outid": 0,
+    "slots": 16,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 1,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 2,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "merge0",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "speculator0",
+    "outid": 5,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork9",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork9",
+    "outid": 1,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 0,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 2,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 3,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 4,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 5,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 6,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 7,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 8,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 9,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 10,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 11,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 12,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 13,
+    "slots": 32,
+    "type": "tehb"
+  },
+  {
+    "pred": "fork8",
+    "outid": 14,
+    "slots": 32,
+    "type": "tehb"
+  }
+]
