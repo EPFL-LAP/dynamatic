@@ -59,8 +59,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
     //
     // 3. If only breaking R:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R;
-    // When numslot > 1, map to ONE_SLOT_BREAK_R + (numslot - 1) * FIFO_BREAK_NONE.
+    // Map to numslot * FIFO_BREAK_NONE.
     //
     // 4. If breaking none:
     // Map to numslot * FIFO_BREAK_NONE.
@@ -72,7 +71,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        // result.numOneSlotDV = 1;
         result.numFifoDV = numSlotsToPlace - 1;
         result.numOneSlotR = 1;
       }
@@ -80,7 +78,6 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       result.numOneSlotDV = 1;
       result.numFifoNone = numSlotsToPlace - 1;
     } else if (forceBreakR) {
-      // result.numOneSlotR = 1;
       result.numFifoNone = numSlotsToPlace;
     } else {
       result.numFifoNone = numSlotsToPlace;
