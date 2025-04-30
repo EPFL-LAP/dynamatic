@@ -25,15 +25,11 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
     signal_manager = _generate_concat_signal_manager(
         name, in_ports, out_ports, extra_signals, ignore_ports, generate_inner)
   elif type == "bbmerge":
-    size = params["size"]
-    data_in_name = params["data_in_name"]
+    extra_signals = params["extra_signals"]
     index_name = params["index_name"]
-    out_extra_signals = params["out_extra_signals"]
-    index_extra_signals = params["index_extra_signals"]
     index_dir = params["index_dir"]
-    spec_inputs = params["spec_inputs"]
     signal_manager = _generate_bbmerge_signal_manager(
-        name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner)
+        name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
@@ -103,17 +99,10 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
       port_decls.append(
           f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
 
-      # Use extra_signals_list if available to handle per-port extra signals
-      use_extra_signals_list = "extra_signals_list" in port
-
       # Generate extra signal declarations for each item in the 2d input port
       for i in range(size):
-        if use_extra_signals_list:
-          # Use different extra signals for different ports
-          current_extra_signals = port["extra_signals_list"][i]
-        else:
-          # Use the same extra signals for all items
-          current_extra_signals = extra_signals
+        # Use the same extra signals for all items
+        current_extra_signals = extra_signals
 
         # The netlist generator declares extra signals independently for each item,
         # in contrast to ready/valid signals.
@@ -612,25 +601,6 @@ end architecture;
   return inner + entity + architecture
 
 
-def _generate_bbmerge_lacking_spec_statements(spec_inputs, size, data_in_name):
-  """
-  e.g.,
-  - decls: signal lhs_0_spec : std_logic_vector(0 downto 0);
-  - assigns: lhs_0_spec <= "0";
-  """
-  # Declare and assign default spec bits for inputs without them
-  lacking_spec_ports = [
-      i for i in range(size) if i not in spec_inputs
-  ]
-  lacking_spec_port_decls = [
-      f"  signal {data_in_name}_{i}_spec : std_logic_vector(0 downto 0);" for i in lacking_spec_ports
-  ]
-  lacking_spec_port_assignments = [
-      f"  {data_in_name}_{i}_spec <= {_get_default_extra_signal_value("spec")};" for i in lacking_spec_ports
-  ]
-  return "\n".join(lacking_spec_port_decls).lstrip(), "\n".join(lacking_spec_port_assignments).lstrip()
-
-
 def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_signals, index_dir) -> str:
   """
   e.g., index_tag0 <= "0";
@@ -645,11 +615,8 @@ def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_sig
   return ""
 
 
-def _generate_bbmerge_signal_assignments(lacking_spec_port_assignments, concat_logic, index_extra_signal_assignments) -> str:
+def _generate_bbmerge_signal_assignments(concat_logic, index_extra_signal_assignments) -> str:
   template = f"""
-  -- Assign default spec bit values if not provided
-  {lacking_spec_port_assignments}
-
   -- Concatenate data and extra signals
   {concat_logic}
 """
@@ -663,18 +630,15 @@ def _generate_bbmerge_signal_assignments(lacking_spec_port_assignments, concat_l
   return template.lstrip()
 
 
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_name, index_name, out_extra_signals, index_extra_signals, index_dir, spec_inputs, generate_inner: Callable[[str], str]):
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(out_extra_signals)
+  concat_info = ConcatenationInfo(extra_signals)
   extra_signals_bitwidth = concat_info.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
-
-  lacking_spec_port_decls, lacking_spec_port_assignments = _generate_bbmerge_lacking_spec_statements(
-      spec_inputs, size, data_in_name)
 
   # Declare inner concatenated signals for all input/output ports
   concat_signal_decls = generate_concat_signal_decls(
@@ -686,20 +650,18 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, size, data_in_na
 
   # Assign index extra signals
   index_extra_signal_assignments = _generate_bbmerge_index_extra_signal_assignments(
-      index_name, index_extra_signals, index_dir)
+      index_name, extra_signals, index_dir)
 
   signal_assignments = _generate_bbmerge_signal_assignments(
-      lacking_spec_port_assignments, concat_logic, index_extra_signal_assignments)
+      concat_logic, index_extra_signal_assignments)
 
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
-      in_ports, out_ports, out_extra_signals, [index_name])
+      in_ports, out_ports, extra_signals, [index_name])
 
   architecture = f"""
 -- Architecture of signal manager (bbmerge)
 architecture arch of {name} is
-  -- Lacking spec inputs
-  {lacking_spec_port_decls}
   -- Concatenated data and extra signals
   {concat_signal_decls}
 begin

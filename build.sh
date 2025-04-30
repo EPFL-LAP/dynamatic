@@ -403,6 +403,7 @@ create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
+create_symlink ../build/bin/export-cfg
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator

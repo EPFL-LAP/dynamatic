@@ -136,6 +136,8 @@ end architecture;
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
+  # TODO: Normal signal manager doesn't work for select op.
+  # I'll fix it after the refactoring of signal manager functions.
   return generate_signal_manager(name, {
       "type": "normal",
       "in_ports": [{

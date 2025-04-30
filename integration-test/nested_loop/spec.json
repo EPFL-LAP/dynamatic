@@ -1,6 +1,13 @@
 {
   "speculator": {
     "operation-name": "fork8",
+<<<<<<< HEAD
     "operand-idx": 0
   }
+=======
+    "operand-idx": 0,
+    "fifo-depth": 16
+  },
+  "save-commits-fifo-depth": 16
+>>>>>>> da016a1a6b3d2ffc7ccd1241e9500c101b0b0dd5
 }

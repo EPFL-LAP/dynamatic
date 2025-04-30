@@ -69,7 +69,8 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
                                                ctrlPaths.end());
     for (OpResult forkRes : ctrlDefOp->getResults()) {
       // Channels connecting directly to LSQs should be left alone (group
-      // allocation signals have already been rendered unbufferizable before)
+      // allocation signals have already been rendered unbufferizable before,
+      // i.e., in setFPGA20Properties)
       if (isa<handshake::LSQOp>(*forkRes.getUsers().begin()))
         continue;
 

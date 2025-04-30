@@ -26,7 +26,7 @@ entity {name} is
     -- inputs
     {data(f"ins : in std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in std_logic;
-    ins_spec : in std_logic_vector(0 downto 0);
+    ins_spec : in std_logic_vector(0 downto 0); -- not used
     ctrl : in std_logic_vector(2 downto 0); -- 000:pass, 001:kill, 010:resend, 011:kill-pass, 100:no_cmp
     ctrl_valid : in std_logic;
     outs_ready : in std_logic;
@@ -62,16 +62,12 @@ architecture arch of {name} is
   signal Empty     : std_logic;
   signal Full      : std_logic;
 
-  type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} + 1 - 1 downto 0);
-  signal Memory : FIFO_Memory;
-
-  signal specdataInArray : std_logic_vector({bitwidth} + 1 - 1 downto 0);
+  {data(f"type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} - 1 downto 0);", bitwidth)}
+  {data("signal Memory : FIFO_Memory;", bitwidth)}
 
   signal bypass : std_logic;
 
 begin
-  specdataInArray <= {"ins_spec & ins" if bitwidth else "ins_spec"};
-
   ins_ready <= not Full;
   outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
   --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
@@ -131,18 +127,19 @@ begin
   -------------------------------------------
   -- comb process for output data
   -------------------------------------------
-  output_proc : process (PassEn, Memory, Curr, bypass, specdataInArray, Head)
+  output_proc : process (PassEn, Curr, bypass, {data("ins, Memory, ", bitwidth)}Head)
   begin
     if PassEn = '1' then
+      {data("""
       if bypass = '1' then
-        {data(f"outs <=  specdataInArray({bitwidth} - 1 downto 0);", bitwidth)}
-        outs_spec(0) <= specdataInArray({bitwidth}+1 - 1);
+        outs <= ins;
       else
-        {data(f"outs <=  Memory(Curr)({bitwidth} - 1 downto 0);", bitwidth)}
-        outs_spec(0) <= Memory(Curr)({bitwidth}+1 - 1);
+        outs <= Memory(Curr);
       end if;
+      """, bitwidth)}
+      outs_spec <= "1";
     else
-      {data(f"outs <=  Memory(Head)({bitwidth} - 1 downto 0);", bitwidth)}
+      {data(f"outs <= Memory(Head);", bitwidth)}
       outs_spec <= "0";
     end if;
   end process;
@@ -151,6 +148,7 @@ begin
   -- Sequential Process
   ----------------------------------------------------------------
 
+  {data("""
   -------------------------------------------
   -- process for writing data
   -------------------------------------------
@@ -160,13 +158,14 @@ begin
       if rst = '1' then
         -- TODO: Nothing??
       else
-        if (TailEn = '1' ) then
+        if TailEn = '1' then
           -- Write Data to Memory
-          Memory(Tail) <= specdataInArray;
+          Memory(Tail) <= ins;
         end if;
       end if;
     end if;
   end process;
+  """, bitwidth)}
 
   -------------------------------------------
   -- process for updating tail

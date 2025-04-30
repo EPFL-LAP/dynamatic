@@ -8,7 +8,7 @@ This document explains how to run the speculation integration tests and details 
 
 ## Running the Tests
 
-There are seven speculation integration tests in the `integration-test` folder:
+There are eight speculation integration tests in the `integration-test` folder:
 
 - `single_loop`
 - `loop_path`
@@ -16,6 +16,7 @@ There are seven speculation integration tests in the `integration-test` folder:
 - `subdiag_fast`
 - `fixed`
 - `sparse`
+- `nested_loop`
 - `if_convert` (data speculation)
 
 The `newton` benchmark from Haoran's thesis is excluded because it contains branches within the loop, where the current speculation approach is ineffective.
@@ -111,9 +112,9 @@ Ideally, [#311](https://github.com/EPFL-LAP/dynamatic/issues/311) will eliminate
 
 These transformations may not be generally supported, but they help meet the requirements for speculation.
 
-## Speculator Placement
+## `spec.json`
 
-The location of the speculator must be manually specified using a `spec.json` file in each integration test folder.
+Speculation requires some manual configuration, which is defined in the spec.json file located in each integration test folder.
 
 A typical `spec.json` file looks like this:
 
@@ -121,14 +122,24 @@ A typical `spec.json` file looks like this:
 {
   "speculator": {
     "operation-name": "fork4",
-    "operand-idx": 0
-  }
+    "operand-idx": 0,
+    "fifo-depth": 16
+  },
+  "save-commits-fifo-depth": 16
 }
 ```
+
+### Speculator Placement
 
 In this example, the speculator is placed on operand #0 of the `fork4` operation. Visually, it is like this:
 
 <img src="Figures/IntegrationTest1.png" width="400" />
+
+### Speculator/Save-Commit FIFO Depth
+
+You also need to specify the FIFO depth for speculator and save-commit units. The FIFO must be deep enough to store all in-flight speculations, from the moment they are made until they are resolved. If the FIFO fills up, the circuit deadlocks.
+
+Note: The `save-commits-fifo-depth` value is currently shared across all save-commit units.
 
 ## Buffer Placement
 
@@ -175,3 +186,11 @@ For the first item in the example above, the buffer placement looks like this:
 
 In my opinion, buffer positions should be specified by **operand** rather than **result**.
 Operands are always unique, even without materialization, whereas results are not.
+
+## Integration Test Folder
+
+The integration test folders are located at `integration-test/(test-name)/`. Each folder also contains:
+
+- `(test-name)_original.c`: The original program from the thesis.
+- `cfg_modification.png`: A diagram illustrating the CFG modifications applied to the program.
+- `results.md`: The benchmark results.

@@ -1128,16 +1128,18 @@ void SMVWriter::constructIOMappings(
         .Case<ControlType>([&](auto type) {
           addValid(port, signal);
           addExtraSignals(port, signal, type.getExtraSignals());
+        })
+        .Case<IntegerType>([&](IntegerType intType) {
+          if (signal.str() != dynamatic::hw::CLK_PORT &&
+              signal.str() != dynamatic::hw::RST_PORT)
+            mappings[getSignalName(port)].push_back(signal.str());
         });
   };
 
   auto addOutPortType = [&](Type portType, StringRef port, OpResult op) {
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) { addReady(port, op); })
-        .Case<ControlType>([&](ControlType type) { addReady(port, op); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          mappings[getSignalName(port)].push_back(getValueName(op).str());
-        });
+        .Case<ControlType>([&](ControlType type) { addReady(port, op); });
   };
 
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());

@@ -325,7 +325,6 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-  registerSpecPortsParameter(modOp, modName, modType);
 }
 
 void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
@@ -342,12 +341,13 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
       modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.shli" ||
-      modName == "handshake.sink" || modName == "handshake.subi" ||
-      modName == "handshake.join" || modName == "handshake.shli" ||
+      modName == "handshake.muli" || modName == "handshake.sink" ||
+      modName == "handshake.subi" || modName == "handshake.shli" ||
+      modName == "handshake.join" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
-      modName == "handshake.spec_save_commit") {
+      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.non_spec") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
@@ -429,11 +429,13 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::tehb())
+      if (info == handshake::TimingInfo::break_r() ||
+          info == handshake::TimingInfo::break_none()) {
         serializedParams["TRANSPARENT"] = "True";
-      else if (info == handshake::TimingInfo::oehb())
+      } else if (info == handshake::TimingInfo::break_dv() ||
+                 info == handshake::TimingInfo::break_dvr()) {
         serializedParams["TRANSPARENT"] = "False";
-      else {
+      } else {
         llvm_unreachable("Unknown timing info");
       }
     } else {
@@ -454,11 +456,11 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
       modName == "handshake.muli" || modName == "handshake.select" ||
-      modName == "handshake.shli" || modName == "handshake.sink" ||
-      modName == "handshake.subf" || modName == "handshake.subi" ||
-      modName == "handshake.spec_save_commit" ||
-      modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.sink" || modName == "handshake.subf" ||
       modName == "handshake.extui" || modName == "handshake.shli" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
+      modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.mux" || modName == "handshake.control_merge" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
@@ -521,48 +523,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     // Skip
   } else {
     llvm::errs() << "Uncaught module: " << modName << "\n";
-  }
-}
-
-void RTLMatch::registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType) {
-  if (modName == "handshake.control_merge") {
-    std::string specInputsValue;
-    llvm::raw_string_ostream specInputs(specInputsValue);
-    specInputs << "'[";
-    bool isFirst = true;
-    // The last two inputs are clk and rst
-    for (size_t i = 1; i < modType.getNumInputs() - 2; i++) {
-      if (modType.getInputType(i)
-              .cast<handshake::ExtraSignalsTypeInterface>()
-              .hasExtraSignal("spec")) {
-        if (!isFirst)
-          specInputs << ", ";
-        isFirst = false;
-        specInputs << i;
-      }
-    }
-    specInputs << "]'";
-    serializedParams["SPEC_INPUTS"] = specInputs.str();
-  } else if (modName == "handshake.mux") {
-    std::string specInputsValue;
-    llvm::raw_string_ostream specInputs(specInputsValue);
-    specInputs << "'[";
-    bool isFirst = true;
-    // The first input is index, and the last two inputs are clk and rst
-    for (size_t i = 0; i < modType.getNumInputs() - 2; i++) {
-      if (modType.getInputType(i)
-              .cast<handshake::ExtraSignalsTypeInterface>()
-              .hasExtraSignal("spec")) {
-        if (!isFirst)
-          specInputs << ", ";
-        isFirst = false;
-        specInputs << i - 1; // Skip the index input
-      }
-    }
-    specInputs << "]'";
-    serializedParams["SPEC_INPUTS"] = specInputs.str();
   }
 }
 

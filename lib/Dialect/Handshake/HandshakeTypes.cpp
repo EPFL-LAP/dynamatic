@@ -395,9 +395,9 @@ bool dynamatic::handshake::doExtraSignalsMatch(
   return true;
 }
 
-bool dynamatic::handshake::doesExtraSignalsMatchExcept(
-    const llvm::StringRef &except,
-    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays) {
+bool dynamatic::handshake::doesExtraSignalsMatch(
+    std::vector<llvm::ArrayRef<ExtraSignal>> extraSignalArrays,
+    std::optional<llvm::StringRef> except) {
 
   // If there are fewer than two arrays, they are trivially considered matching.
   if (extraSignalArrays.size() < 2)
@@ -423,12 +423,13 @@ bool dynamatic::handshake::doesExtraSignalsMatchExcept(
 
     while (i < refArraySize || j < toCheckSize) {
       // Skip elements in `head` with the excluded name.
-      if (i < refArraySize && refArray[i].name == except) {
+      if (except.has_value() && i < refArraySize &&
+          refArray[i].name == except) {
         i++;
         continue;
       }
       // Skip elements in `current` with the excluded name.
-      if (j < toCheckSize && toCheck[j].name == except) {
+      if (except.has_value() && j < toCheckSize && toCheck[j].name == except) {
         j++;
         continue;
       }

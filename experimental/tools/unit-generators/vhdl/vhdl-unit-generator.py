@@ -19,7 +19,7 @@ import generators.handshake.merge as merge
 import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
-import generators.handshake.shli as shli
+import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.speculation.spec_commit as spec_commit
@@ -35,14 +35,15 @@ import generators.handshake.speculation.spec_commit as spec_commit
 import generators.handshake.speculation.spec_save_commit as spec_save_commit
 import generators.handshake.speculation.speculating_branch as speculating_branch
 import generators.handshake.speculation.speculator as speculator
+import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.tagger as tagger
 import generators.handshake.untagger as untagger
 import generators.handshake.free_tags_fifo as fifo
-import generators.handshake.shli as shli
 import generators.handshake.join as join
 import generators.handshake.demux as demux
+import generators.handshake.shli as shli
 
 
 def generate_code(name, mod_type, parameters):
@@ -59,6 +60,8 @@ def generate_code(name, mod_type, parameters):
       return cmpf.generate_cmpf(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
     case "constant":
@@ -81,8 +84,8 @@ def generate_code(name, mod_type, parameters):
       return muli.generate_muli(name, parameters)
     case "mux":
       return mux.generate_mux(name, parameters)
-    case "shli":
-      return shli.generate_shli(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "sink":
       return sink.generate_sink(name, parameters)
     case "source":
@@ -105,22 +108,24 @@ def generate_code(name, mod_type, parameters):
       return speculating_branch.generate_speculating_branch(name, parameters)
     case "speculator":
       return speculator.generate_speculator(name, parameters)
+    case "non_spec":
+      return non_spec.generate_non_spec(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
+    case "extui":
+      return extui.generate_extui(name, parameters)
+    case "shli":
+      return shli.generate_shli(name, parameters)
     case "tagger":
       return tagger.generate_tagger(name, parameters)
     case "untagger":
       return untagger.generate_untagger(name, parameters)
     case "free_tags_fifo":
       return fifo.generate_free_tags_fifo(name, parameters)
-    case "extui":
-      return extui.generate_extui(name, parameters)
-    case "shli":
-      return shli.generate_shli(name, parameters)
-    case "join":
-      return join.generate_join(name, parameters)
     case "demux":
       return demux.generate_demux(name, parameters)
+    case "join":
+      return join.generate_join(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
