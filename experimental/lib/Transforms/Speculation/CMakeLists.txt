@@ -2,7 +2,6 @@ add_dynamatic_library(DynamaticSpeculation
   SpeculationPlacement.cpp
   HandshakeSpeculation.cpp
   PlacementFinder.cpp
-  NewPlacementFinder.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -17,4 +16,4 @@ add_dynamatic_library(DynamaticSpeculation
   DynamaticSupport
   DynamaticExperimentalSupport
   )
-
+  
