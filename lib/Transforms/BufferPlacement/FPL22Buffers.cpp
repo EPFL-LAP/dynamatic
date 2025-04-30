@@ -41,43 +41,47 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDV = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool placeTransparent =
+    bool forceBreakR =
         channelVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
-    if (placeOpaque && placeTransparent) {
-      // Place the minumum number of opaque slots; at least one and enough to
-      // satisfy all our opaque/transparent requirements
-      if (props.maxTrans) {
-        // We must place enough opaque slots as to not exceed the maximum number
-        // of transparent slots
-        result.numOpaque =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
+    // 1. If breaking DV & R:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+    //
+    // 2. If only breaking DV:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot > 1, map to (numslot - 1) * FIFO_BREAK_DV.
+    //
+    // 3. If only breaking R:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R;
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    if (forceBreakDV && forceBreakR) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
+      } else if (numSlotsToPlace == 2) {
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else {
-        // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
+        result.numFifoDV = numSlotsToPlace - 1;
+        result.numOneSlotR = 1;
       }
-      // All remaining slots are transparent
-      result.numTrans = numSlotsToPlace - result.numOpaque;
-    } else if (placeOpaque) {
-      // Place the minimum number of transparent slots; at least the expected
-      // minimum and enough to satisfy all our opaque/transparent requirements
-      if (props.maxOpaque) {
-        result.numTrans =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
+    } else if (forceBreakDV) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
       } else {
-        result.numTrans = props.minTrans;
+        result.numFifoNone = numSlotsToPlace;
       }
-      // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
     } else {
-      // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
-      // transparent
-      result.numTrans = numSlotsToPlace;
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
     placement[channel] = result;

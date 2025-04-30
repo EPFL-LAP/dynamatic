@@ -55,27 +55,44 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
+    bool forceBreakDVR = channelVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-
+    
     handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
-    if (placeOpaque) {
-      // We want as many slots as possible to be transparent and at least one
-      // opaque slot, while satisfying all buffering constraints
-      unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-      if (props.maxTrans.has_value() &&
-          (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numTrans = props.maxTrans.value();
-        result.numOpaque = numSlotsToPlace - result.numTrans;
+    // 1. If breaking DVR:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+    //
+    // 2. If breaking none:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R;
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    if (forceBreakDVR) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
+      } else if (numSlotsToPlace == 2) {
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else {
-        result.numOpaque = actualMinOpaque;
-        result.numTrans = numSlotsToPlace - result.numOpaque;
+        if (props.minOpaque <= 1) {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 1;
+        } else {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 2;
+          result.numOneSlotR = 1;
+        }
       }
     } else {
-      // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
     placement[channel] = result;
