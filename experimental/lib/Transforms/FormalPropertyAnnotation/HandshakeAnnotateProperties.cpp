@@ -71,16 +71,28 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
   for (auto [i, res1] : llvm::enumerate(op1.getResults()))
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
+
+      if (op1.getAttr("handshake.name") == op2.getAttr("handshake.name") &&
+          i == j)
+        continue;
+
       addPropertyId(&op1, uid);
+
+      PortNamer namer1(&op1);
+      PortNamer namer2(&op2);
+
       propertyTable.push_back(json::Value(json::Object{
           {"id", uid},
           {"name", "VEQ"},
           {"info",
            json::Value(json::Object{
                {"owner", op1.getAttrOfType<StringAttr>("handshake.name").str()},
-               {"user", op2.getAttrOfType<StringAttr>("handshake.name").str()},
+               {"target",
+                op2.getAttrOfType<StringAttr>("handshake.name").str()},
                {"owner_index", i},
-               {"user_index", j}})},
+               {"tagert_index", j},
+               {"owner_channel", namer1.getOutputName(i).str()},
+               {"target_channel", namer2.getOutputName(j).str()}})},
           {"tag", "optimization"},
           {"check", "unchecked"}}));
       uid++;
@@ -95,7 +107,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalence(ModuleOp modOp) {
       for (auto [j, op_j] : llvm::enumerate(funcOp.getOps())) {
         // equivalence is symmetrical so it needs to be checked only once for
         // each pair of signals (therefore operations)
-        if (i < j &&
+        if (i <= j &&
             op_i.getAttr("handshake.bb") == op_j.getAttr("handshake.bb")) {
           if (failed(annotateValidEquivalenceBetweenOps(op_i, op_j))) {
             return failure();
@@ -122,6 +134,9 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
 
           auto *userOp = *res.getUsers().begin();
 
+          PortNamer namer(&op);
+          PortNamer userNamer(userOp);
+
           unsigned long operandIndex = userOp->getNumOperands();
           for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
             if (arg == res) {
@@ -142,7 +157,10 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
                    {"user",
                     userOp->getAttrOfType<StringAttr>("handshake.name").str()},
                    {"owner_index", resIndex},
-                   {"user_index", operandIndex}})},
+                   {"user_index", operandIndex},
+                   {"owner_channel", namer.getOutputName(resIndex).str()},
+                   {"user_channel",
+                    userNamer.getInputName(operandIndex).str()}})},
               {"tag", "optimization"},
               {"check", "unchecked"}}));
           uid++;
@@ -181,7 +199,6 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   out << formatv("{0:2}", jsonVal);
 
   std::error_code EC;
-  llvm::errs() << jsonPath << "\n\n\n";
   llvm::raw_fd_ostream jsonOut(jsonPath, EC, llvm::sys::fs::OF_Text);
   if (EC)
     return;
