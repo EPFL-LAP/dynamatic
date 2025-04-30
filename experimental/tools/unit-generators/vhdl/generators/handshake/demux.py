@@ -11,7 +11,7 @@ def generate_demux(name, params):
   extra_signals = params.get("extra_signals", None)
 
   if extra_signals:
-    return _generate_demux_signal_manager(name, size, data_bitwidth, data_bitwidth, index_bitwidth, extra_signals)
+    return _generate_demux_signal_manager(name, size, data_bitwidth, index_bitwidth, extra_signals)
   elif data_bitwidth == 0:
     return _generate_demux_dataless(name, size, index_bitwidth)
   else:

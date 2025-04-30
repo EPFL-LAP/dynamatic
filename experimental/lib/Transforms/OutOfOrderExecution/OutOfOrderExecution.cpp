@@ -295,12 +295,12 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
 
-  // llvm::errs() << "Hierarchy nodes: \n";
-  // for (auto &clusterNode : hierarchyNodes) {
-  //   clusterNode->cluster.print(llvm::errs());
-  //   llvm::errs() << "\n";
-  // }
-  // llvm::errs() << "Done printing hierarchy nodes.\n";
+  llvm::errs() << "Hierarchy nodes: \n";
+  for (auto &clusterNode : hierarchyNodes) {
+    clusterNode->cluster.print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "Done printing hierarchy nodes.\n";
 
   // Step 4: Apply the out-of-order execution methodology to each ot-of-order
   // node with respect to each innermost cluster
@@ -413,11 +413,11 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
       return failure();
   }
 
-  // llvm::errs() << "Dirty nodes: \n";
-  // for (auto *node : dirtyNodes) {
-  //   llvm::errs() << *node << "\n";
-  // }
-  // llvm::errs() << "Done printing dirty nodes.\n";
+  llvm::errs() << "Dirty nodes: \n";
+  for (auto *node : dirtyNodes) {
+    llvm::errs() << *node << "\n";
+  }
+  llvm::errs() << "Done printing dirty nodes.\n";
 
   // If there are no dirty nodes and there is free alignment, then we don't need
   // to do anything.
@@ -431,15 +431,15 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                                       dirtyNodes, unalignedEdges)))
       return failure();
 
+    llvm::errs() << "Unaligned edges: \n";
+    for (auto edge : unalignedEdges) {
+      llvm::errs() << edge << "\n";
+    }
+    llvm::errs() << "Done printing unaligned edges.\n";
+
     // If there are no unaligned edges, then we don't need to do
     // anything
     if ((!controlled && unalignedEdges.size() > 1) || controlled) {
-
-      // llvm::errs() << "Unaligned edges: \n";
-      // for (auto edge : unalignedEdges) {
-      //   llvm::errs() << edge << "\n";
-      // }
-      // llvm::errs() << "Done printing unaligned edges.\n";
 
       // Step 3: Identify the tagged edges
       llvm::DenseSet<Value> taggedEdges;
@@ -447,6 +447,12 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                                      outOfOrderNodeOutputs, unalignedEdges,
                                      taggedEdges)))
         return failure();
+
+      llvm::errs() << "taggedEdges edges: \n";
+      for (auto edge : taggedEdges) {
+        llvm::errs() << edge << "\n";
+      }
+      llvm::errs() << "Done printing taggedEdges edges.\n";
 
       // Step 4: Add the tagger and untagger operations and connect them to the
       // freeTagsFifo
@@ -467,7 +473,12 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
         return failure();
     }
   }
-
+  llvm::errs() << "\n";
+  llvm::errs() << "\n";
+  llvm::errs() << "FuncOp\n";
+  funcOp->print(llvm::errs());
+  llvm::errs() << "\n";
+  llvm::errs() << "\n";
   // Step 6: Recursively apply the out-of-order algorithm to the parent cluster
   // Now we consider the cluster as an out-of-order node inside its parent
   // cluster
@@ -477,7 +488,7 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
     if (failed(applyOutOfOrderAlgorithm(
             funcOp, ctx, clusterNode->cluster.inputs,
             clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
-            clusterNode->parent, tagIndex, numTags, controlled)))
+            clusterNode->parent, tagIndex, (2 * numTags), controlled)))
       return failure();
   }
 
@@ -612,25 +623,29 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
     llvm::DenseSet<Value> &unalignedEdges) {
   // Backward edges from the dirty node
   for (auto *dirtyNode : dirtyNodes) {
-    // If the dirty node is an init operation, we don't need to check its
-    // operands because they are already aligned
+    // Because INIT is currenly implemented as a MERGE, we should never consider
+    // its 2 inputs as unaligned
+    // Once the INIT becomes a single input component, this can be removed
     if (isInit(dirtyNode))
       continue;
 
     for (auto operand : dirtyNode->getOperands()) {
-      bool edgeFromCluster = false;
-      // Check if the operand is an output from one of the children clusters
-      for (auto *childCluster : clusterNode->children) {
-        if (childCluster->cluster.outputs.contains(operand)) {
-          edgeFromCluster = true;
-        }
-      }
+      // bool edgeFromCluster = false;
+      // // Check if the operand is an output from one of the children clusters
+      // for (auto *childCluster : clusterNode->children) {
+      //   if (childCluster->cluster.outputs.contains(operand) &&
+      //   childCluster->cluster.isBeforeCluster()) {
+      //     llvm::errs() << "OPerand: " << operand << "\n";
+      //     edgeFromCluster = true;
+      //   }
+      // }
 
-      // If the operand is an output from one of the children clusters, then the
-      // children cluster is technically a dirtyNode, so thi is a
-      // dirtyNode->dirtNode edge that is aligned
-      if (edgeFromCluster)
-        continue;
+      // // If the operand is an output from one of the children clusters, then
+      // the
+      // // children cluster is technically a dirtyNode, so this is a
+      // // dirtyNode->dirtNode edge that is aligned
+      // if (edgeFromCluster)
+      //   continue;
 
       Operation *producer = operand.getDefiningOp();
       // Identify edges that connect a non-dirty node to a dirty node
@@ -686,6 +701,8 @@ LogicalResult OutOfOrderExecutionPass::identifyTaggedEdges(
       if (!isa<handshake::MemoryControllerOp>(prod) &&
           !isa<handshake::LSQOp>(prod))
         taggedEdges.insert(operand);
+    } else {
+      taggedEdges.insert(operand);
     }
   }
 
@@ -961,6 +978,13 @@ void OutOfOrderExecutionPass::addAligner(
     joinOperands.push_back(edgeUntagger.getTagOut());
     untaggers.insert(edgeUntagger.getOperation());
   }
+
+  llvm::errs() << "untaggers:\n";
+  for (Operation *untagger : untaggers) {
+    untagger->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "done printing untaggers\n";
 }
 
 /**
@@ -1076,8 +1100,12 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     // all operands should have an owner and defining operation.
     return failure();
 
-  if (isa<handshake::EndOp>(op))
+  if (isa<handshake::EndOp>(op) || isa<handshake::StoreOp>(op))
     return success();
+
+  // The tags coming in and out of the freeTagsFifo should never be tagged
+  if (dyn_cast<handshake::FreeTagsFifoOp>(op))
+    return failure();
 
   // Add the tag to the current operand
   if (failed(addTagToValue(opOperand.get(), extraTag, numTags)))
@@ -1095,9 +1123,13 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     if (untaggers.contains(op))
       return success();
 
-    return success();
-
     // Else this is an untagger in a nested region and we continue traversal
+    // Special Case: For edges that feed nothing, we still want to tag their
+    // values for type verification purposes
+    if (untagger.getDataOut().getUses().empty()) {
+      if (failed(addTagToValue(untagger.getDataOut(), extraTag, numTags)))
+        return failure();
+    }
     for (auto &operand : untagger.getDataOut().getUses()) {
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
                                         freeTagsFifo, untaggers, numTags)))
@@ -1110,6 +1142,12 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     // Continue traversal to dataOut, skipping ports connected to the memory
     // controller.
+    // Special Case: For edges that feed nothing, we still want to tag their
+    // values for type verification purposes
+    if (loadOp->getOpResult(1).getUses().empty()) {
+      if (failed(addTagToValue(loadOp->getOpResult(1), extraTag, numTags)))
+        return failure();
+    }
     for (auto &operand : loadOp->getOpResult(1).getUses()) {
       if (failed(addTagSignalsRecursive(operand, visited, extraTag,
                                         freeTagsFifo, untaggers, numTags)))
@@ -1119,27 +1157,25 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     return success();
   }
 
-  // TODO: Should storeOp be in tagged region?
-  if (auto storeOp = dyn_cast<handshake::StoreOp>(op))
-    return success();
-
-  if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    // Only perform traversal to the dataResult
-    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
-    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-                                        freeTagsFifo, untaggers, numTags)))
-        return failure();
-    }
-    return success();
-  }
-
-  // The tags coming in and out of the freeTagsFifo should never be tagged
-  if (dyn_cast<handshake::FreeTagsFifoOp>(op))
-    return failure();
+  // if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
+  //   // Only perform traversal to the dataResult
+  //   MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
+  //   for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
+  //     if (failed(addTagSignalsRecursive(operand, visited, extraTag,
+  //                                       freeTagsFifo, untaggers, numTags)))
+  //       return failure();
+  //   }
+  //   return success();
+  // }
 
   // Downstream traversal
   for (auto result : op->getResults()) {
+    // Special Case: For edges that feed nothing, we still want to tag their
+    // values for type verification purposes
+    if (result.getUses().empty()) {
+      if (failed(addTagToValue(result, extraTag, numTags)))
+        return failure();
+    }
     for (auto &operand : result.getUses()) {
       // Skip the operand that is the same as the current operand
       if (operand.get() == opOperand.get())

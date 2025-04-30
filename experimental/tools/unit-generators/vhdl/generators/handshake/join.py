@@ -117,13 +117,7 @@ begin
     end loop;
   end process;
 
-  -- Propagate the first input directly after validation
-  process(allValid, ins)
-  begin
-    if (allValid = '1') then
-      outs <= ins(0);
-    end if;
-  end process;
+  outs <= ins(0);
 
 end architecture;
 """

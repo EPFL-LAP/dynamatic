@@ -14,7 +14,8 @@ def _generate_free_tags_fifo(name, data_bitwidth, fifo_depth):
   dependencies = \
       generate_elastic_fifo_inner(fifo_name, {
           "size": fifo_depth,
-          "bitwidth": data_bitwidth
+          "bitwidth": data_bitwidth,
+          "initialized": True
       })
 
   entity = f"""

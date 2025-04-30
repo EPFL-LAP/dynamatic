@@ -364,7 +364,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
+  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result"]>,
   // Constraints on spec tag
   HasSpecTagIfPresentIn<"dataOperands", "result">,
   LacksSpecTag<"selectOperand">,

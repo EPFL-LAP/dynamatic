@@ -63,9 +63,9 @@ end {name};
 -- Architecture of untagger
 architecture arch of {name} is
 begin
-    outs_valid<= '1';
-    tagOut_valid<= '1';
-    ins_ready <= '1';
+    outs_valid<= ins_valid;
+    tagOut_valid<= ins_valid;
+    ins_ready <= tagOut_ready and outs_ready;
     outs <= ins;
     tagOut <= ins_{current_tag};
 end architecture;
@@ -109,9 +109,9 @@ end {name};
 -- Architecture of untagger
 architecture arch of {name} is
 begin
-    outs_valid<= '1';
-    tagOut_valid<= '1';
-    ins_ready <= '1';
+    outs_valid<= ins_valid;
+    tagOut_valid<= ins_valid;
+    ins_ready <= tagOut_ready and outs_ready;
     tagOut <= ins_{current_tag};
 end architecture;
 """
