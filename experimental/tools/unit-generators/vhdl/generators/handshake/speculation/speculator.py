@@ -165,20 +165,19 @@ begin
           ControlInternal <= CONTROL_NO_CMP;
           outs <= ins;
           outs_spec <= "0";
-        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and FifoNotFull = '1' and ins = fifo_ins) then
           DataR <= ControlnR;
-          PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
+          PredictR <= ControlnR;
 
           ControlV <= '1';
           ControlInternal <= CONTROL_CORRECT_SPEC;
           outs <= predict_ins;
           outs_spec <= "1";
-          FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
-          FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
-        elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
+          FifoV <= ControlnR;
+          FifoR <= ControlnR;
+        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
           DataR <= ControlnR;
-          -- TODO: Not Specifying PredictR <= '0' is buggy?
-          PredictR <= FifoNotFull and ControlnR;
+          PredictR <= '0';
           FifoR <= ControlnR;
 
           FifoV <= '0';
@@ -195,8 +194,8 @@ begin
           outs <= ins;
           outs_spec <= "0";
         else
-          DataR <= ControlnR; -- TODO: '0'?
-          PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
+          DataR <= '0';
+          PredictR <= '0';
           ControlV <= '0';
           FifoR <= '0';
           FifoV <= '0';
