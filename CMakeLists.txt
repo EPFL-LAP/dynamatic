@@ -166,24 +166,26 @@ endif()
 # External binaries
 #-------------------------------------------------------------------------------
 
-# Download modified NuSMV binary,
-# which support to print larger sets of reachable states
-set(EXT_BIN_DIR "${DYNAMATIC_SOURCE_DIR}/ext")
-file(DOWNLOAD
-    https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.0/NuSMV
-    ${EXT_BIN_DIR}/NuSMV
-)
-file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
+if(DYNAMATIC_ENABLE_LEQ_BINARIES)
+  # Download modified NuSMV binary,
+  # which support to print larger sets of reachable states
+  set(EXT_BIN_DIR "${DYNAMATIC_SOURCE_DIR}/ext")
+  file(DOWNLOAD
+      https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.0/NuSMV
+      ${EXT_BIN_DIR}/NuSMV
+  )
+  file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
 
-# Download dot2smv Python scripts
-FetchContent_Declare(
-  dot2smv
-  URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-  SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
-)
+  # Download dot2smv Python scripts
+  FetchContent_Declare(
+    dot2smv
+    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
+  )
 
-FetchContent_MakeAvailable(dot2smv)
+  FetchContent_MakeAvailable(dot2smv)
+endif()
 
 
 #-------------------------------------------------------------------------------
