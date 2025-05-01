@@ -395,7 +395,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
