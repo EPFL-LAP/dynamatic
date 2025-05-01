@@ -87,8 +87,10 @@ begin
     if PassEn = '1' then
       if CurrEmpty = '1' then
         -- Bypass
-        CurrEn <= outs_ready and ins_valid;
+        -- Consider the condition required for TailEn = '1'.
+        CurrEn <= outs_ready and ins_valid and not Full;
       else
+        -- If CurrEmpty is '0', then Empty is '0'.
         CurrEn <= outs_ready;
       end if;
     elsif NoCmpEn = '1' then
@@ -130,7 +132,7 @@ begin
       PassEn <= '1';
       KillEn <= '1';
     elsif ctrl_valid = '1' and ctrl = "100" then
-      -- NO_CMP: Special case of RESEND. Curr must be incremented as well.
+      -- NO_CMP: Special case of RESEND. Curr must be incremented as well (See my report).
       ResendEn <= '1';
       NoCmpEn <= '1';
     end if;
@@ -139,7 +141,7 @@ begin
   -------------------------------------------
   -- comb process for control ready
   -------------------------------------------
-  ctrl_ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, outs_ready, ins_valid)
+  ctrl_ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, Full, outs_ready, ins_valid)
   begin
     -- Note: PassEn and KillEn can be simultaneously '1'
     -- In that case, PassEn is currently prioritized
@@ -147,8 +149,9 @@ begin
     if PassEn = '1' then
       if CurrEmpty = '1' then
         -- Bypass
-        ctrl_ready <= outs_ready and ins_valid;
+        ctrl_ready <= outs_ready and ins_valid and not Full;
       else
+        -- If CurrEmpty is '0', then Empty is '0'.
         ctrl_ready <= outs_ready;
       end if;
     elsif ResendEn = '1' then
@@ -163,14 +166,15 @@ begin
   -------------------------------------------
   -- comb process for outs_valid
   -------------------------------------------
-  outs_valid_proc : process (PassEn, ResendEn, CurrEmpty, Empty, ins_valid)
+  outs_valid_proc : process (PassEn, ResendEn, CurrEmpty, Empty, Full, ins_valid)
   begin
     if PassEn = '1' then
       if CurrEmpty = '1' then
         -- Bypass
-        outs_valid <= ins_valid;
+        outs_valid <= ins_valid and not Full;
       else
-        outs_valid <= '1'; -- TODO: "not Empty"?
+        -- If CurrEmpty is '0', then Empty is '0'.
+        outs_valid <= '1';
       end if;
     elsif ResendEn = '1' then
       outs_valid <= not Empty;
