@@ -1,350 +1,44 @@
 [
   {
-    "pred": "fork12",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "speculator0",
+    "pred": "speculating_branch1",
     "outid": 0,
-    "slots": 16,
-    "type": "tehb"
+    "slots": 6,
+    "type": "fifo_break_none"
   },
   {
-    "pred": "speculator0",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "speculator0",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "merge0",
+    "pred": "fork18",
     "outid": 0,
-    "slots": 16,
-    "type": "tehb"
+    "slots": 4,
+    "type": "fifo_break_none"
   },
   {
-    "pred": "speculator0",
-    "outid": 5,
-    "slots": 16,
-    "type": "tehb"
+    "pred": "fork14",
+    "outid": 0,
+    "slots": 5,
+    "type": "fifo_break_none"
+  },
+  {
+    "pred": "spec_commit8",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none"
+  },
+  {
+    "pred": "spec_commit9",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none"
   },
   {
     "pred": "extsi3",
     "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork11",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork11",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork11",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "extsi11",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork1",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "muli0",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork2",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
+    "slots": 4,
+    "type": "fifo_break_none"
   },
   {
     "pred": "addi0",
     "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork7",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 4,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 5,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 6,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 8,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 9,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 10,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 11,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 12,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 13,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 14,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 15,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 16,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 17,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 18,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 19,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 20,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 21,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 23,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 24,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 3,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 4,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 5,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 6,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 7,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 8,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 9,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 11,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork17",
-    "outid": 12,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork16",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork16",
-    "outid": 1,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "trunci0",
-    "outid": 0,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 2,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 7,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 25,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "fork14",
-    "outid": 22,
-    "slots": 16,
-    "type": "tehb"
-  },
-  {
-    "pred": "cmpi0",
-    "outid": 0,
-    "slots": 1,
-    "type": "tehb"
+    "slots": 4,
+    "type": "fifo_break_none"
   }
 ]
