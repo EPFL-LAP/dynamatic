@@ -1,4 +1,5 @@
 from generators.handshake.fork import generate_fork
+from generators.handshake.tehb import generate_tehb
 from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
 
 
@@ -756,6 +757,7 @@ def _generate_speculator(name, bitwidth, fifo_depth):
   decodeSC_name = f"{name}_decodeSC"
   decodeOutput_name = f"{name}_decodeOutput"
   decodeBranch_name = f"{name}_decodeBranch"
+  tehb_name = f"{name}_tehb"
 
   dependencies = \
       generate_fork(data_fork_name, {
@@ -774,7 +776,8 @@ def _generate_speculator(name, bitwidth, fifo_depth):
       _generate_decodeCommit(decodeCommit_name) + \
       _generate_decodeSC(decodeSC_name) + \
       _generate_decodeOutput(decodeOutput_name) + \
-      _generate_decodeBranch(decodeBranch_name)
+      _generate_decodeBranch(decodeBranch_name) + \
+      generate_tehb(tehb_name, {"bitwidth": 3})
 
   entity = f"""
 library ieee;
@@ -839,6 +842,10 @@ architecture arch of {name} is
   signal specgenCore_control_outs : std_logic_vector(2 downto 0);
   signal specgenCore_control_outs_valid : std_logic;
   signal specgenCore_control_outs_ready : std_logic;
+
+  signal tehb_control_outs : std_logic_vector(2 downto 0);
+  signal tehb_control_outs_valid : std_logic;
+  signal tehb_control_outs_ready : std_logic;
 
   signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
   signal predFifo_data_out_valid : std_logic;
@@ -927,13 +934,25 @@ begin
       data_out_ready => predFifo_data_out_ready
     );
 
-  fork0: entity work.{control_fork_name}(arch)
+  tehb: entity work.{tehb_name}(arch)
     port map (
       clk => clk,
       rst => rst,
       ins => specgenCore_control_outs,
       ins_valid => specgenCore_control_outs_valid,
       ins_ready => specgenCore_control_outs_ready,
+      outs => tehb_control_outs,
+      outs_valid => tehb_control_outs_valid,
+      outs_ready => tehb_control_outs_ready
+    );
+
+  fork0: entity work.{control_fork_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      ins => tehb_control_outs,
+      ins_valid => tehb_control_outs_valid,
+      ins_ready => tehb_control_outs_ready,
       outs => fork_control_outs,
       outs_valid => fork_control_outs_valid,
       outs_ready => fork_control_outs_ready
