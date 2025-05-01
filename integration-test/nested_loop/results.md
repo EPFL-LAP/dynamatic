@@ -6,4 +6,4 @@ The result matched that of Haoran's thesis.
 |----------------------------------------|------------------|-------------------|
 | II of the inner loop (Haoran’s thesis) | 6                | 1                 |
 | II of the inner loop                   | 6                | 1                 |
-| Cycles (Test Bench)                    | 2423 (End: 2421) | 443 (End: 439)    |
+| Cycles (Test Bench)                    | 2423 (End: 2421) | 442 (End: 439)    |

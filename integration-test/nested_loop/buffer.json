@@ -40,5 +40,11 @@
     "outid": 0,
     "slots": 4,
     "type": "fifo_break_none"
+  },
+  {
+    "pred": "cmpi0",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none"
   }
 ]
