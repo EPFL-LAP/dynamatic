@@ -144,4 +144,5 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
       },
       ],
       "extra_signals": extra_signals
-  }, lambda name: _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth))
+  }, lambda name: _generate_untagger_dataless(name, current_tag, tag_bitwidth) if data_bitwidth == 0
+      else _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth))

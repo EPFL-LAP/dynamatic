@@ -183,4 +183,7 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
       },
       ],
       "extra_signals": extra_signals
-  }, lambda name: _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth))
+  }, lambda name: _generate_tagger_dataless(name, current_tag, tag_bitwidth) if data_bitwidth == 0
+      else _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth))
+
+
