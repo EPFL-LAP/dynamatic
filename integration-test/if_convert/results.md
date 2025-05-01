@@ -6,4 +6,4 @@ The optimal II was achieved with speculation.
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 7                | 1                 |
 | II                   | 6                | 1                 |
-| Cycles (Test Bench)  | 1129 (End: 1127) | 309 (End: 307)    |
+| Cycles (Test Bench)  | 1129 (End: 1127) | 319 (End: 317)    |
