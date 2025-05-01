@@ -776,7 +776,10 @@ def _generate_speculator(name, bitwidth, fifo_depth):
       _generate_decodeSC(decodeSC_name) + \
       _generate_decodeOutput(decodeOutput_name) + \
       _generate_decodeBranch(decodeBranch_name) + \
-      generate_tehb(tehb_name, {"bitwidth": 3})
+      generate_tehb(tehb_name, {
+          "bitwidth": bitwidth,
+          "extra_signals": {"internal_ctrl": 3, "spec": 1}
+      })
 
   entity = f"""
 library ieee;
@@ -834,6 +837,8 @@ architecture arch of {name} is
   signal predictor_data_out_spec : std_logic_vector(0 downto 0);
   signal predictor_data_out_ready : std_logic;
 
+  signal specgenCore_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal specgenCore_outs_spec : std_logic_vector(0 downto 0);
   signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
   signal specgenCore_fifo_outs_valid : std_logic;
   signal specgenCore_fifo_outs_ready : std_logic;
@@ -888,8 +893,8 @@ begin
       fifo_ins_valid => predFifo_data_out_valid,
       fifo_ins_ready => predFifo_data_out_ready,
 
-      outs => outs,
-      outs_spec => outs_spec,
+      outs => specgenCore_outs,
+      outs_spec => specgenCore_outs_spec,
 
       fifo_outs => specgenCore_fifo_outs,
       fifo_outs_valid => specgenCore_fifo_outs_valid,
@@ -937,10 +942,14 @@ begin
     port map (
       clk => clk,
       rst => rst,
-      ins => specgenCore_control_outs,
+      ins => specgenCore_outs,
+      ins_spec => specgenCore_outs_spec,
+      ins_internal_ctrl => specgenCore_control_outs,
       ins_valid => specgenCore_control_outs_valid,
       ins_ready => specgenCore_control_outs_ready,
-      outs => tehb_control_outs,
+      outs => outs,
+      outs_spec => outs_spec,
+      outs_internal_ctrl => tehb_control_outs,
       outs_valid => tehb_control_outs_valid,
       outs_ready => tehb_control_outs_ready
     );
