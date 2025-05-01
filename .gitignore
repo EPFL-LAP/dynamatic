@@ -41,9 +41,6 @@ bin/
 __pycache__/
 cs
 
-# Directory for external binaries
-ext/
-
 # Scala/Metals-related
 .metals/
 .scala-build/

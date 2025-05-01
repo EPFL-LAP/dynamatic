@@ -108,8 +108,7 @@ int runNuXmv(const std::filesystem::path &cmdPath,
 }
 
 // For the equivalence checking to work a modified NuSMV is required.
-// Install with:
-// bash utils/get-NuSMV.sh
+// Run build.sh with the --enable-leq-binaries flag
 int runNuSMV(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
   std::string command = "ext/NuSMV -source " + cmdPath.string();
@@ -117,8 +116,8 @@ int runNuSMV(const std::filesystem::path &cmdPath,
 
   // Check if bits 15-8 are set to 0x7F. In this case the command was not found.
   if (exitCode == -1) {
-    llvm::errs() << "NuSMV not found. Run \"bash utils/get-NuSMV.sh\" to "
-                    "install NuSMV.\n";
+    llvm::errs() << "NuSMV not found. Run build.sh with the "
+                    "--enable-leq-binaries flag\n";
   }
   return exitCode;
 }
@@ -163,16 +162,15 @@ handshake2smv(const std::filesystem::path &mlirPath,
   // The current implementation of dot2smv uses the hardcoded name "model.smv"
   // in the dotfile's directory.
   // For the conversion to work dot2smv is required.
-  // Install with:
-  // bash utils/get-dot2smv.sh
+  // Run build.sh with the --enable-leq-binaries flag
   std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
   cmd = "python3 ext/dot2smv/dot2smv " + dotFile.string();
   ret = executeWithRedirect(cmd, "/dev/null");
   // Check if bits 15-8 are set to 0x7F. In this case the command was not
   // found.
   if (ret == -1) {
-    llvm::errs() << "dot2smv not found. Run \"bash utils/get-dot2smv.sh\" to "
-                    "download dot2smv.\n";
+    llvm::errs() << "dot2smv not found. Run build.sh with the "
+                    "--enable-leq-binaries flag\n";
   }
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
