@@ -933,7 +933,12 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp))
     return;
 
+  // The consumer block is the block which contains the consumer
   Block *consumerBlock = consumerOp->getBlock();
+  // The producer block is the block which ontains the producer, and it
+  // corresponds to the parent block of the operand. Since the operand might
+  // have no producer operation (if it is a function arguement) then this is the
+  // only way to get the relevant information.
   Block *producerBlock = operand.getParentBlock();
 
   // If the consumer and the producer are in the same block without the
@@ -944,6 +949,9 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
+    // A conditional branch should undergo the suppression mechanism only if it
+    // has the `FTD_NEW_SUPP` annotation, set in `addMoreSuppressionInLoop`. In
+    // any other cases, suppressing a branch ends up with incorrect results.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         !producerOp->hasAttr(FTD_NEW_SUPP))
       return;
@@ -1117,6 +1125,9 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
     ArrayRef<Gate *> phis = gsa.getGatesPerBlock(&block);
     for (Gate *phi : phis) {
 
+      // `getGatesPerBlock` returns all the gates related to the block, both in
+      // the SSA format (phis) and GSA (gammas and mus). Since we are only
+      // interested in the latter two gates, we skip phis.
       if (phi->gsaGateFunction == PhiGate)
         continue;
 

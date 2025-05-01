@@ -121,6 +121,7 @@ static void channelifyMuxes(handshake::FuncOp &funcOp) {
 
 /// Converts undefined operations (LLVM::UndefOp) with a default "0"
 /// constant triggered by the start signal of the corresponding function.
+/// This is usually associated to uninitialized variables in the code
 static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
                                             handshake::FuncOp &funcOp,
                                             NameAnalysis &namer) {
@@ -193,6 +194,9 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
     rewriter.setInsertionPoint(cstOp);
 
+    // This variable will work as activation value for the constant. If the
+    // constant is considered as sourcable, this will be the output of a source
+    // component, otherwise it remains startValue
     auto controlValue = startValue;
 
     if (isCstSourcable(cstOp)) {
@@ -201,8 +205,7 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
       controlValue = sourceOp.getResult();
     }
 
-    // Convert the constant to the handshake equivalent, using the start value
-    // as control signal
+    // Continue the conversion by obtaining the size of the constnat
     TypedAttr valueAttr = cstOp.getValue();
 
     if (isa<IndexType>(valueAttr.getType())) {
@@ -236,7 +239,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // Add the muxes as obtained by the GSA analysis pass
+  // Add the muxes as obtained by the GSA analysis pass. This requires the start
+  // value, as init merges need it as one of their output. However, the start
+  // value is not available yet here, so a backedge is adopted instead.
   BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
