@@ -242,16 +242,16 @@ void BufferPlacementMILP::addChannelPathConstraints(
 }
 
 void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
-                                                 SignalType signal,
+                                                 SignalType signalType,
                                                  ChannelFilter filter) {
   // Add path constraints for units
   double latency;
-  if (failed(timingDB.getLatency(unit, signal, latency)))
+  if (failed(timingDB.getLatency(unit, signalType, latency)))
     latency = 0.0;
 
   if (latency == 0.0) {
     double delay;
-    if (failed(timingDB.getTotalDelay(unit, signal, delay)))
+    if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
       delay = 0.0;
 
     // The unit is not pipelined, add a path constraint for each input/output
@@ -262,11 +262,11 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
         return;
 
       // Flip channels on ready path which goes upstream
-      if (signal == SignalType::READY)
+      if (signalType == SignalType::READY)
         std::swap(in, out);
 
-      GRBVar &tInPort = vars.channelVars[in].signalVars[signal].path.tOut;
-      GRBVar &tOutPort = vars.channelVars[out].signalVars[signal].path.tIn;
+      GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
+      GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
       model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
@@ -284,10 +284,10 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
       continue;
 
     double inPortDelay;
-    if (failed(timingDB.getPortDelay(unit, signal, PortType::IN, inPortDelay)))
+    if (failed(timingDB.getPortDelay(unit, signalType, PortType::IN, inPortDelay)))
       inPortDelay = 0.0;
 
-    TimeVars &path = vars.channelVars[in].signalVars[signal].path;
+    TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
     GRBVar &tInPort = path.tOut;
     // Arrival time at unit's input port + input port delay must be less
     // than the target clock period
@@ -300,10 +300,10 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
       continue;
 
     double outPortDelay;
-    if (failed(timingDB.getPortDelay(unit, signal, PortType::OUT, outPortDelay)))
+    if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT, outPortDelay)))
       outPortDelay = 0.0;
 
-    TimeVars &path = vars.channelVars[out].signalVars[signal].path;
+    TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
     GRBVar &tOutPort = path.tIn;
     // Arrival time at unit's output port is equal to the output port delay
     model.addConstr(tOutPort == outPortDelay, "path_outDelay");
