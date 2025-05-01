@@ -31,8 +31,6 @@ module cond_br_dataless (
 	join_type #(
 		.SIZE(2)
 	) join_branch (
-    .clk        (clk               ),
-    .rst        (rst               ),
 		.ins_valid  (ins_valid_vec     ),
 		.outs_ready (branch_ready      ),
 		.ins_ready  (ins_ready_vec     ),
