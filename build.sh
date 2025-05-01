@@ -27,6 +27,8 @@ List of options:
                                          building llvm (defaults to 2)
   --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
   --experimental-enable-xls            : enable experimental xls integration
+  --enable-leq-binaries                : download binaries for elastic-miter equivalence
+                                         checking
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -192,7 +194,6 @@ do
               CMAKE_DYNAMATIC_ENABLE_XLS="-DDYNAMATIC_ENABLE_XLS=ON"
               ;;
           "--enable-leq-binaries")
-              ENABLE_XLS_INTEGRATION=1
               CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES="-DDYNAMATIC_ENABLE_LEQ_BINARIES=ON"
               ;;
           "--help" | "-h")
