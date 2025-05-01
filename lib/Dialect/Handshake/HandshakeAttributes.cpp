@@ -154,8 +154,8 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
 // TimingInfo(Attr)
 //===----------------------------------------------------------------------===//
 
-std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
-  switch (type) {
+std::optional<unsigned> TimingInfo::getLatency(SignalType signalType) {
+  switch (signalType) {
   case SignalType::DATA:
     return dataLatency;
   case SignalType::VALID:
@@ -165,8 +165,8 @@ std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
   }
 }
 
-TimingInfo &TimingInfo::setLatency(SignalType type, unsigned latency) {
-  switch (type) {
+TimingInfo &TimingInfo::setLatency(SignalType signalType, unsigned latency) {
+  switch (signalType) {
   case SignalType::DATA:
     dataLatency = latency;
     break;
@@ -258,9 +258,9 @@ void TimingAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << " {";
 
   TimingInfo info = getInfo();
-  auto printIfPresent = [&](StringRef name, SignalType type,
+  auto printIfPresent = [&](StringRef name, SignalType signalType,
                             bool &firstData) -> void {
-    std::optional<unsigned> latency = info.getLatency(type);
+    std::optional<unsigned> latency = info.getLatency(signalType);
     if (!latency)
       return;
     if (!firstData)
