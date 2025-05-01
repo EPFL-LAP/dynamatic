@@ -171,7 +171,7 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   # which support to print larger sets of reachable states
   set(EXT_BIN_DIR "${DYNAMATIC_SOURCE_DIR}/ext")
   file(DOWNLOAD
-      https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.0/NuSMV
+      https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.1/NuSMV
       ${EXT_BIN_DIR}/NuSMV
   )
   file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
