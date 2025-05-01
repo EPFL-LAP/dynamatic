@@ -197,7 +197,7 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
-export_cfg "$F_CF" "${KERNEL_NAME}_CFG"
+export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
