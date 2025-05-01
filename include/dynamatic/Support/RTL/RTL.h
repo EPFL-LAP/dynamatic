@@ -306,9 +306,6 @@ public:
   void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                      llvm::StringRef modName,
                                      hw::ModuleType &modType);
-  void registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
-                                  llvm::StringRef modName,
-                                  hw::ModuleType &modType);
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the

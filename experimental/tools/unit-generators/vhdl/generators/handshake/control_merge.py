@@ -11,20 +11,11 @@ def generate_control_merge(name, params):
   data_bitwidth = params["data_bitwidth"]
   index_bitwidth = params["index_bitwidth"]
 
-  # List of extra signals for each data input port
-  # Each element is a dictionary where key: extra signal name, value: bitwidth
-  # e.g., [{"tag0": 8, "spec": 1}, {"tag0": 8}]
-  input_extra_signals_list = params["input_extra_signals_list"]
   # e.g., {"tag0": 8, "spec": 1}
-  output_extra_signals = params["output_extra_signals"]
-  index_extra_signals = params["index_extra_signals"]
+  extra_signals = params["extra_signals"]
 
-  # List of indices of input ports that have spec bit
-  # e.g., [0]
-  spec_inputs = params["spec_inputs"]
-
-  if output_extra_signals:
-    return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs)
+  if extra_signals:
+    return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
   elif data_bitwidth == 0:
     return _generate_control_merge_dataless(name, size, index_bitwidth)
   else:
@@ -177,9 +168,9 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, input_extra_signals_list, output_extra_signals, index_extra_signals, spec_inputs):
+def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      output_extra_signals)
+      extra_signals)
   return generate_signal_manager(name, {
       "type": "bbmerge",
       "in_ports": [{
@@ -187,23 +178,19 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
           "bitwidth": data_bitwidth,
           "2d": True,
           "size": size,
-          "extra_signals_list": input_extra_signals_list
+          "extra_signals": extra_signals
       }],
       "out_ports": [{
           "name": "index",
           "bitwidth": index_bitwidth,
           # TODO: Extra signals for index port are not tested
-          "extra_signals": index_extra_signals
+          "extra_signals": extra_signals
       }, {
           "name": "outs",
           "bitwidth": data_bitwidth,
-          "extra_signals": output_extra_signals
+          "extra_signals": extra_signals
       }],
-      "size": size,
-      "data_in_name": "ins",
       "index_name": "index",
       "index_dir": "out",
-      "index_extra_signals": index_extra_signals,
-      "out_extra_signals": output_extra_signals,
-      "spec_inputs": spec_inputs
+      "extra_signals": extra_signals
   }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))

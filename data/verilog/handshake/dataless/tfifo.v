@@ -11,14 +11,12 @@ module tfifo_dataless #(
   output outs_valid,
   input  outs_ready
 );
-  wire mux_sel;
   wire fifo_valid, fifo_ready;
   wire fifo_pvalid, fifo_nready;
 
   assign outs_valid = ins_valid || fifo_valid;
   assign ins_ready = fifo_ready || outs_ready;
   assign fifo_pvalid = ins_valid && (!outs_ready || fifo_valid);
-  assign mux_sel = fifo_valid;
   assign fifo_nready = outs_ready;
 
   elastic_fifo_inner_dataless #(

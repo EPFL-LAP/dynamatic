@@ -1104,6 +1104,12 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
   TypeRange resultTypes;
+  // Vectors storing indices of classified arguments
+  SmallVector<unsigned> InstanceOpInputIndices;
+  SmallVector<unsigned> InstanceOpOutputIndices;
+  SmallVector<unsigned> InstanceOpParameterIndices;
+  // Maps output argument index -> list of operations that consume its value
+  llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   if (!calledHandshakeFuncOp) {
@@ -1112,6 +1118,30 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
     if (!calledFuncOp)
       return callOp->emitError() << "call does not reference a function";
+    // Classify arguments based on naming convention
+    for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
+      auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
+      if (nameAttr.getValue().starts_with("input_")) {
+        InstanceOpInputIndices.push_back(i);
+      } else if (nameAttr.getValue().starts_with("output_")) {
+        InstanceOpOutputIndices.push_back(i);
+        // For each output argument index, find all operations that consume its value
+        // and store the mapping in OutputConnections
+        Value outputArg = callOp.getOperand(i);
+        auto &fanouts = OutputConnections[i];
+        for(auto &use : outputArg.getUses()){
+          Operation* user = use.getOwner();
+          if(user != callOp){
+            fanouts.push_back(user);
+          }
+        }
+      } else if (nameAttr.getValue().starts_with("parameter_")) {
+        InstanceOpParameterIndices.push_back(i);
+      } else {
+        llvm::errs() << "Argument " << i << " does not follow the naming convention\n";
+        assert(false && "Invalid argument naming");
+      }
+    }
     resultTypes = calledFuncOp.getFunctionType().getResults();
   } else {
     resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
