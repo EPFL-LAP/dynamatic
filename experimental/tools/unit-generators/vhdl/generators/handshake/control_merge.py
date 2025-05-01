@@ -192,6 +192,5 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
       }],
       "index_name": "index",
       "index_dir": "out",
-      "index_extra_signals": extra_signals,
-      "data_extra_signals": extra_signals
+      "extra_signals": extra_signals
   }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))

@@ -475,9 +475,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (modName == "handshake.mux") {
-    serializedParams["INDEX_EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getInputType(0));
-    serializedParams["DATA_EXTRA_SIGNALS"] =
+    serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(1));
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram" ||
