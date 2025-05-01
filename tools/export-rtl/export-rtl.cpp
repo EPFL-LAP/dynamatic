@@ -21,6 +21,7 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -71,6 +72,10 @@ static cl::opt<std::string> outputDir(cl::Positional, cl::Required,
 static cl::opt<std::string> dynamaticPath("dynamatic-path", cl::Optional,
                                           cl::desc("<path to Dynamatic>"),
                                           cl::init("."), cl::cat(mainCategory));
+
+static cl::opt<std::string> propertyFilename("property-database", cl::Optional,
+                                             cl::desc("<property file>"),
+                                             cl::cat(mainCategory));
 
 static cl::opt<HDL>
     hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
@@ -143,6 +148,21 @@ struct ExportInfo {
       delete match;
   }
 };
+
+/// Aggregates information needed to generate formal properties
+struct FormalPropertyInfo {
+  /// The table parsed from JSON-formatted files.
+  FormalPropertyTable &table;
+  /// Output directory (without trailing separators).
+  StringRef outputPath;
+  /// Path for the json ObjectMapper
+  llvm::json::Path::Root jsonRoot;
+  llvm::json::Path jsonPath;
+
+  FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
+      : table(table), outputPath(outputPath), jsonRoot(outputPath),
+        jsonPath(jsonRoot) {};
+};
 } // namespace
 
 LogicalResult ExportInfo::concretizeExternalModules() {
@@ -209,6 +229,9 @@ struct WriteModData {
   llvm::MapVector<Value, std::string> signals;
   /// List of SSA values feeding the module's output ports.
   SmallVector<Value> outputs;
+  /// Maps each property ID to the corresponding property and tag
+  std::unordered_map<long unsigned, std::pair<std::string, FormalProperty::TAG>>
+      properties;
 
   /// Constructs from the module being exported and from the stream to write the
   /// RTL implementation to.
@@ -236,6 +259,14 @@ struct WriteModData {
   /// Writes signal assignments between the top-level module's outputs and
   /// the implementation's internal signals.
   void writeSignalAssignments(SignalAssignmentWriter writeAssignment);
+
+  using PropertyWriter = void (*)(const unsigned long &id,
+                                  const std::string &property,
+                                  FormalProperty::TAG tag,
+                                  raw_indented_ostream &os);
+
+  /// Writes properties
+  void writeProperties(PropertyWriter writeProperty);
 
   /// Returns a function that maps SSA values to the name of the internal RTl
   /// signal that corresponds to it. The returned function asserts if the value
@@ -283,12 +314,14 @@ public:
 
   /// Export information (external modules must have already been concretized).
   ExportInfo &exportInfo;
+  /// Formal property information
+  FormalPropertyInfo &propertyInfo;
   // The HDL in which to write the module.
   HDL hdl;
 
   /// Creates the RTL writer.
-  RTLWriter(ExportInfo &exportInfo, HDL hdl)
-      : exportInfo(exportInfo), hdl(hdl) {};
+  RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -504,6 +537,12 @@ void WriteModData::writeSignalAssignments(
         });
   }
 }
+
+void WriteModData::writeProperties(PropertyWriter writeProperty) {
+  for (auto const &[id, property] : properties) {
+    writeProperty(id, property.first, property.second, os);
+  }
+};
 
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
@@ -986,6 +1025,9 @@ private:
   /// Creates internal signals that in SMV directly reference the unit to be
   /// connected: component_name.port_name
   LogicalResult createInternalSignals(WriteModData &data) const override;
+  /// Associates each property ID with the textual representation of the
+  /// property and tag
+  LogicalResult createProperties(WriteModData &data) const;
   /// Writes all module instantiations inside the entity's architecture.
   void writeModuleInstantiations(WriteModData &data) const;
   /// Writes the preprocessor directives to include the external modules
@@ -1047,6 +1089,49 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
   return success();
 }
 
+LogicalResult SMVWriter::createProperties(WriteModData &data) const {
+  for (const auto &[i, property] :
+       llvm::enumerate(propertyInfo.table.getProperties())) {
+
+    FormalProperty::TYPE propertyType = property.getType();
+    FormalProperty::TAG propertyTag = property.getTag();
+
+    auto path = propertyInfo.jsonPath.index(i);
+    llvm::json::ObjectMapper mapper(property.getInfo(), path);
+
+    if (propertyType == FormalProperty::TYPE::AOB) {
+      std::string owner, ownerChannel, user, userChannel;
+      if (!mapper || !mapper.mapOptional("owner", owner) ||
+          !mapper.mapOptional("owner_channel", ownerChannel) ||
+          !mapper.mapOptional("user", user) ||
+          !mapper.mapOptional("user_channel", userChannel)) {
+        return failure();
+      }
+      std::string validSignal = owner + "." + ownerChannel + "_valid";
+      std::string readySignal = user + "." + userChannel + "_ready";
+
+      data.properties[property.getId()] = {validSignal + " -> " + readySignal,
+                                           propertyTag};
+
+    } else if (propertyType == FormalProperty::TYPE::VEQ) {
+      std::string owner, ownerChannel, target, targetChannel;
+      if (!mapper || !mapper.mapOptional("owner", owner) ||
+          !mapper.mapOptional("owner_channel", ownerChannel) ||
+          !mapper.mapOptional("target", target) ||
+          !mapper.mapOptional("target_channel", targetChannel)) {
+        return failure();
+      }
+      std::string validSignal1 = owner + "." + ownerChannel + "_valid";
+      std::string validSignal2 = target + "." + targetChannel + "_valid";
+
+      data.properties[property.getId()] = {
+          validSignal1 + " <-> " + validSignal2, propertyTag};
+    } else
+      return failure();
+  }
+  return success();
+}
+
 void SMVWriter::constructIOMappings(
     hw::InstanceOp instOp, hw::HWModuleLike modOp,
     const FGetValueName &getValueName,
@@ -1059,10 +1144,10 @@ void SMVWriter::constructIOMappings(
   };
   auto addReady = [&](StringRef port, OpResult res) -> void {
     // To get the name of the ready signal we can't use the inetrnal signal
-    // name. We need to get the user of the signal, and search the name of the
-    // corresponding port.
-    // Example: unit_tx -> [channel] -> unit_rx
-    //          The ready signal needs the name of the user unit_rx.ins_ready
+    // name. We need to get the user of the signal, and search the name of
+    // the corresponding port. Example: unit_tx -> [channel] -> unit_rx
+    //          The ready signal needs the name of the user
+    //          unit_rx.ins_ready
     auto *userOp = *res.getUsers().begin();
     unsigned operandIndex = 0;
     for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
@@ -1154,6 +1239,8 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   WriteModData data(modOp, os);
   if (failed(createInternalSignals(data)))
     return failure();
+  if (failed(createProperties(data)))
+    return failure();
 
   writeIncludes(data);
   os << "\n\n";
@@ -1173,6 +1260,13 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   data.writeSignalAssignments([](const llvm::Twine &src, const llvm::Twine &dst,
                                  raw_indented_ostream &os) {
     os << "DEFINE " << dst << " := " << src << ";\n";
+  });
+
+  os << "\n// properties\n";
+  data.writeProperties([](const unsigned long &id, const std::string &property,
+                          FormalProperty::TAG tag, raw_indented_ostream &os) {
+    if (tag == FormalProperty::TAG::OPT)
+      os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
   });
 
   return success();
@@ -1232,8 +1326,8 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
 
 /// Writes the RTL implementation corresponding to the hardware module in a
 /// file named like the module inside the output directory. Fails if the
-/// output file cannot be created or if the module cannot be converted to RTL;
-/// succeeds otherwise.
+/// output file cannot be created or if the module cannot be converted to
+/// RTL; succeeds otherwise.
 static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
   // Open the file in which we will create the module, it is named like the
   // module itself
@@ -1300,17 +1394,24 @@ int main(int argc, char **argv) {
   if (failed(info.concretizeExternalModules()))
     return 1;
 
+  // Pull all the properties from the property database
+  FormalPropertyTable table;
+  if (failed(table.addPropertiesFromJSON(propertyFilename)))
+    llvm::errs() << "[WARNING] Formal property retrieval failed\n";
+
+  FormalPropertyInfo propertyInfo(table, outputPath);
+
   // Create an RTL writer
   RTLWriter *writer;
   switch (hdl) {
   case HDL::VHDL:
-    writer = new VHDLWriter(info, hdl);
+    writer = new VHDLWriter(info, propertyInfo, hdl);
     break;
   case HDL::VERILOG:
-    writer = new VerilogWriter(info, hdl);
+    writer = new VerilogWriter(info, propertyInfo, hdl);
     break;
   case HDL::SMV:
-    writer = new SMVWriter(info, hdl);
+    writer = new SMVWriter(info, propertyInfo, hdl);
     break;
   }
 
