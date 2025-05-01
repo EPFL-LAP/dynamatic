@@ -83,17 +83,17 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
 
       propertyTable.push_back(json::Value(json::Object{
           {"id", uid},
-          {"name", "VEQ"},
+          {"type", "veq"},
           {"info",
            json::Value(json::Object{
                {"owner", op1.getAttrOfType<StringAttr>("handshake.name").str()},
                {"target",
                 op2.getAttrOfType<StringAttr>("handshake.name").str()},
                {"owner_index", i},
-               {"tagert_index", j},
+               {"target_index", j},
                {"owner_channel", namer1.getOutputName(i).str()},
                {"target_channel", namer2.getOutputName(j).str()}})},
-          {"tag", "optimization"},
+          {"tag", "opt"},
           {"check", "unchecked"}}));
       uid++;
     }
@@ -149,7 +149,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
 
           propertyTable.push_back(json::Value(json::Object{
               {"id", uid},
-              {"name", "AOB"},
+              {"type", "aob"},
               {"info",
                json::Value(json::Object{
                    {"owner",
@@ -161,7 +161,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
                    {"owner_channel", namer.getOutputName(resIndex).str()},
                    {"user_channel",
                     userNamer.getInputName(operandIndex).str()}})},
-              {"tag", "optimization"},
+              {"tag", "opt"},
               {"check", "unchecked"}}));
           uid++;
         }
