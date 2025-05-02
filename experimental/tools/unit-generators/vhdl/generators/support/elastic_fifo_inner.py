@@ -4,11 +4,12 @@ def generate_elastic_fifo_inner(name, params):
     bitwidth = params["bitwidth"]
   else:
     bitwidth = 0
+  initialized = params.get("initialized", False)
 
   if bitwidth == 0:
     return _generate_elastic_fifo_inner_dataless(name, size)
   else:
-    return _generate_elastic_fifo_inner(name, size, bitwidth)
+    return _generate_elastic_fifo_inner(name, size, bitwidth, initialized)
 
 
 def _generate_elastic_fifo_inner_dataless(name, size):
@@ -153,7 +154,28 @@ end architecture;
   return entity + architecture
 
 
-def _generate_elastic_fifo_inner(name, size, bitwidth):
+def _generate_elastic_fifo_inner(name, size, bitwidth, initialized):
+  if initialized:
+    fifo_valid_init = "'1'"
+    memory_init_code = (
+        "for i in Memory'range loop\n"
+        "  Memory(i) <= std_logic_vector(to_unsigned(i, Memory(i)'length));\n"
+        "end loop;"
+    )
+    tail_init = f"{size} - 1"
+    full_init = "'1'"
+    empty_init = "'0'"
+  else:
+    fifo_valid_init = "'0'"
+    memory_init_code = (
+        "for i in Memory'range loop\n"
+        "  Memory(i) <= (others => '0');\n"
+        "end loop;"
+    )
+    tail_init = "0"
+    full_init = "'0'"
+    empty_init = "'1'"
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -205,7 +227,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        fifo_valid <= '0';
+        fifo_valid <= {fifo_valid_init};
       else
         if (ReadEn = '1') then
           fifo_valid <= '1';
@@ -220,9 +242,7 @@ begin
   begin
     if rising_edge(clk) then
       if (rst = '1') then
-        for i in Memory'range loop
-          Memory(i) <= (others => '0');
-        end loop;
+        {memory_init_code}
       else
         if (WriteEn = '1') then
           -- Write Data to Memory
@@ -238,7 +258,7 @@ begin
   begin
     if rising_edge(clk) then
       if (rst = '1') then
-        Tail <= 0;
+        Tail <= {tail_init};
       else
         if (WriteEn = '1') then
           Tail <= (Tail + 1) mod {size};
@@ -268,7 +288,7 @@ begin
   begin
     if rising_edge(clk) then
       if (rst = '1') then
-        Full <= '0';
+        Full <= {full_init};
       else
         -- if only filling but not emptying
         if (WriteEn = '1') and (ReadEn = '0') then
@@ -291,7 +311,7 @@ begin
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        Empty <= '1';
+        Empty <= {empty_init};
       else
         -- if only emptying but not filling
         if (WriteEn = '0') and (ReadEn = '1') then

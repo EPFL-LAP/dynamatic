@@ -64,6 +64,7 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
     bitwidth = port["bitwidth"]
     extra_signals = port.get("extra_signals", {})
     port_2d = port.get("2d", False)
+    handshaked = port.get("handshaked", True)
 
     if not port_2d:
       # Usual case
@@ -73,8 +74,11 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
         port_decls.append(
             f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
 
-      port_decls.append(f"    {name}_valid : {dir} std_logic")
-      port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+      # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+      # because they come from the extra signals of the data
+      if handshaked:
+        port_decls.append(f"    {name}_valid : {dir} std_logic")
+        port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
 
       # Generate extra signals for this input port
       for signal_name, signal_bitwidth in extra_signals.items():
@@ -132,6 +136,16 @@ def _get_default_extra_signal_value(extra_signal_name: str):
 def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signals)
+  
+  """
+  Tags are guaranteed to be the same across all input ports.
+  We can use the first input port's tag for all output ports.
+  """
+  if signal_name.startswith("tag"):
+    if in_extra_signals:
+      return in_extra_signals[0]
+    else:
+      raise ValueError("{signal_name} requires at least one signal")
 
   raise ValueError(
       f"Unsupported forwarding method for extra signal: {signal_name}")
@@ -180,13 +194,17 @@ def generate_inner_port_forwarding(ports) -> str:
   for port in ports:
     port_name = port["name"]
     bitwidth = port["bitwidth"]
+    handshaked = port.get("handshaked", True)
 
     # Forward data if present
     if bitwidth > 0:
       forwardings.append(f"      {port_name} => {port_name}")
 
-    forwardings.append(f"      {port_name}_valid => {port_name}_valid")
-    forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+    # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+    # because they come from the extra signals of the data
+    if handshaked:
+      forwardings.append(f"      {port_name}_valid => {port_name}_valid")
+      forwardings.append(f"      {port_name}_ready => {port_name}_ready")
 
   return ",\n".join(forwardings).lstrip()
 
@@ -203,11 +221,19 @@ def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> s
   extra_signal_assignments = []
   for out_port in out_ports:
     port_name = out_port["name"]
+    port_2d = out_port.get("2d", False)
 
-    # Assign all extra signals to this output port
-    for signal_name in extra_signals:
-      extra_signal_assignments.append(
-          f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+    if not port_2d:
+      # Assign all extra signals to this output port
+      for signal_name in extra_signals:
+        extra_signal_assignments.append(
+            f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+    else:
+      port_size = out_port["size"]
+      for signal_name in extra_signals:
+        for i in range(port_size):
+          extra_signal_assignments.append(
+            f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
   return "\n".join(extra_signal_assignments).lstrip()
 
 

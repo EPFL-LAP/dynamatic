@@ -158,10 +158,12 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType) 
+            auto optBufferType =
+                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType)
               return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
+            if (auto bufferTypeAttr =
+                    dyn_cast<StringAttr>(optBufferType->getValue())) {
               std::string bufferTypeStr = bufferTypeAttr.getValue().str();
               if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
                 return "DV" + numSlotsStr;
@@ -286,12 +288,13 @@ static StringRef getNodeColor(Operation *op) {
             handshake::StoreOp>([&](auto) { return "coral"; })
       .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
           [&](auto) { return "lightblue"; })
-      .Case<handshake::BranchOp, handshake::ConditionalBranchOp>(
-          [&](auto) { return "tan2"; })
+      .Case<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::DemuxOp>([&](auto) { return "tan2"; })
       .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
             handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
-            handshake::SpeculatingBranchOp, handshake::NonSpecOp>(
-          [&](auto) { return "salmon"; })
+            handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
+      .Case<handshake::TaggerOp, handshake::UntaggerOp,
+            handshake::FreeTagsFifoOp>([&](auto) { return "cyan"; })
       .Default([&](auto) { return "moccasin"; });
 }
 

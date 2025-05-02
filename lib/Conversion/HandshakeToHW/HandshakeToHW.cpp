@@ -105,7 +105,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -320,7 +320,7 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name){
+                                          StringRef name) {
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -540,6 +540,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::JoinOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
+        addType("DATA_TYPE", op->getResult(0));
       })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
             handshake::NDWireOp>([&](auto) {
@@ -551,6 +552,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Bitwidth
             addType("DATA_TYPE", cbrOp.getDataOperand());
           })
+      .Case<handshake::DemuxOp>([&](handshake::DemuxOp demuxOp) {
+        // Number of output data channels, data bitwidth, and select bitwidth
+        addUnsigned("SIZE", demuxOp->getResults().size());
+        addType("DATA_TYPE", demuxOp.getDataOperand());
+        addType("SELECT_TYPE", demuxOp.getSelectOperand());
+      })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
         // default case for sources
@@ -677,10 +684,31 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::SpeculatingBranchOp, handshake::NonSpecOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::SpecSaveCommitOp>(
-          [&](handshake::SpecSaveCommitOp saveCommitOp) {
-            addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
-          })
+      .Case<handshake::SpecSaveCommitOp>([&](auto) {
+        // TODO: Determine the FIFO size based on speculation resolution delay.
+        addUnsigned("FIFO_DEPTH", 32);
+      })
+      .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
+        // Data bitwidth
+        addType("DATA_TYPE", taggerOp.getDataOperand());
+        addType("TAG_TYPE", taggerOp.getTagOperand());
+      })
+      .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
+        addType("DATA_TYPE", untaggerOp.getDataOperand());
+        addType("TAG_TYPE", untaggerOp.getTagOut());
+      })
+      .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
+        // Tag bitwidth and fifo depth
+        addType("TAG_TYPE", fifo.getTagOut());
+        ChannelType ct =
+            dyn_cast_or_null<ChannelType>(fifo.getTagOut().getType());
+        if (!ct) {
+          op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
+          unsupported = true;
+          return;
+        }
+        addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -798,7 +826,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1800,6 +1828,7 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::DemuxOp>,
 
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
@@ -1836,7 +1865,11 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
                     ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-                    ConvertToHWInstance<handshake::NonSpecOp>>(
+
+                    // Tagger operations
+                    ConvertToHWInstance<handshake::TaggerOp>,
+                    ConvertToHWInstance<handshake::UntaggerOp>,
+                    ConvertToHWInstance<handshake::FreeTagsFifoOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect

@@ -4,7 +4,9 @@ set-src             tutorials/Introduction/Ch1/loop_multiply.c
 # Compile (from source to Handshake IR/DOT)
 # Provide the --simple-buffers flag to `compile` to use a simple buffering
 # strategy which does not require an MILP solver.
-compile             
+# Provide the --out-of-order-execution flag to `compile` to use out-of-order
+# execution 
+compile      
 
 # Generate the VHDL design corresponding to the source code
 write-hdl

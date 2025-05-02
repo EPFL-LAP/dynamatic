@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H
-#define DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H
+#ifndef EXPERIMENTAL_TRANSFORMS_SPECULATION_SPECULATIONPLACEMENT_H
+#define EXPERIMENTAL_TRANSFORMS_SPECULATION_SPECULATIONPLACEMENT_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -54,7 +54,7 @@ public:
 
   /// Initializer with operand specifying the speculator position
   SpeculationPlacements(OpOperand &speculatorPosition)
-      : speculator(&speculatorPosition){};
+      : speculator(&speculatorPosition) {};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,
@@ -105,4 +105,4 @@ public:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_SPECULATION_PLACEMENT_H
+#endif // EXPERIMENTAL_TRANSFORMS_SPECULATION_SPECULATIONPLACEMENT_H
