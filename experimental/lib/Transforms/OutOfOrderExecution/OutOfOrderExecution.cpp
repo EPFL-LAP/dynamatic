@@ -101,11 +101,9 @@ private:
 
   // Add the untagger operations and connect them to consumers
   // DEPRECATED (now part of addAligner)
-  void addUntaggers(Operation *outOfOrderNode, OpBuilder builder,
-                    ClusterHierarchyNode *clusterNode,
+  void addUntaggers(OpBuilder builder, ClusterHierarchyNode *clusterNode,
                     FreeTagsFifoOp &freeTagsFifo,
                     llvm::DenseSet<Value> &unalignedEdges,
-                    SmallVector<Value> &joinOperands,
                     llvm::DenseSet<Operation *> &untaggers);
 
   // Step 1.5: Add the aligner
@@ -301,12 +299,12 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
 
-  llvm::errs() << "Hierarchy nodes: \n";
-  for (auto &clusterNode : hierarchyNodes) {
-    clusterNode->cluster.print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "Done printing hierarchy nodes.\n";
+  // llvm::errs() << "Hierarchy nodes: \n";
+  // for (auto &clusterNode : hierarchyNodes) {
+  //   clusterNode->cluster.print(llvm::errs());
+  //   llvm::errs() << "\n";
+  // }
+  // llvm::errs() << "Done printing hierarchy nodes.\n";
 
   // Step 4: Apply the out-of-order execution methodology to each ot-of-order
   // node with respect to each innermost cluster
@@ -437,11 +435,11 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                                       dirtyNodes, unalignedEdges)))
       return failure();
 
-    llvm::errs() << "Unaligned edges: \n";
-    for (auto edge : unalignedEdges) {
-      llvm::errs() << edge << "\n";
-    }
-    llvm::errs() << "Done printing unaligned edges.\n";
+    // llvm::errs() << "Unaligned edges: \n";
+    // for (auto edge : unalignedEdges) {
+    //   llvm::errs() << edge << "\n";
+    // }
+    // llvm::errs() << "Done printing unaligned edges.\n";
 
     // If there are no unaligned edges, then we don't need to do
     // anything
@@ -799,10 +797,9 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
                  dirtyNodes, unalignedEdges, taggedEdges);
   assert(taggedOutput && "At least one tagger should be created");
 
-  // SmallVector<Value> joinOperands;
-  // Step 4: Add the Untagger Operations
-  // addUntaggers(op, builder, clusterNode, freeTagsFifo, unalignedEdges,
-  //              joinOperands, untaggers);
+  // Step 3 (DEPRECATED): Add the Untagger Operations
+  // addUntaggers(builder, clusterNode, freeTagsFifo, unalignedEdges,
+  // untaggers);
 
   // The select of the Aligner is:
   // (1) Free Aligner: the output of the out-of-order node
@@ -817,22 +814,6 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
   // Step 3: Add the Aligner Operation
   addAligner(builder, clusterNode, select, numTags, freeTagsFifo,
              unalignedEdges, untaggers);
-
-  // If more than on untagger was created, then join them and feed the
-  // result of the join (the free tag) back into the freeTagsFifo. Else, feed
-  // the free tag output of the single untagger into the freeTagsFifo.
-
-  // if (joinOperands.size() > 1) {
-  //   handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
-  //       (*joinOperands.begin()).getLoc(), joinOperands);
-  //   clusterNode->addInternalOp(joinOp.getOperation());
-  //   inheritBBFromValue((*taggedEdges.begin()), joinOp);
-  //   freeTagsFifo.getOperation()->replaceUsesOfWith(cond,
-  //                                                  joinOp.getResult());
-  // } else {
-  //   freeTagsFifo.getOperation()->replaceUsesOfWith(cond,
-  //                                                  (*joinOperands.begin()));
-  // }
 
   return freeTagsFifo.getOperation();
 }
@@ -901,12 +882,11 @@ Value OutOfOrderExecutionPass::addTaggers(
 }
 
 void OutOfOrderExecutionPass::addUntaggers(
-    Operation *outOfOrderNode, OpBuilder builder,
-    ClusterHierarchyNode *clusterNode, FreeTagsFifoOp &freeTagsFifo,
-    llvm::DenseSet<Value> &unalignedEdges, SmallVector<Value> &joinOperands,
+    OpBuilder builder, ClusterHierarchyNode *clusterNode,
+    FreeTagsFifoOp &freeTagsFifo, llvm::DenseSet<Value> &unalignedEdges,
     llvm::DenseSet<Operation *> &untaggers) {
-
-  builder.setInsertionPoint(outOfOrderNode);
+  SmallVector<Value> joinOperands;
+  Operation *consumer = (*unalignedEdges.begin()).getDefiningOp();
 
   for (auto edge : unalignedEdges) {
     // Start by untagging the edge
@@ -922,15 +902,32 @@ void OutOfOrderExecutionPass::addUntaggers(
       }
     }
     for (auto *user : users) {
+      consumer = user;
+      inheritBB(user, edgeUntagger);
       user->replaceUsesOfWith(edge, edgeUntagger.getDataOut());
     }
 
     // The untagger, demux and mux are internal to the cluster
     clusterNode->addInternalOp(edgeUntagger.getOperation());
-    inheritBB(outOfOrderNode, edgeUntagger);
 
     joinOperands.push_back(edgeUntagger.getTagOut());
     untaggers.insert(edgeUntagger.getOperation());
+  }
+
+  // If more than on untagger was created, then join them and feed the
+  // result of the join (the free tag) back into the freeTagsFifo. Else, feed
+  // the free tag output of the single untagger into the freeTagsFifo.
+
+  if (joinOperands.size() > 1) {
+    handshake::JoinOp joinOp = builder.create<handshake::JoinOp>(
+        (*joinOperands.begin()).getLoc(), joinOperands);
+    clusterNode->addInternalOp(joinOp.getOperation());
+    inheritBB(consumer, joinOp);
+    freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
+                                                   joinOp.getResult());
+  } else {
+    freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
+                                                   (*joinOperands.begin()));
   }
 }
 
