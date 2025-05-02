@@ -129,10 +129,13 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
           if (res.getUsers().empty()) {
             continue;
           }
+          auto *userOp = *res.getUsers().begin();
+
+          // skip connections to the output
+          if (userOp->getName().getStringRef() == "handshake.end")
+            continue;
 
           addPropertyId(&op, uid);
-
-          auto *userOp = *res.getUsers().begin();
 
           PortNamer namer(&op);
           PortNamer userNamer(userOp);
