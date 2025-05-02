@@ -367,6 +367,18 @@ class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, lis
   >.result # ", \"" # except # "\")">
 >;
 
+// Ensures that if operand `op0` has extra signals, then operand `op1` must too
+class ExtraSignalsImplies<string op0, string op1> : PredOpTrait<
+  "if " # op0 # " has extra signals, then " # op1 # " must too",
+  CPred<[{
+    [](ExtraSignalsTypeInterface op0Type, ExtraSignalsTypeInterface op1Type) {
+      return op0Type.getExtraSignals().empty() ||
+           !op1Type.getExtraSignals().empty();
+    }
+  }] # "($" # op0 # ".getType().cast<ExtraSignalsTypeInterface>(), $" # op1 # ".getType().cast<ExtraSignalsTypeInterface>())">
+>;
+
+
 /// Constraint to ensure that the variadic has at least one element.
 class VariadicHasElement<string variadic> : PredOpTrait<
   "the variadic " # variadic # " should have at least one element",
