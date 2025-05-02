@@ -140,6 +140,11 @@ void createClusters(
         &condToBranches,
     std::vector<Cluster> &clusters);
 
+// Creates a global cluster spanning the function's entire graph(except for
+// end).
+void createGlobalCluster(handshake::FuncOp funcOp,
+                         std::vector<Cluster> &clusters);
+
 // Identify the clusters in the graph
 // This is done by
 // 1. Identifying the MUXes with common condition, the searching for BRANCHes
