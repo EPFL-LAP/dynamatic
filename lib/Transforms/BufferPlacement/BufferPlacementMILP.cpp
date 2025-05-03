@@ -310,8 +310,6 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   }
 }
 
-// This function shows the relationship among buffer presence, signal
-// buffer presence, and the number of slots on the channel.
 void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -329,8 +327,7 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   }
 }
 
-// Same as previous bufgroup related constraints
-void BufferPlacementMILP::addBufferGroupConstraints(
+void BufferPlacementMILP::addBufferingGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -359,8 +356,8 @@ void BufferPlacementMILP::addBufferGroupConstraints(
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
-// The follwing two constraints are used to break combinational cycles in the CFG
-void BufferPlacementMILP::addBreakingCycleChannelConstraints(Value channel) {
+void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
+                          Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
   GRBVar &tIn = chVars.elastic.tIn;
@@ -376,8 +373,9 @@ void BufferPlacementMILP::addBreakingCycleChannelConstraints(Value channel) {
   }
 }
 
-void BufferPlacementMILP::addBreakingCycleUnitConstraints(Operation *unit,
-                                                       ChannelFilter filter) {
+void BufferPlacementMILP::addDataFlowDirectionConstraintsForUnit(
+                          Operation *unit, ChannelFilter filter) {
+
   forEachIOPair(unit, [&](Value in, Value out) {
     // Both channels must be eligible
     if (!filter(in) || !filter(out))
@@ -391,8 +389,7 @@ void BufferPlacementMILP::addBreakingCycleUnitConstraints(Operation *unit,
   });
 }
 
-// Generate token occupancy distribution which represents a steady state
-void BufferPlacementMILP::addSteadyStateConstraints(CFDFC &cfdfc) {
+void BufferPlacementMILP::addSteadyStateReachabilityConstraint(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -430,8 +427,8 @@ void BufferPlacementMILP::addSteadyStateConstraints(CFDFC &cfdfc) {
   }
 }
 
-// Only channel throughput constraints. They are linear.
-void BufferPlacementMILP::addBasicChannelThroughputConstraints(CFDFC &cfdfc) {
+void BufferPlacementMILP::addChannelThroughputConstraintForBinaryLatencyChannel(
+                          CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {

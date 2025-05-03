@@ -208,7 +208,7 @@ protected:
   ///
   /// It is only valid to call this method after having added channel variables
   /// for the specific signal to the model.
-  void addChannelPathConstraints(Value channel, SignalType signalType,
+  void addChannelTimingConstraints(Value channel, SignalType signalType,
                                  const TimingModel *bufModel,
                                  ArrayRef<BufferingGroup> before = {},
                                  ArrayRef<BufferingGroup> after = {});
@@ -224,10 +224,15 @@ protected:
   /// after having added channel variables to the model for all channels
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
-  void addUnitPathConstraints(Operation *unit, SignalType signalType,
+  void addUnitTimingConstraints(Operation *unit, SignalType signalType,
                               ChannelFilter filter = nullFilter);
+  
+  /// This function models the fact that:
+  /// - Signal buffer presence -> buffer presence
+  /// - Num slots > 1 -> buffer presence
+  void addBufferPresenceConstraints(Value channel);
 
-  /// Adds elasticity constraints for the channel. The buffering groups should
+  /// Adds buffering group constraints for the channel. The buffering groups should
   /// contain all the signal types with which channel variables for the specific
   /// channel were added exactly once. Groups force the MILP to place buffers
   /// for all signals within each group at the same locations. For example, if
@@ -239,11 +244,22 @@ protected:
   ///
   /// The order of signals within each group is irrelevant; the resulting
   /// constraints will be identical modulo a reordering of the terms.
-  void addChannelElasticityConstraints(Value channel,
-                                       ArrayRef<BufferingGroup> bufGroups);
+  void addBufferingGroupConstraints(Value channel,
+                                    ArrayRef<BufferingGroup> bufGroups);
 
-  /// Adds elasticity constraints between the unit's input and output ports. A
-  /// constraint is added for every input/output port pair.
+  /// Adds data flow direction constraints between the channel's input and 
+  /// output ports.
+  ///
+  /// The following two functions do not represent actual delays on a channel 
+  /// or unit. Instead, they describe the direction of data flow in a 
+  /// combinational path. The value of the later unit port in a path must be 
+  /// greater than that of earlier ones. Hence, combinational cycles are 
+  /// prevented, particularly in cases where all delays are zero and such
+  /// cycles would otherwise be undetectable by timing constraints.
+  void addDataFlowDirectionConstraintsForChannel(Value channel);
+
+  /// Adds data flow direction constraints between the unit's input and 
+  /// output ports. A constraint is added for every input/output port pair.
   ///
   /// A `filter` can be provided to filter out constraints involving input or
   /// output ports connected to channels for which the filter returns false. The
@@ -251,8 +267,12 @@ protected:
   /// after having added channel variables to the model for all channels
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
-  void addUnitElasticityConstraints(Operation *unit,
-                                    ChannelFilter filter = nullFilter);
+  void addDataFlowDirectionConstraintsForUnit(Operation *unit,
+                                       ChannelFilter filter = nullFilter);
+
+  /// Constraints that ensure the final throughput is calculated for a reachable
+  /// steady state.
+  void addSteadyStateReachabilityConstraint(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel
@@ -261,7 +281,9 @@ protected:
   /// It is only valid to call this method after having added variables for the
   /// CFDFC and variables for the data signal of all channels inside the CFDFC
   /// to the model.
-  void addChannelThroughputConstraints(CFDFC &cfdfc);
+  /// 
+  /// The function assumes that the buffer's latency is a binary value.
+  void addChannelThroughputConstraintForBinaryLatencyChannel(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all units in the CFDFC. A single
   /// constraint is added for all units with non-zero latency on their datapath.
@@ -281,7 +303,7 @@ protected:
   /// using an estimation of the transfer frequency over each provided channel.
   /// The objective has a negative term for each buffer placement decision and
   /// for each buffer slot placed on any of the provide channels.
-  void addObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
+  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
 
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
