@@ -47,14 +47,14 @@ static StringRef getSignalName(SignalType signalType) {
 /// type. If the type is `SignalType::DATA`, the channel's bitwidth is used as a
 /// parameter to determine the delays. If the model is nullptr, delays are
 /// assumed to be 0.
-static std::pair<double, double> getPortDelays(Value channel, SignalType signal,
+static std::pair<double, double> getPortDelays(Value channel, SignalType signalType,
                                                const TimingModel *model) {
   if (!model)
     return {0.0, 0.0};
 
   double inBufDelay = 0.0, outBufDelay = 0.0;
   unsigned bitwidth;
-  switch (signal) {
+  switch (signalType) {
   case SignalType::DATA:
     bitwidth = getHandshakeTypeBitWidth(channel.getType());
     /// TODO: It's bad to discard these results, needs a safer way of querying
@@ -188,7 +188,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 }
 
 void BufferPlacementMILP::addChannelTimingConstraints(
-    Value channel, SignalType signal, const TimingModel *bufModel,
+    Value channel, SignalType signalType, const TimingModel *bufModel,
     ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -198,20 +198,20 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   GRBLinExpr bufsBeforeDelay;
   for (const BufferingGroup &group : before)
     bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                       group.getCombinationalDelay(channel, signal);
+                       group.getCombinationalDelay(channel, signalType);
 
   // Sum up conditional delays of buffers after the one that cuts the path
   GRBLinExpr bufsAfterDelay;
   for (const BufferingGroup &group : after)
     bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                      group.getCombinationalDelay(channel, signal);
+                      group.getCombinationalDelay(channel, signalType);
 
   ChannelBufProps &props = channelProps[channel];
-  ChannelSignalVars &signalVars = chVars.signalVars[signal];
+  ChannelSignalVars &signalVars = chVars.signalVars[signalType];
   GRBVar &t1 = signalVars.path.tIn;
   GRBVar &t2 = signalVars.path.tOut;
   GRBVar &bufPresent = signalVars.bufPresent;
-  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signal, bufModel);
+  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
 
   // Arrival time at channel's output must be lower than target clock period
   model.addConstr(t2 <= targetPeriod, "path_period");
@@ -253,6 +253,10 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     double delay;
     if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
       delay = 0.0;
+
+    if (delay == 0.0) {
+      delay = 0.001;
+    }
 
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
@@ -331,7 +335,6 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufPresent = chVars.bufPresent;
   GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // Compute the sum of the binary buffer presence over all signals that have
@@ -362,7 +365,6 @@ void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
   ChannelVars &chVars = vars.channelVars[channel];
   GRBVar &tIn = chVars.elastic.tIn;
   GRBVar &tOut = chVars.elastic.tOut;
-  GRBVar &bufPresent = chVars.bufPresent;
 
   auto dataIt = chVars.signalVars.find(SignalType::DATA);
   if (dataIt != chVars.signalVars.end()) {
@@ -389,7 +391,7 @@ void BufferPlacementMILP::addDataFlowDirectionConstraintsForUnit(
   });
 }
 
-void BufferPlacementMILP::addSteadyStateReachabilityConstraint(CFDFC &cfdfc) {
+void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -427,7 +429,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraint(CFDFC &cfdfc) {
   }
 }
 
-void BufferPlacementMILP::addChannelThroughputConstraintForBinaryLatencyChannel(
+void BufferPlacementMILP::addThroughputConstraintsForBinaryLatencyChannel(
                           CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];

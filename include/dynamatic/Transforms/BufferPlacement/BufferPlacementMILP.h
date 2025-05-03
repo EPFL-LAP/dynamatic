@@ -272,7 +272,7 @@ protected:
 
   /// Constraints that ensure the final throughput is calculated for a reachable
   /// steady state.
-  void addSteadyStateReachabilityConstraint(CFDFC &cfdfc);
+  void addSteadyStateReachabilityConstraints(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel
@@ -283,7 +283,7 @@ protected:
   /// to the model.
   /// 
   /// The function assumes that the buffer's latency is a binary value.
-  void addChannelThroughputConstraintForBinaryLatencyChannel(CFDFC &cfdfc);
+  void addThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all units in the CFDFC. A single
   /// constraint is added for all units with non-zero latency on their datapath.

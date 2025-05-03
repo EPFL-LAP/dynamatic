@@ -188,15 +188,17 @@ void FPGA20Buffers::setup() {
     // that are not adjacent to a memory interface
     if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
-      addChannelPathConstraints(channel, SignalType::DATA, bufModel);
-      addChannelElasticityConstraints(channel, bufGroups);
+      addChannelTimingConstraints(channel, SignalType::DATA, bufModel);
+      addBufferPresenceConstraints(channel);
+      addBufferingGroupConstraints(channel, bufGroups);
+      // addDataFlowDirectionConstraintsForChannel(channel);
     }
   }
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
-    addUnitPathConstraints(&op, SignalType::DATA);
-    addUnitElasticityConstraints(&op);
+    addUnitTimingConstraints(&op, SignalType::DATA);
+    // addDataFlowDirectionConstraintsForUnit(&op);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC that
@@ -207,12 +209,13 @@ void FPGA20Buffers::setup() {
       continue;
     cfdfcs.push_back(cfdfc);
     addCFDFCVars(*cfdfc);
-    addChannelThroughputConstraints(*cfdfc);
+    addSteadyStateReachabilityConstraints(*cfdfc);
+    addThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
-  addObjective(allChannels, cfdfcs);
+  addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
 
