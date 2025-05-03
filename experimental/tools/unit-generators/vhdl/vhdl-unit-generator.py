@@ -30,6 +30,7 @@ import generators.handshake.speculation.spec_commit as spec_commit
 import generators.handshake.speculation.spec_save_commit as spec_save_commit
 import generators.handshake.speculation.speculating_branch as speculating_branch
 import generators.handshake.speculation.speculator as speculator
+import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
@@ -93,6 +94,8 @@ def generate_code(name, mod_type, parameters):
       return speculating_branch.generate_speculating_branch(name, parameters)
     case "speculator":
       return speculator.generate_speculator(name, parameters)
+    case "non_spec":
+      return non_spec.generate_non_spec(name, parameters)
     case "mem_to_bram":
       return mem_to_bram.generate_mem_to_bram(name, parameters)
     case "extui":

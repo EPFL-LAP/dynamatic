@@ -372,8 +372,8 @@ static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
 }
 
 /// Returns the internal signal name for a specific signal type.
-static std::string getInternalSignalName(StringRef baseName, SignalType type) {
-  switch (type) {
+static std::string getInternalSignalName(StringRef baseName, SignalType signalType) {
+  switch (signalType) {
   case (SignalType::DATA):
     return baseName.str();
   case (SignalType::VALID):
@@ -1126,16 +1126,18 @@ void SMVWriter::constructIOMappings(
         .Case<ControlType>([&](auto type) {
           addValid(port, signal);
           addExtraSignals(port, signal, type.getExtraSignals());
+        })
+        .Case<IntegerType>([&](IntegerType intType) {
+          if (signal.str() != dynamatic::hw::CLK_PORT &&
+              signal.str() != dynamatic::hw::RST_PORT)
+            mappings[getSignalName(port)].push_back(signal.str());
         });
   };
 
   auto addOutPortType = [&](Type portType, StringRef port, OpResult op) {
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) { addReady(port, op); })
-        .Case<ControlType>([&](ControlType type) { addReady(port, op); })
-        .Case<IntegerType>([&](IntegerType intType) {
-          mappings[getSignalName(port)].push_back(getValueName(op).str());
-        });
+        .Case<ControlType>([&](ControlType type) { addReady(port, op); });
   };
 
   auto ins = llvm::zip_equal(instOp.getOperands(), modOp.getInputNamesStr());
