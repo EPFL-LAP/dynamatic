@@ -187,7 +187,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   model.update();
 }
 
-void BufferPlacementMILP::addChannelPathConstraints(
+void BufferPlacementMILP::addChannelTimingConstraints(
     Value channel, SignalType signal, const TimingModel *bufModel,
     ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
 
@@ -241,7 +241,7 @@ void BufferPlacementMILP::addChannelPathConstraints(
                   "path_unbufferedChannel");
 }
 
-void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
+void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                  SignalType signalType,
                                                  ChannelFilter filter) {
   // Add path constraints for units
@@ -310,31 +310,32 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
   }
 }
 
-void BufferPlacementMILP::addChannelElasticityConstraints(
-    Value channel, ArrayRef<BufferingGroup> bufGroups) {
+// This function shows the relationship among buffer presence, signal
+// buffer presence, and the number of slots on the channel.
+void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
+
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &tIn = chVars.elastic.tIn;
-  GRBVar &tOut = chVars.elastic.tOut;
   GRBVar &bufPresent = chVars.bufPresent;
   GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // If there is at least one slot, there must be a buffer
-  model.addConstr(0.01 * bufNumSlots <= bufPresent, "elastic_presence");
+  model.addConstr(0.01 * bufNumSlots <= bufPresent, "buffer_presence");
 
   for (auto &[sig, signalVars] : chVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
     // on the channel
     model.addConstr(signalVars.bufPresent <= bufPresent,
-                    "elastic_" + getSignalName(sig).str() + "Presence");
+                    getSignalName(sig).str() + "_Presence");
   }
+}
 
-  auto dataIt = chVars.signalVars.find(SignalType::DATA);
-  if (dataIt != chVars.signalVars.end()) {
-    GRBVar &dataBuf = dataIt->second.bufPresent;
-    // If there is a data buffer on the channel, the channel elastic
-    // arrival time at the ouput must be greater than at the input
-    model.addConstr(tOut >= tIn - largeCst * dataBuf, "elastic_data");
-  }
+// Same as previous bufgroup related constraints
+void BufferPlacementMILP::addBufferGroupConstraints(
+    Value channel, ArrayRef<BufferingGroup> bufGroups) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  GRBVar &bufPresent = chVars.bufPresent;
+  GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // Compute the sum of the binary buffer presence over all signals that have
   // different buffers
@@ -358,7 +359,24 @@ void BufferPlacementMILP::addChannelElasticityConstraints(
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
-void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit,
+// The follwing two constraints are used to break combinational cycles in the CFG
+void BufferPlacementMILP::addBreakingCycleChannelConstraints(Value channel) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  GRBVar &tIn = chVars.elastic.tIn;
+  GRBVar &tOut = chVars.elastic.tOut;
+  GRBVar &bufPresent = chVars.bufPresent;
+
+  auto dataIt = chVars.signalVars.find(SignalType::DATA);
+  if (dataIt != chVars.signalVars.end()) {
+    GRBVar &dataBuf = dataIt->second.bufPresent;
+    // If there is a data buffer on the channel, the channel elastic
+    // arrival time at the ouput must be greater than at the input
+    model.addConstr(tOut >= tIn - largeCst * dataBuf, "elastic_data");
+  }
+}
+
+void BufferPlacementMILP::addBreakingCycleUnitConstraints(Operation *unit,
                                                        ChannelFilter filter) {
   forEachIOPair(unit, [&](Value in, Value out) {
     // Both channels must be eligible
@@ -373,11 +391,51 @@ void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit,
   });
 }
 
-void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
+// Generate token occupancy distribution which represents a steady state
+void BufferPlacementMILP::addSteadyStateConstraints(CFDFC &cfdfc) {
+
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
     // Get the ports the channels connect and their retiming MILP variables
     Operation *srcOp = channel.getDefiningOp();
+    Operation *dstOp = *channel.getUsers().begin();
+
+    // No throughput constraints on channels going to stores
+    /// TODO: this is from legacy implementation, we should understand why we
+    /// really do this and figure out if it makes sense (@lucas-rami: I don't
+    /// think it does)
+    if (isa<handshake::StoreOp>(dstOp))
+      continue;
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // Retrieve the MILP variables we need
+    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
+    GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
+    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+
+    // If the channel isn't a backedge, its throughput equals the difference
+    // between the fluid retiming of tokens at its endpoints. Otherwise, it is
+    // one less than this difference
+    model.addConstr(chThroughput - backedge == retDst - retSrc,
+                    "throughput_channelRetiming");
+  }
+}
+
+// Only channel throughput constraints. They are linear.
+void BufferPlacementMILP::addBasicChannelThroughputConstraints(CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
     Operation *dstOp = *channel.getUsers().begin();
 
     // No throughput constraints on channels going to stores
@@ -406,15 +464,7 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     GRBVar &dataBuf = dataVars->second.bufPresent;
     GRBVar &bufNumSlots = chVars.bufNumSlots;
     GRBVar &chThroughput = cfVars.channelThroughputs[channel];
-    GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
-    GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
-    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
-    // If the channel isn't a backedge, its throughput equals the difference
-    // between the fluid retiming of tokens at its endpoints. Otherwise, it is
-    // one less than this difference
-    model.addConstr(chThroughput - backedge == retDst - retSrc,
-                    "throughput_channelRetiming");
     // The channel's throughput cannot exceed the number of buffer slots
     model.addConstr(chThroughput <= bufNumSlots, "throughput_channel");
     // If there is an opaque buffer, the CFDFC throughput cannot exceed the
@@ -468,7 +518,7 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
-void BufferPlacementMILP::addObjective(ValueRange channels,
+void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
                                        ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
