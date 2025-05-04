@@ -74,6 +74,10 @@ struct ChannelVars {
   GRBVar bufPresent;
   /// Number of buffer slots on the channel (integer).
   GRBVar bufNumSlots;
+  /// Buffer latency on the data signal path (integer).
+  GRBVar dataLatency;
+  /// Usage of a shift register on the channel (binary).
+  GRBVar shiftReg;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -227,20 +231,30 @@ protected:
   void addUnitTimingConstraints(Operation *unit, SignalType signalType,
                               ChannelFilter filter = nullFilter);
   
-  /// This function models the fact that:
+  /// This function models the facts that:
   /// - Signal buffer presence -> buffer presence
   /// - Num slots > 1 -> buffer presence
   void addBufferPresenceConstraints(Value channel);
 
-  /// Adds buffering group constraints for the channel. The buffering groups should
-  /// contain all the signal types with which channel variables for the specific
-  /// channel were added exactly once. Groups force the MILP to place buffers
-  /// for all signals within each group at the same locations. For example, if
-  /// one can only place two buffer types, one which cuts both the data and
-  /// valid signals and one which cuts the ready signal only, and channel
-  /// variables were created for all those signals, then one should pass two
-  /// groups: one containing tne SignalType::DATA and SignalType::VALID signal
-  /// types and one containing the SignalType::READY signal only.
+  /// This function models the fact that:
+  /// - data/valid buffer presence <-> dataLatency > 0
+  /// - dataLatency <= slot number
+  /// - If shiftReg is used, a buffer slot can either break data/valid or
+  ///   ready signal. The buffer slot breaking ready signal is at most 1.
+  ///   This is because the buffer breaking ready signal restricts throughput
+  ///   and has no advantage on area cost. Only one slot on the channel is 
+  ///   enough for breaking the timing path.
+  void addBufferLatencyConstraints(Value channel);
+
+  /// Adds buffering group constraints for the channel. The buffering groups 
+  /// should contain all the signal types with which channel variables for 
+  /// the specific channel were added exactly once. Groups force the MILP to 
+  /// place buffers for all signals within each group at the same locations. 
+  /// For example, if one can only place two buffer types, one which cuts both 
+  /// the data and valid signals and one which cuts the ready signal only, and 
+  /// channel variables were created for all those signals, then one should 
+  /// pass two groups: one containing tne SignalType::DATA and SignalType::VALID 
+  /// signal types and one containing the SignalType::READY signal only.
   ///
   /// The order of signals within each group is irrelevant; the resulting
   /// constraints will be identical modulo a reordering of the terms.
@@ -282,8 +296,15 @@ protected:
   /// CFDFC and variables for the data signal of all channels inside the CFDFC
   /// to the model.
   /// 
-  /// The function assumes that the buffer's latency is a binary value.
+  /// The function assumes that the buffer's latency is a binary value. Choose 
+  /// only one function between 'addThroughputConstraintsForBinaryLatencyChannel'
+  /// and 'addThroughputConstraintsForIntegerLatencyChannel'.
   void addThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc);
+
+  // Channel throughput constraints considering the integer buffer latency on
+  // the data signal paths and the choice of using shift registers as buffers.
+  // The constraints are Quadratic.
+  void addThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc)
 
   /// Adds throughput constraints for all units in the CFDFC. A single
   /// constraint is added for all units with non-zero latency on their datapath.
@@ -303,8 +324,22 @@ protected:
   /// using an estimation of the transfer frequency over each provided channel.
   /// The objective has a negative term for each buffer placement decision and
   /// for each buffer slot placed on any of the provide channels.
+  ///
+  /// Choose only one function between 'addMaxThroughputObjective' and
+  /// 'addBufferAreaAwareObjective'.
   void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
 
+  /// Adds the MILP model's objective to maximize. The objective has a positive
+  /// "throughput term" for every provided CFDFC. These terms are weighted by
+  /// the "importance" of the CFDFC compared to the others, which is determined
+  /// using an estimation of the transfer frequency over each provided channel.
+  /// The objective has a negative term for each buffer placement decision and
+  /// for each buffer slot depending on the buffer type.
+  ///
+  /// Choose only one function between 'addMaxThroughputObjective' and
+  /// 'addBufferAreaAwareObjective'.
+  void addBufferAreaAwareObjective(ValueRange channels,
+                                                        ArrayRef<CFDFC *> cfdfcs)
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,

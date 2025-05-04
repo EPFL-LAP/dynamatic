@@ -110,7 +110,6 @@ BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
   initialize();
 }
 
-// Not modified
 void BufferPlacementMILP::addChannelVars(Value channel,
                                          ArrayRef<SignalType> signals) {
 
@@ -138,13 +137,14 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   // Variables for placement information
   chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+  chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
+  chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
   model.update();
 }
 
-// Not modified
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   // Create a set of variables for each CFDFC
   std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
@@ -333,10 +333,6 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   }
 }
 
-// This function shows the relationship among 'dataLatency', signal buffer presence
-// and slot number.
-// Two ways to describe the constraints. Only choose one of them on the final
-// implementation
 void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -544,9 +540,8 @@ void BufferPlacementMILP::addThroughputConstraintsForBinaryLatencyChannel(
   }
 }
 
-// New channel throughput constraints considering the latency
-// and the shift register. They are Quadratic.
-void BufferPlacementMILP::addBufferLatencyChannelThroughputConstraints(CFDFC &cfdfc) {
+void BufferPlacementMILP::addThroughputConstraintsForIntegerLatencyChannel(
+                          CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -598,7 +593,6 @@ void BufferPlacementMILP::addBufferLatencyChannelThroughputConstraints(CFDFC &cf
   }
 }
 
-// Same as before.
 void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
@@ -679,7 +673,6 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   model.setObjective(objective, GRB_MAXIMIZE);
 }
 
-// New Objective, cost aware.
 void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
                                        ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
