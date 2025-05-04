@@ -1054,6 +1054,13 @@ void SMVWriter::writeIncludes(WriteModData &data) const {
 
 std::optional<std::string> SMVWriter::getUserSignal(Value val) const {
   auto *userOp = *val.getUsers().begin();
+  std::optional<hw::InstanceOp> userInstance =
+      llvm::TypeSwitch<Operation *, std::optional<hw::InstanceOp>>(userOp)
+          .Case<hw::InstanceOp>([&](hw::InstanceOp instOp) { return instOp; })
+          .Default([&](auto) { return std::nullopt; });
+
+  if (userInstance == std::nullopt)
+    return std::nullopt;
 
   // Search the operand index that corresponds to the port where val is
   // connected
@@ -1067,38 +1074,35 @@ std::optional<std::string> SMVWriter::getUserSignal(Value val) const {
   }
   // Get the name of the unit where val is connected
   std::string instName;
-  bool instFound = false;
-  if (auto argNamesAttr =
-          userOp->getAttrOfType<mlir::StringAttr>("instanceName")) {
-    instName = argNamesAttr.getValue().str();
-    instFound = true;
-  }
+  auto instNameAttr = userInstance->getInstanceName();
+  instName = instNameAttr.str();
+
   // Get the name of the port where val is connected
   std::string argName;
-  bool argFound = false;
-  if (auto argNamesAttr = userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
-    if (operandIndex < argNamesAttr.size()) {
-      if (auto strAttr =
-              argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
-        argName = strAttr.getValue().str();
-        argFound = true;
-      }
+  auto argNamesAttr = userInstance->getArgNames();
+  if (operandIndex < argNamesAttr.size()) {
+    if (auto strAttr =
+            argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+      argName = strAttr.getValue().str();
+      return instName + "." + argName;
     }
   }
-  if (instFound && argFound)
-    return instName + "." + argName;
+
   return std::nullopt;
 }
 
 LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
-  // Create the names of all the input signals of the RTL module (i.e., the
-  // block arguments of the HW MLIR) by using the user's signal name)
+  // Create the internal names corresponding to the input signals of the RTL
+  // module. The internal name is associated with the instantiated entity that
+  // is connected to the input signal, or the user of the signal (e.g.,
+  // fork0_outs_0)
   for (auto arg : data.modOp.getBodyBlock()->getArguments()) {
     auto signal = getUserSignal(arg);
     if (signal != std::nullopt)
       data.signals[arg] = signal.value();
   }
-  // Save the RTL module arguments
+  // Create the external module names (e.g., func_arg) of the input signals of
+  // the RTL module
   llvm::copy(data.modOp.getBodyBlock()->getArguments(),
              std::back_inserter(data.inputs));
 
@@ -1119,9 +1123,9 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
               return success();
             })
             .Case<hw::OutputOp>([&](hw::OutputOp outputOp) {
-              // Create the names of all the output signals of the RTL module:
-              // i.e., the input signals connected to the terminator op
-              // (hw::OutputOp).
+              // Create the names of all the output signals of the
+              // RTL module: i.e., the input signals connected to the
+              // terminator op (hw::OutputOp).
               llvm::copy(outputOp->getOperands(),
                          std::back_inserter(data.outputs));
               return success();
