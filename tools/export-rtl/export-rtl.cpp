@@ -374,7 +374,8 @@ static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
 }
 
 /// Returns the internal signal name for a specific signal type.
-static std::string getInternalSignalName(StringRef baseName, SignalType signalType) {
+static std::string getInternalSignalName(StringRef baseName,
+                                         SignalType signalType) {
   switch (signalType) {
   case (SignalType::DATA):
     return baseName.str();
@@ -491,6 +492,7 @@ void WriteModData::writeSignalAssignments(
     // When connecting the ready signal of the top level module a proper
     // internal signal is needed. This signal needs to be named
     // component_name_port_name instead of component_name.port_name
+    // This feature is used for SMV only! (other HDLs are unaffected)
     std::replace(internalSignalName.begin(), internalSignalName.end(), '.',
                  '_');
 
@@ -524,6 +526,7 @@ void WriteModData::writeSignalAssignments(
     std::string internalSignalName = signal.str();
     // When connecting the input signals of the top level module we
     // use internal signals with the name of where the signal will go
+    // This feature is used for SMV only! (other HDLs are unaffected)
     std::replace(internalSignalName.begin(), internalSignalName.end(), '.',
                  '_');
 
