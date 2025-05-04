@@ -49,10 +49,10 @@ struct TimingInfo {
   std::optional<unsigned> readyLatency;
 
   /// Returns the optional latency associated to a signal type.
-  std::optional<unsigned> getLatency(SignalType type);
+  std::optional<unsigned> getLatency(SignalType signalType);
 
   /// Sets the latency associated to a signal type.
-  TimingInfo &setLatency(SignalType type, unsigned latency);
+  TimingInfo &setLatency(SignalType signalType, unsigned latency);
 
   /// During parsing of attributes storing instances of this type, attempts to
   /// parse the data after a key and colon were parsed (<key> <:>

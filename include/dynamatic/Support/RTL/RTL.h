@@ -414,7 +414,7 @@ public:
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
   std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
-                                              SignalType type, HDL hdl) const;
+                                              SignalType signalType, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

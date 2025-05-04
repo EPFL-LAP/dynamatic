@@ -147,7 +147,7 @@ template <typename T>
 std::string formatElement(const T &element) {
   std::ostringstream oss;
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double> ||
-                std::is_same_v<T, int>) {
+                std::is_same_v<T, int> || std::is_same_v<T, unsigned>) {
     // We can use the default handler for printing float, double, and int.
     oss << element;
   } else if constexpr (std::is_same_v<T, int8_t> ||

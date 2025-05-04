@@ -748,10 +748,10 @@ RTLComponent::getRTLPortName(StringRef mlirPortName, HDL hdl) const {
 }
 
 std::pair<std::string, bool>
-RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType type,
+RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType signalType,
                              HDL hdl) const {
   auto portName = getRTLPortName(mlirPortName, hdl);
-  return {portName.first + ioSignals.at(type), portName.second};
+  return {portName.first + ioSignals.at(signalType), portName.second};
 }
 
 bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
@@ -792,9 +792,9 @@ bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
   }
 
   /// Defines default signal type suffixes if they were not overriden
-  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
-    if (ioSignals.find(type) == ioSignals.end())
-      ioSignals[type] = suffix;
+  auto setDefaultSignalSuffix = [&](SignalType signalType, StringRef suffix) {
+    if (ioSignals.find(signalType) == ioSignals.end())
+      ioSignals[signalType] = suffix;
   };
   setDefaultSignalSuffix(SignalType::DATA, "");
   setDefaultSignalSuffix(SignalType::VALID, "_valid");
@@ -865,13 +865,13 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
   ioChannels.clear();
   for (const auto &[signalStr, jsonSuffix] : *object) {
     // Deserialize the signal type
-    SignalType type;
+    SignalType signalType;
     if (signalStr == "data") {
-      type = SignalType::DATA;
+      signalType = SignalType::DATA;
     } else if (signalStr == "valid") {
-      type = SignalType::VALID;
+      signalType = SignalType::VALID;
     } else if (signalStr == "ready") {
-      type = SignalType::READY;
+      signalType = SignalType::READY;
     } else {
       path.field(signalStr).report("unknown channel signal type: possible keys "
                                    "are 'data', 'valid', or 'ready'");
@@ -879,7 +879,7 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
     }
 
     // Deserialize the suffix (just a string)
-    if (!fromJSON(jsonSuffix, ioChannels[type], path.field(signalStr)))
+    if (!fromJSON(jsonSuffix, ioChannels[signalType], path.field(signalStr)))
       return false;
   }
 
