@@ -336,7 +336,6 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
 void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufPresent = chVars.bufPresent;
   GRBVar &bufNumSlots = chVars.bufNumSlots;
   GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
   GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
@@ -390,11 +389,10 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
                   "enough_slots_for_shiftReg");
 }
 
-void BufferPlacementMILP::addBufferGroupConstraints(
+void BufferPlacementMILP::addBufferingGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
   ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &bufPresent = chVars.bufPresent;
   GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // Compute the sum of the binary buffer presence over all signals that have
@@ -571,7 +569,6 @@ void BufferPlacementMILP::addThroughputConstraintsForIntegerLatencyChannel(
     assert(dataFound && "missing data signal variables on channel variables");
 
     // Retrieve the MILP variables we need
-    GRBVar &dataBuf = dataVars->second.bufPresent;
     GRBVar &bufNumSlots = chVars.bufNumSlots;
     GRBVar &chThroughput = cfVars.channelThroughputs[channel];
     GRBVar &throughput = cfVars.throughput;
@@ -674,7 +671,7 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
 }
 
 void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
-                                       ArrayRef<CFDFC *> cfdfcs) {
+                                                      ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
@@ -683,7 +680,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
   }
 
   // Create the expression for the MILP objective
-  GRBLinExpr objective;
+  GRBLinExpr objective = 0;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -717,9 +714,16 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
     GRBVar &shiftReg = chVars.shiftReg;
     objective -= maxCoefCFDFC * bufPenaltyMul * bufPresent;
     objective -= maxCoefCFDFC * largeSlotPenaltyMul * (bufNumSlots - dataLatency);
-    objective -= maxCoefCFDFC * smallSlotPenaltyMul * dataLatency * (1 - shiftReg);
     objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
-    objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * dataLatency * shiftReg;
+
+    // Linearization of dataLatency * shiftReg
+    GRBVar latencyMulShiftReg = model.addVar(0, 100, 0.0, GRB_INTEGER,
+                                             "latencyMulShiftReg");
+    model.addConstr(latencyMulShiftReg <= dataLatency);
+    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    objective -= maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
+    objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
   }
 
   // Finally, set the MILP objective

@@ -304,7 +304,7 @@ protected:
   // Channel throughput constraints considering the integer buffer latency on
   // the data signal paths and the choice of using shift registers as buffers.
   // The constraints are Quadratic.
-  void addThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc)
+  void addThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all units in the CFDFC. A single
   /// constraint is added for all units with non-zero latency on their datapath.
@@ -339,7 +339,7 @@ protected:
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
   void addBufferAreaAwareObjective(ValueRange channels,
-                                                        ArrayRef<CFDFC *> cfdfcs)
+                                   ArrayRef<CFDFC *> cfdfcs);
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,
