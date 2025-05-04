@@ -232,15 +232,15 @@ protected:
   /// - Num slots > 1 -> buffer presence
   void addBufferPresenceConstraints(Value channel);
 
-  /// Adds buffering group constraints for the channel. The buffering groups should
-  /// contain all the signal types with which channel variables for the specific
-  /// channel were added exactly once. Groups force the MILP to place buffers
-  /// for all signals within each group at the same locations. For example, if
-  /// one can only place two buffer types, one which cuts both the data and
-  /// valid signals and one which cuts the ready signal only, and channel
-  /// variables were created for all those signals, then one should pass two
-  /// groups: one containing tne SignalType::DATA and SignalType::VALID signal
-  /// types and one containing the SignalType::READY signal only.
+  /// Adds buffering group constraints for the channel. The buffering groups 
+  /// should contain all the signal types with which channel variables for 
+  /// the specific channel were added exactly once. Groups force the MILP to 
+  /// place buffers for all signals within each group at the same locations. 
+  /// For example, if one can only place two buffer types, one which cuts both 
+  /// the data and valid signals and one which cuts the ready signal only, and 
+  /// channel variables were created for all those signals, then one should 
+  /// pass two groups: one containing tne SignalType::DATA and SignalType::VALID 
+  /// signal types and one containing the SignalType::READY signal only.
   ///
   /// The order of signals within each group is irrelevant; the resulting
   /// constraints will be identical modulo a reordering of the terms.
