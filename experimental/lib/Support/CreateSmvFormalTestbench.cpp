@@ -42,9 +42,12 @@ static std::string instantiateModuleUnderTest(
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
     const SmallVector<std::pair<std::string, mlir::Type>> &results) {
   SmallVector<std::string> inputVariables;
-  for (const auto &[argumentName, argumentType] : arguments) {
+  for (const auto &argument : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
+    auto argumentName = argument.first;
+    auto argumentType = argument.second;
+
     llvm::TypeSwitch<Type, void>(argumentType)
         .Case<handshake::ControlType>([&](handshake::ControlType) {
           if (!LEGACY_DOT2SMV_COMPATIBLE) {
@@ -84,7 +87,7 @@ static std::string instantiateModuleUnderTest(
 
   return call.str();
 }
-std::string getPrefixTypeName(std::string smvType) {
+std::string getPrefixTypeName(const std::string &smvType) {
   size_t start = smvType.find('[');
   size_t end = smvType.find(']');
 
@@ -99,7 +102,7 @@ std::string getPrefixTypeName(std::string smvType) {
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
-const std::string SMV_INPUT(const std::string &type) {
+std::string SMV_INPUT(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input(nReady0, max_tokens)\n"
          "  VAR dataOut0 : " +
@@ -119,7 +122,7 @@ const std::string SMV_INPUT(const std::string &type) {
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-const std::string SMV_INPUT_EXACT(const std::string &type) {
+std::string SMV_INPUT_EXACT(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_exact(nReady0, exact_tokens)\n"
          "  VAR dataOut0 : " +
@@ -137,7 +140,7 @@ const std::string SMV_INPUT_EXACT(const std::string &type) {
 }
 
 // SMV module for a sequence generator with an infinite number of tokens
-const std::string SMV_INPUT_INF(const std::string &type) {
+std::string SMV_INPUT_INF(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_inf(nReady0)\n"
          "  VAR dataOut0 : " +
@@ -156,13 +159,15 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
     if (generateExactNrOfTokens)
       return SMV_CTRL_INPUT_EXACT;
     return SMV_CTRL_INPUT;
-  } else if (type == "boolean") {
+  }
+  if (type == "boolean") {
     if (nrOfTokens == 0)
       return SMV_BOOL_INPUT_INF;
     if (generateExactNrOfTokens)
       return SMV_BOOL_INPUT_EXACT;
     return SMV_BOOL_INPUT;
-  } else {
+  }
+  {
     if (nrOfTokens == 0)
       return SMV_INPUT_INF(type);
     if (generateExactNrOfTokens)
