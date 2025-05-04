@@ -189,7 +189,6 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   model.update();
 }
 
-// Content not modified
 void BufferPlacementMILP::addChannelTimingConstraints(
     Value channel, SignalType signalType, const TimingModel *bufModel,
     ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
@@ -201,20 +200,20 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   GRBLinExpr bufsBeforeDelay;
   for (const BufferingGroup &group : before)
     bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                       group.getCombinationalDelay(channel, signal);
+                       group.getCombinationalDelay(channel, signalType);
 
   // Sum up conditional delays of buffers after the one that cuts the path
   GRBLinExpr bufsAfterDelay;
   for (const BufferingGroup &group : after)
     bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
-                      group.getCombinationalDelay(channel, signal);
+                      group.getCombinationalDelay(channel, signalType);
 
   ChannelBufProps &props = channelProps[channel];
-  ChannelSignalVars &signalVars = chVars.signalVars[signal];
+  ChannelSignalVars &signalVars = chVars.signalVars[signalType];
   GRBVar &t1 = signalVars.path.tIn;
   GRBVar &t2 = signalVars.path.tOut;
   GRBVar &bufPresent = signalVars.bufPresent;
-  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signal, bufModel);
+  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
 
   // Arrival time at channel's output must be lower than target clock period
   model.addConstr(t2 <= targetPeriod, "path_period");
@@ -244,7 +243,6 @@ void BufferPlacementMILP::addChannelTimingConstraints(
                   "path_unbufferedChannel");
 }
 
-// Content not modified
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                  SignalType signalType,
                                                  ChannelFilter filter) {
@@ -257,6 +255,10 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     double delay;
     if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
       delay = 0.0;
+
+    if (delay == 0.0) {
+      delay = 0.001;
+    }
 
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
@@ -314,8 +316,6 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   }
 }
 
-// This function shows the relationship among buffer presence, signal
-// buffer presence, and the number of slots on the channel.
 void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -394,7 +394,6 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
                   "enough_slots_for_shiftReg");
 }
 
-// Same as previous bufgroup related constraints
 void BufferPlacementMILP::addBufferGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
@@ -424,13 +423,12 @@ void BufferPlacementMILP::addBufferGroupConstraints(
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
-// The follwing two constraints are used to break combinational cycles in the CFG
-void BufferPlacementMILP::addBreakingCycleChannelConstraints(Value channel) {
+void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
+                          Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
   GRBVar &tIn = chVars.elastic.tIn;
   GRBVar &tOut = chVars.elastic.tOut;
-  GRBVar &bufPresent = chVars.bufPresent;
 
   auto dataIt = chVars.signalVars.find(SignalType::DATA);
   if (dataIt != chVars.signalVars.end()) {
@@ -441,8 +439,9 @@ void BufferPlacementMILP::addBreakingCycleChannelConstraints(Value channel) {
   }
 }
 
-void BufferPlacementMILP::addBreakingCycleUnitConstraints(Operation *unit,
-                                                       ChannelFilter filter) {
+void BufferPlacementMILP::addDataFlowDirectionConstraintsForUnit(
+                          Operation *unit, ChannelFilter filter) {
+
   forEachIOPair(unit, [&](Value in, Value out) {
     // Both channels must be eligible
     if (!filter(in) || !filter(out))
@@ -456,8 +455,7 @@ void BufferPlacementMILP::addBreakingCycleUnitConstraints(Operation *unit,
   });
 }
 
-// Generate token occupancy distribution which represents a steady state
-void BufferPlacementMILP::addSteadyStateConstraints(CFDFC &cfdfc) {
+void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -495,8 +493,8 @@ void BufferPlacementMILP::addSteadyStateConstraints(CFDFC &cfdfc) {
   }
 }
 
-// Only channel throughput constraints. They are linear.
-void BufferPlacementMILP::addBasicChannelThroughputConstraints(CFDFC &cfdfc) {
+void BufferPlacementMILP::addThroughputConstraintsForBinaryLatencyChannel(
+                          CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -638,7 +636,6 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
-// Previous Objective, contents not modified
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
                                        ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any

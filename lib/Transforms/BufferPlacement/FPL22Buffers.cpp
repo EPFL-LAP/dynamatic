@@ -359,15 +359,17 @@ void CFDFCUnionBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addChannelTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addBufferPresenceConstraints(channel);
+    addBufferingGroupConstraints(channel, bufGroups);
+    // addDataFlowDirectionConstraintsForChannel(channel);
   }
 
   // For unit constraints, filter out ports that are not part of the CFDFC union
@@ -378,11 +380,11 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
-    addUnitPathConstraints(unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(unit, channelFilter);
-    addUnitElasticityConstraints(unit, channelFilter);
+    // addDataFlowDirectionConstraintsForUnit(unit, channelFilter);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC in the
@@ -392,14 +394,15 @@ void CFDFCUnionBuffers::setup() {
     if (!funcInfo.cfdfcs[cfdfc])
       continue;
     addCFDFCVars(*cfdfc);
-    addChannelThroughputConstraints(*cfdfc);
+    addSteadyStateReachabilityConstraints(*cfdfc);
+    addThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addObjective(allChannels, cfUnion.cfdfcs);
+  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
   markReadyToOptimize();
 }
 
@@ -474,15 +477,17 @@ void OutOfCycleBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addChannelTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Add elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addBufferPresenceConstraints(channel);
+    addBufferingGroupConstraints(channel, bufGroups);
+    // addDataFlowDirectionConstraintsForChannel(channel);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &chVars = vars.channelVars[channel];
@@ -499,11 +504,11 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
-    addUnitPathConstraints(&unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(&unit, channelFilter);
-    addUnitElasticityConstraints(&unit, channelFilter);
+    // addDataFlowDirectionConstraintsForUnit(&unit, channelFilter);
   }
 
   // Set MILP objective and mark it ready to be optimized
