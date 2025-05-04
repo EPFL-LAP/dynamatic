@@ -227,7 +227,7 @@ protected:
   void addUnitTimingConstraints(Operation *unit, SignalType signalType,
                               ChannelFilter filter = nullFilter);
   
-  /// This function models the fact that:
+  /// This function models the facts that:
   /// - Signal buffer presence -> buffer presence
   /// - Num slots > 1 -> buffer presence
   void addBufferPresenceConstraints(Value channel);
