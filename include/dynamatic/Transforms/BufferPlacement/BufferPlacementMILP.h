@@ -93,7 +93,7 @@ struct CFDFCVars {
 /// function.
 struct MILPVars {
   /// Mapping between CFDFCs and their related variables.
-  llvm::MapVector<CFDFC *, CFDFCVars> cfVars;
+  llvm::MapVector<CFDFC *, CFDFCVars> cfdfcVars;
   /// Mapping between channels and their related variables.
   llvm::MapVector<Value, ChannelVars> channelVars;
 };
@@ -137,28 +137,28 @@ protected:
     /// least one signal type. The first signal in the list is considered the
     /// "reference" for this group. The ordering of these signals should only
     /// change the MILP cosmetically.
-    SmallVector<SignalType> signals;
+    SmallVector<SignalType> signalTypes;
     /// Buffer's timing model.
     const TimingModel *bufModel;
 
     /// Simple member-by-member constructor. At least one signal must be
     /// provided, otherwise the cosntructor will assert.
-    BufferingGroup(ArrayRef<SignalType> signals, const TimingModel *bufModel)
-        : signals(signals), bufModel(bufModel) {
-      assert(!signals.empty() && "list of signals cannot be empty");
+    BufferingGroup(ArrayRef<SignalType> signalTypes, const TimingModel *bufModel)
+        : signalTypes(signalTypes), bufModel(bufModel) {
+      assert(!signalTypes.empty() && "list of signals cannot be empty");
     }
 
     /// Returns the reference signals of the group.
-    SignalType getRefSignal() const { return signals.front(); };
+    SignalType getRefSignal() const { return signalTypes.front(); };
     /// Returns the "other" signals in the group i.e., those that are not the
     /// reference. The returned array is empty if the group only contains one
     /// signal.
     ArrayRef<SignalType> getOtherSignals() const {
-      return ArrayRef<SignalType>(signals).drop_front();
+      return ArrayRef<SignalType>(signalTypes).drop_front();
     };
 
     /// Returns the combinational delay of the group's buffer for a signal type.
-    double getCombinationalDelay(Value channel, SignalType type) const;
+    double getCombinationalDelay(Value channel, SignalType signalType) const;
   };
 
   /// For unit constraints, oracle function determining whether constraints
@@ -191,7 +191,7 @@ protected:
   /// Adds channel variables to the MILP model for the provided channel.
   /// Signal-specific variables will be added for the provided signal types
   /// only.
-  void addChannelVars(Value channel, ArrayRef<SignalType> signals);
+  void addChannelVars(Value channel, ArrayRef<SignalType> signalTypes);
 
   /// Adds CFDFC variables to the MILP model for the provided CFDFC. These are
   /// a pair of retiming variables for each CFDFC unit, a throughput variable
@@ -208,7 +208,7 @@ protected:
   ///
   /// It is only valid to call this method after having added channel variables
   /// for the specific signal to the model.
-  void addChannelPathConstraints(Value channel, SignalType signal,
+  void addChannelPathConstraints(Value channel, SignalType signalType,
                                  const TimingModel *bufModel,
                                  ArrayRef<BufferingGroup> before = {},
                                  ArrayRef<BufferingGroup> after = {});
@@ -224,7 +224,7 @@ protected:
   /// after having added channel variables to the model for all channels
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
-  void addUnitPathConstraints(Operation *unit, SignalType type,
+  void addUnitPathConstraints(Operation *unit, SignalType signalType,
                               ChannelFilter filter = nullFilter);
 
   /// Adds elasticity constraints for the channel. The buffering groups should

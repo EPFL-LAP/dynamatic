@@ -47,35 +47,52 @@ FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto &[channel, channelVars] : vars.channelVars) {
+  for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
+    bool forceBreakDVR = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-
+    
     handshake::ChannelBufProps &props = channelProps[channel];
 
     PlacementResult result;
-    if (placeOpaque) {
-      // We want as many slots as possible to be transparent and at least one
-      // opaque slot, while satisfying all buffering constraints
-      unsigned actualMinOpaque = std::max(1U, props.minOpaque);
-      if (props.maxTrans.has_value() &&
-          (props.maxTrans.value() < numSlotsToPlace - actualMinOpaque)) {
-        result.numTrans = props.maxTrans.value();
-        result.numOpaque = numSlotsToPlace - result.numTrans;
+    // 1. If breaking DVR:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+    //
+    // 2. If breaking none:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R;
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    if (forceBreakDVR) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
+      } else if (numSlotsToPlace == 2) {
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else {
-        result.numOpaque = actualMinOpaque;
-        result.numTrans = numSlotsToPlace - result.numOpaque;
+        if (props.minOpaque <= 1) {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 1;
+        } else {
+          result.numOneSlotDV = 1;
+          result.numFifoNone = numSlotsToPlace - 2;
+          result.numOneSlotR = 1;
+        }
       }
     } else {
-      // All slots should be transparent
-      result.numTrans = numSlotsToPlace;
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
     placement[channel] = result;
@@ -85,7 +102,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -147,8 +164,8 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
 
 void FPGA20Buffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 1> signals;
-  signals.push_back(SignalType::DATA);
+  SmallVector<SignalType, 1> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -164,7 +181,7 @@ void FPGA20Buffers::setup() {
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
     allChannels.push_back(channel);
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add path and elasticity constraints over all channels in the function
