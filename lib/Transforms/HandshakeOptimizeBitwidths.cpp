@@ -1169,9 +1169,6 @@ struct ArithShift : public OpRewritePattern<Op> {
         }
       }
 
-    llvm::errs() << "optWidth: " << optWidth << "\n";
-    llvm::errs() << "cstVal: " << cstVal << "\n";
-
     if (optWidth >= resWidth)
       return failure();
 
