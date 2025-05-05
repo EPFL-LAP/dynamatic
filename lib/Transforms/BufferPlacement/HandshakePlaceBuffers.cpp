@@ -576,54 +576,70 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
 
       // Insert a transparent and opaque slot after any free_tags_fifo to break
       // the cycle created with the tagger/untagger
-      for (auto one_tags_fifo : funcOp.getOps<FreeTagsFifoOp>()) {
-        ChannelBufProps& resProps = channelProps[one_tags_fifo->getResult(0)];
-        if (resProps.maxTrans.value_or(1) >= 1) {
-          resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-        }
-        else {
-          one_tags_fifo->emitWarning()
-            << "Cannot place transparent buffer on free_tags_fifo's "
-            "output due to channel-specific buffering constraints. This may "
-            "yield an invalid buffering.";
-        }
-        if (resProps.maxOpaque.value_or(1) >= 1) {
-          resProps.minOpaque = std::max(resProps.minOpaque, maxTagCount);
-        }
-        else {
-          one_tags_fifo->emitWarning()
-            << "Cannot place opaque buffer on free_tags_fifo's "
-            "output due to channel-specific buffering constraints. This may "
-            "yield an invalid buffering.";
-        }
-      }
+      // for (auto one_tags_fifo : funcOp.getOps<FreeTagsFifoOp>()) {
+      //   ChannelBufProps& resProps = channelProps[one_tags_fifo->getResult(0)];
+      //   if (resProps.maxTrans.value_or(1) >= 1) {
+      //     resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
+      //   }
+      //   else {
+      //     one_tags_fifo->emitWarning()
+      //       << "Cannot place transparent buffer on free_tags_fifo's "
+      //       "output due to channel-specific buffering constraints. This may "
+      //       "yield an invalid buffering.";
+      //   }
+      //   if (resProps.maxOpaque.value_or(1) >= 1) {
+      //     resProps.minOpaque = std::max(resProps.minOpaque, maxTagCount);
+      //   }
+      //   else {
+      //     one_tags_fifo->emitWarning()
+      //       << "Cannot place opaque buffer on free_tags_fifo's "
+      //       "output due to channel-specific buffering constraints. This may "
+      //       "yield an invalid buffering.";
+      //   }
+      // }
 
 
-      // Insert transparent slots at the inputs of a Join. This is necessary to prevent
-      // deadlocks around the Join that feeds a free_tags_fifo
-      for (auto join : funcOp.getOps<handshake::JoinOp>()) {
-        for (auto operand : join->getOperands()) {
-          ChannelBufProps& resProps = channelProps[operand];
-          if (resProps.maxTrans.value_or(1) >= 1) {
-            resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-          }
-          else {
-            join->emitWarning()
-              << "Cannot place transparent buffer on merge-like operation's "
-              "output due to channel-specific buffering constraints. This "
-              "may "
-              "yield an invalid buffering.";
-          }
-        }
-      }
+      // // Insert transparent slots at the inputs of a Join. This is necessary to prevent
+      // // deadlocks around the Join that feeds a free_tags_fifo
+      // for (auto join : funcOp.getOps<handshake::JoinOp>()) {
+      //   for (auto operand : join->getOperands()) {
+      //     ChannelBufProps& resProps = channelProps[operand];
+      //     if (resProps.maxTrans.value_or(1) >= 1) {
+      //       resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
+      //     }
+      //     else {
+      //       join->emitWarning()
+      //         << "Cannot place transparent buffer on merge-like operation's "
+      //         "output due to channel-specific buffering constraints. This "
+      //         "may "
+      //         "yield an invalid buffering.";
+      //     }
+      //   }
+      // }
 
-      // Insert transparent slots at the outputs of a Fork that feeds a free_tags_fifo
-      // This is necessary to prevent deadlocks 
-      for (auto fork : funcOp.getOps<handshake::ForkOp>()) {
-        // if (!isa_and_nonnull<handshake::FreeTagsFifoOp>(fork->getOperand(0).getDefiningOp())
-        //   )
-        //   continue;
+      // // Insert transparent slots at the outputs of a Fork that feeds a free_tags_fifo
+      // // This is necessary to prevent deadlocks 
+      // for (auto fork : funcOp.getOps<handshake::ForkOp>()) {
+      //   // if (!isa_and_nonnull<handshake::FreeTagsFifoOp>(fork->getOperand(0).getDefiningOp())
+      //   //   )
+      //   //   continue;
 
+      //   for (auto res : fork->getResults()) {
+      //     ChannelBufProps& resProps = channelProps[res];
+      //     if (resProps.maxTrans.value_or(1) >= 1) {
+      //       resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
+      //     }
+      //     else {
+      //       fork->emitWarning()
+      //         << "Cannot place transparent buffer on merge-like operation's "
+      //         "output due to channel-specific buffering constraints. This "
+      //         "may "
+      //         "yield an invalid buffering.";
+      //     }
+      //   }
+      // }
+
+      for (auto fork : funcOp.getOps<handshake::UntaggerOp>()) {
         for (auto res : fork->getResults()) {
           ChannelBufProps& resProps = channelProps[res];
           if (resProps.maxTrans.value_or(1) >= 1) {
