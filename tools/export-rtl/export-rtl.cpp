@@ -372,8 +372,8 @@ static hw::HWModuleLike getHWModule(hw::InstanceOp instOp) {
 }
 
 /// Returns the internal signal name for a specific signal type.
-static std::string getInternalSignalName(StringRef baseName, SignalType type) {
-  switch (type) {
+static std::string getInternalSignalName(StringRef baseName, SignalType signalType) {
+  switch (signalType) {
   case (SignalType::DATA):
     return baseName.str();
   case (SignalType::VALID):

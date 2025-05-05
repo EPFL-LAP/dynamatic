@@ -33,18 +33,18 @@ using namespace dynamatic::buffer::fpl22;
 
 void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto [channel, channelVars] : vars.channelVars) {
+  for (auto [channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool forceBreakDV = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
     bool forceBreakR =
-        channelVars.signalVars[SignalType::READY].bufPresent.get(
+        chVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
     PlacementResult result;
@@ -91,7 +91,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -175,10 +175,10 @@ struct Pin {
   /// The channel connected to the unit's port.
   Value channel;
   /// The pin's timing domain, denoted by a signal type.
-  SignalType type;
+  SignalType signalType;
 
   /// Simple member-by-member constructor.
-  Pin(Value channel, SignalType type) : channel(channel), type(type) {};
+  Pin(Value channel, SignalType signalType) : channel(channel), signalType(signalType) {};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -290,10 +290,10 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
 
     // Find variables for arrival time at input/output pin
     GRBVar &tPinIn = vars.channelVars[cons.input.channel]
-                         .signalVars[cons.input.type]
+                         .signalVars[cons.input.signalType]
                          .path.tOut;
     GRBVar &tPinOut = vars.channelVars[cons.output.channel]
-                          .signalVars[cons.output.type]
+                          .signalVars[cons.output.signalType]
                           .path.tIn;
 
     // Arrival time at unit's output pin must be greater than arrival time at
@@ -325,10 +325,10 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void CFDFCUnionBuffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 4> signals;
-  signals.push_back(SignalType::DATA);
-  signals.push_back(SignalType::VALID);
-  signals.push_back(SignalType::READY);
+  SmallVector<SignalType, 4> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
+  signalTypes.push_back(SignalType::VALID);
+  signalTypes.push_back(SignalType::READY);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -355,7 +355,7 @@ void CFDFCUnionBuffers::setup() {
   // over all channels in the CFDFC union
   for (Value channel : cfUnion.channels) {
     // Create variables and add custom channel constraints
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
@@ -423,10 +423,10 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void OutOfCycleBuffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 4> signals;
-  signals.push_back(SignalType::DATA);
-  signals.push_back(SignalType::VALID);
-  signals.push_back(SignalType::READY);
+  SmallVector<SignalType, 4> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
+  signalTypes.push_back(SignalType::VALID);
+  signalTypes.push_back(SignalType::READY);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -470,7 +470,7 @@ void OutOfCycleBuffers::setup() {
       continue;
 
     // Create channel variables and add custom constraints for the channel
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
@@ -485,12 +485,12 @@ void OutOfCycleBuffers::setup() {
     addChannelElasticityConstraints(channel, bufGroups);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
-    ChannelVars &channelVars = vars.channelVars[channel];
-    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
-    GRBVar &readyBuf = channelVars.signalVars[SignalType::READY].bufPresent;
+    ChannelVars &chVars = vars.channelVars[channel];
+    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     objective -= dataBuf;
     objective -= readyBuf;
-    objective -= 0.1 * channelVars.bufNumSlots;
+    objective -= 0.1 * chVars.bufNumSlots;
   }
 
   // Add single-domain and mixed-domain path constraints as well as elasticity
