@@ -52,16 +52,16 @@ using namespace dynamatic::experimental::outoforder;
  *
  * @return Vector of identified clusters.
  */
-std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
+std::vector<Cluster> outoforder::identifyClusters(FuncOp funcOp,
                                                   MLIRContext *ctx) {
   std::vector<Cluster> clusters;
 
   // Step 1: Identify the MUXes and their conditions
-  llvm::DenseMap<Value, std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+  llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
       condToMuxes = analyzeMuxConditions(funcOp);
 
   // Step 2: Find all the branches that are fed by the each condition
-  llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+  llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
       condToBranches = analyzeBranchesConditions(funcOp, condToMuxes, clusters);
 
   // Step 3: Create clusters for each condition
@@ -82,16 +82,16 @@ std::vector<Cluster> outoforder::identifyClusters(handshake::FuncOp funcOp,
  * @return True if it's a Shannon Mux, false otherwise.
  */
 
-static bool isShannonMux(handshake::MuxOp muxOp) {
+static bool isShannonMux(MuxOp muxOp) {
   Value result = muxOp.getResult();
 
   // If the MUX feeds the select of another MUX or a BRANCH, then it is a
   // Shannon MUX
   for (Operation *user : result.getUsers()) {
-    if (auto nextMux = dyn_cast<handshake::MuxOp>(user)) {
+    if (auto nextMux = dyn_cast<MuxOp>(user)) {
       if (nextMux.getSelectOperand() == result)
         return true;
-    } else if (auto branch = dyn_cast<handshake::ConditionalBranchOp>(user)) {
+    } else if (auto branch = dyn_cast<ConditionalBranchOp>(user)) {
       if (branch.getConditionOperand() == result)
         return true;
     }
@@ -108,8 +108,8 @@ static bool isShannonMux(handshake::MuxOp muxOp) {
  *
  * @return A map of conditions to MUXes.
  */
-llvm::DenseMap<Value, std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
-outoforder::analyzeMuxConditions(handshake::FuncOp funcOp) {
+llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+outoforder::analyzeMuxConditions(FuncOp funcOp) {
   // Map each condition value to all the MUXes that it feeds as the select
   // Each value will then correspond to a cluster
   // All Muxes being fed by the same value or its negation will be in the
@@ -117,11 +117,11 @@ outoforder::analyzeMuxConditions(handshake::FuncOp funcOp) {
   // The bool is used to differentiate between loop and if/else clusters
   // True: loop cluster
   // False: if/else cluster
-  llvm::DenseMap<Value, std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+  llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
       condToMuxes;
 
   // Step 1: Identify the MUXes and their conditions
-  for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
+  for (auto muxOp : funcOp.getOps<MuxOp>()) {
     Value cond = muxOp.getSelectOperand();
 
     // Skip Shannon MUXes
@@ -129,27 +129,25 @@ outoforder::analyzeMuxConditions(handshake::FuncOp funcOp) {
       continue;
 
     //  c1 and NOT c1 all should be in 1 cluster
-    if (isa<handshake::NotOp>(cond.getDefiningOp()))
+    if (isa<NotOp>(cond.getDefiningOp()))
       cond = cond.getDefiningOp()->getOperand(0);
 
     // If a MUX is fed by a MergeOp(INIT) fed by condition c (or NOT c), then
     // the MUX is a loop header
-    if (handshake::MergeOp init =
-            dyn_cast<handshake::MergeOp>(cond.getDefiningOp())) {
+    if (MergeOp init = dyn_cast<MergeOp>(cond.getDefiningOp())) {
       Value op1 = init->getOperand(0);
       Value op2 = init->getOperand(1);
 
       // The Merge Op is fed by a constant and the condition c (or NOT c)
-      if (isa<handshake::ConstantOp>(op1.getDefiningOp())) {
+      if (isa<ConstantOp>(op1.getDefiningOp())) {
         cond = op2;
       } else {
-        assert((isa<handshake::ConstantOp>(op2.getDefiningOp())) &&
+        assert((isa<ConstantOp>(op2.getDefiningOp())) &&
                "An in input to a MergeOp feeding the MUX loop header should be "
                "a constant");
         cond = op1;
       }
-      if (handshake::NotOp notOp =
-              dyn_cast<handshake::NotOp>(cond.getDefiningOp())) {
+      if (NotOp notOp = dyn_cast<NotOp>(cond.getDefiningOp())) {
         cond = notOp.getOperand();
       }
       condToMuxes[cond].second = true;
@@ -176,7 +174,7 @@ static bool leadsToSinkOrStore(Value value, llvm::DenseSet<Value> &visited) {
 
   // Check if any of the users of this value is a SinkOp or StoreOp
   for (auto *user : value.getUsers()) {
-    if (isa<handshake::SinkOp>(user) || isa<handshake::StoreOp>(user))
+    if (isa<SinkOp>(user) || isa<StoreOp>(user))
       return true;
 
     // Recursively check the users of the user's results (if needed)
@@ -221,20 +219,19 @@ static void findReachableOps(Operation *op,
  *
  * @return A map of conditions to branches.
  */
-llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
 outoforder::analyzeBranchesConditions(
-    handshake::FuncOp funcOp,
-    llvm::DenseMap<Value,
-                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+    FuncOp funcOp,
+    llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
         &condToMuxes,
     std::vector<Cluster> &clusters) {
-  llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+  llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
       condToBranches;
-  for (auto branchOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+  for (auto branchOp : funcOp.getOps<ConditionalBranchOp>()) {
     Value cond = branchOp.getConditionOperand();
 
     //  c1 and NOT c1 all should be in 1 cluster
-    if (isa<handshake::NotOp>(cond.getDefiningOp()))
+    if (isa<NotOp>(cond.getDefiningOp()))
       cond = cond.getDefiningOp()->getOperand(0);
 
     // Case 1: if/else or loop cluster
@@ -264,7 +261,8 @@ outoforder::analyzeBranchesConditions(
       // Inputs: the data operand of the branch
       // Outputs: none
       // Internal ops: all the reachable operations from the branch
-      Cluster ifCluster(llvm::DenseSet<Value>{branchOp.getDataOperand()},
+      Cluster ifCluster(ClusterType::IfClsuter,
+                        llvm::DenseSet<Value>{branchOp.getDataOperand()},
                         llvm::DenseSet<Value>(), reachableOps);
       clusters.push_back(ifCluster);
     }
@@ -279,11 +277,10 @@ outoforder::analyzeBranchesConditions(
  *
  * @return The constant input to the MergeOp.
  */
-static Value getInitConstantInput(handshake::MergeOp mergeOp) {
+Value outoforder::getInitConstantInput(MergeOp mergeOp) {
   // Get the constant input to the MergeOp
   Value constantInput = mergeOp.getOperand(0);
-  if (auto constantOp =
-          dyn_cast<handshake::ConstantOp>(constantInput.getDefiningOp())) {
+  if (auto constantOp = dyn_cast<ConstantOp>(constantInput.getDefiningOp())) {
     return constantInput;
   }
   return mergeOp.getOperand(1);
@@ -314,8 +311,7 @@ static bool findPathsBetweenOps(Operation *currentOp,
   // Memoization
   visited.insert(currentOp);
 
-  if (isa<handshake::MemoryControllerOp>(currentOp) ||
-      isa<handshake::LSQOp>(currentOp)) {
+  if (isa<MemoryControllerOp>(currentOp) || isa<LSQOp>(currentOp)) {
     visited.insert(currentOp);
     return false;
   }
@@ -348,10 +344,9 @@ static bool findPathsBetweenOps(Operation *currentOp,
  * @param clusters A vector to store the created clusters.
  */
 void outoforder::createClusters(
-    llvm::DenseMap<Value,
-                   std::pair<llvm::SmallVector<handshake::MuxOp, 4>, bool>>
+    llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
         &condToMuxes,
-    llvm::DenseMap<Value, llvm::SmallVector<handshake::ConditionalBranchOp, 4>>
+    llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
         &condToBranches,
     std::vector<Cluster> &clusters) {
   // IMPORTANT REMARK: The generators of the condition are considered as
@@ -389,12 +384,11 @@ void outoforder::createClusters(
                       muxOp.getDataOperands().end());
         // inputs.insert(muxOp.getSelectOperand());
 
-        assert(
-            isa<handshake::MergeOp>(muxOp.getSelectOperand().getDefiningOp()) &&
-            "Loop MUX must be fed by INIT");
+        assert(isa<MergeOp>(muxOp.getSelectOperand().getDefiningOp()) &&
+               "Loop MUX must be fed by INIT");
 
-        handshake::MergeOp init = dyn_cast<handshake::MergeOp>(
-            muxOp.getSelectOperand().getDefiningOp());
+        MergeOp init =
+            dyn_cast<MergeOp>(muxOp.getSelectOperand().getDefiningOp());
 
         assert(
             init &&
@@ -494,7 +488,9 @@ void outoforder::createClusters(
         outputs.insert(muxOp.getResult());
       }
     }
-    Cluster cluster(inputs, outputs, internalOps);
+    Cluster cluster(((pair.second.second) ? ClusterType::LoopCluster
+                                          : ClusterType::IfElseCluster),
+                    inputs, outputs, internalOps);
     clusters.push_back(cluster);
   }
 }
@@ -509,7 +505,7 @@ void outoforder::createClusters(
  * @param funcOp   The handshake function.
  * @param clusters Appends the global cluster to this vector.
  */
-void outoforder::createGlobalCluster(handshake::FuncOp funcOp,
+void outoforder::createGlobalCluster(FuncOp funcOp,
                                      std::vector<Cluster> &clusters) {
   // Inputs: start
   // Outputs: the inputs of EndOp
@@ -520,17 +516,16 @@ void outoforder::createGlobalCluster(handshake::FuncOp funcOp,
   llvm::DenseSet<Value> outputs;
 
   for (auto &op : funcOp.getBody().getOps()) {
-    if (handshake::EndOp end = dyn_cast<handshake::EndOp>(op)) {
+    if (EndOp end = dyn_cast<EndOp>(op)) {
       outputs.insert(end.getOperands().begin(), end.getOperands().end());
-    } else if (isa<handshake::MemoryControllerOp>(op) ||
-               isa<handshake::LSQOp>(op)) {
+    } else if (isa<MemoryControllerOp>(op) || isa<LSQOp>(op)) {
       continue;
     } else {
       globalOps.insert(&op);
     }
   }
   inputs.insert((Value)funcOp.getArguments().back());
-  Cluster graphCluster(inputs, outputs, globalOps);
+  Cluster graphCluster(ClusterType::GlobalCluster, inputs, outputs, globalOps);
   clusters.push_back(graphCluster);
 }
 

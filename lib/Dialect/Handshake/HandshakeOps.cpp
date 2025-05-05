@@ -433,17 +433,18 @@ LogicalResult BufferOp::verify() {
 
   auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
   if (!bufferTypeAttr)
-    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
 
   auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
   if (!numSlotsAttr)
-    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
 
   StringRef bufferType = bufferTypeAttr.getValue();
   unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
 
-  if ((bufferType == ONE_SLOT_BREAK_DV ||
-       bufferType == ONE_SLOT_BREAK_R ||
+  if ((bufferType == ONE_SLOT_BREAK_DV || bufferType == ONE_SLOT_BREAK_R ||
        bufferType == ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
@@ -2020,6 +2021,25 @@ LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
 // ExtFOp
 //===----------------------------------------------------------------------===//
 LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
+
+//===----------------------------------------------------------------------===//
+// ExtractOp
+//===----------------------------------------------------------------------===//
+LogicalResult ExtractOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties, RegionRange,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+
+  Type channelLikeType = operands.front().getType();
+  if (auto channelType = dyn_cast<handshake::ChannelType>(channelLikeType)) {
+    inferredReturnTypes.push_back(ChannelType::get(channelType.getDataType()));
+  } else {
+    assert(isa<handshake::ControlType>(channelLikeType) && "expected control");
+    inferredReturnTypes.push_back(handshake::ControlType::get(context));
+  }
+
+  return success();
+}
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"

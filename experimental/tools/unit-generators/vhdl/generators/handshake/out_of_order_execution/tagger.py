@@ -16,7 +16,7 @@ def generate_tagger(name, params):
       if name not in input_extra_signals
   }
   current_tag = next(iter(unique_data_out_signals))
-
+  
   if input_extra_signals:
     return _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, input_extra_signals)
   elif data_bitwidth == 0:

@@ -225,12 +225,12 @@ def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> s
 
     if not port_2d:
       # Assign all extra signals to this output port
-      for signal_name in extra_signals:
+      for signal_name in out_port["extra_signals"]:
         extra_signal_assignments.append(
             f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
     else:
       port_size = out_port["size"]
-      for signal_name in extra_signals:
+      for signal_name in out_port["extra_signals"]:
         for i in range(port_size):
           extra_signal_assignments.append(
             f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")

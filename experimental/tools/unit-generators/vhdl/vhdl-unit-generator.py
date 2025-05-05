@@ -38,12 +38,13 @@ import generators.handshake.speculation.speculator as speculator
 import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
-import generators.handshake.tagger as tagger
-import generators.handshake.untagger as untagger
-import generators.handshake.free_tags_fifo as fifo
+import generators.handshake.out_of_order_execution.tagger as tagger
+import generators.handshake.out_of_order_execution.untagger as untagger
+import generators.handshake.out_of_order_execution.free_tags_fifo as fifo
 import generators.handshake.join as join
 import generators.handshake.demux as demux
 import generators.handshake.shli as shli
+import generators.handshake.extract as extract
 
 
 def generate_code(name, mod_type, parameters):
@@ -126,6 +127,8 @@ def generate_code(name, mod_type, parameters):
       return demux.generate_demux(name, parameters)
     case "join":
       return join.generate_join(name, parameters)
+    case "extract":
+      return extract.generate_extract(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

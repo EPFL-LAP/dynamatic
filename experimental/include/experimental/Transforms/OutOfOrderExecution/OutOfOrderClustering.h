@@ -25,14 +25,25 @@ namespace dynamatic {
 namespace experimental {
 namespace outoforder {
 
+// Enum representing the structural type of a cluster.
+// - LoopCluster: A cluster representing a loop construct.
+// - IfElseCluster: A cluster representing an if-else conditional structure.
+// - IfCluster: A cluster representing a simple if (no else) structure.
+// - GlobalCluster: A top-level cluster containing the entire function body
+//   except memory and end operations.
+enum ClusterType { LoopCluster, IfElseCluster, IfClsuter, GlobalCluster };
+
 struct Cluster {
+  ClusterType type;
+  bool markedOutOfOrder;
   llvm::DenseSet<Value> inputs;
   llvm::DenseSet<Value> outputs;
   llvm::DenseSet<Operation *> internalOps;
 
-  Cluster(llvm::DenseSet<Value> inputs, llvm::DenseSet<Value> outputs,
+  Cluster(ClusterType type, llvm::DenseSet<Value> inputs,
+          llvm::DenseSet<Value> outputs,
           llvm::DenseSet<Operation *> internalOps)
-      : inputs(std::move(inputs)), outputs(std::move(outputs)),
+      : type(type), inputs(std::move(inputs)), outputs(std::move(outputs)),
         internalOps(std::move(internalOps)) {}
   Cluster() = default;
   Cluster(const Cluster &other) = default;
@@ -76,8 +87,55 @@ struct Cluster {
     return false;
   }
 
+  /// Checks whether a Mux operation lies on the boundary of the cluster.
+  /// A Mux is considered at the boundary if any of its data operands
+  /// are among the cluster's
+  // 1- Loop Cluster: input values.
+  // 1- If/else Cluster: output values.
+  bool isMuxAtBoundary(Operation *op) {
+    if (handshake::MuxOp muxOp = dyn_cast<handshake::MuxOp>(op)) {
+      if (type == ClusterType::LoopCluster) {
+        for (Value muxOperand : muxOp.getDataOperands()) {
+          if (inputs.contains(muxOperand))
+            return true;
+        }
+      }
+      if (type == ClusterType::IfElseCluster)
+        return outputs.contains(muxOp.getResult());
+    }
+    return false;
+  }
+
+  /// Returns the MUX operations at the boundary of the cluster.
+  /// A Mux is considered at the boundary if any of its data operands
+  /// are among the cluster's
+  // 1- Loop Cluster: input values.
+  // 1- If/else Cluster: output values.
+  llvm::DenseSet<handshake::MuxOp> getMuxesAtBoundary() {
+    llvm::DenseSet<handshake::MuxOp> boundaryMuxes;
+    for (Operation *op : internalOps) {
+      if (isMuxAtBoundary(op))
+        boundaryMuxes.insert(dyn_cast<handshake::MuxOp>(op));
+    }
+    return boundaryMuxes;
+  }
+
   // Adds an operation to the cluster by inserting it into its internal ops
   void addInternalOp(Operation *op) { internalOps.insert(op); }
+
+  // Removes an operation to the cluster by erasing it from its internal ops
+  void removeInternalOp(Operation *op) { internalOps.erase(op); }
+
+  // Replaces an old input with a new one in the cluster's input set.
+  void replaceInput(Value oldInput, Value newInput) {
+    for (Value input : inputs) {
+      if (input == oldInput) {
+        inputs.erase(oldInput);
+        inputs.insert(newInput);
+        break;
+      }
+    }
+  }
 
   void print(llvm::raw_ostream &os) const {
     os << "Cluster: \n";
@@ -108,14 +166,34 @@ struct ClusterHierarchyNode {
 
   ClusterHierarchyNode(const Cluster &c) : cluster(c) {}
 
-  // Adds op to this cluster and all ancestor clusters
+  // Adds an operation to this cluster and all ancestor clusters
   void addInternalOp(Operation *op) {
     cluster.addInternalOp(op);
 
     if (parent)
       parent->addInternalOp(op);
   }
+
+  // Removes an operation from this cluster and all ancestor clusters
+  void removeInternalOp(Operation *op) {
+    cluster.removeInternalOp(op);
+
+    if (parent)
+      parent->removeInternalOp(op);
+  }
+
+  // Recursively replaces an input in the current cluster and all child
+  // clusters.
+  void replaceInputInChildren(Value oldInput, Value newInput) {
+    cluster.replaceInput(oldInput, newInput);
+
+    for (ClusterHierarchyNode *child : children)
+      child->replaceInputInChildren(oldInput, newInput);
+  }
 };
+
+// Gets the constant feeding the init
+Value getInitConstantInput(handshake::MergeOp mergeOp);
 
 // Analyzes the MUXes in a handshake function and groups them by their
 // conditions.

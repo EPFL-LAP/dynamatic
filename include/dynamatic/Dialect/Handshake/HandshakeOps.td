@@ -584,6 +584,32 @@ def DemuxOp : Handshake_Op<"demux", [
   let hasCustomAssemblyFormat = 1;
 }
 
+def ExtractOp : Handshake_Op<"extract", [
+  Pure,
+  HasExtraSignal<"operand">,
+  IsSimpleHandshake<"result">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  ]> {
+  let summary = "extract operation";
+  let description = [{
+    The extract operation takes a data channel with additional signals (such as tags or spec bits)
+    as input and removes these extra signals, returning only the core data.
+
+    Example:
+
+    ```mlir
+    extract %data : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:`  custom<HandshakeType>(type($operand)) `,`  custom<HandshakeType>(type($result))
+  }];
+}
+
 def SinkOp : Handshake_Op<"sink"> {
   let summary = "sink operation";
   let description = [{

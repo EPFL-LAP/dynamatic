@@ -343,6 +343,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.fork" || modName == "handshake.merge" ||
       modName == "handshake.muli" || modName == "handshake.sink" ||
       modName == "handshake.subi" || modName == "handshake.shli" ||
+      modName == "handshake.extract" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -458,7 +459,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extui" || modName == "handshake.shli" ||
       modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
-      modName == "handshake.control_merge" ||
+      modName == "handshake.control_merge" || modName == "handshake.extract" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
@@ -475,7 +476,9 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (modName == "handshake.mux") {
-    serializedParams["EXTRA_SIGNALS"] =
+    serializedParams["INDEX_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
+    serializedParams["DATA_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(1));
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram" ||
