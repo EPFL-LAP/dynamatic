@@ -14,18 +14,16 @@ void float_basic(in_float_t A[30][30], in_float_t B[30][30], out_float_t y[30],
   for (i = 0; i < 30; i++) {
     float t_y = 0;
 
-    float a_val = A[i][0];
+    //float a_val = A[i][0];
+    float a_val;
     float b_val = A[i][1];
-    float c_val = A[i][2];
+    //float c_val = A[i][2];
+    float c_val;
     float d_val = A[i][3];
     float e_val = A[i][4];
-    //__tester(a_val, b_val, bitw);
-    //__tester(a_val, b_val, c_val, d_val, e_val, bitw);
     float callres = __tester(a_val, b_val, c_val, d_val, e_val, bitw);
-    //float result = a_val + b_val;
     float result = a_val + b_val + c_val - d_val - e_val;
-
-    //example to showcase multiple users of outputs
+    
     float result2 = c_val * d_val;
     float result3 = c_val + c_val;
 
