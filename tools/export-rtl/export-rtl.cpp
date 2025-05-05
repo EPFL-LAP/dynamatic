@@ -456,7 +456,11 @@ void WriteModData::writeSignalDeclarations(
         })
         .Case<IntegerType>([&](IntegerType intType) {
           // @jiahui17: this is a very bad hack to force the type to be an array
-          // when the array only has one element.
+          // when the array only has one element:
+          // - getRawType specifies std_logic instead of std_logic_vector when
+          // the bitwidth is 1 (in VHDL).
+          // - However, address signals should still be declared as
+          // std_logic_vector, even when their bitwidth is 1.
           bool forceArrayType =
               valueAndName.second.find("_address") != std::string::npos ||
               valueAndName.second.find("_loadAddr") != std::string::npos ||
@@ -551,6 +555,10 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
         .Case<IntegerType>([&](IntegerType intType) {
           // @jiahui17: this is a very bad hack to force the type to be an array
           // when the array only has one element.
+          // - getRawType specifies std_logic instead of std_logic_vector when
+          // the bitwidth is 1 (in VHDL).
+          // - However, address signals should still be declared as
+          // std_logic_vector, even when their bitwidth is 1.
           bool forceArrayType =
               portName.find("_address") != std::string::npos ||
               portName.find("_loadAddr") != std::string::npos ||
