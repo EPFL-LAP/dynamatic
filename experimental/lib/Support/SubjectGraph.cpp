@@ -206,7 +206,7 @@ void ArithSubjectGraph::connectInputNodes() {
 }
 
 ChannelSignals &
-ArithSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
+ArithSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
@@ -554,14 +554,8 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
     : BaseSubjectGraph(op) {
   auto cstOp = llvm::dyn_cast<handshake::ConstantOp>(op);
   handshake::ChannelType cstType = cstOp.getResult().getType();
-  unsigned bitwidth = cstType.getDataBitWidth();
-  dataWidth = bitwidth;
+  dataWidth = cstType.getDataBitWidth();
   fullPath = appendVarsToPath({dataWidth}, moduleType);
-
-  if (bitwidth > 64) {
-    op->emitError("Operation Unsupported"); 
-    return;
-  }
 
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
