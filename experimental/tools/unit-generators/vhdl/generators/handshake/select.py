@@ -137,12 +137,78 @@ end architecture;
   return antitokens + entity + architecture
 
 
+def _generate_concat(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+  concat_decls = []
+  concat_assignments = []
+  # Concatenate trueValue data and extra signals to create trueValue_inner
+  assignments, decls = generate_concat(
+      "trueValue", bitwidth, "trueValue_inner", concat_layout)
+  concat_assignments.extend(assignments)
+  # Declare trueValue_inner data signal
+  concat_decls.extend(decls["out"])
+
+  # Forward trueValue_inner handshake to trueValue_inner
+  assignments, decls = generate_handshake_forwarding(
+      "trueValue", "trueValue_inner")
+  concat_assignments.extend(assignments)
+  # Declare trueValue_inner handshake
+  concat_decls.extend(decls["out"])
+
+  # Concatenate falseValue data and extra signals to create falseValue_inner
+  assignments, decls = generate_concat(
+      "falseValue", bitwidth, "falseValue_inner", concat_layout)
+  concat_assignments.extend(assignments)
+  # Declare falseValue_inner data signal
+  concat_decls.extend(decls["out"])
+
+  # Forward falseValue_inner handshake to falseValue_inner
+  assignments, decls = generate_handshake_forwarding(
+      "falseValue", "falseValue_inner")
+  concat_assignments.extend(assignments)
+  # Declare falseValue_inner handshake
+  concat_decls.extend(decls["out"])
+
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_decls = []
+  slice_assignments = []
+
+  # Slice result_inner_concat to create result_inner data and extra signals
+  assignments, decls = generate_slice(
+      "result_inner_concat", "result_inner", bitwidth, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare both result_inner_concat data signal and result_inner data and extra signals
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  # Forward result_inner_concat handshake to result_inner
+  assignments, decls = generate_handshake_forwarding(
+      "result_inner_concat", "result_inner")
+  slice_assignments.extend(assignments)
+  # Declare both result_inner_concat handshake and result_inner handshake
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
+
+
+def _generate_forwarding(extra_signals: dict) -> str:
+  forwarding_assignments = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    # Signal-wise forwarding of extra signals from condition and result_inner to result
+    assignments, _ = generate_signal_wise_forwarding(
+        ["condition", "result_inner"], ["result"], signal_name, signal_bitwidth)
+    forwarding_assignments.extend(assignments)
+
+  return "\n  ".join(forwarding_assignments)
+
+
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
   # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals)
   extra_signals_total_bitwidth = concat_layout.total_bitwidth
-
-  extra_signal_names = list(extra_signals)
 
   inner_name = f"{name}_inner"
   inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
@@ -165,56 +231,11 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       "extra_signals": extra_signals
   }])
 
-  concat_decls = []
-  concat_assignments = []
-  assignments, decls = generate_concat(
-      "trueValue", bitwidth, "trueValue_inner", concat_layout)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "trueValue", "trueValue_inner")
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  assignments, decls = generate_concat(
-      "falseValue", bitwidth, "falseValue_inner", concat_layout)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "falseValue", "falseValue_inner")
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  concat_assignments = "\n  ".join(concat_assignments)
-  concat_decls = "\n  ".join(concat_decls)
-
-  slice_decls = []
-  slice_assignments = []
-
-  assignments, decls = generate_slice(
-      "result_inner_concat", "result_inner", bitwidth, concat_layout)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "result_inner_concat", "result_inner")
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  slice_assignments = "\n  ".join(slice_assignments)
-  slice_decls = "\n  ".join(slice_decls)
-
-  forwarding_assignments = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    assignments, _ = generate_signal_wise_forwarding(
-        ["condition", "result_inner"], ["result"], signal_name, signal_bitwidth)
-    forwarding_assignments.extend(assignments)
-
-  forwarding_assignments = "\n  ".join(forwarding_assignments)
+  concat_assignments, concat_decls = _generate_concat(
+      bitwidth, concat_layout)
+  slice_assignments, slice_decls = _generate_slice(
+      bitwidth, concat_layout)
+  forwarding_assignments = _generate_forwarding(extra_signals)
 
   architecture = f"""
 -- Architecture of selector signal manager

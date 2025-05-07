@@ -206,7 +206,7 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
   assignments, decls = generate_slice(
       "outs_inner_concat", "outs_inner", data_bitwidth, concat_layout)
   slice_assignments.extend(assignments)
-  # Declare both outs_inner_concat data signal and outs_inner data signal
+  # Declare both outs_inner_concat data signal and outs_inner data and extra signals
   slice_decls.extend(decls["in"])
   slice_decls.extend(decls["out"])
 
