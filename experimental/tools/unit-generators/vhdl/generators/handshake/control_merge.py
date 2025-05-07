@@ -171,7 +171,8 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_cmerge_index_extra_signal_assignments(index_name: str, index_extra_signals: ExtraSignals) -> str:
+# TODO: Update CMerge's type constraints and remove this function
+def _generate_index_extra_signal_assignments(index_name: str, index_extra_signals: ExtraSignals) -> str:
   """
   Generate VHDL assignments for extra signals on the index port (cmerge).
 
@@ -185,6 +186,48 @@ def _generate_cmerge_index_extra_signal_assignments(index_name: str, index_extra
     index_extra_signals_list.append(
         f"  {index_name}_{signal_name} <= {get_default_extra_signal_value(signal_name)};")
   return "\n  ".join(index_extra_signals_list)
+
+
+def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int) -> tuple[str, str]:
+  concat_assignments = []
+  concat_decls = []
+
+  # Concatenate ins data and extra signals to create ins_inner
+  assignments, decls = generate_concat(
+      "ins", data_bitwidth, "ins_inner", concat_layout, size)
+  concat_assignments.extend(assignments)
+  # Declare ins_inner data
+  concat_decls.extend(decls["out"])
+
+  # Forward ins handshake to ins_inner
+  assignments, decls = generate_handshake_forwarding(
+      "ins", "ins_inner", size)
+  concat_assignments.extend(assignments)
+  # Declare ins_inner handshake
+  concat_decls.extend(decls["out"])
+
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_decls = []
+  slice_assignments = []
+
+  # Slice outs_inner data to create outs data and extra signals
+  assignments, decls = generate_slice(
+      "outs_inner", "outs", data_bitwidth, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare outs_inner data and extra signals
+  slice_decls.extend(decls["in"])
+
+  # Forward outs_inner handshake to outs
+  assignments, decls = generate_handshake_forwarding(
+      "outs_inner", "outs")
+  slice_assignments.extend(assignments)
+  # Declare outs_inner handshake
+  slice_decls.extend(decls["in"])
+
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
@@ -216,52 +259,24 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   inner = _generate_control_merge(
       inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
 
-  concat_assignments = []
-  concat_decls = []
+  concat_assignments, concat_decls = _generate_concat(
+      data_bitwidth, concat_layout, size)
 
-  assignments, decls = generate_concat(
-      "ins", data_bitwidth, "ins_inner", concat_layout, size)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "ins", "ins_inner", size)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  concat_assignments = "\n  ".join(concat_assignments)
-  concat_decls = "\n  ".join(concat_decls)
-
-  slice_decls = []
-  slice_assignments = []
-
-  assignments, decls = generate_slice(
-      "outs_inner", "outs", data_bitwidth, concat_layout, size)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "outs_inner", "outs", size)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  slice_assignments = "\n  ".join(slice_assignments)
-  slice_decls = "\n  ".join(slice_decls)
+  slice_assignments, slice_decls = _generate_slice(
+      data_bitwidth, concat_layout)
 
   # Assign index extra signals
-  index_extra_signal_assignments = _generate_cmerge_index_extra_signal_assignments(
+  index_extra_signal_assignments = _generate_index_extra_signal_assignments(
       "index", extra_signals)
 
   architecture = f"""
 -- Architecture of signal manager (cmerge)
 architecture arch of {name} is
-  -- Concatenated data and extra signals
+  -- Concat/slice data and extra signals
   {concat_decls}
   {slice_decls}
 begin
-  -- Concatenate data and extra signals
+  -- Concat/slice data and extra signals
   {concat_assignments}
   {slice_assignments}
 
