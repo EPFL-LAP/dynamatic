@@ -1,6 +1,7 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout, generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
 from generators.handshake.tehb import generate_tehb
+from generators.support.signal_manager.utils.types import ExtraSignals
 
 
 def generate_mux(name, params):
@@ -176,6 +177,61 @@ end architecture;
   return dependencies + entity + architecture
 
 
+def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int) -> tuple[str, str]:
+  concat_decls = []
+  concat_assignments = []
+
+  # Concatenate ins data and extra signals to create ins_inner
+  assignments, decls = generate_concat(
+      "ins", data_bitwidth, "ins_inner", concat_layout, size)
+  concat_assignments.extend(assignments)
+  # Declare ins_inner data
+  concat_decls.extend(decls["out"])
+
+  # Forward ins handshake to ins_inner
+  assignments, decls = generate_handshake_forwarding(
+      "ins", "ins_inner", size)
+  concat_assignments.extend(assignments)
+  # Declare ins_inner handshake
+  concat_decls.extend(decls["out"])
+
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_decls = []
+  slice_assignments = []
+
+  # Slice outs_inner_concat to create outs_inner data and extra signals
+  assignments, decls = generate_slice(
+      "outs_inner_concat", "outs_inner", data_bitwidth, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare both outs_inner_concat data signal and outs_inner data signal
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  # Forward outs_inner_concat handshake to outs_inner
+  assignments, decls = generate_handshake_forwarding(
+      "outs_inner_concat", "outs_inner")
+  slice_assignments.extend(assignments)
+  # Declare both outs_inner_concat handshake and outs_inner handshake
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
+
+
+def _generate_forwarding(extra_signals: ExtraSignals) -> str:
+  forwarding_assignments = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    # Signal-wise forwarding of extra signals from ins_inner and outs_inner to outs
+    assignments, _ = generate_signal_wise_forwarding(
+        ["index", "outs_inner"], ["outs"], signal_name, signal_bitwidth)
+    forwarding_assignments.extend(assignments)
+
+  return "\n  ".join(forwarding_assignments)
+
+
 def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
   # Generate signal manager entity
   entity = generate_entity(
@@ -206,47 +262,11 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
   inner = _generate_mux(inner_name, size, index_bitwidth,
                         extra_signals_bitwidth + data_bitwidth)
 
-  concat_decls = []
-  concat_assignments = []
-
-  assignments, decls = generate_concat(
-      "ins", data_bitwidth, "ins_inner", concat_layout, size)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "ins", "ins_inner", size)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-
-  concat_assignments = "\n  ".join(concat_assignments)
-  concat_decls = "\n  ".join(concat_decls)
-
-  slice_decls = []
-  slice_assignments = []
-
-  assignments, decls = generate_slice(
-      "outs_inner_concat", "outs_inner", data_bitwidth, concat_layout, size)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  assignments, decls = generate_handshake_forwarding(
-      "outs_inner_concat", "outs_inner", size)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
-  slice_assignments = "\n  ".join(slice_assignments)
-  slice_decls = "\n  ".join(slice_decls)
-
-  forwarding_assignments = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    assignments, _ = generate_signal_wise_forwarding(
-        ["index", "outs_inner"], ["outs"], signal_name, signal_bitwidth)
-    forwarding_assignments.extend(assignments)
-
-  forwarding_assignments = "\n  ".join(forwarding_assignments)
+  concat_assignments, concat_decls = _generate_concat(
+      data_bitwidth, concat_layout, size)
+  slice_assignments, slice_decls = _generate_slice(
+      data_bitwidth, concat_layout)
+  forwarding_assignments = _generate_forwarding(extra_signals)
 
   architecture = f"""
 -- Architecture of signal manager (mux)

@@ -89,6 +89,30 @@ end architecture;
   return dependencies + entity + architecture
 
 
+def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
+  concat_assignments = []
+  concat_decls = []
+  # Concatenate addrIn extra signals to create signals_pre_buffer
+  assignments, decls = generate_concat(
+      "addrIn", 0, "signals_pre_buffer", concat_layout)
+  concat_assignments.extend(assignments)
+  # Declare signals_pre_buffer data signal
+  concat_decls.extend(decls["out"])
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_assignments = []
+  slice_decls = []
+  # Slice signals_post_buffer to create dataOut data and extra signals
+  assignments, decls = generate_slice(
+      "signals_post_buffer", "dataOut", 0, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare signals_post_buffer data signal
+  slice_decls.extend(decls["in"])
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
+
+
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Get concatenation details for extra signals
   concat_layout = ConcatLayout(extra_signals)
@@ -122,42 +146,20 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  buff_in_name = "buff_in"
-  concat_assignments = []
-  concat_decls = []
-  assignments, decls = generate_concat(
-      "addrIn", 0, buff_in_name, concat_layout)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-  concat_assignments = "\n  ".join(concat_assignments)
-  concat_decls = "\n  ".join(concat_decls)
-
-  buff_out_name = "buff_out"
-  slice_assignments = []
-  slice_decls = []
-  assignments, decls = generate_slice(
-      buff_out_name, "dataOut", 0, concat_layout)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_assignments = "\n  ".join(slice_assignments)
-  slice_decls = "\n  ".join(slice_decls)
+  concat_assignments, concat_decls = _generate_concat(concat_layout)
+  slice_assignments, slice_decls = _generate_slice(concat_layout)
 
   architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
-  signal addrIn_ready_inner : std_logic;
-  signal ofifo_ready : std_logic;
   -- Concatenated signals
   {concat_decls}
   {slice_decls}
   -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
-  -- addrIn_ready <= addrIn_ready_inner and ofifo_ready; -- Conservative
-  addrIn_ready <= addrIn_ready_inner; -- Assuming MC latency is 1 and ofifo is always ready
-
   -- Transfer signal assignments
-  transfer_in <= addrIn_valid and addrIn_ready_inner;
+  transfer_in <= addrIn_valid and addrIn_ready;
   transfer_out <= dataOut_valid and dataOut_ready;
 
   -- Concatenate extra signals
@@ -171,10 +173,10 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      ins => addrIn_inner,
+      ins => signals_pre_buffer,
       ins_valid => transfer_in,
-      ins_ready => ofifo_ready,
-      outs => dataOut_inner,
+      ins_ready => open,
+      outs => signals_post_buffer,
       outs_valid => open,
       outs_ready => transfer_out
     );
@@ -185,7 +187,7 @@ begin
       rst => rst,
       addrIn => addrIn,
       addrIn_valid => addrIn_valid,
-      addrIn_ready => addrIn_ready_inner,
+      addrIn_ready => addrIn_ready,
       addrOut => addrOut,
       addrOut_valid => addrOut_valid,
       addrOut_ready => addrOut_ready,
