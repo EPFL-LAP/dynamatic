@@ -272,7 +272,6 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   architecture = f"""
 -- Architecture of signal manager (cmerge)
 architecture arch of {name} is
-  -- Concat/slice data and extra signals
   {concat_decls}
   {slice_decls}
 begin

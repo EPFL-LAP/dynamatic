@@ -271,7 +271,6 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
   architecture = f"""
 -- Architecture of signal manager (mux)
 architecture arch of {name} is
-  -- Concatenated data and extra signals
   {concat_decls}
   {slice_decls}
 begin

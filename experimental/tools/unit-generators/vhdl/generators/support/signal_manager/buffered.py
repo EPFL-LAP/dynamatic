@@ -4,23 +4,61 @@ from .utils.types import Port, ExtraSignals
 from .utils.concat import ConcatLayout, generate_signal_wise_forwarding, generate_signal_direct_forwarding, generate_concat, generate_slice, subtract_extra_signals, generate_mapping
 
 
-def _generate_buffered_transfer_logic(
-    in_ports: list[Port],
-    out_ports: list[Port],
-    transfer_in_name: str,
-    transfer_out_name: str
-) -> str:
-  """
-  Generate `transfer_in` and `transfer_out` logic based on the valid/ready
-  handshake of the first input and output ports.
-  """
-
+def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> str:
   first_in_port_name = in_ports[0]["name"]
   first_out_port_name = out_ports[0]["name"]
 
   return f"""
-  {transfer_in_name} <= {first_in_port_name}_valid and {first_in_port_name}_ready;
-  {transfer_out_name} <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
+  transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
+  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
+
+
+def _generate_forwarding(in_channel_names: list[str], extra_signals: ExtraSignals) -> tuple[str, str]:
+  forwarded_assignments = []
+  forwarded_decls = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    # Signal-wise forwarding of extra signals from in_ports to `forwarded`
+    assignments, decls = generate_signal_wise_forwarding(
+        in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
+    forwarded_assignments.extend(assignments)
+    # Declare extra signals of `forwarded` channel
+    forwarded_decls.extend(decls["out"])
+  return "\n  ".join(forwarded_assignments), "\n  ".join(forwarded_decls)
+
+
+def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
+  concat_assignments = []
+  concat_decls = []
+  # Concatenate `forwarded` extra signals to create `signals_pre_buffer`
+  assignments, decls = generate_concat(
+      "forwarded", 0, "signals_pre_buffer", concat_layout)
+  concat_assignments.extend(assignments)
+  # Declare `signals_pre_buffer` data signal
+  concat_decls.extend(decls["out"])
+
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(out_channel_names: list[str], concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_assignments = []
+  slice_decls = []
+
+  # Slice `signals_post_buffer` to create `sliced` data and extra signals
+  assignments, decls = generate_slice(
+      "signals_post_buffer", "sliced", 0, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare both `signals_post_buffer` data signal and `sliced` data and extra signals
+  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["out"])
+
+  for signal_name, signal_bitwidth in concat_layout.extra_signals().items():
+    for out_channel_name in out_channel_names:
+      # Assign the extra signals of `sliced` to the output channel
+      assignments, _ = generate_signal_direct_forwarding(
+          "sliced", out_channel_name, signal_name, signal_bitwidth)
+      slice_assignments.extend(assignments)
+
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 
 def generate_buffered_signal_manager(
@@ -70,55 +108,17 @@ def generate_buffered_signal_manager(
   })
 
   # Generate transfer handshake logic
-  transfer_in_name = "transfer_in"
-  transfer_out_name = "transfer_out"
-  transfer_logic = _generate_buffered_transfer_logic(
-      in_ports, out_ports, transfer_in_name, transfer_out_name)
+  transfer_logic = _generate_transfer_logic(
+      in_ports, out_ports)
 
-  # Assign extra signals to FIFO input/output
-  # buff_in_name = "buff_in"
-  # buff_out_name = "buff_out"
-  # signal_assignments = _generate_buffered_signal_assignments(
-  #     in_ports, out_ports, concat_layout, extra_signals, buff_in_name, buff_out_name)
   in_channel_names = [port["name"] for port in in_ports]
-  forwarded_name = "forwarded"
-  forwarded_assignments = []
-  forwarded_decls = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    assignments, decls = generate_signal_wise_forwarding(
-        in_channel_names, [forwarded_name], signal_name, signal_bitwidth)
-    forwarded_assignments.extend(assignments)
-    forwarded_decls.extend(decls["out"])
-  forwarded_assignments = "\n  ".join(forwarded_assignments)
-  forwarded_decls = "\n  ".join(forwarded_decls)
+  out_channel_names = [port["name"] for port in out_ports]
 
-  buff_in_name = "buff_in"
-  concat_assignments = []
-  concat_decls = []
-  assignments, decls = generate_concat(
-      forwarded_name, 0, buff_in_name, concat_layout)
-  concat_assignments.extend(assignments)
-  concat_decls.extend(decls["out"])
-  concat_assignments = "\n  ".join(concat_assignments)
-  concat_decls = "\n  ".join(concat_decls)
-
-  buff_out_name = "buff_out"
-  sliced_name = "sliced"
-  slice_assignments = []
-  slice_decls = []
-  assignments, decls = generate_slice(
-      buff_out_name, sliced_name, 0, concat_layout)
-  slice_assignments.extend(assignments)
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-  for signal_name, signal_bitwidth in extra_signals.items():
-    for out_port in out_ports:
-      port_name = out_port["name"]
-      assignments, _ = generate_signal_direct_forwarding(
-          sliced_name, port_name, signal_name, signal_bitwidth)
-      slice_assignments.extend(assignments)
-  slice_assignments = "\n  ".join(slice_assignments)
-  slice_decls = "\n  ".join(slice_decls)
+  forwarded_assignments, forwarded_decls = _generate_forwarding(
+      in_channel_names, extra_signals)
+  concat_assignments, concat_decls = _generate_concat(concat_layout)
+  slice_assignments, slice_decls = _generate_slice(
+      out_channel_names, concat_layout)
 
   # Map data ports and untouched extra signals directly to inner component
   mapped_ports: list[Port] = []
@@ -141,7 +141,7 @@ architecture arch of {name} is
   {forwarded_decls}
   {concat_decls}
   {slice_decls}
-  signal {transfer_in_name}, {transfer_out_name} : std_logic;
+  signal transfer_in, transfer_out : std_logic;
 begin
   -- Transfer signal assignments
   {transfer_logic}
@@ -164,12 +164,12 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      ins => {buff_in_name},
-      ins_valid => {transfer_in_name},
+      ins => signals_pre_buffer,
+      ins_valid => transfer_in,
       ins_ready => open,
-      outs => {buff_out_name},
+      outs => signals_post_buffer,
       outs_valid => open,
-      outs_ready => {transfer_out_name}
+      outs_ready => transfer_out
     );
 end architecture;
 """

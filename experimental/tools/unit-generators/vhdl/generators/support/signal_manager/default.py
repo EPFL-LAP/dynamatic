@@ -4,6 +4,17 @@ from .utils.types import Port, ExtraSignals
 from .utils.concat import generate_signal_wise_forwarding, subtract_extra_signals, generate_mapping
 
 
+def _generate_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signals: ExtraSignals) -> str:
+  extra_signal_assignments = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    # Signal-wise forwarding of extra signals from input channels to output channels
+    assignments, _ = generate_signal_wise_forwarding(
+        in_channel_names, out_channel_names, signal_name, signal_bitwidth)
+    extra_signal_assignments.extend(assignments)
+
+  return "\n  ".join(extra_signal_assignments)
+
+
 def generate_default_signal_manager(
     name: str,
     in_ports: list[Port],
@@ -40,15 +51,8 @@ def generate_default_signal_manager(
 
   in_channel_names = [port["name"] for port in in_ports]
   out_channel_names = [port["name"] for port in out_ports]
-
-  # Generate the VHDL assignments for forwarding the extra signals from input to output
-  extra_signal_assignments = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    assignments, _ = generate_signal_wise_forwarding(
-        in_channel_names, out_channel_names, signal_name, signal_bitwidth)
-    extra_signal_assignments.extend(assignments)
-
-  extra_signal_assignments = "\n  ".join(extra_signal_assignments)
+  extra_signal_assignments = _generate_forwarding(
+      in_channel_names, out_channel_names, extra_signals)
 
   # Map data ports and untouched extra signals to inner component
   mappings = []

@@ -152,17 +152,15 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
   architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
-  -- Concatenated signals
   {concat_decls}
   {slice_decls}
-  -- Transfer signals
   signal transfer_in, transfer_out : std_logic;
 begin
   -- Transfer signal assignments
   transfer_in <= addrIn_valid and addrIn_ready;
   transfer_out <= dataOut_valid and dataOut_ready;
 
-  -- Concatenate extra signals
+  -- Concat/slice extra signals
   {concat_assignments}
   {slice_assignments}
 
