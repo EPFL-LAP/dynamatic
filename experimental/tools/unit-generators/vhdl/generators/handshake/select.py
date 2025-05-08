@@ -183,17 +183,6 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
   slice_decls.extend(decls["in"])
   slice_decls.extend(decls["out"])
 
-  # Forward result_inner data to result
-  assignments.append("  result <= result_inner;")
-
-  # Forward result_inner_concat handshake to result
-  assignments, decls = generate_handshake_forwarding(
-      "result_inner_concat", "result")
-  slice_assignments.extend(assignments)
-  # Declare both result_inner_concat handshake and result handshake
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
-
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 
@@ -254,8 +243,6 @@ begin
   {forwarding_assignments}
 
   result <= result_inner;
-  result_valid <= result_inner_valid;
-  result_inner_ready <= result_ready;
 
   inner : entity work.{inner_name}(arch)
     port map(
@@ -271,8 +258,8 @@ begin
       falseValue_valid => falseValue_valid,
       falseValue_ready => falseValue_ready,
       result => result_inner_concat,
-      result_ready => result_inner_ready,
-      result_valid => result_inner_valid
+      result_ready => result_ready,
+      result_valid => result_valid
     );
 end architecture;
 """
