@@ -1,4 +1,5 @@
 from generators.handshake.fork import generate_fork
+from generators.handshake.tehb import generate_tehb
 from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
 
 
@@ -164,20 +165,19 @@ begin
           ControlInternal <= CONTROL_NO_CMP;
           outs <= ins;
           outs_spec <= "0";
-        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+        elsif (DatapV = '1' and PredictpV = '1' and FifoNotEmpty = '1' and FifoNotFull = '1' and ins = fifo_ins) then
           DataR <= ControlnR;
-          PredictR <= FifoNotFull and ControlnR; -- TODO: Assert FifoNotFull?
+          PredictR <= ControlnR;
 
           ControlV <= '1';
           ControlInternal <= CONTROL_CORRECT_SPEC;
           outs <= predict_ins;
           outs_spec <= "1";
-          FifoV <= '1'; -- TODO: Buggy? Change to ControlnR?
-          FifoR <= '1'; -- TODO: Buggy? Change to ControlnR?
-        elsif (DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) then
+          FifoV <= ControlnR;
+          FifoR <= ControlnR;
+        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
           DataR <= ControlnR;
-          -- TODO: Not Specifying PredictR <= '0' is buggy?
-          PredictR <= FifoNotFull and ControlnR;
+          PredictR <= '0';
           FifoR <= ControlnR;
 
           FifoV <= '0';
@@ -194,8 +194,8 @@ begin
           outs <= ins;
           outs_spec <= "0";
         else
-          DataR <= ControlnR; -- TODO: '0'?
-          PredictR <= FifoNotFull and ControlnR; -- TODO: '0'?
+          DataR <= '0';
+          PredictR <= '0';
           ControlV <= '0';
           FifoR <= '0';
           FifoV <= '0';
@@ -756,6 +756,7 @@ def _generate_speculator(name, bitwidth, fifo_depth):
   decodeSC_name = f"{name}_decodeSC"
   decodeOutput_name = f"{name}_decodeOutput"
   decodeBranch_name = f"{name}_decodeBranch"
+  tehb_name = f"{name}_tehb"
 
   dependencies = \
       generate_fork(data_fork_name, {
@@ -774,7 +775,11 @@ def _generate_speculator(name, bitwidth, fifo_depth):
       _generate_decodeCommit(decodeCommit_name) + \
       _generate_decodeSC(decodeSC_name) + \
       _generate_decodeOutput(decodeOutput_name) + \
-      _generate_decodeBranch(decodeBranch_name)
+      _generate_decodeBranch(decodeBranch_name) + \
+      generate_tehb(tehb_name, {
+          "bitwidth": bitwidth,
+          "extra_signals": {"internal_ctrl": 3, "spec": 1}
+      })
 
   entity = f"""
 library ieee;
@@ -832,6 +837,8 @@ architecture arch of {name} is
   signal predictor_data_out_spec : std_logic_vector(0 downto 0);
   signal predictor_data_out_ready : std_logic;
 
+  signal specgenCore_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal specgenCore_outs_spec : std_logic_vector(0 downto 0);
   signal specgenCore_fifo_outs : std_logic_vector({bitwidth} - 1 downto 0);
   signal specgenCore_fifo_outs_valid : std_logic;
   signal specgenCore_fifo_outs_ready : std_logic;
@@ -839,6 +846,10 @@ architecture arch of {name} is
   signal specgenCore_control_outs : std_logic_vector(2 downto 0);
   signal specgenCore_control_outs_valid : std_logic;
   signal specgenCore_control_outs_ready : std_logic;
+
+  signal tehb_control_outs : std_logic_vector(2 downto 0);
+  signal tehb_control_outs_valid : std_logic;
+  signal tehb_control_outs_ready : std_logic;
 
   signal predFifo_data_out : std_logic_vector({bitwidth} - 1 downto 0);
   signal predFifo_data_out_valid : std_logic;
@@ -882,8 +893,8 @@ begin
       fifo_ins_valid => predFifo_data_out_valid,
       fifo_ins_ready => predFifo_data_out_ready,
 
-      outs => outs,
-      outs_spec => outs_spec,
+      outs => specgenCore_outs,
+      outs_spec => specgenCore_outs_spec,
 
       fifo_outs => specgenCore_fifo_outs,
       fifo_outs_valid => specgenCore_fifo_outs_valid,
@@ -927,13 +938,29 @@ begin
       data_out_ready => predFifo_data_out_ready
     );
 
+  tehb: entity work.{tehb_name}(arch)
+    port map (
+      clk => clk,
+      rst => rst,
+      ins => specgenCore_outs,
+      ins_spec => specgenCore_outs_spec,
+      ins_internal_ctrl => specgenCore_control_outs,
+      ins_valid => specgenCore_control_outs_valid,
+      ins_ready => specgenCore_control_outs_ready,
+      outs => outs,
+      outs_spec => outs_spec,
+      outs_internal_ctrl => tehb_control_outs,
+      outs_valid => tehb_control_outs_valid,
+      outs_ready => tehb_control_outs_ready
+    );
+
   fork0: entity work.{control_fork_name}(arch)
     port map (
       clk => clk,
       rst => rst,
-      ins => specgenCore_control_outs,
-      ins_valid => specgenCore_control_outs_valid,
-      ins_ready => specgenCore_control_outs_ready,
+      ins => tehb_control_outs,
+      ins_valid => tehb_control_outs_valid,
+      ins_ready => tehb_control_outs_ready,
       outs => fork_control_outs,
       outs_valid => fork_control_outs_valid,
       outs_ready => fork_control_outs_ready
