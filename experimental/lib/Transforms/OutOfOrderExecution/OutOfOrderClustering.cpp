@@ -563,6 +563,13 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
             bOps, [&](Operation *op) { return aOps.contains(op); });
 
         // Not nested: invalid overlap
+        if (!(aInB || bInA)) {
+          clusters[i].print(llvm::errs());
+          llvm::errs() << "\n";
+          llvm::errs() << "\n";
+          clusters[j].print(llvm::errs());
+        }
+
         assert((aInB || bInA) && "Clusters are not nested: invalid overlap");
         if (!aInB && !bInA)
           return failure();

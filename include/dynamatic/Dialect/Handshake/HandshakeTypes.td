@@ -374,6 +374,16 @@ class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, lis
   >.result # ", \"" # except # "\")">
 >;
 
+/// Constraint to ensure that HandshakeType has no extra signals.
+class LacksExtraSignals<string operand> : PredOpTrait<
+  "should not have any extra signals",
+  CPred<[{
+    [](ExtraSignalsTypeInterface type) {
+      return type.getExtraSignals().empty();
+    }
+  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
+>;
+
 /// Constraint to ensure that the variadic has at least one element.
 class VariadicHasElement<string variadic> : PredOpTrait<
   "the variadic " # variadic # " should have at least one element",

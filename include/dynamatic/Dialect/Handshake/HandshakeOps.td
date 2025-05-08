@@ -396,6 +396,7 @@ def MuxOp : Handshake_Op<"mux", [
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
   AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result"]>,
+  LacksExtraSignals<"selectOperand">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -433,7 +434,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
+  LacksExtraSignals<"index">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -542,6 +544,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 def DemuxOp : Handshake_Op<"demux", [
   AllDataTypesMatchWithVariadic<"result", ["dataOperand"]>,
   AllExtraSignalsMatchWithVariadic<"result", ["dataOperand"]>,
+  LacksExtraSignals<"selectOperand">,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
 ]> {

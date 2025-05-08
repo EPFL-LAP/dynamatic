@@ -311,6 +311,15 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   // Step 1: Identify the clusters
   std::vector<Cluster> clusters = identifyClusters(funcOp, ctx);
 
+  // llvm::errs() << "clusters: \n";
+  // for (auto &clusters : clusters) {
+  //   clusters.print(llvm::errs());
+  //   llvm::errs() << "\n";
+  // }
+  // llvm::errs() << "Done printing clusters.\n";
+  // llvm::errs() << "\n";
+  // llvm::errs() << "\n";
+
   // Step 2: Check validity of the clusters
   if (failed(verifyClusters(clusters)))
     return failure();
@@ -320,14 +329,14 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
 
-  // llvm::errs() << "Hierarchy nodes: \n";
-  // for (auto &clusterNode : hierarchyNodes) {
-  //   clusterNode->cluster.print(llvm::errs());
-  //   llvm::errs() << "\n";
-  // }
-  // llvm::errs() << "Done printing hierarchy nodes.\n";
-  // llvm::errs() << "\n";
-  // llvm::errs() << "\n";
+  llvm::errs() << "Hierarchy nodes: \n";
+  for (auto &clusterNode : hierarchyNodes) {
+    clusterNode->cluster.print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "Done printing hierarchy nodes.\n";
+  llvm::errs() << "\n";
+  llvm::errs() << "\n";
 
   // Step 4: Apply the out-of-order execution methodology to each ot-of-order
   // node with respect to each innermost cluster

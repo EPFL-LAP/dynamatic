@@ -13,6 +13,7 @@ import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
+import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.load as load
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
@@ -73,6 +74,8 @@ def generate_code(name, mod_type, parameters):
       return extsi.generate_extsi(name, parameters)
     case "fork":
       return fork.generate_fork(name, parameters)
+    case "lazy_fork":
+      return lazy_fork.generate_lazy_fork(name, parameters)
     case "load":
       return load.generate_load(name, parameters)
     case "mem_controller":
