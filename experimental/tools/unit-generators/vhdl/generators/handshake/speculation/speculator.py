@@ -579,21 +579,16 @@ begin
   begin
     if (rst = '1') then
       data_reg <= zeros & '1';
-      data_out <= zeros & '1';
     elsif (rising_edge(clk)) then
       if (data_in_valid = '1') then
         data_reg <= data_in;
-      end if;
-      if (data_out_ready = '1' and trigger_valid = '1') then
-        -- After handshaking, data_out updates and holds its value until the
-        -- next handshaking, ensuring stability while valid is high.
-        data_out <= data_reg;
       end if;
     end if;
   end process;
 
   data_in_ready <= '1';
 
+  data_out <= data_reg;
   data_out_valid <= trigger_valid;
   trigger_ready <= data_out_ready;
 
