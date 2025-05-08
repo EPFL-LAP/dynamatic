@@ -935,9 +935,10 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   // The consumer block is the block which contains the consumer
   Block *consumerBlock = consumerOp->getBlock();
-  // The producer block is the block which ontains the producer, and it
+
+  // The producer block is the block which contains the producer, and it
   // corresponds to the parent block of the operand. Since the operand might
-  // have no producer operation (if it is a function arguement) then this is the
+  // have no producer operation (if it is a function argument) then this is the
   // only way to get the relevant information.
   Block *producerBlock = operand.getParentBlock();
 
