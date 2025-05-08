@@ -80,6 +80,11 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
 
   convertPhiToMu(region);
   convertPhiToGamma(region, bi);
+
+  // After the conversion is done, `gatesPerBlock` will contain some phis, some
+  // MUs and some GAMMAs. Since we are only interested in the last two, we can
+  // remove all the phis.
+  removePhiGates();
   printAllGates();
 }
 
@@ -355,6 +360,11 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
 
   convertPhiToMu(region);
   convertPhiToGamma(region, bi);
+
+  // After the conversion is done, `gatesPerBlock` will contain some phis, some
+  // MUs and some GAMMAs. Since we are only interested in the last two, we can
+  // remove all the phis.
+  removePhiGates();
   printAllGates();
 }
 
@@ -503,6 +513,24 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
       phi->isRoot = true;
     }
+  }
+}
+
+void experimental::gsa::GSAAnalysis::removePhiGates() {
+  for (auto const &[block, gates] : gatesPerBlock) {
+
+    // New vector of gates, which will contain only gamms and mus
+    SmallVector<Gate *> gatesWithoutPhis;
+    for (Gate *g : gates) {
+      // Delete the gate in case of a phi, otherwise keep it and insert it in
+      // the new list.
+      if (g->gsaGateFunction == GateType::PhiGate)
+        delete g;
+      else
+        gatesWithoutPhis.push_back(g);
+    }
+    // Modify the list
+    gatesPerBlock[block] = gatesWithoutPhis;
   }
 }
 

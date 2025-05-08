@@ -1122,14 +1122,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   for (Block &block : llvm::drop_begin(region)) {
 
     // For each GSA function
-    ArrayRef<Gate *> phis = gsa.getGatesPerBlock(&block);
-    for (Gate *phi : phis) {
-
-      // `getGatesPerBlock` returns all the gates related to the block, both in
-      // the SSA format (phis) and GSA (gammas and mus). Since we are only
-      // interested in the latter two gates, we skip phis.
-      if (phi->gsaGateFunction == PhiGate)
-        continue;
+    ArrayRef<Gate *> gates = gsa.getGatesPerBlock(&block);
+    for (Gate *gate : gates) {
 
       Location loc = block.front().getLoc();
       rewriter.setInsertionPointToStart(&block);
@@ -1141,7 +1135,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       int nullOperand = -1;
 
       // For each of its operand
-      for (auto *operand : phi->operands) {
+      for (auto *operand : gate->operands) {
         // If the input is another GSA function, then a dummy value is used as
         // operand and the operations will be reconnected later on.
         // If the input is empty, we keep track of its index.
@@ -1150,7 +1144,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           Gate *g = std::get<Gate *>(operand->input);
           operands.emplace_back(g->result);
           missingGsaList.emplace_back(
-              MissingGsa(phi->index, g->index, operandIndex));
+              MissingGsa(gate->index, g->index, operandIndex));
         } else if (operand->isTypeEmpty()) {
           nullOperand = operandIndex;
           operands.emplace_back(nullptr);
@@ -1162,13 +1156,13 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // The condition value is provided by the `condition` field of the phi
-      rewriter.setInsertionPointAfterValue(phi->result);
+      rewriter.setInsertionPointAfterValue(gate->result);
       Value conditionValue =
-          phi->conditionBlock->getTerminator()->getOperand(0);
+          gate->conditionBlock->getTerminator()->getOperand(0);
 
       // If the function is MU, then we create a merge
       // and use its result as condition
-      if (phi->gsaGateFunction == MuGate) {
+      if (gate->gsaGateFunction == MuGate) {
         mlir::DominanceInfo domInfo;
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
@@ -1208,7 +1202,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(loc, phi->result.getType(),
+      auto mux = rewriter.create<handshake::MuxOp>(loc, gate->result.getType(),
                                                    conditionValue, operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
@@ -1216,10 +1210,10 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       if (nullOperand >= 0)
         oneInputGammaList.insert(mux);
 
-      if (phi->isRoot)
-        rewriter.replaceAllUsesWith(phi->result, mux.getResult());
+      if (gate->isRoot)
+        rewriter.replaceAllUsesWith(gate->result, mux.getResult());
 
-      gsaList.insert({phi->index, mux});
+      gsaList.insert({gate->index, mux});
       mux->setAttr(FTD_EXPLICIT_PHI, rewriter.getUnitAttr());
     }
   }
