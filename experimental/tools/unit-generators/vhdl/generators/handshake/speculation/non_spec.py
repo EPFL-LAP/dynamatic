@@ -1,6 +1,6 @@
-from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
-from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth, generate_concat, generate_slice, ConcatLayout
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.utils import data
 
@@ -57,8 +57,8 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
   extra_signals_without_spec = extra_signals.copy()
   extra_signals_without_spec.pop("spec")
 
-  extra_signals_without_spec_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals_without_spec)
+  concat_layout = ConcatLayout(extra_signals_without_spec)
+  extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = _generate_non_spec(inner_name, extra_signals_without_spec_bitwidth)
@@ -72,8 +72,6 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
       "bitwidth": bitwidth,
       "extra_signals": extra_signals
   }])
-
-  concat_layout = ConcatLayout(extra_signals_without_spec)
 
   assignments = []
   decls = []

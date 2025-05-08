@@ -1,5 +1,6 @@
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.concat import ConcatLayout, generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
 from generators.handshake.tehb import generate_tehb
 from generators.support.signal_manager.utils.types import ExtraSignals
 

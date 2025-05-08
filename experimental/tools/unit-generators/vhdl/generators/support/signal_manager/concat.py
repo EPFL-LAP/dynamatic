@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.concat import ConcatLayout, generate_concat, generate_slice, subtract_extra_signals, generate_signal_direct_forwarding, generate_mapping, generate_handshake_forwarding
+from .utils.concat import ConcatLayout
+from .utils.generation import generate_concat, generate_slice, generate_mapping, generate_handshake_forwarding
 from .utils.types import Port, ExtraSignals
 
 

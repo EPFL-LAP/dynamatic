@@ -1,7 +1,8 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Port, ExtraSignals
-from .utils.concat import ConcatLayout, generate_signal_wise_forwarding, generate_signal_direct_forwarding, generate_concat, generate_slice, subtract_extra_signals, generate_mapping
+from .utils.concat import ConcatLayout
+from .utils.generation import generate_signal_wise_forwarding, generate_signal_assignment, generate_concat, generate_slice, generate_mapping
 
 
 def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> str:
@@ -54,7 +55,7 @@ def _generate_slice(out_channel_names: list[str], concat_layout: ConcatLayout) -
   for signal_name, signal_bitwidth in concat_layout.extra_signals().items():
     for out_channel_name in out_channel_names:
       # Assign the extra signals of `sliced` to the output channel
-      assignments, _ = generate_signal_direct_forwarding(
+      assignments, _ = generate_signal_assignment(
           "sliced", out_channel_name, signal_name, signal_bitwidth)
       slice_assignments.extend(assignments)
 
@@ -120,18 +121,9 @@ def generate_buffered_signal_manager(
   slice_assignments, slice_decls = _generate_slice(
       out_channel_names, concat_layout)
 
-  # Map data ports and untouched extra signals directly to inner component
-  mapped_ports: list[Port] = []
-  for port in in_ports + out_ports:
-    mapped_ports.append({
-        "name": port["name"],
-        "bitwidth": port["bitwidth"],
-        "size": port.get("size", 0),
-        "extra_signals": subtract_extra_signals(port.get("extra_signals", {}), extra_signals)
-    })
-
+  # Map channels to inner component
   mappings = []
-  for port in mapped_ports:
+  for port in in_ports + out_ports:
     mappings.extend(generate_mapping(port, port["name"]))
   mappings = ",\n      ".join(mappings)
 
