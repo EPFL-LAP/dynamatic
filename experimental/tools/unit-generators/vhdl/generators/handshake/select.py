@@ -183,6 +183,13 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
   slice_decls.extend(decls["in"])
   slice_decls.extend(decls["out"])
 
+  # Forward result_inner_concat handshake to result
+  assignments, decls = generate_handshake_forwarding(
+      "result_inner_concat", "result")
+  slice_assignments.extend(assignments)
+  # Declare result_inner_concat handshake
+  slice_decls.extend(decls["in"])
+
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 
@@ -252,14 +259,14 @@ begin
       condition_valid => condition_valid,
       condition_ready => condition_ready,
       trueValue => trueValue_inner,
-      trueValue_valid => trueValue_valid,
-      trueValue_ready => trueValue_ready,
+      trueValue_valid => trueValue_inner_valid,
+      trueValue_ready => trueValue_inner_ready,
       falseValue => falseValue_inner,
-      falseValue_valid => falseValue_valid,
-      falseValue_ready => falseValue_ready,
+      falseValue_valid => falseValue_inner_valid,
+      falseValue_ready => falseValue_inner_ready,
       result => result_inner_concat,
-      result_ready => result_ready,
-      result_valid => result_valid
+      result_ready => result_inner_concat_ready,
+      result_valid => result_inner_concat_valid
     );
 end architecture;
 """
