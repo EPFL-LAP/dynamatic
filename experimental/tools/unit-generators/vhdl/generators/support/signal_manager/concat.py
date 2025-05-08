@@ -85,6 +85,13 @@ def _generate_slice(out_ports: list[Port], concat_layout: ConcatLayout) -> tuple
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls), slice_ports
 
 
+def _generate_mappings(concat_ports: dict[str, Port], slice_ports: dict[str, Port]) -> str:
+  mappings = []
+  for original_name, concat_channel in (concat_ports | slice_ports).items():
+    mappings.extend(generate_mapping(concat_channel, original_name))
+  return ",\n      ".join(mappings)
+
+
 def generate_concat_signal_manager(
     name: str,
     in_ports: list[Port],
@@ -119,10 +126,7 @@ def generate_concat_signal_manager(
   slice_assignments, slice_decls, slice_ports = _generate_slice(
       out_ports, concat_layout)
 
-  mappings = []
-  for original_name, concat_channel in (concat_ports | slice_ports).items():
-    mappings.extend(generate_mapping(concat_channel, original_name))
-  mappings = ",\n      ".join(mappings)
+  mappings = _generate_mappings(concat_ports, slice_ports)
 
   architecture = f"""
 -- Architecture of signal manager (concat)

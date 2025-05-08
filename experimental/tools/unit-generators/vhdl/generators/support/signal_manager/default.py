@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Port, ExtraSignals
-from .utils.generation import generate_signal_wise_forwarding, generate_mapping
+from .utils.generation import generate_signal_wise_forwarding, generate_default_mappings
 
 
 def _generate_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signals: ExtraSignals) -> str:
@@ -46,10 +46,7 @@ def generate_default_signal_manager(
       in_channel_names, out_channel_names, extra_signals)
 
   # Map channels to inner component
-  mappings = []
-  for channel in in_ports + out_ports:
-    mappings.extend(generate_mapping(channel, channel["name"]))
-  mappings = ",\n      ".join(mappings)
+  mappings = generate_default_mappings(in_ports, out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (default)

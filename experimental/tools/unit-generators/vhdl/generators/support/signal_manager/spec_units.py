@@ -75,6 +75,19 @@ def _generate_slice(out_ports: list[Port], concat_layout: ConcatLayout) -> tuple
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls), slice_ports
 
 
+def _generate_mappings(concat_ports: dict[str, Port], slice_ports: dict[str, Port], ctrl_ports: list[Port]) -> str:
+  mapped_ports = {}
+  mapped_ports.update(concat_ports)
+  mapped_ports.update(slice_ports)
+  for ctrl_port in ctrl_ports:
+    mapped_ports[ctrl_port["name"]] = ctrl_port
+
+  mappings = []
+  for original_name, mapped_channel in mapped_ports.items():
+    mappings.extend(generate_mapping(mapped_channel, original_name))
+  return ",\n      ".join(mappings)
+
+
 def generate_spec_units_signal_manager(
     name: str,
     in_ports: list[Port],
@@ -123,16 +136,8 @@ def generate_spec_units_signal_manager(
   slice_assignments, slice_decls, slice_ports = _generate_slice(
       out_ports, concat_layout)
 
-  mapped_ports = {}
-  mapped_ports.update(concat_ports)
-  mapped_ports.update(slice_ports)
-  for ctrl_port in ctrl_ports:
-    mapped_ports[ctrl_port["name"]] = ctrl_port
-
-  mappings = []
-  for original_name, mapped_channel in mapped_ports.items():
-    mappings.extend(generate_mapping(mapped_channel, original_name))
-  mappings = ",\n      ".join(mappings)
+  mappings = _generate_mappings(
+      concat_ports, slice_ports, ctrl_ports)
 
   architecture = f"""
 -- Architecture of signal manager (spec_units)

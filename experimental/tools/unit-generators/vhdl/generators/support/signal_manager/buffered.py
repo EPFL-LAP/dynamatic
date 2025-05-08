@@ -2,16 +2,16 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Port, ExtraSignals
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_signal_wise_forwarding, generate_signal_assignment, generate_concat, generate_slice, generate_mapping
+from .utils.generation import generate_signal_wise_forwarding, generate_signal_assignment, generate_concat, generate_slice, generate_default_mappings
 
 
-def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> str:
+def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> tuple[str, str]:
   first_in_port_name = in_ports[0]["name"]
   first_out_port_name = out_ports[0]["name"]
 
-  return f"""
-  transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
-  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""".lstrip()
+  return "  signal transfer_in, transfer_out : std_logic;", \
+      f"""transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
+  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;"""
 
 
 def _generate_forwarding(in_channel_names: list[str], extra_signals: ExtraSignals) -> tuple[str, str]:
@@ -109,7 +109,7 @@ def generate_buffered_signal_manager(
   })
 
   # Generate transfer handshake logic
-  transfer_logic = _generate_transfer_logic(
+  transfer_assignments, transfer_decls = _generate_transfer_logic(
       in_ports, out_ports)
 
   in_channel_names = [port["name"] for port in in_ports]
@@ -122,10 +122,7 @@ def generate_buffered_signal_manager(
       out_channel_names, concat_layout)
 
   # Map channels to inner component
-  mappings = []
-  for port in in_ports + out_ports:
-    mappings.extend(generate_mapping(port, port["name"]))
-  mappings = ",\n      ".join(mappings)
+  mappings = generate_default_mappings(in_ports, out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (buffered)
@@ -133,10 +130,10 @@ architecture arch of {name} is
   {forwarded_decls}
   {concat_decls}
   {slice_decls}
-  signal transfer_in, transfer_out : std_logic;
+  {transfer_decls}
 begin
   -- Transfer signal assignments
-  {transfer_logic}
+  {transfer_assignments}
 
   -- Concat/split extra signals for buffer input/output
   {forwarded_assignments}

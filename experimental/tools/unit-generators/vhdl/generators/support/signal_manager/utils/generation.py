@@ -156,6 +156,13 @@ def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
   return mapping
 
 
+def generate_default_mappings(in_ports: list[Port], out_ports: list[Port]) -> str:
+  mappings = []
+  for port in in_ports + out_ports:
+    mappings.extend(generate_mapping(port, port["name"]))
+  return ",\n      ".join(mappings)
+
+
 def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
   assignments = []
   in_declarations = []
