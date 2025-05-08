@@ -159,7 +159,11 @@ def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
 def generate_default_mappings(in_ports: list[Port], out_ports: list[Port]) -> str:
   mappings = []
   for port in in_ports + out_ports:
-    mappings.extend(generate_mapping(port, port["name"]))
+    mappings.extend(generate_mapping({
+        **port,
+        # Exclude extra signals from the mapping
+        "extra_signals": {}
+    }, port["name"]))
   return ",\n      ".join(mappings)
 
 

@@ -25,9 +25,9 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
     name = port["name"]
     bitwidth = port["bitwidth"]
     extra_signals = port.get("extra_signals", {})
-    port_2d = port.get("2d", False)
+    size = port.get("size", 0)
 
-    if not port_2d:
+    if size == 0:
       # Usual case
 
       # Generate data signal if present
@@ -43,9 +43,6 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
         port_decls.append(
             f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
     else:
-      # Port is 2d
-      size = port["size"]
-
       # Generate data_array signal declarations for 2d input port with bitwidth > 0
       if bitwidth > 0:
         port_decls.append(
@@ -59,12 +56,9 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
 
       # Generate extra signal declarations for each item in the 2d input port
       for i in range(size):
-        # Use the same extra signals for all items
-        current_extra_signals = extra_signals
-
         # The netlist generator declares extra signals independently for each item,
         # in contrast to ready/valid signals.
-        for signal_name, signal_bitwidth in current_extra_signals.items():
+        for signal_name, signal_bitwidth in extra_signals.items():
           port_decls.append(
               f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 

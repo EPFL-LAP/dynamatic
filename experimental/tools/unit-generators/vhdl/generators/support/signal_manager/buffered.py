@@ -9,9 +9,9 @@ def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> tup
   first_in_port_name = in_ports[0]["name"]
   first_out_port_name = out_ports[0]["name"]
 
-  return "  signal transfer_in, transfer_out : std_logic;", \
-      f"""transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
-  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;"""
+  return f"""transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
+  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""", \
+      "  signal transfer_in, transfer_out : std_logic;"
 
 
 def _generate_forwarding(in_channel_names: list[str], extra_signals: ExtraSignals) -> tuple[str, str]:
