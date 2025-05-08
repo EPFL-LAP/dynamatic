@@ -47,8 +47,6 @@ architecture arch of {name} is
   signal TailEn : std_logic := '0';
   signal CurrEn : std_logic := '0';
 
-  signal CurrHeadEqual : std_logic;
-
   signal PassEn   : std_logic := '0';
   signal KillEn   : std_logic := '0';
   signal ResendEn : std_logic := '0';
@@ -64,22 +62,9 @@ architecture arch of {name} is
 
   {data(f"type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} - 1 downto 0);", bitwidth)}
   {data("signal Memory : FIFO_Memory;", bitwidth)}
-
-  signal bypass : std_logic;
-
 begin
   ins_ready <= not Full;
-  outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
-  --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
 
-  CurrHeadEqual <= '1' when Curr = Head else '0';
-  TailEn <= not Full and ins_valid;
-  HeadEn <= not Empty and ((outs_ready and ResendEn) or (ctrl_ready and KillEn));
-  CurrEn <= ((not CurrEmpty or ins_valid) and (outs_ready and PassEn)) or
-            (not Empty and (outs_ready and NoCmpEn)) or
-            (CurrHeadEqual and ctrl_ready and KillEn);
-
-  bypass <= ins_valid and CurrEmpty;
   -------------------
   -- comb process for control en
   -------------------
@@ -91,56 +76,88 @@ begin
     NoCmpEn <= '0';
 
     if ctrl_valid = '1' and ctrl = "000" then
+      -- PASS
       PassEn <= '1';
     elsif ctrl_valid = '1' and ctrl = "001" then
+      -- KILL
       KillEn <= '1';
     elsif ctrl_valid = '1' and ctrl = "010" then
+      -- RESEND
       ResendEn <= '1';
     elsif ctrl_valid = '1' and ctrl = "011" then
+      -- PASS_KILL
       PassEn <= '1';
       KillEn <= '1';
     elsif ctrl_valid = '1' and ctrl = "100" then
+      -- NO_CMP: Special case of RESEND. Curr must be incremented as well (See my report).
       ResendEn <= '1';
       NoCmpEn <= '1';
     end if;
   end process;
 
   -------------------------------------------
-  -- comb process for control ready
+  -- comb process for all signals
   -------------------------------------------
-  ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, outs_ready, ctrl_valid, ins_valid)
+  signal_proc : process (
+    PassEn, ResendEn, NoCmpEn, KillEn,
+    CurrEmpty, Empty, Full,
+    {data("Memory, ins,", bitwidth)}
+    Head, Curr,
+    outs_ready, ins_valid)
   begin
+    TailEn <= not Full and ins_valid;
+    HeadEn <= '0';
+    CurrEn <= '0';
+
+    ctrl_ready <= '0';
+    outs_valid <= '0';
+    {data("outs <= Memory(Head);", bitwidth)}
+    outs_spec <= "0";
+
     -- Note: PassEn and KillEn can be simultaneously '1'
     -- In that case, PassEn is prioritized
     if PassEn = '1' then
-      ctrl_ready <= (not CurrEmpty or ins_valid) and outs_ready;
-      --ctrl_ready <= not CurrEmpty and outs_ready;
-    elsif ResendEn = '1' then
-      ctrl_ready <= not Empty and outs_ready;
-    elsif KillEn = '1' then
-      ctrl_ready <= not Empty;
-    else
-      ctrl_ready <= '0';
-    end if;
-  end process;
+      if CurrEmpty = '1' then
+        -- Bypass
+        -- Consider the condition required for TailEn = '1'.
+        CurrEn <= outs_ready and ins_valid and not Full;
+        HeadEn <= outs_ready and ins_valid and not Full and KillEn and not Empty;
 
-  -------------------------------------------
-  -- comb process for output data
-  -------------------------------------------
-  output_proc : process (PassEn, Curr, bypass, {data("ins, Memory, ", bitwidth)}Head)
-  begin
-    if PassEn = '1' then
-      {data("""
-      if bypass = '1' then
-        outs <= ins;
+        ctrl_ready <= outs_ready and ins_valid and not Full;
+        outs_valid <= ins_valid and not Full;
+        {data("outs <= ins;", bitwidth)}
       else
-        outs <= Memory(Curr);
+        -- If CurrEmpty is '0', then Empty is '0'.
+        CurrEn <= outs_ready;
+        HeadEn <= outs_ready and KillEn;
+
+        ctrl_ready <= outs_ready;
+        outs_valid <= '1';
+        {data("outs <= Memory(Curr);", bitwidth)}
       end if;
-      """, bitwidth)}
       outs_spec <= "1";
-    else
-      {data(f"outs <= Memory(Head);", bitwidth)}
+    elsif ResendEn = '1' then
+      if NoCmpEn = '1' then
+        -- Exceptional case. See my report.
+
+        -- TODO: When Empty = '1', input data should be bypassed,
+        --       just like with PassEn.
+        CurrEn <= outs_ready and not Empty;
+      end if;
+      HeadEn <= outs_ready and not Empty;
+
+      ctrl_ready <= not Empty and outs_ready;
+      outs_valid <= not Empty;
+      {data("outs <= Memory(Head);", bitwidth)}
       outs_spec <= "0";
+    elsif KillEn = '1' then
+      if Curr = Head then
+        -- Exceptional case. See my report.
+        CurrEn <= not Empty;
+      end if;
+      HeadEn <= not Empty;
+
+      ctrl_ready <= not Empty;
     end if;
   end process;
 
