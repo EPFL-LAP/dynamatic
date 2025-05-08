@@ -1,6 +1,6 @@
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.generation import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding, generate_signal_assignment
 
 
 def generate_select(name, parameters):
@@ -183,11 +183,14 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
   slice_decls.extend(decls["in"])
   slice_decls.extend(decls["out"])
 
-  # Forward result_inner_concat handshake to result_inner
+  # Forward result_inner data to result
+  assignments.append("  result <= result_inner;")
+
+  # Forward result_inner_concat handshake to result
   assignments, decls = generate_handshake_forwarding(
-      "result_inner_concat", "result_inner")
+      "result_inner_concat", "result")
   slice_assignments.extend(assignments)
-  # Declare both result_inner_concat handshake and result_inner handshake
+  # Declare both result_inner_concat handshake and result handshake
   slice_decls.extend(decls["in"])
   slice_decls.extend(decls["out"])
 
