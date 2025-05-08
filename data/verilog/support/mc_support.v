@@ -248,7 +248,7 @@ module write_data_signals #(
   input      [              ARBITER_SIZE - 1 : 0] sel,
   output     [                DATA_TYPE - 1 : 0] write_data,
   input      [ARBITER_SIZE * DATA_TYPE  - 1 : 0] in_data,
-  output reg [              ARBITER_SIZE - 1 : 0] valid
+  output     [              ARBITER_SIZE - 1 : 0] valid
 );
   integer                      i;
   reg     [DATA_TYPE - 1 : 0] data_out_var = 0;

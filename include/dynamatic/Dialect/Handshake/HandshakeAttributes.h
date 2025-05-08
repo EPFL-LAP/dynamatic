@@ -49,23 +49,22 @@ struct TimingInfo {
   std::optional<unsigned> readyLatency;
 
   /// Returns the optional latency associated to a signal type.
-  std::optional<unsigned> getLatency(SignalType type);
+  std::optional<unsigned> getLatency(SignalType signalType);
 
   /// Sets the latency associated to a signal type.
-  TimingInfo &setLatency(SignalType type, unsigned latency);
+  TimingInfo &setLatency(SignalType signalType, unsigned latency);
 
   /// During parsing of attributes storing instances of this type, attempts to
   /// parse the data after a key and colon were parsed (<key> <:>
   /// <data_to_parse>) and modifies the timing characteristics accordingly.
   mlir::ParseResult parseKey(mlir::AsmParser &odsParser, mlir::StringRef key);
 
-  /// Returns timing information for a standard OEHB.
+  /// Returns timing information.
   /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
-  static TimingInfo oehb();
-
-  /// Returns timing information for a standard TEHB.
-  /// NOTE: (lucas-rami) I am not sure these make sense, see type's note above.
-  static TimingInfo tehb();
+  static TimingInfo break_dv();
+  static TimingInfo break_r();
+  static TimingInfo break_none();
+  static TimingInfo break_dvr();
 };
 
 bool operator==(const TimingInfo &lhs, const TimingInfo &rhs);

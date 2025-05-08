@@ -22,7 +22,7 @@ MODULE {name} (ins_valid, outs_ready)
   fifo_valid := ins_valid & (!outs_ready | inner_elastic_fifo.outs_valid);
   fifo_ready := outs_ready;
 
-  // output
+  -- output
   DEFINE
   ins_ready := inner_elastic_fifo.ins_ready | outs_ready;
   outs_valid := ins_valid | inner_elastic_fifo.outs_valid;
@@ -41,7 +41,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   fifo_valid := ins_valid & (!outs_ready | inner_elastic_fifo.outs_valid);
   fifo_ready := outs_ready;
 
-  // output
+  -- output
   DEFINE
   ins_ready := inner_elastic_fifo.ins_ready | outs_ready;
   outs_valid := ins_valid | inner_elastic_fifo.outs_valid;

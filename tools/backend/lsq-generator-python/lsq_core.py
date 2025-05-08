@@ -1021,7 +1021,7 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
         arch += CyclicLeftShift(stq_port_idx_o, stq_port_idx_rom, stq_tail_i)
     arch += CyclicLeftShift(ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
     arch += CyclicLeftShift(stq_wen_o, stq_wen_unshifted, stq_tail_i)
-    for i in range(0, configs.numStqEntries):
+    for i in range(0, configs.numLdqEntries):
         arch += CyclicLeftShift(ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
     arch += CyclicLeftShift(ga_ls_order_o, ga_ls_order_temp, ldq_tail_i)
 
@@ -1348,8 +1348,8 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     ldq_tail       = LogicVec('ldq_tail', 'r', configs.ldqAddrW)
     ldq_head       = LogicVec('ldq_head', 'r', configs.ldqAddrW)
 
-    stq_tail       = LogicVec('stq_tail', 'r', configs.ldqAddrW)
-    stq_head       = LogicVec('stq_head', 'r', configs.ldqAddrW)
+    stq_tail       = LogicVec('stq_tail', 'r', configs.stqAddrW)
+    stq_head       = LogicVec('stq_head', 'r', configs.stqAddrW)
     stq_issue      = LogicVec('stq_issue', 'r', configs.stqAddrW)
     stq_resp       = LogicVec('stq_resp', 'r', configs.stqAddrW)
 
@@ -1449,7 +1449,12 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
             'not', stq_wen[i], 'and',
             '(', stq_data_wen[i], 'or', stq_data_valid[i], ')'
         )
+
+
     # order matrix
+    # store_is_older(i,j) = (not stq_reset(j) and (stq_valid(j) or ga_ls_order(i, j))) 
+    #                  when ldq_wen(i)
+    #                  else not stq_reset(j) and store_is_older(i, j)
     for i in range(0, configs.numLdqEntries):
         for j in range(0, configs.numStqEntries):
             arch += Op((store_is_older, i, j),
@@ -1564,7 +1569,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
         configs.numLdPorts, configs.numLdqEntries,
         ldp_data_o, ldp_data_valid_o, ldp_data_ready_i,
         ldq_valid, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
-    )
+    )    
     # Store Address Port Dispatcher
     arch += PortToQueueDispatcherInit(name + '_sta',
         configs.numStPorts, configs.numStqEntries,
@@ -1587,8 +1592,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
 
     if configs.pipe0:
         ###### Dependency Check ######
-
-        load_idx_oh    = LogicVecArray('load_idx_oh', 'w', configs.numLdMem, configs.numStqEntries)
+        load_idx_oh    = LogicVecArray('load_idx_oh', 'w', configs.numLdMem, configs.numLdqEntries)
         load_en        = LogicArray('load_en', 'w', configs.numLdMem)
 
         assert(configs.numStMem == 1) # Multiple store channels not yet implemented
@@ -1705,8 +1709,11 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 arch += CyclicPriorityMasking(load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
                 arch += Reduce(load_en[w], can_load_list[w], 'or')
                 if (w+1 != configs.numLdMem):
-                    can_load_list.append(LogicArray(f'can_load_list_{i}', 'w', configs.numLdqEntries))
-                    arch += Op(can_load_list[w+1][j], 'not', load_idx_oh[w], 'and', can_load_list[w][j])
+                    load_idx_oh_LogicArray = LogicArray(f'load_idx_oh_Array_{w+1}', 'w', configs.numLdqEntries)
+                    arch += VecToArray(load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(f'can_load_list_{w+1}', 'w', configs.numLdqEntries))
+                    for i in range(0, configs.numLdqEntries):
+                        arch += Op(can_load_list[w+1][i], 'not', load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
 
             # Store
             stq_issue_en_p0        = Logic('stq_issue_en_p0', 'r')
@@ -1868,8 +1875,11 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 arch += CyclicPriorityMasking(load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
                 arch += Reduce(load_en[w], can_load_list[w], 'or')
                 if (w+1 != configs.numLdMem):
-                    can_load_list.append(LogicArray(f'can_load_list_{i}', 'w', configs.numLdqEntries))
-                    arch += Op(can_load_list[w+1][j], 'not', load_idx_oh[w], 'and', can_load_list[w][j])
+                    load_idx_oh_LogicArray = LogicArray(f'load_idx_oh_Array_{w+1}', 'w', configs.numLdqEntries)
+                    arch += VecToArray(load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(f'can_load_list_{w+1}', 'w', configs.numLdqEntries))
+                    for i in range(0, configs.numLdqEntries):
+                        arch += Op(can_load_list[w+1][i], 'not', load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
 
             # Store
             stq_issue_en_p0        = Logic('stq_issue_en_p0', 'r')
@@ -1958,7 +1968,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
     else:
         ###### Dependency Check ######
 
-        load_idx_oh    = LogicVecArray('load_idx_oh', 'w', configs.numLdMem, configs.numStqEntries)
+        load_idx_oh    = LogicVecArray('load_idx_oh', 'w', configs.numLdMem, configs.numLdqEntries)
         load_en        = LogicArray('load_en', 'w', configs.numLdMem)
 
         assert(configs.numStMem == 1) # Multiple store channels not yet implemented
@@ -2058,8 +2068,11 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 arch += CyclicPriorityMasking(load_idx_oh[w], can_load_list[w], ldq_head_oh)
                 arch += Reduce(load_en[w], can_load_list[w], 'or')
                 if (w+1 != configs.numLdMem):
-                    can_load_list.append(LogicArray(f'can_load_list_{i}', 'w', configs.numLdqEntries))
-                    arch += Op(can_load_list[w+1][j], 'not', load_idx_oh[w], 'and', can_load_list[w][j])
+                    load_idx_oh_LogicArray = LogicArray(f'load_idx_oh_Array_{w+1}', 'w', configs.numLdqEntries)
+                    arch += VecToArray(load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(f'can_load_list_{w+1}', 'w', configs.numLdqEntries))
+                    for i in range(0, configs.numLdqEntries):
+                        arch += Op(can_load_list[w+1][i], 'not', load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
 
             # Store
 
@@ -2167,9 +2180,11 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
                 arch += CyclicPriorityMasking(load_idx_oh[w], can_load_list[w], ldq_head_oh)
                 arch += Reduce(load_en[w], can_load_list[w], 'or')
                 if (w+1 != configs.numLdMem):
-                    can_load_list.append(LogicArray(f'can_load_list_{i}', 'w', configs.numLdqEntries))
-                    arch += Op(can_load_list[w+1][j], 'not', load_idx_oh[w], 'and', can_load_list[w][j])
-
+                    load_idx_oh_LogicArray = LogicArray(f'load_idx_oh_Array_{w+1}', 'w', configs.numLdqEntries)
+                    arch += VecToArray(load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(f'can_load_list_{w+1}', 'w', configs.numLdqEntries))
+                    for i in range(0, configs.numLdqEntries):
+                        arch += Op(can_load_list[w+1][i], 'not', load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
             # Store
 
             st_ld_conflict   = LogicVec('st_ld_conflict', 'w', configs.numLdqEntries)
@@ -2217,8 +2232,7 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
 
     if configs.pipe1:
         # Pipeline Stage 1
-
-        load_idx_oh_p1   = LogicVecArray('load_idx_oh_p1', 'r', configs.numLdMem, configs.numStqEntries)
+        load_idx_oh_p1   = LogicVecArray('load_idx_oh_p1', 'r', configs.numLdMem, configs.numLdqEntries)
         load_en_p1       = LogicArray('load_en_p1', 'r', configs.numLdMem)
 
         load_hs         = LogicArray('load_hs', 'w', configs.numLdMem)
@@ -2364,7 +2378,10 @@ def LSQ(path_rtl: str, name: str, configs: Configs):
             arch += Reduce(read_valid, read_idx_oh, 'or')
             # multiplex from store queue data
             bypass_data = LogicVec(f'bypass_data_{i}', 'w', configs.dataW)
-            arch += Mux1H(bypass_data, stq_data, bypass_idx_oh[i])
+            if configs.pipe0:
+                arch += Mux1H(bypass_data, stq_data, bypass_idx_oh_p0[i])
+            else:
+                arch += Mux1H(bypass_data, stq_data, bypass_idx_oh[i])
             # multiplex from read and bypass data
             arch += Op(ldq_data[i], read_data, 'or', bypass_data)
             arch += Op(ldq_data_wen[i], bypass_en[i], 'or', read_valid)

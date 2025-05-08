@@ -154,8 +154,8 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
 // TimingInfo(Attr)
 //===----------------------------------------------------------------------===//
 
-std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
-  switch (type) {
+std::optional<unsigned> TimingInfo::getLatency(SignalType signalType) {
+  switch (signalType) {
   case SignalType::DATA:
     return dataLatency;
   case SignalType::VALID:
@@ -165,8 +165,8 @@ std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
   }
 }
 
-TimingInfo &TimingInfo::setLatency(SignalType type, unsigned latency) {
-  switch (type) {
+TimingInfo &TimingInfo::setLatency(SignalType signalType, unsigned latency) {
+  switch (signalType) {
   case SignalType::DATA:
     dataLatency = latency;
     break;
@@ -214,15 +214,32 @@ mlir::ParseResult TimingInfo::parseKey(mlir::AsmParser &odsParser,
   return success();
 }
 
-TimingInfo TimingInfo::oehb() {
+TimingInfo TimingInfo::break_dv() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 1)
       .setLatency(SignalType::VALID, 1)
       .setLatency(SignalType::READY, 0);
 }
 
-TimingInfo TimingInfo::tehb() {
-  return TimingInfo().setLatency(SignalType::READY, 1);
+TimingInfo TimingInfo::break_r() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 1);
+}
+
+TimingInfo TimingInfo::break_none() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::break_dvr() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 1);
 }
 
 bool dynamatic::handshake::operator==(const TimingInfo &lhs,
@@ -241,9 +258,9 @@ void TimingAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << " {";
 
   TimingInfo info = getInfo();
-  auto printIfPresent = [&](StringRef name, SignalType type,
+  auto printIfPresent = [&](StringRef name, SignalType signalType,
                             bool &firstData) -> void {
-    std::optional<unsigned> latency = info.getLatency(type);
+    std::optional<unsigned> latency = info.getLatency(signalType);
     if (!latency)
       return;
     if (!firstData)
