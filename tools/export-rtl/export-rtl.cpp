@@ -129,7 +129,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath) {};
+      : modOp(modOp), config(config), outputPath(outputPath){};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -288,7 +288,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, HDL hdl)
-      : exportInfo(exportInfo), hdl(hdl) {};
+      : exportInfo(exportInfo), hdl(hdl){};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -455,7 +455,22 @@ void WriteModData::writeSignalDeclarations(
           addExtraSignals(valueAndName.second, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          writeDeclaration(valueAndName.second, getRawType(intType), os);
+          // @jiahui17: this is a very bad hack to force the type to be an array
+          // when the array only has one element:
+          // - getRawType specifies std_logic instead of std_logic_vector when
+          // the bitwidth is 1 (in VHDL).
+          // - However, address signals should still be declared as
+          // std_logic_vector, even when their bitwidth is 1.
+          bool forceArrayType =
+              valueAndName.second.find("_address") != std::string::npos ||
+              valueAndName.second.find("_loadAddr") != std::string::npos ||
+              valueAndName.second.find("_storeAddr") != std::string::npos;
+
+          writeDeclaration(valueAndName.second,
+                           !forceArrayType
+                               ? getRawType(intType)
+                               : convertToInclusiveArrayBound(intType),
+                           os);
         });
   }
 }
@@ -538,7 +553,20 @@ RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
           addExtraSignals(portName, down, up, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          down.emplace_back(portName, getRawType(intType));
+          // @jiahui17: this is a very bad hack to force the type to be an array
+          // when the array only has one element.
+          // - getRawType specifies std_logic instead of std_logic_vector when
+          // the bitwidth is 1 (in VHDL).
+          // - However, address signals should still be declared as
+          // std_logic_vector, even when their bitwidth is 1.
+          bool forceArrayType =
+              portName.find("_address") != std::string::npos ||
+              portName.find("_loadAddr") != std::string::npos ||
+              portName.find("_storeAddr") != std::string::npos;
+          down.emplace_back(portName,
+                            !forceArrayType
+                                ? getRawType(intType)
+                                : convertToInclusiveArrayBound(intType));
         });
   };
 
