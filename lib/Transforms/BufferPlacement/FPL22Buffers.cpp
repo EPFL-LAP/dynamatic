@@ -369,7 +369,6 @@ void CFDFCUnionBuffers::setup() {
     // Elasticity constraints
     addBufferPresenceConstraints(channel);
     addBufferingGroupConstraints(channel, bufGroups);
-    // addDataFlowDirectionConstraintsForChannel(channel);
   }
 
   // For unit constraints, filter out ports that are not part of the CFDFC union
@@ -384,7 +383,6 @@ void CFDFCUnionBuffers::setup() {
     addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(unit, channelFilter);
-    // addDataFlowDirectionConstraintsForUnit(unit, channelFilter);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC in the
@@ -487,7 +485,6 @@ void OutOfCycleBuffers::setup() {
     // Add elasticity constraints
     addBufferPresenceConstraints(channel);
     addBufferingGroupConstraints(channel, bufGroups);
-    // addDataFlowDirectionConstraintsForChannel(channel);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &chVars = vars.channelVars[channel];
@@ -508,7 +505,6 @@ void OutOfCycleBuffers::setup() {
     addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(&unit, channelFilter);
-    // addDataFlowDirectionConstraintsForUnit(&unit, channelFilter);
   }
 
   // Set MILP objective and mark it ready to be optimized
