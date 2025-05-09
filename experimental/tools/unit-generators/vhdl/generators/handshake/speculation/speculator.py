@@ -175,7 +175,8 @@ begin
           outs_spec <= "1";
           FifoV <= ControlnR;
           FifoR <= ControlnR;
-        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+        elsif ((DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) or
+               (DatapV = '1' and PredictpV = '1' and FifoNotFull = '0' and ins = fifo_ins)) then
           DataR <= ControlnR;
           PredictR <= '0';
           FifoR <= ControlnR;
