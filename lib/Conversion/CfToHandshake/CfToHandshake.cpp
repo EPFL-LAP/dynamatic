@@ -1180,6 +1180,11 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
   if (!calledHandshakeFuncOp) {
+    //print Operands
+    llvm::errs() << "Operands:\n";
+    for (auto operand : operands) {
+      llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
+    }
     // if this is not the case, the function might have been not traversed yet
     // during the conversion
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
@@ -1188,6 +1193,10 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     // Classify arguments based on naming convention
     for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
+            //? should this assertion be removed? since we trigger an assertion later on if
+            //? the argument doesnt fit naming convention? But this assertion would be due to lowering
+            //? issues or manuel removal of name attr in IR
+      assert(nameAttr && !nameAttr.getValue().empty() && "Argument name attribute is missing or empty");
       if (nameAttr.getValue().starts_with("input_")) {
         InstanceOpInputIndices.push_back(i);
       } else if (nameAttr.getValue().starts_with("output_")) {
@@ -1209,7 +1218,45 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         assert(false && "Invalid argument naming");
       }
     }
+    // Create resultTypes based on collected Outputs //! Will use this implementation in case function
+    //SmallVector<Type> resultTypesVec;              //! definiton wont be used later on (see TODO)
+    //for(auto OutputId : InstanceOpOutputIndices)
+    //  resultTypesVec.push_back(callOp.getOperand(OutputId).getType());
+    //resultTypes = TypeRange(resultTypesVec);
+
+    // Create Operands for InstanceOp based on collected Inputs
+    // Remember that the control signal is already included in operands so start at size - 1
+    // for every element check if its Index is part of Output/Parameter vector and delete it,
+    // else keep it. 
+    for(int i = adaptor.getOperands().size() - 1; i >= 0 ; --i){
+      if(llvm::is_contained(InstanceOpOutputIndices, i) || llvm::is_contained(InstanceOpParameterIndices, i)){
+        operands.erase(operands.begin() + i);
+        llvm::errs() << "Removed operand at index " << i << "\n";
+      }
+    }
+    // Rewriting the Function definition
+    //! TODO check if function definition is needed
+    auto calledFuncOpType = calledFuncOp.getFunctionType();
+    SmallVector<Type> newInputs;
+    SmallVector<Type> newResults;
+    for(unsigned i = 0; i < calledFuncOpType.getNumInputs(); ++i){
+      if(llvm::is_contained(InstanceOpInputIndices, i))
+        newInputs.push_back(calledFuncOpType.getInput(i));
+      else if(llvm::is_contained(InstanceOpOutputIndices, i))
+        newResults.push_back(calledFuncOpType.getInput(i));
+    }
+
+    //create new Type based on newInputs and newResults
+    auto newFuncType = FunctionType::get(calledFuncOpType.getContext(), newInputs, newResults);
+    calledFuncOp.setType(newFuncType);
+
     resultTypes = calledFuncOp.getFunctionType().getResults();
+
+    // new Operands should only have input (no outputs and paramters)
+    llvm::errs() << "Operands:\n";
+    for (auto operand : operands) {
+      llvm::errs() << "  - " << operand << " : " << operand.getType() << "\n";
+    }
   } else {
     resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
   }
@@ -1224,12 +1271,38 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
+  // rewiring (if called function is func::FuncOp)
+  if(!calledHandshakeFuncOp){
+    llvm::errs() << "entered rewiring \n";
+    auto InstanceResults = instOp.getResults();
+    unsigned ResultId = 0;
+    for(auto OutputId : InstanceOpOutputIndices){
+      llvm::errs() << "loop 1 (Output) \n";
+      for(Operation *user : OutputConnections[OutputId]){ //! add more users for testing (float_basic)
+        llvm::errs() << "loop 2 (users) \n";
+        for(OpOperand &operand : user->getOpOperands()){ //! try if used multiple types add %5, %5
+          llvm::errs() << "loop 3 (operands) \n";
+          if(operand.get() == callOp.getOperand(OutputId)){
+            llvm::errs() << "loop 4 (check if correct operand) \n";
+            operand.set(InstanceResults[ResultId]);//! (write meaningful comment) in case something breaks maybe needs assertion (loops). we do not account for cyclic dependencys might cause problems
+          }
+        }
+      }
+      ResultId++;
+    }
+  }
   namer.replaceOp(callOp, instOp);
-  if (callOp->getNumResults() == 0)
+  if (callOp->getNumResults() == 0){ //! when using if always include {} or write on the same line as the condition
     rewriter.eraseOp(callOp);
-  else
+  } else if (!calledHandshakeFuncOp) {
+    // In case of placeholder functions (multi-output) use last result (control signal)
+    //! error: operand must be a dataflow channel but got '!handshake.control<>' (I used it for an addf)
+    //rewriter.replaceOp(callOp, instOp.getResult(instOp.getResults().size() - 1)); //? use last result also test by using call result somewhere
+    rewriter.replaceOp(callOp, instOp.getResult(0));
+  } else {
     rewriter.replaceOp(callOp, instOp.getResults().drop_back());
-  return success();
+  }
+  return success(); //! add comment (why last element)
 }
 
 /// Determines whether it is possible to transform an arith-level constant into
