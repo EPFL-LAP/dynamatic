@@ -167,16 +167,16 @@ def generate_default_mappings(in_ports: list[Port], out_ports: list[Port]) -> st
   return ",\n      ".join(mappings)
 
 
-def enumerate_channel_signal_prefixes(channels: list[Port]) -> list[str]:
-  prefixes = []
+def enumerate_channel_names(channels: list[Port]) -> list[str]:
+  channel_names = []
   for channel in channels:
     size = channel.get("size", 0)
     if size == 0:
-      prefixes.append(channel["name"])
+      channel_names.append(channel["name"])
     else:
       for i in range(size):
-        prefixes.append(f"{channel['name']}_{i}")
-  return prefixes
+        channel_names.append(f"{channel['name']}_{i}")
+  return channel_names
 
 
 def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
