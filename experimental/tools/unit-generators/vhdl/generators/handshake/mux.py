@@ -10,11 +10,10 @@ def generate_mux(name, params):
   index_bitwidth = params["index_bitwidth"]
 
   # e.g., {"tag0": 8, "spec": 1}
-  index_extra_signals = params["index_extra_signals"]
-  data_extra_signals = params["data_extra_signals"]
+  extra_signals = params["extra_signals"]
 
-  if data_extra_signals:
-    return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, index_extra_signals, data_extra_signals)
+  if extra_signals:
+    return _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
   elif data_bitwidth == 0:
     return _generate_mux_dataless(name, size, index_bitwidth)
   else:
@@ -176,9 +175,9 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, index_extra_signals, data_extra_signals):
+def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      data_extra_signals)
+      extra_signals)
   return generate_signal_manager(name, {
       "type": "bbmerge",
       "in_ports": [{
@@ -186,19 +185,18 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, inde
           "bitwidth": data_bitwidth,
           "2d": True,
           "size": size,
-          "extra_signals": data_extra_signals
+          "extra_signals": extra_signals
       }, {
           "name": "index",
           "bitwidth": index_bitwidth,
           # TODO: Extra signals for index port are not tested
-          "extra_signals": index_extra_signals
+          "extra_signals": {}
       }],
       "out_ports": [{
           "name": "outs",
           "bitwidth": data_bitwidth,
-          "extra_signals": data_extra_signals
+          "extra_signals": extra_signals
       }],
       "index_name": "index",
-      "index_dir": "in",
-      "extra_signals": data_extra_signals
+      "extra_signals": extra_signals
   }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))

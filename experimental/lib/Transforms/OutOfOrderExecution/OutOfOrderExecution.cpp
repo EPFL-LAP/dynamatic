@@ -59,6 +59,10 @@ private:
   // MUX in the function.
   LogicalResult removeExtraSignalsFromMux(FuncOp funcOp, MLIRContext *ctx);
 
+  // Removes any extra signals (tags, spec bits) from the data going into the
+  // LSQs.
+  LogicalResult removeExtraSignalsFromLSQ(FuncOp funcOp, MLIRContext *ctx);
+
   // Step 1.1: Identify dirty nodes
   LogicalResult identifyDirtyNodes(
       const llvm::DenseSet<Value> &outOfOrderNodeOutputs,
@@ -311,7 +315,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   // Step 1: Identify the clusters
   std::vector<Cluster> clusters = identifyClusters(funcOp, ctx);
 
-  // llvm::errs() << "clusters: \n";
   // for (auto &clusters : clusters) {
   //   clusters.print(llvm::errs());
   //   llvm::errs() << "\n";
@@ -321,22 +324,27 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   // llvm::errs() << "\n";
 
   // Step 2: Check validity of the clusters
-  if (failed(verifyClusters(clusters)))
+  if (failed(verifyClusters(clusters))) {
+    llvm::errs() << "Failed to verify clusters\n";
     return failure();
+  }
 
   // Step 3: Build the cluster hierarchy, returning the all the nodes of the
   // tree from innermost to outermost
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
 
-  llvm::errs() << "Hierarchy nodes: \n";
-  for (auto &clusterNode : hierarchyNodes) {
-    clusterNode->cluster.print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "Done printing hierarchy nodes.\n";
-  llvm::errs() << "\n";
-  llvm::errs() << "\n";
+  // llvm::errs() << "Hierarchy nodes: \n";
+  // for (auto &clusterNode : hierarchyNodes) {
+  //   llvm::errs() << "Cluster size: " <<
+  //   clusterNode->cluster.internalOps.size()
+  //                << "\n";
+  //   clusterNode->cluster.print(llvm::errs());
+  //   llvm::errs() << "\n";
+  // }
+  // llvm::errs() << "Done printing hierarchy nodes.\n";
+  // llvm::errs() << "\n";
+  // llvm::errs() << "\n";
 
   // Step 4: Apply the out-of-order execution methodology to each ot-of-order
   // node with respect to each innermost cluster
@@ -355,8 +363,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
     if (MuxOp muxOp = dyn_cast<MuxOp>(op)) {
       if (failed(applyMuxToCMerge(funcOp, ctx, muxOp, innermostCluster,
-                                  tagIndex, numTags, controlled)))
+                                  tagIndex, numTags, controlled))) {
+        llvm::errs() << "Failed to applyMuxToCMerge\n";
         return failure();
+      }
     } else {
       if (failed(applyOutOfOrderAlgorithm(
               funcOp, ctx,
@@ -365,8 +375,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
               llvm::DenseSet<Value>(op->getResults().begin(),
                                     op->getResults().end()),
               llvm::DenseSet<Operation *>({op}), innermostCluster, tagIndex,
-              numTags, controlled)))
+              numTags, controlled))) {
+        llvm::errs() << "Failed to applyOutOfOrderAlgorithm\n";
         return failure();
+      }
     }
   }
 
@@ -379,6 +391,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
   // Remove the extra signals from the select of the MUXes
   if (failed(removeExtraSignalsFromMux(funcOp, ctx)))
+    return failure();
+
+  // Remove the extra signals from the operands of the LSQs
+  if (failed(removeExtraSignalsFromLSQ(funcOp, ctx)))
     return failure();
 
   llvm::errs() << "\n";
@@ -425,18 +441,25 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMerge(
                    clusterNode->cluster.isMuxAtBoundary(muxOp);
   if (loopMux || ifElseMux) {
     if (loopMux) {
-      if (failed(applyMuxToCMergeLoopCluster(funcOp, ctx, muxOp, clusterNode)))
+      if (failed(
+              applyMuxToCMergeLoopCluster(funcOp, ctx, muxOp, clusterNode))) {
+        llvm::errs() << "failed to applyMuxToCMergeLoopCluster\n";
         return failure();
+      }
     } else {
-      if (failed(applyMuxToCMergeIfElseCluster(funcOp, ctx, clusterNode)))
+      if (failed(applyMuxToCMergeIfElseCluster(funcOp, ctx, clusterNode))) {
+        llvm::errs() << "failed to applyMuxToCMergeIfElseCluster\n";
         return failure();
+      }
     }
     if (!controlled) {
       if (failed(applyOutOfOrderAlgorithm(
               funcOp, ctx, clusterNode->cluster.inputs,
               clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
-              clusterNode->parent, tagIndex, numTags, controlled)))
+              clusterNode->parent, tagIndex, numTags, controlled))) {
+        llvm::errs() << "failed to applyOutOfOrderAlgorithm rec\n";
         return failure();
+      }
     }
   }
   return success();
@@ -472,6 +495,7 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
       muxOp->getLoc(), muxOp.getDataResult().getType(),
       muxOp.getSelectOperand().getType(), muxOp.getDataOperands());
   clusterNode->cluster.internalOps.insert(cmerge);
+  inheritBB(muxOp, cmerge);
 
   // Feed the index output of the CMERGE to the select of the rest of the
   // MUXes at the boundary of teh cluster
@@ -490,9 +514,10 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
   if (!init)
     return failure();
 
-  // Now we replace the MUX's connections to the rest of teh circuit with the
-  // output of the CMERGE and delet the MUX
+  // Now we replace the MUX's connections to the rest of the circuit with the
+  // output of the CMERGE and delete the MUX and remove it from the cluster
   muxOp.getDataResult().replaceAllUsesWith(cmerge.getDataResult());
+  clusterNode->removeInternalOp(muxOp);
   muxOp.erase();
 
   // If the constant feeding the INIT is only used by this INIT and no other
@@ -500,6 +525,11 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
   Value cnstFeedingInit = getInitConstantInput(init);
   size_t numUsers = std::distance(cnstFeedingInit.getUsers().begin(),
                                   cnstFeedingInit.getUsers().end());
+
+  // Now remove the INIT from the cluster and delete it
+  clusterNode->removeInternalOp(init);
+  init->erase();
+
   if (numUsers == 1) {
     Operation *constant = cnstFeedingInit.getDefiningOp();
     // Remove the constant from the parent clusters and rom the inputs of the
@@ -508,10 +538,6 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
     clusterNode->removeInternalOp(constant);
     constant->erase();
   }
-
-  // Now remove the INIT from the cluster and delete it
-  clusterNode->removeInternalOp(init);
-  init->erase();
 
   return success();
 }
@@ -541,6 +567,7 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeIfElseCluster(
   for (MuxOp mux : boundaryMuxes) {
     MergeOp merge =
         rewriter.create<MergeOp>(mux->getLoc(), mux.getDataOperands());
+    inheritBB(mux, merge);
     clusterNode->addInternalOp(merge);
     clusterNode->removeInternalOp(mux);
     rewriter.replaceOp(mux, merge);
@@ -622,8 +649,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
   if (!controlled) {
     if (failed(identifyDirtyNodes(outOfOrderNodeOutputs,
                                   outOfOrderNodeInternalOps, clusterNode,
-                                  dirtyNodes)))
+                                  dirtyNodes))) {
+      llvm::errs() << "Failed to identifyDirtyNodes\n";
       return failure();
+    }
   }
 
   // llvm::errs() << "Dirty nodes: \n";
@@ -641,8 +670,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
     llvm::DenseSet<Value> unalignedEdges;
     if (failed(identifyUnalignedEdges(outOfOrderNodeInputs,
                                       outOfOrderNodeOutputs, clusterNode,
-                                      dirtyNodes, unalignedEdges)))
+                                      dirtyNodes, unalignedEdges))) {
+      llvm::errs() << "Failed to identifyUnalignedEdges\n";
       return failure();
+    }
 
     // llvm::errs() << "Unaligned edges: \n";
     // for (auto edge : unalignedEdges) {
@@ -658,8 +689,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
       llvm::DenseSet<Value> taggedEdges;
       if (failed(identifyTaggedEdges(outOfOrderNodeInputs,
                                      outOfOrderNodeOutputs, unalignedEdges,
-                                     taggedEdges)))
+                                     taggedEdges))) {
+        llvm::errs() << "Failed to identifyTaggedEdges\n";
         return failure();
+      }
 
       // llvm::errs() << "taggedEdges edges: \n";
       // for (auto edge : taggedEdges) {
@@ -681,14 +714,18 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                            builder, clusterNode, numTags, controlled,
                            dirtyNodes, unalignedEdges, taggedEdges, untaggers);
 
-      if (!freeTagsFifo)
+      if (!freeTagsFifo) {
+        llvm::errs() << "Failed to freeTagsFifo\n";
         return failure();
+      }
 
       // Step 5: Tag the channels in the tagged region
       std::string extraTag = "tag" + std::to_string(tagIndex++);
       if (failed(addTagSignalsToTaggedRegion(funcOp, freeTagsFifo, numTags,
-                                             extraTag, untaggers)))
+                                             extraTag, untaggers))) {
+        llvm::errs() << "Failed to addTagSignalsToTaggedRegion\n";
         return failure();
+      }
     }
   }
 
@@ -702,8 +739,10 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
     if (failed(applyOutOfOrderAlgorithm(
             funcOp, ctx, clusterNode->cluster.inputs,
             clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
-            clusterNode->parent, tagIndex, numTags, controlled)))
+            clusterNode->parent, tagIndex, numTags, controlled))) {
+      llvm::errs() << "failed heirarchical\n";
       return failure();
+    }
   }
 
   return success();
@@ -1351,16 +1390,17 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     // all operands should have an owner and defining operation.
     return failure();
 
-  if (isa<EndOp>(op) || isa<StoreOp>(op))
-    return success();
-
-  // The tags coming in and out of the freeTagsFifo should never be tagged
-  if (dyn_cast<FreeTagsFifoOp>(op))
+  // The tags coming in and out of the freeTagsFifo and the data going into a
+  // LSQ should never be tagged
+  if (isa<FreeTagsFifoOp>(op))
     return failure();
 
   // Add the tag to the current operand
   if (failed(addTagToValue(opOperand.get(), extraTag, numTags)))
     return failure();
+
+  if (isa<EndOp>(op) || isa<StoreOp>(op) || isa<LSQOp>(op))
+    return success();
 
   if (visited.contains(op))
     return success();
@@ -1389,7 +1429,7 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     return success();
   }
 
-  // MemPortOp (Load and Store)
+  // LoadOp
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
     // Continue traversal to dataOut, skipping ports connected to the memory
     // controller.
@@ -1408,16 +1448,16 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
     return success();
   }
 
-  // if (isa<ControlMergeOp>(op) || isa<MuxOp>(op)) {
-  //   // Only perform traversal to the dataResult
-  //   MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
-  //   for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-  //     if (failed(addTagSignalsRecursive(operand, visited, extraTag,
-  //                                       freeTagsFifo, untaggers, numTags)))
-  //       return failure();
-  //   }
-  //   return success();
-  // }
+  // CmergeOp
+  if (auto cmergeOp = dyn_cast<ControlMergeOp>(op)) {
+    // Only perform traversal to the dataResult
+    for (auto &use : cmergeOp.getDataResult().getUses()) {
+      if (failed(addTagSignalsRecursive(use, visited, extraTag, freeTagsFifo,
+                                        untaggers, numTags)))
+        return failure();
+    }
+    return success();
+  }
 
   // Downstream traversal
   for (auto result : op->getResults()) {
@@ -1477,7 +1517,7 @@ LogicalResult
 OutOfOrderExecutionPass::removeExtraSignalsFromMux(FuncOp funcOp,
                                                    MLIRContext *ctx) {
   OpBuilder builder(ctx);
-  // Loop over all the muxes in the graph
+  // Loop over all the MUXes in the graph
   for (MuxOp muxOp : funcOp.getOps<MuxOp>()) {
     // If the select of the MUX has any extra signals, then these extra signals
     // must be removed by an extract op.
@@ -1490,6 +1530,41 @@ OutOfOrderExecutionPass::removeExtraSignalsFromMux(FuncOp funcOp,
             muxOp->getLoc(), muxOp.getSelectOperand());
         muxOp->replaceUsesOfWith(muxOp.getSelectOperand(),
                                  extractor.getResult());
+        inheritBB(muxOp, extractor);
+      }
+    }
+  }
+  return success();
+}
+
+/**
+ * @brief Removes any extra signals (tags, spec bits) from the data going into
+ * the LSQs.
+ *
+ * @param funcOp The function containing the operations to be processed.
+ * @param ctx The MLIR context.
+ *
+ * @return Success if extra signals are successfully removed from the LSQ data
+ * operands, failure otherwise.
+ */
+LogicalResult
+OutOfOrderExecutionPass::removeExtraSignalsFromLSQ(FuncOp funcOp,
+                                                   MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+  // Loop over all the LSQs in the graph
+  for (LSQOp lsqOp : funcOp.getOps<LSQOp>()) {
+    builder.setInsertionPoint(lsqOp);
+    // If the operands of the LSQ have any extra signals, then these extra
+    // signals must be removed by an extract op.
+    for (auto operand : lsqOp->getOperands()) {
+      if (auto valueType =
+              operand.getType().dyn_cast<ExtraSignalsTypeInterface>()) {
+        if (valueType.getNumExtraSignals() > 0) {
+          ExtractOp extractor =
+              builder.create<ExtractOp>(lsqOp->getLoc(), operand);
+          lsqOp->replaceUsesOfWith(operand, extractor.getResult());
+          inheritBB(lsqOp, extractor);
+        }
       }
     }
   }

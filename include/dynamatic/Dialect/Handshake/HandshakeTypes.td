@@ -272,7 +272,7 @@ class IsSimpleHandshake<string name> : PredOpTrait<
 
 /// Constraint to ensure an operand/result has atleast 1 extra signal.
 class HasExtraSignal<string name> : PredOpTrait<
-  name # " shouldn't have any extra signals",
+  name # " should have atleast 1 extra signal",
   CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getNumExtraSignals() > 0">
 >;
@@ -376,7 +376,7 @@ class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, lis
 
 /// Constraint to ensure that HandshakeType has no extra signals.
 class LacksExtraSignals<string operand> : PredOpTrait<
-  "should not have any extra signals",
+  operand # " should not have any extra signals",
   CPred<[{
     [](ExtraSignalsTypeInterface type) {
       return type.getExtraSignals().empty();

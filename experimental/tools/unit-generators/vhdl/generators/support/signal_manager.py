@@ -27,9 +27,8 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
   elif type == "bbmerge":
     extra_signals = params["extra_signals"]
     index_name = params["index_name"]
-    index_dir = params["index_dir"]
     signal_manager = _generate_bbmerge_signal_manager(
-        name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner)
+        name, in_ports, out_ports, index_name, extra_signals, generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
@@ -588,37 +587,7 @@ end architecture;
 
   return inner + entity + architecture
 
-
-def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_signals, index_dir) -> str:
-  """
-  e.g., index_tag0 <= "0";
-  """
-  # TODO: Extra signals for index port are not tested
-  if index_dir == "out" and index_extra_signals:
-    index_extra_signals_list = []
-    for signal_name in index_extra_signals:
-      index_extra_signals_list.append(
-          f"  {index_name}_{signal_name} <= {_get_default_extra_signal_value(signal_name)};")
-    return "\n".join(index_extra_signals_list)
-  return ""
-
-
-def _generate_bbmerge_signal_assignments(concat_logic, index_extra_signal_assignments) -> str:
-  template = f"""
-  -- Concatenate data and extra signals
-  {concat_logic}
-"""
-
-  if index_extra_signal_assignments:
-    template += f"""
-  -- Assign index extra signals
-  {index_extra_signal_assignments}
-"""
-
-  return template.lstrip()
-
-
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner: Callable[[str], str]):
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
@@ -636,13 +605,6 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extr
   concat_logic = generate_concat_logic(
       in_ports, out_ports, concat_info, ignore=[index_name])
 
-  # Assign index extra signals
-  index_extra_signal_assignments = _generate_bbmerge_index_extra_signal_assignments(
-      index_name, extra_signals, index_dir)
-
-  signal_assignments = _generate_bbmerge_signal_assignments(
-      concat_logic, index_extra_signal_assignments)
-
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
       in_ports, out_ports, extra_signals, [index_name])
@@ -653,7 +615,8 @@ architecture arch of {name} is
   -- Concatenated data and extra signals
   {concat_signal_decls}
 begin
-  {signal_assignments}
+  -- Concatenate data and extra signals
+  {concat_logic}
 
   inner : entity work.{inner_name}(arch)
     port map(
