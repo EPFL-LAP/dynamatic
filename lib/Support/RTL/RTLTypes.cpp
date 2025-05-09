@@ -250,8 +250,8 @@ std::string RTLDataflowType::serialize(Attribute attr) {
 //===----------------------------------------------------------------------===//
 
 TimingConstraints::TimingConstraints() {
-  for (SignalType type : getSignalTypes())
-    latencies.emplace(type, UnsignedConstraints{});
+  for (SignalType signalType : getSignalTypes())
+    latencies.emplace(signalType, UnsignedConstraints{});
 }
 
 bool TimingConstraints::verify(Attribute attr) const {
@@ -260,9 +260,9 @@ bool TimingConstraints::verify(Attribute attr) const {
     return false;
 
   handshake::TimingInfo info = timingAttr.getInfo();
-  for (SignalType type : getSignalTypes()) {
-    std::optional<unsigned> latency = info.getLatency(type);
-    const UnsignedConstraints &cons = latencies.at(type);
+  for (SignalType signalType : getSignalTypes()) {
+    std::optional<unsigned> latency = info.getLatency(signalType);
+    const UnsignedConstraints &cons = latencies.at(signalType);
     if (latency) {
       if (!cons.verify(*latency))
         return false;
@@ -285,9 +285,9 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingConstraints &cons,
   ObjectDeserializer deserial(value, path);
 
   std::string latSuffix = RTLTimingType::LATENCY.str() + "-";
-  for (SignalType type : getSignalTypes()) {
-    std::string key = SIGNAL_TYPE_NAMES.at(type).str() + latSuffix;
-    cons.latencies.at(type).deserialize(deserial, key);
+  for (SignalType signalType : getSignalTypes()) {
+    std::string key = SIGNAL_TYPE_NAMES.at(signalType).str() + latSuffix;
+    cons.latencies.at(signalType).deserialize(deserial, key);
   }
   return deserial.exhausted(RESERVED_KEYS);
 }

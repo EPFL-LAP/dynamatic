@@ -47,16 +47,16 @@ FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto &[channel, channelVars] : vars.channelVars) {
+  for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
     // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
-    bool forceBreakDVR = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDVR = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
     
     handshake::ChannelBufProps &props = channelProps[channel];
@@ -102,7 +102,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -164,8 +164,8 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
 
 void FPGA20Buffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 1> signals;
-  signals.push_back(SignalType::DATA);
+  SmallVector<SignalType, 1> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -181,7 +181,7 @@ void FPGA20Buffers::setup() {
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
     allChannels.push_back(channel);
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add path and elasticity constraints over all channels in the function
