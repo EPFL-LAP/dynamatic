@@ -254,9 +254,8 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
       delay = 0.0;
 
-    if (delay == 0.0) {
-      delay = 0.001;
-    }
+    // The delay of the unit must be positive.
+    delay = std::max(delay, 0.001);
 
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
