@@ -109,7 +109,6 @@ begin
         ctrl_ready <= not Empty;
       else
         -- Head < Curr.
-        CurrEn <= '1';
         HeadEn <= '1';
         ctrl_ready <= '1';
       end if;
