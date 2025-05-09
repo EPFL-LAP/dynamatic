@@ -175,7 +175,8 @@ begin
           outs_spec <= "1";
           FifoV <= ControlnR;
           FifoR <= ControlnR;
-        elsif (DatapV = '1' and FifoNotEmpty = '1' and ins = fifo_ins) then
+        elsif ((DatapV = '1' and PredictpV = '0' and FifoNotEmpty = '1' and ins = fifo_ins) or
+               (DatapV = '1' and PredictpV = '1' and FifoNotFull = '0' and ins = fifo_ins)) then
           DataR <= ControlnR;
           PredictR <= '0';
           FifoR <= ControlnR;
@@ -476,7 +477,7 @@ end architecture;
   return entity + architecture
 
 
-def _generate_decodeOutput(name):
+def _generate_decodeOutput(name, bitwidth):
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -489,8 +490,13 @@ entity {name} is
     control_in_valid : in std_logic;
     control_in_ready : out std_logic;
 
-    out_valid : out std_logic;
-    out_ready : in std_logic
+    tehb_outs : in std_logic_vector({bitwidth} - 1 downto 0);
+    tehb_outs_spec : in std_logic_vector(0 downto 0);
+
+    outs : out std_logic_vector({bitwidth} - 1 downto 0);
+    outs_spec : out std_logic_vector(0 downto 0);
+    outs_valid : out std_logic;
+    outs_ready : in std_logic
   );
 end entity;
 """
@@ -499,25 +505,29 @@ end entity;
 -- Architecture of decodeOutput
 architecture arch of {name} is
 begin
-  process (control_in, control_in_valid, out_ready)
+  -- Forward outs data and spec bit
+  outs <= tehb_outs;
+  outs_spec <= tehb_outs_spec;
+
+  process (control_in, control_in_valid, outs_ready)
   begin
     if (control_in = "000" or control_in = "001" or control_in = "011" or control_in = "101") then
-      control_in_ready <= out_ready;
+      control_in_ready <= outs_ready;
     else
       control_in_ready <= '1';
     end if;
 
-    out_valid <= '0';
+    outs_valid <= '0';
 
     if (control_in_valid = '1') then
       if control_in = "000" then -- spec
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "101" then -- correct-spec
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "001" then -- no cmp
-        out_valid <= '1';
+        outs_valid <= '1';
       elsif control_in = "011" then -- cmp wrong resend
-        out_valid <= '1';
+        outs_valid <= '1';
       end if;
     end if;
   end process;
@@ -769,7 +779,7 @@ def _generate_speculator(name, bitwidth, fifo_depth):
       _generate_decodeSave(decodeSave_name) + \
       _generate_decodeCommit(decodeCommit_name) + \
       _generate_decodeSC(decodeSC_name) + \
-      _generate_decodeOutput(decodeOutput_name) + \
+      _generate_decodeOutput(decodeOutput_name, bitwidth) + \
       _generate_decodeBranch(decodeBranch_name) + \
       generate_tehb(tehb_name, {
           "bitwidth": bitwidth,
@@ -842,6 +852,8 @@ architecture arch of {name} is
   signal specgenCore_control_outs_valid : std_logic;
   signal specgenCore_control_outs_ready : std_logic;
 
+  signal tehb_outs : std_logic_vector({bitwidth} - 1 downto 0);
+  signal tehb_outs_spec : std_logic_vector(0 downto 0);
   signal tehb_control_outs : std_logic_vector(2 downto 0);
   signal tehb_control_outs_valid : std_logic;
   signal tehb_control_outs_ready : std_logic;
@@ -942,8 +954,8 @@ begin
       ins_internal_ctrl => specgenCore_control_outs,
       ins_valid => specgenCore_control_outs_valid,
       ins_ready => specgenCore_control_outs_ready,
-      outs => outs,
-      outs_spec => outs_spec,
+      outs => tehb_outs,
+      outs_spec => tehb_outs_spec,
       outs_internal_ctrl => tehb_control_outs,
       outs_valid => tehb_control_outs_valid,
       outs_ready => tehb_control_outs_ready
@@ -999,8 +1011,12 @@ begin
       control_in => fork_control_outs(4),
       control_in_valid => fork_control_outs_valid(4),
       control_in_ready => fork_control_outs_ready(4),
-      out_valid => outs_valid,
-      out_ready => outs_ready
+      tehb_outs => tehb_outs,
+      tehb_outs_spec => tehb_outs_spec,
+      outs => outs,
+      outs_spec => outs_spec,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready
     );
 
   decodeBranch0: entity work.{decodeBranch_name}(arch)
