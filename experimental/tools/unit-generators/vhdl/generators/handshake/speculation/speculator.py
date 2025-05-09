@@ -56,7 +56,7 @@ end entity;
   architecture = f"""
 -- Architecture of specgenCore
 architecture arch of {name} is
-  type State_type is (IDLE, KILL, KILL_ONLY_TOKENS);
+  type State_type is (IDLE, KILL, KILL_ONLY_DATA);
   type Control_type is (CONTROL_SPEC, CONTROL_NO_CMP, CONTROL_CMP_CORRECT, CONTROL_RESEND, CONTROL_KILL, CONTROL_CORRECT_SPEC);
   signal State : State_type;
 
@@ -123,10 +123,10 @@ begin
                   State <= IDLE;
                 else
                   -- Wait for all misspec tokens, but accept new speculation
-                  State <= KILL_ONLY_TOKENS;
+                  State <= KILL_ONLY_DATA;
                 end if;
             end if;
-          when KILL_ONLY_TOKENS =>
+          when KILL_ONLY_DATA =>
             if (DatapV = '1' and ins_spec = "0") then
               State <= IDLE;
             end if;
@@ -217,7 +217,7 @@ begin
 
         -- Never pushes new data to fifo
         FifoV <= '0';
-      when KILL_ONLY_TOKENS =>
+      when KILL_ONLY_DATA =>
         -- Accepts spec data to kill it
         DataR <= ins_spec(0);
 
