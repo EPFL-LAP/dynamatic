@@ -149,9 +149,8 @@ def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
   mapping.append(f"{inner_channel_name}_ready => {port_name}_ready")
 
   for signal_name in port_extra_signals:
-    if signal_name in port_extra_signals:
-      mapping.append(
-          f"{port_name}_{signal_name} => {port_name}_{signal_name}")
+    mapping.append(
+        f"{port_name}_{signal_name} => {port_name}_{signal_name}")
 
   return mapping
 
