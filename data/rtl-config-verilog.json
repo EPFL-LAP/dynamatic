@@ -566,7 +566,6 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/mux.v",
     "module-name": "mux_dataless",
-    "dependencies": ["tehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -577,7 +576,6 @@
       { "name": "SELECT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/mux.v",
-    "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
@@ -595,7 +593,7 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/control_merge.v",
     "module-name": "control_merge_dataless",
-    "dependencies": ["merge_notehb_dataless", "tehb", "fork_dataless"],
+    "dependencies": ["merge_dataless", "tehb", "fork_dataless"],
     "hdl": "verilog"
   },
   {
@@ -623,7 +621,6 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/dataless/merge.v",
     "module-name": "merge_dataless",
-    "dependencies": ["tehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -633,7 +630,6 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/handshake/merge.v",
-    "dependencies": ["tehb"],
     "hdl": "verilog"
   },
   {
@@ -816,15 +812,6 @@
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/mc_support.v",
-    "hdl": "verilog"
-  },
-  {
-    "generic": "$DYNAMATIC/data/verilog/support/merge_notehb.v",
-    "hdl": "verilog"
-  },
-  {
-    "generic": "$DYNAMATIC/data/verilog/support/dataless/merge_notehb.v",
-    "module-name": "merge_notehb_dataless",
     "hdl": "verilog"
   },
   {

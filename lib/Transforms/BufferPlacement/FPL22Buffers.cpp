@@ -49,20 +49,25 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
     // 1. If breaking DV & R:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
     // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
     //
     // 2. If only breaking DV:
     // When numslot = 1, map to ONE_SLOT_BREAK_DV;
-    // When numslot > 1, map to (numslot - 1) * FIFO_BREAK_DV.
+    // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
     //
     // 3. If only breaking R:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R;
-    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    // Map to numslot * FIFO_BREAK_NONE.
+    // Avoiding ONE_SLOT_BREAK_R here makes circuit performance better.
+    //
+    // 4. If breaking none:
+    // Map to numslot * FIFO_BREAK_NONE.
     if (forceBreakDV && forceBreakR) {
       if (numSlotsToPlace == 1) {
         result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else if (numSlotsToPlace == 2) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
@@ -71,17 +76,12 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
         result.numOneSlotR = 1;
       }
     } else if (forceBreakDV) {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotDV = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numOneSlotDV = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
+    } else if (forceBreakR) {
+      result.numFifoNone = numSlotsToPlace;
     } else {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotR = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numFifoNone = numSlotsToPlace;
     }
 
     placement[channel] = result;
@@ -110,7 +110,7 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
 
   // Force buffer presence if at least one slot is requested
-  unsigned minSlots = props.minOpaque + props.minTrans;
+  unsigned minSlots = std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
     model.addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");

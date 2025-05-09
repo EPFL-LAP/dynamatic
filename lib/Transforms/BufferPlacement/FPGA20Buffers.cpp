@@ -59,40 +59,29 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     bool forceBreakDVR = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
     
-    handshake::ChannelBufProps &props = channelProps[channel];
-
     PlacementResult result;
     // 1. If breaking DVR:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
     // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
     // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
     //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
     //
     // 2. If breaking none:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R;
-    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    // Map to numslot * FIFO_BREAK_NONE.
     if (forceBreakDVR) {
       if (numSlotsToPlace == 1) {
         result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else if (numSlotsToPlace == 2) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
       } else {
-        if (props.minOpaque <= 1) {
-          result.numOneSlotDV = 1;
-          result.numFifoNone = numSlotsToPlace - 1;
-        } else {
-          result.numOneSlotDV = 1;
-          result.numFifoNone = numSlotsToPlace - 2;
-          result.numOneSlotR = 1;
-        }
+        result.numOneSlotDV = 1;
+        result.numFifoNone = numSlotsToPlace - 2;
+        result.numOneSlotR = 1;
       }
     } else {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotR = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numFifoNone = numSlotsToPlace;
     }
 
     placement[channel] = result;
@@ -139,8 +128,12 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
     // Force the MILP to place a minimum number of transparent slots
     model.addConstr(chVars.bufNumSlots >= props.minTrans + dataBuf,
                     "custom_minTrans");
+  } else if (props.minSlots > 0) {
+    // Force the MILP to place a minimum number of slots
+    model.addConstr(chVars.bufNumSlots >= props.minSlots,
+                    "custom_minSlots");
   }
-  if (props.minOpaque + props.minTrans > 0)
+  if (props.minOpaque + props.minTrans + props.minSlots > 0)
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
 
   // Set a maximum number of slots to be placed
