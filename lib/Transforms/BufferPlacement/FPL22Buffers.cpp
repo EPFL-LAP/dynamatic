@@ -60,6 +60,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     //
     // 3. If only breaking R:
     // Map to numslot * FIFO_BREAK_NONE.
+    // Avoiding ONE_SLOT_BREAK_R here makes circuit performance better.
     //
     // 4. If breaking none:
     // Map to numslot * FIFO_BREAK_NONE.
