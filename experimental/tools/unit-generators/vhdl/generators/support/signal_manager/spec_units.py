@@ -5,93 +5,66 @@ from .utils.generation import generate_concat, generate_slice, generate_mapping,
 from .utils.types import Port, ExtraSignals
 
 
-def _generate_concat(in_ports_without_ctrl: list[Port], concat_layout: ConcatLayout) -> tuple[str, str, dict[str, Port]]:
-  concat_assignments = []
-  concat_decls = []
-  concat_ports = {}
+def _generate_concat(channel: Port, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Port]):
+  channel_name = channel["name"]
+  concat_name = f"{channel_name}_concat"
+  channel_bitwidth = channel["bitwidth"]
+  channel_size = channel.get("size", 0)
 
-  for port in in_ports_without_ctrl:
-    channel_name = port["name"]
-    concat_name = f"{channel_name}_concat"
-    channel_bitwidth = port["bitwidth"]
-    channel_size = port.get("size", 0)
+  # Concatenate the input channel data and extra signals to create the concat channel
+  assignments, decls = generate_concat(
+      channel_name, channel_bitwidth, concat_name, concat_layout, channel_size)
+  concat_assignments.extend(assignments)
+  # Declare the concat channel data signal
+  concat_decls.extend(decls["out"])
 
-    # Concatenate the input channel data and extra signals to create the concat channel
-    assignments, decls = generate_concat(
-        channel_name, channel_bitwidth, concat_name, concat_layout, channel_size)
-    concat_assignments.extend(assignments)
-    # Declare the concat channel data signal
-    concat_decls.extend(decls["out"])
+  # Forward the input channel handshake to the concat channel
+  assignments, decls = generate_handshake_forwarding(
+      channel_name, concat_name, channel_size)
+  concat_assignments.extend(assignments)
+  # Declare the concat channel handshake signals
+  concat_decls.extend(decls["out"])
 
-    # Forward the input channel handshake to the concat channel
-    assignments, decls = generate_handshake_forwarding(
-        channel_name, concat_name, channel_size)
-    concat_assignments.extend(assignments)
-    # Declare the concat channel handshake signals
-    concat_decls.extend(decls["out"])
-
-    concat_ports[channel_name] = {
-        "name": concat_name,
-        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
-        "size": channel_size,
-        "extra_signals": {"spec": 1}
-    }
-
-  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls), concat_ports
+  concat_channels[channel_name] = {
+      "name": concat_name,
+      "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+      "size": channel_size,
+      "extra_signals": {"spec": 1}
+  }
 
 
-def _generate_slice(out_ports: list[Port], concat_layout: ConcatLayout) -> tuple[str, str, dict[str, Port]]:
-  slice_decls = []
-  slice_assignments = []
-  slice_ports = {}
+def _generate_slice(port: Port, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Port]):
+  channel_name = port["name"]
+  concat_name = f"{channel_name}_concat"
+  channel_bitwidth = port["bitwidth"]
+  channel_size = port.get("size", 0)
 
-  for port in out_ports:
-    channel_name = port["name"]
-    concat_name = f"{channel_name}_concat"
-    channel_bitwidth = port["bitwidth"]
-    channel_size = port.get("size", 0)
+  # Slice the concat channel to create the output channel data and extra signals
+  assignments, decls = generate_slice(
+      concat_name, channel_name, channel_bitwidth, concat_layout, channel_size)
+  slice_assignments.extend(assignments)
+  # Declare the concat channel data signal
+  slice_decls.extend(decls["in"])
 
-    # Slice the concat channel to create the output channel data and extra signals
-    assignments, decls = generate_slice(
-        concat_name, channel_name, channel_bitwidth, concat_layout, channel_size)
-    slice_assignments.extend(assignments)
-    # Declare the concat channel data signal
-    slice_decls.extend(decls["in"])
+  # Forward the concat channel handshake to the output channel
+  assignments, decls = generate_handshake_forwarding(
+      concat_name, channel_name, channel_size)
+  slice_assignments.extend(assignments)
+  # Declare the concat channel handshake signals
+  slice_decls.extend(decls["in"])
 
-    # Forward the concat channel handshake to the output channel
-    assignments, decls = generate_handshake_forwarding(
-        concat_name, channel_name, channel_size)
-    slice_assignments.extend(assignments)
-    # Declare the concat channel handshake signals
-    slice_decls.extend(decls["in"])
-
-    slice_ports[channel_name] = {
-        "name": concat_name,
-        "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
-        "size": channel_size,
-        "extra_signals": {"spec": 1}
-    }
-
-  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls), slice_ports
-
-
-def _generate_mappings(concat_ports: dict[str, Port], slice_ports: dict[str, Port], ctrl_ports: list[Port]) -> str:
-  mapped_ports = {}
-  mapped_ports.update(concat_ports)
-  mapped_ports.update(slice_ports)
-  for ctrl_port in ctrl_ports:
-    mapped_ports[ctrl_port["name"]] = ctrl_port
-
-  mappings = []
-  for original_name, mapped_channel in mapped_ports.items():
-    mappings.extend(generate_mapping(mapped_channel, original_name))
-  return ",\n      ".join(mappings)
+  slice_channels[channel_name] = {
+      "name": concat_name,
+      "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
+      "size": channel_size,
+      "extra_signals": {"spec": 1}
+  }
 
 
 def generate_spec_units_signal_manager(
     name: str,
-    in_ports: list[Port],
-    out_ports: list[Port],
+    in_channels: list[Port],
+    out_channels: list[Port],
     extra_signals_without_spec: ExtraSignals,
     ctrl_names: list[str],
     generate_inner: Callable[[str], str]
@@ -117,13 +90,13 @@ def generate_spec_units_signal_manager(
     A string representing the complete VHDL architecture for the signal manager.
   """
 
-  entity = generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_channels, out_channels)
 
   # Separate input ports into control ports and non-control ports
-  in_ports_without_ctrl = [
-      port for port in in_ports if not port["name"] in ctrl_names]
-  ctrl_ports = [
-      port for port in in_ports if port["name"] in ctrl_names]
+  in_channel_without_ctrl = [
+      port for port in in_channels if not port["name"] in ctrl_names]
+  ctrl_channels = [
+      port for port in in_channels if port["name"] in ctrl_names]
 
   # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals_without_spec)
@@ -131,23 +104,37 @@ def generate_spec_units_signal_manager(
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  concat_assignments, concat_decls, concat_ports = _generate_concat(
-      in_ports_without_ctrl, concat_layout)
-  slice_assignments, slice_decls, slice_ports = _generate_slice(
-      out_ports, concat_layout)
+  assignments = []
+  decls = []
+  channels = {}
 
-  mappings = _generate_mappings(
-      concat_ports, slice_ports, ctrl_ports)
+  for port in in_channel_without_ctrl:
+    _generate_concat(port, concat_layout,
+                     assignments, decls, channels)
 
+  for port in out_channels:
+    _generate_slice(port, concat_layout,
+                    assignments, decls, channels)
+
+  mappings = []
+  for channel_name, channel in channels.items():
+    mappings.append(generate_mapping(
+        channel, channel_name))
+
+  for ctrl_channel in ctrl_channels:
+    mappings.extend(generate_mapping(
+        ctrl_channel, ctrl_channel["name"]))
+
+  assignments = "\n  ".join(assignments)
+  decls = "\n  ".join(decls)
+  mappings = ",\n      ".join(mappings)
   architecture = f"""
 -- Architecture of signal manager (spec_units)
 architecture arch of {name} is
-  {concat_decls}
-  {slice_decls}
+  {decls}
 begin
   -- Concat/slice data and extra signals
-  {concat_assignments}
-  {slice_assignments}
+  {assignments}
 
   inner : entity work.{inner_name}(arch)
     port map(

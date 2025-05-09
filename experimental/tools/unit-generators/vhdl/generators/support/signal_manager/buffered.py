@@ -122,7 +122,7 @@ def generate_buffered_signal_manager(
       out_channel_names, concat_layout)
 
   # Map channels to inner component
-  mappings = generate_default_mappings(in_ports, out_ports)
+  mappings = generate_default_mappings(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (buffered)

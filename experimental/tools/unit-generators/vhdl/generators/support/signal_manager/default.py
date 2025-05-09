@@ -46,7 +46,7 @@ def generate_default_signal_manager(
       in_channel_names, out_channel_names, extra_signals)
 
   # Map channels to inner component
-  mappings = generate_default_mappings(in_ports, out_ports)
+  mappings = generate_default_mappings(in_ports + out_ports)
 
   architecture = f"""
 -- Architecture of signal manager (default)
