@@ -424,4 +424,18 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 }
 
 
+def FormalPropertiesAttr : Handshake_Attr<"FormalProperties", "formalProperties"> {
+ let summary = "list of formal property IDs";
+  let description = [{
+    Holds an operation's formal properties by IDs. Each ID references
+    an entry in the formal_properities.json file, that contains all
+    the information needed for each property.
+  }];
+  
+  let parameters = (ins ArrayRefParameter<"unsigned">:$IDs);
+  
+  let assemblyFormat = "`[` $IDs `]`";
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
