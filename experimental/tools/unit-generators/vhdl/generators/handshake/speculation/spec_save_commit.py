@@ -47,11 +47,6 @@ architecture arch of {name} is
   signal TailEn : std_logic := '0';
   signal CurrEn : std_logic := '0';
 
-  signal PassEn   : std_logic := '0';
-  signal KillEn   : std_logic := '0';
-  signal ResendEn : std_logic := '0';
-  signal NoCmpEn  : std_logic := '0';
-
   signal Tail : natural range 0 to {fifo_depth} - 1;
   signal Head : natural range 0 to {fifo_depth} - 1;
   signal Curr : natural range 0 to {fifo_depth} - 1;
@@ -147,13 +142,13 @@ begin
       HeadEn <= outs_ready;
 
       ctrl_ready <= outs_ready;
-      outs_valid <= "1";
+      outs_valid <= '1';
       {data("outs <= Memory(Head);", bitwidth)}
       outs_spec <= "0";
     elsif ctrl_valid = '1' and ctrl = "100" then
       -- NO_CMP
       -- TODO: When Empty = '1', input data should be bypassed,
-      --       just like with PassEn, for better performance.
+      --       just like when PASS or PASS_KILL, for better performance.
       -- Head = Curr is assumed from the specification.
       -- `not Empty` ensures Curr < Tail.
       CurrEn <= outs_ready and not Empty;
