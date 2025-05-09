@@ -38,9 +38,10 @@ public:
   FormalProperty() : info(nullptr) {}
   FormalProperty(unsigned long id, const std::string &type,
                  const std::string &tag, llvm::json::Value info)
-      : id(id), type(*typeFromStr(type)), tag(*tagFromStr(tag)), info(info) {}
+      : id(id), type(*typeFromStr(type)), tag(*tagFromStr(tag)),
+        check("unchecked"), info(info) {}
   FormalProperty(unsigned long id, TYPE type, TAG tag, llvm::json::Value info)
-      : id(id), type(type), tag(tag), info(info) {}
+      : id(id), type(type), tag(tag), check("unchecked"), info(info) {}
 
   static llvm::json::Object AOBInfo(const OpResult &res);
   static llvm::json::Object VEQInfo(const OpResult &res1, const OpResult &res2);

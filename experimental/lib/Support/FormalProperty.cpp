@@ -81,7 +81,7 @@ llvm::json::Object FormalProperty::toJsonObj() const {
                             {"info", info},
                             {"tag", tagToStr(tag)},
                             {"type", typeToStr(type)},
-                            {"check", "unchecked"}};
+                            {"check", check}};
 }
 
 llvm::json::Object FormalProperty::AOBInfo(const OpResult &res) {
