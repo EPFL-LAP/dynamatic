@@ -24,16 +24,49 @@ library          = 'library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeri
 #===----------------------------------------------------------------------===#
 # VHDL Signal Definition
 #===----------------------------------------------------------------------===#
+# This section defined Python classes that generate VHDL signal declarations.
+# 
+# - class Logic         : (std_logic) one‑bit signal wire / port / register
+# - class LogicVec      : (std_logic_vector) Multi-bit signal.
+# - class LogicArray    : (Multiple std_logic) Array of individual std_logic signals.
+# - class LogicVecArray : (Multiple std_logic_vector) Array of std_logic_vector signals.
 
 #
 # std_logic bit
 #
 class Logic:
+    """
+    A one-bit VHDL std_logic signal.
+
+    Logic class encapsulates wires, ports, and registers in the code generator,
+    handling name with '_i', '_o', '_q', '_d' suffixes.
+
+    Attributes:
+        name (str): The base name of the signal.
+        type (str): 
+            'i' input port      (<name>_i: in std_logic)
+            'o' output port     (<name>_o: out std_logic)
+            'w' internal wire   (signal <name>: std_logic)
+            'r' register        (<name>_q) for the registered value
+                                (<name>_d) for the next-cycled value
+    
+    Methods:
+        getNameRead(): Returns the name we should use when reading the signal. (e.g. <name>_q for a register type)
+        getNameWrite(): Returns the name to write to. (e.g. <name>_d for a register type)
+        signalInit(): Appends the VHDL signal/port declaration.
+        regInit(): Appends the VHDL register initialization block.
+    """
+        
     # Signal name
     name = ''
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
     def __init__(self, name: str, type: str = 'w', init: bool = True) -> None:
+        """
+        init: If True, immediately generates the corresponding std_logic in VHDL.
+              True when we instantiate Logic.
+              False when we instantiate LogicVec, LogicArray, and LogicVecArray.
+        """
         # Type should be one of the four types.
         assert(type in ('i','o','w','r'))
         self.name = name
@@ -41,6 +74,9 @@ class Logic:
         if (init):
             self.signalInit()
     def __repr__(self) -> str:
+        """
+        Print Logic with useful information.
+        """
         # Signal type
         type = ''
         if (self.type   == 'w'):
@@ -53,6 +89,13 @@ class Logic:
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: single bit\n'
     def getNameRead(self, sufix = '') -> str:
+        """
+        Returns the name we should use when reading the signal.
+
+        Example (Pseudo-code)
+            If you want to do "Logic a = Logic b + Logic c"
+            -> getNameWrite(a) = getNameRead(b) + getNameRead(c)
+        """
         if (self.type == 'w'):
             return self.name + sufix
         elif(self.type == 'r'):
@@ -62,6 +105,11 @@ class Logic:
         elif(self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
     def getNameWrite(self, sufix = '') -> str:
+        """
+        Returns the name to write to. 
+        
+        Example in the getNameRead() method.
+        """
         if (self.type == 'w'):
             return self.name + sufix
         elif (self.type == 'r'):
@@ -71,6 +119,9 @@ class Logic:
         elif (self.type == 'o'):
             return self.name + sufix + '_o'
     def signalInit(self, sufix = '') -> None:
+        """
+        Appends the appropriate declaration or port line for this signal to a global buffer.
+        """
         global signalInitString
         global portInitString
         if (self.type == 'w'):
@@ -85,6 +136,16 @@ class Logic:
             portInitString += ';\n'
             portInitString += f'\t\t{self.name + sufix}_o : out std_logic'
     def regInit(self, enable = None, init = None) -> None:
+        """
+        Generates a clocked process snippet that sets up the register's behavior.
+        For example,
+
+        if (rst = '1') then
+            <name>_q <= '0';
+        elsif (rising_edge(clk)) then
+            <name>_q <= <name>_d;
+        end if;
+        """
         global regInitString
         assert (self.type == 'r')
         if (init != None):
@@ -105,6 +166,26 @@ class Logic:
 # std_logic_vec
 #
 class LogicVec(Logic):
+    """
+    Like 'class Logic', but for M-bit vectors.
+
+    Inherits all methods and suffix rules of Logic in default.
+    Additionally, it has additional features.
+
+    Attributes:
+        size (int): bit-width of vector (M)
+    
+    Methods:
+        Indexable reads/writes of LogicVec components
+        Access a certain i-th bit of LogicVec via getNameRead(i), getNameWrite(i)
+
+        LogicVec (size=3)    : "101"
+        LogicArray (length=3): [1,
+                                0,
+                                1]
+        LogicVecArray (size=3, length=2): [101,
+                                           010]
+    """
     # Signal name
     name = ''
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
@@ -175,6 +256,24 @@ class LogicVec(Logic):
 # An array of std_logic
 #
 class LogicArray(Logic):
+    """
+    Represents a N-length array of one-bit VHDL std_logic.
+    Generates total of N one-bit std_logic.
+
+    Each element (total N) is generated as a separate Logic(name + f'_{i}', type)
+    For example,
+        signal <name>_0 : std_logic;
+        signal <name>_1 : std_logic;
+        ...
+        signal <name>_{N-1} : std_logic;
+        
+    Attributes:
+        length (int): number of elements in the array.
+    
+    Methods:
+        Indexable reads/writes of LogicArray components
+        Access a certain i-th element of LogicArray via getNameRead(i), getNameWrite(i)
+    """
     length = 1
     def __init__(self, name: str, type: str = 'w', length: int = 1):
         self.length = length
@@ -218,6 +317,25 @@ class LogicArray(Logic):
 # An array of std_logic vector
 #
 class LogicVecArray(LogicVec):
+    """
+    Represents a N-length array of M-bit VHDL std_logic_vec.
+    Generates total of N M-bit std_logic_vec.
+
+    Each element (total N) is generated as a separate LogicVec
+    For example,
+        signal <name>_0 : std_logic_vector(M-1 downto 0);
+        signal <name>_1 : std_logic_vector(M-1 downto 0);
+        …
+        signal <name>_{N-1} : std_logic_vector(M-1 downto 0);
+
+    Attributes:
+        length (int): number of entries (N).
+        size   (int): bit-width of each vector (M).
+    
+    Methods:
+        Indexable reads/writes of LogicVecArray components
+        Access a certain i-th LogicVec of LogicVecArray via getNameRead(i), getNameWrite(i)
+    """
     length = 1
     def __init__(self, name: str, type: str = 'w', length: int = 1, size: int = 1):
         self.length = length
@@ -261,7 +379,18 @@ class LogicVecArray(LogicVec):
 # Unit Operator
 #===----------------------------------------------------------------------===#
 
-def Op(out, *list_in) -> str:
+def Op(out, *list_in) -> str:    
+    """
+    Generates a proper VHDL assignment statement.
+
+    Args:
+        out: LHS of the assignment
+        *list_in: A sequence of RHS elements
+
+    Example: Op(valid, a,'when', b, 'else', 0)
+            valid <= a when b else '0'
+    
+    """
     global tabLevel
     if type(out) == tuple:
         if len(out) == 2:
@@ -310,6 +439,21 @@ def log2Ceil(value: int) -> int:
     return math.ceil(math.log2(value))
 
 def WrapAdd(out, in_a, in_b, max: int) -> str:
+    """
+    if "max" is power of 2:
+        out = in_a + in_b
+    else:
+        "sum", "res" -> one extra bit to extend the bit-width
+        Concatenates '0' to each input to extend the bit-width
+        
+        sum = in_a + in_b
+
+        if sum >= max:
+            out = sum - max
+        else
+            out = sum
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- WrapAdd Begin\n'
     str_ret += '\t'*tabLevel + f'-- WrapAdd({out.name}, {in_a.name}, {in_b.name}, {max})\n'
@@ -330,6 +474,16 @@ def WrapAdd(out, in_a, in_b, max: int) -> str:
     return str_ret
 
 def WrapAddConst(out, in_a, const: int, max: int) -> str:
+    """
+    if "max" is power of 2:
+        out = in_a + const
+    else:
+        if in_a + const >= max:
+            out = in_a + const - max
+        else:
+            out = in_a + const
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- WrapAdd Begin\n'
     str_ret += '\t'*tabLevel + f'-- WrapAdd({out.name}, {in_a.name}, {const}, {max})\n'
@@ -345,6 +499,16 @@ def WrapAddConst(out, in_a, const: int, max: int) -> str:
     return str_ret
 
 def WrapSub(out, in_a, in_b, max: int) -> str:
+    """
+    if "max" is power of 2:
+        out = in_a - in_b
+    else:
+        if in_a >= in_b:
+            out = in_a - in_b
+        else:
+            out = (in_a + max) - in_b
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- WrapSub Begin\n'
     str_ret += '\t'*tabLevel + f'-- WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})\n'
@@ -359,7 +523,48 @@ def WrapSub(out, in_a, in_b, max: int) -> str:
     str_ret += '\t'*tabLevel + '-- WrapAdd End\n\n'
     return str_ret
 
+#===----------------------------------------------------------------------===#
+# Cyclic Left Shift
+#===----------------------------------------------------------------------===#
+# The following functions implement cyclic left shifts:
+#   RotateLogicVec()      : Recursively shift a single vector.
+#   RotateLogicArray()    : Recursively shift an array of single-bit elements.
+#   RotateLogicVecArray() : Recursively shift an array of vectors.
+#   -> These are called only internally by CyclicLeftShift().
+#
+# CyclicLeftShift():
+#   Detects the type of `din` and dispatches to the appropriate implementation.
+
 def RotateLogicVec(dout, din, distance, layer) -> str:
+    """
+    Recursively perform a cyclic left shift of the vector "din" by the amount 
+    specified in "distance".
+
+    Parameters:
+        dout     (LogicVec): Destination vector to hold the shifted result.
+        din      (LogicVec): Source vector to be shifted.
+        distance (LogicVec): Binary vector representing the shift amount.
+        layer    (int)     : Current recursion layer; set to "distance.size-1" when called initially.
+    
+        The "layer" parameter is used internally to control recursion depth and
+        should always start at "distance.size - 1".
+
+    Returns:
+        str_ret (str): A VHDL code snippet implementing the cyclic left shift.
+
+    Usage:
+        (Called only internally by CyclicLeftShift)
+        RotateLogicVec(dout, din, distance, distance.size - 1)
+
+        When this method is called, "layer" is always "distance.size - 1".
+        "layer" is just for an recursive action.
+        
+
+    Example: 
+        Input:  din  = "01110010", distance = 3
+        Output: dout = "10010011"
+    """
+
     global tabLevel
     str_ret = ''
     length = din.size
@@ -378,6 +583,15 @@ def RotateLogicVec(dout, din, distance, layer) -> str:
     return str_ret
 
 def RotateLogicArray(dout, din, distance, layer) -> str:
+    """
+    Recursively perform a cyclic left shift of LogicArray "din" by the amount 
+    specified in "distance".
+    
+    Identical in behavior to RotateLogicVec, but operates on multiple VHDL single-bit std_logic
+    instead of std_logic_vector.
+    
+    """
+
     global tabLevel
     str_ret = ''
     length = din.length
@@ -395,7 +609,23 @@ def RotateLogicArray(dout, din, distance, layer) -> str:
         str_ret += RotateLogicArray(dout, res, distance, layer-1)
     return str_ret
 
-def RotateLogicVecArray(dout, din, distance, layer) -> str:
+def RotateLogicVecArray(dout, din, distance, layer) -> str:    
+    """
+    Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount 
+    specified in "distance".
+    
+    Identical in behavior to RotateLogicVec, but operates on multiple VHDL vectors std_logic_vector.
+    For every LogicVec in LogicVecArray, cyclic left shift by "distance".
+    
+    Example:
+        din = "11001001
+               11100011"
+        distance = 2
+        
+        -> dout = "00100111     (Cyclic Left Shift of each vector by 2)
+                   10001111"
+    """
+
     global tabLevel
     str_ret = ''
     length = din.length
@@ -414,6 +644,23 @@ def RotateLogicVecArray(dout, din, distance, layer) -> str:
     return str_ret
 
 def CyclicLeftShift(dout, din, distance) -> str:
+    """
+    Execute a cyclic left shift operation based on the type of "din"
+
+    This function wraps the three implementations:
+        - RotateLogicVec        : when "din" is LogicVec
+        - RotateLogicArray      : when "din" is LogicArray
+        - RotateLogicVecArray   : when "din" is LogicVecArray
+
+    Parameters:
+        dout    : Destination signal to receive the shifted data.
+        din     : Source data to be shifted.
+        distance: Binary vector specifying how many positions to shift.
+
+    Returns:
+        str_ret : A VHDL code snippet (with indentation) implementing the cyclic left shift.
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Shifter Begin\n'
     str_ret += '\t'*tabLevel + f'-- CyclicLeftShift({dout.name}, {din.name}, {distance.name})\n'
@@ -426,7 +673,52 @@ def CyclicLeftShift(dout, din, distance) -> str:
     str_ret += '\t'*tabLevel + '-- Shifter End\n\n'
     return str_ret
 
+
+#===----------------------------------------------------------------------===#
+# Reduction
+#===----------------------------------------------------------------------===#
+# The following functions implement cyclic left shifts:
+#   ReduceLogicVec()      : Recursively reduce a single vector.
+#   ReduceLogicArray()    : Recursively reduce an array of single-bit elements.
+#   ReduceLogicVecArray() : Recursively reduce an array of vectors.
+#   -> These are called only internally by Reduce().
+#
+# Reduce():
+#   Detects the type of `din` and dispatches to the appropriate implementation.
+
 def ReduceLogicVec(dout, din, operator, length) -> str:
+    """
+    Recursively reduce the vector "din" by "operator".
+
+    Parameters:
+        dout     (Logic)   : Destination std_logic to hold the reduced result.
+        din      (LogicVec): Source vector to be reduced.
+        operator (str)     : 'and', 'or', ...
+        length   (int)     : Current recursion length;
+                             set to "2**(log2Ceil(din.size) - 1)" when called initially.
+    
+        The "length" parameter is used internally to control recursion depth and
+        should always start at "2**(log2Ceil(din.size) - 1)".
+
+    Returns:
+        str_ret (str): A VHDL code snippet implementing the LogicVec reduction.
+
+    Usage:
+        (Called only internally by Reduce)
+        ReduceLogicVec(dout, din, operator, 2**(log2Ceil(din.size) - 1))
+
+        When this method is called, "length" is always "2**(log2Ceil(din.size) - 1)".
+        "length" is just for an recursive action.
+        
+
+    Example: 
+        1. din = "01110010", operator = 'and' -> dout = '0'
+        2. din = "01100111", operator = 'or'  -> dout = '1'
+        3. din = "abcdefghijklmnop"
+           dout = "a" operator "b" operator "c" operator "d" operator "e" operator "f"
+                      operator "g" operator "h" operator "i" operator "j" operator "k"
+                      operator "l" operator "m" operator "n" operator "o" operator "p" 
+    """
     global tabLevel
     str_ret = ''
     if (length == 1):
@@ -446,6 +738,13 @@ def ReduceLogicVec(dout, din, operator, length) -> str:
     return str_ret
 
 def ReduceLogicArray(dout, din, operator, length) -> str:
+    """
+    Recursively perform reduction of LogicArray "din" by "operator".
+    
+    Identical in behavior to ReduceLogicVec, but operates on multiple VHDL single-bit std_logic
+    instead of std_logic_vector.
+    """
+
     global tabLevel
     str_ret = ''
     if (length == 1):
@@ -462,6 +761,43 @@ def ReduceLogicArray(dout, din, operator, length) -> str:
     return str_ret
 
 def ReduceLogicVecArray(dout, din, operator, length) -> str:
+    """
+    Recursively perform reduction of the LogicVecArray "din" by "operator".
+    
+    Parameters:
+        dout     (LogicVec)     : Destination std_logic_vector to hold the reduced result.
+        din      (LogicVecArray): Source LogicVecArray to be reduced.
+        operator (str)          : 'and', 'or', ...
+        length   (int)          : Current recursion length;
+                                  set to "2**(log2Ceil(din.size) - 1)" when called initially.
+    
+        The "length" parameter is used internally to control recursion depth and
+        should always start at "2**(log2Ceil(din.size) - 1)".
+
+    Returns:
+        str_ret (str): A VHDL code snippet implementing the LogicVecArray reduction.
+
+    Usage:
+        (Called only internally by Reduce)
+        ReduceLogicVecArray(dout, din, operator, 2**(log2Ceil(din.size) - 1))
+
+        When this method is called, "length" is always "2**(log2Ceil(din.size) - 1)".
+        "length" is just for an recursive action.
+    
+    Example:
+        din = (LogicVecArray x with length of 8, each Vec size 16) where
+        x[0]  = "a1 a2 a3 ... a16"
+        x[1]  = "b1 b2 b3 ... b16"
+        ...
+        x[7]  = "p1 p2 p3 ... p16"
+        
+        dout = x[0] operator x[1] operator ... operator x[7]
+
+        If operator = '&',
+        dout = {a1 & b1 & ... & p1, a2 & b2 & ... & p2, ..., a16 & b16 & ... & p16}
+
+        Therefore, dout is LogicVec.
+    """
     global tabLevel
     str_ret = ''
     if (length == 1):
@@ -478,6 +814,24 @@ def ReduceLogicVecArray(dout, din, operator, length) -> str:
     return str_ret
 
 def Reduce(dout, din, operator, comment: bool = True) -> str:
+    """
+    Execute reduction based on the type of "din"
+
+    This function wraps the three implementations:
+        - ReduceLogicVec        : when "din" is LogicVec
+        - ReduceLogicArray      : when "din" is LogicArray
+        - ReduceLogicVecArray   : when "din" is LogicVecArray
+
+    Parameters:
+        dout    : Destination signal to receive the reduced data.
+        din     : Source data to be reduced.
+        operator: types of operator for the reduction
+        comment : Turn on/off adding VHDL comment lines.
+
+    Returns:
+        str_ret : A VHDL code snippet (with indentation) implementing the reduction.
+    """
+
     global tabLevel
     str_ret = ''
     if (comment):
@@ -502,11 +856,55 @@ def Reduce(dout, din, operator, comment: bool = True) -> str:
         str_ret += '\t'*tabLevel + '-- Reduction End\n\n'
     return str_ret
 
+
+#===----------------------------------------------------------------------===#
+# Multiplexer
+#===----------------------------------------------------------------------===#
+# Mux1H    : One-hot select elements of `din` using `sel`
+# Mux1HROM : Special multiplexer for the Group Allocator ROM.
+# MuxIndex : 
+# MuxLookUp: 
+
 def Mux1H(dout, din, sel, j = None) -> str:
+    """
+    Generate a one-hot multiplexer: for each element of "din", 
+    write that bit/vector into a temporary and then OR-reduce into "dout".
+
+    Parameters:
+        dout (LogicVec or Logic):
+            Destination for the multiplexed data, chosen by "sel".
+        din (LogicVecArray or LogicArray or LogicVec):
+            Source data.  
+            - If LogicVecArray: 2D array of vectors.  
+            - If LogicArray: 1D array of bits.  
+            - If LogicVec: single vector.
+        sel (LogicVec or LogicArray or LogicVecArray):
+            One-hot select signals.
+        j (int, optional):
+            When "sel" is LogicVecArray, select the j-th "sel" signal.
+
+    Returns:
+        str: A VHDL code snippet for multiplexing.
+
+    Example:
+        type(din) = LogicVecArray:
+          din = ("0010"; "1100"), sel = "10"
+          -> dout = "0010"
+
+        type(din) = LogicArray:
+          din = ("0"; "1"; "1"), sel = "010"
+          -> selects the middle bit: dout = '1'
+
+        type(din) = LogicVec:
+          din = "01101", sel = "00100"
+          -> selects the third bit: dout = '1'
+    """
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Mux1H Begin\n'
     str_ret += '\t'*tabLevel + f'-- Mux1H({dout.name}, {din.name}, {sel.name})\n'
     useTemp()
+
+    # din is always LogicVecArray
     if (type(din) == LogicVecArray):
         length = din.length
         size = din.size
@@ -535,6 +933,55 @@ def Mux1H(dout, din, sel, j = None) -> str:
     return str_ret
 
 def Mux1HROM(dout, din, sel, func = IntToBits) -> str:
+    """
+    Generate a one-hot ROM multiplexer for LSQ port index allocation,
+    Load-Store Order Matrix construction, and tracking load/store numbers.
+
+    Parameters:
+        dout (LogicVecArray or LogicVec):
+            If LogicVecArray: an NxM array; each row i will be computed independently.
+                - ldq_port_idx_rom
+                - stq_port_idx_rom
+                - ga_ls_order_rom
+            If LogicVec: a single M-bit vector; results from all groups are OR-reduced.
+                - num_loads
+                - num_stores
+        
+        din (list or list of lists): 
+            ROM contents. (configs.gaLdPortIdx, configs.gaStPortIdx, configs.gaLdOrder
+                           configs.gaNumLoads, configs. gaNumStores)
+            
+        sel (LogicArray):
+            Indicates groups to be allocated. (group_init_hs)
+        
+        func (callable, optional):
+            Conversion function from integer to LogicVec (default: IntToBits).
+            Either IntToBits() or MaskLess()
+
+    Behavior:
+        - type(dout) == LogicVec:
+            1. Build a temporary vector "mux" of width M.  
+            2. For each group j, if sel[j] = '1', assign mux[j] <= func(din[j]);  
+                else mux[j] <= Zero.  
+            3. OR-reduce "mux" into the single "dout".
+
+        - type(dout) == LogicVecArray:
+            For each row i in dout:
+                Repeat 1, 2, and 3.
+
+    Example:
+        Assume numBB = 3
+
+        - type(dout) == LogicVec:
+            dout = num_loads
+            din  = configs.gaNumLoads = [3,1,2]
+            sel  = "010"
+            -> dout = "01" (1 load)
+        
+        This means that the currently allocated BB is BB1 (among BB0, BB1, and BB2)
+        It has 1 load. that "dout" indicates 1.
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Mux1H For Rom Begin\n'
     str_ret += '\t'*tabLevel + f'-- Mux1H({dout.name}, {sel.name})\n'
@@ -555,7 +1002,7 @@ def Mux1HROM(dout, din, sel, func = IntToBits) -> str:
                     str_ret += '\t'*tabLevel + f'{mux.getNameWrite(j)} <= {str_value} ' + \
                         f'when {sel.getNameRead(j)} else {str_zero};\n'
             str_ret += Reduce(dout[i], mux, 'or', False)
-    else:
+    else:   # type(dout) == LogicVec
         mux = LogicVecArray(getTemp(f'mux'), 'w', mlen, size)
         for j in range(0, mlen):
             str_value = func(din[j], size)
@@ -569,9 +1016,41 @@ def Mux1HROM(dout, din, sel, func = IntToBits) -> str:
     return str_ret
 
 def MuxIndex(din, sel) -> str:
+    """
+    Generate a VHDL array-index expression for selecting an element
+    """
     return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
 
 def MuxLookUp(dout, din, sel) -> str:
+    """
+    Generate a conditional "when/else" lookup multiplexer in VHDL.
+
+    Parameters:
+        dout (Logic or LogicVec):
+            Destination signal to receive the selected value.
+        din (LogicArray or LogicVecArray):
+            Array of input signals to choose from.
+        sel (LogicVec):
+            Binary select vector; compared against each index using IntToBits.
+    
+    Example:
+        dout <= 
+        din_0 when (sel = "0000") else
+        din_1 when (sel = "0001") else
+        din_2 when (sel = "0010") else
+        din_3 when (sel = "0011") else
+        din_4 when (sel = "0100") else
+        din_5 when (sel = "0101") else
+        din_6 when (sel = "0110") else
+        din_7 when (sel = "0111") else
+        din_8 when (sel = "1000") else
+        din_9 when (sel = "1001") else
+        '0';
+
+        Depending on the value of "sel", "dout" is driven by the
+        corresponding element of "din" or defaults to '0'.
+            
+    """
     global tabLevel
     str_ret = '\t'*tabLevel + '-- MuxLookUp Begin\n'
     str_ret += '\t'*tabLevel + f'-- MuxLookUp({dout.name}, {din.name}, {sel.name})\n'
@@ -593,6 +1072,17 @@ def MuxLookUp(dout, din, sel) -> str:
     return str_ret
 
 def VecToArray(dout, din) -> str:
+    """
+    Converts LogicVec to LogicArray
+
+    Parameter:
+        dout (LogicArray)
+        din  (LogicVec)
+
+    Example:
+        din = "0101"
+        dout = ('0'; '1'; '0'; '1')
+    """
     size = din.size
     assert dout.length == size
     str_ret = ''
@@ -601,6 +1091,39 @@ def VecToArray(dout, din) -> str:
     return str_ret
 
 def CyclicPriorityMasking(dout, din, base, reverse = False) -> str:
+    """
+    Parameters:
+        dout (LogicVecArray, LogicArray, LogicVec):
+            Destination to write the masked result. 
+            One youngest or oldest bit set to '1' and the other to '0' per each Array
+        din  (LogicVecArray, LogicArray, LogicVec):
+            Input data to be masked.
+        base (LogicVec):
+            Binary pivot index for the rotation mask.
+        reverse (bool, optional): 
+            Choose direction of masking.
+            False -> Find the oldest   (Searching direction: base to MSB -> LSB to base)
+            True  -> Find the youngest (Searching direction: base to LSB -> MSB to base)
+
+    Example:
+        1. din1 = 010110     2. din2 = 100100   3. din3 = 000110
+           base = 001000        base = 001000      base = 001000   
+           reverse = False      reverse = True     reverse = False  
+
+           dout1= 010000        dout2= 000100      dout3= 000010
+           (base to MSB)        (base to LSB)      (base to MSB -> LSB to base)
+           
+    Behavior (with the Example 1):
+        double_in            = 010110 010110
+        base                 = 000000 001000
+        double_in - base     = 010110 001110
+        ~(double_in - base)  = 101001 110001
+        double_out           = double_in & ~(double_in - base)
+                             = 000000 010000
+        dout                 = 000000 | 010000 
+                             = 010000
+    """
+
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Priority Masking Begin\n'
     str_ret += '\t'*tabLevel + f'-- CyclicPriorityMask({dout.name}, {din.name}, {base.name})\n'
@@ -667,6 +1190,13 @@ def CyclicPriorityMasking(dout, din, base, reverse = False) -> str:
     return str_ret
 
 def BitsToOH(dout, din) -> str:
+    """
+    Convert a binary vector into its one-hot representation in VHDL.
+
+    Example:
+        din  = "01"
+        dout = "0010"
+    """
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Bits To One-Hot Begin\n'
     str_ret += '\t'*tabLevel + f'-- BitsToOH({dout.name}, {din.name})\n'
@@ -677,9 +1207,17 @@ def BitsToOH(dout, din) -> str:
     return str_ret
 
 def BitsToOHSub1(dout, din) -> str:
+    """
+    Convert a binary vector into its one-hot representation in VHDL.
+    The result one-hot representation should be cyclic right shifted.
+
+    Example:
+        din  = "01"
+        dout = "0001"
+    """
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Bits To One-Hot Begin\n'
-    str_ret += '\t'*tabLevel + f'-- BitsToOH({dout.name}, {din.name})\n'
+    str_ret += '\t'*tabLevel + f'-- BitsToOHSub1({dout.name}, {din.name})\n'
     for i in range(0, dout.size):
         str_ret += '\t'*tabLevel + f'{dout.getNameWrite(i)} <= ' \
             f'\'1\' when {din.getNameRead()} = {IntToBits((i+1) % dout.size, din.size)} else \'0\';\n'
@@ -687,6 +1225,13 @@ def BitsToOHSub1(dout, din) -> str:
     return str_ret
 
 def OHToBits(dout, din) -> str:
+    """
+    Generate VHDL code to convert a one-hot vector into its binary index.
+
+    Example:
+        din  = "0010"
+        dout = "01"
+    """
     global tabLevel
     str_ret = '\t'*tabLevel + '-- One-Hot To Bits Begin\n'
     str_ret += '\t'*tabLevel + f'-- OHToBits({dout.name}, {din.name})\n'
@@ -928,14 +1473,14 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
     stq_empty_i        = Logic('stq_empty', 'i')
 
     ldq_wen_o          = LogicArray('ldq_wen', 'o', configs.numLdqEntries)
-    num_loads_o        = LogicVec('num_loads', 'o', configs.ldqAddrW)
-    num_loads          = LogicVec('num_loads', 'w', configs.ldqAddrW)
+    num_loads_o        = LogicVec('num_loads', 'o', configs.emptyLdAddrW)
+    num_loads          = LogicVec('num_loads', 'w', configs.emptyLdAddrW)
     if (configs.ldpAddrW > 0):
         ldq_port_idx_o = LogicVecArray('ldq_port_idx', 'o', configs.numLdqEntries, configs.ldpAddrW)
 
     stq_wen_o          = LogicArray('stq_wen', 'o', configs.numStqEntries)
-    num_stores_o       = LogicVec('num_stores', 'o', configs.stqAddrW)
-    num_stores         = LogicVec('num_stores', 'w', configs.stqAddrW)
+    num_stores_o       = LogicVec('num_stores', 'o', configs.emptyStAddrW)
+    num_stores         = LogicVec('num_stores', 'w', configs.emptyStAddrW)
     if (configs.stpAddrW > 0):
         stq_port_idx_o = LogicVecArray('stq_port_idx', 'o', configs.numStqEntries, configs.stpAddrW)
 
@@ -948,7 +1493,7 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
     empty_loads  = LogicVec('empty_loads', 'w', configs.emptyLdAddrW)
     empty_stores = LogicVec('empty_stores', 'w', configs.emptyStAddrW)
 
-    arch += WrapSub(loads_sub, ldq_head_i, ldq_tail_i, configs.numStqEntries)
+    arch += WrapSub(loads_sub, ldq_head_i, ldq_tail_i, configs.numLdqEntries)
     arch += WrapSub(stores_sub, stq_head_i, stq_tail_i, configs.numStqEntries)
 
     arch += Op(empty_loads, configs.numLdqEntries, 'when', ldq_empty_i, 'else', \
@@ -2471,4 +3016,4 @@ if __name__ == '__main__':
     # Read the configuration file
     lsqConfig = GetConfigs(path_configs)
     codeGen(path_rtl, lsqConfig)
-    
+
