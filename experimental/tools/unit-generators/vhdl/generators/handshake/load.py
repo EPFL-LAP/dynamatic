@@ -1,4 +1,6 @@
-from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic, ConcatenationInfo
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
@@ -88,10 +90,34 @@ end architecture;
   return dependencies + entity + architecture
 
 
+def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
+  concat_assignments = []
+  concat_decls = []
+  # Concatenate addrIn extra signals to create signals_pre_buffer
+  assignments, decls = generate_concat(
+      "addrIn", 0, "signals_pre_buffer", concat_layout)
+  concat_assignments.extend(assignments)
+  # Declare signals_pre_buffer data signal
+  concat_decls.extend(decls["signals_pre_buffer"])
+  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+
+
+def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
+  slice_assignments = []
+  slice_decls = []
+  # Slice signals_post_buffer to create dataOut data and extra signals
+  assignments, decls = generate_slice(
+      "signals_post_buffer", "dataOut", 0, concat_layout)
+  slice_assignments.extend(assignments)
+  # Declare signals_post_buffer data signal
+  slice_decls.extend(decls["signals_post_buffer"])
+  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
+
+
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Get concatenation details for extra signals
-  concat_info = ConcatenationInfo(extra_signals)
-  extra_signals_total_bitwidth = concat_info.total_bitwidth
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
   inner_name = f"{name}_inner"
   inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
@@ -121,41 +147,23 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  # Only extra signals (not data) are concatenated, so set inner port bitwidth to 0.
-  addrIn_inner_port = {
-      "name": "addrIn",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
-  }
-  dataOut_inner_port = {
-      "name": "dataOut",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
-  }
-  concat_signal_decls = generate_concat_signal_decls(
-      [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
-  concat_signal_logic = generate_concat_logic(
-      [addrIn_inner_port], [dataOut_inner_port], concat_info)
+  concat_assignments, concat_decls = _generate_concat(concat_layout)
+  slice_assignments, slice_decls = _generate_slice(concat_layout)
 
   architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
-  signal addrIn_ready_inner : std_logic;
-  signal ofifo_ready : std_logic;
-  -- Concatenated signals
-  {concat_signal_decls}
-  -- Transfer signals
+  {concat_decls}
+  {slice_decls}
   signal transfer_in, transfer_out : std_logic;
 begin
-  -- addrIn_ready <= addrIn_ready_inner and ofifo_ready; -- Conservative
-  addrIn_ready <= addrIn_ready_inner; -- Assuming MC latency is 1 and ofifo is always ready
-
   -- Transfer signal assignments
-  transfer_in <= addrIn_valid and addrIn_ready_inner;
+  transfer_in <= addrIn_valid and addrIn_ready;
   transfer_out <= dataOut_valid and dataOut_ready;
 
-  -- Concatenate extra signals
-  {concat_signal_logic}
+  -- Concat/slice extra signals
+  {concat_assignments}
+  {slice_assignments}
 
   -- Buffer to store extra signals for in-flight memory requests
   -- LoadOp is assumed to be connected to a memory controller
@@ -164,10 +172,10 @@ begin
     port map(
       clk => clk,
       rst => rst,
-      ins => addrIn_inner,
+      ins => signals_pre_buffer,
       ins_valid => transfer_in,
-      ins_ready => ofifo_ready,
-      outs => dataOut_inner,
+      ins_ready => open,
+      outs => signals_post_buffer,
       outs_valid => open,
       outs_ready => transfer_out
     );
@@ -178,7 +186,7 @@ begin
       rst => rst,
       addrIn => addrIn,
       addrIn_valid => addrIn_valid,
-      addrIn_ready => addrIn_ready_inner,
+      addrIn_ready => addrIn_ready,
       addrOut => addrOut,
       addrOut_valid => addrOut_valid,
       addrOut_ready => addrOut_ready,
