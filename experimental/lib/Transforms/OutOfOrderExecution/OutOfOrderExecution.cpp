@@ -397,10 +397,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   if (failed(removeExtraSignalsFromLSQ(funcOp, ctx)))
     return failure();
 
-  llvm::errs() << "\n";
-  llvm::errs() << "\n";
-  funcOp->print(llvm::errs());
-
   return success();
 }
 
@@ -1030,6 +1026,7 @@ Operation *OutOfOrderExecutionPass::addTagOperations(
 
   FreeTagsFifoOp freeTagsFifo = builder.create<FreeTagsFifoOp>(
       (*taggedEdges.begin()).getLoc(), ChannelType::get(tagType), cond);
+  freeTagsFifo->setAttr("fifo_depth", builder.getUI32IntegerAttr(numTags));
 
   // The fifo is now internal to the cluster
   clusterNode->addInternalOp(freeTagsFifo.getOperation());

@@ -707,7 +707,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           unsupported = true;
           return;
         }
-        addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
+        addUnsigned("FIFO_DEPTH",
+                    fifo->getAttrOfType<IntegerAttr>("fifo_depth").getUInt());
+        // addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
