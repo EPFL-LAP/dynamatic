@@ -401,8 +401,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
@@ -415,9 +413,11 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::break_r() || info == handshake::TimingInfo::break_none()) {
+      if (info == handshake::TimingInfo::break_r() ||
+          info == handshake::TimingInfo::break_none()) {
         serializedParams["TRANSPARENT"] = "True";
-      } else if (info == handshake::TimingInfo::break_dv() || info == handshake::TimingInfo::break_dvr()) {
+      } else if (info == handshake::TimingInfo::break_dv() ||
+                 info == handshake::TimingInfo::break_dvr()) {
         serializedParams["TRANSPARENT"] = "False";
       } else {
         llvm_unreachable("Unknown timing info");
@@ -457,8 +457,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
