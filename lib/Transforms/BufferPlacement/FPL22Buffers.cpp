@@ -74,7 +74,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
       if (numSlotsToPlace == 1) {
         result.numOneSlotDV = 1;
       } else {
-        result.numFifoNone = numSlotsToPlace;
+        result.numFifoDV = numSlotsToPlace;
       }
     } else {
       if (numSlotsToPlace == 1) {
