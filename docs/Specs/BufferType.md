@@ -32,7 +32,6 @@ In addition to the timing attribute to characterize `BufferOp`, we directly repr
 | `SHIFT_REG_BREAK_DV`   | N/A                | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
 
 > [!NOTE]
-> `SHIFT_REG_BREAK_DV` is currently not implemented.
 > All six buffer types can be used together in a channel to handle various needs. For the first three types, you can chain multiple modules if you need more slots. The last three types allow multiple slots within their module parameters, so they need not be chained in a channel.
 > An assertion is placed in the BufferOp builder to ensure that if the buffer type is ONE_SLOT, then num_slots == 1.
 ## Map MILP Result to Buffer Types
