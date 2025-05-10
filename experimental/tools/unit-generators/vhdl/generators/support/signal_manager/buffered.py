@@ -2,7 +2,7 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Channel, ExtraSignals
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_signal_wise_forwarding, generate_signal_assignment, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names
+from .utils.generation import generate_signal_wise_forwarding, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names
 
 
 def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
@@ -49,13 +49,6 @@ def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
   slice_decls.extend(decls["sliced"])
 
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
-
-
-def _generate_output_assignments(out_channel_name: str, signal_name: str, signal_bitwidth: int, output_assignments: list[str]):
-  # Assign the extra signals of `sliced` to the output channel
-  assignments, _ = generate_signal_assignment(
-      "sliced", out_channel_name, signal_name, signal_bitwidth)
-  output_assignments.extend(assignments)
 
 
 def generate_buffered_signal_manager(
@@ -120,11 +113,12 @@ def generate_buffered_signal_manager(
   concat_assignments, concat_decls = _generate_concat(concat_layout)
   slice_assignments, slice_decls = _generate_slice(concat_layout)
 
+  # Assign the extra signals of `sliced` to the output channel
   output_assignments = []
   for out_channel_name in out_channel_names:
-    for signal_name, signal_bitwidth in extra_signals.items():
-      _generate_output_assignments(
-          out_channel_name, signal_name, signal_bitwidth, output_assignments)
+    for signal_name, _ in extra_signals.items():
+      output_assignments.append(
+          f"{out_channel_name}_{signal_name} <= sliced_{signal_name};")
 
   # Map channels to inner component
   mappings = generate_default_mappings(in_channels + out_channels)

@@ -1,6 +1,3 @@
-from .types import ExtraSignals
-
-
 # Holds the concatenation layout of extra signals.
 # Tracks each signal's bit range and keeps the total combined bitwidth.
 class ConcatLayout:
@@ -20,12 +17,6 @@ class ConcatLayout:
     self.mapping.append(
         (name, (self.total_bitwidth + bitwidth - 1, self.total_bitwidth)))
     self.total_bitwidth += bitwidth
-
-  def extra_signals(self) -> ExtraSignals:
-    extra_signals = {}
-    for signal_name, (msb, lsb) in self.mapping:
-      extra_signals[signal_name] = msb - lsb + 1
-    return extra_signals
 
 
 def get_concat_extra_signals_bitwidth(extra_signals: dict[str, int]):

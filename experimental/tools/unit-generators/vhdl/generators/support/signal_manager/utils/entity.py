@@ -33,26 +33,28 @@ def generate_entity(entity_name, in_channels, out_channels) -> str:
       # Generate data signal if present
       if bitwidth > 0:
         channel_decls.append(
-            f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
+            f"{name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
 
-      channel_decls.append(f"    {name}_valid : {dir} std_logic")
-      channel_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+      channel_decls.append(f"{name}_valid : {dir} std_logic")
+      channel_decls.append(f"{name}_ready : {ready_dir} std_logic")
 
       # Generate extra signals for this input channel
       for signal_name, signal_bitwidth in extra_signals.items():
         channel_decls.append(
-            f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+            f"{name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
     else:
       # Generate data_array signal declarations for 2d input channel
+
+      # Generate data signal if present
       if bitwidth > 0:
         channel_decls.append(
-            f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+            f"{name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
 
       # Use std_logic_vector for valid/ready of 2d input channel
       channel_decls.append(
-          f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
+          f"{name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
       channel_decls.append(
-          f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+          f"{name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
 
       # Generate extra signal declarations for each item in the 2d input channel
       for i in range(size):
@@ -60,9 +62,9 @@ def generate_entity(entity_name, in_channels, out_channels) -> str:
         # in contrast to ready/valid signals.
         for signal_name, signal_bitwidth in extra_signals.items():
           channel_decls.append(
-              f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+              f"{name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
 
-  channel_decls_str = ";\n".join(channel_decls).lstrip()
+  channel_decls_str = ";\n    ".join(channel_decls).lstrip()
 
   return f"""
 library ieee;
