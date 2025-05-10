@@ -1,4 +1,4 @@
-from .types import Port, ExtraSignals
+from .types import Channel, ExtraSignals
 from .concat import ConcatLayout
 from .internal_signal import generate_internal_signal, generate_internal_signal_vector, generate_internal_signal_array
 from .forwarding import generate_forwarding_expression_for_signal
@@ -151,28 +151,28 @@ def generate_signal_assignment(in_channel_name: str, out_channel_name: str, sign
   return assignments, decls
 
 
-def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
+def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
   mapping: list[str] = []
-  port_name = port["name"]
-  port_extra_signals = port.get("extra_signals", {})
-  port_bitwidth = port["bitwidth"]
+  channel_name = channel["name"]
+  channel_extra_signals = channel.get("extra_signals", {})
+  channel_bitwidth = channel["bitwidth"]
 
-  if port_bitwidth > 0:
+  if channel_bitwidth > 0:
     # Mapping for data signal if present
-    mapping.append(f"{inner_channel_name} => {port_name}")
+    mapping.append(f"{inner_channel_name} => {channel_name}")
 
   # Mapping for handshake signals
-  mapping.append(f"{inner_channel_name}_valid => {port_name}_valid")
-  mapping.append(f"{inner_channel_name}_ready => {port_name}_ready")
+  mapping.append(f"{inner_channel_name}_valid => {channel_name}_valid")
+  mapping.append(f"{inner_channel_name}_ready => {channel_name}_ready")
 
-  for signal_name in port_extra_signals:
+  for signal_name in channel_extra_signals:
     mapping.append(
-        f"{port_name}_{signal_name} => {port_name}_{signal_name}")
+        f"{channel_name}_{signal_name} => {channel_name}_{signal_name}")
 
   return mapping
 
 
-def generate_default_mappings(channels: list[Port]) -> str:
+def generate_default_mappings(channels: list[Channel]) -> str:
   mappings = []
   for channel in channels:
     mappings.extend(generate_mapping({
@@ -183,7 +183,7 @@ def generate_default_mappings(channels: list[Port]) -> str:
   return ",\n      ".join(mappings)
 
 
-def enumerate_channel_names(channels: list[Port]) -> list[str]:
+def enumerate_channel_names(channels: list[Channel]) -> list[str]:
   channel_names = []
   for channel in channels:
     size = channel.get("size", 0)

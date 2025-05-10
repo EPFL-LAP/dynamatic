@@ -2,10 +2,10 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.concat import ConcatLayout
 from .utils.generation import generate_concat, generate_slice, generate_mapping, generate_handshake_forwarding
-from .utils.types import Port, ExtraSignals
+from .utils.types import Channel, ExtraSignals
 
 
-def _generate_concat(in_channel: Port, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Port]):
+def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Channel]):
   channel_name = in_channel["name"]
   concat_name = f"{channel_name}_concat"
   channel_bitwidth = in_channel["bitwidth"]
@@ -38,7 +38,7 @@ def _generate_concat(in_channel: Port, concat_layout: ConcatLayout, concat_assig
   }
 
 
-def _generate_slice(out_channel: Port, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Port]):
+def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Channel]):
   channel_name = out_channel["name"]
   concat_name = f"{channel_name}_concat"
   channel_bitwidth = out_channel["bitwidth"]
@@ -73,19 +73,19 @@ def _generate_slice(out_channel: Port, concat_layout: ConcatLayout, slice_assign
 
 def generate_concat_signal_manager(
     name: str,
-    in_channels: list[Port],
-    out_channels: list[Port],
+    in_channels: list[Channel],
+    out_channels: list[Channel],
     extra_signals: ExtraSignals,
     generate_inner: Callable[[str], str]
 ):
   """
   Generate a signal manager architecture that handles the concatenation of extra signals
-  for input and output ports, and forwards them to an inner entity.
+  for input and output channels, and forwards them to an inner entity.
 
   Args:
     name: Name for the signal manager entity.
-    in_ports: List of input ports for the signal manager.
-    out_ports: List of output ports for the signal manager.
+    in_channels: List of input channels for the signal manager.
+    out_channels: List of output channels for the signal manager.
     extra_signals: Dictionary of extra signals (e.g., spec, tag) to be concatenated.
     generate_inner: Function to generate the inner component.
 

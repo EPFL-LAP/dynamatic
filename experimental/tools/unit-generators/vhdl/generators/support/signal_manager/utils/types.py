@@ -4,7 +4,7 @@ from typing import TypedDict, NotRequired
 ExtraSignals = dict[str, int]
 
 
-class Port(TypedDict):
+class Channel(TypedDict):
   name: str
   bitwidth: int
   extra_signals: NotRequired[ExtraSignals]

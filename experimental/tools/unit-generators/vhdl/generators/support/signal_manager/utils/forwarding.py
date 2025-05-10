@@ -1,4 +1,4 @@
-# Default expression to use when no input ports are present
+# Default expression to use when no input channels are present
 def get_default_extra_signal_value(extra_signal_name: str):
   """
   Return the default VHDL value for an extra signal

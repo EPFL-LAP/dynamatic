@@ -1,21 +1,21 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
-from .utils.types import Port, ExtraSignals
+from .utils.types import Channel, ExtraSignals
 from .utils.concat import ConcatLayout
 from .utils.generation import generate_signal_wise_forwarding, generate_signal_assignment, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names
 
 
-def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> tuple[str, str]:
-  first_in_port_name = in_ports[0]["name"]
-  first_out_port_name = out_ports[0]["name"]
+def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
+  first_in_channel_name = in_channels[0]["name"]
+  first_out_channel_name = out_channels[0]["name"]
 
-  return f"""transfer_in <= {first_in_port_name}_valid and {first_in_port_name}_ready;
-  transfer_out <= {first_out_port_name}_valid and {first_out_port_name}_ready;""", \
+  return f"""transfer_in <= {first_in_channel_name}_valid and {first_in_channel_name}_ready;
+  transfer_out <= {first_out_channel_name}_valid and {first_out_channel_name}_ready;""", \
       "  signal transfer_in, transfer_out : std_logic;"
 
 
 def _generate_forwarding(in_channel_names: list[str], signal_name: str, signal_bitwidth: int, forwarding_assignments: list[str], forwarding_decls: list[str]):
-  # Signal-wise forwarding of extra signals from in_ports to `forwarded`
+  # Signal-wise forwarding of extra signals from in_channels to `forwarded`
   assignments, decls = generate_signal_wise_forwarding(
       in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
   forwarding_assignments.extend(assignments)
@@ -60,15 +60,15 @@ def _generate_output_assignments(out_channel_name: str, signal_name: str, signal
 
 def generate_buffered_signal_manager(
     name: str,
-    in_ports: list[Port],
-    out_ports: list[Port],
+    in_channels: list[Channel],
+    out_channels: list[Channel],
     extra_signals: ExtraSignals,
     generate_inner: Callable[[str], str],
     latency: int
 ) -> str:
   """
   Generate a signal manager architecture that buffers extra signals
-  between input and output ports using a FIFO.
+  between input and output channels using a FIFO.
 
   The buffering allows the extra signals (e.g., `spec`, `tag`) to be delayed
   in sync with data paths. Signals are packed into a single bus, stored in the FIFO,
@@ -76,8 +76,8 @@ def generate_buffered_signal_manager(
 
   Args:
     name: Name of the signal manager entity
-    in_ports: List of input ports
-    out_ports: List of output ports
+    in_channels: List of input channels
+    out_channel: List of output channels
     extra_signals: Dictionary of extra signals (e.g., spec, tag) to be handled
     generate_inner: Function to generate the inner component
     latency: FIFO depth
@@ -91,7 +91,7 @@ def generate_buffered_signal_manager(
   inner_name = f"{name}_inner"
   inner = generate_inner(inner_name)
 
-  entity = generate_entity(name, in_ports, out_ports)
+  entity = generate_entity(name, in_channels, out_channels)
 
   # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals)
@@ -106,10 +106,10 @@ def generate_buffered_signal_manager(
 
   # Generate transfer handshake logic
   transfer_assignments, transfer_decls = _generate_transfer_logic(
-      in_ports, out_ports)
+      in_channels, out_channels)
 
-  in_channel_names = enumerate_channel_names(in_ports)
-  out_channel_names = enumerate_channel_names(out_ports)
+  in_channel_names = enumerate_channel_names(in_channels)
+  out_channel_names = enumerate_channel_names(out_channels)
 
   forwarding_assignments = []
   forwarding_decls = []
@@ -127,7 +127,7 @@ def generate_buffered_signal_manager(
           out_channel_name, signal_name, signal_bitwidth, output_assignments)
 
   # Map channels to inner component
-  mappings = generate_default_mappings(in_ports + out_ports)
+  mappings = generate_default_mappings(in_channels + out_channels)
 
   architecture = f"""
 -- Architecture of signal manager (buffered)

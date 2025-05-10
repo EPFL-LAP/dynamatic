@@ -2,10 +2,10 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.concat import ConcatLayout
 from .utils.generation import generate_concat, generate_slice, generate_mapping, generate_handshake_forwarding
-from .utils.types import Port, ExtraSignals
+from .utils.types import Channel, ExtraSignals
 
 
-def _generate_concat(channel: Port, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Port]):
+def _generate_concat(channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Channel]):
   channel_name = channel["name"]
   concat_name = f"{channel_name}_concat"
   channel_bitwidth = channel["bitwidth"]
@@ -33,11 +33,11 @@ def _generate_concat(channel: Port, concat_layout: ConcatLayout, concat_assignme
   }
 
 
-def _generate_slice(port: Port, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Port]):
-  channel_name = port["name"]
+def _generate_slice(channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Channel]):
+  channel_name = channel["name"]
   concat_name = f"{channel_name}_concat"
-  channel_bitwidth = port["bitwidth"]
-  channel_size = port.get("size", 0)
+  channel_bitwidth = channel["bitwidth"]
+  channel_size = channel.get("size", 0)
 
   # Slice the concat channel to create the output channel data and extra signals
   assignments, decls = generate_slice(
@@ -63,8 +63,8 @@ def _generate_slice(port: Port, concat_layout: ConcatLayout, slice_assignments: 
 
 def generate_spec_units_signal_manager(
     name: str,
-    in_channels: list[Port],
-    out_channels: list[Port],
+    in_channels: list[Channel],
+    out_channels: list[Channel],
     extra_signals_without_spec: ExtraSignals,
     ctrl_names: list[str],
     generate_inner: Callable[[str], str]
@@ -80,8 +80,8 @@ def generate_spec_units_signal_manager(
 
   Args:
     name: Name for the signal manager entity.
-    in_ports: List of input ports for the signal manager.
-    out_ports: List of output ports for the signal manager.
+    in_channels: List of input channels for the signal manager.
+    out_channels: List of output channels for the signal manager.
     extra_signals_without_spec: List of extra signals (except `spec`) to be handled.
     ctrl_names: List of control signal names that should be separated from data signals.
     generate_inner: Function to generate the inner component.
@@ -92,11 +92,11 @@ def generate_spec_units_signal_manager(
 
   entity = generate_entity(name, in_channels, out_channels)
 
-  # Separate input ports into control ports and non-control ports
+  # Separate input channels into control channels and non-control channels
   in_channel_without_ctrl = [
-      port for port in in_channels if not port["name"] in ctrl_names]
+      channel for channel in in_channels if not channel["name"] in ctrl_names]
   ctrl_channels = [
-      port for port in in_channels if port["name"] in ctrl_names]
+      channel for channel in in_channels if channel["name"] in ctrl_names]
 
   # Layout info for how extra signals are packed into one std_logic_vector
   concat_layout = ConcatLayout(extra_signals_without_spec)
@@ -108,12 +108,12 @@ def generate_spec_units_signal_manager(
   decls = []
   channels = {}
 
-  for port in in_channel_without_ctrl:
-    _generate_concat(port, concat_layout,
+  for channel in in_channel_without_ctrl:
+    _generate_concat(channel, concat_layout,
                      assignments, decls, channels)
 
-  for port in out_channels:
-    _generate_slice(port, concat_layout,
+  for channel in out_channels:
+    _generate_slice(channel, concat_layout,
                     assignments, decls, channels)
 
   mappings = []
