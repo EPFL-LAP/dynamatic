@@ -4,8 +4,8 @@ use ieee.numeric_std.all;
 
 entity shift_reg_break_dv is
   generic (
-    DATA_TYPE   : integer;
-    NUM_SLOTS   : integer
+    NUM_SLOTS   : integer;
+    DATA_TYPE   : integer
   );
   port (
     clk, rst : in std_logic;
