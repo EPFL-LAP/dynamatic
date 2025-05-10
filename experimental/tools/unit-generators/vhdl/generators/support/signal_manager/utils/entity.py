@@ -43,7 +43,7 @@ def generate_entity(entity_name, in_ports, out_ports) -> str:
         port_decls.append(
             f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
     else:
-      # Generate data_array signal declarations for 2d input port with bitwidth > 0
+      # Generate data_array signal declarations for 2d input port
       if bitwidth > 0:
         port_decls.append(
             f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
