@@ -1,6 +1,6 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
-from generators.support.signal_manager.utils.generation import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding
 from generators.handshake.tehb import generate_tehb
 from generators.support.signal_manager.utils.types import ExtraSignals
 
@@ -183,17 +183,10 @@ def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int)
   concat_assignments = []
 
   # Concatenate ins data and extra signals to create ins_inner
-  assignments, decls = generate_concat(
+  assignments, decls = generate_concat_and_handshake(
       "ins", data_bitwidth, "ins_inner", concat_layout, size)
   concat_assignments.extend(assignments)
-  # Declare ins_inner data
-  concat_decls.extend(decls["ins_inner"])
-
-  # Forward ins handshake to ins_inner
-  assignments, decls = generate_handshake_forwarding(
-      "ins", "ins_inner", size)
-  concat_assignments.extend(assignments)
-  # Declare ins_inner handshake
+  # Declare ins_inner data and handshake
   concat_decls.extend(decls["ins_inner"])
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
@@ -204,18 +197,10 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
   slice_assignments = []
 
   # Slice outs_inner_concat to create outs_inner data and extra signals
-  assignments, decls = generate_slice(
+  assignments, decls = generate_slice_and_handshake(
       "outs_inner_concat", "outs_inner", data_bitwidth, concat_layout)
   slice_assignments.extend(assignments)
-  # Declare both outs_inner_concat data signal and outs_inner data and extra signals
-  slice_decls.extend(decls["outs_inner_concat"])
-  slice_decls.extend(decls["outs_inner"])
-
-  # Forward outs_inner_concat handshake to outs_inner
-  assignments, decls = generate_handshake_forwarding(
-      "outs_inner_concat", "outs_inner")
-  slice_assignments.extend(assignments)
-  # Declare both outs_inner_concat handshake and outs_inner handshake
+  # Declare both outs_inner_concat data signal and outs_inner data, handshake, and extra signals
   slice_decls.extend(decls["outs_inner_concat"])
   slice_decls.extend(decls["outs_inner"])
 

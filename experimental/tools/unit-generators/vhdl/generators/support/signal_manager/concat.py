@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_concat, generate_slice, generate_mapping, generate_handshake_forwarding
+from .utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_mapping
 from .utils.types import Channel, ExtraSignals
 
 
@@ -12,7 +12,7 @@ def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_as
   channel_size = in_channel.get("size", 0)
 
   # Concatenate the input channel data and extra signals to create the concat channel
-  assignments, declarations = generate_concat(
+  assignments, declarations = generate_concat_and_handshake(
       channel_name,
       channel_bitwidth,
       concat_name,
@@ -20,14 +20,7 @@ def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_as
       channel_size
   )
   concat_assignments.extend(assignments)
-  # Declare the concat channel data signal
-  concat_decls.extend(declarations[concat_name])
-
-  # Forward the input channel handshake to the concat channel
-  assignments, declarations = generate_handshake_forwarding(
-      channel_name, concat_name, channel_size)
-  concat_assignments.extend(assignments)
-  # Declare the concat channel handshake signals
+  # Declare the concat channel data and handshake
   concat_decls.extend(declarations[concat_name])
 
   concat_channels[channel_name] = {
@@ -45,7 +38,7 @@ def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_ass
   channel_size = out_channel.get("size", 0)
 
   # Slice the concat channel to create the output channel data and extra signals
-  assignments, declarations = generate_slice(
+  assignments, declarations = generate_slice_and_handshake(
       concat_name,
       channel_name,
       channel_bitwidth,
@@ -53,14 +46,7 @@ def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_ass
       channel_size
   )
   slice_assignments.extend(assignments)
-  # Declare the concat channel data signal
-  slice_decls.extend(declarations[concat_name])
-
-  # Forward the concat channel handshake to the output channel
-  assignments, declarations = generate_handshake_forwarding(
-      concat_name, channel_name, channel_size)
-  slice_assignments.extend(assignments)
-  # Declare the concat channel handshake signals
+  # Declare the concat channel data and handshake
   slice_decls.extend(declarations[concat_name])
 
   slice_channels[channel_name] = {

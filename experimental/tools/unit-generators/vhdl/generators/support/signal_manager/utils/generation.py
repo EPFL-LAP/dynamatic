@@ -139,6 +139,58 @@ def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidt
   return assignments, decls
 
 
+def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
+
+  # Concatenate the input channel data and extra signals to create the concat channel
+  assignments, decls = generate_concat(
+      in_channel_name, in_data_bitwidth, out_channel_name, concat_layout, array_size)
+  assignments.extend(assignments)
+  in_declarations.extend(decls[in_channel_name])
+  out_declarations.extend(decls[out_channel_name])
+
+  # Forward the input channel handshake to the concat channel
+  assignments, decls = generate_handshake_forwarding(
+      in_channel_name, out_channel_name, array_size)
+  assignments.extend(assignments)
+  in_declarations.extend(decls[in_channel_name])
+  out_declarations.extend(decls[out_channel_name])
+
+  decls = {
+      in_channel_name: in_declarations,
+      out_channel_name: out_declarations
+  }
+  return assignments, decls
+
+
+def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
+  assignments = []
+  in_declarations = []
+  out_declarations = []
+
+  # Slice the concat channel to create the output channel data and extra signals
+  assignments, decls = generate_slice(
+      in_channel_name, out_channel_name, out_data_bitwidth, concat_layout, array_size)
+  assignments.extend(assignments)
+  in_declarations.extend(decls[in_channel_name])
+  out_declarations.extend(decls[out_channel_name])
+
+  # Forward the concat channel handshake to the output channel
+  assignments, decls = generate_handshake_forwarding(
+      in_channel_name, out_channel_name, array_size)
+  assignments.extend(assignments)
+  in_declarations.extend(decls[in_channel_name])
+  out_declarations.extend(decls[out_channel_name])
+
+  decls = {
+      in_channel_name: in_declarations,
+      out_channel_name: out_declarations
+  }
+  return assignments, decls
+
+
 def generate_signal_assignment(in_channel_name: str, out_channel_name: str, signal_name: str, signal_bitwidth: int) -> tuple[list[str], Decls]:
   assignments = [
       f"{out_channel_name}_{signal_name} <= {in_channel_name}_{signal_name};"]

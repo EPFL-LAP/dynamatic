@@ -1,6 +1,6 @@
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.generation import generate_concat, generate_slice, generate_handshake_forwarding, generate_signal_wise_forwarding, generate_signal_assignment
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding, generate_signal_assignment
 
 
 def generate_select(name, parameters):
@@ -141,31 +141,17 @@ def _generate_concat(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, s
   concat_decls = []
   concat_assignments = []
   # Concatenate trueValue data and extra signals to create trueValue_inner
-  assignments, decls = generate_concat(
+  assignments, decls = generate_concat_and_handshake(
       "trueValue", bitwidth, "trueValue_inner", concat_layout)
   concat_assignments.extend(assignments)
-  # Declare trueValue_inner data signal
-  concat_decls.extend(decls["trueValue_inner"])
-
-  # Forward trueValue_inner handshake to trueValue_inner
-  assignments, decls = generate_handshake_forwarding(
-      "trueValue", "trueValue_inner")
-  concat_assignments.extend(assignments)
-  # Declare trueValue_inner handshake
+  # Declare trueValue_inner data and handshake
   concat_decls.extend(decls["trueValue_inner"])
 
   # Concatenate falseValue data and extra signals to create falseValue_inner
-  assignments, decls = generate_concat(
+  assignments, decls = generate_concat_and_handshake(
       "falseValue", bitwidth, "falseValue_inner", concat_layout)
   concat_assignments.extend(assignments)
-  # Declare falseValue_inner data signal
-  concat_decls.extend(decls["falseValue_inner"])
-
-  # Forward falseValue_inner handshake to falseValue_inner
-  assignments, decls = generate_handshake_forwarding(
-      "falseValue", "falseValue_inner")
-  concat_assignments.extend(assignments)
-  # Declare falseValue_inner handshake
+  # Declare falseValue_inner data and handshake
   concat_decls.extend(decls["falseValue_inner"])
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
@@ -176,19 +162,12 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
   slice_assignments = []
 
   # Slice result_inner_concat to create result_inner data and extra signals
-  assignments, decls = generate_slice(
+  assignments, decls = generate_slice_and_handshake(
       "result_inner_concat", "result_inner", bitwidth, concat_layout)
   slice_assignments.extend(assignments)
   # Declare both result_inner_concat data signal and result_inner data and extra signals
   slice_decls.extend(decls["result_inner_concat"])
   slice_decls.extend(decls["result_inner"])
-
-  # Forward result_inner_concat handshake to result
-  assignments, decls = generate_handshake_forwarding(
-      "result_inner_concat", "result")
-  slice_assignments.extend(assignments)
-  # Declare result_inner_concat handshake
-  slice_decls.extend(decls["result_inner_concat"])
 
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
@@ -250,6 +229,8 @@ begin
   {forwarding_assignments}
 
   result <= result_inner;
+  result_valid <= result_inner_valid;
+  result_inner_ready <= result_ready;
 
   inner : entity work.{inner_name}(arch)
     port map(
