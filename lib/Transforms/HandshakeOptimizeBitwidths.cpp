@@ -38,6 +38,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/raw_ostream.h"
 #include <functional>
 #include <iterator>
 
@@ -385,7 +386,7 @@ class OptDataConfig {
 public:
   /// Constructs the configuration from the specific operation being
   /// transformed.
-  OptDataConfig(Op op) : op(op) {};
+  OptDataConfig(Op op) : op(op){};
 
   /// Returns the list of operands that carry data. The method must return at
   /// least one operand. If multiple operands are returned, they must all have
@@ -457,7 +458,7 @@ protected:
 /// result which does not carry data.
 class CMergeDataConfig : public OptDataConfig<handshake::ControlMergeOp> {
 public:
-  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op) {};
+  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op){};
 
   SmallVector<Value> getDataResults() override {
     return SmallVector<Value>{op.getResult()};
@@ -483,7 +484,7 @@ public:
 /// which does not carry data.
 class MuxDataConfig : public OptDataConfig<handshake::MuxOp> {
 public:
-  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op) {};
+  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op){};
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
@@ -503,7 +504,7 @@ public:
 /// condition operand which does not carry data.
 class CBranchDataConfig : public OptDataConfig<handshake::ConditionalBranchOp> {
 public:
-  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op) {};
+  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op){};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{op.getDataOperand()};
@@ -524,7 +525,7 @@ public:
 class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
 public:
   BufferDataConfig(handshake::BufferOp op)
-      : OptDataConfig<handshake::BufferOp>(op) {};
+      : OptDataConfig<handshake::BufferOp>(op){};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
@@ -746,6 +747,10 @@ struct MemInterfaceAddrOpt
     unsigned optWidth = APInt(APInt::APINT_BITS_PER_WORD,
                               memOp.getMemRef().getType().getDimSize(0))
                             .ceilLogBase2();
+
+    // If the array only has one element (e.g., unsigned a[0]), we still need 1
+    // bit to address it (e.g., tmp = a[0]).
+    optWidth = std::max(1U, optWidth);
 
     FuncMemoryPorts ports = getMemoryPorts(memOp);
     if (ports.addrWidth == 0 || optWidth >= ports.addrWidth)
@@ -1163,6 +1168,7 @@ struct ArithShift : public OpRewritePattern<Op> {
             optWidth += cstVal;
         }
       }
+
     if (optWidth >= resWidth)
       return failure();
 
@@ -1608,9 +1614,12 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
                ArithSingleType<handshake::XOrIOp>>(true, orWidth, ctx,
                                                    getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithShift<handshake::ShLIOp>, ArithShift<handshake::ShRSIOp>,
-               ArithShift<handshake::ShRUIOp>, ArithSelect>(
-      forward, ctx, getAnalysis<NameAnalysis>());
+  // [TODO] @jiahui17: Optimizing bitwidth based on the shift operation
+  // is dangerous if the shift is used as multiplication.
+  // Therefore, removing "ArithShift<handshake::ShLIOp>" from the patterns for
+  // now
+  patterns.add<ArithShift<handshake::ShRSIOp>, ArithShift<handshake::ShRUIOp>,
+               ArithSelect>(forward, ctx, getAnalysis<NameAnalysis>());
 
   patterns.add<ArithExtToTruncOpt>(ctx, getAnalysis<NameAnalysis>());
 }
