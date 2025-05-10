@@ -4,15 +4,11 @@ from .utils.types import Port, ExtraSignals
 from .utils.generation import generate_signal_wise_forwarding, generate_default_mappings, enumerate_channel_names
 
 
-def _generate_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signals: ExtraSignals) -> str:
-  extra_signal_assignments = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    # Signal-wise forwarding of extra signals from input channels to output channels
-    assignments, _ = generate_signal_wise_forwarding(
-        in_channel_names, out_channel_names, signal_name, signal_bitwidth)
-    extra_signal_assignments.extend(assignments)
-
-  return "\n  ".join(extra_signal_assignments)
+def _generate_forwarding(in_channel_names: list[str], out_channel_names: list[str], signal_name: str, signal_bitwidth: int, extra_signal_assignments: list[str]):
+  # Signal-wise forwarding of extra signals from input channels to output channels
+  assignments, _ = generate_signal_wise_forwarding(
+      in_channel_names, out_channel_names, signal_name, signal_bitwidth)
+  extra_signal_assignments.extend(assignments)
 
 
 def generate_default_signal_manager(
@@ -42,8 +38,10 @@ def generate_default_signal_manager(
 
   in_channel_names = enumerate_channel_names(in_ports)
   out_channel_names = enumerate_channel_names(out_ports)
-  extra_signal_assignments = _generate_forwarding(
-      in_channel_names, out_channel_names, extra_signals)
+  extra_signal_assignments = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    _generate_forwarding(in_channel_names, out_channel_names,
+                         signal_name, signal_bitwidth, extra_signal_assignments)
 
   # Map channels to inner component
   mappings = generate_default_mappings(in_ports + out_ports)
@@ -53,7 +51,7 @@ def generate_default_signal_manager(
 architecture arch of {name} is
 begin
   -- Forward extra signals to output ports
-  {extra_signal_assignments}
+  {"\n  ".join(extra_signal_assignments)}
 
   inner : entity work.{inner_name}(arch)
     port map(

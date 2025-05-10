@@ -14,17 +14,13 @@ def _generate_transfer_logic(in_ports: list[Port], out_ports: list[Port]) -> tup
       "  signal transfer_in, transfer_out : std_logic;"
 
 
-def _generate_forwarding(in_channel_names: list[str], extra_signals: ExtraSignals) -> tuple[str, str]:
-  forwarded_assignments = []
-  forwarded_decls = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    # Signal-wise forwarding of extra signals from in_ports to `forwarded`
-    assignments, decls = generate_signal_wise_forwarding(
-        in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
-    forwarded_assignments.extend(assignments)
-    # Declare extra signals of `forwarded` channel
-    forwarded_decls.extend(decls["forwarded"])
-  return "\n  ".join(forwarded_assignments), "\n  ".join(forwarded_decls)
+def _generate_forwarding(in_channel_names: list[str], signal_name: str, signal_bitwidth: int, forwarding_assignments: list[str], forwarding_decls: list[str]):
+  # Signal-wise forwarding of extra signals from in_ports to `forwarded`
+  assignments, decls = generate_signal_wise_forwarding(
+      in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
+  forwarding_assignments.extend(assignments)
+  # Declare extra signals of `forwarded` channel
+  forwarding_decls.extend(decls["forwarded"])
 
 
 def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
@@ -40,7 +36,7 @@ def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
 
-def _generate_slice(out_channel_names: list[str], concat_layout: ConcatLayout) -> tuple[str, str]:
+def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
   slice_assignments = []
   slice_decls = []
 
@@ -52,14 +48,14 @@ def _generate_slice(out_channel_names: list[str], concat_layout: ConcatLayout) -
   slice_decls.extend(decls["signals_post_buffer"])
   slice_decls.extend(decls["sliced"])
 
-  for signal_name, signal_bitwidth in concat_layout.extra_signals().items():
-    for out_channel_name in out_channel_names:
-      # Assign the extra signals of `sliced` to the output channel
-      assignments, _ = generate_signal_assignment(
-          "sliced", out_channel_name, signal_name, signal_bitwidth)
-      slice_assignments.extend(assignments)
-
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
+
+
+def _generate_output_assignments(out_channel_name: str, signal_name: str, signal_bitwidth: int, output_assignments: list[str]):
+  # Assign the extra signals of `sliced` to the output channel
+  assignments, _ = generate_signal_assignment(
+      "sliced", out_channel_name, signal_name, signal_bitwidth)
+  output_assignments.extend(assignments)
 
 
 def generate_buffered_signal_manager(
@@ -115,11 +111,20 @@ def generate_buffered_signal_manager(
   in_channel_names = enumerate_channel_names(in_ports)
   out_channel_names = enumerate_channel_names(out_ports)
 
-  forwarded_assignments, forwarded_decls = _generate_forwarding(
-      in_channel_names, extra_signals)
+  forwarding_assignments = []
+  forwarding_decls = []
+  for signal_name, signal_bitwidth in extra_signals.items():
+    _generate_forwarding(in_channel_names, signal_name, signal_bitwidth,
+                         forwarding_assignments, forwarding_decls)
+
   concat_assignments, concat_decls = _generate_concat(concat_layout)
-  slice_assignments, slice_decls = _generate_slice(
-      out_channel_names, concat_layout)
+  slice_assignments, slice_decls = _generate_slice(concat_layout)
+
+  output_assignments = []
+  for out_channel_name in out_channel_names:
+    for signal_name, signal_bitwidth in extra_signals.items():
+      _generate_output_assignments(
+          out_channel_name, signal_name, signal_bitwidth, output_assignments)
 
   # Map channels to inner component
   mappings = generate_default_mappings(in_ports + out_ports)
@@ -127,7 +132,7 @@ def generate_buffered_signal_manager(
   architecture = f"""
 -- Architecture of signal manager (buffered)
 architecture arch of {name} is
-  {forwarded_decls}
+  {"\n  ".join(forwarding_decls)}
   {concat_decls}
   {slice_decls}
   {transfer_decls}
@@ -135,10 +140,15 @@ begin
   -- Transfer signal assignments
   {transfer_assignments}
 
+  -- Forward extra signals
+  {"\n  ".join(forwarding_assignments)}
+
   -- Concat/split extra signals for buffer input/output
-  {forwarded_assignments}
   {concat_assignments}
   {slice_assignments}
+
+  -- Assign extra signals to output channels
+  {"\n  ".join(output_assignments)}
 
   inner : entity work.{inner_name}(arch)
     port map(
