@@ -145,28 +145,28 @@ def _generate_concat(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, s
       "trueValue", bitwidth, "trueValue_inner", concat_layout)
   concat_assignments.extend(assignments)
   # Declare trueValue_inner data signal
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["trueValue_inner"])
 
   # Forward trueValue_inner handshake to trueValue_inner
   assignments, decls = generate_handshake_forwarding(
       "trueValue", "trueValue_inner")
   concat_assignments.extend(assignments)
   # Declare trueValue_inner handshake
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["trueValue_inner"])
 
   # Concatenate falseValue data and extra signals to create falseValue_inner
   assignments, decls = generate_concat(
       "falseValue", bitwidth, "falseValue_inner", concat_layout)
   concat_assignments.extend(assignments)
   # Declare falseValue_inner data signal
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["falseValue_inner"])
 
   # Forward falseValue_inner handshake to falseValue_inner
   assignments, decls = generate_handshake_forwarding(
       "falseValue", "falseValue_inner")
   concat_assignments.extend(assignments)
   # Declare falseValue_inner handshake
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["falseValue_inner"])
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
@@ -180,15 +180,15 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
       "result_inner_concat", "result_inner", bitwidth, concat_layout)
   slice_assignments.extend(assignments)
   # Declare both result_inner_concat data signal and result_inner data and extra signals
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
+  slice_decls.extend(decls["result_inner_concat"])
+  slice_decls.extend(decls["result_inner"])
 
   # Forward result_inner_concat handshake to result
   assignments, decls = generate_handshake_forwarding(
       "result_inner_concat", "result")
   slice_assignments.extend(assignments)
   # Declare result_inner_concat handshake
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["result_inner_concat"])
 
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 

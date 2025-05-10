@@ -26,14 +26,14 @@ def _generate_concat(in_ports: list[Port], concat_layout: ConcatLayout) -> tuple
     )
     concat_assignments.extend(assignments)
     # Declare the concat channel data signal
-    concat_decls.extend(declarations["out"])
+    concat_decls.extend(declarations[concat_name])
 
     # Forward the input channel handshake to the concat channel
     assignments, declarations = generate_handshake_forwarding(
         channel_name, concat_name, channel_size)
     concat_assignments.extend(assignments)
     # Declare the concat channel handshake signals
-    concat_decls.extend(declarations["out"])
+    concat_decls.extend(declarations[concat_name])
 
     concat_ports[channel_name] = {
         "name": concat_name,
@@ -66,14 +66,14 @@ def _generate_slice(out_ports: list[Port], concat_layout: ConcatLayout) -> tuple
     )
     slice_assignments.extend(assignments)
     # Declare the concat channel data signal
-    slice_decls.extend(declarations["in"])
+    slice_decls.extend(declarations[concat_name])
 
     # Forward the concat channel handshake to the output channel
     assignments, declarations = generate_handshake_forwarding(
         concat_name, channel_name, channel_size)
     slice_assignments.extend(assignments)
     # Declare the concat channel handshake signals
-    slice_decls.extend(declarations["in"])
+    slice_decls.extend(declarations[concat_name])
 
     slice_ports[channel_name] = {
         "name": concat_name,

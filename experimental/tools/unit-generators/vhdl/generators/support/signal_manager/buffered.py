@@ -23,7 +23,7 @@ def _generate_forwarding(in_channel_names: list[str], extra_signals: ExtraSignal
         in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
     forwarded_assignments.extend(assignments)
     # Declare extra signals of `forwarded` channel
-    forwarded_decls.extend(decls["out"])
+    forwarded_decls.extend(decls["forwarded"])
   return "\n  ".join(forwarded_assignments), "\n  ".join(forwarded_decls)
 
 
@@ -35,7 +35,7 @@ def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
       "forwarded", 0, "signals_pre_buffer", concat_layout)
   concat_assignments.extend(assignments)
   # Declare `signals_pre_buffer` data signal
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["signals_pre_buffer"])
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
@@ -49,8 +49,8 @@ def _generate_slice(out_channel_names: list[str], concat_layout: ConcatLayout) -
       "signals_post_buffer", "sliced", 0, concat_layout)
   slice_assignments.extend(assignments)
   # Declare both `signals_post_buffer` data signal and `sliced` data and extra signals
-  slice_decls.extend(decls["in"])
-  slice_decls.extend(decls["out"])
+  slice_decls.extend(decls["signals_post_buffer"])
+  slice_decls.extend(decls["sliced"])
 
   for signal_name, signal_bitwidth in concat_layout.extra_signals().items():
     for out_channel_name in out_channel_names:

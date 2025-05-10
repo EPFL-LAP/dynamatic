@@ -4,7 +4,10 @@ from .internal_signal import generate_internal_signal, generate_internal_signal_
 from .forwarding import generate_forwarding_expression_for_signal
 
 
-def generate_handshake_forwarding(in_channel_name: str, out_channel_name: str, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+Decls = dict[str, list[str]]
+
+
+def generate_handshake_forwarding(in_channel_name: str, out_channel_name: str, array_size=0) -> tuple[list[str], Decls]:
   assignments = []
   in_declarations = []
   out_declarations = []
@@ -31,10 +34,14 @@ def generate_handshake_forwarding(in_channel_name: str, out_channel_name: str, a
     out_declarations.append(
         generate_internal_signal_vector(f"{out_channel_name}_ready", array_size))
 
-  return assignments, {"in": in_declarations, "out": out_declarations}
+  decls = {
+      in_channel_name: in_declarations,
+      out_channel_name: out_declarations
+  }
+  return assignments, decls
 
 
-def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   assignments = []
   in_declarations = []
   out_declarations = []
@@ -76,10 +83,14 @@ def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_nam
     out_declarations.append(
         generate_internal_signal_array(out_channel_name, in_data_bitwidth + concat_layout.total_bitwidth, array_size))
 
-  return assignments, {"in": in_declarations, "out": out_declarations}
+  decls = {
+      in_channel_name: in_declarations,
+      out_channel_name: out_declarations
+  }
+  return assignments, decls
 
 
-def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], dict[str, list[str]]]:
+def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   assignments = []
   in_declarations = []
   out_declarations = []
@@ -121,17 +132,23 @@ def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidt
     out_declarations.append(
         generate_internal_signal_array(out_channel_name, out_data_bitwidth, array_size))
 
-  return assignments, {"in": in_declarations, "out": out_declarations}
+  decls = {
+      in_channel_name: in_declarations,
+      out_channel_name: out_declarations
+  }
+  return assignments, decls
 
 
-def generate_signal_assignment(in_channel_name: str, out_channel_name: str, signal_name: str, signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
+def generate_signal_assignment(in_channel_name: str, out_channel_name: str, signal_name: str, signal_bitwidth: int) -> tuple[list[str], Decls]:
   assignments = [
       f"{out_channel_name}_{signal_name} <= {in_channel_name}_{signal_name};"]
-  declarations = {
-      "in": [generate_internal_signal_vector(f"{in_channel_name}_{signal_name}", signal_bitwidth)],
-      "out": [generate_internal_signal_vector(f"{out_channel_name}_{signal_name}", signal_bitwidth)]
+  decls = {
+      in_channel_name: [generate_internal_signal_vector(
+          f"{in_channel_name}_{signal_name}", signal_bitwidth)],
+      out_channel_name: [generate_internal_signal_vector(
+          f"{out_channel_name}_{signal_name}", signal_bitwidth)]
   }
-  return assignments, declarations
+  return assignments, decls
 
 
 def generate_mapping(port: Port, inner_channel_name: str) -> list[str]:
@@ -178,17 +195,16 @@ def enumerate_channel_names(channels: list[Port]) -> list[str]:
   return channel_names
 
 
-def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], dict[str, list[str]]]:
+def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], Decls]:
   assignments = []
-  in_declarations = []
-  out_declarations = []
+  decls = {}
 
   in_extra_signal_names = []
   for in_channel_name in in_channel_names:
     signal_name = f"{in_channel_name}_{extra_signal_name}"
     in_extra_signal_names.append(signal_name)
-    in_declarations.append(
-        generate_internal_signal_vector(signal_name, extra_signal_bitwidth))
+    decls[in_channel_name] = [
+        generate_internal_signal_vector(signal_name, extra_signal_bitwidth)]
 
   expression = generate_forwarding_expression_for_signal(
       extra_signal_name, in_extra_signal_names)
@@ -196,7 +212,7 @@ def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_nam
   for out_channel_name in out_channel_names:
     signal_name = f"{out_channel_name}_{extra_signal_name}"
     assignments.append(f"{signal_name} <= {expression};")
-    out_declarations.append(
-        generate_internal_signal_vector(signal_name, extra_signal_bitwidth))
+    decls[out_channel_name] = [
+        generate_internal_signal_vector(signal_name, extra_signal_bitwidth)]
 
-  return assignments, {"in": in_declarations, "out": out_declarations}
+  return assignments, decls

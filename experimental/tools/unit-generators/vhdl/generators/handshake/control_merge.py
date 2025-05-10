@@ -198,14 +198,14 @@ def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int)
       "ins", data_bitwidth, "ins_inner", concat_layout, size)
   concat_assignments.extend(assignments)
   # Declare ins_inner data
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["ins_inner"])
 
   # Forward ins handshake to ins_inner
   assignments, decls = generate_handshake_forwarding(
       "ins", "ins_inner", size)
   concat_assignments.extend(assignments)
   # Declare ins_inner handshake
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["ins_inner"])
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
@@ -219,14 +219,14 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
       "outs_inner", "outs", data_bitwidth, concat_layout)
   slice_assignments.extend(assignments)
   # Declare outs_inner data and extra signals
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["outs_inner"])
 
   # Forward outs_inner handshake to outs
   assignments, decls = generate_handshake_forwarding(
       "outs_inner", "outs")
   slice_assignments.extend(assignments)
   # Declare outs_inner handshake
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["outs_inner"])
 
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 

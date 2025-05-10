@@ -98,7 +98,7 @@ def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
       "addrIn", 0, "signals_pre_buffer", concat_layout)
   concat_assignments.extend(assignments)
   # Declare signals_pre_buffer data signal
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls["signals_pre_buffer"])
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
 
@@ -110,7 +110,7 @@ def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
       "signals_post_buffer", "dataOut", 0, concat_layout)
   slice_assignments.extend(assignments)
   # Declare signals_post_buffer data signal
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls["signals_post_buffer"])
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 

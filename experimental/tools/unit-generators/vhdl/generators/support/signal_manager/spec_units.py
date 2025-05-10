@@ -16,14 +16,14 @@ def _generate_concat(channel: Port, concat_layout: ConcatLayout, concat_assignme
       channel_name, channel_bitwidth, concat_name, concat_layout, channel_size)
   concat_assignments.extend(assignments)
   # Declare the concat channel data signal
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls[concat_name])
 
   # Forward the input channel handshake to the concat channel
   assignments, decls = generate_handshake_forwarding(
       channel_name, concat_name, channel_size)
   concat_assignments.extend(assignments)
   # Declare the concat channel handshake signals
-  concat_decls.extend(decls["out"])
+  concat_decls.extend(decls[concat_name])
 
   concat_channels[channel_name] = {
       "name": concat_name,
@@ -44,14 +44,14 @@ def _generate_slice(port: Port, concat_layout: ConcatLayout, slice_assignments: 
       concat_name, channel_name, channel_bitwidth, concat_layout, channel_size)
   slice_assignments.extend(assignments)
   # Declare the concat channel data signal
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls[concat_name])
 
   # Forward the concat channel handshake to the output channel
   assignments, decls = generate_handshake_forwarding(
       concat_name, channel_name, channel_size)
   slice_assignments.extend(assignments)
   # Declare the concat channel handshake signals
-  slice_decls.extend(decls["in"])
+  slice_decls.extend(decls[concat_name])
 
   slice_channels[channel_name] = {
       "name": concat_name,
