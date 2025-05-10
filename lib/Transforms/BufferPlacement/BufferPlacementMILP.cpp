@@ -548,7 +548,7 @@ void BufferPlacementMILP::addThroughputConstraintsForIntegerLatencyChannel(
     model.addQConstr(extraBubble <= dataLatency * throughput + 0.99, extraBubbleConstrName);
     model.addQConstr(dataLatency * throughput <= chThroughput, 
                      "throughput_tokens_lb");
-    model.addConstr(chThroughput + readyBuf * throughput 
+    model.addQConstr(chThroughput + readyBuf * throughput 
                     + shiftReg * (dataLatency - extraBubble) <= bufNumSlots, 
                     "throughput_tokens_ub");
   }
