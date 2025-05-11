@@ -81,3 +81,52 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     }
   },
 ```
+
+
+
+## Directory & File Descriptions
+
+- **lsq-generator.py**  
+  Runs the tool.
+
+- **vhdl_gen/**
+  - **\_\_init__.py**  
+    Re-exports a curated list of public API symbols (e.g. `main`, `generate`, `Logic`, `LSQ`).
+
+  - **cli.py**  
+    Parses command-line arguments (with `argparse`), converts them into a `Configs` instance, and calls the core generator.
+
+  - **codegen.py**  
+    Implements the `codeGen(config: Configs)` function.
+
+  - **configs.py**  
+    Defines the `Configs` class.
+
+  - **context.py**  
+    Defines the `VHDLContext` class. It substitutes the previous `global` VHDL context variables.
+
+  - **utils.py**  
+    - Defines `VHDLLogicType`, `VHDLLogicVecType`, `VHDLLogicTypeArray`, `VHDLLogicVecTypeArray`, `OpTab`.
+    - `IntToBits`, `Zero`, `GetValue`, `MaskLess`, `isPow2`, `log2Ceil` helper functions.
+    - Classes and functions need to be relocated into other files later.
+
+  - **signals.py**  
+    Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
+
+  - **vhdlgen/operators/**  
+    Low-level functions that generate VHDL snippets:  
+    - `assign.py`: `Op`  
+    - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
+    - `conversions.py`: `VecToArray`, `BitsToOH`, `BitsToOHSub1`, `OHToBits`
+    - `masking.py`: `CyclicPriorityMasking`  
+    - `mux.py`: `Mux1H`, `Mux1HROM`, `MuxIndex`, `MuxLookUp`
+    - `reduction.py`: `ReduceLogicVec`, `ReduceLogicArray`, `ReduceLogicVecArray`, `Reduce`
+    - `shifts.py`: `RotateLogicVec`, `RotateLogicArray`, `RotateLogicVecArray`, `CyclicLeftShift`
+
+  - **vhdlgen/generators/**  
+    High-level modules that build complete entities/architectures:  
+    - `dispatchers.py` : `PortToQueueDispatcher`, `QueueToPortDispatcher`, `PortToQueueDispatcherInit`, `QueueToPortDispatcherInit`
+    - `group_allocator.py` : `GroupAllocator`, `GroupAllocatorInit`
+    - `lsq.py` : `LSQ`
+
+ 
