@@ -416,8 +416,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
@@ -483,8 +481,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
              modName == "mem_to_bram" ||
              modName == "handshake.free_tags_fifo") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
