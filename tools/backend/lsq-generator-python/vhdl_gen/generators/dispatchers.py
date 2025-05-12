@@ -277,3 +277,4 @@ def QueueToPortDispatcherInit(
     arch += ctx.get_current_indent() + f');\n'
     ctx.tabLevel -= 1
     return arch
+
