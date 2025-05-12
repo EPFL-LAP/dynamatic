@@ -446,12 +446,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extui" || modName == "handshake.shli" ||
       modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
-<<<<<<< HEAD
-      modName == "handshake.extui" || modName == "handshake.shli" ||
-      modName == "handshake.blocker" ||
-=======
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
->>>>>>> main
+      modName == "handshake.blocker" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

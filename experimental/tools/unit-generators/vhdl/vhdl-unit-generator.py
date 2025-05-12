@@ -34,10 +34,7 @@ import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
-<<<<<<< HEAD
 import generators.handshake.blocker as blocker
-=======
->>>>>>> main
 
 
 def generate_code(name, mod_type, parameters):

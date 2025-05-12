@@ -599,14 +599,17 @@ def JoinOp : Handshake_Op<"join", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
+// Future Upgrades:
+// - split the input into two parts
+// - make the forwarded input explicit
+// - after the backend correctly handles variadic channels with one or zero items
 def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  SameOperandsAndResultType
 ]> {
   let summary = "blocker operation";
   let description = [{
-    A  data synchronizer. Forwards the firts input when all
-    inputs become available.
+    A  data synchronizer. Blocks handshakes until all inputs are valid, 
+    then forwards the first input.
 
     Example:
 

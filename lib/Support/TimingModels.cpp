@@ -64,10 +64,9 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       })
       .Case<handshake::EndOp, handshake::JoinOp, handshake::BlockerOp>(
           [&](auto) {
-            unsigned maxWidth = 0;
-            for (Type ty : op->getOperandTypes())
-              maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
-            return maxWidth;
+            if (op->getNumOperands() == 0)
+              return 0u;
+            return getHandshakeTypeBitWidth(op->getOperand(0).getType());
           })
       .Case<handshake::LoadOp, handshake::StoreOp>([&](auto) {
         return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
@@ -141,7 +140,8 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getInternalDelay(Operation *op,
+                                               SignalType signalType,
                                                double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
@@ -181,7 +181,8 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op,
+                                            SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
