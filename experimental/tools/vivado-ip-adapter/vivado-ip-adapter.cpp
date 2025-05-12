@@ -52,6 +52,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -132,19 +133,49 @@ void createModuleInterface(VerilogModule &module, handshake::FuncOp funcOp,
 
 void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp,
                            raw_indented_ostream &os) {
+
+  // Storing the current state of the module
+  // (kernel_state = 0) => idle state
+  // (kernel_state = 1) => working state
+  module.reg("kernel_state", 2);
+
+  // State registers
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+
     if (handshake::ChannelType type =
             dyn_cast<handshake::ChannelType>(arg.getType())) {
-      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_valid", 1);
-      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_data",
-                  type.getDataBitWidth());
+      // Storing the input data (in case the function is not ready to take all
+      // arguments at once).
+      module.reg(signalName + "_reg", type.getDataBitWidth());
+      // Indicates if the input data has been taken by the handshake function.
+      module.reg(signalName + "_taken", type.getDataBitWidth());
+
+      auto reset = std::make_unique<IfElseBlock>("rst");
+      reset
+          ->addIf(std::make_unique<NonBlockingAssign>(signalName + "_reg", "0"))
+          .addElse(std::make_unique<NonBlockingAssign>(signalName + "_reg",
+                                                       signalName));
+
+      module.always(std::move(
+          AlwaysBlock("posedge clk").add(dyn_cast<Statement>(reset))));
+    }
+  }
+
+  // The handshake signals are internally generated:
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      module.wire(signalName + "_valid", 1);
+      module.wire(signalName + "_ready", 1);
+
     } else if (handshake::ControlType type =
                    dyn_cast<handshake::ControlType>(arg.getType())) {
-      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_valid", 1);
-    } else if (mlir::IntegerType type =
-                   dyn_cast<mlir::IntegerType>(arg.getType())) {
-      module.wire(portAttr.dyn_cast<StringAttr>().str(), type.getWidth());
+      module.wire(signalName + "_valid", 1);
+      module.wire(signalName + "_ready", 1);
     }
   }
 }
