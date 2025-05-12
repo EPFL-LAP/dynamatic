@@ -2,6 +2,7 @@ from generators.support.signal_manager.utils.forwarding import get_default_extra
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.internal_signal import generate_internal_signal_vector
 from generators.support.utils import data
 
 
@@ -76,19 +77,19 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
   assignments = []
   decls = []
 
+  # Declare dataIn_concat signal
+  decls.append(generate_internal_signal_vector(
+      "dataIn_concat", bitwidth + extra_signals_without_spec_bitwidth))
   # Concat dataIn data and extra signals to create dataIn_concat
-  concat_assignments, concat_decls = generate_concat(
-      "dataIn", bitwidth, "dataIn_concat", concat_layout)
-  assignments.extend(concat_assignments)
-  # Declare dataIn_concat data signal
-  decls.extend(concat_decls["dataIn_concat"])
+  assignments.extend(generate_concat(
+      "dataIn", bitwidth, "dataIn_concat", concat_layout))
 
+  # Declare dataOut_concat signal
+  decls.append(generate_internal_signal_vector(
+      "dataOut_concat", bitwidth + extra_signals_without_spec_bitwidth))
   # Slice dataOut_concat to create dataOut data and extra signals (except spec)
-  slice_assignments, slice_decls = generate_slice(
-      "dataOut_concat", "dataOut", bitwidth, concat_layout)
-  assignments.extend(slice_assignments)
-  # Declare dataOut_concat data signal
-  decls.extend(slice_decls["dataOut_concat"])
+  assignments.extend(generate_slice(
+      "dataOut_concat", "dataOut", bitwidth, concat_layout))
 
   architecture = f"""
 -- Architecture of non_spec signal manager

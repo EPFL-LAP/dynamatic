@@ -2,7 +2,8 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Channel, ExtraSignals
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_signal_wise_forwarding, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names
+from .utils.generation import generate_signal_wise_forwarding, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names, generate_extra_signal_decls
+from .utils.internal_signal import generate_internal_signal_vector
 
 
 def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
@@ -14,24 +15,17 @@ def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Chan
       "  signal transfer_in, transfer_out : std_logic;"
 
 
-def _generate_forwarding(in_channel_names: list[str], signal_name: str, signal_bitwidth: int, forwarding_assignments: list[str], forwarding_decls: list[str]):
-  # Signal-wise forwarding of extra signals from in_channels to `forwarded`
-  assignments, decls = generate_signal_wise_forwarding(
-      in_channel_names, ["forwarded"], signal_name, signal_bitwidth)
-  forwarding_assignments.extend(assignments)
-  # Declare extra signals of `forwarded` channel
-  forwarding_decls.extend(decls["forwarded"])
-
-
 def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
   concat_assignments = []
   concat_decls = []
+
+  # Declare `signals_pre_buffer` signal
+  concat_decls.append(generate_internal_signal_vector(
+      "signals_pre_buffer", concat_layout.total_bitwidth))
+
   # Concatenate `forwarded` extra signals to create `signals_pre_buffer`
-  assignments, decls = generate_concat(
-      "forwarded", 0, "signals_pre_buffer", concat_layout)
-  concat_assignments.extend(assignments)
-  # Declare `signals_pre_buffer` data signal
-  concat_decls.extend(decls["signals_pre_buffer"])
+  concat_assignments.extend(generate_concat(
+      "forwarded", 0, "signals_pre_buffer", concat_layout))
 
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
@@ -40,13 +34,19 @@ def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
   slice_assignments = []
   slice_decls = []
 
+  # Declare both `signals_post_buffer` and `sliced` signals
+  slice_decls.append(generate_internal_signal_vector(
+      "signals_post_buffer", concat_layout.total_bitwidth))
+  slice_decls.append(generate_internal_signal_vector(
+      "sliced", concat_layout.total_bitwidth))
+
+  # Declare extra signals of `sliced` channel
+  slice_decls.extend(generate_extra_signal_decls(
+      "sliced", concat_layout.extra_signals))
+
   # Slice `signals_post_buffer` to create `sliced` data and extra signals
-  assignments, decls = generate_slice(
-      "signals_post_buffer", "sliced", 0, concat_layout)
-  slice_assignments.extend(assignments)
-  # Declare both `signals_post_buffer` data signal and `sliced` data and extra signals
-  slice_decls.extend(decls["signals_post_buffer"])
-  slice_decls.extend(decls["sliced"])
+  slice_assignments.extend(generate_slice(
+      "signals_post_buffer", "sliced", 0, concat_layout))
 
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
@@ -106,9 +106,13 @@ def generate_buffered_signal_manager(
 
   forwarding_assignments = []
   forwarding_decls = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    _generate_forwarding(in_channel_names, signal_name, signal_bitwidth,
-                         forwarding_assignments, forwarding_decls)
+  # Signal-wise forwarding of extra signals from in_channels to `forwarded`
+  for signal_name in extra_signals:
+    forwarding_assignments.append(generate_signal_wise_forwarding(
+        in_channel_names, ["forwarded"], signal_name))
+  # Declare extra signals of `forwarded` channel
+  forwarding_decls.append(
+      generate_extra_signal_decls("forwarded", extra_signals))
 
   concat_assignments, concat_decls = _generate_concat(concat_layout)
   slice_assignments, slice_decls = _generate_slice(concat_layout)

@@ -4,13 +4,6 @@ from .utils.types import Channel, ExtraSignals
 from .utils.generation import generate_signal_wise_forwarding, generate_default_mappings, enumerate_channel_names
 
 
-def _generate_forwarding(in_channel_names: list[str], out_channel_names: list[str], signal_name: str, signal_bitwidth: int, extra_signal_assignments: list[str]):
-  # Signal-wise forwarding of extra signals from input channels to output channels
-  assignments, _ = generate_signal_wise_forwarding(
-      in_channel_names, out_channel_names, signal_name, signal_bitwidth)
-  extra_signal_assignments.extend(assignments)
-
-
 def generate_default_signal_manager(
     name: str,
     in_channels: list[Channel],
@@ -39,9 +32,10 @@ def generate_default_signal_manager(
   in_channel_names = enumerate_channel_names(in_channels)
   out_channel_names = enumerate_channel_names(out_channels)
   extra_signal_assignments = []
-  for signal_name, signal_bitwidth in extra_signals.items():
-    _generate_forwarding(in_channel_names, out_channel_names,
-                         signal_name, signal_bitwidth, extra_signal_assignments)
+  # Signal-wise forwarding of extra signals from input channels to output channels
+  for signal_name in extra_signals:
+    extra_signal_assignments.extend(generate_signal_wise_forwarding(
+        in_channel_names, out_channel_names, signal_name))
 
   # Map channels to inner component
   mappings = generate_default_mappings(in_channels + out_channels)

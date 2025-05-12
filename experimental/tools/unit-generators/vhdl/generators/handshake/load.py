@@ -1,6 +1,7 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
+from generators.support.signal_manager.utils.internal_signal import generate_internal_signal_vector
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
@@ -93,24 +94,30 @@ end architecture;
 def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
   concat_assignments = []
   concat_decls = []
+
+  # Declare signals_pre_buffer signal
+  concat_decls.append(generate_internal_signal_vector(
+      "signals_pre_buffer", concat_layout.total_bitwidth))
+
   # Concatenate addrIn extra signals to create signals_pre_buffer
-  assignments, decls = generate_concat(
-      "addrIn", 0, "signals_pre_buffer", concat_layout)
-  concat_assignments.extend(assignments)
-  # Declare signals_pre_buffer data signal
-  concat_decls.extend(decls["signals_pre_buffer"])
+  concat_assignments.extend(generate_concat(
+      "addrIn", 0, "signals_pre_buffer", concat_layout))
+
   return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
 
 
 def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
   slice_assignments = []
   slice_decls = []
+
+  # Declare signals_post_buffer signal
+  slice_decls.append(generate_internal_signal_vector(
+      "signals_post_buffer", concat_layout.total_bitwidth))
+
   # Slice signals_post_buffer to create dataOut data and extra signals
-  assignments, decls = generate_slice(
-      "signals_post_buffer", "dataOut", 0, concat_layout)
-  slice_assignments.extend(assignments)
-  # Declare signals_post_buffer data signal
-  slice_decls.extend(decls["signals_post_buffer"])
+  slice_assignments.extend(generate_slice(
+      "signals_post_buffer", "dataOut", 0, concat_layout))
+
   return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
 
 

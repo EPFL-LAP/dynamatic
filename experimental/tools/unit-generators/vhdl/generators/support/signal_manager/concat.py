@@ -1,60 +1,66 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_mapping
+from .utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_mapping, generate_channel_decls
 from .utils.types import Channel, ExtraSignals
 
 
-def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_decls: list[str], concat_channels: dict[str, Channel]):
+def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
   channel_name = in_channel["name"]
   concat_name = f"{channel_name}_concat"
   channel_bitwidth = in_channel["bitwidth"]
   channel_size = in_channel.get("size", 0)
 
-  # Concatenate the input channel data and extra signals to create the concat channel
-  assignments, declarations = generate_concat_and_handshake(
-      channel_name,
-      channel_bitwidth,
-      concat_name,
-      concat_layout,
-      channel_size
-  )
-  concat_assignments.extend(assignments)
-  # Declare the concat channel data and handshake
-  concat_decls.extend(declarations[concat_name])
-
-  concat_channels[channel_name] = {
+  concat_channel: Channel = {
       "name": concat_name,
       "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
       "size": channel_size,
       "extra_signals": {}
   }
 
+  # Declare the concat channel
+  concat_channel_decls.extend(generate_channel_decls(concat_channel))
 
-def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], slice_decls: list[str], slice_channels: dict[str, Channel]):
+  # Register the concat channel
+  concat_channels[channel_name] = concat_channel
+
+  # Concatenate the input channel data and extra signals to create the concat channel
+  concat_assignments.extend(generate_concat_and_handshake(
+      channel_name,
+      channel_bitwidth,
+      concat_name,
+      concat_layout,
+      channel_size
+  ))
+
+
+def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
   channel_name = out_channel["name"]
   concat_name = f"{channel_name}_concat"
   channel_bitwidth = out_channel["bitwidth"]
   channel_size = out_channel.get("size", 0)
 
-  # Slice the concat channel to create the output channel data and extra signals
-  assignments, declarations = generate_slice_and_handshake(
-      concat_name,
-      channel_name,
-      channel_bitwidth,
-      concat_layout,
-      channel_size
-  )
-  slice_assignments.extend(assignments)
-  # Declare the concat channel data and handshake
-  slice_decls.extend(declarations[concat_name])
-
-  slice_channels[channel_name] = {
+  concat_channel: Channel = {
       "name": concat_name,
       "bitwidth": channel_bitwidth + concat_layout.total_bitwidth,
       "size": channel_size,
       "extra_signals": {}
   }
+
+  # Declare the concat channel
+  concat_channel_decls.extend(generate_channel_decls(concat_channel))
+
+  # Register the concat channel
+  concat_channels[channel_name] = concat_channel
+
+  # Slice the concat channel to create the output channel data and extra signals
+  slice_assignments.extend(generate_slice_and_handshake(
+      concat_name,
+      channel_name,
+      channel_bitwidth,
+      concat_layout,
+      channel_size
+  ))
 
 
 def generate_concat_signal_manager(
