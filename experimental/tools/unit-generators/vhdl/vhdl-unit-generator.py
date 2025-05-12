@@ -35,6 +35,8 @@ import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
 import generators.handshake.blocker as blocker
+import generators.handshake.sitofp as sitofp
+import generators.handshake.fptosi as fptosi
 
 
 def generate_code(name, mod_type, parameters):
@@ -105,6 +107,10 @@ def generate_code(name, mod_type, parameters):
       return shli.generate_shli(name, parameters)
     case "blocker":
       return blocker.generate_blocker(name, parameters)
+    case "sitofp":
+      return sitofp.generate_sitofp(name, parameters)
+    case "fptosi":
+      return fptosi.generate_fptosi(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

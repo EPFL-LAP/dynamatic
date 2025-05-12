@@ -158,10 +158,12 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType) 
+            auto optBufferType =
+                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType)
               return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
+            if (auto bufferTypeAttr =
+                    dyn_cast<StringAttr>(optBufferType->getValue())) {
               std::string bufferTypeStr = bufferTypeAttr.getValue().str();
               if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
                 return "DV" + numSlotsStr;
@@ -278,7 +280,7 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
-      .Case<handshake::BufferOp>([&](auto) { return "green"; })
+      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
