@@ -159,7 +159,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
               }
             }
             auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType)
+            if (!optBufferType) 
               return "buffer" + numSlotsStr;
             if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
               std::string bufferTypeStr = bufferTypeAttr.getValue().str();
