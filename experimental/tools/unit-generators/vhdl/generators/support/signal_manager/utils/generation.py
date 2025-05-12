@@ -1,4 +1,4 @@
-from .types import Channel, ExtraSignals
+from .types import Channel
 from .concat import ConcatLayout
 from .internal_signal import generate_internal_signal, generate_internal_signal_vector, generate_internal_signal_array
 from .forwarding import generate_forwarding_expression_for_signal
@@ -9,7 +9,8 @@ Decls = dict[str, list[str]]
 
 def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   """
-  Generate VHDL assignments for concatenating input channel data and extra signals into output channel data.
+  Generate VHDL assignments and decls for concatenating input channel data and
+  extra signals into output channel data.
   Args:
     in_channel_name (str): Name of the input channel.
     in_data_bitwidth (int): Bitwidth of the input channel data.
@@ -73,7 +74,8 @@ def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_nam
 
 def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   """
-  Generate VHDL assignments for slicing input channel data into output channel data and extra signals.
+  Generate VHDL assignments and decls for slicing input channel data into output
+  channel data and extra signals.
   Args:
     in_channel_name (str): Name of the input channel.
     out_channel_name (str): Name of the output channel.
@@ -187,8 +189,8 @@ def generate_handshake_forwarding(in_channel_name: str, out_channel_name: str, a
 
 def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, out_channel_name: str, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   """
-  Generate VHDL assignments for concatenating input channel data and extra signals into output channel data,
-  and forwarding the handshake signals.
+  Generate VHDL assignments and decls for concatenating input channel data and
+  extra signals into output channel data, and forwarding the handshake signals.
   Args:
     in_channel_name (str): Name of the input channel.
     in_data_bitwidth (int): Bitwidth of the input channel data.
@@ -227,8 +229,8 @@ def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, o
 
 def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, out_data_bitwidth: int, concat_layout: ConcatLayout, array_size=0) -> tuple[list[str], Decls]:
   """
-  Generate VHDL assignments for slicing input channel data into output channel data,
-  and forwarding the handshake signals.
+  Generate VHDL assignments and decls for slicing input channel data into output
+  channel data, and forwarding the handshake signals.
   Args:
     in_channel_name (str): Name of the input channel.
     out_channel_name (str): Name of the output channel.
@@ -267,7 +269,7 @@ def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, ou
 
 def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
   """
-  Generate a list of VHDL port mappings (inside `port map (...)`) for a channel.
+  Generate VHDL port mappings of a channel, for the inner entity (port map (...)).
   Maps extra signals if present.
   `inner_channel_name` can differ from the name of `channel`. For example, the
   `channel` can be internally defined as `ins_inner`, while it still maps to the
@@ -301,8 +303,9 @@ def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
 
 def generate_default_mappings(channels: list[Channel]) -> str:
   """
-  Generate VHDL mappings for a list of channels, where each channel maps to the
-  same name and no extra signals are included.
+  Generate VHDL mappings for the inner entity (port map (...)), using a list of
+  channels where each channel maps to a channel of the same name without extra
+  signals.
   """
 
   mappings = []
@@ -329,6 +332,7 @@ def enumerate_channel_names(channels: list[Channel]) -> list[str]:
     if size == 0:
       channel_names.append(channel["name"])
     else:
+      # Channel is an array
       for i in range(size):
         channel_names.append(f"{channel['name']}_{i}")
 
@@ -337,7 +341,8 @@ def enumerate_channel_names(channels: list[Channel]) -> list[str]:
 
 def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_names: list[str], extra_signal_name: str, extra_signal_bitwidth: int) -> tuple[list[str], Decls]:
   """
-  Generate VHDL assignments for forwarding extra signals from input channels to output channels.
+  Generate VHDL assignments and decls for forwarding extra signals from input
+  channels to output channels.
   Args:
     in_channel_names (list[str]): List of input channel names.
     out_channel_names (list[str]): List of output channel names.
