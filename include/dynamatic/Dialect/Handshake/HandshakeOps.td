@@ -608,7 +608,7 @@ def BlockerOp : Handshake_Op<"blocker", [
 ]> {
   let summary = "blocker operation";
   let description = [{
-    A  data synchronizer. Blocks handshakes until all inputs are valid, 
+    A data synchronizer. Blocks handshakes until all inputs are valid, 
     then forwards the first input.
 
     Example:
