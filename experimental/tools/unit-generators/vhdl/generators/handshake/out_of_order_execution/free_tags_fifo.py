@@ -2,19 +2,19 @@ from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_free_tags_fifo(name, params):
-  data_bitwidth = params["bitwidth"]
+  bitwidth = params["bitwidth"]
   fifo_depth = params["fifo_depth"]
 
-  return _generate_free_tags_fifo(name, data_bitwidth, fifo_depth)
+  return _generate_free_tags_fifo(name, bitwidth, fifo_depth)
 
 
-def _generate_free_tags_fifo(name, data_bitwidth, fifo_depth):
+def _generate_free_tags_fifo(name, bitwidth, fifo_depth):
   fifo_name = f"{name}_fifo"
 
   dependencies = \
       generate_elastic_fifo_inner(fifo_name, {
           "size": fifo_depth,
-          "bitwidth": data_bitwidth,
+          "bitwidth": bitwidth,
           "initialized": True
       })
 
@@ -28,8 +28,8 @@ use work.types.all;
 entity {name} is 
 port (
         clk, rst      : in  std_logic;
-        ins           : in  std_logic_vector({data_bitwidth} - 1 downto 0);
-        outs          : out std_logic_vector({data_bitwidth} - 1 downto 0);
+        ins           : in  std_logic_vector({bitwidth} - 1 downto 0);
+        outs          : out std_logic_vector({bitwidth} - 1 downto 0);
         ins_valid     : in  std_logic;
         outs_ready    : in  std_logic;
         outs_valid    : out std_logic;
@@ -43,7 +43,7 @@ architecture arch of {name} is
     signal mux_sel : std_logic;
     signal fifo_valid, fifo_ready : STD_LOGIC;
     signal fifo_pvalid, fifo_nready : STD_LOGIC;
-    signal fifo_in, fifo_out: std_logic_vector({data_bitwidth}-1 downto 0);
+    signal fifo_in, fifo_out: std_logic_vector({bitwidth}-1 downto 0);
 begin
     
     process (mux_sel, fifo_out, ins) is

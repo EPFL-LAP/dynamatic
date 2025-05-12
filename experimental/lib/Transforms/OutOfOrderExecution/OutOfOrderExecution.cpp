@@ -324,10 +324,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   // llvm::errs() << "\n";
 
   // Step 2: Check validity of the clusters
-  if (failed(verifyClusters(clusters))) {
-    llvm::errs() << "Failed to verify clusters\n";
+  if (failed(verifyClusters(clusters)))
     return failure();
-  }
 
   // Step 3: Build the cluster hierarchy, returning the all the nodes of the
   // tree from innermost to outermost
@@ -363,10 +361,9 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
     if (MuxOp muxOp = dyn_cast<MuxOp>(op)) {
       if (failed(applyMuxToCMerge(funcOp, ctx, muxOp, innermostCluster,
-                                  tagIndex, numTags, controlled))) {
-        llvm::errs() << "Failed to applyMuxToCMerge\n";
+                                  tagIndex, numTags, controlled)))
         return failure();
-      }
+
     } else {
       if (failed(applyOutOfOrderAlgorithm(
               funcOp, ctx,
@@ -375,10 +372,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
               llvm::DenseSet<Value>(op->getResults().begin(),
                                     op->getResults().end()),
               llvm::DenseSet<Operation *>({op}), innermostCluster, tagIndex,
-              numTags, controlled))) {
-        llvm::errs() << "Failed to applyOutOfOrderAlgorithm\n";
+              numTags, controlled)))
         return failure();
-      }
     }
   }
 
@@ -386,8 +381,6 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   for (auto &clusterNode : hierarchyNodes) {
     delete clusterNode;
   }
-
-  funcOp->print(llvm::errs());
 
   // Remove the extra signals from the select of the MUXes
   if (failed(removeExtraSignalsFromMux(funcOp, ctx)))
@@ -437,26 +430,19 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMerge(
                    clusterNode->cluster.isMuxAtBoundary(muxOp);
   if (loopMux || ifElseMux) {
     if (loopMux) {
-      if (failed(
-              applyMuxToCMergeLoopCluster(funcOp, ctx, muxOp, clusterNode))) {
-        llvm::errs() << "failed to applyMuxToCMergeLoopCluster\n";
+      if (failed(applyMuxToCMergeLoopCluster(funcOp, ctx, muxOp, clusterNode)))
         return failure();
-      }
+
     } else {
-      if (failed(applyMuxToCMergeIfElseCluster(funcOp, ctx, clusterNode))) {
-        llvm::errs() << "failed to applyMuxToCMergeIfElseCluster\n";
+      if (failed(applyMuxToCMergeIfElseCluster(funcOp, ctx, clusterNode)))
         return failure();
-      }
     }
-    if (!controlled) {
-      if (failed(applyOutOfOrderAlgorithm(
-              funcOp, ctx, clusterNode->cluster.inputs,
-              clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
-              clusterNode->parent, tagIndex, numTags, controlled))) {
-        llvm::errs() << "failed to applyOutOfOrderAlgorithm rec\n";
-        return failure();
-      }
-    }
+
+    if (failed(applyOutOfOrderAlgorithm(
+            funcOp, ctx, clusterNode->cluster.inputs,
+            clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
+            clusterNode->parent, tagIndex, numTags, controlled)))
+      return failure();
   }
   return success();
 }
@@ -645,10 +631,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
   if (!controlled) {
     if (failed(identifyDirtyNodes(outOfOrderNodeOutputs,
                                   outOfOrderNodeInternalOps, clusterNode,
-                                  dirtyNodes))) {
-      llvm::errs() << "Failed to identifyDirtyNodes\n";
+                                  dirtyNodes)))
       return failure();
-    }
   }
 
   // llvm::errs() << "Dirty nodes: \n";
@@ -666,10 +650,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
     llvm::DenseSet<Value> unalignedEdges;
     if (failed(identifyUnalignedEdges(outOfOrderNodeInputs,
                                       outOfOrderNodeOutputs, clusterNode,
-                                      dirtyNodes, unalignedEdges))) {
-      llvm::errs() << "Failed to identifyUnalignedEdges\n";
+                                      dirtyNodes, unalignedEdges)))
       return failure();
-    }
 
     // llvm::errs() << "Unaligned edges: \n";
     // for (auto edge : unalignedEdges) {
@@ -685,10 +667,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
       llvm::DenseSet<Value> taggedEdges;
       if (failed(identifyTaggedEdges(outOfOrderNodeInputs,
                                      outOfOrderNodeOutputs, unalignedEdges,
-                                     taggedEdges))) {
-        llvm::errs() << "Failed to identifyTaggedEdges\n";
+                                     taggedEdges)))
         return failure();
-      }
 
       // llvm::errs() << "taggedEdges edges: \n";
       // for (auto edge : taggedEdges) {
@@ -710,18 +690,14 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
                            builder, clusterNode, numTags, controlled,
                            dirtyNodes, unalignedEdges, taggedEdges, untaggers);
 
-      if (!freeTagsFifo) {
-        llvm::errs() << "Failed to freeTagsFifo\n";
+      if (!freeTagsFifo)
         return failure();
-      }
 
       // Step 5: Tag the channels in the tagged region
       std::string extraTag = "tag" + std::to_string(tagIndex++);
       if (failed(addTagSignalsToTaggedRegion(funcOp, freeTagsFifo, numTags,
-                                             extraTag, untaggers))) {
-        llvm::errs() << "Failed to addTagSignalsToTaggedRegion\n";
+                                             extraTag, untaggers)))
         return failure();
-      }
     }
   }
 
@@ -735,10 +711,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrderAlgorithm(
     if (failed(applyOutOfOrderAlgorithm(
             funcOp, ctx, clusterNode->cluster.inputs,
             clusterNode->cluster.outputs, clusterNode->cluster.internalOps,
-            clusterNode->parent, tagIndex, numTags, controlled))) {
-      llvm::errs() << "failed heirarchical\n";
+            clusterNode->parent, tagIndex, numTags, controlled)))
       return failure();
-    }
   }
 
   return success();

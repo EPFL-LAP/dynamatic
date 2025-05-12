@@ -46,7 +46,8 @@ import generators.handshake.join as join
 import generators.handshake.demux as demux
 import generators.handshake.shli as shli
 import generators.handshake.extract as extract
-
+import generators.handshake.sitofp as sitofp
+import generators.handshake.fptosi as fptosi
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -132,6 +133,10 @@ def generate_code(name, mod_type, parameters):
       return join.generate_join(name, parameters)
     case "extract":
       return extract.generate_extract(name, parameters)
+    case "sitofp":
+      return sitofp.generate_sitofp(name, parameters)
+    case "fptosi":
+      return fptosi.generate_fptosi(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

@@ -67,6 +67,7 @@ begin
     );
 
   process (index, branchInputs_valid)
+    variable temp : std_logic_vector(8 - 1 downto 0);
   begin
     for i in 0 to {size}-1 loop
       outs_valid(i) <= '0';
@@ -130,9 +131,12 @@ begin
       outs_ready   => outs_ready
     );
 
-  outs_assign : for i in 0 to {size}-1 generate
-    outs(i) <= ins;
-  end generate outs_assign;
+  process (ins)
+  begin
+    for i in 0 to {size}-1 loop
+      outs(i) <= ins;
+    end loop;
+  end process;
 end architecture;
 """
 
