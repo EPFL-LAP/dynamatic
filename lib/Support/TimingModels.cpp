@@ -140,7 +140,8 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getInternalDelay(Operation *op,
+                                               SignalType signalType,
                                                double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
@@ -180,8 +181,8 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op,
+                                            SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
