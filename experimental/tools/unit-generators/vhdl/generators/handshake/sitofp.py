@@ -2,6 +2,7 @@ from generators.support.signal_manager import generate_signal_manager
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
 
+
 def generate_sitofp(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params["extra_signals"]
@@ -10,7 +11,7 @@ def generate_sitofp(name, params):
     return _generate_sitofp_signal_manager(name, bitwidth, extra_signals)
   else:
     return _generate_sitofp(name, bitwidth)
-  
+
 
 def _generate_sitofp(name, bitwidth):
   oehb_name = f"{name}_oehb"
@@ -19,7 +20,7 @@ def _generate_sitofp(name, bitwidth):
   dependencies = generate_oehb(oehb_name, {"bitwidth": bitwidth}) + \
       generate_delay_buffer(
       buff_name, {"slots": 4})
-  
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -108,8 +109,9 @@ begin
 
 end architecture;
 """
-  
+
   return dependencies + entity + architecture
+
 
 def _generate_sitofp_signal_manager(name, bitwidth, extra_signals):
   return generate_signal_manager(name, {
