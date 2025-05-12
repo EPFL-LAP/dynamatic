@@ -599,10 +599,8 @@ def JoinOp : Handshake_Op<"join", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-// Future Upgrades:
-// - split the input into two parts
-// - make the forwarded input explicit
-// - after the backend correctly handles variadic channels with one or zero items
+// TODO: Split the input into two parts and explicitly mark the forwarded input,
+// once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
   SameOperandsAndResultType
 ]> {
