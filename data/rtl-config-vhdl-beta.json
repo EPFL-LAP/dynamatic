@@ -191,7 +191,6 @@
     "dependencies": ["types"]
   },
   {
-
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   },
   {
