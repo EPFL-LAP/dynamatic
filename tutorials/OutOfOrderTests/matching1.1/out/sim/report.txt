@@ -1,0 +1,284 @@
+[INFO  CAnalyzer] Return identified: out0 of type int (return value).
+[INFO  CAnalyzer] Parsing parameter in_int_t num_edges
+[INFO  CAnalyzer] Parameter identified: num_edges of type in_int_t.
+i0
+[INFO  CAnalyzer] Actual type of "num_edges" is "int" (32 bits).
+[INFO  VVER] Generating VHDL testbench for entity matching_wrapper
+[INFO  VVER] Transaction number computed : 1
+[INFO  VVER] Copying supplementary files: [cp /home/kossayba/dynamatic/tools/hls-verifier/resources/template_tb_join.vhd ../VHDL_SRC/tb_join.vhd]
+[INFO  VVER] Copying supplementary files: [cp /home/kossayba/dynamatic/tools/hls-verifier/resources/template_two_port_RAM.vhd ../VHDL_SRC/two_port_RAM.vhd]
+[INFO  VVER] Copying supplementary files: [cp /home/kossayba/dynamatic/tools/hls-verifier/resources/template_single_argument.vhd ../VHDL_SRC/single_argument.vhd]
+[INFO  VVER] Copying supplementary files: [cp /home/kossayba/dynamatic/tools/hls-verifier/resources/template_simpackage.vhd ../VHDL_SRC/simpackage.vhd]
+[INFO  VVER] Copying supplementary files: [cp /home/kossayba/dynamatic/tools/hls-verifier/resources/modelsim.ini ./modelsim.ini]
+[INFO  VVER] Cleaning VHDL output files [rm -rf ../VHDL_OUT]
+[INFO  VVER] Creating VHDL output files directory [mkdir -p ../VHDL_OUT]
+[INFO  VVER] Executing modelsim: [vsim -c -do simulation.do]
+Reading pref.tcl
+
+# 2020.1
+
+# do simulation.do
+# Model Technology ModelSim - Intel FPGA Edition vmap 2020.1 Lib Mapping Utility 2020.02 Feb 28 2020
+# vmap work work 
+# Modifying modelsim.ini
+# Loading project simulation
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/matching.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matching
+# -- Compiling architecture behavioral of matching
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matching.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd(8): Unknown expanded name.
+# ** Note: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd(11): VHDL Compiler exiting
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd(8): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd(8): Unknown expanded name.
+# ** Note: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd(11): VHDL Compiler exiting
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# ** Error: (vcom-11) Could not find work.sim_package.
+# ** Error (suppressible): /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd(9): (vcom-1195) Cannot find expanded name "work.sim_package".
+# ** Error: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd(9): Unknown expanded name.
+# ** Note: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd(13): VHDL Compiler exiting
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 3, Warnings: 0
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/matching_wrapper.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matching_wrapper
+# -- Compiling architecture behavioral of matching_wrapper
+# -- Loading entity matching
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of matching_wrapper.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/simpackage.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of simpackage.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/tb_join.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+# Compile of tb_join.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of single_argument.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of two_port_RAM.vhd was successful.
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# Start time: 17:39:34 on May 01,2025
+# vcom -work work -2008 -explicit /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd 
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity matching_wrapper_tb
+# -- Compiling architecture behav of matching_wrapper_tb
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd(56): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matching_wrapper
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+# End time: 17:39:34 on May 01,2025, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 1
+# Compile of hls_verify_matching_tb.vhd was successful.
+# All compile dependencies have been resolved.vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/matching.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matching
+# -- Compiling architecture behavioral of matching
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/matching_wrapper.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package NUMERIC_STD
+# -- Compiling entity matching_wrapper
+# -- Compiling architecture behavioral of matching_wrapper
+# -- Loading entity matching
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/simpackage.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Compiling package sim_package
+# -- Compiling package body sim_package
+# -- Loading package sim_package
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/tb_join.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Compiling entity tb_join
+# -- Compiling architecture arch of tb_join
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity single_argument
+# -- Compiling architecture behav of single_argument
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/single_argument.vhd(40): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package NUMERIC_STD
+# -- Loading package std_logic_textio
+# -- Loading package sim_package
+# -- Compiling entity two_port_RAM
+# -- Compiling architecture behav of two_port_RAM
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/two_port_RAM.vhd(47): (vcom-1236) Shared variables must be of a protected type.
+ModelSim> # vcom -work work -2008 -explicit -stats=none /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd
+# Model Technology ModelSim - Intel FPGA Edition vcom 2020.1 Compiler 2020.02 Feb 28 2020
+# -- Loading package STANDARD
+# -- Loading package TEXTIO
+# -- Loading package std_logic_1164
+# -- Loading package std_logic_arith
+# -- Loading package STD_LOGIC_UNSIGNED
+# -- Loading package std_logic_textio
+# -- Loading package NUMERIC_STD
+# -- Loading package sim_package
+# -- Compiling entity matching_wrapper_tb
+# -- Compiling architecture behav of matching_wrapper_tb
+# ** Warning: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd(56): (vcom-1236) Shared variables must be of a protected type.
+# -- Loading entity matching_wrapper
+# -- Loading entity single_argument
+# -- Loading entity tb_join
+ModelSim> # 7 compiles, 0 failed with no errors.
+# vsim matching_wrapper_tb 
+# Start time: 17:39:34 on May 01,2025
+# Loading std.standard
+# Loading std.textio(body)
+# Loading ieee.std_logic_1164(body)
+# Loading ieee.std_logic_arith(body)
+# Loading ieee.std_logic_unsigned(body)
+# Loading ieee.std_logic_textio(body)
+# Loading ieee.numeric_std(body)
+# Loading work.sim_package(body)
+# Loading work.matching_wrapper_tb(behav)
+# Loading work.matching_wrapper(behavioral)
+# Loading work.matching(behavioral)
+# Loading work.single_argument(behav)
+# Loading work.tb_join(arch)
+# ** Note: simulation done!
+#    Time: 38 ns  Iteration: 1  Instance: /matching_wrapper_tb
+# ** Failure: NORMAL EXIT (note: failure is to force the simulator to stop)
+#    Time: 38 ns  Iteration: 1  Process: /matching_wrapper_tb/generate_sim_done_proc File: /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd
+# Break in Process generate_sim_done_proc at /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd line 170
+# Stopped at /home/kossayba/dynamatic/tutorials/OutOfOrderTests/matching1.1/out/sim/VHDL_SRC/hls_verify_matching_tb.vhd line 170
+# End time: 17:39:35 on May 01,2025, Elapsed time: 0:00:01
+# Errors: 1, Warnings: 11
+
+--- Comparison Results ---
+
+Comparison of [out0] : Pass

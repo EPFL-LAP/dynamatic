@@ -33,54 +33,57 @@ using namespace dynamatic::buffer::fpl22;
 
 void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
-  for (auto [channel, channelVars] : vars.channelVars) {
+  for (auto [channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    bool placeOpaque = channelVars.signalVars[SignalType::DATA].bufPresent.get(
+    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool placeTransparent =
-        channelVars.signalVars[SignalType::READY].bufPresent.get(
+    bool forceBreakR =
+        chVars.signalVars[SignalType::READY].bufPresent.get(
             GRB_DoubleAttr_X) > 0;
 
-    handshake::ChannelBufProps &props = channelProps[channel];
     PlacementResult result;
-    if (placeOpaque && placeTransparent) {
-      // Place the minumum number of opaque slots; at least one and enough to
-      // satisfy all our opaque/transparent requirements
-      if (props.maxTrans) {
-        // We must place enough opaque slots as to not exceed the maximum number
-        // of transparent slots
-        result.numOpaque =
-            std::max(props.minOpaque, numSlotsToPlace - *props.maxTrans);
+    // 1. If breaking DV & R:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+    //
+    // 2. If only breaking DV:
+    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
+    // When numslot > 1, map to (numslot - 1) * FIFO_BREAK_DV.
+    //
+    // 3. If only breaking R:
+    // When numslot = 1, map to ONE_SLOT_BREAK_R;
+    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    if (forceBreakDV && forceBreakR) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
+      } else if (numSlotsToPlace == 2) {
+        result.numOneSlotDV = 1;
+        result.numOneSlotR = 1;
       } else {
-        // At least one slot, but no more than necessary
-        result.numOpaque = std::max(props.minOpaque, 1U);
+        result.numFifoDV = numSlotsToPlace - 1;
+        result.numOneSlotR = 1;
       }
-      // All remaining slots are transparent
-      result.numTrans = numSlotsToPlace - result.numOpaque;
-    } else if (placeOpaque) {
-      // Place the minimum number of transparent slots; at least the expected
-      // minimum and enough to satisfy all our opaque/transparent requirements
-      if (props.maxOpaque) {
-        result.numTrans =
-            std::max(props.minTrans, numSlotsToPlace - *props.maxOpaque);
+    } else if (forceBreakDV) {
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotDV = 1;
       } else {
-        result.numTrans = props.minTrans;
+        result.numFifoNone = numSlotsToPlace;
       }
-      // All remaining slots are opaque
-      result.numOpaque = numSlotsToPlace - result.numTrans;
     } else {
-      // placeOpaque == 0 --> props.minOpaque == 0 so all slots can be
-      // transparent
-      result.numTrans = numSlotsToPlace;
+      if (numSlotsToPlace == 1) {
+        result.numOneSlotR = 1;
+      } else {
+        result.numFifoNone = numSlotsToPlace;
+      }
     }
 
-    result.deductInternalBuffers(Channel(channel), timingDB);
     placement[channel] = result;
   }
 
@@ -88,7 +91,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     logResults(placement);
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
 
@@ -172,10 +175,10 @@ struct Pin {
   /// The channel connected to the unit's port.
   Value channel;
   /// The pin's timing domain, denoted by a signal type.
-  SignalType type;
+  SignalType signalType;
 
   /// Simple member-by-member constructor.
-  Pin(Value channel, SignalType type) : channel(channel), type(type) {};
+  Pin(Value channel, SignalType signalType) : channel(channel), signalType(signalType) {};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -287,10 +290,10 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
 
     // Find variables for arrival time at input/output pin
     GRBVar &tPinIn = vars.channelVars[cons.input.channel]
-                         .signalVars[cons.input.type]
+                         .signalVars[cons.input.signalType]
                          .path.tOut;
     GRBVar &tPinOut = vars.channelVars[cons.output.channel]
-                          .signalVars[cons.output.type]
+                          .signalVars[cons.output.signalType]
                           .path.tIn;
 
     // Arrival time at unit's output pin must be greater than arrival time at
@@ -322,10 +325,10 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void CFDFCUnionBuffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 4> signals;
-  signals.push_back(SignalType::DATA);
-  signals.push_back(SignalType::VALID);
-  signals.push_back(SignalType::READY);
+  SmallVector<SignalType, 4> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
+  signalTypes.push_back(SignalType::VALID);
+  signalTypes.push_back(SignalType::READY);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -352,7 +355,7 @@ void CFDFCUnionBuffers::setup() {
   // over all channels in the CFDFC union
   for (Value channel : cfUnion.channels) {
     // Create variables and add custom channel constraints
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
@@ -420,10 +423,10 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
 
 void OutOfCycleBuffers::setup() {
   // Signals for which we have variables
-  SmallVector<SignalType, 4> signals;
-  signals.push_back(SignalType::DATA);
-  signals.push_back(SignalType::VALID);
-  signals.push_back(SignalType::READY);
+  SmallVector<SignalType, 4> signalTypes;
+  signalTypes.push_back(SignalType::DATA);
+  signalTypes.push_back(SignalType::VALID);
+  signalTypes.push_back(SignalType::READY);
 
   /// NOTE: (lucas-rami) For each buffering group this should be the timing
   /// model of the buffer that will be inserted by the MILP for this group. We
@@ -467,7 +470,7 @@ void OutOfCycleBuffers::setup() {
       continue;
 
     // Create channel variables and add custom constraints for the channel
-    addChannelVars(channel, signals);
+    addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
@@ -482,12 +485,12 @@ void OutOfCycleBuffers::setup() {
     addChannelElasticityConstraints(channel, bufGroups);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
-    ChannelVars &channelVars = vars.channelVars[channel];
-    GRBVar &dataBuf = channelVars.signalVars[SignalType::DATA].bufPresent;
-    GRBVar &readyBuf = channelVars.signalVars[SignalType::READY].bufPresent;
+    ChannelVars &chVars = vars.channelVars[channel];
+    GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     objective -= dataBuf;
     objective -= readyBuf;
-    objective -= 0.1 * channelVars.bufNumSlots;
+    objective -= 0.1 * chVars.bufNumSlots;
   }
 
   // Add single-domain and mixed-domain path constraints as well as elasticity

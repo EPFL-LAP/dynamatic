@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
   module control_merge #(
     parameter SIZE = 2,
-    parameter DATA_TYPE = 1,
+    parameter DATA_TYPE = 32,
     parameter INDEX_TYPE = 1
   )(
     input  clk,
@@ -38,6 +38,5 @@
 
     assign index = index_internal;
 
-    assign outs = 0;
-
+    assign outs = ins[index_internal * DATA_TYPE +: DATA_TYPE];
   endmodule

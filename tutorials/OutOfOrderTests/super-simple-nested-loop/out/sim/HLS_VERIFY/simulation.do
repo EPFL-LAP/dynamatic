@@ -1,0 +1,62 @@
+vlib work
+vmap work work
+project new . simulation work modelsim.ini 0
+project open simulation
+project addfile ../VHDL_SRC/handshake_fork_1.vhd
+project addfile ../VHDL_SRC/handshake_buffer_5.vhd
+project addfile ../VHDL_SRC/handshake_fork_6.vhd
+project addfile ../VHDL_SRC/mem_to_bram_32_5.vhd
+project addfile ../VHDL_SRC/handshake_store_0.vhd
+project addfile ../VHDL_SRC/handshake_trunci_0.vhd
+project addfile ../VHDL_SRC/handshake_sink_0.vhd
+project addfile ../VHDL_SRC/hls_verify_bicg_tb.vhd
+project addfile ../VHDL_SRC/handshake_mem_controller_0.vhd
+project addfile ../VHDL_SRC/handshake_cmpi_0.vhd
+project addfile ../VHDL_SRC/handshake_extsi_4.vhd
+project addfile ../VHDL_SRC/handshake_fork_3.vhd
+project addfile ../VHDL_SRC/bicg.vhd
+project addfile ../VHDL_SRC/handshake_fork_4.vhd
+project addfile ../VHDL_SRC/handshake_cond_br_0.vhd
+project addfile ../VHDL_SRC/handshake_fork_8.vhd
+project addfile ../VHDL_SRC/handshake_buffer_7.vhd
+project addfile ../VHDL_SRC/handshake_buffer_6.vhd
+project addfile ../VHDL_SRC/handshake_buffer_3.vhd
+project addfile ../VHDL_SRC/handshake_constant_0.vhd
+project addfile ../VHDL_SRC/single_argument.vhd
+project addfile ../VHDL_SRC/handshake_extsi_1.vhd
+project addfile ../VHDL_SRC/handshake_addi_0.vhd
+project addfile ../VHDL_SRC/handshake_mux_0.vhd
+project addfile ../VHDL_SRC/handshake_fork_2.vhd
+project addfile ../VHDL_SRC/handshake_fork_5.vhd
+project addfile ../VHDL_SRC/handshake_mux_2.vhd
+project addfile ../VHDL_SRC/handshake_extsi_0.vhd
+project addfile ../VHDL_SRC/handshake_buffer_0.vhd
+project addfile ../VHDL_SRC/two_port_RAM.vhd
+project addfile ../VHDL_SRC/handshake_cond_br_1.vhd
+project addfile ../VHDL_SRC/handshake_cond_br_2.vhd
+project addfile ../VHDL_SRC/handshake_mux_1.vhd
+project addfile ../VHDL_SRC/handshake_trunci_1.vhd
+project addfile ../VHDL_SRC/handshake_buffer_1.vhd
+project addfile ../VHDL_SRC/handshake_buffer_2.vhd
+project addfile ../VHDL_SRC/handshake_fork_7.vhd
+project addfile ../VHDL_SRC/handshake_constant_1.vhd
+project addfile ../VHDL_SRC/handshake_muli_0.vhd
+project addfile ../VHDL_SRC/handshake_merge_0.vhd
+project addfile ../VHDL_SRC/simpackage.vhd
+project addfile ../VHDL_SRC/handshake_control_merge_0.vhd
+project addfile ../VHDL_SRC/handshake_buffer_4.vhd
+project addfile ../VHDL_SRC/handshake_sink_2.vhd
+project addfile ../VHDL_SRC/bicg_wrapper.vhd
+project addfile ../VHDL_SRC/handshake_extsi_3.vhd
+project addfile ../VHDL_SRC/handshake_extsi_2.vhd
+project addfile ../VHDL_SRC/types.vhd
+project addfile ../VHDL_SRC/tb_join.vhd
+project addfile ../VHDL_SRC/handshake_sink_1.vhd
+project addfile ../VHDL_SRC/handshake_constant_2.vhd
+project addfile ../VHDL_SRC/handshake_fork_0.vhd
+project calculateorder
+project compileall
+eval vsim bicg_wrapper_tb
+log -r *
+run 10000ns -all
+exit

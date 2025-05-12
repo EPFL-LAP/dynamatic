@@ -219,7 +219,7 @@ def BufferOp : Handshake_Op<"buffer", [
 ]> {
   let summary = "buffer operation";
   let description = [{
-    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    Represents an arbitrary buffer whose properties (e.g., type, latency, and number of
     slots) are dictated by HW parameters. 
   }];
   
@@ -228,17 +228,48 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let builders = [OpBuilder<
     (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-         "std::optional<unsigned>":$numSlots)>
+         "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
   ];
-
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING";
+                                           TIMING_ATTR_NAME = "TIMING",
+                                           BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
+    
+    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths. 
+    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer), 
+    /// it introduces one cycle of latency on the D and V paths. 
+    /// It does not break the R signal path and adds no latency on R.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV";
+    
+    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path. 
+    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer), 
+    /// it introduces one cycle of latency on the R path. 
+    /// It does not break the D and V signal path and adds no latency on D and V.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R";
+    
+    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO), 
+    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths. 
+    /// Its only purpose is to hold tokens.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_NONE = "FIFO_BREAK_NONE";
+    
+    /// FIFO_BREAK_DV: This buffer breaks the D and V paths. 
+    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers, 
+    /// its structure cannot be split. It introduces one cycle of latency on the D and V paths 
+    /// regardless of the number of slots and has no latency on R. 
+    /// It was previously called an 'elastic_fifo_inner'.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_DV = "FIFO_BREAK_DV";
+    
+    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal paths 
+    /// and introduces one cycle of latency on all three.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
+    
   }];
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
+
+  let hasVerifier = 1;
 }
 
 def InitOp : Handshake_Op<"init", [
@@ -364,10 +395,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"selectOperand">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -405,10 +433,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"index">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -997,7 +1022,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$trigger);
+  let arguments = (ins ChannelType:$dataIn,
+                       ControlType:$trigger,
+                       UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
@@ -1011,8 +1038,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }];
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger, "unsigned":$fifoDepth), [{
     $_state.addOperands({dataIn, trigger});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -1162,7 +1190,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn,
+                       ChannelType:$ctrl,
+                       UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
@@ -1225,6 +1255,46 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
+    }
+  }];
+}
+
+def NonSpecOp : Handshake_Op<"non_spec", [
+  AllDataTypesMatch<["dataIn", "dataOut"]>,
+  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  LacksSpecTag<"dataIn">,
+  HasValidSpecTag<"dataOut">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Adds a non-speculative spec bit.";
+  let description = [{
+    The non-spec operation has an input channel without a spec bit and an output
+    channel with a spec bit. Tokens on the output channel are marked as non-spec.
+    It's typically used before a MuxOp or CMergeOp to satisfy their type
+    requirements and to indicate the beginning of a speculative region.
+
+    Example:
+
+    ```mlir
+    %dataOut = non_spec %dataIn : !handshake.channel<i32> to !handshake.channel<i32, [spec: i1]>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataIn);
+  let results = (outs HandshakeType:$dataOut);
+  let assemblyFormat = [{
+    $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "dataIn";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "dataOut";
     }
   }];
 }

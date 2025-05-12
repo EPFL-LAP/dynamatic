@@ -306,9 +306,6 @@ public:
   void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
                                      llvm::StringRef modName,
                                      hw::ModuleType &modType);
-  void registerSpecPortsParameter(hw::HWModuleExternOp &modOp,
-                                  llvm::StringRef modName,
-                                  hw::ModuleType &modType);
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
@@ -417,7 +414,7 @@ public:
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
   std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
-                                              SignalType type, HDL hdl) const;
+                                              SignalType signalType, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

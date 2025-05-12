@@ -141,13 +141,13 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType type,
+LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
                                                double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
 
-  switch (type) {
+  switch (signalType) {
   case SignalType::DATA:
     return model->dataDelay.getCeilMetric(op, delay);
   case SignalType::VALID:
@@ -181,12 +181,12 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType type,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
-  switch (type) {
+  switch (signalType) {
   case SignalType::DATA:
     return model->getTotalDataDelay(getOpDatawidth(op), delay);
   case SignalType::VALID:
@@ -306,8 +306,6 @@ static const std::string LATENCY[] = {"latency"};
 static const std::string DELAY[] = {"delay", "data"};
 static const std::string DELAY_VALID[] = {"delay", "valid", "1"};
 static const std::string DELAY_READY[] = {"delay", "ready", "1"};
-static const std::string BUF_TRANS[] = {"transparentBuffer"};
-static const std::string BUF_OPAQUE[] = {"opaqueBuffer"};
 static const std::string DELAY_VR[] = {"delay", "VR"};
 static const std::string DELAY_CV[] = {"delay", "CV"};
 static const std::string DELAY_CR[] = {"delay", "CR"};
@@ -327,9 +325,6 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   // Deserialize the valid/ready delays
   FW_FALSE(deserializeNested(DELAY_VALID, object, model.validDelay, path));
   FW_FALSE(deserializeNested(DELAY_READY, object, model.readyDelay, path));
-  // Deserialize the number of buffer slots of each type
-  FW_FALSE(deserializeNested(BUF_TRANS, object, model.transparentSlots, path));
-  FW_FALSE(deserializeNested(BUF_OPAQUE, object, model.opaqueSlots, path));
   return true;
 }
 
