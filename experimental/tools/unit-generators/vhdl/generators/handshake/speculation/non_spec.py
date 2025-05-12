@@ -2,7 +2,6 @@ from generators.support.signal_manager.utils.forwarding import get_default_extra
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.internal_signal import generate_internal_signal_vector
 from generators.support.utils import data
 
 
@@ -75,18 +74,11 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
   }])
 
   assignments = []
-  decls = []
 
-  # Declare dataIn_concat signal
-  decls.append(generate_internal_signal_vector(
-      "dataIn_concat", bitwidth + extra_signals_without_spec_bitwidth))
   # Concat dataIn data and extra signals to create dataIn_concat
   assignments.extend(generate_concat(
       "dataIn", bitwidth, "dataIn_concat", concat_layout))
 
-  # Declare dataOut_concat signal
-  decls.append(generate_internal_signal_vector(
-      "dataOut_concat", bitwidth + extra_signals_without_spec_bitwidth))
   # Slice dataOut_concat to create dataOut data and extra signals (except spec)
   assignments.extend(generate_slice(
       "dataOut_concat", "dataOut", bitwidth, concat_layout))
@@ -94,7 +86,7 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
   architecture = f"""
 -- Architecture of non_spec signal manager
 architecture arch of {name} is
-  {"\n  ".join(decls)}
+  signal dataIn_concat, dataOut_concat : std_logic_vector({bitwidth + extra_signals_without_spec_bitwidth} - 1 downto 0);
 begin
   {"\n  ".join(assignments)}
   inner : entity work.{inner_name}(arch)

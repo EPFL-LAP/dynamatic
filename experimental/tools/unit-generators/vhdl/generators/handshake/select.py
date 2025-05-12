@@ -137,7 +137,7 @@ end architecture;
   return antitokens + entity + architecture
 
 
-def _generate_concat(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
   concat_decls = []
   concat_assignments = []
 
@@ -159,10 +159,10 @@ def _generate_concat(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, s
   concat_assignments.extend(generate_concat_and_handshake(
       "falseValue", bitwidth, "falseValue_inner", concat_layout))
 
-  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
+  return concat_assignments, concat_decls
 
 
-def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
+def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
   slice_decls = []
   slice_assignments = []
 
@@ -181,17 +181,7 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, st
   slice_assignments.extend(generate_slice_and_handshake(
       "result_inner_concat", "result_inner", bitwidth, concat_layout))
 
-  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
-
-
-def _generate_forwarding(extra_signals: dict) -> str:
-  forwarding_assignments = []
-  # Signal-wise forwarding of extra signals from condition and result_inner to result
-  for signal_name in extra_signals:
-    forwarding_assignments.extend(generate_signal_wise_forwarding(
-        ["condition", "result_inner"], ["result"], signal_name))
-
-  return "\n  ".join(forwarding_assignments)
+  return slice_assignments, slice_decls
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
@@ -224,20 +214,25 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
       bitwidth, concat_layout)
   slice_assignments, slice_decls = _generate_slice(
       bitwidth, concat_layout)
-  forwarding_assignments = _generate_forwarding(extra_signals)
+
+  forwarding_assignments = []
+  # Signal-wise forwarding of extra signals from condition and result_inner to result
+  for signal_name in extra_signals:
+    forwarding_assignments.extend(generate_signal_wise_forwarding(
+        ["condition", "result_inner"], ["result"], signal_name))
 
   architecture = f"""
 -- Architecture of selector signal manager
 architecture arch of {name} is
-  {concat_decls}
-  {slice_decls}
+  {"\n  ".join(concat_decls)}
+  {"\n  ".join(slice_decls)}
 begin
   -- Concatenate extra signals
-  {concat_assignments}
-  {slice_assignments}
+  {"\n  ".join(concat_assignments)}
+  {"\n  ".join(slice_assignments)}
 
   -- Forwarding logic
-  {forwarding_assignments}
+  {"\n  ".join(forwarding_assignments)}
 
   result <= result_inner;
   result_valid <= result_inner_valid;

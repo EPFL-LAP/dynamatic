@@ -1,7 +1,6 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
-from generators.support.signal_manager.utils.internal_signal import generate_internal_signal_vector
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 
@@ -91,36 +90,6 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
-  concat_assignments = []
-  concat_decls = []
-
-  # Declare signals_pre_buffer signal
-  concat_decls.append(generate_internal_signal_vector(
-      "signals_pre_buffer", concat_layout.total_bitwidth))
-
-  # Concatenate addrIn extra signals to create signals_pre_buffer
-  concat_assignments.extend(generate_concat(
-      "addrIn", 0, "signals_pre_buffer", concat_layout))
-
-  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
-
-
-def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
-  slice_assignments = []
-  slice_decls = []
-
-  # Declare signals_post_buffer signal
-  slice_decls.append(generate_internal_signal_vector(
-      "signals_post_buffer", concat_layout.total_bitwidth))
-
-  # Slice signals_post_buffer to create dataOut data and extra signals
-  slice_assignments.extend(generate_slice(
-      "signals_post_buffer", "dataOut", 0, concat_layout))
-
-  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
-
-
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
   # Get concatenation details for extra signals
   concat_layout = ConcatLayout(extra_signals)
@@ -154,14 +123,20 @@ def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_sign
       "extra_signals": extra_signals
   }])
 
-  concat_assignments, concat_decls = _generate_concat(concat_layout)
-  slice_assignments, slice_decls = _generate_slice(concat_layout)
+  assignments = []
+
+  # Concatenate addrIn extra signals to create signals_pre_buffer
+  assignments.extend(generate_concat(
+      "addrIn", 0, "signals_pre_buffer", concat_layout))
+
+  # Slice signals_post_buffer to create dataOut data and extra signals
+  assignments.extend(generate_slice(
+      "signals_post_buffer", "dataOut", 0, concat_layout))
 
   architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
-  {concat_decls}
-  {slice_decls}
+  signal signals_pre_buffer, signals_post_buffer : std_logic_vector({concat_layout.total_bitwidth} - 1 downto 0);
   signal transfer_in, transfer_out : std_logic;
 begin
   -- Transfer signal assignments
@@ -169,8 +144,7 @@ begin
   transfer_out <= dataOut_valid and dataOut_ready;
 
   -- Concat/slice extra signals
-  {concat_assignments}
-  {slice_assignments}
+  {"\n  ".join(assignments)}
 
   -- Buffer to store extra signals for in-flight memory requests
   -- LoadOp is assumed to be connected to a memory controller

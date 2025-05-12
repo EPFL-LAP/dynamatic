@@ -1,7 +1,7 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
 from generators.support.signal_manager.utils.concat import ConcatLayout
-from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_channel_decls
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake
 from generators.support.signal_manager.utils.types import ExtraSignals
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.merge_notehb import generate_merge_notehb
@@ -189,41 +189,6 @@ def _generate_index_extra_signal_assignments(index_name: str, index_extra_signal
   return "\n  ".join(index_extra_signals_list)
 
 
-def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int) -> tuple[str, str]:
-  concat_assignments = []
-  concat_decls = []
-
-  # Declare ins_inner channel
-  concat_decls.extend(generate_channel_decls({
-      "name": "ins_inner",
-      "bitwidth": data_bitwidth + concat_layout.total_bitwidth,
-      "size": size
-  }))
-
-  # Concatenate ins data and extra signals to create ins_inner
-  concat_assignments.extend(generate_concat_and_handshake(
-      "ins", data_bitwidth, "ins_inner", concat_layout, size))
-
-  return "\n  ".join(concat_assignments), "\n  ".join(concat_decls)
-
-
-def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[str, str]:
-  slice_decls = []
-  slice_assignments = []
-
-  # Declare outs_inner channel
-  slice_decls.extend(generate_channel_decls({
-      "name": "outs_inner",
-      "bitwidth": data_bitwidth + concat_layout.total_bitwidth
-  }))
-
-  # Slice outs_inner data to create outs data and extra signals
-  slice_assignments.extend(generate_slice_and_handshake(
-      "outs_inner", "outs", data_bitwidth, concat_layout))
-
-  return "\n  ".join(slice_assignments), "\n  ".join(slice_decls)
-
-
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
   # Generate signal manager entity
   entity = generate_entity(
@@ -253,25 +218,30 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
   inner = _generate_control_merge(
       inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
 
-  concat_assignments, concat_decls = _generate_concat(
-      data_bitwidth, concat_layout, size)
+  assignments = []
 
-  slice_assignments, slice_decls = _generate_slice(
-      data_bitwidth, concat_layout)
+  # Concatenate ins data and extra signals to create ins_inner
+  assignments.extend(generate_concat_and_handshake(
+      "ins", data_bitwidth, "ins_inner", concat_layout, size))
 
-  # Assign index extra signals
+  # Slice outs_inner data to create outs data and extra signals
+  assignments.extend(generate_slice_and_handshake(
+      "outs_inner", "outs", data_bitwidth, concat_layout))
+
+  # Assign index extra signals (TODO: Remove this)
   index_extra_signal_assignments = _generate_index_extra_signal_assignments(
       "index", extra_signals)
 
   architecture = f"""
 -- Architecture of signal manager (cmerge)
 architecture arch of {name} is
-  {concat_decls}
-  {slice_decls}
+  signal ins_inner : data_array({size} - 1 downto 0)({data_bitwidth} + {extra_signals_bitwidth} - 1 downto 0);
+  signal ins_inner_valid, ins_inner_ready : std_logic_vector({size} - 1 downto 0);
+  signal outs_inner : std_logic_vector({data_bitwidth} + {extra_signals_bitwidth} - 1 downto 0);
+  signal outs_inner_valid, outs_inner_ready : std_logic;
 begin
   -- Concat/slice data and extra signals
-  {concat_assignments}
-  {slice_assignments}
+  {"\n  ".join(assignments)}
 
   -- Assign index extra signals
   {index_extra_signal_assignments}
