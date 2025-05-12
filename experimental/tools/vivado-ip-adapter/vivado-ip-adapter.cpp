@@ -22,6 +22,7 @@
 //   ap_return
 // );
 
+#include "VerilogModule.h"
 #include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -41,6 +42,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
@@ -68,62 +70,146 @@ static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
 
-std::string formatSignalWidth(Type type) {
-
-  if (auto channelType = dyn_cast<ChannelType>(type)) {
-    int width = channelType.getDataBitWidth();
-    if (width == 1) {
-      return "";
-    }
-    return "[" + std::to_string(width - 1) + ":0]";
-  }
-
-  if (auto intType = dyn_cast<IntegerType>(type)) {
-    int width = intType.getWidth();
-    if (width == 1) {
-      return "";
-    }
-    return "[" + std::to_string(width - 1) + ":0]";
-  }
-  return "";
+constexpr int clog2(uint32_t x) {
+  return (x <= 1) ? 0 : 1 + clog2((x + 1) >> 1);
 }
 
-void createModuleInterface(handshake::FuncOp funcOp, raw_indented_ostream &os) {
+// This creates the module declaration
+// module fir(
+//   clk,
+//   rst,
+//   ap_start,
+//   ap_done,
+//   ap_idle,
+//   ap_ready,
+//   d_i_address0,
+//   d_i_ce0,
+//   d_i_q0,
+//   idx_address0,
+//   idx_ce0,
+//   idx_q0,
+//   ap_return
+// );
+void createModuleInterface(VerilogModule &module, handshake::FuncOp funcOp,
+                           raw_indented_ostream &os) {
 
-  os << "input clk,\n";
-  os << "input rst,\n";
+  module.port("rst", 1, false);
+  module.port("clk", 1, false);
+  module.port("go", 1, false);
+  module.port("done", 1, true);
 
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
-    if (isa<handshake::ChannelType>(arg.getType())) {
-      os << ",\n";
-      os << "input " << formatSignalWidth(arg.getType())
-         << portAttr.dyn_cast<StringAttr>().data();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      module.port(portAttr.dyn_cast<StringAttr>().data(),
+                  type.getDataBitWidth(), false);
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+
+      std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+
+      unsigned addressWidth = clog2(type.getNumElements());
+      unsigned dataWidth = type.getElementTypeBitWidth();
+      module.port(signalName + "_loadAddr", addressWidth, true);
+      module.port(signalName + "_loadEn", 1, true);
+      module.port(signalName + "_storeEn", 1, true);
+      module.port(signalName + "_storeAddr", addressWidth, true);
+      module.port(signalName + "_storeData", dataWidth, true);
+      module.port(signalName + "_loadData", dataWidth, false);
     }
   }
-
-  os << "input go\n";
 
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp.getResultTypes(), funcOp.getResNames())) {
-    if (isa<handshake::ChannelType>(resType)) {
-      os << ",\n";
-      os << "output " << formatSignalWidth(resType)
-         << portAttr.dyn_cast<StringAttr>().data();
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      module.port(signalName, type.getDataBitWidth(), true);
     }
   }
-  os << ",\n";
-  os << "output done\n";
+}
+
+void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp,
+                           raw_indented_ostream &os) {
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_valid", 1);
+      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_data",
+                  type.getDataBitWidth());
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(arg.getType())) {
+      module.wire(portAttr.dyn_cast<StringAttr>().str() + "_valid", 1);
+    } else if (mlir::IntegerType type =
+                   dyn_cast<mlir::IntegerType>(arg.getType())) {
+      module.wire(portAttr.dyn_cast<StringAttr>().str(), type.getWidth());
+    }
+  }
+}
+
+void createInstantiation(VerilogModule &module, handshake::FuncOp funcOp,
+                         raw_indented_ostream &os) {
+  Instance inst(funcOp.getName().str(), funcOp.getName().str() + "_inst");
+  inst.connect("clk", "clk");
+  inst.connect("rst", "rst");
+  inst.connect("go", "go");
+  inst.connect("done", "done");
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      inst.connect(signalName, signalName);
+      inst.connect(signalName + "_valid", signalName + "_valid");
+      inst.connect(signalName + "_ready", signalName + "_ready");
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(arg.getType())) {
+      inst.connect(signalName + "_valid", signalName + "_valid");
+      inst.connect(signalName + "_ready", signalName + "_ready");
+    } else if (mlir::IntegerType type =
+                   dyn_cast<mlir::IntegerType>(arg.getType())) {
+      inst.connect(signalName, signalName);
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+      inst.connect(signalName + "_loadAddr", signalName + "_loadAddr");
+      inst.connect(signalName + "_loadEn", signalName + "_loadEn");
+      inst.connect(signalName + "_storeEn", signalName + "_storeEn");
+      inst.connect(signalName + "_storeAddr", signalName + "_storeAddr");
+      inst.connect(signalName + "_storeData", signalName + "_storeData");
+      inst.connect(signalName + "_loadData", signalName + "_loadData");
+    }
+  }
+
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp.getResultTypes(), funcOp.getResNames())) {
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      inst.connect(signalName, signalName);
+      inst.connect(signalName + "_valid", signalName + "_valid");
+      inst.connect(signalName + "_ready", signalName + "_ready");
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(resType)) {
+      inst.connect(signalName + "_valid", signalName + "_valid");
+      inst.connect(signalName + "_ready", signalName + "_ready");
+    } else if (mlir::IntegerType type = dyn_cast<mlir::IntegerType>(resType)) {
+      inst.connect(signalName, signalName);
+    }
+  }
+  module.instantiate(inst);
 }
 
 void createAdapter(handshake::FuncOp funcOp, raw_indented_ostream &os) {
-  os << "module " << funcOp->getName() << "(\n";
-  createModuleInterface(funcOp, os);
-  os << ")\n";
-  os.indent();
 
-  os.unindent();
-  os << "endmodule\n";
+  auto m = VerilogModule(funcOp.getName().str());
+  createModuleInterface(m, funcOp, os);
+
+  createInstantiation(m, funcOp, os);
+
+  createInternalSignals(m, funcOp, os);
+  m.emit(os);
 }
 
 int main(int argc, char **argv) {
