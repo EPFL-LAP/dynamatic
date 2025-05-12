@@ -108,10 +108,10 @@ def generate_buffered_signal_manager(
   forwarding_decls = []
   # Signal-wise forwarding of extra signals from in_channels to `forwarded`
   for signal_name in extra_signals:
-    forwarding_assignments.append(generate_signal_wise_forwarding(
+    forwarding_assignments.extend(generate_signal_wise_forwarding(
         in_channel_names, ["forwarded"], signal_name))
   # Declare extra signals of `forwarded` channel
-  forwarding_decls.append(
+  forwarding_decls.extend(
       generate_extra_signal_decls("forwarded", extra_signals))
 
   concat_assignments, concat_decls = _generate_concat(concat_layout)
