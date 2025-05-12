@@ -616,9 +616,9 @@ def BlockerOp : Handshake_Op<"blocker", [
     ```
   }];
 
-  let arguments = (ins Variadic<HandshakeType>:$data);
-  let results = (outs HandshakeType:$result);
-  let assemblyFormat = "$data attr-dict `:` custom<HandshakeType>(type($result))";
+  let arguments = (ins Variadic<ChannelType>:$data);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
