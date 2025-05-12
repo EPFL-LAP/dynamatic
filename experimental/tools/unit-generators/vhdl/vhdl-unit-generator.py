@@ -103,11 +103,8 @@ def generate_code(name, mod_type, parameters):
       return extui.generate_extui(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
-<<<<<<< HEAD
     case "blocker":
       return blocker.generate_blocker(name, parameters)
-=======
->>>>>>> main
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 
