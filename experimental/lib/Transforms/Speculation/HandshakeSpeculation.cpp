@@ -106,6 +106,10 @@ struct BranchTracingItem {
         branchDirection(branchDirection) {}
 };
 
+/// If the value is a result of ForkOp, returns the operand of the ForkOp.
+/// Otherwise, returns the value itself.
+/// If the operand of the ForkOp is also a result of ForkOp, the function
+/// recursively finds the top of the fork tree.
 static Value findForkTreeTop(Value value) {
   Operation *definingOp = value.getDefiningOp();
   if (!definingOp)
@@ -117,44 +121,50 @@ static Value findForkTreeTop(Value value) {
   if (auto lazyForkOp = dyn_cast<LazyForkOp>(definingOp))
     return findForkTreeTop(lazyForkOp.getOperand());
 
-  // TODO: Support BufferOp?
+  // TODO: We might want to handle buffer ops here to ignore buffering
+  // differences, but it's not necessary for the current use case.
 
   return value;
 }
 
+/// Find all users of the MLIR values in the fork tree, starting from the value.
 static void
-getForkTraversalTargetsTraversal(llvm::SmallVector<OpOperand *> &targets,
-                                 Value value) {
-  for (OpOperand &opOperand : value.getUses()) {
-    targets.push_back(&opOperand);
+findUsersInForkTreeTraversal(llvm::SmallVector<Operation *> &targets,
+                             Value value) {
+  for (Operation *user : value.getUsers()) {
+    targets.push_back(user);
 
-    Operation *user = opOperand.getOwner();
     if (isa<ForkOp>(user) || isa<LazyForkOp>(user)) {
       for (OpResult result : user->getResults()) {
-        getForkTraversalTargetsTraversal(targets, result);
+        findUsersInForkTreeTraversal(targets, result);
       }
     }
   }
 }
 
-static llvm::SmallVector<OpOperand *> getForkTraversalTargets(Value value) {
+/// Find all users of the MLIR values in the fork tree.
+static llvm::SmallVector<Operation *> findUsersInForkTree(Value value) {
   Value forkTreeTop = findForkTreeTop(value);
 
-  llvm::SmallVector<OpOperand *> targets;
-  getForkTraversalTargetsTraversal(targets, forkTreeTop);
+  llvm::SmallVector<Operation *> targets;
+  // Start the traversal from the top of the fork tree
+  findUsersInForkTreeTraversal(targets, forkTreeTop);
   return targets;
 }
 
+/// Returns if two values are in the same fork tree.
 static bool forkTreeEquals(Value a, Value b) {
   return findForkTreeTop(a) == findForkTreeTop(b);
 }
 
 static std::optional<SpeculatingBranchOp> findExistingSpecBranch(Value specBit,
                                                                  Value data) {
-
-  llvm::SmallVector<OpOperand *> targets = getForkTraversalTargets(specBit);
-  for (OpOperand *target : targets) {
-    if (auto specBranch = dyn_cast<SpeculatingBranchOp>(target->getOwner())) {
+  // Find all users of the specBit (ignoring the fork differences)
+  llvm::SmallVector<Operation *> users = findUsersInForkTree(specBit);
+  for (Operation *user : users) {
+    if (auto specBranch = dyn_cast<SpeculatingBranchOp>(user)) {
+      // Check if the data operand is also the same (ignoring the fork
+      // differences)
       if (forkTreeEquals(specBranch.getDataOperand(), data)) {
         // Found a branch that matches the specBit and data
         return specBranch;
@@ -166,9 +176,12 @@ static std::optional<SpeculatingBranchOp> findExistingSpecBranch(Value specBit,
 
 static std::optional<ConditionalBranchOp> findExistingBranch(Value condition,
                                                              Value data) {
-  llvm::SmallVector<OpOperand *> targets = getForkTraversalTargets(condition);
-  for (OpOperand *target : targets) {
-    if (auto branchOp = dyn_cast<ConditionalBranchOp>(target->getOwner())) {
+  // Find all users of the condition (ignoring the fork differences)
+  llvm::SmallVector<Operation *> users = findUsersInForkTree(condition);
+  for (Operation *user : users) {
+    if (auto branchOp = dyn_cast<ConditionalBranchOp>(user)) {
+      // Check if the data operand is also the same (ignoring the fork
+      // differences)
       if (forkTreeEquals(branchOp.getDataOperand(), data)) {
         // Found a branch that matches the condition and data
         return branchOp;
