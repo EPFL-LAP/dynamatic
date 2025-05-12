@@ -293,5 +293,10 @@
     "name": "handshake.lsq",
     "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
     "hdl": "smv"
+  },
+  {
+    "name": "handshake.ndwire",
+    "generic": "$DYNAMATIC/data/vhdl/support/ndwire.vhd",
+    "hdl": "smv"
   }
 ]

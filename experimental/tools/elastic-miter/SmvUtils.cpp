@@ -133,45 +133,24 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 
 FailureOr<std::pair<std::filesystem::path, std::string>>
 handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool generateCircuitPng) {
+              const std::filesystem::path &outputDir) {
 
-  std::filesystem::path dotFile = outputDir / "model.dot";
+  std::filesystem::path hwFile = outputDir / "hw.mlir";
 
-  // Convert the handshake to dot
+  // Convert Handshake to HW
   std::string cmd =
-      "bin/export-dot " + mlirPath.string() + " --edge-style=spline";
-  int ret = executeWithRedirect(cmd, dotFile);
+      "bin/dynamatic-opt " + mlirPath.string() + " --lower-handshake-to-hw";
+  int ret = executeWithRedirect(cmd, hwFile);
   if (ret != 0) {
-    llvm::errs() << "Failed to convert to dot\n";
+    llvm::errs() << "Failed to convert to HW\n";
     return failure();
   }
 
-  // Optionally, generate a visual representation of the circuit from the
-  // generated dotfile
-  if (generateCircuitPng) {
-    std::filesystem::path pngFile = outputDir / "model.png";
-    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
-    ret = executeWithRedirect(cmd, "/dev/null");
-    if (ret != 0) {
-      llvm::errs() << "Failed to convert to PNG\n";
-      return failure();
-    }
-  }
-
-  // Convert the dotfile to SMV
-  // The current implementation of dot2smv uses the hardcoded name "model.smv"
-  // in the dotfile's directory.
-  // For the conversion to work dot2smv is required.
-  // Run build.sh with the --enable-leq-binaries flag
-  std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
-  cmd = "python3 ext/dot2smv/dot2smv " + dotFile.string();
+  // Convert the HW file to SMV
+  std::filesystem::path smvFile = hwFile.parent_path() / "model.smv";
+  cmd = "bin/export-rtl " + hwFile.string() + " " + outputDir.string() +
+        " ./data/rtl-config-smv.json " + " --dynamatic-path=." + " --hdl=smv";
   ret = executeWithRedirect(cmd, "/dev/null");
-  // Check if bits 15-8 are set to 0x7F. In this case the command was not
-  // found.
-  if (ret == -1) {
-    llvm::errs() << "dot2smv not found. Run build.sh with the "
-                    "--enable-leq-binaries flag\n";
-  }
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();

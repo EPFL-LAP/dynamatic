@@ -177,10 +177,9 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   }
 
-  // Convert the circuit to SMV and generate a PNG with the circuit's
-  // representation.
-  auto failOrSmvPair = dynamatic::experimental::handshake2smv(
-      reachabilityMlirPath, outputDir, true);
+  // Convert the circuit to SMV
+  auto failOrSmvPair =
+      dynamatic::experimental::handshake2smv(reachabilityMlirPath, outputDir);
   if (failed(failOrSmvPair))
     return failure();
   auto [dstSmv, smvModelName] = failOrSmvPair.value();

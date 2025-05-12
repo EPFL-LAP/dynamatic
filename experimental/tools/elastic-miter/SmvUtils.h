@@ -57,7 +57,7 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 // file and the name of the generated SMV module, is returned.
 FailureOr<std::pair<std::filesystem::path, std::string>>
 handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir, bool png);
+              const std::filesystem::path &outputDir);
 
 } // namespace dynamatic::experimental
 #endif

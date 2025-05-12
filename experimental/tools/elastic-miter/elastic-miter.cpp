@@ -191,7 +191,7 @@ static FailureOr<bool> checkEquivalence(
 
   // Convert the MLIR circuit to SMV
   auto failOrSmvPair =
-      dynamatic::experimental::handshake2smv(mlirPath, miterDir, true);
+      dynamatic::experimental::handshake2smv(mlirPath, miterDir);
   if (failed(failOrSmvPair)) {
     llvm::errs() << "Failed to convert miter module to SMV.\n";
     return failure();
