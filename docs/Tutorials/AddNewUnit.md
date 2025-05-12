@@ -10,9 +10,9 @@ This document explains how to add a new component to Dynamatic.
 
 ## 1. Define a Handshake Op
 
-The first step is to define a Handshake Op. In MLIR, an Op refers to a specific, concrete operation (see [Op vs Operation](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#op-vs-operation) for more details).
+The first step is to define a Handshake op. In MLIR, an op refers to a specific, concrete operation (see [Op vs Operation](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#op-vs-operation) for more details).
 
-Handshake Ops are defined using the [LLVM TableGen format](https://llvm.org/docs/TableGen/index.html), typically in either `include/dynamatic/Dialect/Handshake/HandshakeOps.td` or `HandshakeArithOps.td`.
+Handshake ops are defined using the [LLVM TableGen format](https://llvm.org/docs/TableGen/index.html), typically in either `include/dynamatic/Dialect/Handshake/HandshakeOps.td` or `HandshakeArithOps.td`.
 
 The simplest way to define your op is to mimic an existing, similar one. A typical op declaration looks like this:
 
@@ -39,7 +39,7 @@ def SomethingOp : Handshake_Op<"something", [
                        UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$result1,
                       HandshakeType:$result2);
-  
+
   let assemblyFormat = [{
     $operand1 `,` $operand2 attr-dict
       `:` type($operand1) `,` type($operand2)
@@ -95,7 +95,7 @@ For more details, refer to the [MLIR documentation](https://mlir.llvm.org/docs/D
 
 ## 2. Implement Propagation Logic to the Backend
 
-From this point on, the steps depend on which backend you're targeting: the legacy backend or the newer *beta backend* (used for speculation, out-of-order execution, and SMV generation).
+From this point on, the steps depend on which backend you're targeting: the legacy backend or the newer *beta backend* of VHDL (used for speculation and out-of-order execution).
 
 In this guide, we assume you're supporting both backends and outline the necessary steps for each.
 
@@ -164,7 +164,7 @@ To complete support for your op, you need to provide an RTL implementation for t
 
 ## Other Procedures
 
-To fully integrate your op into Dynamatic, additional steps may be required. These steps are spread throughout the codebase, but in the future, they should all be connected to the **tablegen** definition (as interfaces or other means) to maintain the single-source-of-truth principle and improve readability. The RTL propagation logic (Step 2) is also planned to be implemented as an interface through the backend redesign.
+To fully integrate your op into Dynamatic, additional steps may be required. These steps are spread throughout the codebase, but in the future, they should all be tied to the **tablegen definition** (as interfaces or other means) to maintain the single-source-of-truth principle and improve readability. The RTL propagation logic (Step 2) is also planned to be implemented as an interface through the backend redesign.
 
 - Timing/Latency Models: Register the timing and latency values in `data/components.json`. Additionally, add a case for your op in `lib/Support/TimingModels.cpp`. Further modifications may be required.
 
