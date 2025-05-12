@@ -320,7 +320,7 @@ LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
 static hw::HWModuleExternOp findExternMod(mlir::ModuleOp modOp,
-                                          StringRef name) {
+                                          StringRef name){
   if (hw::HWModuleExternOp mod = modOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return mod;
   return nullptr;
@@ -798,7 +798,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
