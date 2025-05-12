@@ -105,7 +105,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
