@@ -1,5 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager
-from generators.handshake.fork import generate_fork
+from generators.support.signal_manager import generate_entity_tag_operations, _forward_extra_signals, generate_inner_port_forwarding_tag_operations
+
 
 def generate_untagger(name, params):
   data_bitwidth = params["data_bitwidth"]
@@ -25,9 +25,6 @@ def generate_untagger(name, params):
 
 
 def _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth):
-  fork_name = f"{name}_fork"
-
-  dependencies = generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
   entity = f"""
 library ieee;
@@ -73,10 +70,8 @@ end architecture;
 
   return entity + architecture
 
-def _generate_untagger_dataless(name, current_tag, tag_bitwidth):
-  fork_name = f"{name}_fork"
 
-  dependencies = generate_fork(fork_name, {"size": 2, "bitwidth": 0})
+def _generate_untagger_dataless(name, current_tag, tag_bitwidth):
 
   entity = f"""
 library ieee;
@@ -120,29 +115,77 @@ end architecture;
 
 
 def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      },
-          {
-          "name": f"ins_{current_tag}",
-          "bitwidth": tag_bitwidth,
-          "extra_signals": {},
-          "handshaked": False
-      },],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "tagOut",
-          "bitwidth": tag_bitwidth,
-          "extra_signals": {}
-      },
-      ],
+  inner_name = f"{name}_inner"
+  inner = (
+      _generate_untagger_dataless(name, current_tag, tag_bitwidth)
+      if data_bitwidth == 0
+      else _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth)
+  )
+
+  in_ports = [{
+      "name": "ins",
+      "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
-  }, lambda name: _generate_untagger_dataless(name, current_tag, tag_bitwidth) if data_bitwidth == 0
-      else _generate_untagger(name, data_bitwidth, current_tag, tag_bitwidth))
+  }, {
+      "name": f"ins_{current_tag}",
+      "bitwidth": tag_bitwidth,
+      "extra_signals": {},
+      "handshaked": False
+  }]
+
+  out_ports = [{
+      "name": "outs",
+      "bitwidth": data_bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": "tagOut",
+      "bitwidth": tag_bitwidth,
+      "extra_signals": {}
+  }]
+
+  entity = generate_entity_tag_operations(name, in_ports, out_ports)
+
+  forwarded_extra_signals = _forward_extra_signals(
+      extra_signals, in_ports)
+
+  # Assign all extra signals for each output port, based on forwarded_extra_signals.
+  # e.g., result_spec <= lhs_spec or rhs_spec;
+  extra_signal_assignments = []
+  for out_port in out_ports:
+    port_name = out_port["name"]
+    port_2d = out_port.get("2d", False)
+
+    if not port_2d:
+      # Assign all extra signals to this output port
+      for signal_name in out_port["extra_signals"]:
+        extra_signal_assignments.append(
+            f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+    else:
+      port_size = out_port["size"]
+      for signal_name in out_port["extra_signals"]:
+        for i in range(port_size):
+          extra_signal_assignments.append(
+              f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+  extra_signal_assignments_formatted = "\n".join(
+      extra_signal_assignments).lstrip()
+
+  inner_port_forwarding = generate_inner_port_forwarding_tag_operations(
+      in_ports + out_ports)
+
+  architecture = f"""
+-- Architecture of untagger signal manager
+architecture arch of {name} is
+begin
+  -- Forward extra signals to output ports
+  {extra_signal_assignments_formatted}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      {inner_port_forwarding}
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture

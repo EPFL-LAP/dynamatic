@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_entity_tag_operations, _forward_extra_signals, generate_inner_port_forwarding_tag_operations
 from generators.handshake.join import generate_join
 
 
@@ -16,7 +16,7 @@ def generate_tagger(name, params):
       if name not in input_extra_signals
   }
   current_tag = next(iter(unique_data_out_signals))
-  
+
   if input_extra_signals:
     return _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, input_extra_signals)
   elif data_bitwidth == 0:
@@ -93,6 +93,7 @@ end architecture;
 
   return dependencies + entity + architecture
 
+
 def _generate_tagger_dataless(name, current_tag, tag_bitwidth):
   join_name = f"{name}_join"
 
@@ -158,32 +159,77 @@ end architecture;
 
 
 def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "tagIn",
-          "bitwidth": tag_bitwidth,
-          "extra_signals": {}
-      },
-      ],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      },
-          {
-          "name": f"outs_{current_tag}",
-          "bitwidth": tag_bitwidth,
-          "extra_signals": {},
-          "handshaked": False
-      },
-      ],
+  inner_name = f"{name}_inner"
+  inner = (
+      _generate_tagger_dataless(name, current_tag, tag_bitwidth)
+      if data_bitwidth == 0
+      else _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth)
+  )
+
+  in_ports = [{
+      "name": "ins",
+      "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
-  }, lambda name: _generate_tagger_dataless(name, current_tag, tag_bitwidth) if data_bitwidth == 0
-      else _generate_tagger(name, data_bitwidth, current_tag, tag_bitwidth))
+  }, {
+      "name": "tagIn",
+      "bitwidth": tag_bitwidth,
+      "extra_signals": {}
+  }]
 
+  out_ports = [{
+      "name": "outs",
+      "bitwidth": data_bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": f"outs_{current_tag}",
+      "bitwidth": tag_bitwidth,
+      "extra_signals": {},
+      "handshaked": False
+  }]
 
+  entity = generate_entity_tag_operations(name, in_ports, out_ports)
+
+  forwarded_extra_signals = _forward_extra_signals(
+      extra_signals, in_ports)
+
+  # Assign all extra signals for each output port, based on forwarded_extra_signals.
+  # e.g., result_spec <= lhs_spec or rhs_spec;
+  extra_signal_assignments = []
+  for out_port in out_ports:
+    port_name = out_port["name"]
+    port_2d = out_port.get("2d", False)
+
+    if not port_2d:
+      # Assign all extra signals to this output port
+      for signal_name in out_port["extra_signals"]:
+        extra_signal_assignments.append(
+            f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+    else:
+      port_size = out_port["size"]
+      for signal_name in out_port["extra_signals"]:
+        for i in range(port_size):
+          extra_signal_assignments.append(
+              f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+  extra_signal_assignments_formatted = "\n".join(
+      extra_signal_assignments).lstrip()
+
+  inner_port_forwarding = generate_inner_port_forwarding_tag_operations(
+      in_ports + out_ports)
+
+  architecture = f"""
+-- Architecture of tagger signal manager
+architecture arch of {name} is
+begin
+  -- Forward extra signals to output ports
+  {extra_signal_assignments_formatted}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      {inner_port_forwarding}
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture
