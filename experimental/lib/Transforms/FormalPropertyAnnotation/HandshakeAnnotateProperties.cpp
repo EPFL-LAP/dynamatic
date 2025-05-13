@@ -23,7 +23,10 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+<<<<<<< HEAD
 #include "experimental/Support/FormalProperty.h"
+=======
+>>>>>>> dev/gioele/generate-prop
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -70,6 +73,7 @@ private:
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
+<<<<<<< HEAD
   for (auto res1 : op1.getResults())
     for (auto res2 : op2.getResults()) {
       if (res1 == res2)
@@ -79,6 +83,34 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
       VEQProperty p(uid, FormalProperty::TAG::OPT, res1, res2);
 
       propertyTable.push_back(json::Value(p.toJsonObj()));
+=======
+  for (auto [i, res1] : llvm::enumerate(op1.getResults()))
+    for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
+
+      if (op1.getAttr("handshake.name") == op2.getAttr("handshake.name") &&
+          i == j)
+        continue;
+
+      addPropertyId(&op1, uid);
+
+      PortNamer namer1(&op1);
+      PortNamer namer2(&op2);
+
+      propertyTable.push_back(json::Value(json::Object{
+          {"id", uid},
+          {"type", "veq"},
+          {"info",
+           json::Value(json::Object{
+               {"owner", op1.getAttrOfType<StringAttr>("handshake.name").str()},
+               {"target",
+                op2.getAttrOfType<StringAttr>("handshake.name").str()},
+               {"owner_index", i},
+               {"target_index", j},
+               {"owner_channel", namer1.getOutputName(i).str()},
+               {"target_channel", namer2.getOutputName(j).str()}})},
+          {"tag", "opt"},
+          {"check", "unchecked"}}));
+>>>>>>> dev/gioele/generate-prop
       uid++;
     }
   return success();
@@ -91,7 +123,12 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalence(ModuleOp modOp) {
       for (auto [j, op_j] : llvm::enumerate(funcOp.getOps())) {
         // equivalence is symmetrical so it needs to be checked only once for
         // each pair of signals (therefore operations)
+<<<<<<< HEAD
         if (i <= j && getLogicBB(&op_i) == getLogicBB(&op_i)) {
+=======
+        if (i <= j &&
+            op_i.getAttr("handshake.bb") == op_j.getAttr("handshake.bb")) {
+>>>>>>> dev/gioele/generate-prop
           if (failed(annotateValidEquivalenceBetweenOps(op_i, op_j))) {
             return failure();
           }
@@ -112,6 +149,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
           if (res.getUsers().empty()) {
             continue;
           }
+<<<<<<< HEAD
           auto *userOp = *res.getUsers().begin();
 
           // skip connections to the output
@@ -123,6 +161,42 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
           AOBProperty p(uid, FormalProperty::TAG::OPT, res);
 
           propertyTable.push_back(json::Value(p.toJsonObj()));
+=======
+
+          addPropertyId(&op, uid);
+
+          auto *userOp = *res.getUsers().begin();
+
+          PortNamer namer(&op);
+          PortNamer userNamer(userOp);
+
+          unsigned long operandIndex = userOp->getNumOperands();
+          for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
+            if (arg == res) {
+              operandIndex = j;
+              break;
+            }
+          }
+          if (operandIndex >= userOp->getNumOperands())
+            return failure();
+
+          propertyTable.push_back(json::Value(json::Object{
+              {"id", uid},
+              {"type", "aob"},
+              {"info",
+               json::Value(json::Object{
+                   {"owner",
+                    op.getAttrOfType<StringAttr>("handshake.name").str()},
+                   {"user",
+                    userOp->getAttrOfType<StringAttr>("handshake.name").str()},
+                   {"owner_index", resIndex},
+                   {"user_index", operandIndex},
+                   {"owner_channel", namer.getOutputName(resIndex).str()},
+                   {"user_channel",
+                    userNamer.getInputName(operandIndex).str()}})},
+              {"tag", "opt"},
+              {"check", "unchecked"}}));
+>>>>>>> dev/gioele/generate-prop
           uid++;
         }
     }

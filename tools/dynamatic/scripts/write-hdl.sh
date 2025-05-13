@@ -37,7 +37,7 @@ elif [ "$HDL" == "smv" ]; then
 fi
 
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
-  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
+  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL --property-database "$COMP_DIR/formal_properties.json"
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"

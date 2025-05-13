@@ -14,6 +14,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
+#include <memory>
 
 namespace dynamatic {
 
@@ -31,6 +32,9 @@ public:
   inline virtual llvm::json::Object toJsonObj() const {
     return llvm::json::Object();
   };
+
+  std::unique_ptr<FormalProperty> static fromJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
 
   FormalProperty() = default;
   FormalProperty(unsigned long id, const std::string &tag)
@@ -55,6 +59,9 @@ public:
   std::string getUserChannel() { return userChannel; }
 
   llvm::json::Object toJsonObj() const override;
+  /// Attempts to deserialize a propertyfrom a JSON value.
+  static std::unique_ptr<AOBProperty> fromJSON(const llvm::json::Value &value,
+                                               llvm::json::Path path);
 
   AOBProperty() = default;
   AOBProperty(unsigned long id, TAG tag, const OpResult &res);
@@ -79,6 +86,12 @@ public:
   std::string getTargetChannel() { return targetChannel; }
 
   llvm::json::Object toJsonObj() const override;
+  /// Attempts to deserialize a propertyfrom a JSON value.
+  static std::unique_ptr<VEQProperty> fromJSON(const llvm::json::Value &value,
+                                               llvm::json::Path path);
+
+  // std::optional<TYPE> typeFromStr(const std::string &s);
+  std::optional<TAG> tagFromStr(const std::string &s);
 
   VEQProperty() = default;
   VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
@@ -92,6 +105,31 @@ private:
   int targetIndex;
   std::string ownerChannel;
   std::string targetChannel;
+};
+
+class FormalPropertyTable {
+public:
+  FormalPropertyTable() = default;
+
+  LogicalResult addPropertiesFromJSON(StringRef filepath);
+
+  const std::vector<std::unique_ptr<FormalProperty>> &getProperties() const {
+    return properties;
+  }
+
+  inline bool fromJSON(const llvm::json::Value &value,
+                       std::unique_ptr<FormalProperty> &property,
+                       llvm::json::Path path) {
+    // fromJson internally allocates the correct space for the class with
+    // make_unique and returns a pointer
+    property = FormalProperty::fromJson(value, path);
+
+    return true;
+  }
+
+private:
+  /// List of properties.
+  std::vector<std::unique_ptr<FormalProperty>> properties;
 };
 
 } // namespace dynamatic
