@@ -236,6 +236,13 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.init",
+    "parameters": [
+      { "name": "INITIAL_VALUE", "type": "unsigned" }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initialized=True initial_value=$INITIAL_VALUE"
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   },
   {

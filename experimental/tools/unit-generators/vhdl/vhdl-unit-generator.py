@@ -48,6 +48,8 @@ import generators.handshake.shli as shli
 import generators.handshake.extract as extract
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
+import generators.handshake.tehb as init
+
 
 def generate_code(name, mod_type, parameters):
   match mod_type:
@@ -137,6 +139,8 @@ def generate_code(name, mod_type, parameters):
       return sitofp.generate_sitofp(name, parameters)
     case "fptosi":
       return fptosi.generate_fptosi(name, parameters)
+    case "init":
+      return init.generate_tehb(name, parameters)
     case _:
       raise ValueError(f"Module type {mod_type} not found")
 

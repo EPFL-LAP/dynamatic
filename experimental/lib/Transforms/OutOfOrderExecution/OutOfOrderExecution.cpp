@@ -452,8 +452,7 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMerge(
  *
  * This function replaces a MuxOp at the boundary of a loop cluster with a
  * CMERGE, updating the select operands of other boundary MuxOps to the CMERGE’s
- * index output. It also removes the INIT operation and its constant input if
- * they are only used by the INIT, and deletes the MuxOp.
+ * index output. It also removes the INIT operation and deletes the MuxOp.
  *
  * @param funcOp       The function being transformed.
  * @param ctx          The MLIR context.
@@ -492,7 +491,7 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
   }
 
   // Get the INIT driving the select of the MUXes
-  MergeOp init = dyn_cast<MergeOp>(muxOp.getSelectOperand().getDefiningOp());
+  InitOp init = dyn_cast<InitOp>(muxOp.getSelectOperand().getDefiningOp());
   if (!init)
     return failure();
 
@@ -504,22 +503,22 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMergeLoopCluster(
 
   // If the constant feeding the INIT is only used by this INIT and no other
   // operation, then we should delete it
-  Value cnstFeedingInit = getInitConstantInput(init);
-  size_t numUsers = std::distance(cnstFeedingInit.getUsers().begin(),
-                                  cnstFeedingInit.getUsers().end());
+  // Value cnstFeedingInit = getInitConstantInput(init);
+  // size_t numUsers = std::distance(cnstFeedingInit.getUsers().begin(),
+  //                                 cnstFeedingInit.getUsers().end());
 
   // Now remove the INIT from the cluster and delete it
   clusterNode->removeInternalOp(init);
   init->erase();
 
-  if (numUsers == 1) {
-    Operation *constant = cnstFeedingInit.getDefiningOp();
-    // Remove the constant from the parent clusters and rom the inputs of the
-    // current node
-    clusterNode->cluster.inputs.erase(cnstFeedingInit);
-    clusterNode->removeInternalOp(constant);
-    constant->erase();
-  }
+  // if (numUsers == 1) {
+  //   Operation *constant = cnstFeedingInit.getDefiningOp();
+  //   // Remove the constant from the parent clusters and rom the inputs of the
+  //   // current node
+  //   clusterNode->cluster.inputs.erase(cnstFeedingInit);
+  //   clusterNode->removeInternalOp(constant);
+  //   constant->erase();
+  // }
 
   return success();
 }
@@ -848,8 +847,8 @@ LogicalResult OutOfOrderExecutionPass::identifyUnalignedEdges(
     // Because INIT is currenly implemented as a MERGE, we should never consider
     // its 2 inputs as unaligned
     // Once the INIT becomes a single input component, this can be removed
-    if (isInit(dirtyNode))
-      continue;
+    // if (isInit(dirtyNode))
+    //   continue;
 
     for (auto operand : dirtyNode->getOperands()) {
       // bool edgeFromCluster = false;
@@ -1370,7 +1369,8 @@ LogicalResult OutOfOrderExecutionPass::addTagSignalsRecursive(
   if (failed(addTagToValue(opOperand.get(), extraTag, numTags)))
     return failure();
 
-  if (isa<EndOp>(op) || isa<StoreOp>(op) || isa<LSQOp>(op))
+  if (isa<EndOp>(op) || isa<StoreOp>(op) || isa<LSQOp>(op) ||
+      isa<MemoryControllerOp>(op))
     return success();
 
   if (visited.contains(op))
@@ -1535,6 +1535,23 @@ OutOfOrderExecutionPass::removeExtraSignalsFromLSQ(FuncOp funcOp,
               builder.create<ExtractOp>(lsqOp->getLoc(), operand);
           lsqOp->replaceUsesOfWith(operand, extractor.getResult());
           inheritBB(lsqOp, extractor);
+        }
+      }
+    }
+  }
+
+  for (MemoryControllerOp mcOp : funcOp.getOps<MemoryControllerOp>()) {
+    builder.setInsertionPoint(mcOp);
+    // If the operands of the LSQ have any extra signals, then these extra
+    // signals must be removed by an extract op.
+    for (auto operand : mcOp->getOperands()) {
+      if (auto valueType =
+              operand.getType().dyn_cast<ExtraSignalsTypeInterface>()) {
+        if (valueType.getNumExtraSignals() > 0) {
+          ExtractOp extractor =
+              builder.create<ExtractOp>(mcOp->getLoc(), operand);
+          mcOp->replaceUsesOfWith(operand, extractor.getResult());
+          inheritBB(mcOp, extractor);
         }
       }
     }

@@ -711,6 +711,23 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                     fifo->getAttrOfType<IntegerAttr>("fifo_depth").getUInt());
         // addUnsigned("FIFO_DEPTH", 1 << ct.getDataBitWidth());
       })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr =
+            initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+
+        if (paramsAttr) {
+          auto initTokenAttr =
+              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+
+          int initialValue =
+              (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else {
+          // Fallback if hw.parameters not found
+          addUnsigned("INITIAL_VALUE", 0);
+        }
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1832,6 +1849,7 @@ public:
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
                     ConvertToHWInstance<handshake::DemuxOp>,
                     ConvertToHWInstance<handshake::ExtractOp>,
+                    ConvertToHWInstance<handshake::InitOp>,
 
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,

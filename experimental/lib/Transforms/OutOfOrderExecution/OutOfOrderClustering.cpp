@@ -134,19 +134,29 @@ outoforder::analyzeMuxConditions(FuncOp funcOp) {
 
     // If a MUX is fed by a MergeOp(INIT) fed by condition c (or NOT c), then
     // the MUX is a loop header
-    if (MergeOp init = dyn_cast<MergeOp>(cond.getDefiningOp())) {
-      Value op1 = init->getOperand(0);
-      Value op2 = init->getOperand(1);
+    // if (MergeOp init = dyn_cast<MergeOp>(cond.getDefiningOp())) {
+    //   Value op1 = init->getOperand(0);
+    //   Value op2 = init->getOperand(1);
 
-      // The Merge Op is fed by a constant and the condition c (or NOT c)
-      if (isa<ConstantOp>(op1.getDefiningOp())) {
-        cond = op2;
-      } else {
-        assert((isa<ConstantOp>(op2.getDefiningOp())) &&
-               "An in input to a MergeOp feeding the MUX loop header should be "
-               "a constant");
-        cond = op1;
-      }
+    //   // The Merge Op is fed by a constant and the condition c (or NOT c)
+    //   if (isa<ConstantOp>(op1.getDefiningOp())) {
+    //     cond = op2;
+    //   } else {
+    //     assert((isa<ConstantOp>(op2.getDefiningOp())) &&
+    //            "An in input to a MergeOp feeding the MUX loop header should
+    //            be " "a constant");
+    //     cond = op1;
+    //   }
+    //   if (NotOp notOp = dyn_cast<NotOp>(cond.getDefiningOp())) {
+    //     cond = notOp.getOperand();
+    //   }
+    //   condToMuxes[cond].second = true;
+    // }
+
+    // If a MUX is fed by an INIT fed by condition c (or NOT c), then
+    // the MUX is a loop header
+    if (InitOp init = dyn_cast<InitOp>(cond.getDefiningOp())) {
+      cond = init.getOperand();
       if (NotOp notOp = dyn_cast<NotOp>(cond.getDefiningOp())) {
         cond = notOp.getOperand();
       }
@@ -277,14 +287,15 @@ outoforder::analyzeBranchesConditions(
  *
  * @return The constant input to the MergeOp.
  */
-Value outoforder::getInitConstantInput(MergeOp mergeOp) {
-  // Get the constant input to the MergeOp
-  Value constantInput = mergeOp.getOperand(0);
-  if (auto constantOp = dyn_cast<ConstantOp>(constantInput.getDefiningOp())) {
-    return constantInput;
-  }
-  return mergeOp.getOperand(1);
-}
+// Value outoforder::getInitConstantInput(MergeOp mergeOp) {
+//   // Get the constant input to the MergeOp
+//   Value constantInput = mergeOp.getOperand(0);
+//   if (auto constantOp = dyn_cast<ConstantOp>(constantInput.getDefiningOp()))
+//   {
+//     return constantInput;
+//   }
+//   return mergeOp.getOperand(1);
+// }
 
 static void dfs(Operation *current, const llvm::DenseSet<Operation *> &endNodes,
                 std::vector<Operation *> &path,
@@ -438,17 +449,13 @@ void outoforder::createClusters(
                       muxOp.getDataOperands().end());
         // inputs.insert(muxOp.getSelectOperand());
 
-        assert(isa<MergeOp>(muxOp.getSelectOperand().getDefiningOp()) &&
-               "Loop MUX must be fed by INIT");
+        InitOp init =
+            dyn_cast<InitOp>(muxOp.getSelectOperand().getDefiningOp());
 
-        MergeOp init =
-            dyn_cast<MergeOp>(muxOp.getSelectOperand().getDefiningOp());
+        assert(init && "The select operand of a MUX in a loop header should be "
+                       "fed by an INIT");
 
-        assert(
-            init &&
-            "The select operand of the MUX in loop header should be a MergeOp");
-
-        inputs.insert(getInitConstantInput(init));
+        inputs.insert(init.getOperand());
 
         // First add all the operations between the MUXes and the BRANCHes
         // llvm::DenseSet<Operation *> visitedMuxesToBranches;

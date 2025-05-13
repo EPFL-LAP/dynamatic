@@ -4,16 +4,23 @@ from generators.support.signal_manager import generate_signal_manager, get_conca
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
+  initialized = params.get("initialized", False)
+  initial_value = params.get("initial_value", 0)
 
   if extra_signals:
-    return _generate_tehb_signal_manager(name, bitwidth, extra_signals)
+    return _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, initial_value)
   elif bitwidth == 0:
-    return _generate_tehb_dataless(name)
+    return _generate_tehb_dataless(name, initialized, initial_value)
   else:
-    return _generate_tehb(name, bitwidth)
+    return _generate_tehb(name, bitwidth, initialized, initial_value)
 
 
-def _generate_tehb_dataless(name):
+def _generate_tehb_dataless(name, initialized, initial_value):
+  if initialized:
+    fullReg_init = f"'{initial_value}'"
+  else:
+    fullReg_init = "'0'"
+
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -44,7 +51,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        fullReg <= '0';
+        fullReg <= {fullReg_init};
       else
         fullReg <= outputValid and not outs_ready;
       end if;
@@ -59,10 +66,16 @@ end architecture;
   return entity + architecture
 
 
-def _generate_tehb(name, bitwidth):
+def _generate_tehb(name, bitwidth, initialized, initial_value):
   tehb_dataless_name = f"{name}_dataless"
 
-  dependencies = _generate_tehb_dataless(tehb_dataless_name)
+  dependencies = _generate_tehb_dataless(
+      tehb_dataless_name, initialized, initial_value)
+
+  if initialized:
+    dataReg_init = f"'{initial_value}'"
+  else:
+    dataReg_init = "'0'"
 
   entity = f"""
 library ieee;
@@ -107,7 +120,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        dataReg <= (others => '0');
+        dataReg <= (others => {dataReg_init});
       elsif (regEnable) then
         dataReg <= ins;
       end if;
@@ -131,7 +144,7 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
+def _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, initial_value):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
   return generate_signal_manager(name, {
       "type": "concat",
@@ -146,4 +159,4 @@ def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
           "extra_signals": extra_signals
       }],
       "extra_signals": extra_signals
-  }, lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth))
+  }, lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth, initialized, initial_value))
