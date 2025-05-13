@@ -294,7 +294,8 @@ static StringRef getNodeColor(Operation *op) {
             handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
             handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
       .Case<handshake::TaggerOp, handshake::UntaggerOp,
-            handshake::FreeTagsFifoOp>([&](auto) { return "cyan"; })
+            handshake::FreeTagsFifoOp, handshake::BlockerOp>(
+          [&](auto) { return "cyan"; })
       .Default([&](auto) { return "moccasin"; });
 }
 

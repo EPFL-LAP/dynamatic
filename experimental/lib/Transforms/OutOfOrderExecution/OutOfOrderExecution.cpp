@@ -1105,7 +1105,7 @@ void OutOfOrderExecutionPass::addUntaggers(
     OpBuilder builder, ClusterHierarchyNode *clusterNode,
     FreeTagsFifoOp &freeTagsFifo, llvm::DenseSet<Value> &unalignedEdges,
     llvm::DenseSet<Operation *> &untaggers) {
-  SmallVector<Value> joinOperands;
+  SmallVector<Value> blockerOperands;
   Operation *consumer = (*unalignedEdges.begin()).getDefiningOp();
 
   for (auto edge : unalignedEdges) {
@@ -1130,24 +1130,24 @@ void OutOfOrderExecutionPass::addUntaggers(
     // The untagger, demux and mux are internal to the cluster
     clusterNode->addInternalOp(edgeUntagger.getOperation());
 
-    joinOperands.push_back(edgeUntagger.getTagOut());
+    blockerOperands.push_back(edgeUntagger.getTagOut());
     untaggers.insert(edgeUntagger.getOperation());
   }
 
   // If more than on untagger was created, then join them and feed the
-  // result of the join (the free tag) back into the freeTagsFifo. Else, feed
+  // result of the blocker (the free tag) back into the freeTagsFifo. Else, feed
   // the free tag output of the single untagger into the freeTagsFifo.
 
-  if (joinOperands.size() > 1) {
-    JoinOp joinOp =
-        builder.create<JoinOp>((*joinOperands.begin()).getLoc(), joinOperands);
-    clusterNode->addInternalOp(joinOp.getOperation());
-    inheritBB(consumer, joinOp);
+  if (blockerOperands.size() > 1) {
+    BlockerOp blockerOp = builder.create<BlockerOp>(
+        (*blockerOperands.begin()).getLoc(), blockerOperands);
+    clusterNode->addInternalOp(blockerOp.getOperation());
+    inheritBB(consumer, blockerOp);
     freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
-                                                   joinOp.getResult());
+                                                   blockerOp.getResult());
   } else {
     freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
-                                                   (*joinOperands.begin()));
+                                                   (*blockerOperands.begin()));
   }
 }
 
@@ -1181,7 +1181,7 @@ void OutOfOrderExecutionPass::addAligner(
   untaggers.insert(selectUntagger.getOperation());
 
   Operation *consumer = selectUntagger.getOperation();
-  SmallVector<Value> joinOperands;
+  SmallVector<Value> blockerOperands;
 
   for (auto edge : unalignedEdges) {
     // Start by untagging the edge
@@ -1227,24 +1227,24 @@ void OutOfOrderExecutionPass::addAligner(
     clusterNode->addInternalOp(demux.getOperation());
     clusterNode->addInternalOp(mux.getOperation());
 
-    joinOperands.push_back(edgeUntagger.getTagOut());
+    blockerOperands.push_back(edgeUntagger.getTagOut());
     untaggers.insert(edgeUntagger.getOperation());
   }
 
   // If more than on untagger was created, then join them and feed the
-  // result of the join (the free tag) back into the freeTagsFifo. Else, feed
+  // result of the blocker (the free tag) back into the freeTagsFifo. Else, feed
   // the free tag output of the single untagger into the freeTagsFifo.
 
-  if (joinOperands.size() > 1) {
-    JoinOp joinOp =
-        builder.create<JoinOp>((*joinOperands.begin()).getLoc(), joinOperands);
-    clusterNode->addInternalOp(joinOp.getOperation());
-    inheritBB(consumer, joinOp);
+  if (blockerOperands.size() > 1) {
+    BlockerOp blockerOp = builder.create<BlockerOp>(
+        (*blockerOperands.begin()).getLoc(), blockerOperands);
+    clusterNode->addInternalOp(blockerOp.getOperation());
+    inheritBB(consumer, blockerOp);
     freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
-                                                   joinOp.getResult());
+                                                   blockerOp.getResult());
   } else {
     freeTagsFifo.getOperation()->replaceUsesOfWith(freeTagsFifo.getOperand(),
-                                                   (*joinOperands.begin()));
+                                                   (*blockerOperands.begin()));
   }
 }
 

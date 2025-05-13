@@ -26,8 +26,6 @@ use ieee.std_logic_1164.all;
 entity {name} is
   port (
     -- inputs
-    clk          : in std_logic;
-    rst          : in std_logic;
     ins_valid  : in std_logic_vector({size} - 1 downto 0);
     outs_ready : in std_logic;
     -- outputs
@@ -79,8 +77,6 @@ use work.types.all;
 -- Entity of join
 entity {name} is
   port (
-    clk          : in std_logic;
-    rst          : in std_logic;
     -- input channels
     ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid  : in std_logic_vector({size} - 1 downto 0);

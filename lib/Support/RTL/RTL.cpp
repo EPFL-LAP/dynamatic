@@ -346,6 +346,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.shli" || modName == "handshake.extract" ||
       modName == "handshake.join" || modName == "handshake.sitofp" ||
       modName == "handshake.fptosi" || modName == "handshake.init" ||
+      modName == "handshake.blocker" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -462,6 +463,7 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.control_merge" || modName == "handshake.extract" ||
       modName == "handshake.lazy_fork" || modName == "handshake.sitofp" ||
       modName == "handshake.fptosi" || modName == "handshake.init" ||
+      modName == "handshake.blocker" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||

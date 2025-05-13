@@ -42,7 +42,7 @@ import generators.handshake.extui as extui
 import generators.handshake.out_of_order_execution.tagger as tagger
 import generators.handshake.out_of_order_execution.untagger as untagger
 import generators.handshake.out_of_order_execution.free_tags_fifo as fifo
-import generators.handshake.join as join
+import generators.handshake.out_of_order_execution.blocker as blocker
 import generators.handshake.demux as demux
 import generators.handshake.shli as shli
 import generators.handshake.extract as extract
@@ -131,8 +131,8 @@ def generate_code(name, mod_type, parameters):
       return fifo.generate_free_tags_fifo(name, parameters)
     case "demux":
       return demux.generate_demux(name, parameters)
-    case "join":
-      return join.generate_join(name, parameters)
+    case "blocker":
+      return blocker.generate_blocker(name, parameters)
     case "extract":
       return extract.generate_extract(name, parameters)
     case "sitofp":
