@@ -131,9 +131,6 @@ void BufferPlacementMILP::addChannelVars(Value channel,
     signalVars.bufPresent = createVar(name + "BufPresent", GRB_BINARY);
   }
 
-  // Variables for elasticity constraints
-  chVars.elastic.tIn = createVar("elasIn", GRB_CONTINUOUS);
-  chVars.elastic.tOut = createVar("elasOut", GRB_CONTINUOUS);
   // Variables for placement information
   chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
@@ -356,38 +353,6 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
 
   // There must be enough slots for all disjoint buffers
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
-}
-
-void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
-                          Value channel) {
-
-  ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &tIn = chVars.elastic.tIn;
-  GRBVar &tOut = chVars.elastic.tOut;
-
-  auto dataIt = chVars.signalVars.find(SignalType::DATA);
-  if (dataIt != chVars.signalVars.end()) {
-    GRBVar &dataBuf = dataIt->second.bufPresent;
-    // If there is a data buffer on the channel, the channel elastic
-    // arrival time at the ouput must be greater than at the input
-    model.addConstr(tOut >= tIn - largeCst * dataBuf, "elastic_data");
-  }
-}
-
-void BufferPlacementMILP::addDataFlowDirectionConstraintsForUnit(
-                          Operation *unit, ChannelFilter filter) {
-
-  forEachIOPair(unit, [&](Value in, Value out) {
-    // Both channels must be eligible
-    if (!filter(in) || !filter(out))
-      return;
-
-    GRBVar &tInPort = vars.channelVars[in].elastic.tOut;
-    GRBVar &tOutPort = vars.channelVars[out].elastic.tIn;
-    // The elastic arrival time at the output port must be at least one
-    // greater than at the input port
-    model.addConstr(tOutPort >= 1 + tInPort, "elastic_unitTime");
-  });
 }
 
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
