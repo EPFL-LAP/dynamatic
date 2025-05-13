@@ -18,24 +18,6 @@
 
 namespace dynamatic {
 
-std::optional<FormalProperty::TYPE>
-FormalProperty::typeFromStr(const std::string &s) {
-
-  auto toLower = [](const std::string &s) {
-    std::string tmp(s);
-    for (auto &c : tmp)
-      c = tolower(c);
-    return tmp;
-  };
-
-  if (toLower(s) == "aob")
-    return FormalProperty::TYPE::AOB;
-  if (toLower(s) == "veq")
-    return FormalProperty::TYPE::VEQ;
-
-  return std::nullopt;
-}
-
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
 
@@ -56,15 +38,6 @@ FormalProperty::tagFromStr(const std::string &s) {
   return std::nullopt;
 }
 
-std::string FormalProperty::typeToStr(TYPE t) {
-  switch (t) {
-  case TYPE::AOB:
-    return "AOB";
-  case TYPE::VEQ:
-    return "VEQ";
-  }
-}
-
 std::string FormalProperty::tagToStr(TAG t) {
   switch (t) {
   case TAG::OPT:
@@ -76,15 +49,10 @@ std::string FormalProperty::tagToStr(TAG t) {
   }
 }
 
-llvm::json::Object FormalProperty::toJsonObj() const {
-  return llvm::json::Object{{"id", id},
-                            {"info", info},
-                            {"tag", tagToStr(tag)},
-                            {"type", typeToStr(type)},
-                            {"check", check}};
-}
+// Absence of Backpressure
 
-llvm::json::Object FormalProperty::AOBInfo(const OpResult &res) {
+AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
+    : FormalProperty(id, tag) {
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
 
@@ -100,17 +68,32 @@ llvm::json::Object FormalProperty::AOBInfo(const OpResult &res) {
   }
   assert(operandIndex < userOp->getNumOperands());
 
-  return llvm::json::Object{
-      {"owner", getUniqueName(ownerOp).str()},
-      {"user", getUniqueName(userOp).str()},
-      {"owner_index", res.getResultNumber()},
-      {"user_index", operandIndex},
-      {"owner_channel", ownerNamer.getOutputName(res.getResultNumber()).str()},
-      {"user_channel", userNamer.getInputName(operandIndex).str()}};
+  owner = getUniqueName(ownerOp).str();
+  user = getUniqueName(userOp).str();
+  ownerIndex = res.getResultNumber();
+  userIndex = operandIndex;
+  ownerChannel = ownerNamer.getOutputName(res.getResultNumber()).str();
+  userChannel = userNamer.getInputName(operandIndex).str();
 }
 
-llvm::json::Object FormalProperty::VEQInfo(const OpResult &res1,
-                                           const OpResult &res2) {
+llvm::json::Object AOBProperty::toJsonObj() const {
+  return llvm::json::Object({{"id", id},
+                             {"type", "AOB"},
+                             {"tag", tagToStr(tag)},
+                             {"check", check},
+                             {"owner", owner},
+                             {"user", user},
+                             {"owner_index", ownerIndex},
+                             {"user_index", userIndex},
+                             {"owner_channel", ownerChannel},
+                             {"user_channel", userChannel}});
+}
+
+// Valid Equivalence
+
+VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
+                         const OpResult &res2)
+    : FormalProperty(id, tag) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
   handshake::PortNamer namer1(op1);
@@ -119,13 +102,24 @@ llvm::json::Object FormalProperty::VEQInfo(const OpResult &res1,
   unsigned int j = res2.getResultNumber();
   handshake::PortNamer namer2(op2);
 
-  return llvm::json::Object(
-      {{"owner", getUniqueName(op1).str()},
-       {"target", getUniqueName(op2).str()},
-       {"owner_index", i},
-       {"target_index", j},
-       {"owner_channel", namer1.getOutputName(i).str()},
-       {"target_channel", namer2.getOutputName(j).str()}});
+  owner = getUniqueName(op1).str();
+  target = getUniqueName(op2).str();
+  ownerIndex = i;
+  targetIndex = j;
+  ownerChannel = namer1.getOutputName(i).str();
+  targetChannel = namer2.getOutputName(j).str();
 }
 
+llvm::json::Object VEQProperty::toJsonObj() const {
+  return llvm::json::Object({{"id", id},
+                             {"type", "VEQ"},
+                             {"tag", tagToStr(tag)},
+                             {"check", check},
+                             {"owner", owner},
+                             {"target", target},
+                             {"owner_index", ownerIndex},
+                             {"target_index", targetIndex},
+                             {"owner_channel", ownerChannel},
+                             {"target_channel", targetChannel}});
+}
 } // namespace dynamatic

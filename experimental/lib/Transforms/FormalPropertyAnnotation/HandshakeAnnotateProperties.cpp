@@ -76,10 +76,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
         continue;
       addPropertyId(&op1, uid);
 
-      json::Value info = FormalProperty::VEQInfo(res1, res2);
-
-      FormalProperty p(uid, FormalProperty::TYPE::VEQ, FormalProperty::TAG::OPT,
-                       info);
+      VEQProperty p(uid, FormalProperty::TAG::OPT, res1, res2);
 
       propertyTable.push_back(json::Value(p.toJsonObj()));
       uid++;
@@ -123,10 +120,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
 
           addPropertyId(&op, uid);
 
-          json::Value info = FormalProperty::AOBInfo(res);
-
-          FormalProperty p(uid, FormalProperty::TYPE::AOB,
-                           FormalProperty::TAG::OPT, info);
+          AOBProperty p(uid, FormalProperty::TAG::OPT, res);
 
           propertyTable.push_back(json::Value(p.toJsonObj()));
           uid++;
