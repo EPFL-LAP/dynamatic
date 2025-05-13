@@ -204,11 +204,11 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t demux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.join",
+    "name": "handshake.blocker",
     "parameters": [
       { "name": "SIZE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t join -p size=$SIZE port_types=$PORT_TYPES bitwidth=$BITWIDTH",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t blocker -p size=$SIZE bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": ["types"]
   },
   {
@@ -240,7 +240,7 @@
     "parameters": [
       { "name": "INITIAL_VALUE", "type": "unsigned" }
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initialized=True initial_value=$INITIAL_VALUE"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initialized=1 initial_value=$INITIAL_VALUE"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"

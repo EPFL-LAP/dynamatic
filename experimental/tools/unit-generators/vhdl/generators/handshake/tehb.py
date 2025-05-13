@@ -4,22 +4,18 @@ from generators.support.signal_manager import generate_signal_manager, get_conca
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
-  initialized = params.get("initialized", False)
+  initialized = params.get("initialized", 0)
   initial_value = params.get("initial_value", 0)
 
   if extra_signals:
     return _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, initial_value)
   elif bitwidth == 0:
-    return _generate_tehb_dataless(name, initialized, initial_value)
+    return _generate_tehb_dataless(name, initialized)
   else:
     return _generate_tehb(name, bitwidth, initialized, initial_value)
 
 
-def _generate_tehb_dataless(name, initialized, initial_value):
-  if initialized:
-    fullReg_init = f"'{initial_value}'"
-  else:
-    fullReg_init = "'0'"
+def _generate_tehb_dataless(name, initialized):
 
   entity = f"""
 library ieee;
@@ -51,7 +47,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        fullReg <= {fullReg_init};
+        fullReg <= '{initialized}';
       else
         fullReg <= outputValid and not outs_ready;
       end if;
@@ -70,9 +66,9 @@ def _generate_tehb(name, bitwidth, initialized, initial_value):
   tehb_dataless_name = f"{name}_dataless"
 
   dependencies = _generate_tehb_dataless(
-      tehb_dataless_name, initialized, initial_value)
+      tehb_dataless_name, initialized)
 
-  if initialized:
+  if initialized == 1:
     dataReg_init = f"'{initial_value}'"
   else:
     dataReg_init = "'0'"
