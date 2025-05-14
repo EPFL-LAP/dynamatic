@@ -374,7 +374,7 @@ void BufferPlacementMILP::addChannelElasticityConstraints(
   }
 }
 
-void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit, 
+void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit,
                                                        ChannelFilter filter) {
 
   forEachIOPair(unit, [&](Value in, Value out) {
