@@ -75,6 +75,53 @@ constexpr int clog2(uint32_t x) {
   return (x <= 1) ? 0 : 1 + clog2((x + 1) >> 1);
 }
 
+// Suffix for the names of the memory signals of the instantiated module
+static const std::string INST_STORE_ADDR = ("_storeAddr");
+static const std::string INST_STORE_EN = ("_storeEn");
+static const std::string INST_STORE_DATA = ("_storeData");
+static const std::string INST_LOAD_ADDR = ("_loadAddr");
+static const std::string INST_LOAD_EN = ("_loadEn");
+static const std::string INST_LOAD_DATA = ("_loadData");
+// Suffix for the names of the memory signals of the interface
+static const std::string ITF_STORE_ADDR = ("_address0");
+static const std::string ITF_STORE_EN = ("_ce0");
+static const std::string ITF_STORE_DATA = ("_din0");
+static const std::string ITF_LOAD_ADDR = ("_address1");
+static const std::string ITF_LOAD_EN = ("_ce1");
+static const std::string ITF_LOAD_DATA = ("_dout1");
+
+std::string STR_STD_REG = R"DELIM(
+`timescale 1ns / 1ps
+module standard_reg #(
+  parameter DATA_TYPE = 32
+) (
+  clk,
+  rst,
+  data_in,
+  enable,
+  data_out
+);
+
+input clk;
+input rst;
+input [DATA_TYPE-1:0]data_in;
+input enable;
+output [DATA_TYPE-1:0]data_out;
+
+reg [DATA_TYPE-1:0]data_reg = 0;
+
+always @(posedge clk) begin
+  if (rst) 
+    data_reg <= 0;
+  else begin
+    if (enable) 
+      data_reg <= data_in;
+  end
+end
+
+assign data_out = data_reg;
+endmodule)DELIM";
+
 // This creates the module declaration
 // module fir(
 //   clk,
@@ -96,8 +143,8 @@ void createModuleInterface(VerilogModule &module, handshake::FuncOp funcOp,
 
   module.port("rst", 1, false);
   module.port("clk", 1, false);
-  module.port("go", 1, false);
-  module.port("done", 1, true);
+  module.port("ap_start", 1, false);
+  module.port("ap_done", 1, true);
 
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
@@ -112,12 +159,12 @@ void createModuleInterface(VerilogModule &module, handshake::FuncOp funcOp,
 
       unsigned addressWidth = clog2(type.getNumElements());
       unsigned dataWidth = type.getElementTypeBitWidth();
-      module.port(signalName + "_loadAddr", addressWidth, true);
-      module.port(signalName + "_loadEn", 1, true);
-      module.port(signalName + "_storeEn", 1, true);
-      module.port(signalName + "_storeAddr", addressWidth, true);
-      module.port(signalName + "_storeData", dataWidth, true);
-      module.port(signalName + "_loadData", dataWidth, false);
+      module.port(signalName + ITF_LOAD_ADDR, addressWidth, true);
+      module.port(signalName + ITF_LOAD_EN, 1, true);
+      module.port(signalName + ITF_STORE_EN, 1, true);
+      module.port(signalName + ITF_STORE_ADDR, addressWidth, true);
+      module.port(signalName + ITF_STORE_DATA, dataWidth, true);
+      module.port(signalName + ITF_LOAD_DATA, dataWidth, false);
     }
   }
 
@@ -137,7 +184,19 @@ void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp,
   // Storing the current state of the module
   // (kernel_state = 0) => idle state
   // (kernel_state = 1) => working state
-  module.reg("kernel_state", 2);
+  module.wire("kernel_state", 1);
+  module.wire("all_finish", 1);
+
+  Instance instKernelStateReg("standard_reg", "kernel_state_reg", {1});
+
+  // kernel_state == 0 && ap_start == 1 -> go to kernel_state == 1
+  // kernel_state == 1 && all_finish == 1 -> go to kernel_state == 0
+  instKernelStateReg.connect("clk", "clk")
+      .connect("rst", "(rst) || (kernel_state == 1 && all_finish == 1)")
+      .connect("data_in", "1")
+      .connect("data_out", "kernel_state")
+      .connect("enable", "(kernel_state == 0 && ap_start == 1)");
+  module.instantiate(instKernelStateReg);
 
   // State registers
   for (auto [arg, portAttr] : llvm::zip_equal(
@@ -148,22 +207,44 @@ void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp,
             dyn_cast<handshake::ChannelType>(arg.getType())) {
       // Storing the input data (in case the function is not ready to take all
       // arguments at once).
-      module.reg(signalName + "_reg", type.getDataBitWidth());
-      // Indicates if the input data has been taken by the handshake function.
-      module.reg(signalName + "_taken", type.getDataBitWidth());
 
-      auto reset = std::make_unique<IfElseBlock>("rst");
-      reset
-          ->addIf(std::make_unique<NonBlockingAssign>(signalName + "_reg", "0"))
-          .addElse(std::make_unique<NonBlockingAssign>(signalName + "_reg",
-                                                       signalName));
+      module.wire(signalName + "_data_reg", type.getDataBitWidth());
 
-      module.always(std::move(
-          AlwaysBlock("posedge clk").add(dyn_cast<Statement>(reset))));
+      Instance instDataReg("standard_reg", signalName + "_data_reg_inst",
+                           {type.getDataBitWidth()});
+      instDataReg.connect("clk", "clk")
+          .connect("rst", "rst")
+          .connect("data_in", signalName)
+          .connect("data_out", signalName + "_data_reg")
+          .connect("enable", "(kernel_state == 0) && (ap_start == 1)");
+      module.instantiate(instDataReg);
+
+      module.wire(signalName + "_sent", 1);
+
+      Instance instSentReg("standard_reg", signalName + "_sent_reg_inst", {1});
+      instSentReg.connect("clk", "clk")
+          .connect("rst", "rst")
+          .connect("data_in", "1")
+          .connect("data_out", signalName + "_sent")
+          .connect("enable",
+                   "(kernel_state == 1) && (" + signalName + "_ready == 1)");
+      module.instantiate(instSentReg);
+    }
+    if (handshake::ControlType type =
+            dyn_cast<handshake::ControlType>(arg.getType())) {
+      module.wire(signalName + "_sent", 1);
+      Instance instSentReg("standard_reg", signalName + "_sent_reg_inst", {1});
+      instSentReg.connect("clk", "clk")
+          .connect("rst", "rst")
+          .connect("data_in", "1")
+          .connect("data_out", signalName + "_sent")
+          .connect("enable",
+                   "(kernel_state == 1) && (" + signalName + "_ready == 1)");
+      module.instantiate(instSentReg);
     }
   }
 
-  // The handshake signals are internally generated:
+  // Communicating with the input channels of the kernel
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
     std::string signalName = portAttr.dyn_cast<StringAttr>().str();
@@ -171,45 +252,86 @@ void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp,
             dyn_cast<handshake::ChannelType>(arg.getType())) {
       module.wire(signalName + "_valid", 1);
       module.wire(signalName + "_ready", 1);
+      module.assign(signalName + "_valid",
+                    "(kernel_state == 1) && !" + signalName + "_sent");
 
     } else if (handshake::ControlType type =
                    dyn_cast<handshake::ControlType>(arg.getType())) {
       module.wire(signalName + "_valid", 1);
       module.wire(signalName + "_ready", 1);
+      module.assign(signalName + "_valid",
+                    "(kernel_state == 1) && !" + signalName + "_sent");
     }
   }
+
+  // Communicating with the output channels of the kernel
+  SmallVector<std::string> outputValidSignals;
+  SmallVector<std::string> outputReadySignals;
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp.getResultTypes(), funcOp.getResNames())) {
+    std::string signalName = portAttr.dyn_cast<StringAttr>().str();
+
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      module.wire(signalName + "_valid", 1);
+      module.wire(signalName + "_ready", 1);
+      outputValidSignals.push_back(signalName + "_valid");
+      outputReadySignals.push_back(signalName + "_ready");
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(resType)) {
+      module.wire(signalName + "_valid", 1);
+      module.wire(signalName + "_ready", 1);
+      outputValidSignals.push_back(signalName + "_valid");
+      outputReadySignals.push_back(signalName + "_ready");
+    }
+  }
+
+  // The output is ready if all other outputs are valid (this is used to avoid
+  // any combinational dependency between valid and ready).
+  for (auto [id, ready] : llvm::enumerate(outputReadySignals)) {
+    SmallVector<std::string> validSignals;
+    for (auto [id2, valid] : llvm::enumerate(outputValidSignals)) {
+      if (id != id2) {
+        validSignals.push_back(valid);
+      }
+    }
+    module.assign(ready, llvm::join(validSignals, " && "));
+  }
+
+  module.assign("all_finish", llvm::join(outputValidSignals, " && "));
+  module.assign("ap_done", "all_finish");
 }
 
 void createInstantiation(VerilogModule &module, handshake::FuncOp funcOp,
                          raw_indented_ostream &os) {
   Instance inst(funcOp.getName().str(), funcOp.getName().str() + "_inst");
-  inst.connect("clk", "clk");
-  inst.connect("rst", "rst");
-  inst.connect("go", "go");
-  inst.connect("done", "done");
+  inst.connect("clk", "clk")
+      .connect("rst", "rst")
+      .connect("go", "go")
+      .connect("done", "done");
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp.getBodyBlock()->getArguments(), funcOp.getArgNames())) {
     std::string signalName = portAttr.dyn_cast<StringAttr>().str();
     if (handshake::ChannelType type =
             dyn_cast<handshake::ChannelType>(arg.getType())) {
-      inst.connect(signalName, signalName);
-      inst.connect(signalName + "_valid", signalName + "_valid");
-      inst.connect(signalName + "_ready", signalName + "_ready");
+      inst.connect(signalName, signalName)
+          .connect(signalName + "_valid", signalName + "_valid")
+          .connect(signalName + "_ready", signalName + "_ready");
     } else if (handshake::ControlType type =
                    dyn_cast<handshake::ControlType>(arg.getType())) {
-      inst.connect(signalName + "_valid", signalName + "_valid");
-      inst.connect(signalName + "_ready", signalName + "_ready");
+      inst.connect(signalName + "_valid", signalName + "_valid")
+          .connect(signalName + "_ready", signalName + "_ready");
     } else if (mlir::IntegerType type =
                    dyn_cast<mlir::IntegerType>(arg.getType())) {
       inst.connect(signalName, signalName);
     } else if (mlir::MemRefType type =
                    dyn_cast<mlir::MemRefType>(arg.getType())) {
-      inst.connect(signalName + "_loadAddr", signalName + "_loadAddr");
-      inst.connect(signalName + "_loadEn", signalName + "_loadEn");
-      inst.connect(signalName + "_storeEn", signalName + "_storeEn");
-      inst.connect(signalName + "_storeAddr", signalName + "_storeAddr");
-      inst.connect(signalName + "_storeData", signalName + "_storeData");
-      inst.connect(signalName + "_loadData", signalName + "_loadData");
+      inst.connect(signalName + INST_LOAD_EN, signalName + ITF_LOAD_EN)
+          .connect(signalName + INST_LOAD_ADDR, signalName + ITF_LOAD_ADDR)
+          .connect(signalName + INST_LOAD_DATA, signalName + ITF_LOAD_DATA)
+          .connect(signalName + INST_STORE_EN, signalName + ITF_STORE_EN)
+          .connect(signalName + INST_STORE_ADDR, signalName + ITF_STORE_ADDR)
+          .connect(signalName + INST_STORE_DATA, signalName + ITF_STORE_DATA);
     }
   }
 
@@ -234,7 +356,7 @@ void createInstantiation(VerilogModule &module, handshake::FuncOp funcOp,
 
 void createAdapter(handshake::FuncOp funcOp, raw_indented_ostream &os) {
 
-  auto m = VerilogModule(funcOp.getName().str());
+  auto m = VerilogModule(funcOp.getName().str() + "_vivado_ip_adapter");
   createModuleInterface(m, funcOp, os);
 
   createInstantiation(m, funcOp, os);
@@ -268,6 +390,7 @@ int main(int argc, char **argv) {
 
   mlir::raw_indented_ostream os(llvm::outs());
 
+  os << STR_STD_REG << "\n\n";
   // Write each module's RTL implementation to a separate file
   for (handshake::FuncOp funcOp : modOp->getOps<handshake::FuncOp>()) {
     createAdapter(funcOp, os);
