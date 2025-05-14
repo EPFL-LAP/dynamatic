@@ -256,7 +256,7 @@ protected:
   /// greater than that of earlier ones. Hence, combinational cycles are 
   /// prevented, particularly in cases where all delays are zero and such
   /// cycles would otherwise be undetectable by timing constraints.
-  void addDataFlowDirectionConstraintsForChannel(Value channel);
+  void addChannelElasticityConstraints(Value channel);
 
   /// Adds data flow direction constraints between the unit's input and 
   /// output ports. A constraint is added for every input/output port pair.
@@ -267,7 +267,7 @@ protected:
   /// after having added channel variables to the model for all channels
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
-  void addDataFlowDirectionConstraintsForUnit(Operation *unit,
+  void addUnitElasticityConstraints(Operation *unit,
                                        ChannelFilter filter = nullFilter);
 
   /// Constraints that ensure the final throughput is calculated for a reachable

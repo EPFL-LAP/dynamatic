@@ -358,7 +358,7 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
-void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
+void BufferPlacementMILP::addChannelElasticityConstraints(
                           Value channel) {
 
   ChannelVars &chVars = vars.channelVars[channel];
@@ -374,8 +374,8 @@ void BufferPlacementMILP::addDataFlowDirectionConstraintsForChannel(
   }
 }
 
-void BufferPlacementMILP::addDataFlowDirectionConstraintsForUnit(
-                          Operation *unit, ChannelFilter filter) {
+void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit, 
+                                                       ChannelFilter filter) {
 
   forEachIOPair(unit, [&](Value in, Value out) {
     // Both channels must be eligible

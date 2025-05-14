@@ -191,14 +191,14 @@ void FPGA20Buffers::setup() {
       addChannelTimingConstraints(channel, SignalType::DATA, bufModel);
       addBufferPresenceConstraints(channel);
       addBufferingGroupConstraints(channel, bufGroups);
-      addDataFlowDirectionConstraintsForChannel(channel);
+      addChannelElasticityConstraints(channel);
     }
   }
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
     addUnitTimingConstraints(&op, SignalType::DATA);
-    addDataFlowDirectionConstraintsForUnit(&op);
+    addUnitElasticityConstraints(&op);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC that
