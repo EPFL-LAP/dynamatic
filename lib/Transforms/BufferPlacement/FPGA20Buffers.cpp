@@ -210,7 +210,7 @@ void FPGA20Buffers::setup() {
     cfdfcs.push_back(cfdfc);
     addCFDFCVars(*cfdfc);
     addSteadyStateReachabilityConstraints(*cfdfc);
-    addThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
+    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 

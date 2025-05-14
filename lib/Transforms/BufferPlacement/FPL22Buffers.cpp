@@ -395,7 +395,7 @@ void CFDFCUnionBuffers::setup() {
       continue;
     addCFDFCVars(*cfdfc);
     addSteadyStateReachabilityConstraints(*cfdfc);
-    addThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
+    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 
