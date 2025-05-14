@@ -52,8 +52,6 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
         chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    if (numSlotsToPlace == 0)
-      continue;
 
     // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
     bool forceBreakDVR = chVars.signalVars[SignalType::DATA].bufPresent.get(
@@ -77,7 +75,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       } else if (numSlotsToPlace == 2) {
         result.numOneSlotDV = 1;
         result.numOneSlotR = 1;
-      } else {
+      } else if (numSlotsToPlace > 2) {
         if (props.minOpaque <= 1) {
           result.numOneSlotDV = 1;
           result.numFifoNone = numSlotsToPlace - 1;
@@ -90,8 +88,31 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     } else {
       if (numSlotsToPlace == 1) {
         result.numOneSlotR = 1;
-      } else {
+      } else if (numSlotsToPlace > 1) {
         result.numFifoNone = numSlotsToPlace;
+      }
+    }
+    
+    // FPGA20Buffers does not model the READY signal,
+    // so it cannot detect combinational cycles on READY paths.
+    //
+    // Units with positive latency are treated as path breaks,
+    // so buffers are considered unnecessary.
+    //
+    // However, such units only break DATA and VALID,
+    // not READY, which may still form combinational cycles.
+    // Buffers breaking READY are still necessary.
+    //
+    // To prevent this, we insert a TEHB after those units
+    // to explicitly break the READY path and avoid cycles.
+    Operation *srcOp = channel.getDefiningOp();
+    if (srcOp) {
+      if (!isa<handshake::LoadOp>(srcOp)) {
+        double latency;
+        if (succeeded(timingDB.getLatency(srcOp, SignalType::DATA, latency)) 
+            && latency > 0.0) {
+          result.numOneSlotR = 1;
+        }
       }
     }
 
