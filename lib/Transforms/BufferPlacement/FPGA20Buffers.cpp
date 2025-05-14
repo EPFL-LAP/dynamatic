@@ -93,18 +93,10 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       }
     }
     
-    // FPGA20Buffers does not model the READY signal,
-    // so it cannot detect combinational cycles on READY paths.
-    //
-    // Units with positive latency are treated as path breaks,
-    // so buffers are considered unnecessary.
-    //
-    // However, such units only break DATA and VALID,
-    // not READY, which may still form combinational cycles.
-    // Buffers breaking READY are still necessary.
-    //
-    // To prevent this, we insert a TEHB after those units
-    // to explicitly break the READY path and avoid cycles.
+    // (PR #427) Currently, the HDL implementations of Dynamatic's pipeline operations
+    // only break DV. In FPGA20's timing model, these units break all three signals
+    // DVR. We add TEHBs at the output of the pipelined operation to make the unit
+    // consistent with the model.
     Operation *srcOp = channel.getDefiningOp();
     if (srcOp) {
       if (!isa<handshake::LoadOp>(srcOp)) {
