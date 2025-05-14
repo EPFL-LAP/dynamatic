@@ -393,7 +393,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
   }
 }
 
-void BufferPlacementMILP::addThroughputConstraintsForBinaryLatencyChannel(
+void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel(
                           CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];

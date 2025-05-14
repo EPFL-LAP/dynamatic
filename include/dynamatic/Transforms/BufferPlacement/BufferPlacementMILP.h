@@ -258,7 +258,7 @@ protected:
   /// to the model.
   /// 
   /// The function assumes that the buffer's latency is a binary value.
-  void addThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc);
+  void addChannelThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc);
 
   /// Adds throughput constraints for all units in the CFDFC. A single
   /// constraint is added for all units with non-zero latency on their datapath.
