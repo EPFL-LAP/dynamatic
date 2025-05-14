@@ -1342,41 +1342,20 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (!originalInitCallsToErase.empty()) {
       llvm::errs() << "did enter if originalInitCallsToErase is not empty ";
       for (Operation *initCallToErase : originalInitCallsToErase) { // These are 'func.call @__init' ops
-          // Ensure the operation is still in the IR and valid
-          if (initCallToErase->isRegistered() && initCallToErase->getParentRegion()) {
-              bool safeToErase = true;
-              for (OpResult result : initCallToErase->getResults()) {
-                  if (!result.use_empty()) {
-                      safeToErase = false;
-                      llvm::errs() << "CRITICAL_DEBUG: __init call '" << initCallToErase->getName()
-                      << "' result " << result << " (original SSA name) still has users. NOT ERASING.\n";
-                      llvm::errs() << "  Defining Op of result: " << *result.getDefiningOp() << "\n";
-                      for (OpOperand &use : result.getUses()) { // Iterate through OpOperand to get more info
-                          llvm::errs() << "  Still used by Op: " << *use.getOwner()
-                                        << " (operand #" << use.getOperandNumber() << ")\n";
-                      }
-                      break;
-                  }
-                llvm::errs() << "printttingggg" << safeToErase;
-              }
-
-              if (safeToErase) {
-                llvm::errs() << "Ready to erase: " << *initCallToErase << "\n";
-                //testing if all deleted
-                  for (OpResult result : initCallToErase->getResults()) {
-                    for (OpOperand &use : result.getUses()) {
-                      llvm::errs() << "Still used: " << *use.getOwner() << "\n";
-                    }
-                  }  
-                  //end 
-
-                  rewriter.eraseOp(initCallToErase);
-                  llvm::errs() << "Erased __init call: " << initCallToErase->getName()
-                              << " (op: " << *initCallToErase << ")\n";
-              }
+        // Ensure the operation is still in the IR and valid
+        if (initCallToErase->isRegistered() && initCallToErase->getParentRegion()) {
+          // Forcefully drop all uses before deletion
+          for (OpResult result : initCallToErase->getResults()){
+            result.dropAllUses();
           }
+          rewriter.eraseOp(initCallToErase);
+          llvm::errs() << "FORCE erased __init call: " << initCallToErase->getName()
+                  << " (op: " << *initCallToErase << ")\n";
+
+        }
       }
   }
+
   return success();
 }
 
@@ -1553,6 +1532,14 @@ struct CfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // erase @__init
+    if (auto initFunc = modOp.lookupSymbol<func::FuncOp>("__init")) {
+      if (initFunc.use_empty()) {
+        initFunc.erase();
+        llvm::errs() << "Final cleanup: erased func.func @__init\n";
+      }
+    }
   }
 };
 } // namespace
