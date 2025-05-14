@@ -117,6 +117,160 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
   
+  for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
+    bool connectedToLSQ = false;
+    for (Operation *user : storeOp->getUsers()) {
+      if (isa<handshake::LSQOp>(user)) {
+        connectedToLSQ = true;
+        break;
+      }
+    }
+  
+    if (!connectedToLSQ)
+      continue;
+  
+    for (Value operand : storeOp->getOperands()) {
+      Channel channel(operand, true);
+      if (channel.props->maxTrans.value_or(1) > 0) {
+        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      } else {
+        storeOp->emitWarning()
+            << "Store input channel (connected to LSQ) should have transparent buffer, but not allowed";
+      }
+    }
+  }
+
+  for (handshake::LoadOp loadOp : funcOp.getOps<handshake::LoadOp>()) {
+    bool connectedToLSQ = false;
+    for (Operation *user : loadOp->getUsers()) {
+      if (isa<handshake::LSQOp>(user)) {
+        connectedToLSQ = true;
+        break;
+      }
+    }
+
+    if (!connectedToLSQ)
+      continue;
+
+    for (Value operand : loadOp->getOperands()) {
+      Channel channel(operand, true);
+      if (channel.props->maxTrans.value_or(1) > 0) {
+        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      } else {
+        loadOp->emitWarning()
+            << "Load input channel (connected to LSQ) should have transparent buffer, but not allowed";
+      }
+    }
+  }
+
+  // // Build the CFG adjacency: succ / pred maps
+  // DenseMap<Operation*, SmallVector<Operation*, 8>> succ, pred;
+  // funcOp.walk([&](Operation *op) {
+  //   for (Value result : op->getResults()) {
+  //     for (Operation *user : result.getUsers()) {
+  //       succ[op].push_back(user);
+  //       pred[user].push_back(op);
+  //     }
+  //   }
+  // });
+
+  // // Helper: BFS find any path src→dst, optionally avoiding 'blocked'
+  // auto findPath = [&](Operation *src,
+  //                     Operation *dst,
+  //                     SmallVectorImpl<Operation*> &outPath,
+  //                     const SmallPtrSetImpl<Operation*> *blocked = nullptr) {
+  //   DenseMap<Operation*, Operation*> parent;
+  //   SmallVector<Operation*, 64> queue;
+  //   queue.push_back(src);
+  //   parent[src] = nullptr;
+
+  //   bool found = false;
+  //   for (size_t i = 0; i < queue.size() && !found; ++i) {
+  //     Operation *cur = queue[i];
+  //     for (Operation *nxt : succ[cur]) {
+  //       if (parent.count(nxt))
+  //         continue;
+  //       if (blocked && blocked->contains(nxt))
+  //         continue;
+  //       parent[nxt] = cur;
+  //       if (nxt == dst) {
+  //         found = true;
+  //         break;
+  //       }
+  //       queue.push_back(nxt);
+  //     }
+  //   }
+  //   if (!found)
+  //     return false;
+  //   // reconstruct path
+  //   for (Operation *it = dst; it != nullptr; it = parent[it])
+  //     outPath.push_back(it);
+  //   std::reverse(outPath.begin(), outPath.end());
+  //   return true;
+  // };
+
+  // // For each StoreOp that feeds directly into an LSQOp, apply the new logic
+  // for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
+  //   // (a) find the adjacent LSQOp, if any
+  //   handshake::LSQOp lsqOp = nullptr;
+  //   for (OpResult res : storeOp.getResults()) {
+  //     for (Operation *user : res.getUsers()) {
+  //       if ((lsqOp = dyn_cast<handshake::LSQOp>(user)))
+  //         break;
+  //     }
+  //     if (lsqOp) break;
+  //   }
+  //   // If no direct store→lsq adjacency
+  //   if (!lsqOp)
+  //     continue;
+
+  //   // (b) backwards BFS from storeOp to collect all reachable ForkOps
+  //   SmallVector<Operation*, 64> work{storeOp};
+  //   DenseSet<Operation*> visited;
+  //   SmallPtrSet<Operation*, 16> forkSet;
+  //   while (!work.empty()) {
+  //     Operation *cur = work.pop_back_val();
+  //     if (!visited.insert(cur).second)
+  //       continue;
+  //     if (auto forkOp = dyn_cast<handshake::ForkOp>(cur))
+  //       forkSet.insert(forkOp);
+  //     for (Operation *p : pred[cur])
+  //       work.push_back(p);
+  //   }
+
+  //   // (c) for each fork, try to find two disjoint paths:
+  //   // (1) fork→…→store, (2) fork→…→lsq, disjoint except at fork/lsq
+  //   for (Operation *forkOp : forkSet) {
+  //     // path from fork→store
+  //     SmallVector<Operation*, 32> pathFS;
+  //     if (!findPath(forkOp, storeOp, pathFS))
+  //       continue;
+
+  //     // build block set from that path (excluding forkOp and lsqOp)
+  //     SmallPtrSet<Operation*, 32> blocked(pathFS.begin(), pathFS.end());
+  //     blocked.erase(forkOp);
+  //     blocked.erase(lsqOp.getOperation());
+
+  //     // try to find fork→lsq avoiding blocked nodes
+  //     SmallVector<Operation*, 32> pathFL;
+  //     if (findPath(forkOp, lsqOp.getOperation(), pathFL, &blocked)) {
+  //       // success: set minTrans on each input channel of this storeOp
+  //       for (Value operand : storeOp.getOperands()) {
+  //         Channel channel(operand, true);
+  //         if (channel.props->maxTrans.value_or(1) > 0) {
+  //           channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+  //         } else {
+  //           storeOp->emitWarning()
+  //             << "Store input channel (connected to LSQ) should have "
+  //             << "transparent buffer, but not allowed";
+  //         }
+  //       }
+  //       // no need to test other forks for this storeOp
+  //       break;
+  //     }
+  //   }
+  // }
+  
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
