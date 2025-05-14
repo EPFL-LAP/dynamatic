@@ -430,17 +430,19 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
 
     // The channel's throughput cannot exceed the number of buffer slots
     model.addConstr(chThroughput <= bufNumSlots, "throughput_channel");
-    // If there is an opaque buffer, the CFDFC throughput cannot exceed the
-    // channel throughput. If there is not, the CFDFC throughput can exceed
-    // the channel thoughput by 1
+    // If DATA signal is buffered, the CFDFC throughput cannot exceed the
+    // channel throughput. If there is not, the constraint is loose.
     model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
-                    "throughput_cfdfc");
-    // If there is an opaque buffer, the summed channel and CFDFC throughputs
-    // cannot exceed the number of buffer slots. If there is not, the combined
-    // throughput can exceed the number of slots by 1
-    model.addConstr(chThroughput + cfVars.throughput + dataBuf - bufNumSlots <=
-                        1,
-                    "throughput_combined");
+                    "throughput_data");
+    // If READY signal exists and is buffered, the summed channel and 
+    // CFDFC throughputs cannot exceed the number of buffer slots. 
+    // If there is not, the constraint is loose.
+    if (chVars.signalVars.count(SignalType::READY)) {
+      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+      model.addConstr(chThroughput + cfVars.throughput + readyBuf - bufNumSlots 
+                          <= 1,
+                      "throughput_ready");
+    }
   }
 }
 

@@ -128,8 +128,6 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
                     "custom_minData");
   }
   if (props.minTrans > 0) {
-    // Force the MILP to place at least one transparent slot
-    model.addConstr(bufReady == 1, "custom_forceReady");
     // If the MILP decides to also place a data buffer, then we must reserve
     // an extra slot for it
     model.addConstr(chVars.bufNumSlots >= props.minTrans + bufData,
