@@ -9,81 +9,16 @@
 
 using namespace mlir;
 
-class Statement {
-public:
-  virtual ~Statement() = default;
-  virtual void emit(raw_indented_ostream &os, int indent = 2) const = 0;
-};
-
-class NonBlockingAssign : public Statement {
-  std::string lhs, rhs;
-
-public:
-  NonBlockingAssign(std::string lhs, std::string rhs)
-      : lhs(std::move(lhs)), rhs(std::move(rhs)) {}
-  void emit(raw_indented_ostream &os, int indent = 2) const override {
-    os << std::string(indent, ' ') << lhs << " <= " << rhs << ";\n";
-  }
-};
-
-class IfElseBlock : public Statement {
-  std::string condition;
-  std::vector<std::unique_ptr<Statement>> ifBody;
-  std::vector<std::unique_ptr<Statement>> elseBody;
-
-public:
-  IfElseBlock(std::string condition) : condition(std::move(condition)) {}
-
-  IfElseBlock &addIf(std::unique_ptr<Statement> stmt) {
-    ifBody.push_back(std::move(stmt));
-    return *this;
-  }
-
-  IfElseBlock &addElse(std::unique_ptr<Statement> stmt) {
-    elseBody.push_back(std::move(stmt));
-    return *this;
-  }
-
-  void emit(raw_indented_ostream &os, int indent = 2) const override {
-    os << std::string(indent, ' ') << "if (" << condition << ")\n";
-    for (const auto &stmt : ifBody)
-      stmt->emit(os, indent + 2);
-    if (!elseBody.empty()) {
-      os << std::string(indent, ' ') << "else\n";
-      for (const auto &stmt : elseBody)
-        stmt->emit(os, indent + 2);
-    }
-  }
-};
-
-class AlwaysBlock {
-  std::string sensitivity;
-  std::vector<std::unique_ptr<Statement>> body;
-
-public:
-  AlwaysBlock(std::string sensitivity) : sensitivity(std::move(sensitivity)) {}
-
-  AlwaysBlock &add(std::unique_ptr<Statement> stmt) {
-    body.push_back(std::move(stmt));
-    return *this;
-  }
-
-  void emit(raw_indented_ostream &os) const {
-    os << "  always @(" << sensitivity << ") begin\n";
-    for (const auto &stmt : body)
-      stmt->emit(os, 4);
-    os << "  end\n";
-  }
-};
-
 class Instance {
   std::string moduleName;
   std::string instanceName;
   std::vector<std::pair<std::string, std::string>> connections; // .port(signal)
+  std::vector<unsigned> params;
 
 public:
-  Instance(std::string module, std::string inst)
-      : moduleName(std::move(module)), instanceName(std::move(inst)) {}
+  Instance(std::string module, std::string inst, std::vector<unsigned> p = {})
+      : moduleName(std::move(module)), instanceName(std::move(inst)),
+        params(std::move(p)) {}
 
   Instance &connect(const std::string &port, const std::string &signal) {
     connections.emplace_back(port, signal);
@@ -91,7 +26,19 @@ public:
   }
 
   void emit(raw_indented_ostream &os) const {
-    os << moduleName << " " << instanceName << " (\n";
+    os << moduleName << " ";
+
+    if (!params.empty()) {
+      os << "#(";
+      for (size_t i = 0; i < params.size(); ++i) {
+        os << params[i];
+        if (i != params.size() - 1)
+          os << ", ";
+      }
+      os << ") ";
+    }
+
+    os << instanceName << " (\n";
     os.indent();
     for (size_t i = 0; i < connections.size(); ++i) {
       const auto &[port, sig] = connections[i];
@@ -135,19 +82,16 @@ public:
     return *this;
   }
 
-  VerilogModule &always(AlwaysBlock blk) {
-    alwaysBlocks.push_back(std::move(blk));
-    return *this;
-  }
-
   void emit(raw_indented_ostream &os) const {
     os << "module " << name << "(";
+    os.indent();
     for (size_t i = 0; i < ports.size(); ++i) {
       os << ports[i].name;
       if (i < ports.size() - 1)
-        os << ", ";
+        os << ",\n";
     }
-    os << ");\n";
+    os.unindent();
+    os << "\n);\n";
     os.indent();
 
     for (const auto &p : ports) {
@@ -174,9 +118,6 @@ public:
     for (const auto &a : assigns) {
       os << "assign " << a.lhs << " = " << a.rhs << ";\n";
     }
-
-    for (const auto &blk : alwaysBlocks)
-      blk.emit(os);
 
     for (const auto &inst : instances)
       inst.emit(os);
@@ -217,5 +158,4 @@ private:
   std::vector<Reg> regs;
   std::vector<Assign> assigns;
   std::vector<Instance> instances;
-  std::vector<AlwaysBlock> alwaysBlocks;
 };
