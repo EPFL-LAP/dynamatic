@@ -692,3 +692,27 @@ bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
   assert(path.size() >= 2 && "path must have at least two blocks");
   return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
 }
+
+bool dynamatic::isChannelOnCycle(mlir::Value channel) {
+  llvm::SmallPtrSet<mlir::Value, 32> visited;
+
+  std::function<bool(mlir::Value, bool)> dfs =
+      [&](mlir::Value current, bool isStart) -> bool {
+    if (!isStart && current == channel)
+      return true;
+
+    if (visited.contains(current))
+      return false;
+    visited.insert(current);
+
+    for (mlir::Operation *user : current.getUsers()) {
+      for (mlir::Value next : user->getResults()) {
+        if (dfs(next, false))
+          return true;
+      }
+    }
+    return false;
+  };
+
+  return dfs(channel, true);
+}

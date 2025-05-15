@@ -76,7 +76,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // We insert TEHBs after all Merge-like operations to break the ready paths.
     Operation *srcOp = channel.getDefiningOp();
     if (srcOp && isa<handshake::MuxOp, handshake::MergeOp>(srcOp) &&
-        srcOp->getNumOperands() > 1) {
+        srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
       result.numOneSlotR = 1;
     }
 
