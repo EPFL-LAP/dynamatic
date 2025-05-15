@@ -14,16 +14,12 @@ This creates a gap within Dynamatic, the high-level Handshake dialect cannot pro
 BaseSubjectGraph class is an abstract class that provides base functionality for hardware module specific Subject Graph classes. 
 ## Key Variables
 1) Operation *op: The MLIR Operation of the Dataflow unit that the Subject Graph represents
-2) std::string moduleType: Used to generate the path to the BLIF file, derived from operation name
-3) std::string uniqueName: Unique identifier used for node naming in the BLIF file
-4) bool isBlackbox: Flag indicating if the module is not mapped to LUTs but DSPs or carry chains on the FPGA. No AIG is created for the logic part of these modules, but only channel signals are created.
-5) std::vector<Operation *> inputModules/outputModules: Operations that provide inputs to/receive outputs from this operation
-6) DenseMap<Operation *, unsigned int> inputModuleToResultNumber/outputModuleToResultNumber: Maps Operations to their MLIR result numbers, obtained by getResultNumber() function in MLIR.
-7) std::vector<BaseSubjectGraph *> inputSubjectGraphs/outputSubjectGraphs: SubjectGraphs connected as inputs/outputs
-DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResultNumber/outputSubjectGraphToResultNumber: Maps SubjectGraphs to their MLIR result numbers
-8) static DenseMap<Operation *, BaseSubjectGraph *> moduleMap: A static variable that maps Operations to their SubjectGraphs
-9) std::string fullPath: Path to the BLIF file this subject graph is based on
-10) LogicNetwork *blifData: Pointer to the parsed BLIF file data, the AIG file is saved here. 
+2) std::string uniqueName: Unique identifier used for node naming in the BLIF file
+3) bool isBlackbox: Flag indicating if the module is not mapped to LUTs but DSPs or carry chains on the FPGA. No AIG is created for the logic part of these modules, but only channel signals are created.
+4) std::vector<BaseSubjectGraph *> inputSubjectGraphs/outputSubjectGraphs: SubjectGraphs connected as inputs/outputs
+5) DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResultNumber: Maps SubjectGraphs to their MLIR result numbers
+6) static DenseMap<Operation *, BaseSubjectGraph *> moduleMap: A static variable that maps Operations to their SubjectGraphs
+7) LogicNetwork *blifData: Pointer to the parsed BLIF file data, the AIG file is saved here. 
 
 ## Key Functions
 1) void buildSubjectGraphConnections(): Populates input/output SubjectGraph vectors and maps of a SubjectGraph object
@@ -51,10 +47,9 @@ Corresponds to the DATA_TYPE parameter in the HDL implementation.
 ### Functions
 1) ArithSubjectGraph(Operation *op): 
     1) Retrieves the dataWidth of the module.
-    2) Sets the path (fullPath variable) of the AIG representation of this module.
-    3) Checks if dataWidth is greater than 4, if so, the module is a blackbox. 
-    4) AIG is read into blifData variable.
-    5) Loop over all of the nodes of AIG. Based on the names, populate the ChannelSignals structs of inputs and outputs. For example, if a node in the AIG file has the string "lhs" in it, it means that that node is an input node of the lhs. Then, assignSignals function is called on that node. If the Node has the strings "valid" or "ready, the corresponding Channel Signal is assigned to this Node. Else, it means the Node is a Data Signal. The naming convention in the generated BLIF files need to be read in order to determine how to parse the Nodes correctly.
+    2) Checks if dataWidth is greater than 4, if so, the module is a blackbox. 
+    3) AIG is read into blifData variable.
+    4) Loop over all of the nodes of AIG. Based on the names, populate the ChannelSignals structs of inputs and outputs. For example, if a node in the AIG file has the string "lhs" in it, it means that that node is an input node of the lhs. Then, assignSignals function is called on that node. If the Node has the strings "valid" or "ready, the corresponding Channel Signal is assigned to this Node. Else, it means the Node is a Data Signal. The naming convention in the generated BLIF files need to be read in order to determine how to parse the Nodes correctly.
 
 2) void connectInputNodes(): Connects the input Nodes of this Subject Graph with the output Nodes of its predecessing Subject Graph
 
@@ -66,7 +61,7 @@ Represents fork_dataless and fork modules.
 ### Variables
 1) unsigned int size: Number of inputs of the Fork module (SIZE parameter in HDL)
 2) unsigned int dataWidth: Bit width of the data signals (DATA_TYPE parameter in HDL)
-3) std::unordered_map<unsigned int, ChannelSignals> outputNodes: Since fork has multiple outputs, this is map from channel numbers to signals.
+3) std::vector<ChannelSignals> outputNodes: Vector of the outputs of fork.
 4) ChannelSignals inputNodes: Input Nodes of the module.
 
 ### Functions:

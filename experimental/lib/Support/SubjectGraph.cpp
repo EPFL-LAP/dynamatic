@@ -75,7 +75,8 @@ void BaseSubjectGraph::connectInputNodesHelper(
   }
 }
 
-void BaseSubjectGraph::retrieveBlif(std::initializer_list<unsigned int> inputs,
+// Constructs the file path based on Operation name and parameters, calls the Blif parser to load the Blif file
+void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
                                     std::string to_append) {
   std::string moduleType;
   std::string fullPath;
@@ -129,20 +130,11 @@ void BaseSubjectGraph::buildSubjectGraphConnections() {
   }
 }
 
-void changeIO(BaseSubjectGraph *newIO, BaseSubjectGraph *prevIO,
-              std::vector<BaseSubjectGraph *> &inputOutput) {
-  auto it = std::find(inputOutput.begin(), inputOutput.end(), prevIO);
-  // Delete the SubjectGraph from the vector and insert the new SubjectGraph.
-  auto index = std::distance(inputOutput.begin(), it);
-  inputOutput.erase(it);
-  inputOutput.insert(inputOutput.begin() + index, newIO);
-}
-
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
-  retrieveBlif({dataWidth});
+  loadBlifFile({dataWidth});
 
   // Ops are mapped to DSP slices if the bitwidth is greater than 4
   if ((dataWidth > 4) &&
@@ -189,9 +181,9 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   outputNodes.resize(size);
 
   if (dataWidth == 0) {
-    retrieveBlif({size}, "_dataless");
+    loadBlifFile({size}, "_dataless");
   } else {
-    retrieveBlif({size, dataWidth}, "_type");
+    loadBlifFile({size, dataWidth}, "_type");
   }
 
   auto generateNewNameRV =
@@ -274,7 +266,7 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       handshake::getHandshakeTypeBitWidth(muxOp.getSelectOperand().getType());
   inputNodes.resize(size);
 
-  retrieveBlif({size, dataWidth});
+  loadBlifFile({size, dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -301,7 +293,6 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 }
 
 void MuxSubjectGraph::connectInputNodes() {
-  // index is the first input
   connectInputNodesHelper(indexNodes, inputSubjectGraphs[0]);
 
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
@@ -309,7 +300,7 @@ void MuxSubjectGraph::connectInputNodes() {
   }
 }
 
-ChannelSignals &MuxSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
+ChannelSignals &MuxSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
@@ -325,7 +316,7 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
   inputNodes.resize(size);
 
   if (dataWidth == 0) {
-    retrieveBlif({size, indexType}, "_dataless");
+    loadBlifFile({size, indexType}, "_dataless");
   } else {
     op->emitError("Operation Unsupported");
   }
@@ -378,9 +369,9 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
       handshake::getHandshakeTypeBitWidth(cbrOp.getDataOperand().getType());
 
   if (dataWidth == 0) {
-    retrieveBlif({}, "_dataless");
+    loadBlifFile({}, "_dataless");
   } else {
-    retrieveBlif({dataWidth});
+    loadBlifFile({dataWidth});
   }
 
   for (auto &node : blifData->getAllNodes()) {
@@ -413,7 +404,7 @@ ConditionalBranchSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 
 // SourceSubjectGraph implementation
 SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  retrieveBlif({});
+  loadBlifFile({});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -442,7 +433,7 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(loadOp.getAddressInput().getType());
 
-  retrieveBlif({addrType, dataWidth});
+  loadBlifFile({addrType, dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -476,7 +467,7 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   addrType =
       handshake::getHandshakeTypeBitWidth(storeOp.getAddressInput().getType());
 
-  retrieveBlif({addrType, dataWidth});
+  loadBlifFile({addrType, dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -510,7 +501,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
   handshake::ChannelType cstType = cstOp.getResult().getType();
   dataWidth = cstType.getDataBitWidth();
 
-  retrieveBlif({dataWidth});
+  loadBlifFile({dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -545,7 +536,7 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
             handshake::getHandshakeTypeBitWidth(extOp.getResult().getType());
       });
 
-  retrieveBlif({inputWidth, outputWidth});
+  loadBlifFile({inputWidth, outputWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -576,7 +567,7 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   dataWidth =
       handshake::getHandshakeTypeBitWidth(selectOp->getOperand(1).getType());
 
-  retrieveBlif({dataWidth});
+  loadBlifFile({dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -616,7 +607,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       mergeOp.getDataOperands()[0].getType());
   inputNodes.resize(size);
 
-  retrieveBlif({size, dataWidth});
+  loadBlifFile({size, dataWidth});
 
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
@@ -661,9 +652,9 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
   if (dataWidth == 0) {
-    retrieveBlif({}, "_dataless");
+    loadBlifFile({}, "_dataless");
   } else {
-    retrieveBlif({dataWidth});
+    loadBlifFile({dataWidth});
   }
 
   for (auto &node : blifData->getAllNodes()) {
@@ -752,8 +743,16 @@ void BufferSubjectGraph::insertBuffer(BaseSubjectGraph *graph1,
   ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
   dataWidth = channel.dataSignals.size();
 
-  changeIO(this, graph1, graph2->inputSubjectGraphs);
-  changeIO(this, graph2, graph1->outputSubjectGraphs);
+  // Delete the SubjectGraph from the input/output vector and insert the new SubjectGraph.
+  auto changeIO = [&](BaseSubjectGraph *prevIO, std::vector<BaseSubjectGraph *> &inputOutput){
+    auto it = std::find(inputOutput.begin(), inputOutput.end(), prevIO);
+    auto index = std::distance(inputOutput.begin(), it);
+    inputOutput.erase(it);
+    inputOutput.insert(inputOutput.begin() + index, this);
+  };
+
+  changeIO(graph1, graph2->inputSubjectGraphs);
+  changeIO(graph2, graph1->outputSubjectGraphs);
 }
 
 BufferSubjectGraph::BufferSubjectGraph(Operation *op1, Operation *op2,

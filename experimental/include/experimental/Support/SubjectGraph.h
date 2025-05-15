@@ -58,7 +58,7 @@ protected:
   // isBlackbox is used to determine if the module is a blackbox module
   bool isBlackbox = false;
 
-  void retrieveBlif(std::initializer_list<unsigned int> inputs,
+  void loadBlifFile(std::initializer_list<unsigned int> inputs,
                     std::string to_append = "");
 
   // Helper function to connect the input nodes of the current module
