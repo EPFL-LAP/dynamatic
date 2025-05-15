@@ -93,7 +93,7 @@ public:
   }
 
   // Replaces an existing fanin with a new one.
-  void replaceFanin(Node* oldFanin, Node* newFanin) {
+  void replaceFanin(Node *oldFanin, Node *newFanin) {
     fanins.erase(oldFanin);
     fanins.insert(newFanin);
   }
@@ -103,11 +103,8 @@ public:
   // node of one LogicNetwork object is connected to the output node of
   // LogicNetwork object that comes before it.
   static void connectNodes(Node *currentNode, Node *previousNode) {
-    for (auto *node : currentNode->fanouts) {
-      previousNode->addFanout(node);
-    }
-
-    // Connected nodes are no more input/output nodes in a BLIF file.
+    // Once Input/Output Nodes are connected, they should not be Input/Output in
+    // the BLIF, but just become internal Nodes
     currentNode->convertIOToChannel();
     previousNode->convertIOToChannel();
 
@@ -116,6 +113,7 @@ public:
     }
 
     for (auto &fanout : currentNode->fanouts) {
+      previousNode->addFanout(fanout);
       fanout->replaceFanin(currentNode, previousNode);
     }
 

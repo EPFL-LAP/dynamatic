@@ -46,22 +46,20 @@ struct ChannelSignals {
 /// Each BaseSubjectGraph maintains information about:
 /// - Input/output connections to other modules and subject graphs
 /// - Signals for handshake protocols (data, valid, ready signals)
-/// - Path information for BLIF (Berkeley Logic Interchange Format) file
-/// generation
 /// - Unique naming and module type identification
 class BaseSubjectGraph {
 protected:
   // Operation that the SubjectGraph is based on
   Operation *op;
 
-  // moduleType is used to generate the path to the BLIF file
-  std::string moduleType;
-
   // uniqueName is used to generate unique names for the nodes in the BLIF file
   std::string uniqueName;
 
   // isBlackbox is used to determine if the module is a blackbox module
   bool isBlackbox = false;
+
+  void retrieveBlif(std::initializer_list<unsigned int> inputs,
+                    std::string to_append = "");
 
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
@@ -72,14 +70,6 @@ public:
   BaseSubjectGraph();
   // Constructor for a SubjectGraph based on an Operation
   BaseSubjectGraph(Operation *op);
-
-  // Vectors and Maps to hold the input and output modules and SubjectGraphs.
-  // (input/output)Modules and ToResNum is populated the first time the
-  // SubjectGraph is created.
-  std::vector<Operation *> inputModules;
-  std::vector<Operation *> outputModules;
-  DenseMap<Operation *, unsigned int> inputModuleToResultNumber;
-  DenseMap<Operation *, unsigned int> outputModuleToResultNumber;
 
   // The populated maps store channel-specific information that connects
   // SubjectGraphs together. Each SubjectGraph has a position in the vector
@@ -92,24 +82,17 @@ public:
   std::vector<BaseSubjectGraph *> inputSubjectGraphs;
   std::vector<BaseSubjectGraph *> outputSubjectGraphs;
   DenseMap<BaseSubjectGraph *, unsigned int> inputSubjectGraphToResultNumber;
-  DenseMap<BaseSubjectGraph *, unsigned int> outputSubjectGraphToResultNumber;
 
   // static map that holds all Operation/Subject Graph Pairs
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
 
   // A vector of all BaseSubjectGraphs. This is not a subset of the Values of
-  // moduleMap, since not all of the SubjectGraphs are created from Operations.
+  // moduleMap, since not all of the SubjectGraphs are created from Operations
+  // (Buffers will be inserted to ensure acyclicity).
   static inline std::vector<BaseSubjectGraph *> subjectGraphVector;
-
-  // Holds the path to the BLIF file this subject graph is based on
-  std::string fullPath;
 
   // Pointer to the LogicNetwork object that represents the BLIF file
   LogicNetwork *blifData;
-
-  // Gets the MLIR Result Number between two SubjectGraphs
-  static unsigned int getResultNumber(BaseSubjectGraph *first,
-                                       BaseSubjectGraph *second);
 
   // Populates inputSubjectGraphs and outputSubjectGraphs after all of the
   // SubjectGraphs are created
@@ -133,7 +116,8 @@ public:
 class ArithSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  ChannelSignals lhsNodes;
+  ChannelSignals rhsNodes;
   ChannelSignals outputNodes;
 
 public:
@@ -146,8 +130,8 @@ class ForkSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int size = 0;
   unsigned int dataWidth = 0;
-  std::unordered_map<unsigned int, ChannelSignals> outputNodes;
   ChannelSignals inputNodes;
+  std::vector<ChannelSignals> outputNodes;
 
 public:
   ForkSubjectGraph(Operation *op);
@@ -160,7 +144,7 @@ private:
   unsigned int size = 0;
   unsigned int dataWidth = 0;
   unsigned int selectType = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> inputNodes;
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
 
@@ -175,7 +159,7 @@ private:
   unsigned int size = 0;
   unsigned int dataWidth = 0;
   unsigned int indexType = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> inputNodes;
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
 
@@ -190,7 +174,8 @@ private:
   unsigned int dataWidth = 0;
   ChannelSignals conditionNodes;
   ChannelSignals inputNodes;
-  std::unordered_map<unsigned int, ChannelSignals> outputNodes;
+  ChannelSignals trueOut;
+  ChannelSignals falseOut;
 
 public:
   ConditionalBranchSubjectGraph(Operation *op);
@@ -264,7 +249,9 @@ public:
 class SelectSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  ChannelSignals condition;
+  ChannelSignals trueValue;
+  ChannelSignals falseValue;
   ChannelSignals outputNodes;
 
 public:
@@ -277,7 +264,7 @@ class MergeSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
   unsigned int size = 0;
-  std::unordered_map<unsigned int, ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> inputNodes;
   ChannelSignals outputNodes;
 
 public:
@@ -305,6 +292,7 @@ private:
   unsigned int dataWidth = 0;
   ChannelSignals inputNodes;
   ChannelSignals outputNodes;
+  std::string bufferType;
 
   static std::string getBufferTypeName(BufferType type) {
     switch (type) {
@@ -317,9 +305,10 @@ private:
 
 public:
   BufferSubjectGraph(Operation *op);
-  BufferSubjectGraph(Operation *op1, Operation *op2, std::string bufferType);
+  BufferSubjectGraph(Operation *op1, Operation *op2,
+                     std::string bufferTypeName);
   BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
-                     std::string bufferType);
+                     std::string bufferTypeName);
 
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
