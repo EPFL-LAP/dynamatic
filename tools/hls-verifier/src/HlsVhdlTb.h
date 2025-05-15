@@ -67,16 +67,11 @@ private:
   vector<Constant> constants;
   vector<MemElem> memElems;
 
-  void getLibraryHeader(mlir::raw_indented_ostream &os);
-  void getEntitiyDeclaration(mlir::raw_indented_ostream &os);
-  void getArchitectureBegin(mlir::raw_indented_ostream &os);
   void getConstantDeclaration(mlir::raw_indented_ostream &os);
   void getSignalDeclaration(mlir::raw_indented_ostream &os);
   void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os);
   void getDuvInstanceGeneration(mlir::raw_indented_ostream &os);
   void getDuvComponentDeclaration(mlir::raw_indented_ostream &os);
-  void getCommonBody(mlir::raw_indented_ostream &os);
-  void getArchitectureEnd(mlir::raw_indented_ostream &os);
   void getOutputTagGeneration(mlir::raw_indented_ostream &os);
   int getTransactionNumberFromInput();
 };

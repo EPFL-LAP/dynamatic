@@ -287,14 +287,6 @@ string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
   return "";
 }
 
-void HlsVhdlTb::getLibraryHeader(mlir::raw_indented_ostream &os) {
-  os << VHDL_LIBRARY_HEADER;
-}
-
-void HlsVhdlTb::getEntitiyDeclaration(mlir::raw_indented_ostream &os) {
-  os << "entity " + tleName + " is\n\nend entity " + tleName + ";\n";
-}
-
 // Declare a signal. Usage:
 // - declareSTL(os, "signal_name"); declares a std_logic signal
 // - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
@@ -310,17 +302,6 @@ void declareSTL(mlir::raw_indented_ostream &os, const string &name,
 }
 
 // function to get the port name in the entitiy for each paramter
-
-void HlsVhdlTb::getArchitectureBegin(mlir::raw_indented_ostream &os) {
-  os << "architecture behav of " << tleName << " is\n\n";
-  os.indent();
-  os << "-- Constant declarations\n";
-  getConstantDeclaration(os);
-  os << "-- Signal declarations\n\n";
-  getSignalDeclaration(os);
-  os.unindent();
-  os << "begin\n\n";
-}
 
 void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   for (const auto &c : constants) {
@@ -617,14 +598,6 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
   duvInst.emitVhdl(os);
 }
 
-void HlsVhdlTb::getCommonBody(mlir::raw_indented_ostream &os) {
-  os << COMMON_TB_BODY;
-}
-
-void HlsVhdlTb::getArchitectureEnd(mlir::raw_indented_ostream &os) {
-  os << "end architecture behav;\n";
-}
-
 void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
   os << "------------------------------------------------------------\n";
   os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
@@ -640,16 +613,21 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
-  getLibraryHeader(os);
-  getEntitiyDeclaration(os);
-  getArchitectureBegin(os);
+  os << VHDL_LIBRARY_HEADER;
+  os << "entity " + tleName + " is\nend entity " + tleName + ";\n\n";
+  os << "architecture behavior of " << tleName << " is\n\n";
+  os.indent();
+  getConstantDeclaration(os);
+  getSignalDeclaration(os);
+  os.unindent();
+  os << "begin\n\n";
   os.indent();
   getDuvInstanceGeneration(os);
   getMemoryInstanceGeneration(os);
   getOutputTagGeneration(os);
-  getCommonBody(os);
+  os << COMMON_TB_BODY;
   os.unindent();
-  getArchitectureEnd(os);
+  os << "end architecture behavior;\n";
 }
 
 int HlsVhdlTb::getTransactionNumberFromInput() {
