@@ -42,7 +42,7 @@ void Node::configureConstantNode() {
   }
 }
 
-void Node::setIOChannel() {
+void Node::convertIOToChannel() {
   isInput = false;
   isOutput = false;
   isChannelEdge = true;
