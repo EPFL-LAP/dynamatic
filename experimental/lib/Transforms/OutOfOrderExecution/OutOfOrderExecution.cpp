@@ -287,6 +287,30 @@ LogicalResult OutOfOrderExecutionPass::readOutOfOrderNodes(
   return success();
 }
 
+static void printHierarchy(const ClusterHierarchyNode *node, int depth = 0) {
+  if (!node)
+    return;
+
+  // Indentation based on depth
+  for (int i = 0; i < depth; ++i)
+    llvm::errs() << "  ";
+
+  // Just print the address or label (not the actual cluster)
+  llvm::errs() << "Node at " << node << "\n";
+
+  for (const auto *child : node->children) {
+    printHierarchy(child, depth + 1);
+  }
+}
+
+static void
+printAllHierarchies(const std::vector<ClusterHierarchyNode *> &roots) {
+  for (const auto *root : roots) {
+    printHierarchy(root);
+    llvm::errs() << "-----\n"; // separator between root trees if needed
+  }
+}
+
 /**
  * @brief Applies out-of-order execution to a set of operations within a
  * function. This method identifies clusters of operations within the given
@@ -332,6 +356,9 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
   std::vector<ClusterHierarchyNode *> hierarchyNodes =
       buildClusterHierarchy(clusters);
 
+  // printAllHierarchies(hierarchyNodes);
+  // llvm::errs() << "\n";
+
   // llvm::errs() << "Hierarchy nodes: \n";
   // for (auto &clusterNode : hierarchyNodes) {
   //   llvm::errs() << "Cluster size: " <<
@@ -353,6 +380,8 @@ LogicalResult OutOfOrderExecutionPass::applyOutOfOrder(
 
     ClusterHierarchyNode *innermostCluster =
         findInnermostClusterContainingOp(op, hierarchyNodes);
+
+    // printHierarchy(innermostCluster);
 
     // The entire graph is a cluster. So if the out-of-order node is not inside
     // any cluster, then it must not be inside the graph
@@ -438,6 +467,7 @@ LogicalResult OutOfOrderExecutionPass::applyMuxToCMerge(
         return failure();
     }
 
+    clusterNode->cluster.markedOutOfOrder = true;
     if (failed(applyOutOfOrderAlgorithm(
             funcOp, ctx, clusterNode->cluster.inputs,
             clusterNode->cluster.outputs, clusterNode->cluster.internalOps,

@@ -132,27 +132,6 @@ outoforder::analyzeMuxConditions(FuncOp funcOp) {
     if (isa<NotOp>(cond.getDefiningOp()))
       cond = cond.getDefiningOp()->getOperand(0);
 
-    // If a MUX is fed by a MergeOp(INIT) fed by condition c (or NOT c), then
-    // the MUX is a loop header
-    // if (MergeOp init = dyn_cast<MergeOp>(cond.getDefiningOp())) {
-    //   Value op1 = init->getOperand(0);
-    //   Value op2 = init->getOperand(1);
-
-    //   // The Merge Op is fed by a constant and the condition c (or NOT c)
-    //   if (isa<ConstantOp>(op1.getDefiningOp())) {
-    //     cond = op2;
-    //   } else {
-    //     assert((isa<ConstantOp>(op2.getDefiningOp())) &&
-    //            "An in input to a MergeOp feeding the MUX loop header should
-    //            be " "a constant");
-    //     cond = op1;
-    //   }
-    //   if (NotOp notOp = dyn_cast<NotOp>(cond.getDefiningOp())) {
-    //     cond = notOp.getOperand();
-    //   }
-    //   condToMuxes[cond].second = true;
-    // }
-
     // If a MUX is fed by an INIT fed by condition c (or NOT c), then
     // the MUX is a loop header
     if (InitOp init = dyn_cast<InitOp>(cond.getDefiningOp())) {
@@ -281,28 +260,59 @@ outoforder::analyzeBranchesConditions(
 }
 
 /**
- * @brief Retrieves the constant input to a MergeOp.
+ * @brief Determines if the first operation has a greater bb than the second
  *
- * @param mergeOp The MergeOp to analyze.
+ * @param op1 The first operation to compare.
+ * @param op2 The second operation to compare.
  *
- * @return The constant input to the MergeOp.
+ * @return True if the bb of the first operation is greater than that of the
+ * second, false otherwise.
  */
-// Value outoforder::getInitConstantInput(MergeOp mergeOp) {
-//   // Get the constant input to the MergeOp
-//   Value constantInput = mergeOp.getOperand(0);
-//   if (auto constantOp = dyn_cast<ConstantOp>(constantInput.getDefiningOp()))
-//   {
-//     return constantInput;
-//   }
-//   return mergeOp.getOperand(1);
-// }
+static bool isBBGreater(Operation *op1, Operation *op2) {
+  auto getBBValue = [](mlir::Operation *op) -> std::optional<uint64_t> {
+    if (auto attr =
+            op->getAttr("handshake.bb").dyn_cast_or_null<mlir::IntegerAttr>())
+      return attr.getUInt();
+    return std::nullopt;
+  };
 
-static void dfs(Operation *current, const llvm::DenseSet<Operation *> &endNodes,
+  auto bb1 = getBBValue(op1);
+  auto bb2 = getBBValue(op2);
+
+  if (bb1 && bb2) {
+    return *bb1 > *bb2;
+  }
+  return false;
+}
+
+/**
+ * @brief Depth-first search to collect all valid operation paths.
+ *
+ * Recursively traverses the graph of operations, collecting paths that either:
+ * - reach a specified end node
+ * - end at a terminal node (i.e., an operation with no users)
+ *
+ * @param current     The current operation being visited.
+ * @param start       The original start operation of the traversal.
+ * @param endNodes    Set of operations that mark valid end points.
+ * @param backward    If true, enforces backward edge condition based on BB
+ * values.
+ * @param path        Current path being built during traversal.
+ * @param allPaths    Vector to collect all valid paths found.
+ * @param visited     Set to track visited operations to avoid cycles.
+ */
+static void dfs(Operation *current, Operation *start,
+                const llvm::DenseSet<Operation *> &endNodes, bool backward,
                 std::vector<Operation *> &path,
                 std::vector<std::vector<Operation *>> &allPaths,
                 llvm::DenseSet<Operation *> &visited) {
-
-  if (isa<MemoryControllerOp>(current) || isa<LSQOp>(current))
+  // Add condition to terminate when we hit an operation with a BB greater that
+  // the start operation because this means that this path is not a  backward
+  // edge.
+  // A backward edge is an edge that leads to a node with a smaller or
+  // same BB
+  if (isa<MemoryControllerOp>(current) || isa<LSQOp>(current) ||
+      (backward && isBBGreater(current, start)))
     return;
 
   path.push_back(current);
@@ -317,7 +327,7 @@ static void dfs(Operation *current, const llvm::DenseSet<Operation *> &endNodes,
       } else {
         for (Operation *neighbor : res.getUsers()) {
           if (!visited.contains(neighbor)) {
-            dfs(neighbor, endNodes, path, allPaths, visited);
+            dfs(neighbor, start, endNodes, backward, path, allPaths, visited);
           }
         }
       }
@@ -329,12 +339,28 @@ static void dfs(Operation *current, const llvm::DenseSet<Operation *> &endNodes,
   visited.erase(current);
 }
 
+/**
+ * @brief Finds all valid paths from a start operation to given end nodes.
+ *
+ * Initializes a depth-first traversal using `dfs()` and gathers all paths
+ * that start at the given operation and reach an end node or a terminal node.
+ * If `backward` is true, traversal respects the basic block ordering, avoiding
+ * forward edges (to nodes with higher `handshake.bb` values).
+ *
+ * @param start       The operation from which to begin the search.
+ * @param endNodes    Set of operations considered valid endpoints.
+ * @param backward    Whether to enforce backward edge constraints.
+ * @return A vector of all valid operation paths, each represented as a vector
+ * of `Operation*`.
+ */
 static std::vector<std::vector<Operation *>>
-findAllPaths(Operation *start, const llvm::DenseSet<Operation *> &endNodes) {
+findAllPaths(Operation *start, const llvm::DenseSet<Operation *> &endNodes,
+             bool backward) {
   std::vector<std::vector<Operation *>> allPaths;
   std::vector<Operation *> path;
   llvm::DenseSet<Operation *> visited;
-  dfs(start, endNodes, path, allPaths, visited);
+
+  dfs(start, start, endNodes, backward, path, allPaths, visited);
   return allPaths;
 }
 
@@ -468,7 +494,7 @@ void outoforder::createClusters(
         //                    pathsMuxesToBranches.end());
 
         std::vector<std::vector<Operation *>> allPaths =
-            findAllPaths(muxOp.getOperation(), branchOpPtrs);
+            findAllPaths(muxOp.getOperation(), branchOpPtrs, false);
 
         for (const auto &path : allPaths) {
           for (Operation *op : path) {
@@ -484,18 +510,18 @@ void outoforder::createClusters(
 
       // A loop is a while loop if one branch has no backward edge feeding a MUX
       // directly.
-      bool whileLoop = false;
-      for (Operation *branch : branchOpPtrs) {
-        bool backwardEdgeToMux = false;
-        for (Value res : branch->getResults()) {
-          for (auto user : res.getUsers()) {
-            if (muxOpPtrs.contains(user))
-              backwardEdgeToMux = true;
-          }
-          if (!backwardEdgeToMux)
-            whileLoop = true;
-        }
-      }
+      // bool whileLoop = false;
+      // for (Operation *branch : branchOpPtrs) {
+      //   bool backwardEdgeToMux = false;
+      //   for (Value res : branch->getResults()) {
+      //     for (auto user : res.getUsers()) {
+      //       if (muxOpPtrs.contains(user))
+      //         backwardEdgeToMux = true;
+      //     }
+      //     if (!backwardEdgeToMux)
+      //       whileLoop = true;
+      //   }
+      // }
       // Then add all the operations between the BRANCHes and the MUXes, in
       // addition to all the operatiosn from the BRANCHes to a store or a sink.
       // This is necessary for the while loop case where there are operations
@@ -519,7 +545,7 @@ void outoforder::createClusters(
 
         if (!backwardEdgeToMux) {
           std::vector<std::vector<Operation *>> allPaths =
-              findAllPaths(branchOp, muxOpPtrs);
+              findAllPaths(branchOp, muxOpPtrs, true);
 
           for (const auto &path : allPaths) {
             for (Operation *op : path) {
@@ -591,7 +617,7 @@ void outoforder::createClusters(
         // internalOps.insert(paths.begin(), paths.end());
 
         std::vector<std::vector<Operation *>> allPaths =
-            findAllPaths(branchOp.getOperation(), muxOpPtrs);
+            findAllPaths(branchOp.getOperation(), muxOpPtrs, false);
 
         for (const auto &path : allPaths) {
           for (Operation *op : path) {
@@ -677,6 +703,22 @@ LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
 
         bool bInA = llvm::all_of(
             bOps, [&](Operation *op) { return aOps.contains(op); });
+
+        if (!(aInB || bInA)) {
+          // llvm::errs() << "Invalid overlap between cluster " << i
+          //              << " and cluster " << j << "\n";
+
+          // llvm::errs() << "Operations in cluster " << i
+          //              << " but not in cluster " << j << ":\n";
+          llvm::errs() << "ops in a and not b:\n";
+          for (Operation *op : aOps) {
+            if (!bOps.contains(op)) {
+              op->print(llvm::errs());
+              llvm::errs() << "\n";
+            }
+          }
+          llvm::errs() << "done with ops in a and not b\n";
+        }
 
         // Not nested: invalid overlap
         if (!(aInB || bInA)) {
