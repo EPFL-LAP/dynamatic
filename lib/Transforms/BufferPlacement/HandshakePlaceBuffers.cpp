@@ -30,7 +30,6 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
-#include <fstream>
 #include <string>
 
 using namespace mlir;
@@ -491,35 +490,6 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 }
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-unsigned readTagCount() {
-  std::ifstream file("experimental/lib/Transforms/"
-                     "OutOfOrderExecution/OutOfOrderOps.txt");
-  if (!file.is_open()) {
-    llvm::errs() << "Error opening file\n";
-    return -1;
-  }
-
-  std::string outOfOrderOpName;
-  unsigned numTags;
-  unsigned maxNumTags = 0;
-  bool controlled;
-
-  while (file >> outOfOrderOpName >> numTags >> controlled)
-    if (numTags > maxNumTags)
-      maxNumTags = numTags;
-
-  if (file.bad()) {
-    llvm::errs() << "I/O error while reading\n";
-    return 0;
-  }
-  if (!file.eof()) {
-    llvm::errs() << "Malformed line or wrong data format\n";
-    return 0;
-  }
-  file.close();
-  return maxNumTags;
-}
-
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // The only strategy at this point is to place buffers on the output channels
   // of all merge-like operations. We still want to respect channel-specific
@@ -537,115 +507,26 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    unsigned maxTagCount = readTagCount();
-    if (maxTagCount > 0) {
-      // Make sure that the data output channels of all merge-like operations
-      // have at least one opaque and one transparent slot, unless a constraint
-      // explicitly prevents us from putting a buffer there
-      for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
-
-        if (mergeLikeOp->hasAttr("ftd.imerge")) // Skip for Inits
-          continue;
-
-        ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
-        if (resProps.maxTrans.value_or(1) >= 1) {
-          resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-        } else {
-          mergeLikeOp->emitWarning()
-              << "Cannot place transparent buffer on merge-like operation's "
-                 "output due to channel-specific buffering constraints. This "
-                 "may "
-                 "yield an invalid buffering.";
-        }
-        if (resProps.maxOpaque.value_or(1) >= 1) {
-          resProps.minOpaque = std::max(resProps.minOpaque, 1U);
-        } else {
-          mergeLikeOp->emitWarning()
-              << "Cannot place opaque buffer on merge-like operation's "
-                 "output due to channel-specific buffering constraints. This "
-                 "may "
-                 "yield an invalid buffering.";
-        }
+    // Make sure that the data output channels of all merge-like operations have
+    // at least one opaque and one transparent slot, unless a constraint
+    // explicitly prevents us from putting a buffer there
+    for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+      ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
+      if (resProps.maxTrans.value_or(1) >= 1) {
+        resProps.minTrans = std::max(resProps.minTrans, 1U);
+      } else {
+        mergeLikeOp->emitWarning()
+            << "Cannot place transparent buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
       }
-
-      // TODO: Better reason about the source of deadlocks.
-      // Temporary solution is the insertion of the following buffers
-
-      // Insert a transparent and opaque slot after any free_tags_fifo to break
-      // the cycle created with the tagger/untagger
-      // for (auto one_tags_fifo : funcOp.getOps<FreeTagsFifoOp>()) {
-      //   ChannelBufProps& resProps =
-      //   channelProps[one_tags_fifo->getResult(0)]; if
-      //   (resProps.maxTrans.value_or(1) >= 1) {
-      //     resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-      //   }
-      //   else {
-      //     one_tags_fifo->emitWarning()
-      //       << "Cannot place transparent buffer on free_tags_fifo's "
-      //       "output due to channel-specific buffering constraints. This may "
-      //       "yield an invalid buffering.";
-      //   }
-      //   if (resProps.maxOpaque.value_or(1) >= 1) {
-      //     resProps.minOpaque = std::max(resProps.minOpaque, maxTagCount);
-      //   }
-      //   else {
-      //     one_tags_fifo->emitWarning()
-      //       << "Cannot place opaque buffer on free_tags_fifo's "
-      //       "output due to channel-specific buffering constraints. This may "
-      //       "yield an invalid buffering.";
-      //   }
-      // }
-
-      // // Insert transparent slots at the inputs of a Join. This is necessary
-      // to prevent
-      // // deadlocks around the Join that feeds a free_tags_fifo
-      // for (auto join : funcOp.getOps<handshake::JoinOp>()) {
-      //   for (auto operand : join->getOperands()) {
-      //     ChannelBufProps& resProps = channelProps[operand];
-      //     if (resProps.maxTrans.value_or(1) >= 1) {
-      //       resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-      //     }
-      //     else {
-      //       join->emitWarning()
-      //         << "Cannot place transparent buffer on merge-like operation's "
-      //         "output due to channel-specific buffering constraints. This "
-      //         "may "
-      //         "yield an invalid buffering.";
-      //     }
-      //   }
-      // }
-
-      // Insert a transparent fifo at the output of every fork to ensure
-      // maximum throughput
-      for (auto fork : funcOp.getOps<handshake::ForkOp>()) {
-
-        for (auto res : fork->getResults()) {
-          ChannelBufProps &resProps = channelProps[res];
-          if (resProps.maxTrans.value_or(1) >= 1) {
-            resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-          } else {
-            fork->emitWarning()
-                << "Cannot place transparent buffer on merge-like operation's "
-                   "output due to channel-specific buffering constraints. This "
-                   "may "
-                   "yield an invalid buffering.";
-          }
-        }
-      }
-
-      for (auto fork : funcOp.getOps<handshake::UntaggerOp>()) {
-        for (auto res : fork->getResults()) {
-          ChannelBufProps &resProps = channelProps[res];
-          if (resProps.maxTrans.value_or(1) >= 1) {
-            resProps.minTrans = std::max(resProps.minTrans, maxTagCount);
-          } else {
-            fork->emitWarning()
-                << "Cannot place transparent buffer on merge-like operation's "
-                   "output due to channel-specific buffering constraints. This "
-                   "may "
-                   "yield an invalid buffering.";
-          }
-        }
+      if (resProps.maxOpaque.value_or(1) >= 1) {
+        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+      } else {
+        mergeLikeOp->emitWarning()
+            << "Cannot place opaque buffer on merge-like operation's "
+               "output due to channel-specific buffering constraints. This may "
+               "yield an invalid buffering.";
       }
     }
 
