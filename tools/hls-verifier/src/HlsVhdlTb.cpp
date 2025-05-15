@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
+#include <string>
 
 #include "CAnalyser.h"
 #include "HlsLogging.h"
@@ -308,6 +310,20 @@ void HlsVhdlTb::getEntitiyDeclaration(mlir::raw_indented_ostream &os) {
   os << "entity " + tleName + " is\n\nend entity " + tleName + ";\n";
 }
 
+// Declare a signal. Usage:
+// - declareSTL(os, "signal_name"); declares a std_logic signal
+// - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
+void declareSTL(mlir::raw_indented_ostream &os, const string &name,
+                std::optional<std::string> size = std::nullopt,
+                std::optional<std::string> initialValue = std::nullopt) {
+  os << "signal " << name << " : std_logic";
+  if (size)
+    os << "_vector(" << *size << " - 1 downto 0)";
+  if (initialValue)
+    os << " := " << *initialValue;
+  os << ";\n";
+}
+
 // function to get the port name in the entitiy for each paramter
 
 void HlsVhdlTb::getArchitectureBegin(mlir::raw_indented_ostream &os) {
@@ -328,63 +344,69 @@ void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   }
 }
 
+// This writes the signal declarations fot the testbench
+// Example:
+// signal tb_clk : std_logic := '0';
+// signal tb_start_value : std_logic := '0';
 void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
 
-  os << "signal tb_clk : std_logic := '0';\n";
-  os << "signal tb_rst : std_logic := '0';\n";
-  os << "signal tb_start_valid : std_logic := '0';\n";
-  os << "signal tb_start_ready, tb_started : std_logic;\n";
-  os << "signal tb_end_valid, tb_end_ready : std_logic;\n";
-  os << "signal tb_out0_valid, tb_out0_ready : std_logic;\n";
-  os << "signal tb_global_valid, tb_global_ready, tb_stop : std_logic;\n\n";
+  declareSTL(os, "tb_clk", std::nullopt, "'0'");
+  declareSTL(os, "tb_start_value", std::nullopt, "'0'");
+  declareSTL(os, "tb_rst", std::nullopt, "'0'");
+  declareSTL(os, "tb_start_valid", std::nullopt, "'0'");
+  declareSTL(os, "tb_start_ready");
+  declareSTL(os, "tb_started");
+  declareSTL(os, "tb_end_valid");
+  declareSTL(os, "tb_end_ready");
+  declareSTL(os, "tb_out0_valid");
+  declareSTL(os, "tb_out0_ready");
+  declareSTL(os, "tb_global_valid");
+  declareSTL(os, "tb_global_ready");
+  declareSTL(os, "tb_stop");
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
     CFunctionParameter p = cDuvParams[i];
     MemElem m = memElems[i];
 
     if (m.isArray) {
-      os << "signal " << m.ce0SignalName << " : std_logic;\n";
-      os << "signal " << m.we0SignalName << " : std_logic;\n";
-      os << "signal " << m.dIn0SignalName << " : std_logic_vector("
-         << m.dataWidthParamValue << " - 1 downto 0);\n";
-      os << "signal " << m.dOut0SignalName << " : std_logic_vector("
-         << m.dataWidthParamValue << " - 1 downto 0);\n";
-      os << "signal " << m.addr0SignalName << " : std_logic_vector("
-         << m.addrWidthParamValue << " - 1 downto 0);\n\n";
 
-      os << "signal " << m.ce1SignalName << " : std_logic;\n";
-      os << "signal " << m.we1SignalName << " : std_logic;\n";
-      os << "signal " << m.dIn1SignalName << " : std_logic_vector("
-         << m.dataWidthParamValue << " - 1 downto 0);\n";
-      os << "signal " << m.dOut1SignalName << " : std_logic_vector("
-         << m.dataWidthParamValue << " - 1 downto 0);\n";
-      os << "signal " << m.addr1SignalName << " : std_logic_vector("
-         << m.addrWidthParamValue << " - 1 downto 0);\n";
+      declareSTL(os, m.ce0SignalName);
+      declareSTL(os, m.we0SignalName);
+      declareSTL(os, m.dIn0SignalName, m.dataWidthParamValue);
+      declareSTL(os, m.dOut0SignalName, m.dataWidthParamValue);
+      declareSTL(os, m.addr0SignalName, m.addrWidthParamValue);
 
-      os << "signal " << m.memStartSignalName << "_valid : std_logic;\n";
-      os << "signal " << m.memStartSignalName << "_ready : std_logic;\n";
-      os << "signal " << m.memEndSignalName << "_valid : std_logic;\n";
-      os << "signal " << m.memEndSignalName << "_ready : std_logic;\n\n";
+      declareSTL(os, m.ce1SignalName);
+      declareSTL(os, m.we1SignalName);
+
+      declareSTL(os, m.dIn1SignalName, m.dataWidthParamValue);
+      declareSTL(os, m.dOut1SignalName, m.dataWidthParamValue);
+      declareSTL(os, m.addr1SignalName, m.addrWidthParamValue);
+
+      declareSTL(os, m.memStartSignalName + "_valid");
+      declareSTL(os, m.memStartSignalName + "_ready");
+      declareSTL(os, m.memEndSignalName + "_valid");
+      declareSTL(os, m.memEndSignalName + "_ready");
 
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
-        os << "signal " << m.ce0SignalName << " : std_logic;\n";
-        os << "signal " << m.we0SignalName << " : std_logic;\n";
 
-        os << "signal " << m.dOut0SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);\n";
-        os << "signal " << m.dIn0SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);\n";
-        os << "signal " << m.dOut0SignalName << "_valid : std_logic;\n";
-        os << "signal " << m.dOut0SignalName << "_ready : std_logic;\n\n";
+        declareSTL(os, m.ce0SignalName);
+        declareSTL(os, m.we0SignalName);
+
+        declareSTL(os, m.dOut0SignalName, m.dataWidthParamValue);
+        declareSTL(os, m.dIn0SignalName, m.dataWidthParamValue);
+
+        declareSTL(os, m.dOut0SignalName + "_valid");
+        declareSTL(os, m.dOut0SignalName + "_ready");
       }
     }
   }
 
   os << "\n";
 
-  os << "signal tb_temp_idle : std_logic := '1';\n";
+  declareSTL(os, "tb_temp_idle", std::nullopt, "'1'");
   os << "shared variable transaction_idx : INTEGER := 0;\n";
 }
 
@@ -476,8 +498,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
     joinSize += 1;
 
   unsigned idx = 0;
-  os << "join_valids: entity work.tb_join(arch) generic map(" << joinSize
-     << ")\nport map(\n";
+  os << "join_valids: entity work.tb_join(arch)\n";
+  os << "generic map(" << joinSize << ")\n";
+  os << "port map(\n";
   os.indent();
   if (hasReturnVal)
     os << "ins_valid(" << idx++ << ") => tb_out0_valid,\n";
