@@ -392,7 +392,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   for (size_t i = 0; i < memElems.size(); i++) {
     MemElem m = memElems[i];
     CFunctionParameter p = cDuvParams[i];
+
     if (m.isArray) {
+      // Models for array arguments
       os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
       os << "generic map(\n";
       os.indent();
@@ -421,117 +423,43 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
       os.unindent();
       os << ");";
     } else {
+      // Models for scalar arguments
+      os << "arg_inst_" << p.parameterName << ": entity work.single_argument\n";
+      os << "generic map(\n";
+      os.indent();
+      os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
+      os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
+      os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
+      os.unindent();
+      os << ")\n";
+      os << "port map(\n";
+      os.indent();
 
       if (p.isInput && !p.isOutput && !p.isReturn) {
-
-        os << "arg_inst_" << p.parameterName
-           << ": entity work.single_argument\n";
-        os << "generic map(\n";
-        os.indent();
-        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
-        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
-        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
-        os << ")\n";
-        os << "port map(\n";
-        os << CLK_PORT << " => tb_clk,\n";
-        os << RST_PORT << " => tb_rst,\n";
-        os << CE0_PORT << " => '1',\n";
+        // An argument that is a pure input (e.g., in_int_t).
         os << WE0_PORT << " =>'0',\n";
-        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
-           << "\n";
-        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
-           << "\n";
         os << D_IN0_PORT << " => (others => '0'),\n";
-        os << DONE_PORT << " => tb_temp_idle";
-        os.unindent();
-        os << ");";
-      }
-      if (p.isInput && p.isOutput && !p.isReturn) {
-
-        os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
-           << "\n";
-        os << "generic map(\n";
-        os.indent();
-        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
-           << "\n";
-        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
-           << "\n";
-        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
-        os << ")\n";
-        os << "port map(\n";
-        os << CLK_PORT << " => tb_clk,\n";
-        os << RST_PORT << " => tb_rst,\n";
-        os << CE0_PORT << " => '1',\n";
+      } else if (p.isOutput && !p.isReturn) {
+        // An argument that is an output (e.g., inout_int_t or out_int_t).
         os << WE0_PORT << " => " << m.we0SignalName << ",\n";
-        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
-           << "\n";
-        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
-           << "\n";
         os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
-        os << DONE_PORT << " => tb_temp_idle\n";
-        os.unindent();
-        os << ");\n\n";
-      }
-
-      if (!p.isInput && p.isOutput && p.isReturn) {
-
-        os << "res_inst_" << p.parameterName << ": entity work.single_argument"
-           << "\n";
-        os << "generic map(\n";
-        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
-           << "\n";
-        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
-           << "\n";
-        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
-        os << ")\n";
-        os << "port map(\n";
-        os.indent();
-        os << CLK_PORT << " => tb_clk,\n";
-        os << RST_PORT << " => tb_rst,\n";
-        os << CE0_PORT << " => '1',\n";
+      } else if (!p.isInput && p.isOutput && p.isReturn) {
+        // Return value of the function.
         os << WE0_PORT << " => tb_out0_valid,\n";
-        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ","
-           << "\n";
-        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
-           << "\n";
-        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
-           << "\n";
-        os << D_IN0_PORT << " => " << m.dIn0SignalName << ","
-           << "\n";
-        os << DONE_PORT << " => tb_temp_idle\n";
-        os.unindent();
-        os << ");";
-      }
-
-      if (!p.isInput && p.isOutput && !p.isReturn) {
-
-        os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
-           << "\n";
-        os << "generic map(\n";
-        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
-           << "\n";
-        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
-           << "\n";
-        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
-        os << ")\n";
-        os << "port map(\n";
-        os.indent();
-        os << CLK_PORT << " => tb_clk,\n";
-        os << RST_PORT << " => tb_rst,\n";
-        os << CE0_PORT << " => '1',\n";
-        os << WE0_PORT << " => " << m.we0SignalName << ",\n";
         os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
-        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
-           << "\n";
-        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
-           << "\n";
-        os << DONE_PORT << " => tb_temp_idle\n";
-        os.unindent();
-        os << ");";
+      } else {
+        assert(false && "Invalid parameter type");
       }
+
+      os << CLK_PORT << " => tb_clk,\n";
+      os << RST_PORT << " => tb_rst,\n";
+      os << CE0_PORT << " => '1',\n";
+      os << DONE_PORT << " => tb_temp_idle,\n";
+      os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
+      os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,\n";
+      os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready\n";
+      os.unindent();
+      os << ");";
     }
 
     os << "\n\n";
