@@ -364,8 +364,12 @@ public:
     return *this;
   }
 
-  void emitVhdl(mlir::raw_indented_ostream &os) const {
+  void emitVhdl(mlir::raw_indented_ostream &os) {
     os << instanceName << ": entity work." << moduleName << "\n";
+
+    // VHDL port map needs a continuous assignment
+    std::sort(connections.begin(), connections.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
 
     if (!params.empty()) {
       os << "generic map(\n";
@@ -535,34 +539,30 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
     joinSize += 1;
 
   unsigned idx = 0;
-  os << "join_valids: entity work.tb_join(arch)\n";
-  os << "generic map(" << joinSize << ")\n";
-  os << "port map(\n";
-  os.indent();
-  if (hasReturnVal)
-    os << "ins_valid(" << idx++ << ") => tb_out0_valid,\n";
-  for (MemElem &m : memElems) {
-    if (m.isArray) {
-      os << "ins_valid(" << idx++ << ") => " << m.memEndSignalName
-         << "_valid,\n";
-    }
-  }
-  os << "ins_valid(" << idx++ << ") => tb_end_valid,\n";
 
-  idx = 0;
-  if (hasReturnVal)
-    os << "ins_ready(" << idx++ << ") => tb_out0_ready,\n";
+  Instance joinInst("tb_join", "join_valids");
+
+  joinInst.parameter("SIZE", std::to_string(joinSize));
+
+  if (hasReturnVal) {
+    joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_out0_valid");
+    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                     "tb_out0_ready");
+  }
   for (MemElem &m : memElems) {
     if (m.isArray) {
-      os << "ins_ready(" << idx++ << ") => " << m.memEndSignalName
-         << "_ready,\n";
+      joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                       m.memEndSignalName + "_valid");
+      joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                       m.memEndSignalName + "_ready");
     }
   }
-  os << "ins_ready(" << idx++ << ") => tb_end_ready,\n";
-  os << "outs_valid => tb_global_valid,\n";
-  os << "outs_ready => tb_global_ready\n";
-  os.unindent();
-  os << ");\n\n";
+  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_end_valid");
+  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")", "tb_end_ready");
+  joinInst.connect("outs_valid", "tb_global_valid");
+  joinInst.connect("outs_ready", "tb_global_ready");
+
+  joinInst.emitVhdl(os);
 }
 
 void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
