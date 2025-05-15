@@ -23,25 +23,6 @@ class MemElem {
 public:
   bool isArray;
 
-  static string clkPortName;
-  static string rstPortName;
-  static string ce0PortName;
-  static string we0PortName;
-  static string dIn0PortName;
-  static string dOut0PortName;
-  static string addr0PortName;
-  static string ce1PortName;
-  static string we1PortName;
-  static string dIn1PortName;
-  static string dOut1PortName;
-  static string addr1PortName;
-  static string donePortName;
-  static string inFileParamName;
-  static string outFileParamName;
-  static string dataWidthParamName;
-  static string addrWidthParamName;
-  static string dataDepthParamName;
-
   string ce0SignalName;
   string we0SignalName;
   string dIn0SignalName;

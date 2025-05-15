@@ -18,126 +18,114 @@
 namespace hls_verify {
 const string LOG_TAG = "VVER";
 
-string vhdlLibraryHeader = "library IEEE;\n"
-                           "use ieee.std_logic_1164.all;\n"
-                           "use ieee.std_logic_arith.all;\n"
-                           "use ieee.std_logic_unsigned.all;\n"
-                           "use ieee.std_logic_textio.all;\n"
-                           "use ieee.numeric_std.all;\n"
-                           "use std.textio.all;\n\n"
-                           "use work.sim_package.all;\n"
-                           "\n\n";
+static const string VHDL_LIBRARY_HEADER = R"DELIM(
+library IEEE;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
+use ieee.std_logic_textio.all;
+use ieee.numeric_std.all;
+use std.textio.all;
+use work.sim_package.all;
+)DELIM";
 
-string commonTbBody =
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "generate_sim_done_proc : process\n"
-    "begin\n"
-    "	while (transaction_idx /= TRANSACTION_NUM) loop\n"
-    "		wait until tb_clk'event and tb_clk = '1';\n"
-    "	end loop;\n"
-    "	wait until tb_clk'event and tb_clk = '1';\n"
-    "	wait until tb_clk'event and tb_clk = '1';\n"
-    "	wait until tb_clk'event and tb_clk = '1';\n"
-    "	assert false report \"simulation done!\" severity note;\n"
-    "	assert false report \"NORMAL EXIT (note: failure is to force the "
-    "simulator to stop)\" severity failure;\n"
-    "	wait;\n"
-    "end process;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "gen_clock_proc : process\n"
-    "begin\n"
-    "	tb_clk <= '0';\n"
-    "	while (true) loop\n"
-    "		wait for HALF_CLK_PERIOD;\n"
-    "		tb_clk <= not tb_clk;\n"
-    "	end loop;\n"
-    "	wait;\n"
-    "end process;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "gen_reset_proc : process\n"
-    "begin\n"
-    "	tb_rst <= '1';\n"
-    "	wait for 10 ns;\n"
-    "	tb_rst <= '0';\n"
-    "	wait;\n"
-    "end process;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "acknowledge_tb_end: process(tb_clk,tb_rst)\n"
-    "begin\n"
-    "   if (tb_rst = '1') then\n"
-    "       tb_global_ready <= '1';\n"
-    "       tb_stop <= '0';\n"
-    "   elsif rising_edge(tb_clk) then\n"
-    "       if (tb_global_valid = '1') then\n"
-    "           tb_global_ready <= '0';\n"
-    "           tb_stop <= '1';\n"
-    "       end if;\n"
-    "   end if;\n"
-    "end process;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "generate_idle_signal: process(tb_clk,tb_rst)\n"
-    "begin\n"
-    "   if (tb_rst = '1') then\n"
-    "       tb_temp_idle <= '1';\n"
-    "   elsif rising_edge(tb_clk) then\n"
-    "       tb_temp_idle <= tb_temp_idle;\n"
-    "       if (tb_start_valid = '1') then\n"
-    "           tb_temp_idle <= '0';\n"
-    "       end if;\n"
-    "       if(tb_stop = '1') then\n"
-    "           tb_temp_idle <= '1';\n"
-    "       end if;\n"
-    "   end if;\n"
-    "end process generate_idle_signal;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "generate_start_signal : process(tb_clk, tb_rst)\n"
-    "begin\n"
-    "   if (tb_rst = '1') then\n"
-    "       tb_start_valid <= '0';\n"
-    "       tb_started <= '0';\n"
-    "   elsif rising_edge(tb_clk) then\n"
-    "       if (tb_started = '0') then \n"
-    "           tb_start_valid <= '1';\n"
-    "           tb_started <= '1';\n"
-    "       else\n"
-    "           tb_start_valid <= tb_start_valid and (not tb_start_ready);\n"
-    "       end if;\n"
-    "   end if;\n"
-    "end process generate_start_signal;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n"
-    "transaction_increment : process\n"
-    "begin\n"
-    "	wait until tb_rst = '0';\n"
-    "	while (tb_temp_idle /= '1') loop\n"
-    "		wait until tb_clk'event and tb_clk = '1';\n"
-    "	end loop;\n"
-    "	wait until tb_temp_idle = '0';\n"
-    "\n"
-    "	while (true) loop\n"
-    "		while (tb_temp_idle /= '1') loop\n"
-    "			wait until tb_clk'event and tb_clk = '1';\n"
-    "		end loop;\n"
-    "		transaction_idx := transaction_idx + 1;\n"
-    "		wait until tb_temp_idle = '0';\n"
-    "	end loop;\n"
-    "end process;\n"
-    "\n"
-    "--------------------------------------------------------------------------"
-    "--\n\n";
+static const string COMMON_TB_BODY = R"DELIM(
+----------------------------------------------------------------------------
+generate_sim_done_proc : process
+begin
+  while (transaction_idx /= TRANSACTION_NUM) loop
+    wait until tb_clk'event and tb_clk = '1';
+  end loop;
+  wait until tb_clk'event and tb_clk = '1';
+  wait until tb_clk'event and tb_clk = '1';
+  wait until tb_clk'event and tb_clk = '1';
+  assert false
+  report "simulation done!"
+  severity note;
+  assert false
+  report "NORMAL EXIT (note: failure is to force the simulator to stop)"
+  severity failure;
+  wait;
+end process;
+----------------------------------------------------------------------------
+gen_clock_proc : process
+begin
+  tb_clk <= '0';
+  while (true) loop
+    wait for HALF_CLK_PERIOD;
+    tb_clk <= not tb_clk;
+  end loop;
+  wait;
+end process;
+----------------------------------------------------------------------------
+gen_reset_proc : process
+begin
+  tb_rst <= '1';
+  wait for 10 ns;
+  tb_rst <= '0';
+  wait;
+end process;
+----------------------------------------------------------------------------
+acknowledge_tb_end: process(tb_clk,tb_rst)
+begin
+  if (tb_rst = '1') then
+    tb_global_ready <= '1';
+    tb_stop <= '0';
+  elsif rising_edge(tb_clk) then
+    if (tb_global_valid = '1') then
+      tb_global_ready <= '0';
+      tb_stop <= '1';
+    end if;
+  end if;
+end process;
+----------------------------------------------------------------------------
+generate_idle_signal: process(tb_clk,tb_rst)
+begin
+  if (tb_rst = '1') then
+    tb_temp_idle <= '1';
+  elsif rising_edge(tb_clk) then
+    tb_temp_idle <= tb_temp_idle;
+    if (tb_start_valid = '1') then
+      tb_temp_idle <= '0';
+    end if;
+    if(tb_stop = '1') then
+      tb_temp_idle <= '1';
+    end if;
+  end if;
+end process generate_idle_signal;
+----------------------------------------------------------------------------
+generate_start_signal : process(tb_clk, tb_rst)
+begin
+  if (tb_rst = '1') then
+    tb_start_valid <= '0';
+    tb_started <= '0';
+  elsif rising_edge(tb_clk) then
+    if (tb_started = '0') then
+      tb_start_valid <= '1';
+      tb_started <= '1';
+    else
+      tb_start_valid <= tb_start_valid and (not tb_start_ready);
+    end if;
+  end if;
+end process generate_start_signal;
+----------------------------------------------------------------------------
+transaction_increment : process
+begin
+  wait until tb_rst = '0';
+  while (tb_temp_idle /= '1') loop
+    wait until tb_clk'event and tb_clk = '1';
+  end loop;
+  wait until tb_temp_idle = '0';
+  while (true) loop
+    while (tb_temp_idle /= '1') loop
+      wait until tb_clk'event and tb_clk = '1';
+    end loop;
+    transaction_idx := transaction_idx + 1;
+    wait until tb_temp_idle = '0';
+  end loop;
+end process;
+--------------------------------------------------------------------------
+)DELIM";
 
 // class Constant
 
@@ -146,24 +134,24 @@ Constant::Constant(const string &name, const string &type, const string &value)
 
 // class MemElem
 
-string MemElem::clkPortName = "clk";
-string MemElem::rstPortName = "rst";
-string MemElem::ce0PortName = "ce0";
-string MemElem::we0PortName = "we0";
-string MemElem::dIn0PortName = "mem_din0";
-string MemElem::dOut0PortName = "mem_dout0";
-string MemElem::addr0PortName = "address0";
-string MemElem::ce1PortName = "ce1";
-string MemElem::we1PortName = "we1";
-string MemElem::dIn1PortName = "mem_din1";
-string MemElem::dOut1PortName = "mem_dout1";
-string MemElem::addr1PortName = "address1";
-string MemElem::donePortName = "done";
-string MemElem::inFileParamName = "TV_IN";
-string MemElem::outFileParamName = "TV_OUT";
-string MemElem::dataWidthParamName = "DATA_WIDTH";
-string MemElem::addrWidthParamName = "ADDR_WIDTH";
-string MemElem::dataDepthParamName = "DEPTH";
+static const string CLK_PORT_NAME = "clk";
+static const string RST_PORT_NAME = "rst";
+static const string CE0_PORT_NAME = "ce0";
+static const string WE0_PORT_NAME = "we0";
+static const string D_IN0_PORT_NAME = "mem_din0";
+static const string D_OUT0_PORT_NAME = "mem_dout0";
+static const string ADDR0_PORT_NAME = "address0";
+static const string CE1_PORT_NAME = "ce1";
+static const string WE1_PORT_NAME = "we1";
+static const string D_IN1_PORT_NAME = "mem_din1";
+static const string D_OUT1_PORT_NAME = "mem_dout1";
+static const string ADDR1_PORT_NAME = "address1";
+static const string DONE_PORT_NAME = "done";
+static const string IN_FILE_PARAM_NAME = "TV_IN";
+static const string OUT_FILE_PARAM_NAME = "TV_OUT";
+static const string DATA_WIDTH_PARAM_NAME = "DATA_WIDTH";
+static const string ADDR_WIDTH_PARAM_NAME = "ADDR_WIDTH";
+static const string DATA_DEPTH_PARAM_NAME = "DEPTH";
 
 // class HlsVhdTb
 
@@ -219,14 +207,14 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
 
     mElem.dIn0SignalName = p.parameterName + "_mem_din0";
     mElem.dOut0SignalName = p.parameterName + "_mem_dout0";
-    mElem.we0SignalName = p.parameterName + "_mem_" + mElem.we0PortName;
-    mElem.ce0SignalName = p.parameterName + "_mem_" + mElem.ce0PortName;
-    mElem.addr0SignalName = p.parameterName + "_mem_" + mElem.addr0PortName;
+    mElem.we0SignalName = p.parameterName + "_mem_" + WE0_PORT_NAME;
+    mElem.ce0SignalName = p.parameterName + "_mem_" + CE0_PORT_NAME;
+    mElem.addr0SignalName = p.parameterName + "_mem_" + ADDR0_PORT_NAME;
     mElem.dIn1SignalName = p.parameterName + "_mem_din1";
     mElem.dOut1SignalName = p.parameterName + "_mem_dout1";
-    mElem.we1SignalName = p.parameterName + "_mem_" + mElem.we1PortName;
-    mElem.ce1SignalName = p.parameterName + "_mem_" + mElem.ce1PortName;
-    mElem.addr1SignalName = p.parameterName + "_mem_" + mElem.addr1PortName;
+    mElem.we1SignalName = p.parameterName + "_mem_" + WE1_PORT_NAME;
+    mElem.ce1SignalName = p.parameterName + "_mem_" + CE1_PORT_NAME;
+    mElem.addr1SignalName = p.parameterName + "_mem_" + ADDR1_PORT_NAME;
 
     mElem.memStartSignalName = p.parameterName + "_memStart";
     mElem.memEndSignalName = p.parameterName + "_memEnd";
@@ -314,7 +302,7 @@ string HlsVhdlTb::getDataOutSaPortNameForCParam(string &cParam) {
 }
 
 void HlsVhdlTb::getLibraryHeader(mlir::raw_indented_ostream &os) {
-  os << vhdlLibraryHeader;
+  os << VHDL_LIBRARY_HEADER;
 }
 
 void HlsVhdlTb::getEntitiyDeclaration(mlir::raw_indented_ostream &os) {
@@ -406,28 +394,25 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
     if (m.isArray) {
       os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
       os << "generic map(\n";
-      os << MemElem::inFileParamName << " => " << m.inFileParamValue << ",\n";
-      os << MemElem::outFileParamName << " => " << m.outFileParamValue << ",\n";
-      os << MemElem::dataDepthParamName << " => " << m.dataDepthParamValue
-         << ",\n";
-      os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
-         << ",\n";
-      os << MemElem::addrWidthParamName << " => " << m.addrWidthParamValue
-         << "\n)\n";
+      os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
+      os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
+      os << DATA_DEPTH_PARAM_NAME << " => " << m.dataDepthParamValue << ",\n";
+      os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << ",\n";
+      os << ADDR_WIDTH_PARAM_NAME << " => " << m.addrWidthParamValue << "\n)\n";
       os << "port map(\n";
-      os << MemElem::clkPortName << " => tb_clk,\n";
-      os << MemElem::rstPortName << " => tb_rst,\n";
-      os << MemElem::ce0PortName << " => " << m.ce0SignalName << ",\n";
-      os << MemElem::we0PortName << " => " << m.we0SignalName << ",\n";
-      os << MemElem::addr0PortName << " => " << m.addr0SignalName << ",\n";
-      os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ",\n";
-      os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ",\n";
-      os << MemElem::ce1PortName << " => " << m.ce1SignalName << ",\n";
-      os << MemElem::we1PortName << " => " << m.we1SignalName << ",\n";
-      os << MemElem::addr1PortName << " => " << m.addr1SignalName << ",\n";
-      os << MemElem::dOut1PortName << " => " << m.dOut1SignalName << ",\n";
-      os << MemElem::dIn1PortName << " => " << m.dIn1SignalName << ",\n";
-      os << MemElem::donePortName << " => tb_stop\n);\n\n";
+      os << CLK_PORT_NAME << " => tb_clk,\n";
+      os << RST_PORT_NAME << " => tb_rst,\n";
+      os << CE0_PORT_NAME << " => " << m.ce0SignalName << ",\n";
+      os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
+      os << ADDR0_PORT_NAME << " => " << m.addr0SignalName << ",\n";
+      os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
+      os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
+      os << CE1_PORT_NAME << " => " << m.ce1SignalName << ",\n";
+      os << WE1_PORT_NAME << " => " << m.we1SignalName << ",\n";
+      os << ADDR1_PORT_NAME << " => " << m.addr1SignalName << ",\n";
+      os << D_OUT1_PORT_NAME << " => " << m.dOut1SignalName << ",\n";
+      os << D_IN1_PORT_NAME << " => " << m.dIn1SignalName << ",\n";
+      os << DONE_PORT_NAME << " => tb_stop\n);\n\n";
     } else {
 
       if (p.isInput && !p.isOutput && !p.isReturn) {
@@ -435,41 +420,37 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
         os << "arg_inst_" << p.parameterName
            << ": entity work.single_argument\n";
         os << "generic map(\n";
-        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ",\n";
-        os << MemElem::outFileParamName << " => " << m.outFileParamValue
-           << ",\n";
-        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
-           << "\n";
+        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
+        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
+        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
         os << "port map("
            << "\n";
-        os << MemElem::clkPortName << " => "
+        os << CLK_PORT_NAME << " => "
            << "tb_clk,"
            << "\n";
-        os << MemElem::rstPortName << " => "
+        os << RST_PORT_NAME << " => "
            << "tb_rst,"
            << "\n";
-        os << MemElem::ce0PortName << " => "
+        os << CE0_PORT_NAME << " => "
            << "'1'"
            << ","
            << "\n";
-        os << MemElem::we0PortName << " => "
+        os << WE0_PORT_NAME << " => "
            << "'0'"
            << ","
            << "\n";
-        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
-           << "_valid,"
+        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
-           << "_ready,"
+        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << MemElem::dIn0PortName << " => "
+        os << D_IN0_PORT_NAME << " => "
            << "(others => '0')"
            << ","
            << "\n";
-        os << MemElem::donePortName << " => "
+        os << DONE_PORT_NAME << " => "
            << "tb_temp_idle"
            << "\n";
         os << ");"
@@ -482,39 +463,36 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << "\n";
         os << "generic map("
            << "\n";
-        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
-        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
-        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
-           << "\n";
+        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
         os << ")"
            << "\n";
         os << "port map("
            << "\n";
-        os << MemElem::clkPortName << " => "
+        os << CLK_PORT_NAME << " => "
            << "tb_clk,"
            << "\n";
-        os << MemElem::rstPortName << " => "
+        os << RST_PORT_NAME << " => "
            << "tb_rst,"
            << "\n";
-        os << MemElem::ce0PortName << " => "
+        os << CE0_PORT_NAME << " => "
            << "'1'"
            << ","
            << "\n";
-        os << MemElem::we0PortName << " => " << m.we0SignalName << ","
+        os << WE0_PORT_NAME << " => " << m.we0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
-           << "_valid,"
+        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
-           << "_ready,"
+        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
            << "\n";
-        os << MemElem::donePortName << " => "
+        os << DONE_PORT_NAME << " => "
            << "tb_temp_idle"
            << "\n";
         os << ");"
@@ -528,41 +506,38 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << "\n";
         os << "generic map("
            << "\n";
-        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
-        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
-        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
-           << "\n";
+        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
         os << ")"
            << "\n";
         os << "port map("
            << "\n";
-        os << MemElem::clkPortName << " => "
+        os << CLK_PORT_NAME << " => "
            << "tb_clk,"
            << "\n";
-        os << MemElem::rstPortName << " => "
+        os << RST_PORT_NAME << " => "
            << "tb_rst,"
            << "\n";
-        os << MemElem::ce0PortName << " => "
+        os << CE0_PORT_NAME << " => "
            << "'1'"
            << ","
            << "\n";
-        os << MemElem::we0PortName << " => "
+        os << WE0_PORT_NAME << " => "
            << "tb_out0_valid"
            << ","
            << "\n";
-        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
-           << "_valid,"
+        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
-           << "_ready,"
+        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
            << "\n";
-        os << MemElem::donePortName << " => "
+        os << DONE_PORT_NAME << " => "
            << "tb_temp_idle"
            << "\n";
         os << ");"
@@ -576,39 +551,36 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << "\n";
         os << "generic map("
            << "\n";
-        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
-        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
-        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
-           << "\n";
+        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
         os << ")"
            << "\n";
         os << "port map("
            << "\n";
-        os << MemElem::clkPortName << " => "
+        os << CLK_PORT_NAME << " => "
            << "tb_clk,"
            << "\n";
-        os << MemElem::rstPortName << " => "
+        os << RST_PORT_NAME << " => "
            << "tb_rst,"
            << "\n";
-        os << MemElem::ce0PortName << " => "
+        os << CE0_PORT_NAME << " => "
            << "'1'"
            << ","
            << "\n";
-        os << MemElem::we0PortName << " => " << m.we0SignalName << ","
+        os << WE0_PORT_NAME << " => " << m.we0SignalName << ","
            << "\n";
-        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
            << "\n";
-        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
-           << "_valid,"
+        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
-           << "_ready,"
+        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << MemElem::donePortName << " => "
+        os << DONE_PORT_NAME << " => "
            << "tb_temp_idle"
            << "\n";
         os << ");"
@@ -741,7 +713,7 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getCommonBody(mlir::raw_indented_ostream &os) {
-  os << commonTbBody;
+  os << COMMON_TB_BODY;
 }
 
 void HlsVhdlTb::getArchitectureEnd(mlir::raw_indented_ostream &os) {
@@ -749,54 +721,51 @@ void HlsVhdlTb::getArchitectureEnd(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
-  os << "\n";
-  os << "---------------------------------------------------------------------"
-        "-------\n";
+  os << "-------------------------------------------------------------------\n";
   os << "-- Write \"[[[runtime]]]\" and \"[[[/runtime]]]\" for output "
         "transactor\n";
   for (auto &cDuvParam : cDuvParams) {
     if (cDuvParam.isOutput) {
       os << "write_output_transactor_" << cDuvParam.parameterName
          << "_runtime_proc : process\n";
-      os << "	file fp             : TEXT;\n";
-      os << "	variable fstatus    : FILE_OPEN_STATUS;\n";
-      os << "	variable token_line : LINE;\n";
-      os << "	variable token      : STRING(1 to 1024);\n";
+      os << "file fp             : TEXT;\n";
+      os << "variable fstatus    : FILE_OPEN_STATUS;\n";
+      os << "variable token_line : LINE;\n";
+      os << "variable token      : STRING(1 to 1024);\n";
       os << "\n";
       os << "begin\n";
-      os << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
+      os << "file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
          << ", WRITE_MODE);\n";
-      os << "	if (fstatus /= OPEN_OK) then\n";
-      os << "		assert false report \"Open file \" & OUTPUT_"
+      os << "if (fstatus /= OPEN_OK) then\n";
+      os << "assert false report \"Open file \" & OUTPUT_"
          << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      os << "		assert false report \"ERROR: Simulation using HLS TB "
+      os << "assert false report \"ERROR: Simulation using HLS TB "
             "failed.\" severity failure;\n";
-      os << "	end if;\n";
-      os << "	write(token_line, string'(\"[[[runtime]]]\"));\n";
-      os << "	writeline(fp, token_line);\n";
-      os << "	file_close(fp);\n";
-      os << "	while transaction_idx /= TRANSACTION_NUM loop\n";
-      os << "		wait until tb_clk'event and tb_clk = '1';\n";
-      os << "	end loop;\n";
-      os << "	wait until tb_clk'event and tb_clk = '1';\n";
-      os << "	wait until tb_clk'event and tb_clk = '1';\n";
-      os << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
+      os << "end if;\n";
+      os << "write(token_line, string'(\"[[[runtime]]]\"));\n";
+      os << "writeline(fp, token_line);\n";
+      os << "file_close(fp);\n";
+      os << "while transaction_idx /= TRANSACTION_NUM loop\n";
+      os << "wait until tb_clk'event and tb_clk = '1';\n";
+      os << "end loop;\n";
+      os << "wait until tb_clk'event and tb_clk = '1';\n";
+      os << "wait until tb_clk'event and tb_clk = '1';\n";
+      os << "file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
          << ", APPEND_MODE);\n";
-      os << "	if (fstatus /= OPEN_OK) then\n";
-      os << "		assert false report \"Open file \" & OUTPUT_"
+      os << "if (fstatus /= OPEN_OK) then\n";
+      os << "assert false report \"Open file \" & OUTPUT_"
          << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      os << "		assert false report \"ERROR: Simulation using HLS TB "
+      os << "assert false report \"ERROR: Simulation using HLS TB "
             "failed.\" severity failure;\n";
-      os << "	end if;\n";
-      os << "	write(token_line, string'(\"[[[/runtime]]]\"));\n";
-      os << "	writeline(fp, token_line);\n";
-      os << "	file_close(fp);\n";
-      os << "	wait;\n";
+      os << "end if;\n";
+      os << "write(token_line, string'(\"[[[/runtime]]]\"));\n";
+      os << "writeline(fp, token_line);\n";
+      os << "file_close(fp);\n";
+      os << "wait;\n";
       os << "end process;\n";
     }
   }
-  os << "---------------------------------------------------------------------"
-        "-------\n\n";
+  os << "-----------------------------------------------------------------\n\n";
 }
 
 void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
