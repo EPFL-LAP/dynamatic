@@ -344,6 +344,54 @@ void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   }
 }
 
+class Instance {
+  std::string moduleName;
+  std::string instanceName;
+  std::vector<std::pair<std::string, std::string>> connections;
+  std::vector<std::pair<std::string, std::string>> params;
+
+public:
+  Instance(std::string module, std::string inst, std::vector<unsigned> p = {})
+      : moduleName(std::move(module)), instanceName(std::move(inst)) {}
+
+  Instance &parameter(const std::string &parameter, const std::string &value) {
+    params.emplace_back(parameter, value);
+    return *this;
+  }
+
+  Instance &connect(const std::string &port, const std::string &signal) {
+    connections.emplace_back(port, signal);
+    return *this;
+  }
+
+  void emitVhdl(mlir::raw_indented_ostream &os) const {
+    os << instanceName << ": entity work." << moduleName << "\n";
+
+    if (!params.empty()) {
+      os << "generic map(\n";
+      os.indent();
+      for (size_t i = 0; i < params.size(); ++i) {
+        os << params[i].first << " => " << params[i].second;
+        if (i != params.size() - 1)
+          os << ",\n";
+      }
+      os.unindent();
+      os << ")\n";
+    }
+    os << "port map(\n";
+    os.indent();
+    for (size_t i = 0; i < connections.size(); ++i) {
+      const auto &[port, sig] = connections[i];
+      os << port << " => " << sig;
+      if (i != connections.size() - 1)
+        os << ",";
+      os << "\n";
+    }
+    os.unindent();
+    os << ");\n";
+  }
+};
+
 // This writes the signal declarations fot the testbench
 // Example:
 // signal tb_clk : std_logic := '0';
@@ -417,71 +465,60 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
 
     if (m.isArray) {
       // Models for array arguments
-      os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
-      os << "generic map(\n";
-      os.indent();
-      os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
-      os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
-      os << DATA_DEPTH_PARAM << " => " << m.dataDepthParamValue << ",\n";
-      os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << ",\n";
-      os << ADDR_WIDTH_PARAM << " => " << m.addrWidthParamValue;
-      os.unindent();
-      os << "\n)";
-      os << "port map(\n";
-      os.indent();
-      os << CLK_PORT << " => tb_clk,\n";
-      os << RST_PORT << " => tb_rst,\n";
-      os << CE0_PORT << " => " << m.ce0SignalName << ",\n";
-      os << WE0_PORT << " => " << m.we0SignalName << ",\n";
-      os << ADDR0_PORT << " => " << m.addr0SignalName << ",\n";
-      os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
-      os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
-      os << CE1_PORT << " => " << m.ce1SignalName << ",\n";
-      os << WE1_PORT << " => " << m.we1SignalName << ",\n";
-      os << ADDR1_PORT << " => " << m.addr1SignalName << ",\n";
-      os << D_OUT1_PORT << " => " << m.dOut1SignalName << ",\n";
-      os << D_IN1_PORT << " => " << m.dIn1SignalName << ",\n";
-      os << DONE_PORT << " => tb_stop\n";
-      os.unindent();
-      os << ");";
+
+      Instance memInst("two_port_RAM", "mem_inst_" + p.parameterName);
+
+      memInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
+          .parameter(OUT_FILE_PARAM, m.outFileParamValue)
+          .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
+          .parameter(ADDR_WIDTH_PARAM, m.addrWidthParamValue)
+          .parameter(DATA_DEPTH_PARAM, m.dataDepthParamValue)
+          .connect(CLK_PORT, "tb_clk")
+          .connect(RST_PORT, "tb_rst")
+          .connect(CE0_PORT, m.ce0SignalName)
+          .connect(WE0_PORT, m.we0SignalName)
+          .connect(ADDR0_PORT, m.addr0SignalName)
+          .connect(D_OUT0_PORT, m.dOut0SignalName)
+          .connect(D_IN0_PORT, m.dIn0SignalName)
+          .connect(CE1_PORT, m.ce1SignalName)
+          .connect(WE1_PORT, m.we1SignalName)
+          .connect(ADDR1_PORT, m.addr1SignalName)
+          .connect(D_OUT1_PORT, m.dOut1SignalName)
+          .connect(D_IN1_PORT, m.dIn1SignalName)
+          .connect(DONE_PORT, "tb_stop");
+
+      memInst.emitVhdl(os);
+
     } else {
-      // Models for scalar arguments
-      os << "arg_inst_" << p.parameterName << ": entity work.single_argument\n";
-      os << "generic map(\n";
-      os.indent();
-      os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
-      os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
-      os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
-      os.unindent();
-      os << ")\n";
-      os << "port map(\n";
-      os.indent();
+
+      Instance argInst("single_argument", "arg_inst_" + p.parameterName);
+      argInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
+          .parameter(OUT_FILE_PARAM, m.outFileParamValue)
+          .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
+          .connect(CLK_PORT, "tb_clk")
+          .connect(RST_PORT, "tb_rst")
+          .connect(CE0_PORT, "'1'")
+          .connect(DONE_PORT, "tb_temp_idle")
+          .connect(D_OUT0_PORT, m.dOut0SignalName)
+          .connect(D_OUT0_PORT + "_valid", m.dOut0SignalName + "_valid")
+          .connect(D_OUT0_PORT + "_ready", m.dOut0SignalName + "_ready");
 
       if (p.isInput && !p.isOutput && !p.isReturn) {
         // An argument that is a pure input (e.g., in_int_t).
-        os << WE0_PORT << " =>'0',\n";
-        os << D_IN0_PORT << " => (others => '0'),\n";
+        argInst.connect(WE0_PORT, "'0'").connect(D_IN0_PORT, "(others => '0')");
       } else if (p.isOutput && !p.isReturn) {
         // An argument that is an output (e.g., inout_int_t or out_int_t).
-        os << WE0_PORT << " => " << m.we0SignalName << ",\n";
-        os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
+        argInst.connect(WE0_PORT, m.we0SignalName)
+            .connect(D_IN0_PORT, m.dIn0SignalName);
       } else if (!p.isInput && p.isOutput && p.isReturn) {
         // Return value of the function.
-        os << WE0_PORT << " => tb_out0_valid,\n";
-        os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
+        argInst.connect(WE0_PORT, "tb_out0_valid")
+            .connect(D_IN0_PORT, m.dIn0SignalName);
       } else {
         assert(false && "Invalid parameter type");
       }
 
-      os << CLK_PORT << " => tb_clk,\n";
-      os << RST_PORT << " => tb_rst,\n";
-      os << CE0_PORT << " => '1',\n";
-      os << DONE_PORT << " => tb_temp_idle,\n";
-      os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
-      os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,\n";
-      os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready\n";
-      os.unindent();
-      os << ");";
+      argInst.emitVhdl(os);
     }
 
     os << "\n\n";
