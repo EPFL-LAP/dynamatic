@@ -430,21 +430,22 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
 
     // The channel's throughput cannot exceed the number of buffer slots
     model.addConstr(chThroughput <= bufNumSlots, "throughput_channel");
-    // (#427) If DATA signal is buffered, the CFDFC throughput cannot exceed 
-    // the channel throughput. If there is not, the constraint is loose. 
-    //
+
     // In the FPGA'20 paper: 
-    // - If R_c, Token occupancy >= cfVars.throughput &&
-    //           Bubble occupancy >= cfVars.throughput
+    // - If R_c, then token occupancy >= cfdfc's throughput, 
+    //           and bubble occupancy >= cfdfc's throughput.
     // 
     // In this implementation, R_c is separated into dataBuf and readyBuf.
-    // - If dataBuf, Token occupancy >= cfVars.throughput
-    // - If readyBuf, Bubble occupancy >= cfVars.throughput
+    // - If dataBuf, then token occupancy >= cfdfc's throughput.
+    // - If readyBuf, then bubble occupancy >= cfdfc's throughput.
+
+    // (#427) This constraint encodes:
+    // - If dataBuf, then token occupancy >= cfdfc's throughput.
     model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
                     "throughput_data");
-    // (#427) If READY signal exists and is buffered, the summed channel 
-    // and CFDFC throughputs cannot exceed the number of buffer slots. 
-    // If there is not, the constraint is loose.
+    // (#427) This constraint encodes the combined constraints:
+    // - If readyBuf, then bubble occupancy >= cfdfc's throughput.
+    // - Token occupancy + bubble occupancy <= buffer's slot number.
     //
     // Note: Additional buffers may be needed to prevent combinational cycles 
     // if the model does not select all three signals (or only selects DATA).
