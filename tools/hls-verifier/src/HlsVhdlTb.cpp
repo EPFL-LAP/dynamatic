@@ -313,10 +313,12 @@ void HlsVhdlTb::getEntitiyDeclaration(mlir::raw_indented_ostream &os) {
 
 void HlsVhdlTb::getArchitectureBegin(mlir::raw_indented_ostream &os) {
   os << "architecture behav of " << tleName << " is\n\n";
+  os.indent();
   os << "-- Constant declarations\n";
   getConstantDeclaration(os);
   os << "-- Signal declarations\n\n";
   getSignalDeclaration(os);
+  os.unindent();
   os << "begin\n\n";
 }
 
@@ -394,12 +396,16 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
     if (m.isArray) {
       os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
       os << "generic map(\n";
+      os.indent();
       os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
       os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
       os << DATA_DEPTH_PARAM_NAME << " => " << m.dataDepthParamValue << ",\n";
       os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << ",\n";
-      os << ADDR_WIDTH_PARAM_NAME << " => " << m.addrWidthParamValue << "\n)\n";
+      os << ADDR_WIDTH_PARAM_NAME << " => " << m.addrWidthParamValue;
+      os.unindent();
+      os << "\n)";
       os << "port map(\n";
+      os.indent();
       os << CLK_PORT_NAME << " => tb_clk,\n";
       os << RST_PORT_NAME << " => tb_rst,\n";
       os << CE0_PORT_NAME << " => " << m.ce0SignalName << ",\n";
@@ -412,7 +418,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
       os << ADDR1_PORT_NAME << " => " << m.addr1SignalName << ",\n";
       os << D_OUT1_PORT_NAME << " => " << m.dOut1SignalName << ",\n";
       os << D_IN1_PORT_NAME << " => " << m.dIn1SignalName << ",\n";
-      os << DONE_PORT_NAME << " => tb_stop\n);\n\n";
+      os << DONE_PORT_NAME << " => tb_stop\n";
+      os.unindent();
+      os << ");";
     } else {
 
       if (p.isInput && !p.isOutput && !p.isReturn) {
@@ -420,115 +428,71 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
         os << "arg_inst_" << p.parameterName
            << ": entity work.single_argument\n";
         os << "generic map(\n";
+        os.indent();
         os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
         os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
         os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
-        os << "port map("
-           << "\n";
-        os << CLK_PORT_NAME << " => "
-           << "tb_clk,"
-           << "\n";
-        os << RST_PORT_NAME << " => "
-           << "tb_rst,"
-           << "\n";
-        os << CE0_PORT_NAME << " => "
-           << "'1'"
-           << ","
-           << "\n";
-        os << WE0_PORT_NAME << " => "
-           << "'0'"
-           << ","
-           << "\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
-           << "\n";
+        os << "port map(\n";
+        os << CLK_PORT_NAME << " => tb_clk,\n";
+        os << RST_PORT_NAME << " => tb_rst,\n";
+        os << CE0_PORT_NAME << " => '1',\n";
+        os << WE0_PORT_NAME << " =>'0',\n";
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
         os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
         os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << D_IN0_PORT_NAME << " => "
-           << "(others => '0')"
-           << ","
-           << "\n";
-        os << DONE_PORT_NAME << " => "
-           << "tb_temp_idle"
-           << "\n";
-        os << ");"
-           << "\n"
-           << "\n";
+        os << D_IN0_PORT_NAME << " => (others => '0'),\n";
+        os << DONE_PORT_NAME << " => tb_temp_idle";
+        os.unindent();
+        os << ");";
       }
       if (p.isInput && p.isOutput && !p.isReturn) {
 
         os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
            << "\n";
-        os << "generic map("
-           << "\n";
+        os << "generic map(\n";
+        os.indent();
         os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
         os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
         os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
-        os << ")"
-           << "\n";
-        os << "port map("
-           << "\n";
-        os << CLK_PORT_NAME << " => "
-           << "tb_clk,"
-           << "\n";
-        os << RST_PORT_NAME << " => "
-           << "tb_rst,"
-           << "\n";
-        os << CE0_PORT_NAME << " => "
-           << "'1'"
-           << ","
-           << "\n";
-        os << WE0_PORT_NAME << " => " << m.we0SignalName << ","
-           << "\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
-           << "\n";
+        os << ")\n";
+        os << "port map(\n";
+        os << CLK_PORT_NAME << " => tb_clk,\n";
+        os << RST_PORT_NAME << " => tb_rst,\n";
+        os << CE0_PORT_NAME << " => '1',\n";
+        os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
         os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
         os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
-           << "\n";
-        os << DONE_PORT_NAME << " => "
-           << "tb_temp_idle"
-           << "\n";
-        os << ");"
-           << "\n"
-           << "\n";
+        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
+        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os.unindent();
+        os << ");\n\n";
       }
 
       if (!p.isInput && p.isOutput && p.isReturn) {
 
         os << "res_inst_" << p.parameterName << ": entity work.single_argument"
            << "\n";
-        os << "generic map("
-           << "\n";
+        os << "generic map(\n";
         os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
         os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
         os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
-        os << ")"
-           << "\n";
-        os << "port map("
-           << "\n";
-        os << CLK_PORT_NAME << " => "
-           << "tb_clk,"
-           << "\n";
-        os << RST_PORT_NAME << " => "
-           << "tb_rst,"
-           << "\n";
-        os << CE0_PORT_NAME << " => "
-           << "'1'"
-           << ","
-           << "\n";
-        os << WE0_PORT_NAME << " => "
-           << "tb_out0_valid"
-           << ","
-           << "\n";
+        os << ")\n";
+        os << "port map(\n";
+        os.indent();
+        os << CLK_PORT_NAME << " => tb_clk,\n";
+        os << RST_PORT_NAME << " => tb_rst,\n";
+        os << CE0_PORT_NAME << " => '1',\n";
+        os << WE0_PORT_NAME << " => tb_out0_valid,\n";
         os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
            << "\n";
         os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
@@ -537,57 +501,41 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << "\n";
         os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
            << "\n";
-        os << DONE_PORT_NAME << " => "
-           << "tb_temp_idle"
-           << "\n";
-        os << ");"
-           << "\n"
-           << "\n";
+        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os.unindent();
+        os << ");";
       }
 
       if (!p.isInput && p.isOutput && !p.isReturn) {
 
         os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
            << "\n";
-        os << "generic map("
-           << "\n";
+        os << "generic map(\n";
         os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
            << "\n";
         os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
            << "\n";
         os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
-        os << ")"
-           << "\n";
-        os << "port map("
-           << "\n";
-        os << CLK_PORT_NAME << " => "
-           << "tb_clk,"
-           << "\n";
-        os << RST_PORT_NAME << " => "
-           << "tb_rst,"
-           << "\n";
-        os << CE0_PORT_NAME << " => "
-           << "'1'"
-           << ","
-           << "\n";
-        os << WE0_PORT_NAME << " => " << m.we0SignalName << ","
-           << "\n";
-        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
-           << "\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
-           << "\n";
+        os << ")\n";
+        os << "port map(\n";
+        os.indent();
+        os << CLK_PORT_NAME << " => tb_clk,\n";
+        os << RST_PORT_NAME << " => tb_rst,\n";
+        os << CE0_PORT_NAME << " => '1',\n";
+        os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
+        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
+        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
         os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
         os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << DONE_PORT_NAME << " => "
-           << "tb_temp_idle"
-           << "\n";
-        os << ");"
-           << "\n"
-           << "\n";
+        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os.unindent();
+        os << ");";
       }
     }
+
+    os << "\n\n";
   }
 
   // Join all output valid signals into a global simulation end signal to
@@ -603,6 +551,7 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   unsigned idx = 0;
   os << "join_valids: entity work.tb_join(arch) generic map(" << joinSize
      << ")\nport map(\n";
+  os.indent();
   if (hasReturnVal)
     os << "ins_valid(" << idx++ << ") => tb_out0_valid,\n";
   for (MemElem &m : memElems) {
@@ -624,7 +573,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   }
   os << "ins_ready(" << idx++ << ") => tb_end_ready,\n";
   os << "outs_valid => tb_global_valid,\n";
-  os << "outs_ready => tb_global_ready\n);";
+  os << "outs_ready => tb_global_ready\n";
+  os.unindent();
+  os << ");\n\n";
 }
 
 void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
@@ -702,13 +653,14 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
   duvPortMap.emplace_back("end_ready", "tb_end_ready");
 
   os << "duv: entity work." << duvName << "\n";
-  os << "port map ("
-     << "\n";
+  os << "port map (\n";
+  os.indent();
   for (size_t i = 0; i < duvPortMap.size(); i++) {
     pair<string, string> elem = duvPortMap[i];
     os << "" << elem.first << " => " << elem.second
        << ((i < duvPortMap.size() - 1) ? "," : "") << "\n";
   }
+  os.unindent();
   os << ");\n\n";
 }
 
@@ -734,6 +686,7 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
       os << "variable token      : STRING(1 to 1024);\n";
       os << "\n";
       os << "begin\n";
+      os.indent();
       os << "file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
          << ", WRITE_MODE);\n";
       os << "if (fstatus /= OPEN_OK) then\n";
@@ -762,6 +715,7 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
       os << "writeline(fp, token_line);\n";
       os << "file_close(fp);\n";
       os << "wait;\n";
+      os.unindent();
       os << "end process;\n";
     }
   }
@@ -772,10 +726,12 @@ void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
   getLibraryHeader(os);
   getEntitiyDeclaration(os);
   getArchitectureBegin(os);
+  os.indent();
   getDuvInstanceGeneration(os);
   getMemoryInstanceGeneration(os);
   getOutputTagGeneration(os);
   getCommonBody(os);
+  os.unindent();
   getArchitectureEnd(os);
 }
 
