@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <sstream>
 
 #include "CAnalyser.h"
 #include "HlsLogging.h"
@@ -134,24 +133,24 @@ Constant::Constant(const string &name, const string &type, const string &value)
 
 // class MemElem
 
-static const string CLK_PORT_NAME = "clk";
-static const string RST_PORT_NAME = "rst";
-static const string CE0_PORT_NAME = "ce0";
-static const string WE0_PORT_NAME = "we0";
-static const string D_IN0_PORT_NAME = "mem_din0";
-static const string D_OUT0_PORT_NAME = "mem_dout0";
-static const string ADDR0_PORT_NAME = "address0";
-static const string CE1_PORT_NAME = "ce1";
-static const string WE1_PORT_NAME = "we1";
-static const string D_IN1_PORT_NAME = "mem_din1";
-static const string D_OUT1_PORT_NAME = "mem_dout1";
-static const string ADDR1_PORT_NAME = "address1";
-static const string DONE_PORT_NAME = "done";
-static const string IN_FILE_PARAM_NAME = "TV_IN";
-static const string OUT_FILE_PARAM_NAME = "TV_OUT";
-static const string DATA_WIDTH_PARAM_NAME = "DATA_WIDTH";
-static const string ADDR_WIDTH_PARAM_NAME = "ADDR_WIDTH";
-static const string DATA_DEPTH_PARAM_NAME = "DEPTH";
+static const string CLK_PORT = "clk";
+static const string RST_PORT = "rst";
+static const string CE0_PORT = "ce0";
+static const string WE0_PORT = "we0";
+static const string D_IN0_PORT = "mem_din0";
+static const string D_OUT0_PORT = "mem_dout0";
+static const string ADDR0_PORT = "address0";
+static const string CE1_PORT = "ce1";
+static const string WE1_PORT = "we1";
+static const string D_IN1_PORT = "mem_din1";
+static const string D_OUT1_PORT = "mem_dout1";
+static const string ADDR1_PORT = "address1";
+static const string DONE_PORT = "done";
+static const string IN_FILE_PARAM = "TV_IN";
+static const string OUT_FILE_PARAM = "TV_OUT";
+static const string DATA_WIDTH_PARAM = "DATA_WIDTH";
+static const string ADDR_WIDTH_PARAM = "ADDR_WIDTH";
+static const string DATA_DEPTH_PARAM = "DEPTH";
 
 // class HlsVhdTb
 
@@ -207,14 +206,14 @@ HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
 
     mElem.dIn0SignalName = p.parameterName + "_mem_din0";
     mElem.dOut0SignalName = p.parameterName + "_mem_dout0";
-    mElem.we0SignalName = p.parameterName + "_mem_" + WE0_PORT_NAME;
-    mElem.ce0SignalName = p.parameterName + "_mem_" + CE0_PORT_NAME;
-    mElem.addr0SignalName = p.parameterName + "_mem_" + ADDR0_PORT_NAME;
+    mElem.we0SignalName = p.parameterName + "_mem_" + WE0_PORT;
+    mElem.ce0SignalName = p.parameterName + "_mem_" + CE0_PORT;
+    mElem.addr0SignalName = p.parameterName + "_mem_" + ADDR0_PORT;
     mElem.dIn1SignalName = p.parameterName + "_mem_din1";
     mElem.dOut1SignalName = p.parameterName + "_mem_dout1";
-    mElem.we1SignalName = p.parameterName + "_mem_" + WE1_PORT_NAME;
-    mElem.ce1SignalName = p.parameterName + "_mem_" + CE1_PORT_NAME;
-    mElem.addr1SignalName = p.parameterName + "_mem_" + ADDR1_PORT_NAME;
+    mElem.we1SignalName = p.parameterName + "_mem_" + WE1_PORT;
+    mElem.ce1SignalName = p.parameterName + "_mem_" + CE1_PORT;
+    mElem.addr1SignalName = p.parameterName + "_mem_" + ADDR1_PORT;
 
     mElem.memStartSignalName = p.parameterName + "_memStart";
     mElem.memEndSignalName = p.parameterName + "_memEnd";
@@ -397,28 +396,28 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
       os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
       os << "generic map(\n";
       os.indent();
-      os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
-      os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
-      os << DATA_DEPTH_PARAM_NAME << " => " << m.dataDepthParamValue << ",\n";
-      os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << ",\n";
-      os << ADDR_WIDTH_PARAM_NAME << " => " << m.addrWidthParamValue;
+      os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
+      os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
+      os << DATA_DEPTH_PARAM << " => " << m.dataDepthParamValue << ",\n";
+      os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << ",\n";
+      os << ADDR_WIDTH_PARAM << " => " << m.addrWidthParamValue;
       os.unindent();
       os << "\n)";
       os << "port map(\n";
       os.indent();
-      os << CLK_PORT_NAME << " => tb_clk,\n";
-      os << RST_PORT_NAME << " => tb_rst,\n";
-      os << CE0_PORT_NAME << " => " << m.ce0SignalName << ",\n";
-      os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
-      os << ADDR0_PORT_NAME << " => " << m.addr0SignalName << ",\n";
-      os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
-      os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
-      os << CE1_PORT_NAME << " => " << m.ce1SignalName << ",\n";
-      os << WE1_PORT_NAME << " => " << m.we1SignalName << ",\n";
-      os << ADDR1_PORT_NAME << " => " << m.addr1SignalName << ",\n";
-      os << D_OUT1_PORT_NAME << " => " << m.dOut1SignalName << ",\n";
-      os << D_IN1_PORT_NAME << " => " << m.dIn1SignalName << ",\n";
-      os << DONE_PORT_NAME << " => tb_stop\n";
+      os << CLK_PORT << " => tb_clk,\n";
+      os << RST_PORT << " => tb_rst,\n";
+      os << CE0_PORT << " => " << m.ce0SignalName << ",\n";
+      os << WE0_PORT << " => " << m.we0SignalName << ",\n";
+      os << ADDR0_PORT << " => " << m.addr0SignalName << ",\n";
+      os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
+      os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
+      os << CE1_PORT << " => " << m.ce1SignalName << ",\n";
+      os << WE1_PORT << " => " << m.we1SignalName << ",\n";
+      os << ADDR1_PORT << " => " << m.addr1SignalName << ",\n";
+      os << D_OUT1_PORT << " => " << m.dOut1SignalName << ",\n";
+      os << D_IN1_PORT << " => " << m.dIn1SignalName << ",\n";
+      os << DONE_PORT << " => tb_stop\n";
       os.unindent();
       os << ");";
     } else {
@@ -429,22 +428,22 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << ": entity work.single_argument\n";
         os << "generic map(\n";
         os.indent();
-        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ",\n";
-        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ",\n";
-        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
+        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ",\n";
+        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ",\n";
+        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
         os << "port map(\n";
-        os << CLK_PORT_NAME << " => tb_clk,\n";
-        os << RST_PORT_NAME << " => tb_rst,\n";
-        os << CE0_PORT_NAME << " => '1',\n";
-        os << WE0_PORT_NAME << " =>'0',\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
+        os << CLK_PORT << " => tb_clk,\n";
+        os << RST_PORT << " => tb_rst,\n";
+        os << CE0_PORT << " => '1',\n";
+        os << WE0_PORT << " =>'0',\n";
+        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
+        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
+        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << D_IN0_PORT_NAME << " => (others => '0'),\n";
-        os << DONE_PORT_NAME << " => tb_temp_idle";
+        os << D_IN0_PORT << " => (others => '0'),\n";
+        os << DONE_PORT << " => tb_temp_idle";
         os.unindent();
         os << ");";
       }
@@ -454,24 +453,24 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
            << "\n";
         os << "generic map(\n";
         os.indent();
-        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
            << "\n";
-        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
            << "\n";
-        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
+        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
         os << "port map(\n";
-        os << CLK_PORT_NAME << " => tb_clk,\n";
-        os << RST_PORT_NAME << " => tb_rst,\n";
-        os << CE0_PORT_NAME << " => '1',\n";
-        os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
+        os << CLK_PORT << " => tb_clk,\n";
+        os << RST_PORT << " => tb_rst,\n";
+        os << CE0_PORT << " => '1',\n";
+        os << WE0_PORT << " => " << m.we0SignalName << ",\n";
+        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
+        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
+        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
-        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
+        os << DONE_PORT << " => tb_temp_idle\n";
         os.unindent();
         os << ");\n\n";
       }
@@ -481,27 +480,27 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
         os << "res_inst_" << p.parameterName << ": entity work.single_argument"
            << "\n";
         os << "generic map(\n";
-        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
            << "\n";
-        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
            << "\n";
-        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
+        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
         os << "port map(\n";
         os.indent();
-        os << CLK_PORT_NAME << " => tb_clk,\n";
-        os << RST_PORT_NAME << " => tb_rst,\n";
-        os << CE0_PORT_NAME << " => '1',\n";
-        os << WE0_PORT_NAME << " => tb_out0_valid,\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ","
+        os << CLK_PORT << " => tb_clk,\n";
+        os << RST_PORT << " => tb_rst,\n";
+        os << CE0_PORT << " => '1',\n";
+        os << WE0_PORT << " => tb_out0_valid,\n";
+        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ","
            << "\n";
-        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
+        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
+        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ","
+        os << D_IN0_PORT << " => " << m.dIn0SignalName << ","
            << "\n";
-        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os << DONE_PORT << " => tb_temp_idle\n";
         os.unindent();
         os << ");";
       }
@@ -511,25 +510,25 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
         os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
            << "\n";
         os << "generic map(\n";
-        os << IN_FILE_PARAM_NAME << " => " << m.inFileParamValue << ","
+        os << IN_FILE_PARAM << " => " << m.inFileParamValue << ","
            << "\n";
-        os << OUT_FILE_PARAM_NAME << " => " << m.outFileParamValue << ","
+        os << OUT_FILE_PARAM << " => " << m.outFileParamValue << ","
            << "\n";
-        os << DATA_WIDTH_PARAM_NAME << " => " << m.dataWidthParamValue << "\n";
+        os << DATA_WIDTH_PARAM << " => " << m.dataWidthParamValue << "\n";
         os << ")\n";
         os << "port map(\n";
         os.indent();
-        os << CLK_PORT_NAME << " => tb_clk,\n";
-        os << RST_PORT_NAME << " => tb_rst,\n";
-        os << CE0_PORT_NAME << " => '1',\n";
-        os << WE0_PORT_NAME << " => " << m.we0SignalName << ",\n";
-        os << D_IN0_PORT_NAME << " => " << m.dIn0SignalName << ",\n";
-        os << D_OUT0_PORT_NAME << " => " << m.dOut0SignalName << ",\n";
-        os << D_OUT0_PORT_NAME + "_valid => " << m.dOut0SignalName << "_valid,"
+        os << CLK_PORT << " => tb_clk,\n";
+        os << RST_PORT << " => tb_rst,\n";
+        os << CE0_PORT << " => '1',\n";
+        os << WE0_PORT << " => " << m.we0SignalName << ",\n";
+        os << D_IN0_PORT << " => " << m.dIn0SignalName << ",\n";
+        os << D_OUT0_PORT << " => " << m.dOut0SignalName << ",\n";
+        os << D_OUT0_PORT + "_valid => " << m.dOut0SignalName << "_valid,"
            << "\n";
-        os << D_OUT0_PORT_NAME + "_ready => " << m.dOut0SignalName << "_ready,"
+        os << D_OUT0_PORT + "_ready => " << m.dOut0SignalName << "_ready,"
            << "\n";
-        os << DONE_PORT_NAME << " => tb_temp_idle\n";
+        os << DONE_PORT << " => tb_temp_idle\n";
         os.unindent();
         os << ");";
       }
