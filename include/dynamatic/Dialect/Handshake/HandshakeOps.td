@@ -679,28 +679,6 @@ def JoinOp : Handshake_Op<"join", [
   let assemblyFormat = "$data attr-dict `:` custom<HandshakeType>(type($result))";
 }
 
-// TODO: Split the input into two parts and explicitly mark the forwarded input,
-// once the backend supports variadic channels with zero or one item correctly.
-def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
-]> {
-  let summary = "blocker operation";
-  let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
-    then forwards the first input.
-
-    Example:
-
-    ```mlir
-    %0 = blocker %a, %b, %c : !handshake.channel<i32>
-    ```
-  }];
-
-  let arguments = (ins Variadic<ChannelType>:$data);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
-}
-
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
   let summary = "Logical negation";
   let description = [{

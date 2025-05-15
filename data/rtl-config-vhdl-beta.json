@@ -204,14 +204,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t demux -p size=$SIZE port_types=$PORT_TYPES data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.blocker",
-    "parameters": [
-      { "name": "SIZE", "type": "unsigned" }
-    ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t blocker -p size=$SIZE bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
-    "dependencies": ["types"]
-  },
-  {
     "name": "mem_to_bram",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mem_to_bram -p port_types=$PORT_TYPES addr_bitwidth=$ADDR_BITWIDTH data_bitwidth=$DATA_BITWIDTH"
   },
@@ -226,14 +218,6 @@
   {
     "name": "handshake.extract",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extract -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
-  },
-  {
-    "name": "handshake.sitofp",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sitofp -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
-  },
-  {
-    "name": "handshake.fptosi",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p port_types=$PORT_TYPES bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.init",

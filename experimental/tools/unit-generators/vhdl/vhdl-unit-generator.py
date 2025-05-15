@@ -131,14 +131,8 @@ def generate_code(name, mod_type, parameters):
       return fifo.generate_free_tags_fifo(name, parameters)
     case "demux":
       return demux.generate_demux(name, parameters)
-    case "blocker":
-      return blocker.generate_blocker(name, parameters)
     case "extract":
       return extract.generate_extract(name, parameters)
-    case "sitofp":
-      return sitofp.generate_sitofp(name, parameters)
-    case "fptosi":
-      return fptosi.generate_fptosi(name, parameters)
     case "init":
       return init.generate_tehb(name, parameters)
     case _:

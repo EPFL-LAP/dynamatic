@@ -62,12 +62,12 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
       .Case<handshake::SourceOp, handshake::ConstantOp>([&](auto) {
         return getHandshakeTypeBitWidth(op->getResult(0).getType());
       })
-      .Case<handshake::EndOp, handshake::JoinOp, handshake::BlockerOp>(
-          [&](auto) {
-            if (op->getNumOperands() == 0)
-              return 0u;
-            return getHandshakeTypeBitWidth(op->getOperand(0).getType());
-          })
+      .Case<handshake::EndOp, handshake::JoinOp>([&](auto) {
+        unsigned maxWidth = 0;
+        for (Type ty : op->getOperandTypes())
+          maxWidth = std::max(maxWidth, getHandshakeTypeBitWidth(ty));
+        return maxWidth;
+      })
       .Case<handshake::LoadOp, handshake::StoreOp>([&](auto) {
         return std::max(getHandshakeTypeBitWidth(op->getOperand(0).getType()),
                         getHandshakeTypeBitWidth(op->getOperand(1).getType()));

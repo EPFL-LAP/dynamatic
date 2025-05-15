@@ -537,7 +537,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getResult(0));
       })
-      .Case<handshake::JoinOp, handshake::BlockerOp>([&](auto) {
+      .Case<handshake::JoinOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getResult(0));
@@ -1838,7 +1838,6 @@ public:
                     ConvertToHWInstance<handshake::ControlMergeOp>,
                     ConvertToHWInstance<handshake::MuxOp>,
                     ConvertToHWInstance<handshake::JoinOp>,
-                    ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,
