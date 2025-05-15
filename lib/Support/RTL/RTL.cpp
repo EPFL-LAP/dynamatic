@@ -340,11 +340,12 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
-      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
-      modName == "handshake.merge" || modName == "handshake.muli" ||
-      modName == "handshake.sink" || modName == "handshake.subi" ||
-      modName == "handshake.shli" || modName == "handshake.extract" ||
-      modName == "handshake.join" || modName == "handshake.init" ||
+      modName == "handshake.fork" || modName == "handshake.merge" ||
+      modName == "handshake.muli" || modName == "handshake.sink" ||
+      modName == "handshake.subi" || modName == "handshake.shli" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.extract" || modName == "handshake.init" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -458,7 +459,9 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.extui" || modName == "handshake.shli" ||
       modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
-      modName == "handshake.control_merge" || modName == "handshake.extract" ||
+      modName == "handshake.mux" || modName == "handshake.control_merge" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" || modName == "handshake.extract" ||
       modName == "handshake.lazy_fork" || modName == "handshake.init" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
