@@ -19,7 +19,7 @@
 #include <llvm/ADT/StringSet.h>
 
 #include "Constraints.h"
-#include "CreateSmvFormalTestbench.h"
+#include "ElasticMiterTestbench.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
 #include "SmvUtils.h"
@@ -187,7 +187,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
   // Create the wrapper with infinite sequence generators
   auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
-      outputDir / "main_inf.smv", config, smvModelName, 0);
+      context, outputDir / "main_inf.smv", config, smvModelName, 0);
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -219,7 +219,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
     // Create the wrapper with n-token sequence generators
     auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
-        wrapperPath, config, smvModelName, numberOfTokens);
+        context, wrapperPath, config, smvModelName, numberOfTokens);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << numberOfTokens
                    << " token reachability wrapper.\n";
