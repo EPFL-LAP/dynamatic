@@ -238,70 +238,6 @@ string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
   return "";
 }
 
-string HlsVhdlTb::getAddr0PortNameForCParam(string &cParam) {
-  return cParam + "_address0";
-}
-
-string HlsVhdlTb::getAddr1PortNameForCParam(string &cParam) {
-  return cParam + "_address1";
-}
-
-string HlsVhdlTb::getCe0PortNameForCParam(string &cParam) {
-  return cParam + "_ce0";
-}
-
-string HlsVhdlTb::getCe1PortNameForCParam(string &cParam) {
-  return cParam + "_ce1";
-}
-
-string HlsVhdlTb::getDataIn0PortNameForCParam(string &cParam) {
-  return cParam + "_din0";
-}
-
-string HlsVhdlTb::getDataIn1PortNameForCParam(string &cParam) {
-  return cParam + "_din1";
-}
-
-string HlsVhdlTb::getDataOut0PortNameForCParam(string &cParam) {
-  return cParam + "_dout0";
-}
-
-string HlsVhdlTb::getDataOut1PortNameForCParam(string &cParam) {
-  return cParam + "_dout1";
-}
-
-string HlsVhdlTb::getWe0PortNameForCParam(string &cParam) {
-  return cParam + "_we0";
-}
-
-string HlsVhdlTb::getWe1PortNameForCParam(string &cParam) {
-  return cParam + "_we1";
-}
-
-string HlsVhdlTb::getValidInPortNameForCParam(string &cParam) {
-  return cParam + "_valid_in";
-}
-
-string HlsVhdlTb::getValidOutPortNameForCParam(string &cParam) {
-  return cParam + "_valid_out";
-}
-
-string HlsVhdlTb::getReadyInPortNameForCParam(string &cParam) {
-  return cParam + "_ready_in";
-}
-
-string HlsVhdlTb::getReadyOutPortNameForCParam(string &cParam) {
-  return cParam + "_ready_out";
-}
-
-string HlsVhdlTb::getDataInSaPortNameForCParam(string &cParam) {
-  return cParam + "_din";
-}
-
-string HlsVhdlTb::getDataOutSaPortNameForCParam(string &cParam) {
-  return cParam + "_dout";
-}
-
 void HlsVhdlTb::getLibraryHeader(mlir::raw_indented_ostream &os) {
   os << VHDL_LIBRARY_HEADER;
 }
@@ -617,12 +553,9 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
               .connect(p.parameterName + "_valid", "tb_out0_valid")
               .connect(p.parameterName + "_ready", "tb_out0_ready");
         } else {
-          duvInst
-              .connect(getValidOutPortNameForCParam(p.parameterName),
-                       m.we0SignalName)
-              .connect(getDataOutSaPortNameForCParam(p.parameterName),
-                       m.dIn0SignalName)
-              .connect(getReadyInPortNameForCParam(p.parameterName), "'1'");
+          duvInst.connect(p.parameterName + "_valid", m.we0SignalName)
+              .connect(p.parameterName + "_din", m.dIn0SignalName)
+              .connect(p.parameterName + "_ready", "'1'");
         }
       }
     }

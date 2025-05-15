@@ -79,23 +79,6 @@ private:
   void getArchitectureEnd(mlir::raw_indented_ostream &os);
   void getOutputTagGeneration(mlir::raw_indented_ostream &os);
   int getTransactionNumberFromInput();
-
-  static string getCe0PortNameForCParam(string &cParam);
-  static string getWe0PortNameForCParam(string &cParam);
-  static string getDataIn0PortNameForCParam(string &cParam);
-  static string getDataOut0PortNameForCParam(string &cParam);
-  static string getAddr0PortNameForCParam(string &cParam);
-  static string getCe1PortNameForCParam(string &cParam);
-  static string getWe1PortNameForCParam(string &cParam);
-  static string getDataIn1PortNameForCParam(string &cParam);
-  static string getDataOut1PortNameForCParam(string &cParam);
-  static string getAddr1PortNameForCParam(string &cParam);
-  static string getReadyInPortNameForCParam(string &cParam);
-  static string getReadyOutPortNameForCParam(string &cParam);
-  static string getValidInPortNameForCParam(string &cParam);
-  static string getValidOutPortNameForCParam(string &cParam);
-  static string getDataInSaPortNameForCParam(string &cParam);
-  static string getDataOutSaPortNameForCParam(string &cParam);
 };
 } // namespace hls_verify
 
