@@ -13,6 +13,7 @@
 #include "CAnalyser.h"
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
+#include "mlir/Support/IndentedOstream.h"
 
 namespace hls_verify {
 const string LOG_TAG = "VVER";
@@ -312,305 +313,307 @@ string HlsVhdlTb::getDataOutSaPortNameForCParam(string &cParam) {
   return cParam + "_dout";
 }
 
-string HlsVhdlTb::getLibraryHeader() { return vhdlLibraryHeader; }
+void HlsVhdlTb::getLibraryHeader(mlir::raw_indented_ostream &os) {
+  os << vhdlLibraryHeader;
+}
 
-string HlsVhdlTb::getEntitiyDeclaration() {
-  return "entity " + tleName + " is\n\nend entity " + tleName + ";\n";
+void HlsVhdlTb::getEntitiyDeclaration(mlir::raw_indented_ostream &os) {
+  os << "entity " + tleName + " is\n\nend entity " + tleName + ";\n";
 }
 
 // function to get the port name in the entitiy for each paramter
 
-string HlsVhdlTb::getArchitectureBegin() {
-  stringstream arch;
-  arch << "architecture behav of " << tleName << " is" << endl << endl;
-
-  arch << "\t-- Constant declarations" << endl << endl;
-  arch << getConstantDeclaration() << endl;
-
-  arch << "\t-- Signal declarations" << endl << endl;
-  arch << getSignalDeclaration() << endl;
-
-  arch << "begin" << endl << endl;
-  return arch.str();
+void HlsVhdlTb::getArchitectureBegin(mlir::raw_indented_ostream &os) {
+  os << "architecture behav of " << tleName << " is\n\n";
+  os << "-- Constant declarations\n";
+  getConstantDeclaration(os);
+  os << "-- Signal declarations\n\n";
+  getSignalDeclaration(os);
+  os << "begin\n\n";
 }
 
-string HlsVhdlTb::getConstantDeclaration() {
-  stringstream code;
+void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   for (const auto &c : constants) {
-    code << "\t"
-         << "constant " << c.constName << " : " << c.constType
-         << " := " << c.constValue << ";" << endl;
+    os << "constant " << c.constName << " : " << c.constType
+       << " := " << c.constValue << ";\n";
   }
-  return code.str();
 }
 
-string HlsVhdlTb::getSignalDeclaration() {
-  stringstream code;
+void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
 
-  code << "\tsignal tb_clk : std_logic := '0';" << endl;
-  code << "\tsignal tb_rst : std_logic := '0';" << endl;
-
-  code << "\tsignal tb_start_valid : std_logic := '0';" << endl;
-  code << "\tsignal tb_start_ready, tb_started : std_logic;" << endl;
-
-  code << "\tsignal tb_end_valid, tb_end_ready : std_logic;" << endl;
-  code << "\tsignal tb_out0_valid, tb_out0_ready : std_logic;" << endl;
-  code << "\tsignal tb_global_valid, tb_global_ready, tb_stop : std_logic;"
-       << endl;
-
-  code << endl;
+  os << "signal tb_clk : std_logic := '0';\n";
+  os << "signal tb_rst : std_logic := '0';\n";
+  os << "signal tb_start_valid : std_logic := '0';\n";
+  os << "signal tb_start_ready, tb_started : std_logic;\n";
+  os << "signal tb_end_valid, tb_end_ready : std_logic;\n";
+  os << "signal tb_out0_valid, tb_out0_ready : std_logic;\n";
+  os << "signal tb_global_valid, tb_global_ready, tb_stop : std_logic;\n\n";
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
     CFunctionParameter p = cDuvParams[i];
     MemElem m = memElems[i];
 
     if (m.isArray) {
-      code << "\tsignal " << m.ce0SignalName << " : std_logic;" << endl;
-      code << "\tsignal " << m.we0SignalName << " : std_logic;" << endl;
-      code << "\tsignal " << m.dIn0SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-      code << "\tsignal " << m.dOut0SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-      code << "\tsignal " << m.addr0SignalName << " : std_logic_vector("
-           << m.addrWidthParamValue << " - 1 downto 0);" << endl
-           << endl;
+      os << "signal " << m.ce0SignalName << " : std_logic;\n";
+      os << "signal " << m.we0SignalName << " : std_logic;\n";
+      os << "signal " << m.dIn0SignalName << " : std_logic_vector("
+         << m.dataWidthParamValue << " - 1 downto 0);\n";
+      os << "signal " << m.dOut0SignalName << " : std_logic_vector("
+         << m.dataWidthParamValue << " - 1 downto 0);\n";
+      os << "signal " << m.addr0SignalName << " : std_logic_vector("
+         << m.addrWidthParamValue << " - 1 downto 0);\n\n";
 
-      code << "\tsignal " << m.ce1SignalName << " : std_logic;" << endl;
-      code << "\tsignal " << m.we1SignalName << " : std_logic;" << endl;
-      code << "\tsignal " << m.dIn1SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-      code << "\tsignal " << m.dOut1SignalName << " : std_logic_vector("
-           << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-      code << "\tsignal " << m.addr1SignalName << " : std_logic_vector("
-           << m.addrWidthParamValue << " - 1 downto 0);" << endl
-           << endl;
+      os << "signal " << m.ce1SignalName << " : std_logic;\n";
+      os << "signal " << m.we1SignalName << " : std_logic;\n";
+      os << "signal " << m.dIn1SignalName << " : std_logic_vector("
+         << m.dataWidthParamValue << " - 1 downto 0);\n";
+      os << "signal " << m.dOut1SignalName << " : std_logic_vector("
+         << m.dataWidthParamValue << " - 1 downto 0);\n";
+      os << "signal " << m.addr1SignalName << " : std_logic_vector("
+         << m.addrWidthParamValue << " - 1 downto 0);\n";
 
-      code << "\tsignal " << m.memStartSignalName << "_valid : std_logic;"
-           << endl;
-      code << "\tsignal " << m.memStartSignalName << "_ready : std_logic;"
-           << endl;
-      code << "\tsignal " << m.memEndSignalName << "_valid : std_logic;"
-           << endl;
-      code << "\tsignal " << m.memEndSignalName << "_ready : std_logic;" << endl
-           << endl;
+      os << "signal " << m.memStartSignalName << "_valid : std_logic;\n";
+      os << "signal " << m.memStartSignalName << "_ready : std_logic;\n";
+      os << "signal " << m.memEndSignalName << "_valid : std_logic;\n";
+      os << "signal " << m.memEndSignalName << "_ready : std_logic;\n\n";
 
     } else {
       if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
           !cDuvParams[i].isReturn) {
-        code << "\tsignal " << m.ce0SignalName << " : std_logic;" << endl;
-        code << "\tsignal " << m.we0SignalName << " : std_logic;" << endl;
+        os << "signal " << m.ce0SignalName << " : std_logic;\n";
+        os << "signal " << m.we0SignalName << " : std_logic;\n";
 
-        code << "\tsignal " << m.dOut0SignalName << " : std_logic_vector("
-             << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-        code << "\tsignal " << m.dIn0SignalName << " : std_logic_vector("
-             << m.dataWidthParamValue << " - 1 downto 0);" << endl;
-        code << "\tsignal " << m.dOut0SignalName << "_valid : std_logic;"
-             << endl;
-        code << "\tsignal " << m.dOut0SignalName << "_ready : std_logic;"
-             << endl
-             << endl;
+        os << "signal " << m.dOut0SignalName << " : std_logic_vector("
+           << m.dataWidthParamValue << " - 1 downto 0);\n";
+        os << "signal " << m.dIn0SignalName << " : std_logic_vector("
+           << m.dataWidthParamValue << " - 1 downto 0);\n";
+        os << "signal " << m.dOut0SignalName << "_valid : std_logic;\n";
+        os << "signal " << m.dOut0SignalName << "_ready : std_logic;\n\n";
       }
     }
   }
 
-  code << endl;
+  os << "\n";
 
-  code << "\tsignal tb_temp_idle : std_logic := '1';" << endl;
-  code << "\tshared variable transaction_idx : INTEGER := 0;" << endl;
-
-  return code.str();
+  os << "signal tb_temp_idle : std_logic := '1';\n";
+  os << "shared variable transaction_idx : INTEGER := 0;\n";
 }
 
-string HlsVhdlTb::getMemoryInstanceGeneration() {
-  stringstream code;
+void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   for (size_t i = 0; i < memElems.size(); i++) {
     MemElem m = memElems[i];
     CFunctionParameter p = cDuvParams[i];
     if (m.isArray) {
-      code << "mem_inst_" << p.parameterName << ":\t entity work.two_port_RAM "
-           << endl;
-      code << "\tgeneric map(" << endl;
-      code << "\t\t" << MemElem::inFileParamName << " => " << m.inFileParamValue
-           << "," << endl;
-      code << "\t\t" << MemElem::outFileParamName << " => "
-           << m.outFileParamValue << "," << endl;
-      code << "\t\t" << MemElem::dataDepthParamName << " => "
-           << m.dataDepthParamValue << "," << endl;
-      code << "\t\t" << MemElem::dataWidthParamName << " => "
-           << m.dataWidthParamValue << "," << endl;
-      code << "\t\t" << MemElem::addrWidthParamName << " => "
-           << m.addrWidthParamValue << endl;
-      code << "\t)" << endl;
-      code << "\tport map(" << endl;
-      code << "\t\t" << MemElem::clkPortName << " => "
-           << "tb_clk," << endl;
-      code << "\t\t" << MemElem::rstPortName << " => "
-           << "tb_rst," << endl;
-      code << "\t\t" << MemElem::ce0PortName << " => " << m.ce0SignalName << ","
-           << endl;
-      code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName << ","
-           << endl;
-      code << "\t\t" << MemElem::addr0PortName << " => " << m.addr0SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::ce1PortName << " => " << m.ce1SignalName << ","
-           << endl;
-      code << "\t\t" << MemElem::we1PortName << " => " << m.we1SignalName << ","
-           << endl;
-      code << "\t\t" << MemElem::addr1PortName << " => " << m.addr1SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::dOut1PortName << " => " << m.dOut1SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::dIn1PortName << " => " << m.dIn1SignalName
-           << "," << endl;
-      code << "\t\t" << MemElem::donePortName << " => "
-           << "tb_stop" << endl;
-      code << "\t);" << endl << endl;
+      os << "mem_inst_" << p.parameterName << ": entity work.two_port_RAM \n";
+      os << "generic map(\n";
+      os << MemElem::inFileParamName << " => " << m.inFileParamValue << ",\n";
+      os << MemElem::outFileParamName << " => " << m.outFileParamValue << ",\n";
+      os << MemElem::dataDepthParamName << " => " << m.dataDepthParamValue
+         << ",\n";
+      os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
+         << ",\n";
+      os << MemElem::addrWidthParamName << " => " << m.addrWidthParamValue
+         << "\n)\n";
+      os << "port map(\n";
+      os << MemElem::clkPortName << " => tb_clk,\n";
+      os << MemElem::rstPortName << " => tb_rst,\n";
+      os << MemElem::ce0PortName << " => " << m.ce0SignalName << ",\n";
+      os << MemElem::we0PortName << " => " << m.we0SignalName << ",\n";
+      os << MemElem::addr0PortName << " => " << m.addr0SignalName << ",\n";
+      os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ",\n";
+      os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ",\n";
+      os << MemElem::ce1PortName << " => " << m.ce1SignalName << ",\n";
+      os << MemElem::we1PortName << " => " << m.we1SignalName << ",\n";
+      os << MemElem::addr1PortName << " => " << m.addr1SignalName << ",\n";
+      os << MemElem::dOut1PortName << " => " << m.dOut1SignalName << ",\n";
+      os << MemElem::dIn1PortName << " => " << m.dIn1SignalName << ",\n";
+      os << MemElem::donePortName << " => tb_stop\n);\n\n";
     } else {
 
       if (p.isInput && !p.isOutput && !p.isReturn) {
 
-        code << "arg_inst_" << p.parameterName
-             << ":\t entity work.single_argument" << endl;
-        code << "\tgeneric map(" << endl;
-        code << "\t\t" << MemElem::inFileParamName << " => "
-             << m.inFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::outFileParamName << " => "
-             << m.outFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::dataWidthParamName << " => "
-             << m.dataWidthParamValue << endl;
-        code << "\t)" << endl;
-        code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => "
-             << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => "
-             << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => "
-             << "'1'"
-             << "," << endl;
-        code << "\t\t" << MemElem::we0PortName << " => "
-             << "'0'"
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
-             << m.dOut0SignalName << "_valid," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
-             << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::dIn0PortName << " => "
-             << "(others => '0')"
-             << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => "
-             << "tb_temp_idle" << endl;
-        code << "\t);" << endl << endl;
+        os << "arg_inst_" << p.parameterName
+           << ": entity work.single_argument\n";
+        os << "generic map(\n";
+        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ",\n";
+        os << MemElem::outFileParamName << " => " << m.outFileParamValue
+           << ",\n";
+        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
+           << "\n";
+        os << ")\n";
+        os << "port map("
+           << "\n";
+        os << MemElem::clkPortName << " => "
+           << "tb_clk,"
+           << "\n";
+        os << MemElem::rstPortName << " => "
+           << "tb_rst,"
+           << "\n";
+        os << MemElem::ce0PortName << " => "
+           << "'1'"
+           << ","
+           << "\n";
+        os << MemElem::we0PortName << " => "
+           << "'0'"
+           << ","
+           << "\n";
+        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
+           << "_valid,"
+           << "\n";
+        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
+           << "_ready,"
+           << "\n";
+        os << MemElem::dIn0PortName << " => "
+           << "(others => '0')"
+           << ","
+           << "\n";
+        os << MemElem::donePortName << " => "
+           << "tb_temp_idle"
+           << "\n";
+        os << ");"
+           << "\n"
+           << "\n";
       }
       if (p.isInput && p.isOutput && !p.isReturn) {
 
-        code << "arg_inst_" << p.parameterName
-             << ":\t entity work.single_argument" << endl;
-        code << "\tgeneric map(" << endl;
-        code << "\t\t" << MemElem::inFileParamName << " => "
-             << m.inFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::outFileParamName << " => "
-             << m.outFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::dataWidthParamName << " => "
-             << m.dataWidthParamValue << endl;
-        code << "\t)" << endl;
-        code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => "
-             << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => "
-             << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => "
-             << "'1'"
-             << "," << endl;
-        code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
-             << m.dOut0SignalName << "_valid," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
-             << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => "
-             << "tb_temp_idle" << endl;
-        code << "\t);" << endl << endl;
+        os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
+           << "\n";
+        os << "generic map("
+           << "\n";
+        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+           << "\n";
+        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+           << "\n";
+        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
+           << "\n";
+        os << ")"
+           << "\n";
+        os << "port map("
+           << "\n";
+        os << MemElem::clkPortName << " => "
+           << "tb_clk,"
+           << "\n";
+        os << MemElem::rstPortName << " => "
+           << "tb_rst,"
+           << "\n";
+        os << MemElem::ce0PortName << " => "
+           << "'1'"
+           << ","
+           << "\n";
+        os << MemElem::we0PortName << " => " << m.we0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
+           << "_valid,"
+           << "\n";
+        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
+           << "_ready,"
+           << "\n";
+        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+           << "\n";
+        os << MemElem::donePortName << " => "
+           << "tb_temp_idle"
+           << "\n";
+        os << ");"
+           << "\n"
+           << "\n";
       }
 
       if (!p.isInput && p.isOutput && p.isReturn) {
 
-        code << "res_inst_" << p.parameterName
-             << ":\t entity work.single_argument" << endl;
-        code << "\tgeneric map(" << endl;
-        code << "\t\t" << MemElem::inFileParamName << " => "
-             << m.inFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::outFileParamName << " => "
-             << m.outFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::dataWidthParamName << " => "
-             << m.dataWidthParamValue << endl;
-        code << "\t)" << endl;
-        code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => "
-             << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => "
-             << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => "
-             << "'1'"
-             << "," << endl;
-        code << "\t\t" << MemElem::we0PortName << " => "
-             << "tb_out0_valid"
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
-             << m.dOut0SignalName << "_valid," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
-             << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::donePortName << " => "
-             << "tb_temp_idle" << endl;
-        code << "\t);" << endl << endl;
+        os << "res_inst_" << p.parameterName << ": entity work.single_argument"
+           << "\n";
+        os << "generic map("
+           << "\n";
+        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+           << "\n";
+        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+           << "\n";
+        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
+           << "\n";
+        os << ")"
+           << "\n";
+        os << "port map("
+           << "\n";
+        os << MemElem::clkPortName << " => "
+           << "tb_clk,"
+           << "\n";
+        os << MemElem::rstPortName << " => "
+           << "tb_rst,"
+           << "\n";
+        os << MemElem::ce0PortName << " => "
+           << "'1'"
+           << ","
+           << "\n";
+        os << MemElem::we0PortName << " => "
+           << "tb_out0_valid"
+           << ","
+           << "\n";
+        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
+           << "_valid,"
+           << "\n";
+        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
+           << "_ready,"
+           << "\n";
+        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+           << "\n";
+        os << MemElem::donePortName << " => "
+           << "tb_temp_idle"
+           << "\n";
+        os << ");"
+           << "\n"
+           << "\n";
       }
 
       if (!p.isInput && p.isOutput && !p.isReturn) {
 
-        code << "arg_inst_" << p.parameterName
-             << ":\t entity work.single_argument" << endl;
-        code << "\tgeneric map(" << endl;
-        code << "\t\t" << MemElem::inFileParamName << " => "
-             << m.inFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::outFileParamName << " => "
-             << m.outFileParamValue << "," << endl;
-        code << "\t\t" << MemElem::dataWidthParamName << " => "
-             << m.dataWidthParamValue << endl;
-        code << "\t)" << endl;
-        code << "\tport map(" << endl;
-        code << "\t\t" << MemElem::clkPortName << " => "
-             << "tb_clk," << endl;
-        code << "\t\t" << MemElem::rstPortName << " => "
-             << "tb_rst," << endl;
-        code << "\t\t" << MemElem::ce0PortName << " => "
-             << "'1'"
-             << "," << endl;
-        code << "\t\t" << MemElem::we0PortName << " => " << m.we0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dIn0PortName << " => " << m.dIn0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName << " => " << m.dOut0SignalName
-             << "," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_valid => "
-             << m.dOut0SignalName << "_valid," << endl;
-        code << "\t\t" << MemElem::dOut0PortName + "_ready => "
-             << m.dOut0SignalName << "_ready," << endl;
-        code << "\t\t" << MemElem::donePortName << " => "
-             << "tb_temp_idle" << endl;
-        code << "\t);" << endl << endl;
+        os << "arg_inst_" << p.parameterName << ": entity work.single_argument"
+           << "\n";
+        os << "generic map("
+           << "\n";
+        os << MemElem::inFileParamName << " => " << m.inFileParamValue << ","
+           << "\n";
+        os << MemElem::outFileParamName << " => " << m.outFileParamValue << ","
+           << "\n";
+        os << MemElem::dataWidthParamName << " => " << m.dataWidthParamValue
+           << "\n";
+        os << ")"
+           << "\n";
+        os << "port map("
+           << "\n";
+        os << MemElem::clkPortName << " => "
+           << "tb_clk,"
+           << "\n";
+        os << MemElem::rstPortName << " => "
+           << "tb_rst,"
+           << "\n";
+        os << MemElem::ce0PortName << " => "
+           << "'1'"
+           << ","
+           << "\n";
+        os << MemElem::we0PortName << " => " << m.we0SignalName << ","
+           << "\n";
+        os << MemElem::dIn0PortName << " => " << m.dIn0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName << " => " << m.dOut0SignalName << ","
+           << "\n";
+        os << MemElem::dOut0PortName + "_valid => " << m.dOut0SignalName
+           << "_valid,"
+           << "\n";
+        os << MemElem::dOut0PortName + "_ready => " << m.dOut0SignalName
+           << "_ready,"
+           << "\n";
+        os << MemElem::donePortName << " => "
+           << "tb_temp_idle"
+           << "\n";
+        os << ");"
+           << "\n"
+           << "\n";
       }
     }
   }
@@ -626,35 +629,33 @@ string HlsVhdlTb::getMemoryInstanceGeneration() {
     joinSize += 1;
 
   unsigned idx = 0;
-  code << "join_valids: entity work.tb_join(arch) generic map(" << joinSize
-       << ")\n\tport map(\n";
+  os << "join_valids: entity work.tb_join(arch) generic map(" << joinSize
+     << ")\nport map(\n";
   if (hasReturnVal)
-    code << "\t\tins_valid(" << idx++ << ") => tb_out0_valid,\n";
+    os << "ins_valid(" << idx++ << ") => tb_out0_valid,\n";
   for (MemElem &m : memElems) {
     if (m.isArray) {
-      code << "\t\tins_valid(" << idx++ << ") => " << m.memEndSignalName
-           << "_valid,\n";
+      os << "ins_valid(" << idx++ << ") => " << m.memEndSignalName
+         << "_valid,\n";
     }
   }
-  code << "\t\tins_valid(" << idx++ << ") => tb_end_valid,\n";
+  os << "ins_valid(" << idx++ << ") => tb_end_valid,\n";
 
   idx = 0;
   if (hasReturnVal)
-    code << "\t\tins_ready(" << idx++ << ") => tb_out0_ready,\n";
+    os << "ins_ready(" << idx++ << ") => tb_out0_ready,\n";
   for (MemElem &m : memElems) {
     if (m.isArray) {
-      code << "\t\tins_ready(" << idx++ << ") => " << m.memEndSignalName
-           << "_ready,\n";
+      os << "ins_ready(" << idx++ << ") => " << m.memEndSignalName
+         << "_ready,\n";
     }
   }
-  code << "\t\tins_ready(" << idx++ << ") => tb_end_ready,\n";
-  code << "\t\touts_valid => tb_global_valid,\n";
-  code << "\t\touts_ready => tb_global_ready\n\t);";
-
-  return code.str();
+  os << "ins_ready(" << idx++ << ") => tb_end_ready,\n";
+  os << "outs_valid => tb_global_valid,\n";
+  os << "outs_ready => tb_global_ready\n);";
 }
 
-string HlsVhdlTb::getDuvInstanceGeneration() {
+void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
   duvPortMap.emplace_back("clk", "tb_clk");
   duvPortMap.emplace_back("rst", "tb_rst");
 
@@ -728,86 +729,85 @@ string HlsVhdlTb::getDuvInstanceGeneration() {
   duvPortMap.emplace_back("end_valid", "tb_end_valid");
   duvPortMap.emplace_back("end_ready", "tb_end_ready");
 
-  stringstream code;
-  code << "duv: \t entity work." << duvName << endl;
-  code << "\t\tport map (" << endl;
+  os << "duv: entity work." << duvName << "\n";
+  os << "port map ("
+     << "\n";
   for (size_t i = 0; i < duvPortMap.size(); i++) {
     pair<string, string> elem = duvPortMap[i];
-    code << "\t\t\t" << elem.first << " => " << elem.second
-         << ((i < duvPortMap.size() - 1) ? "," : "") << endl;
+    os << "" << elem.first << " => " << elem.second
+       << ((i < duvPortMap.size() - 1) ? "," : "") << "\n";
   }
-  code << "\t\t);" << endl << endl;
-  return code.str();
+  os << ");\n\n";
 }
 
-string HlsVhdlTb::getCommonBody() { return commonTbBody; }
+void HlsVhdlTb::getCommonBody(mlir::raw_indented_ostream &os) {
+  os << commonTbBody;
+}
 
-string HlsVhdlTb::getArchitectureEnd() { return "end architecture behav;\n"; }
+void HlsVhdlTb::getArchitectureEnd(mlir::raw_indented_ostream &os) {
+  os << "end architecture behav;\n";
+}
 
-string HlsVhdlTb::getOutputTagGeneration() {
-  stringstream out;
-  out << "\n";
-  out << "---------------------------------------------------------------------"
-         "-------\n";
-  out << "-- Write \"[[[runtime]]]\" and \"[[[/runtime]]]\" for output "
-         "transactor\n";
+void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
+  os << "\n";
+  os << "---------------------------------------------------------------------"
+        "-------\n";
+  os << "-- Write \"[[[runtime]]]\" and \"[[[/runtime]]]\" for output "
+        "transactor\n";
   for (auto &cDuvParam : cDuvParams) {
     if (cDuvParam.isOutput) {
-      out << "write_output_transactor_" << cDuvParam.parameterName
-          << "_runtime_proc : process\n";
-      out << "	file fp             : TEXT;\n";
-      out << "	variable fstatus    : FILE_OPEN_STATUS;\n";
-      out << "	variable token_line : LINE;\n";
-      out << "	variable token      : STRING(1 to 1024);\n";
-      out << "\n";
-      out << "begin\n";
-      out << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
-          << ", WRITE_MODE);\n";
-      out << "	if (fstatus /= OPEN_OK) then\n";
-      out << "		assert false report \"Open file \" & OUTPUT_"
-          << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      out << "		assert false report \"ERROR: Simulation using HLS TB "
-             "failed.\" severity failure;\n";
-      out << "	end if;\n";
-      out << "	write(token_line, string'(\"[[[runtime]]]\"));\n";
-      out << "	writeline(fp, token_line);\n";
-      out << "	file_close(fp);\n";
-      out << "	while transaction_idx /= TRANSACTION_NUM loop\n";
-      out << "		wait until tb_clk'event and tb_clk = '1';\n";
-      out << "	end loop;\n";
-      out << "	wait until tb_clk'event and tb_clk = '1';\n";
-      out << "	wait until tb_clk'event and tb_clk = '1';\n";
-      out << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
-          << ", APPEND_MODE);\n";
-      out << "	if (fstatus /= OPEN_OK) then\n";
-      out << "		assert false report \"Open file \" & OUTPUT_"
-          << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      out << "		assert false report \"ERROR: Simulation using HLS TB "
-             "failed.\" severity failure;\n";
-      out << "	end if;\n";
-      out << "	write(token_line, string'(\"[[[/runtime]]]\"));\n";
-      out << "	writeline(fp, token_line);\n";
-      out << "	file_close(fp);\n";
-      out << "	wait;\n";
-      out << "end process;\n";
+      os << "write_output_transactor_" << cDuvParam.parameterName
+         << "_runtime_proc : process\n";
+      os << "	file fp             : TEXT;\n";
+      os << "	variable fstatus    : FILE_OPEN_STATUS;\n";
+      os << "	variable token_line : LINE;\n";
+      os << "	variable token      : STRING(1 to 1024);\n";
+      os << "\n";
+      os << "begin\n";
+      os << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
+         << ", WRITE_MODE);\n";
+      os << "	if (fstatus /= OPEN_OK) then\n";
+      os << "		assert false report \"Open file \" & OUTPUT_"
+         << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
+      os << "		assert false report \"ERROR: Simulation using HLS TB "
+            "failed.\" severity failure;\n";
+      os << "	end if;\n";
+      os << "	write(token_line, string'(\"[[[runtime]]]\"));\n";
+      os << "	writeline(fp, token_line);\n";
+      os << "	file_close(fp);\n";
+      os << "	while transaction_idx /= TRANSACTION_NUM loop\n";
+      os << "		wait until tb_clk'event and tb_clk = '1';\n";
+      os << "	end loop;\n";
+      os << "	wait until tb_clk'event and tb_clk = '1';\n";
+      os << "	wait until tb_clk'event and tb_clk = '1';\n";
+      os << "	file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
+         << ", APPEND_MODE);\n";
+      os << "	if (fstatus /= OPEN_OK) then\n";
+      os << "		assert false report \"Open file \" & OUTPUT_"
+         << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
+      os << "		assert false report \"ERROR: Simulation using HLS TB "
+            "failed.\" severity failure;\n";
+      os << "	end if;\n";
+      os << "	write(token_line, string'(\"[[[/runtime]]]\"));\n";
+      os << "	writeline(fp, token_line);\n";
+      os << "	file_close(fp);\n";
+      os << "	wait;\n";
+      os << "end process;\n";
     }
   }
-  out << "---------------------------------------------------------------------"
-         "-------\n\n";
-  return out.str();
+  os << "---------------------------------------------------------------------"
+        "-------\n\n";
 }
 
-string HlsVhdlTb::generateVhdlTestbench() {
-  stringstream tbOut;
-  tbOut << getLibraryHeader() << endl;
-  tbOut << getEntitiyDeclaration() << endl;
-  tbOut << getArchitectureBegin() << endl;
-  tbOut << getDuvInstanceGeneration() << endl;
-  tbOut << getMemoryInstanceGeneration() << endl;
-  tbOut << getOutputTagGeneration() << endl;
-  tbOut << getCommonBody() << endl;
-  tbOut << getArchitectureEnd() << endl;
-  return tbOut.str();
+void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
+  getLibraryHeader(os);
+  getEntitiyDeclaration(os);
+  getArchitectureBegin(os);
+  getDuvInstanceGeneration(os);
+  getMemoryInstanceGeneration(os);
+  getOutputTagGeneration(os);
+  getCommonBody(os);
+  getArchitectureEnd(os);
 }
 
 int HlsVhdlTb::getTransactionNumberFromInput() {

@@ -11,6 +11,7 @@
 
 #include "CAnalyser.h"
 #include "VerificationContext.h"
+#include "mlir/Support/IndentedOstream.h"
 #include <string>
 #include <vector>
 
@@ -72,7 +73,7 @@ public:
 class HlsVhdlTb {
 public:
   HlsVhdlTb(const VerificationContext &ctx);
-  string generateVhdlTestbench();
+  void generateVhdlTestbench(mlir::raw_indented_ostream &os);
   string getInputFilepathForParam(const CFunctionParameter &param);
   string getOutputFilepathForParam(const CFunctionParameter &param);
 
@@ -85,17 +86,17 @@ private:
   vector<Constant> constants;
   vector<MemElem> memElems;
 
-  string getLibraryHeader();
-  string getEntitiyDeclaration();
-  string getArchitectureBegin();
-  string getConstantDeclaration();
-  string getSignalDeclaration();
-  string getMemoryInstanceGeneration();
-  string getDuvInstanceGeneration();
-  string getDuvComponentDeclaration();
-  string getCommonBody();
-  string getArchitectureEnd();
-  string getOutputTagGeneration();
+  void getLibraryHeader(mlir::raw_indented_ostream &os);
+  void getEntitiyDeclaration(mlir::raw_indented_ostream &os);
+  void getArchitectureBegin(mlir::raw_indented_ostream &os);
+  void getConstantDeclaration(mlir::raw_indented_ostream &os);
+  void getSignalDeclaration(mlir::raw_indented_ostream &os);
+  void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os);
+  void getDuvInstanceGeneration(mlir::raw_indented_ostream &os);
+  void getDuvComponentDeclaration(mlir::raw_indented_ostream &os);
+  void getCommonBody(mlir::raw_indented_ostream &os);
+  void getArchitectureEnd(mlir::raw_indented_ostream &os);
+  void getOutputTagGeneration(mlir::raw_indented_ostream &os);
   int getTransactionNumberFromInput();
 
   static string getCe0PortNameForCParam(string &cParam);
