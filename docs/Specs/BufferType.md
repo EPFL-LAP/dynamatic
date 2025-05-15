@@ -53,7 +53,7 @@ For `FPL22Buffers`,
 
 ```
 1. If breaking DV & R:
-When numslot = 1, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
+When numslot = 1, map to ONE_SLOT_BREAK_DVR;
 When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 2) * FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
 
 2. If only breaking DV:
