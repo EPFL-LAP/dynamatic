@@ -166,11 +166,8 @@ end process;
 )DELIM";
 
 // class Constant
-
 Constant::Constant(const string &name, const string &type, const string &value)
     : constName(name), constType(type), constValue(value) {}
-
-// class MemElem
 
 static const string CLK_PORT = "clk";
 static const string RST_PORT = "rst";
@@ -614,7 +611,8 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
 
 void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
   os << VHDL_LIBRARY_HEADER;
-  os << "entity " + tleName + " is\nend entity " + tleName + ";\n\n";
+  os << "entity " + tleName + " is";
+  os << "end entity " + tleName + ";\n\n";
   os << "architecture behavior of " << tleName << " is\n\n";
   os.indent();
   getConstantDeclaration(os);

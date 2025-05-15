@@ -63,7 +63,6 @@ private:
   string duvName;
   string tleName;
   vector<CFunctionParameter> cDuvParams;
-  vector<pair<string, string>> duvPortMap;
   vector<Constant> constants;
   vector<MemElem> memElems;
 
