@@ -139,13 +139,13 @@ static const string CLK_PORT = "clk";
 static const string RST_PORT = "rst";
 static const string CE0_PORT = "ce0";
 static const string WE0_PORT = "we0";
-static const string D_IN0_PORT = "mem_din0";
-static const string D_OUT0_PORT = "mem_dout0";
+static const string D_IN0_PORT = "din0";
+static const string D_OUT0_PORT = "dout0";
 static const string ADDR0_PORT = "address0";
 static const string CE1_PORT = "ce1";
 static const string WE1_PORT = "we1";
-static const string D_IN1_PORT = "mem_din1";
-static const string D_OUT1_PORT = "mem_dout1";
+static const string D_IN1_PORT = "din1";
+static const string D_OUT1_PORT = "dout1";
 static const string ADDR1_PORT = "address1";
 static const string DONE_PORT = "done";
 static const string IN_FILE_PARAM = "TV_IN";
@@ -351,7 +351,8 @@ class Instance {
   std::vector<std::pair<std::string, std::string>> params;
 
 public:
-  Instance(std::string module, std::string inst, std::vector<unsigned> p = {})
+  Instance(std::string module, std::string inst,
+           const std::vector<unsigned> &p = {})
       : moduleName(std::move(module)), instanceName(std::move(inst)) {}
 
   Instance &parameter(const std::string &parameter, const std::string &value) {
@@ -581,24 +582,16 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
     MemElem m = memElems[i];
 
     if (m.isArray) {
-      duvInst
-          .connect(getAddr0PortNameForCParam(p.parameterName),
-                   m.addr0SignalName)
-          .connect(getCe0PortNameForCParam(p.parameterName), m.ce0SignalName)
-          .connect(getWe0PortNameForCParam(p.parameterName), m.we0SignalName)
-          .connect(getDataIn0PortNameForCParam(p.parameterName),
-                   m.dOut0SignalName)
-          .connect(getDataOut0PortNameForCParam(p.parameterName),
-                   m.dIn0SignalName)
-
-          .connect(getAddr1PortNameForCParam(p.parameterName),
-                   m.addr1SignalName)
-          .connect(getCe1PortNameForCParam(p.parameterName), m.ce1SignalName)
-          .connect(getWe1PortNameForCParam(p.parameterName), m.we1SignalName)
-          .connect(getDataIn1PortNameForCParam(p.parameterName),
-                   m.dOut1SignalName)
-          .connect(getDataOut1PortNameForCParam(p.parameterName),
-                   m.dIn1SignalName)
+      duvInst.connect(p.parameterName + "_" + ADDR0_PORT, m.addr0SignalName)
+          .connect(p.parameterName + "_" + CE0_PORT, m.ce0SignalName)
+          .connect(p.parameterName + "_" + WE0_PORT, m.we0SignalName)
+          .connect(p.parameterName + "_" + D_IN0_PORT, m.dOut0SignalName)
+          .connect(p.parameterName + "_" + D_OUT0_PORT, m.dIn0SignalName)
+          .connect(p.parameterName + "_" + ADDR1_PORT, m.addr1SignalName)
+          .connect(p.parameterName + "_" + CE1_PORT, m.ce1SignalName)
+          .connect(p.parameterName + "_" + WE1_PORT, m.we1SignalName)
+          .connect(p.parameterName + "_" + D_IN1_PORT, m.dOut1SignalName)
+          .connect(p.parameterName + "_" + D_OUT1_PORT, m.dIn1SignalName)
 
           // Memory start signal
           .connect(p.parameterName + "_start_valid", "'1'")
