@@ -566,89 +566,76 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
-  duvPortMap.emplace_back("clk", "tb_clk");
-  duvPortMap.emplace_back("rst", "tb_rst");
+
+  Instance duvInst(duvName, "duv_inst");
+
+  duvInst.connect("clk", "tb_clk")
+      .connect("rst", "tb_rst")
+      .connect("start_valid", "tb_start_valid")
+      .connect("start_ready", "tb_start_ready")
+      .connect("end_valid", "tb_end_valid")
+      .connect("end_ready", "tb_end_ready");
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
     CFunctionParameter p = cDuvParams[i];
     MemElem m = memElems[i];
 
     if (m.isArray) {
-      duvPortMap.emplace_back(getAddr0PortNameForCParam(p.parameterName),
-                              m.addr0SignalName);
-      duvPortMap.emplace_back(getCe0PortNameForCParam(p.parameterName),
-                              m.ce0SignalName);
-      duvPortMap.emplace_back(getWe0PortNameForCParam(p.parameterName),
-                              m.we0SignalName);
-      duvPortMap.emplace_back(getDataIn0PortNameForCParam(p.parameterName),
-                              m.dOut0SignalName);
-      duvPortMap.emplace_back(getDataOut0PortNameForCParam(p.parameterName),
-                              m.dIn0SignalName);
+      duvInst
+          .connect(getAddr0PortNameForCParam(p.parameterName),
+                   m.addr0SignalName)
+          .connect(getCe0PortNameForCParam(p.parameterName), m.ce0SignalName)
+          .connect(getWe0PortNameForCParam(p.parameterName), m.we0SignalName)
+          .connect(getDataIn0PortNameForCParam(p.parameterName),
+                   m.dOut0SignalName)
+          .connect(getDataOut0PortNameForCParam(p.parameterName),
+                   m.dIn0SignalName)
 
-      duvPortMap.emplace_back(getAddr1PortNameForCParam(p.parameterName),
-                              m.addr1SignalName);
-      duvPortMap.emplace_back(getCe1PortNameForCParam(p.parameterName),
-                              m.ce1SignalName);
-      duvPortMap.emplace_back(getWe1PortNameForCParam(p.parameterName),
-                              m.we1SignalName);
-      duvPortMap.emplace_back(getDataIn1PortNameForCParam(p.parameterName),
-                              m.dOut1SignalName);
-      duvPortMap.emplace_back(getDataOut1PortNameForCParam(p.parameterName),
-                              m.dIn1SignalName);
+          .connect(getAddr1PortNameForCParam(p.parameterName),
+                   m.addr1SignalName)
+          .connect(getCe1PortNameForCParam(p.parameterName), m.ce1SignalName)
+          .connect(getWe1PortNameForCParam(p.parameterName), m.we1SignalName)
+          .connect(getDataIn1PortNameForCParam(p.parameterName),
+                   m.dOut1SignalName)
+          .connect(getDataOut1PortNameForCParam(p.parameterName),
+                   m.dIn1SignalName)
 
-      // Memory start signal
-      duvPortMap.emplace_back(p.parameterName + "_start_valid", "'1'");
-      duvPortMap.emplace_back(p.parameterName + "_start_ready",
-                              m.memStartSignalName + "_ready");
+          // Memory start signal
+          .connect(p.parameterName + "_start_valid", "'1'")
+          .connect(p.parameterName + "_start_ready",
+                   m.memStartSignalName + "_ready")
 
-      // Memory completion signal
-      duvPortMap.emplace_back(p.parameterName + "_end_valid",
-                              m.memEndSignalName + "_valid");
-      duvPortMap.emplace_back(p.parameterName + "_end_ready",
-                              m.memEndSignalName + "_ready");
+          // Memory completion signal
+          .connect(p.parameterName + "_end_valid",
+                   m.memEndSignalName + "_valid")
+          .connect(p.parameterName + "_end_ready",
+                   m.memEndSignalName + "_ready");
 
     } else {
       if (p.isInput) {
-        duvPortMap.emplace_back(p.parameterName, m.dOut0SignalName);
-        duvPortMap.emplace_back(p.parameterName + "_valid",
-                                m.dOut0SignalName + "_valid");
-        duvPortMap.emplace_back(p.parameterName + "_ready",
-                                m.dOut0SignalName + "_ready");
+        duvInst.connect(p.parameterName, m.dOut0SignalName)
+            .connect(p.parameterName + "_valid", m.dOut0SignalName + "_valid")
+            .connect(p.parameterName + "_ready", m.dOut0SignalName + "_ready");
       }
 
       if (p.isOutput) {
         if (p.isReturn) {
-          duvPortMap.emplace_back(p.parameterName, m.dIn0SignalName);
-          duvPortMap.emplace_back(p.parameterName + "_valid", "tb_out0_valid");
-          duvPortMap.emplace_back(p.parameterName + "_ready", "tb_out0_ready");
+          duvInst.connect(p.parameterName, m.dIn0SignalName)
+              .connect(p.parameterName + "_valid", "tb_out0_valid")
+              .connect(p.parameterName + "_ready", "tb_out0_ready");
         } else {
-          duvPortMap.emplace_back(getValidOutPortNameForCParam(p.parameterName),
-                                  m.we0SignalName);
-          duvPortMap.emplace_back(
-              getDataOutSaPortNameForCParam(p.parameterName), m.dIn0SignalName);
-          duvPortMap.emplace_back(getReadyInPortNameForCParam(p.parameterName),
-                                  "'1'");
+          duvInst
+              .connect(getValidOutPortNameForCParam(p.parameterName),
+                       m.we0SignalName)
+              .connect(getDataOutSaPortNameForCParam(p.parameterName),
+                       m.dIn0SignalName)
+              .connect(getReadyInPortNameForCParam(p.parameterName), "'1'");
         }
       }
     }
   }
 
-  // Start and end signal
-  duvPortMap.emplace_back("start_valid", "tb_start_valid");
-  duvPortMap.emplace_back("start_ready", "tb_start_ready");
-  duvPortMap.emplace_back("end_valid", "tb_end_valid");
-  duvPortMap.emplace_back("end_ready", "tb_end_ready");
-
-  os << "duv: entity work." << duvName << "\n";
-  os << "port map (\n";
-  os.indent();
-  for (size_t i = 0; i < duvPortMap.size(); i++) {
-    pair<string, string> elem = duvPortMap[i];
-    os << "" << elem.first << " => " << elem.second
-       << ((i < duvPortMap.size() - 1) ? "," : "") << "\n";
-  }
-  os.unindent();
-  os << ");\n\n";
+  duvInst.emitVhdl(os);
 }
 
 void HlsVhdlTb::getCommonBody(mlir::raw_indented_ostream &os) {
