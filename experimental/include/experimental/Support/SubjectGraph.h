@@ -41,6 +41,13 @@ struct ChannelSignals {
   Node *readySignal;
 };
 
+struct NodeProcessingRule {
+  std::string pattern;
+  ChannelSignals &signals;
+  bool renameNode;
+  std::function<void(Node *)> extraProcessing;
+};
+
 /// Base class for all subject graphs. This class represents the subject graph
 /// of an Operation in MLIR.
 /// Each BaseSubjectGraph maintains information about:
@@ -58,12 +65,15 @@ protected:
   // isBlackbox is used to determine if the module is a blackbox module
   bool isBlackbox = false;
 
-  void retrieveBlif(std::initializer_list<unsigned int> inputs, std::string to_append = "");
+  void loadBlifFile(std::initializer_list<unsigned int> inputs,
+                    std::string to_append = "");
 
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
                                BaseSubjectGraph *moduleBeforeSubjectGraph);
+
+  void processNodesWithRules(const std::vector<NodeProcessingRule> &rules);
 
 public:
   BaseSubjectGraph();
@@ -86,7 +96,8 @@ public:
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
 
   // A vector of all BaseSubjectGraphs. This is not a subset of the Values of
-  // moduleMap, since not all of the SubjectGraphs are created from Operations (Buffers will be inserted to ensure acyclicity).
+  // moduleMap, since not all of the SubjectGraphs are created from Operations
+  // (Buffers will be inserted to ensure acyclicity).
   static inline std::vector<BaseSubjectGraph *> subjectGraphVector;
 
   // Pointer to the LogicNetwork object that represents the BLIF file
@@ -130,7 +141,9 @@ private:
   unsigned int dataWidth = 0;
   ChannelSignals inputNodes;
   std::vector<ChannelSignals> outputNodes;
-  
+
+  void processOutOfRuleNodes();
+
 public:
   ForkSubjectGraph(Operation *op);
   void connectInputNodes() override;
@@ -146,6 +159,8 @@ private:
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
 
+  void processOutOfRuleNodes();
+
 public:
   MuxSubjectGraph(Operation *op);
   void connectInputNodes() override;
@@ -160,6 +175,8 @@ private:
   std::vector<ChannelSignals> inputNodes;
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
+
+  void processOutOfRuleNodes();
 
 public:
   ControlMergeSubjectGraph(Operation *op);
@@ -265,6 +282,8 @@ private:
   std::vector<ChannelSignals> inputNodes;
   ChannelSignals outputNodes;
 
+  void processOutOfRuleNodes();
+
 public:
   MergeSubjectGraph(Operation *op);
   void connectInputNodes() override;
@@ -303,7 +322,8 @@ private:
 
 public:
   BufferSubjectGraph(Operation *op);
-  BufferSubjectGraph(Operation *op1, Operation *op2, std::string bufferTypeName);
+  BufferSubjectGraph(Operation *op1, Operation *op2,
+                     std::string bufferTypeName);
   BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
                      std::string bufferTypeName);
 
