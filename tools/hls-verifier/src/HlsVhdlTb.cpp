@@ -15,6 +15,7 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/Support/FormatVariadic.h"
 
 namespace hls_verify {
 const string LOG_TAG = "VVER";
@@ -128,6 +129,42 @@ end process;
 --------------------------------------------------------------------------
 )DELIM";
 
+const char *procWriteTransactions = R"DELIM(
+write_output_transactor_{0}_runtime_proc : process
+  file fp             : TEXT;
+  variable fstatus    : FILE_OPEN_STATUS;
+  variable token_line : LINE;
+  variable token      : STRING(1 to 1024);
+begin
+  file_open(fstatus, fp, OUTPUT_{1} , WRITE_MODE);
+  if (fstatus /= OPEN_OK) then
+    assert false
+    report "Open file " & OUTPUT_{2} & " failed!!!"
+    severity note;
+    assert false
+    report "ERROR: Simulation using HLS TB failed."
+    severity failure;
+  end if;
+  write(token_line, string'("[[[runtime]]]"));
+  writeline(fp, token_line);
+  file_close(fp);
+  while transaction_idx /= TRANSACTION_NUM loop
+    wait until tb_clk'event and tb_clk = '1';
+  end loop;
+  wait until tb_clk'event and tb_clk = '1';
+  wait until tb_clk'event and tb_clk = '1';
+  file_open(fstatus, fp, OUTPUT_{3} , APPEND_MODE);
+  if (fstatus /= OPEN_OK) then
+    assert false report "Open file " & OUTPUT_{4} & " failed!!!" severity note;
+    assert false report "ERROR: Simulation using HLS TB failed." severity failure;
+  end if;
+  write(token_line, string'("[[[/runtime]]]"));
+  writeline(fp, token_line);
+  file_close(fp);
+  wait;
+end process;
+)DELIM";
+
 // class Constant
 
 Constant::Constant(const string &name, const string &type, const string &value)
@@ -153,6 +190,18 @@ static const string OUT_FILE_PARAM = "TV_OUT";
 static const string DATA_WIDTH_PARAM = "DATA_WIDTH";
 static const string ADDR_WIDTH_PARAM = "ADDR_WIDTH";
 static const string DATA_DEPTH_PARAM = "DEPTH";
+
+// Start signal names
+static const string START_VALID = "start_valid";
+static const string START_READY = "start_ready";
+
+// Completion signal names
+static const string END_VALID = "end_valid";
+static const string END_READY = "end_ready";
+
+// Name of the return value, it is also called "out0" but it means something
+// else as the D_IN0_PORT (i.e., the first port of the dual-port RAM).
+static const string RET_VALUE_NAME = "out0";
 
 // class HlsVhdTb
 
@@ -342,13 +391,13 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
   declareSTL(os, "tb_start_value", std::nullopt, "'0'");
   declareSTL(os, "tb_rst", std::nullopt, "'0'");
-  declareSTL(os, "tb_start_valid", std::nullopt, "'0'");
-  declareSTL(os, "tb_start_ready");
+  declareSTL(os, "tb_" + START_VALID, std::nullopt, "'0'");
+  declareSTL(os, "tb_" + START_READY);
   declareSTL(os, "tb_started");
-  declareSTL(os, "tb_end_valid");
-  declareSTL(os, "tb_end_ready");
-  declareSTL(os, "tb_out0_valid");
-  declareSTL(os, "tb_out0_ready");
+  declareSTL(os, "tb_" + END_VALID);
+  declareSTL(os, "tb_" + END_READY);
+  declareSTL(os, "tb_" + RET_VALUE_NAME + "_valid");
+  declareSTL(os, "tb_" + RET_VALUE_NAME + "_ready");
   declareSTL(os, "tb_global_valid");
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");
@@ -414,8 +463,8 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
           .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
           .parameter(ADDR_WIDTH_PARAM, m.addrWidthParamValue)
           .parameter(DATA_DEPTH_PARAM, m.dataDepthParamValue)
-          .connect(CLK_PORT, "tb_clk")
-          .connect(RST_PORT, "tb_rst")
+          .connect(CLK_PORT, "tb_" + CLK_PORT)
+          .connect(RST_PORT, "tb_" + RST_PORT)
           .connect(CE0_PORT, m.ce0SignalName)
           .connect(WE0_PORT, m.we0SignalName)
           .connect(ADDR0_PORT, m.addr0SignalName)
@@ -436,8 +485,8 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
       argInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
           .parameter(OUT_FILE_PARAM, m.outFileParamValue)
           .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
-          .connect(CLK_PORT, "tb_clk")
-          .connect(RST_PORT, "tb_rst")
+          .connect(CLK_PORT, "tb_" + CLK_PORT)
+          .connect(RST_PORT, "tb_" + RST_PORT)
           .connect(CE0_PORT, "'1'")
           .connect(DONE_PORT, "tb_temp_idle")
           .connect(D_OUT0_PORT, m.dOut0SignalName)
@@ -453,7 +502,7 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
             .connect(D_IN0_PORT, m.dIn0SignalName);
       } else if (!p.isInput && p.isOutput && p.isReturn) {
         // Return value of the function.
-        argInst.connect(WE0_PORT, "tb_out0_valid")
+        argInst.connect(WE0_PORT, "tb_" + RET_VALUE_NAME + "_valid")
             .connect(D_IN0_PORT, m.dIn0SignalName);
       } else {
         assert(false && "Invalid parameter type");
@@ -482,9 +531,10 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   joinInst.parameter("SIZE", std::to_string(joinSize));
 
   if (hasReturnVal) {
-    joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_out0_valid");
+    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                     "tb_" + RET_VALUE_NAME + "_valid");
     joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                     "tb_out0_ready");
+                     "tb_" + RET_VALUE_NAME + "_ready");
   }
   for (MemElem &m : memElems) {
     if (m.isArray) {
@@ -494,8 +544,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
                        m.memEndSignalName + "_ready");
     }
   }
-  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_end_valid");
-  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")", "tb_end_ready");
+  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_" + END_VALID);
+  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                   "tb_" + END_READY);
   joinInst.connect("outs_valid", "tb_global_valid");
   joinInst.connect("outs_ready", "tb_global_ready");
 
@@ -506,12 +557,12 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
 
   Instance duvInst(duvName, "duv_inst");
 
-  duvInst.connect("clk", "tb_clk")
-      .connect("rst", "tb_rst")
-      .connect("start_valid", "tb_start_valid")
-      .connect("start_ready", "tb_start_ready")
-      .connect("end_valid", "tb_end_valid")
-      .connect("end_ready", "tb_end_ready");
+  duvInst.connect(CLK_PORT, "tb_" + CLK_PORT)
+      .connect(RST_PORT, "tb_" + RST_PORT)
+      .connect(START_VALID, "tb_" + START_VALID)
+      .connect(START_READY, "tb_" + START_READY)
+      .connect(END_VALID, "tb_" + END_VALID)
+      .connect(END_READY, "tb_" + END_READY);
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
     CFunctionParameter p = cDuvParams[i];
@@ -530,14 +581,14 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
           .connect(p.parameterName + "_" + D_OUT1_PORT, m.dIn1SignalName)
 
           // Memory start signal
-          .connect(p.parameterName + "_start_valid", "'1'")
-          .connect(p.parameterName + "_start_ready",
+          .connect(p.parameterName + "_" + START_VALID, "'1'")
+          .connect(p.parameterName + "_" + START_READY,
                    m.memStartSignalName + "_ready")
 
           // Memory completion signal
-          .connect(p.parameterName + "_end_valid",
+          .connect(p.parameterName + "_" + END_VALID,
                    m.memEndSignalName + "_valid")
-          .connect(p.parameterName + "_end_ready",
+          .connect(p.parameterName + "_" + END_READY,
                    m.memEndSignalName + "_ready");
 
     } else {
@@ -550,8 +601,10 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
       if (p.isOutput) {
         if (p.isReturn) {
           duvInst.connect(p.parameterName, m.dIn0SignalName)
-              .connect(p.parameterName + "_valid", "tb_out0_valid")
-              .connect(p.parameterName + "_ready", "tb_out0_ready");
+              .connect(p.parameterName + "_valid",
+                       "tb_" + RET_VALUE_NAME + "_valid")
+              .connect(p.parameterName + "_ready",
+                       "tb_" + RET_VALUE_NAME + "_ready");
         } else {
           duvInst.connect(p.parameterName + "_valid", m.we0SignalName)
               .connect(p.parameterName + "_din", m.dIn0SignalName)
@@ -573,50 +626,14 @@ void HlsVhdlTb::getArchitectureEnd(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
-  os << "-------------------------------------------------------------------\n";
-  os << "-- Write \"[[[runtime]]]\" and \"[[[/runtime]]]\" for output "
-        "transactor\n";
+  os << "------------------------------------------------------------\n";
+  os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
   for (auto &cDuvParam : cDuvParams) {
     if (cDuvParam.isOutput) {
-      os << "write_output_transactor_" << cDuvParam.parameterName
-         << "_runtime_proc : process\n";
-      os << "file fp             : TEXT;\n";
-      os << "variable fstatus    : FILE_OPEN_STATUS;\n";
-      os << "variable token_line : LINE;\n";
-      os << "variable token      : STRING(1 to 1024);\n";
-      os << "\n";
-      os << "begin\n";
-      os.indent();
-      os << "file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
-         << ", WRITE_MODE);\n";
-      os << "if (fstatus /= OPEN_OK) then\n";
-      os << "assert false report \"Open file \" & OUTPUT_"
-         << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      os << "assert false report \"ERROR: Simulation using HLS TB "
-            "failed.\" severity failure;\n";
-      os << "end if;\n";
-      os << "write(token_line, string'(\"[[[runtime]]]\"));\n";
-      os << "writeline(fp, token_line);\n";
-      os << "file_close(fp);\n";
-      os << "while transaction_idx /= TRANSACTION_NUM loop\n";
-      os << "wait until tb_clk'event and tb_clk = '1';\n";
-      os << "end loop;\n";
-      os << "wait until tb_clk'event and tb_clk = '1';\n";
-      os << "wait until tb_clk'event and tb_clk = '1';\n";
-      os << "file_open(fstatus, fp, OUTPUT_" << cDuvParam.parameterName
-         << ", APPEND_MODE);\n";
-      os << "if (fstatus /= OPEN_OK) then\n";
-      os << "assert false report \"Open file \" & OUTPUT_"
-         << cDuvParam.parameterName << " & \" failed!!!\" severity note;\n";
-      os << "assert false report \"ERROR: Simulation using HLS TB "
-            "failed.\" severity failure;\n";
-      os << "end if;\n";
-      os << "write(token_line, string'(\"[[[/runtime]]]\"));\n";
-      os << "writeline(fp, token_line);\n";
-      os << "file_close(fp);\n";
-      os << "wait;\n";
-      os.unindent();
-      os << "end process;\n";
+
+      os << llvm::formatv(procWriteTransactions, cDuvParam.parameterName,
+                          cDuvParam.parameterName, cDuvParam.parameterName,
+                          cDuvParam.parameterName, cDuvParam.parameterName);
     }
   }
   os << "-----------------------------------------------------------------\n\n";
