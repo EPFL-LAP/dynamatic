@@ -41,6 +41,13 @@ struct ChannelSignals {
   Node *readySignal;
 };
 
+struct NodeProcessingRule {
+  std::string pattern;
+  ChannelSignals &signals;
+  bool renameNode;
+  std::function<void(Node *)> extraProcessing;
+};
+
 /// Base class for all subject graphs. This class represents the subject graph
 /// of an Operation in MLIR.
 /// Each BaseSubjectGraph maintains information about:
@@ -65,6 +72,8 @@ protected:
   // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
                                BaseSubjectGraph *moduleBeforeSubjectGraph);
+
+  void processNodesWithRules(const std::vector<NodeProcessingRule> &rules);
 
 public:
   BaseSubjectGraph();
@@ -133,6 +142,8 @@ private:
   ChannelSignals inputNodes;
   std::vector<ChannelSignals> outputNodes;
 
+  void processOutOfRuleNodes();
+
 public:
   ForkSubjectGraph(Operation *op);
   void connectInputNodes() override;
@@ -148,6 +159,8 @@ private:
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
 
+  void processOutOfRuleNodes();
+
 public:
   MuxSubjectGraph(Operation *op);
   void connectInputNodes() override;
@@ -162,6 +175,8 @@ private:
   std::vector<ChannelSignals> inputNodes;
   ChannelSignals indexNodes;
   ChannelSignals outputNodes;
+
+  void processOutOfRuleNodes();
 
 public:
   ControlMergeSubjectGraph(Operation *op);
@@ -266,6 +281,8 @@ private:
   unsigned int size = 0;
   std::vector<ChannelSignals> inputNodes;
   ChannelSignals outputNodes;
+
+  void processOutOfRuleNodes();
 
 public:
   MergeSubjectGraph(Operation *op);

@@ -75,7 +75,8 @@ void BaseSubjectGraph::connectInputNodesHelper(
   }
 }
 
-// Constructs the file path based on Operation name and parameters, calls the Blif parser to load the Blif file
+// Constructs the file path based on Operation name and parameters, calls the
+// Blif parser to load the Blif file
 void BaseSubjectGraph::loadBlifFile(std::initializer_list<unsigned int> inputs,
                                     std::string to_append) {
   std::string moduleType;
@@ -130,6 +131,30 @@ void BaseSubjectGraph::buildSubjectGraphConnections() {
   }
 }
 
+void BaseSubjectGraph::processNodesWithRules(
+    const std::vector<NodeProcessingRule> &rules) {
+  for (auto &node : blifData->getAllNodes()) {
+    std::string nodeName = node->name;
+    for (const auto &rule : rules) {
+      if (nodeName.find(rule.pattern) != std::string::npos &&
+          (node->isInput || node->isOutput)) {
+        assignSignals(rule.signals, node, nodeName);
+        if (rule.renameNode) // change the name of the node if set true
+          node->name = uniqueName + "_" + nodeName;
+        if (rule.extraProcessing) // apply extra processing to node if a
+                                  // function is given
+          rule.extraProcessing(node);
+      } else if (nodeName.find(".") != std::string::npos ||
+                 nodeName.find("dataReg") !=
+                     std::string::npos) { // Nodes with "." and "dataReg"
+                                          // require unique naming to avoid
+                                          // naming conflicts
+        node->name = (uniqueName + "." + nodeName);
+      }
+    }
+  }
+}
+
 // ArithSubjectGraph implementation
 ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
@@ -145,24 +170,20 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
     isBlackbox = true;
   }
 
-  // Assign the nodes to correct signals
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("result") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-      if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
-                         nodeName.find("ready") == std::string::npos)) {
-        node->isBlackboxOutput = (true);
-      }
-    } else if (nodeName.find("lhs") != std::string::npos) {
-      assignSignals(lhsNodes, node, nodeName);
-    } else if (nodeName.find("rhs") != std::string::npos) {
-      assignSignals(rhsNodes, node, nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
+  auto setBlackboxBool = [&](Node *node) {
+    std::string nodeName = node->name;
+    if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                       nodeName.find("ready") == std::string::npos)) {
+      node->isBlackboxOutput = (true);
     }
-  }
+  };
+
+  std::vector<NodeProcessingRule> rules = {
+      {"lhs", lhsNodes, false, nullptr},
+      {"rhs", rhsNodes, false, nullptr},
+      {"result", outputNodes, true, setBlackboxBool}};
+
+  processNodesWithRules(rules);
 }
 
 void ArithSubjectGraph::connectInputNodes() {
@@ -174,18 +195,7 @@ ChannelSignals &ArithSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
-// ForkSubjectGraph implementation
-ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  size = op->getNumResults();
-  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-  outputNodes.resize(size);
-
-  if (dataWidth == 0) {
-    loadBlifFile({size}, "_dataless");
-  } else {
-    loadBlifFile({size, dataWidth}, "_type");
-  }
-
+void ForkSubjectGraph::processOutOfRuleNodes() {
   auto generateNewNameRV =
       [](const std::string &nodeName) -> std::pair<std::string, unsigned int> {
     std::string newName = nodeName;
@@ -238,13 +248,28 @@ ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
       auto [newName, num] = generateNewName(nodeName);
       assignSignals(outputNodes[num], node, newName);
       node->name = (uniqueName + "_" + newName);
-    } else if (nodeName.find("ins") != std::string::npos &&
-               (node->isInput || node->isOutput)) {
-      assignSignals(inputNodes, node, nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    } 
+    }
   }
+}
+
+// ForkSubjectGraph implementation
+ForkSubjectGraph::ForkSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  size = op->getNumResults();
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+  outputNodes.resize(size);
+
+  if (dataWidth == 0) {
+    loadBlifFile({size}, "_dataless");
+  } else {
+    loadBlifFile({size, dataWidth}, "_type");
+  }
+
+  // "outs" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void ForkSubjectGraph::connectInputNodes() {
@@ -257,17 +282,7 @@ ChannelSignals &ForkSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
   return outputNodes[channelIndex];
 }
 
-// MuxSubjectGraph implementation
-MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  auto muxOp = llvm::dyn_cast<handshake::MuxOp>(op);
-  size = muxOp.getDataOperands().size();
-  dataWidth = handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
-  selectType =
-      handshake::getHandshakeTypeBitWidth(muxOp.getSelectOperand().getType());
-  inputNodes.resize(size);
-
-  loadBlifFile({size, dataWidth});
-
+void MuxSubjectGraph::processOutOfRuleNodes() {
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
@@ -281,15 +296,29 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
         num = num / dataWidth;
       }
       assignSignals(inputNodes[num], node, nodeName);
-    } else if (nodeName.find("index") != std::string::npos) {
-      assignSignals(indexNodes, node, nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
     }
   }
+}
+
+// MuxSubjectGraph implementation
+MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  auto muxOp = llvm::dyn_cast<handshake::MuxOp>(op);
+  size = muxOp.getDataOperands().size();
+  dataWidth = handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
+  selectType =
+      handshake::getHandshakeTypeBitWidth(muxOp.getSelectOperand().getType());
+  inputNodes.resize(size);
+
+  loadBlifFile({size, dataWidth});
+
+  // "ins" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {
+      {"index", indexNodes, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void MuxSubjectGraph::connectInputNodes() {
@@ -302,6 +331,28 @@ void MuxSubjectGraph::connectInputNodes() {
 
 ChannelSignals &MuxSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
+}
+
+void ControlMergeSubjectGraph::processOutOfRuleNodes() {
+  for (auto &node : blifData->getAllNodes()) {
+    auto nodeName = node->name;
+    if (nodeName.find("ins") != std::string::npos &&
+        (node->isInput || node->isOutput)) {
+      if (size == 1) {
+        assignSignals(inputNodes[0], node, nodeName);
+        continue;
+      }
+      size_t bracketPos = nodeName.find('[');
+      std::string number = nodeName.substr(bracketPos + 1);
+      number = number.substr(0, number.find_first_not_of("0123456789"));
+      unsigned int num = std::stoi(number);
+      if (nodeName.find("ready") == std::string::npos &&
+          nodeName.find("valid") == std::string::npos) {
+        num = num / dataWidth;
+      }
+      assignSignals(inputNodes[num], node, nodeName);
+    }
+  }
 }
 
 // ControlMergeSubjectGraph implementation
@@ -321,33 +372,14 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
     op->emitError("Operation Unsupported");
   }
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput || node->isOutput)) {
-      if (size == 1) {
-        assignSignals(inputNodes[0], node, nodeName);
-        continue;
-      }
-      size_t bracketPos = nodeName.find('[');
-      std::string number = nodeName.substr(bracketPos + 1);
-      number = number.substr(0, number.find_first_not_of("0123456789"));
-      unsigned int num = std::stoi(number);
-      if (nodeName.find("ready") == std::string::npos &&
-          nodeName.find("valid") == std::string::npos) {
-        num = num / dataWidth;
-      }
-      assignSignals(inputNodes[num], node, nodeName);
-    } else if (nodeName.find("index") != std::string::npos) {
-      assignSignals(indexNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  // "ins" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {
+      {"index", indexNodes, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void ControlMergeSubjectGraph::connectInputNodes() {
@@ -374,22 +406,13 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("true") != std::string::npos) {
-      assignSignals(trueOut, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find("false") != std::string::npos) {
-      assignSignals(falseOut, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find("condition") != std::string::npos) {
-      assignSignals(conditionNodes, node, nodeName);
-    } else if (nodeName.find("data") != std::string::npos) {
-      assignSignals(inputNodes, node, nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"condition", conditionNodes, false, nullptr},
+      {"data", inputNodes, false, nullptr},
+      {"true", trueOut, true, nullptr},
+      {"false", falseOut, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void ConditionalBranchSubjectGraph::connectInputNodes() {
@@ -406,15 +429,10 @@ ConditionalBranchSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
 SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   loadBlifFile({});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void SourceSubjectGraph::connectInputNodes() {
@@ -435,20 +453,12 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({addrType, dataWidth});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("addrIn") != std::string::npos) {
-      assignSignals(addrInSignals, node, nodeName);
-    } else if (nodeName.find("addrOut") != std::string::npos) {
-      assignSignals(addrOutSignals, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find("dataOut") != std::string::npos) {
-      assignSignals(dataOutSignals, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"addrIn", addrInSignals, false, nullptr},
+      {"addrOut", addrOutSignals, true, nullptr},
+      {"dataOut", dataOutSignals, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void LoadSubjectGraph::connectInputNodes() {
@@ -469,19 +479,12 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({addrType, dataWidth});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("dataIn") != std::string::npos) {
-      assignSignals(dataInSignals, node, nodeName);
-    } else if (nodeName.find("addrIn") != std::string::npos) {
-      assignSignals(addrInSignals, node, nodeName);
-    } else if (nodeName.find("addrOut") != std::string::npos) {
-      assignSignals(addrOutSignals, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"dataIn", dataInSignals, false, nullptr},
+      {"addrIn", addrInSignals, false, nullptr},
+      {"addrOut", addrOutSignals, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void StoreSubjectGraph::connectInputNodes() {
@@ -503,17 +506,11 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 
   loadBlifFile({dataWidth});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("outs") != std::string::npos) {
-      node->name = (uniqueName + "_" + nodeName);
-      assignSignals(outputNodes, node, nodeName);
-    } else if (nodeName.find("ctrl") != std::string::npos) {
-      assignSignals(controlSignals, node, nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"ctrl", controlSignals, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void ConstantSubjectGraph::connectInputNodes() {
@@ -538,26 +535,18 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 
   loadBlifFile({inputWidth, outputWidth});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput || node->isOutput)) {
-      assignSignals(inputNodes, node, nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"ins", inputNodes, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void ExtTruncSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
 }
 
-ChannelSignals &
-ExtTruncSubjectGraph::returnOutputNodes(unsigned int) {
+ChannelSignals &ExtTruncSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
@@ -569,24 +558,14 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({dataWidth});
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("condition") != std::string::npos &&
-        (node->isInput || node->isOutput)) {
-      assignSignals(condition, node, nodeName);
-    } else if (nodeName.find("trueValue") != std::string::npos &&
-               (node->isInput || node->isOutput)) {
-      assignSignals(trueValue, node, nodeName);
-    } else if (nodeName.find("falseValue") != std::string::npos &&
-               (node->isInput || node->isOutput)) {
-      assignSignals(falseValue, node, nodeName);
-    } else if (nodeName.find("result") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"condition", condition, false, nullptr},
+      {"trueValue", trueValue, false, nullptr},
+      {"falseValue", falseValue, false, nullptr},
+      {"result", outputNodes, true, nullptr},
+  };
+
+  processNodesWithRules(rules);
 }
 
 void SelectSubjectGraph::connectInputNodes() {
@@ -595,20 +574,11 @@ void SelectSubjectGraph::connectInputNodes() {
   connectInputNodesHelper(falseValue, inputSubjectGraphs[2]);
 }
 
-ChannelSignals &
-SelectSubjectGraph::returnOutputNodes(unsigned int) {
+ChannelSignals &SelectSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
-MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
-  auto mergeOp = llvm::dyn_cast<handshake::MergeOp>(op);
-  size = mergeOp.getDataOperands().size();
-  dataWidth = handshake::getHandshakeTypeBitWidth(
-      mergeOp.getDataOperands()[0].getType());
-  inputNodes.resize(size);
-
-  loadBlifFile({size, dataWidth});
-
+void MergeSubjectGraph::processOutOfRuleNodes() {
   for (auto &node : blifData->getAllNodes()) {
     auto nodeName = node->name;
     if (nodeName.find("ins") != std::string::npos &&
@@ -626,14 +596,26 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
         num = num / dataWidth;
       }
       assignSignals(inputNodes[num], node, nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos ||
-               nodeName.find("dataReg") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
     }
   }
+}
+
+MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  auto mergeOp = llvm::dyn_cast<handshake::MergeOp>(op);
+  size = mergeOp.getDataOperands().size();
+  dataWidth = handshake::getHandshakeTypeBitWidth(
+      mergeOp.getDataOperands()[0].getType());
+  inputNodes.resize(size);
+
+  loadBlifFile({size, dataWidth});
+
+  // "ins" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void MergeSubjectGraph::connectInputNodes() {
@@ -657,19 +639,11 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput || node->isOutput)) {
-      assignSignals(inputNodes, node, nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos ||
-               nodeName.find("dataReg") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"ins", inputNodes, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 void BranchSinkSubjectGraph::connectInputNodes() {
@@ -695,19 +669,11 @@ void BufferSubjectGraph::initBuffer() {
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
 
-  for (auto &node : blifData->getAllNodes()) {
-    auto nodeName = node->name;
-    if (nodeName.find("ins") != std::string::npos &&
-        (node->isInput || node->isOutput)) {
-      assignSignals(inputNodes, node, nodeName);
-    } else if (nodeName.find("outs") != std::string::npos) {
-      assignSignals(outputNodes, node, nodeName);
-      node->name = (uniqueName + "_" + nodeName);
-    } else if (nodeName.find(".") != std::string::npos ||
-               nodeName.find("dataReg") != std::string::npos) {
-      node->name = (uniqueName + "." + nodeName);
-    }
-  }
+  std::vector<NodeProcessingRule> rules = {
+      {"ins", inputNodes, false, nullptr},
+      {"outs", outputNodes, true, nullptr}};
+
+  processNodesWithRules(rules);
 }
 
 // BufferSubjectGraph implementations
@@ -743,8 +709,10 @@ void BufferSubjectGraph::insertBuffer(BaseSubjectGraph *graph1,
   ChannelSignals &channel = graph1->returnOutputNodes(channelNum);
   dataWidth = channel.dataSignals.size();
 
-  // Delete the SubjectGraph from the input/output vector and insert the new SubjectGraph.
-  auto changeIO = [&](BaseSubjectGraph *prevIO, std::vector<BaseSubjectGraph *> &inputOutput){
+  // Delete the SubjectGraph from the input/output vector and insert the new
+  // SubjectGraph.
+  auto changeIO = [&](BaseSubjectGraph *prevIO,
+                      std::vector<BaseSubjectGraph *> &inputOutput) {
     auto it = std::find(inputOutput.begin(), inputOutput.end(), prevIO);
     auto index = std::distance(inputOutput.begin(), it);
     inputOutput.erase(it);
