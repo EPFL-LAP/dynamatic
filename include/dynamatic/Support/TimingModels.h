@@ -55,7 +55,7 @@ public:
   /// sets the metric's value otherwise. For the returned metric to make any
   /// sense, the metric must be monotonically increasing with respect to the
   /// bitwidth.
-  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const {
+  LogicalResult getCeilMetric(unsigned bitwidth, M &metric, double targetPeriod) const {
     std::optional<unsigned> widthCeil;
     M metricCeil = 0.0;
 
@@ -83,10 +83,45 @@ public:
   /// Determines the value of the metric at the bitwidth that is closest and
   /// greater than or equal to the passed operation's datawidth. See override's
   /// documentation for more details.
-  LogicalResult getCeilMetric(Operation *op, M &metric) const {
-    return getCeilMetric(getOpDatawidth(op), metric);
+  LogicalResult getCeilMetric(Operation *op, M &metric, double targetPeriod) const {
+    return getCeilMetric(getOpDatawidth(op), metric, double targetPeriod);
   }
 };
+
+template <typename M>
+struct FrequencyDepMetric {
+public:
+  /// Data points for the metric, mapping a frequency with the metric's value
+  std::unordered_map<double, M> data;
+
+  /// Determines the value of the metric at the internal operating delay that is highest, but still smaller than the target period (meaning we pick the slowest
+  /// implementation that still meets timing).
+  LogicalResult getDelayCeilMetric(double , M &metric, double targetPeriod) const {
+    std::optional<unsigned> opDelayCeil;
+    M metricFloor = 0.0;
+
+    // Find highest delay that's <= targetPeriod
+    for (const auto &[opDelay, val] : data) {
+      if (opDelay <= targetFreq) {
+        if (!opDelayCeil.has_value() || *opDelayCeil < opDelay) {
+          opDelayCeil = opDelay;
+          metricFloor = val;
+        }
+      }
+    }
+
+    if (!opDelayCeil.has_value())
+      return failure();
+
+    metric = metricFloor;
+    return success();
+  }
+};
+
+
+
+
+
 
 /// Deserializes a JSON value into a BitwidthDepMetric<double>. See
 /// ::llvm::json::Value's documentation for a longer description of this
@@ -191,23 +226,23 @@ public:
   /// may not always be true. Once we have formal timing models we will be able
   /// to return the real latency for those signal types too.
   LogicalResult getLatency(Operation *op, SignalType signalType,
-                           double &latency) const;
+                           double &latency, double targetPeriod) const;
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
   LogicalResult getInternalDelay(Operation *op, SignalType signalType,
-                                 double &delay) const;
+                                 double &delay, double targetPeriod) const;
 
   /// Attempts to get an operation's port delay for a specific signal and port
   /// type. On success, sets the last argument to the requested delay.
   LogicalResult getPortDelay(Operation *op, SignalType signalType,
-                             PortType portType, double &delay) const;
+                             PortType portType, double &delay, double targetPeriod) const;
 
   /// Attempts to get an operation's total delay (internal delay + input delay +
   /// output delay) for a specific signal type. On success, sets the last
   /// argument to the requested delay.
   LogicalResult getTotalDelay(Operation *op, SignalType signalType,
-                              double &delay) const;
+                              double &delay, double targetPeriod) const;
 
   /// Parses a JSON file whose path is given as argument and adds all the timing
   /// models it contains to the passed timing database.

@@ -112,7 +112,7 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
 }
 
 LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
-                                         double &latency) const {
+                                         double &latency, double targetPeriod) const {
   // Our current timing model doesn't have latency information for valid and
   // ready signals, assume it is 0.
   if (signalType != SignalType::DATA) {
