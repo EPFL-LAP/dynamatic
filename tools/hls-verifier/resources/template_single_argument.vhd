@@ -24,11 +24,11 @@ entity single_argument is
     ce0 : in std_logic;
     we0 : in std_logic;
     -- input channel
-    mem_din0 : in std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din0 : in std_logic_vector(DATA_WIDTH - 1 downto 0);
     -- output channel
-    mem_dout0       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    mem_dout0_valid : out std_logic;
-    mem_dout0_ready : in  std_logic
+    dout0       : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    dout0_valid : out std_logic;
+    dout0_ready : in  std_logic
   );
 end single_argument;
 
@@ -114,15 +114,15 @@ begin
   begin
     if (rst = '1') then
       tokenEmitted    <= '0';
-      mem_dout0       <= (others => '0');
-      mem_dout0_valid <= '0';
+      dout0       <= (others => '0');
+      dout0_valid <= '0';
     elsif rising_edge(clk) then
       if (not tokenEmitted) then
         tokenEmitted    <= '1';
-        mem_dout0       <= mem;
-        mem_dout0_valid <= '1';
+        dout0       <= mem;
+        dout0_valid <= '1';
       else
-        mem_dout0_valid <= mem_dout0_valid and (not mem_dout0_ready);
+        dout0_valid <= dout0_valid and (not dout0_ready);
       end if;
     end if;
   end process mem_to_port0;
@@ -136,7 +136,7 @@ begin
     -- Simple memory write
     if rising_edge(clk) then
       if (ce0 = '1' and we0 = '1') then
-        mem := mem_din0;
+        mem := din0;
       end if;
     end if;
   end process port0_to_mem;
