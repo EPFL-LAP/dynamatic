@@ -15,9 +15,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/WithColor.h"
+#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -25,11 +24,9 @@ using namespace llvm;
 using namespace mlir;
 
 using namespace hls_verify;
+static const char SEP = std::filesystem::path::preferred_separator;
 
 static const string LOG_TAG = "[HLS_VERIFIER] ";
-
-static const string COVER_CMD = "cover";
-static const string VVER_CMD = "vver";
 
 void generateModelsimScripts(const VerificationContext &ctx) {
   vector<string> filelistVhdl =
@@ -37,28 +34,30 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   vector<string> filelistVerilog =
       getListOfFilesInDirectory(ctx.getVhdlSrcDir(), ".v");
 
-  ofstream sim(ctx.getModelsimDoFileName());
-  // sim << "vdel -all" << endl;
-  sim << "vlib work" << endl;
-  sim << "vmap work work" << endl;
-  sim << "project new . simulation work modelsim.ini 0" << endl;
-  sim << "project open simulation" << endl;
+  std::error_code ec;
+  llvm::raw_fd_ostream os(ctx.getModelsimDoFileName(), ec);
+  // os << "vdel -all" << endl;
+  os << "vlib work\n";
+  os << "vmap work work\n";
+  os << "project new . simulation work modelsim.ini 0\n";
+  os << "project open simulation\n";
   for (auto &it : filelistVhdl)
-    sim << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << endl;
+    os << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << "\n";
 
   for (auto &it : filelistVerilog)
-    sim << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << endl;
+    os << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << "\n";
 
-  sim << "project calculateorder" << endl;
-  sim << "project compileall" << endl;
-  sim << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb" << endl;
-  sim << "log -r *" << endl;
-  sim << "run -all" << endl;
-  sim << "exit" << endl;
-  sim.close();
+  os << "project calculateorder\n";
+  os << "project compileall\n";
+  os << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb\n";
+  os << "log -r *\n";
+  os << "run -all\n";
+  os << "exit\n";
 }
 
 void generateVhdlTestbench(const VerificationContext &ctx) {
+  logInf(LOG_TAG,
+         "Generating VHDL testbench for entity " + ctx.getVhdlDuvEntityName());
   HlsVhdlTb vhdlTb(ctx);
   std::error_code ec;
   std::string filepath = ctx.getVhdlTestbenchPath().c_str();
@@ -67,45 +66,21 @@ void generateVhdlTestbench(const VerificationContext &ctx) {
   vhdlTb.codegen(os);
 }
 
-mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
-  const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
-  cout << "\n--- Comparison Results ---\n" << endl;
-  for (const auto &outputParam : outputParams) {
-    mlir::LogicalResult result = compareFiles(
-        ctx.getCOutPath(outputParam), ctx.getVhdlOutPath(outputParam),
-        ctx.getTokenComparator(outputParam));
-    cout << "Comparison of [" + outputParam.parameterName + "] : "
-         << (mlir::succeeded(result) ? "Pass" : "Fail") << endl;
-    if (mlir::failed(result)) {
-      return failure();
-    }
-  }
-  return mlir::success();
-}
-
-void executeVhdlTestbench(const VerificationContext &ctx,
-                          const std::string &resourceDir) {
-  string command;
-
-  // Generating VHDL testbench
-
-  logInf(LOG_TAG,
-         "Generating VHDL testbench for entity " + ctx.getVhdlDuvEntityName());
-  generateVhdlTestbench(ctx);
-
-  // Copying supplementary files
-  char sep = std::filesystem::path::preferred_separator;
+void copySupplementaryFiles(const VerificationContext &ctx,
+                            const std::string &resourcePathName) {
   auto copyToVHDLDir = [&](const std::string &from,
                            const std::string &to) -> void {
-    command =
-        "cp " + resourceDir + sep + from + " " + ctx.getVhdlSrcDir() + sep + to;
+    string command;
+    command = "cp " + resourcePathName + SEP + from + " " +
+              ctx.getVhdlSrcDir() + SEP + to;
     logInf(LOG_TAG, "Copying supplementary files: [" + command + "]");
     executeCommand(command);
   };
   auto copyToHLSDir = [&](const std::string &from,
                           const std::string &to) -> void {
-    command = "cp " + resourceDir + sep + from + " " + ctx.getHlsVerifyDir() +
-              sep + to;
+    string command;
+    command = "cp " + resourcePathName + SEP + from + " " +
+              ctx.getHlsVerifyDir() + SEP + to;
     logInf(LOG_TAG, "Copying supplementary files: [" + command + "]");
     executeCommand(command);
   };
@@ -115,9 +90,26 @@ void executeVhdlTestbench(const VerificationContext &ctx,
   copyToVHDLDir("template_single_argument.vhd", "single_argument.vhd");
   copyToVHDLDir("template_simpackage.vhd", "simpackage.vhd");
   copyToHLSDir("modelsim.ini", "modelsim.ini");
+}
 
-  // Generating modelsim script for the simulation
-  generateModelsimScripts(ctx);
+mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
+  const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
+  llvm::errs() << "\n--- Comparison Results ---\n";
+  for (const auto &outputParam : outputParams) {
+    mlir::LogicalResult result = compareFiles(
+        ctx.getCOutPath(outputParam), ctx.getVhdlOutPath(outputParam),
+        ctx.getTokenComparator(outputParam));
+    llvm::errs() << "Comparison of [" + outputParam.parameterName + "] : "
+                 << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    if (failed(result)) {
+      return failure();
+    }
+  }
+  return mlir::success();
+}
+
+void executeVhdlTestbench(const VerificationContext &ctx) {
+  string command;
 
   // Cleaning-up exisiting outputs
   command = "rm -rf " + ctx.getVhdlOutDir();
@@ -152,8 +144,8 @@ int main(int argc, char **argv) {
       cl::value_desc("cfuv-function-name"), cl::Required);
 
   cl::opt<std::string> vhdlDuvEntityName(
-      "vhdl-duv-entity-name", cl::desc("Name of the VHDL entity name"),
-      cl::value_desc("vhdl-duv-entity-name"), cl::Required);
+      "hdl-duv-entity-name", cl::desc("Name of the HDL entity name"),
+      cl::value_desc("hdl-duv-entity-name"), cl::Required);
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -167,7 +159,24 @@ int main(int argc, char **argv) {
 
   VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
                           vhdlDuvEntityName);
-  executeVhdlTestbench(ctx, resourcePathName);
 
-  return succeeded(compareCAndVhdlOutputs(ctx));
+  // Generate hls_verify_<function_name>.vhd
+  generateVhdlTestbench(ctx);
+
+  generateModelsimScripts(ctx);
+
+  // Copy two_port_RAM.vhd, single_argument.vhd, etc. to the VHDL source
+  copySupplementaryFiles(ctx, resourcePathName);
+
+  // Run modelsim to simulate the testbench and write the outputs to the
+  // VHDL_OUT
+  executeVhdlTestbench(ctx);
+
+  if (succeeded(compareCAndVhdlOutputs(ctx))) {
+    logInf(LOG_TAG, "C and VHDL outputs match");
+  } else {
+    logErr(LOG_TAG, "C and VHDL outputs do not match");
+    return 1;
+  }
+  return 0;
 }
