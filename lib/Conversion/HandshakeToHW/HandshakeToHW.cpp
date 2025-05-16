@@ -682,7 +682,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
       .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
-        auto paramsAttr = initOp->getAttrOfType<mlir::DictionaryAttr("hw.parameters");
+        auto paramsAttr = initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
         if (paramsAttr) {
           auto initTokenAttr = paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
           int initialValue = (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
