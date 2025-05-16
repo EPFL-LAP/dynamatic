@@ -12,8 +12,7 @@ import argparse
 import os
 import sys
 
-from configs import *
-from lsq_core import *
+from vhdl_gen import *
 
 #===----------------------------------------------------------------------===#
 # Parser Definition
@@ -748,3 +747,4 @@ def main():
     
 if __name__ == '__main__':
     main()
+
