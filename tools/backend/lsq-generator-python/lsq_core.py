@@ -679,7 +679,7 @@ def BitsToOH(dout, din) -> str:
 def BitsToOHSub1(dout, din) -> str:
     global tabLevel
     str_ret = '\t'*tabLevel + '-- Bits To One-Hot Begin\n'
-    str_ret += '\t'*tabLevel + f'-- BitsToOHSub1({dout.name}, {din.name})\n'
+    str_ret += '\t'*tabLevel + f'-- BitsToOH({dout.name}, {din.name})\n'
     for i in range(0, dout.size):
         str_ret += '\t'*tabLevel + f'{dout.getNameWrite(i)} <= ' \
             f'\'1\' when {din.getNameRead()} = {IntToBits((i+1) % dout.size, din.size)} else \'0\';\n'
@@ -928,14 +928,14 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
     stq_empty_i        = Logic('stq_empty', 'i')
 
     ldq_wen_o          = LogicArray('ldq_wen', 'o', configs.numLdqEntries)
-    num_loads_o        = LogicVec('num_loads', 'o', configs.emptyLdAddrW)
-    num_loads          = LogicVec('num_loads', 'w', configs.emptyLdAddrW)
+    num_loads_o        = LogicVec('num_loads', 'o', configs.ldqAddrW)
+    num_loads          = LogicVec('num_loads', 'w', configs.ldqAddrW)
     if (configs.ldpAddrW > 0):
         ldq_port_idx_o = LogicVecArray('ldq_port_idx', 'o', configs.numLdqEntries, configs.ldpAddrW)
 
     stq_wen_o          = LogicArray('stq_wen', 'o', configs.numStqEntries)
-    num_stores_o       = LogicVec('num_stores', 'o', configs.emptyStAddrW)
-    num_stores         = LogicVec('num_stores', 'w', configs.emptyStAddrW)
+    num_stores_o       = LogicVec('num_stores', 'o', configs.stqAddrW)
+    num_stores         = LogicVec('num_stores', 'w', configs.stqAddrW)
     if (configs.stpAddrW > 0):
         stq_port_idx_o = LogicVecArray('stq_port_idx', 'o', configs.numStqEntries, configs.stpAddrW)
 
@@ -948,7 +948,7 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
     empty_loads  = LogicVec('empty_loads', 'w', configs.emptyLdAddrW)
     empty_stores = LogicVec('empty_stores', 'w', configs.emptyStAddrW)
 
-    arch += WrapSub(loads_sub, ldq_head_i, ldq_tail_i, configs.numLdqEntries)
+    arch += WrapSub(loads_sub, ldq_head_i, ldq_tail_i, configs.numStqEntries)
     arch += WrapSub(stores_sub, stq_head_i, stq_tail_i, configs.numStqEntries)
 
     arch += Op(empty_loads, configs.numLdqEntries, 'when', ldq_empty_i, 'else', \
