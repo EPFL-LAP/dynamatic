@@ -190,6 +190,9 @@ private:
 /// influenced by the type of the operation traversed at each step.
 bool isGIID(Value predecessor, OpOperand &oprd, CFGPath &path);
 
+/// Returns true if the given channel locates in a cycle.
+bool isChannelOnCycle(mlir::Value channel);
+
 } // namespace dynamatic
 
 #endif // DYNAMATIC_SUPPORT_CFG_H

@@ -11,6 +11,7 @@
 
 #include "CAnalyser.h"
 #include "VerificationContext.h"
+#include "mlir/Support/IndentedOstream.h"
 #include <string>
 #include <vector>
 
@@ -21,25 +22,6 @@ namespace hls_verify {
 class MemElem {
 public:
   bool isArray;
-
-  static string clkPortName;
-  static string rstPortName;
-  static string ce0PortName;
-  static string we0PortName;
-  static string dIn0PortName;
-  static string dOut0PortName;
-  static string addr0PortName;
-  static string ce1PortName;
-  static string we1PortName;
-  static string dIn1PortName;
-  static string dOut1PortName;
-  static string addr1PortName;
-  static string donePortName;
-  static string inFileParamName;
-  static string outFileParamName;
-  static string dataWidthParamName;
-  static string addrWidthParamName;
-  static string dataDepthParamName;
 
   string ce0SignalName;
   string we0SignalName;
@@ -72,7 +54,7 @@ public:
 class HlsVhdlTb {
 public:
   HlsVhdlTb(const VerificationContext &ctx);
-  string generateVhdlTestbench();
+  void generateVhdlTestbench(mlir::raw_indented_ostream &os);
   string getInputFilepathForParam(const CFunctionParameter &param);
   string getOutputFilepathForParam(const CFunctionParameter &param);
 
@@ -81,39 +63,16 @@ private:
   string duvName;
   string tleName;
   vector<CFunctionParameter> cDuvParams;
-  vector<pair<string, string>> duvPortMap;
   vector<Constant> constants;
   vector<MemElem> memElems;
 
-  string getLibraryHeader();
-  string getEntitiyDeclaration();
-  string getArchitectureBegin();
-  string getConstantDeclaration();
-  string getSignalDeclaration();
-  string getMemoryInstanceGeneration();
-  string getDuvInstanceGeneration();
-  string getDuvComponentDeclaration();
-  string getCommonBody();
-  string getArchitectureEnd();
-  string getOutputTagGeneration();
+  void getConstantDeclaration(mlir::raw_indented_ostream &os);
+  void getSignalDeclaration(mlir::raw_indented_ostream &os);
+  void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os);
+  void getDuvInstanceGeneration(mlir::raw_indented_ostream &os);
+  void getDuvComponentDeclaration(mlir::raw_indented_ostream &os);
+  void getOutputTagGeneration(mlir::raw_indented_ostream &os);
   int getTransactionNumberFromInput();
-
-  static string getCe0PortNameForCParam(string &cParam);
-  static string getWe0PortNameForCParam(string &cParam);
-  static string getDataIn0PortNameForCParam(string &cParam);
-  static string getDataOut0PortNameForCParam(string &cParam);
-  static string getAddr0PortNameForCParam(string &cParam);
-  static string getCe1PortNameForCParam(string &cParam);
-  static string getWe1PortNameForCParam(string &cParam);
-  static string getDataIn1PortNameForCParam(string &cParam);
-  static string getDataOut1PortNameForCParam(string &cParam);
-  static string getAddr1PortNameForCParam(string &cParam);
-  static string getReadyInPortNameForCParam(string &cParam);
-  static string getReadyOutPortNameForCParam(string &cParam);
-  static string getValidInPortNameForCParam(string &cParam);
-  static string getValidOutPortNameForCParam(string &cParam);
-  static string getDataInSaPortNameForCParam(string &cParam);
-  static string getDataOutSaPortNameForCParam(string &cParam);
 };
 } // namespace hls_verify
 

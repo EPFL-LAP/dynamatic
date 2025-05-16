@@ -49,39 +49,34 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
     // 1. If breaking DV & R:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
-    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-    // When numslot > 2, map to (numslot - 1) * FIFO_BREAK_DV + ONE_SLOT_BREAK_R.
+    // When numslot = 1, map to ONE_SLOT_BREAK_DVR;
+    // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
     //
     // 2. If only breaking DV:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV;
-    // When numslot > 1, map to (numslot - 1) * FIFO_BREAK_DV.
+    // Map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
     //
     // 3. If only breaking R:
-    // When numslot = 1, map to ONE_SLOT_BREAK_R;
-    // When numslot > 1, map to numslot * FIFO_BREAK_NONE.
+    // Map to ONE_SLOT_BREAK_R + (numslot - 1) * FIFO_BREAK_NONE.
+    //
+    // 4. If breaking none:
+    // Map to numslot * FIFO_BREAK_NONE.
     if (forceBreakDV && forceBreakR) {
       if (numSlotsToPlace == 1) {
-        result.numOneSlotDV = 1;
-      } else if (numSlotsToPlace == 2) {
-        result.numOneSlotDV = 1;
-        result.numOneSlotR = 1;
+        result.numOneSlotDVR = 1;
       } else {
-        result.numFifoDV = numSlotsToPlace - 1;
+        result.numOneSlotDV = 1;
+        result.numFifoNone = numSlotsToPlace - 2;
         result.numOneSlotR = 1;
       }
     } else if (forceBreakDV) {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotDV = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numOneSlotDV = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
+    } else if (forceBreakR) {
+      result.numOneSlotR = 1;
+      result.numFifoNone = numSlotsToPlace - 1;
     } else {
-      if (numSlotsToPlace == 1) {
-        result.numOneSlotR = 1;
-      } else {
-        result.numFifoNone = numSlotsToPlace;
-      }
+      result.numFifoNone = numSlotsToPlace;
     }
 
     placement[channel] = result;
@@ -128,8 +123,6 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
                     "custom_minData");
   }
   if (props.minTrans > 0) {
-    // Force the MILP to place at least one transparent slot
-    model.addConstr(bufReady == 1, "custom_forceReady");
     // If the MILP decides to also place a data buffer, then we must reserve
     // an extra slot for it
     model.addConstr(chVars.bufNumSlots >= props.minTrans + bufData,
@@ -359,15 +352,16 @@ void CFDFCUnionBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addChannelTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addBufferPresenceConstraints(channel);
+    addBufferingGroupConstraints(channel, bufGroups);
   }
 
   // For unit constraints, filter out ports that are not part of the CFDFC union
@@ -378,11 +372,10 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
-    addUnitPathConstraints(unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(unit, channelFilter);
-    addUnitElasticityConstraints(unit, channelFilter);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC in the
@@ -392,14 +385,15 @@ void CFDFCUnionBuffers::setup() {
     if (!funcInfo.cfdfcs[cfdfc])
       continue;
     addCFDFCVars(*cfdfc);
-    addChannelThroughputConstraints(*cfdfc);
+    addSteadyStateReachabilityConstraints(*cfdfc);
+    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
     addUnitThroughputConstraints(*cfdfc);
   }
 
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addObjective(allChannels, cfUnion.cfdfcs);
+  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
   markReadyToOptimize();
 }
 
@@ -474,15 +468,16 @@ void OutOfCycleBuffers::setup() {
     addCustomChannelConstraints(channel);
 
     // Add single-domain path constraints
-    addChannelPathConstraints(channel, SignalType::DATA, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::VALID, bufModel, {},
+    addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
                               readyGroup);
-    addChannelPathConstraints(channel, SignalType::READY, bufModel,
+    addChannelTimingConstraints(channel, SignalType::READY, bufModel,
                               dataValidGroup, {});
 
     // Add elasticity constraints
-    addChannelElasticityConstraints(channel, bufGroups);
+    addBufferPresenceConstraints(channel);
+    addBufferingGroupConstraints(channel, bufGroups);
 
     // Add negative terms to MILP objective, penalizing placement of buffers
     ChannelVars &chVars = vars.channelVars[channel];
@@ -499,11 +494,10 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
-    addUnitPathConstraints(&unit, SignalType::DATA, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::VALID, channelFilter);
-    addUnitPathConstraints(&unit, SignalType::READY, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
+    addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);
     addUnitMixedPathConstraints(&unit, channelFilter);
-    addUnitElasticityConstraints(&unit, channelFilter);
   }
 
   // Set MILP objective and mark it ready to be optimized
