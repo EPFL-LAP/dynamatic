@@ -211,6 +211,10 @@ private:
   Gate *expandGammaTree(ListExpressionsPerGate &expressions,
                         std::queue<unsigned> conditions, Gate *originalPhi,
                         const ftd::BlockIndexing &bi);
+
+  /// Given the list of gates in `gatesPerBlock`, get rid of the phi after their
+  /// conversion to the GSA equivalents.
+  void removePhiGates();
 };
 } // namespace gsa
 } // namespace experimental
