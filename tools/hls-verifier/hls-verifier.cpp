@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
   VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
                           vhdlDuvEntityName);
 
-  // Generate hls_verify_<function_name>.vhd
+  // Generate hls_verify_<cFuvFunctionName>.vhd
   generateVhdlTestbench(ctx);
 
   generateModelsimScripts(ctx);
