@@ -134,6 +134,8 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   // Variables for placement information
   chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+  chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
+  chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
@@ -327,6 +329,62 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   }
 }
 
+void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  GRBVar &bufNumSlots = chVars.bufNumSlots;
+  GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
+  GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+  GRBVar &dataLatency = chVars.dataLatency;
+  GRBVar &shiftReg = chVars.shiftReg;
+
+  // There is a buffer breaking data & valid iff dataLatency > 0
+
+  // Here are two versions, choose one of them on the final implementation
+  // First version using constraints indicators
+  model.addGenConstrIndicator(dataBuf, 1, dataLatency >= 1, 
+                              "dataBuf_if_dataLatency");
+  model.addGenConstrIndicator(validBuf, 1, dataLatency >= 1,
+                              "validBuf_if_dataLatency");
+  model.addGenConstrIndicator(dataBuf, 0, dataLatency == 0,
+                              "dataLatency_if_dataBuf");
+  model.addGenConstrIndicator(validBuf, 0, dataLatency == 0,
+                              "dataLatency_if_validBuf");
+
+  // Second version using big-M
+  // Assume there are at most 100 slots on the channel
+  model.addConstr(dataLatency * 0.01 <= dataBuf, "dataBuf_if_dataLatency");
+  model.addConstr(dataLatency * 0.01 <= validBuf, "validBuf_if_dataLatency");
+  model.addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model.addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
+
+  // The dataBuf and validBuf must be equal
+  model.addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
+
+  // Here are two versions, choose one of them on the final implementation
+  // First version using constraints indicators
+
+  // The latency does not exceed the number of buffer slots.
+  model.addGenConstrIndicator(shiftReg, 0,
+                              dataLatency <= bufNumSlots,
+                              "latency_le_bufSlots_if_no_shiftReg");
+  // Shift registers only introduce data (and valid) latency.
+  // If shift registers are used, there must be enough slots for them.
+  model.addGenConstrIndicator(shiftReg, 1,
+                              dataLatency + readyBuf <= bufNumSlots,
+                              "enough_slots_if_shiftReg_on");
+
+  // Second version using big-M
+
+  // The latency does not exceed the number of buffer slots.
+  model.addConstr(dataLatency <= bufNumSlots, "latency_le_bufSlots");
+  // Shift registers only introduce data (and valid) latency.
+  // If shift registers are used, there must be enough slots for them.
+  model.addConstr(dataLatency + readyBuf <= bufNumSlots + 100 * (1 - shiftReg),
+                  "enough_slots_for_shiftReg");
+}
+
 void BufferPlacementMILP::addBufferingGroupConstraints(
     Value channel, ArrayRef<BufferingGroup> bufGroups) {
 
@@ -463,6 +521,58 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
   }
 }
 
+void BufferPlacementMILP::addChannelThroughputConstraintsForIntegerLatencyChannel(
+                          CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
+    Operation *dstOp = *channel.getUsers().begin();
+
+    // No throughput constraints on channels going to stores
+    /// TODO: this is from legacy implementation, we should understand why we
+    /// really do this and figure out if it makes sense (@lucas-rami: I don't
+    /// think it does)
+    if (isa<handshake::StoreOp>(dstOp))
+      continue;
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // The channel must have variables for the data signal
+    ChannelVars &chVars = vars.channelVars[channel];
+    auto dataVars = chVars.signalVars.find(SignalType::DATA);
+    bool dataFound = dataVars != chVars.signalVars.end();
+    assert(dataFound && "missing data signal variables on channel variables");
+
+    // Retrieve the MILP variables we need
+    GRBVar &bufNumSlots = chVars.bufNumSlots;
+    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &throughput = cfVars.throughput;
+    GRBVar &dataLatency = chVars.dataLatency;
+    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    GRBVar &shiftReg = chVars.shiftReg;
+
+    // Set a ceiling funciton for the extra bubble component introduced by the shift register.
+    std::string channelName = getUniqueName(*channel.getUses().begin());
+    std::string extraBubbleVarName = "extra_bubble_" + channelName;
+    std::string extraBubbleConstrName = "extra_bubble_constr_" + channelName;
+    GRBVar extraBubble = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, extraBubbleVarName);
+    model.addQConstr(extraBubble <= dataLatency * throughput + 0.99, extraBubbleConstrName);
+    model.addQConstr(dataLatency * throughput <= chThroughput, 
+                     "throughput_tokens_lb");
+    model.addQConstr(chThroughput + readyBuf * throughput 
+                    + shiftReg * (dataLatency - extraBubble) <= bufNumSlots, 
+                    "throughput_tokens_ub");
+  }
+}
+
 void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
@@ -537,6 +647,66 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
     ChannelVars &chVars = vars.channelVars[channel];
     objective -= maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
     objective -= maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
+  }
+
+  // Finally, set the MILP objective
+  model.setObjective(objective, GRB_MAXIMIZE);
+}
+
+void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
+                                                      ArrayRef<CFDFC *> cfdfcs) {
+  // Compute the total number of executions over channels that are part of any
+  // CFDFC
+  unsigned totalExecs = 0;
+  for (Value channel : channels) {
+    totalExecs += getChannelNumExecs(channel);
+  }
+
+  // Create the expression for the MILP objective
+  GRBLinExpr objective = 0;
+
+  // For each CFDFC, add a throughput contribution to the objective, weighted
+  // by the "importance" of the CFDFC
+  double maxCoefCFDFC = 0.0;
+  double fTotalExecs = static_cast<double>(totalExecs);
+  if (totalExecs != 0) {
+    for (CFDFC *cfdfc : cfdfcs) {
+      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      objective += coef * vars.cfdfcVars[cfdfc].throughput;
+      maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+    }
+  }
+
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
+  if (maxCoefCFDFC == 0.0)
+    maxCoefCFDFC = 1.0;
+
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
+  double bufPenaltyMul = 1e-4;
+  double largeSlotPenaltyMul = 1e-4;
+  double smallSlotPenaltyMul = 1e-5;
+  double shiftRegPenaltyMul = 1e-5;
+  double shiftRegSlotPenaltyMul = 1e-7;
+  for (Value channel : channels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    GRBVar &bufPresent = chVars.bufPresent;
+    GRBVar &bufNumSlots = chVars.bufNumSlots;
+    GRBVar &dataLatency = chVars.dataLatency;
+    GRBVar &shiftReg = chVars.shiftReg;
+    objective -= maxCoefCFDFC * bufPenaltyMul * bufPresent;
+    objective -= maxCoefCFDFC * largeSlotPenaltyMul * (bufNumSlots - dataLatency);
+    objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
+
+    // Linearization of dataLatency * shiftReg
+    GRBVar latencyMulShiftReg = model.addVar(0, 100, 0.0, GRB_INTEGER,
+                                             "latencyMulShiftReg");
+    model.addConstr(latencyMulShiftReg <= dataLatency);
+    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    objective -= maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
+    objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
   }
 
   // Finally, set the MILP objective
