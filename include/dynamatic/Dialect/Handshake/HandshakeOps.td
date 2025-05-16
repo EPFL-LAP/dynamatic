@@ -660,23 +660,23 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
 ]> {
   let summary = "join operation";
   let description = [{
-    A  synchronizer with a control-only(dateless) and data-loaded version.  Produces a valid output when all
+    A control-only synchronizer.  Produces a valid output when all
     inputs become available.
 
     Example:
 
     ```mlir
-    %0 = join %a, %b, %c : !handshake.channel<i32>
+    %0 = join %a, %b, %c : !handshake.control
     ```
   }];
 
-  let arguments = (ins Variadic<HandshakeType>:$data);
-  let results = (outs HandshakeType:$result);
-  let assemblyFormat = "$data attr-dict `:` custom<HandshakeType>(type($result))";
+  let arguments = (ins Variadic<ControlType>:$data);
+  let results = (outs ControlType:$result);
+  let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
