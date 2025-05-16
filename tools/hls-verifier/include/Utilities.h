@@ -10,14 +10,13 @@
 #define HLS_VERIFIER_UTILITIES_H
 
 #include "mlir/Support/LogicalResult.h"
+#include <memory>
 #include <string>
 #include <vector>
 
 #define MAX_PATH_LENGTH 5000
 
 using namespace std;
-
-namespace hls_verify {
 
 class TokenCompare {
 public:
@@ -38,23 +37,13 @@ private:
 class FloatCompare : public TokenCompare {
 public:
   FloatCompare() = default;
-  FloatCompare(float threshold);
   bool compare(const string &token1, const string &token2) const override;
-
-private:
-  float threshold;
-  float decodeToken(unsigned int token) const;
 };
 
 class DoubleCompare : public TokenCompare {
 public:
   DoubleCompare() = default;
-  DoubleCompare(double threshold);
   bool compare(const string &token1, const string &token2) const override;
-
-private:
-  double threshold;
-  double decodeToken(unsigned int token) const;
 };
 
 /**
@@ -80,7 +69,7 @@ string getApplicationDirectory();
  */
 mlir::LogicalResult compareFiles(const string &refFilePath,
                                  const string &outFile,
-                                 const TokenCompare *tokenCompare);
+                                 std::unique_ptr<TokenCompare> tokenCompare);
 
 /**
  * Trims the leading and trailing white spaces.
@@ -98,13 +87,6 @@ string trim(const string &str);
 vector<string> split(const string &str, const string &delims = " \t\n\r\f");
 
 /**
- * Get the number of transactions in a data file.
- * @param input_path path of the data file
- * @return the number of transactions in the given file.
- */
-int getNumberOfTransactions(const string &inputPath);
-
-/**
  * Execute the given command in a shell.
  * @param command the command to be executed
  * @return true if execution returns 0, false otherwise.
@@ -120,7 +102,5 @@ bool executeCommand(const string &command);
  */
 vector<string> getListOfFilesInDirectory(const string &directory,
                                          const string &extension = "");
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_UTILITIES_H

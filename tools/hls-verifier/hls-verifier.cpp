@@ -13,18 +13,33 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "Utilities.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h" // Include the header for OwningOpRef
+#include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 
-using namespace hls_verify;
 static const char SEP = std::filesystem::path::preferred_separator;
 
 static const string LOG_TAG = "[HLS_VERIFIER] ";
@@ -50,21 +65,10 @@ void generateModelsimScripts(const VerificationContext &ctx) {
 
   os << "project calculateorder\n";
   os << "project compileall\n";
-  os << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb\n";
+  os << "eval vsim tb\n";
   os << "log -r *\n";
   os << "run -all\n";
   os << "exit\n";
-}
-
-void generateVhdlTestbench(const VerificationContext &ctx) {
-  logInf(LOG_TAG,
-         "Generating VHDL testbench for entity " + ctx.getVhdlDuvEntityName());
-  HlsVhdlTb vhdlTb(ctx);
-  std::error_code ec;
-  std::string filepath = ctx.getVhdlTestbenchPath().c_str();
-  llvm::raw_fd_ostream fileStream(filepath, ec);
-  mlir::raw_indented_ostream os(fileStream);
-  vhdlTb.codegen(os);
 }
 
 void copySupplementaryFiles(const VerificationContext &ctx,
@@ -94,18 +98,71 @@ void copySupplementaryFiles(const VerificationContext &ctx,
 }
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
-  const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
-  llvm::errs() << "\n--- Comparison Results ---\n";
-  for (const auto &outputParam : outputParams) {
-    mlir::LogicalResult result = compareFiles(
-        ctx.getCOutPath(outputParam), ctx.getVhdlOutPath(outputParam),
-        ctx.getTokenComparator(outputParam));
-    llvm::errs() << "Comparison of [" + outputParam.parameterName + "] : "
-                 << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+
+  // mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  handshake::FuncOp *funcOp = ctx.funcOp;
+  // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
+
+  llvm::SmallVector<std::pair<std::string, Type>> argAndTypeMap;
+
+  // Connect the memory elements to the DUV
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      argAndTypeMap.emplace_back(argName, type.getDataType());
+
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+      argAndTypeMap.emplace_back(argName, type.getElementType());
+    }
+  }
+
+  // Connect the output channels to the DUV
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      argAndTypeMap.emplace_back(argName, type.getDataType());
+    }
+  }
+
+  for (auto [argName, type] : argAndTypeMap) {
+    std::string vhdlOutFile =
+        ctx.getVhdlOutDir() + SEP + "output_" + argName + ".dat";
+
+    std::string cOutFile =
+        ctx.getCOutDir() + SEP + "output_" + argName + ".dat";
+
+    LogicalResult result = failure();
+    if (isa<Float32Type>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<FloatCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "FP32 comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    } else if (isa<Float64Type>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<DoubleCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "FP64 comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    } else if (isa<IntegerType>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<IntegerCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "Comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    }
     if (failed(result)) {
       return failure();
     }
   }
+
   return mlir::success();
 }
 
@@ -133,13 +190,6 @@ int main(int argc, char **argv) {
       cl::desc("Name of the resource path (with two_port_RAM.vhd, "
                "single_argument.vhd, etc.)"),
       cl::value_desc("resource-path"), cl::Required);
-  cl::opt<std::string> cTbPathName(
-      "ctb-path", cl::desc("Name of the C file with the main function"),
-      cl::value_desc("ctb-path"), cl::Required);
-  cl::opt<std::string> cDuvPathName(
-      "cduv-path",
-      cl::desc("Name of the C file with the kernel to be verified"),
-      cl::value_desc("cduv-path"), cl::Required);
   cl::opt<std::string> cFuvFunctionName(
       "cfuv-function-name", cl::desc("Name of the C function name"),
       cl::value_desc("cfuv-function-name"), cl::Required);
@@ -147,6 +197,10 @@ int main(int argc, char **argv) {
   cl::opt<std::string> vhdlDuvEntityName(
       "hdl-duv-entity-name", cl::desc("Name of the HDL entity name"),
       cl::value_desc("hdl-duv-entity-name"), cl::Required);
+  cl::opt<std::string> mlirPathName(
+      "handshake-mlir",
+      cl::desc("Name of the handshake MLIR file with the kernel"),
+      cl::value_desc("handshake-mlir"), cl::Required);
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -160,11 +214,38 @@ int main(int argc, char **argv) {
     
     )PREFIX");
 
-  VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
-                          vhdlDuvEntityName);
+  // We only need the Handshake dialect
+  MLIRContext context;
+  context.loadDialect<handshake::HandshakeDialect>();
+  context.allowUnregisteredDialects();
+
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mlirPathName.c_str());
+  if (std::error_code error = fileOrErr.getError()) {
+    llvm::errs() << argv[0] << ": could not open input file '" << mlirPathName
+                 << "': " << error.message() << "\n";
+    return 1;
+  }
+
+  // Load the MLIR module
+  SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> modOp(
+      mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
+  if (!modOp)
+    return 1;
+
+  handshake::FuncOp funcOp =
+      dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(cFuvFunctionName));
+
+  std::string vhdlSrcDir = "../VHDL_SRC";
+
+  std::string vhdlTestbenchPath =
+      vhdlSrcDir + SEP + "hls_verify_" + cFuvFunctionName + "_tb.vhd";
+
+  VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp);
 
   // Generate hls_verify_<cFuvFunctionName>.vhd
-  generateVhdlTestbench(ctx);
+  vhdlTbCodegen(ctx);
 
   // Copy two_port_RAM.vhd, single_argument.vhd, etc. to the VHDL source
   copySupplementaryFiles(ctx, resourcePathName);

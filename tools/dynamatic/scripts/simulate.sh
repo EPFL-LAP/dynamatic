@@ -69,9 +69,8 @@ echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" \
   --resource-path="$RESOURCE_DIR" \
-  --ctb-path="../C_SRC/$KERNEL_NAME.c" \
-  --cduv-path="../C_SRC/$KERNEL_NAME.c" \
   --cfuv-function-name="$KERNEL_NAME" \
-  --hdl-duv-entity-name="$KERNEL_NAME"_wrapper \
+  --hdl-duv-entity-name="$KERNEL_NAME" \
+  --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   > "../report.txt" 2>&1
 exit_on_fail "Simulation failed" "Simulation succeeded"
