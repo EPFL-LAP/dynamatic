@@ -42,44 +42,44 @@ using namespace dynamatic::handshake;
 static cl::OptionCategory mainCategory("Application options");
 
 static cl::opt<std::string> inputFileName(cl::Positional,
-                                          cl::desc("<input file>"),
-                                          cl::cat(mainCategory));
+  cl::desc("<input file>"),
+  cl::cat(mainCategory));
 
 static cl::opt<std::string> timingDBFilepath(
-    "timing-models", cl::Optional,
-    cl::desc(
-        "Relative path to JSON-formatted file containing timing models for "
-        "dataflow components. The tool only tries to read from this file if it "
-        "is ran in one of the legacy-compatible modes, where timing "
-        "annotations are given to all nodes in the graph. By default, contains "
-        "the relative path (from the project's top-level directory) to the "
-        "file defining the default timing models in Dynamatic."),
-    cl::init("data/components.json"), cl::cat(mainCategory));
+  "timing-models", cl::Optional,
+  cl::desc(
+    "Relative path to JSON-formatted file containing timing models for "
+    "dataflow components. The tool only tries to read from this file if it "
+    "is ran in one of the legacy-compatible modes, where timing "
+    "annotations are given to all nodes in the graph. By default, contains "
+    "the relative path (from the project's top-level directory) to the "
+    "file defining the default timing models in Dynamatic."),
+  cl::init("data/components.json"), cl::cat(mainCategory));
 
 static cl::opt<DOTGraph::EdgeStyle> edgeStyle(
-    "edge-style", cl::Optional,
-    cl::desc(
-        "Style in which to render edges in the resulting DOTs (this is "
-        "essentially the 'splines' attribute of the top-level DOT graph):"),
-    cl::values(clEnumValN(DOTGraph::EdgeStyle::SPLINE, "spline",
-                          "splines, default"),
-               clEnumValN(DOTGraph::EdgeStyle::ORTHO, "ortho",
-                          "orthogonal polylines")),
-    cl::init(DOTGraph::EdgeStyle::SPLINE), cl::cat(mainCategory));
+  "edge-style", cl::Optional,
+  cl::desc(
+    "Style in which to render edges in the resulting DOTs (this is "
+    "essentially the 'splines' attribute of the top-level DOT graph):"),
+  cl::values(clEnumValN(DOTGraph::EdgeStyle::SPLINE, "spline",
+    "splines, default"),
+    clEnumValN(DOTGraph::EdgeStyle::ORTHO, "ortho",
+      "orthogonal polylines")),
+  cl::init(DOTGraph::EdgeStyle::SPLINE), cl::cat(mainCategory));
 
 enum class LabelType { TYPE, UNAME };
 
 static cl::opt<LabelType>
-    labelType("label-type", cl::Optional,
-              cl::desc("Information to use as node labels:"),
-              cl::values(clEnumValN(LabelType::TYPE, "type",
-                                    "type of the operation, default"),
-                         clEnumValN(LabelType::UNAME, "uname",
-                                    "unique name of the operation")),
-              cl::init(LabelType::TYPE), cl::cat(mainCategory));
+labelType("label-type", cl::Optional,
+  cl::desc("Information to use as node labels:"),
+  cl::values(clEnumValN(LabelType::TYPE, "type",
+    "type of the operation, default"),
+    clEnumValN(LabelType::UNAME, "uname",
+      "unique name of the operation")),
+  cl::init(LabelType::TYPE), cl::cat(mainCategory));
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
-    NORMAL("normal");
+NORMAL("normal");
 
 static StringRef getStyle(Value val) {
   return isa<handshake::ControlType>(val.getType()) ? DOTTED : SOLID;
@@ -87,9 +87,9 @@ static StringRef getStyle(Value val) {
 
 /// Determines the "arrowhead" attribute of the edge corresponding to the
 /// operand.
-static StringRef getArrowheadStyle(OpOperand &oprd) {
+static StringRef getArrowheadStyle(OpOperand& oprd) {
   Value val = oprd.get();
-  Operation *ownerOp = oprd.getOwner();
+  Operation* ownerOp = oprd.getOwner();
   if (auto muxOp = dyn_cast<handshake::MuxOp>(ownerOp))
     return val == muxOp.getSelectOperand() ? DOT : NORMAL;
   if (auto condBrOp = dyn_cast<handshake::ConditionalBranchOp>(ownerOp))
@@ -101,10 +101,10 @@ static StringRef getArrowheadStyle(OpOperand &oprd) {
 /// operand of a memory interface. Returns an empty reference if the memref
 /// cannot be found in the arguments.
 static StringRef getMemName(Value memref) {
-  Operation *parentOp = memref.getParentBlock()->getParentOp();
+  Operation* parentOp = memref.getParentBlock()->getParentOp();
   handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
   for (auto [name, funArg] :
-       llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
+    llvm::zip(funcOp.getArgNames(), funcOp.getArguments())) {
     if (funArg == memref)
       return cast<StringAttr>(name).getValue();
   }
@@ -118,254 +118,258 @@ static inline std::string getMemLabel(StringRef baseName, StringRef memName) {
 
 /// Returns the pretty-fied version of the DOT node's label corresponding  to
 /// the operation.
-static std::string getPrettyNodeLabel(Operation *op) {
-  return llvm::TypeSwitch<Operation *, std::string>(op)
-      // handshake operations
-      .Case<handshake::ConstantOp>(
-          [&](handshake::ConstantOp cstOp) -> std::string {
-            ChannelType cstType = cstOp.getResult().getType();
-            TypedAttr valueAttr = cstOp.getValueAttr();
-            if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
-              // Special case boolean attribute (which would result in an i1
-              // constant integer results) to print true/false instead of 1/0
-              if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
-                return boolAttr.getValue() ? "true" : "false";
+static std::string getPrettyNodeLabel(Operation* op) {
+  return llvm::TypeSwitch<Operation*, std::string>(op)
+    // handshake operations
+    .Case<handshake::ConstantOp>(
+      [&](handshake::ConstantOp cstOp) -> std::string {
+        ChannelType cstType = cstOp.getResult().getType();
+        TypedAttr valueAttr = cstOp.getValueAttr();
+        if (auto intType = dyn_cast<IntegerType>(cstType.getDataType())) {
+          // Special case boolean attribute (which would result in an i1
+          // constant integer results) to print true/false instead of 1/0
+          if (auto boolAttr = dyn_cast<mlir::BoolAttr>(valueAttr))
+            return boolAttr.getValue() ? "true" : "false";
 
-              APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
-              if (intType.isUnsignedInteger())
-                return std::to_string(value.getZExtValue());
-              return std::to_string(value.getSExtValue());
-            }
-            if (isa<FloatType>(cstType.getDataType())) {
-              mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
-              return std::to_string(attr.getValue().convertToDouble());
-            }
-            // Fallback on an empty string
-            return std::string("");
-          })
-      .Case<handshake::BufferOp>(
-          [&](handshake::BufferOp bufferOp) -> std::string {
-            // Try to infer the buffer type from HW parameters, if present
-            auto params = bufferOp->getAttrOfType<DictionaryAttr>(
-                RTL_PARAMETERS_ATTR_NAME);
-            if (!params)
-              return "buffer";
-            auto optSlots = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-            std::string numSlotsStr = "";
-            if (optSlots) {
-              if (auto numSlots = dyn_cast<IntegerAttr>(optSlots->getValue())) {
-                if (numSlots.getType().isUnsignedInteger())
-                  numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
-              }
-            }
-            auto optBufferType =
-                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType)
-              return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr =
-                    dyn_cast<StringAttr>(optBufferType->getValue())) {
-              std::string bufferTypeStr = bufferTypeAttr.getValue().str();
-              if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
-                return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == "ONE_SLOT_BREAK_R") {
-                return "R" + numSlotsStr;
-              } else if (bufferTypeStr == "FIFO_BREAK_DV") {
-                return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == "FIFO_BREAK_NONE") {
-                return "NONE" + numSlotsStr;
-              } else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
-                return "DVR" + numSlotsStr;
-              }
-            }
-            return "buffer" + numSlotsStr;
-          })
-      .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
-        return getMemLabel("MC", getMemName(mcOp.getMemRef()));
-      })
-      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
-        return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
-      })
-      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        auto memOp = findMemInterface(loadOp.getAddressResult());
-        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
-        return getMemLabel("LD", memName);
-      })
-      .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
-        auto memOp = findMemInterface(storeOp.getAddressResult());
-        StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
-        return getMemLabel("ST", memName);
-      })
-      .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
-      .Case<handshake::BranchOp>([&](auto) { return "branch"; })
-      .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
-      .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
-      .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
-      .Case<handshake::AndIOp>([&](auto) { return "&"; })
-      .Case<handshake::OrIOp>([&](auto) { return "|"; })
-      .Case<handshake::XOrIOp>([&](auto) { return "^"; })
-      .Case<handshake::MulIOp, handshake::MulFOp>([&](auto) { return "*"; })
-      .Case<handshake::DivUIOp, handshake::DivSIOp, handshake::DivFOp>(
-          [&](auto) { return "div"; })
-      .Case<handshake::ShRSIOp, handshake::ShRUIOp>([&](auto) { return ">>"; })
-      .Case<handshake::ShLIOp>([&](auto) { return "<<"; })
-      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
-          [&](auto) {
-            unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
-                                   .getDataBitWidth();
-            unsigned resWidth =
-                cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
-            return "[" + std::to_string(opWidth) + "..." +
-                   std::to_string(resWidth) + "]";
-          })
-      .Case<handshake::CmpIOp>([&](handshake::CmpIOp op) {
-        switch (op.getPredicate()) {
-        case handshake::CmpIPredicate::eq:
-          return "==";
-        case handshake::CmpIPredicate::ne:
-          return "!=";
-        case handshake::CmpIPredicate::uge:
-        case handshake::CmpIPredicate::sge:
-          return ">=";
-        case handshake::CmpIPredicate::ugt:
-        case handshake::CmpIPredicate::sgt:
-          return ">";
-        case handshake::CmpIPredicate::ule:
-        case handshake::CmpIPredicate::sle:
-          return "<=";
-        case handshake::CmpIPredicate::ult:
-        case handshake::CmpIPredicate::slt:
-          return "<";
+          APInt value = cast<mlir::IntegerAttr>(valueAttr).getValue();
+          if (intType.isUnsignedInteger())
+            return std::to_string(value.getZExtValue());
+          return std::to_string(value.getSExtValue());
         }
-      })
-      .Case<handshake::CmpFOp>([&](handshake::CmpFOp op) {
-        switch (op.getPredicate()) {
-        case handshake::CmpFPredicate::OEQ:
-        case handshake::CmpFPredicate::UEQ:
-          return "==";
-        case handshake::CmpFPredicate::ONE:
-        case handshake::CmpFPredicate::UNE:
-          return "!=";
-        case handshake::CmpFPredicate::OGE:
-        case handshake::CmpFPredicate::UGE:
-          return ">=";
-        case handshake::CmpFPredicate::OGT:
-        case handshake::CmpFPredicate::UGT:
-          return ">";
-        case handshake::CmpFPredicate::OLE:
-        case handshake::CmpFPredicate::ULE:
-          return "<=";
-        case handshake::CmpFPredicate::OLT:
-        case handshake::CmpFPredicate::ULT:
-          return "<";
-        case handshake::CmpFPredicate::ORD:
-          return "ordered?";
-        case handshake::CmpFPredicate::UNO:
-          return "unordered?";
-        case handshake::CmpFPredicate::AlwaysFalse:
-          return "false";
-        case handshake::CmpFPredicate::AlwaysTrue:
-          return "true";
+        if (isa<FloatType>(cstType.getDataType())) {
+          mlir::FloatAttr attr = dyn_cast<mlir::FloatAttr>(valueAttr);
+          return std::to_string(attr.getValue().convertToDouble());
         }
+        // Fallback on an empty string
+        return std::string("");
       })
-      .Default([&](auto) {
-        StringRef dialect = op->getDialect()->getNamespace();
-        std::string label = op->getName().getStringRef().str();
-        label.erase(0, dialect.size() + 1);
-        return label;
+    .Case<handshake::BufferOp>(
+      [&](handshake::BufferOp bufferOp) -> std::string {
+        // Try to infer the buffer type from HW parameters, if present
+        auto params = bufferOp->getAttrOfType<DictionaryAttr>(
+          RTL_PARAMETERS_ATTR_NAME);
+        if (!params)
+          return "buffer";
+        auto optSlots = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
+        std::string numSlotsStr = "";
+        if (optSlots) {
+          if (auto numSlots = dyn_cast<IntegerAttr>(optSlots->getValue())) {
+            if (numSlots.getType().isUnsignedInteger())
+              numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
+          }
+        }
+        auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+        if (!optBufferType)
+          return "buffer" + numSlotsStr;
+        if (auto bufferTypeAttr =
+          dyn_cast<StringAttr>(optBufferType->getValue())) {
+          std::string bufferTypeStr = bufferTypeAttr.getValue().str();
+          if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
+            return "DV" + numSlotsStr;
+          }
+          else if (bufferTypeStr == "ONE_SLOT_BREAK_R") {
+            return "R" + numSlotsStr;
+          }
+          else if (bufferTypeStr == "FIFO_BREAK_DV") {
+            return "DV" + numSlotsStr;
+          }
+          else if (bufferTypeStr == "FIFO_BREAK_NONE") {
+            return "NONE" + numSlotsStr;
+          }
+          else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
+            return "DVR" + numSlotsStr;
+          }
+        }
+        return "buffer" + numSlotsStr;
+      })
+    .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
+    return getMemLabel("MC", getMemName(mcOp.getMemRef()));
+      })
+    .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
+    return getMemLabel("LSQ", getMemName(lsqOp.getMemRef()));
+      })
+    .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+    auto memOp = findMemInterface(loadOp.getAddressResult());
+    StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
+    return getMemLabel("LD", memName);
+      })
+    .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
+    auto memOp = findMemInterface(storeOp.getAddressResult());
+    StringRef memName = memOp ? getMemName(memOp.getMemRef()) : "";
+    return getMemLabel("ST", memName);
+      })
+    .Case<handshake::ControlMergeOp>([&](auto) { return "cmerge"; })
+    .Case<handshake::BranchOp>([&](auto) { return "branch"; })
+    .Case<handshake::ConditionalBranchOp>([&](auto) { return "cbranch"; })
+    .Case<handshake::AddIOp, handshake::AddFOp>([&](auto) { return "+"; })
+    .Case<handshake::SubIOp, handshake::SubFOp>([&](auto) { return "-"; })
+    .Case<handshake::AndIOp>([&](auto) { return "&"; })
+    .Case<handshake::OrIOp>([&](auto) { return "|"; })
+    .Case<handshake::XOrIOp>([&](auto) { return "^"; })
+    .Case<handshake::MulIOp, handshake::MulFOp>([&](auto) { return "*"; })
+    .Case<handshake::DivUIOp, handshake::DivSIOp, handshake::DivFOp>(
+      [&](auto) { return "div"; })
+    .Case<handshake::ShRSIOp, handshake::ShRUIOp>([&](auto) { return ">>"; })
+    .Case<handshake::ShLIOp>([&](auto) { return "<<"; })
+    .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
+      [&](auto) {
+        unsigned opWidth = cast<ChannelType>(op->getOperand(0).getType())
+          .getDataBitWidth();
+        unsigned resWidth =
+          cast<ChannelType>(op->getResult(0).getType()).getDataBitWidth();
+        return "[" + std::to_string(opWidth) + "..." +
+          std::to_string(resWidth) + "]";
+      })
+    .Case<handshake::CmpIOp>([&](handshake::CmpIOp op) {
+    switch (op.getPredicate()) {
+    case handshake::CmpIPredicate::eq:
+      return "==";
+    case handshake::CmpIPredicate::ne:
+      return "!=";
+    case handshake::CmpIPredicate::uge:
+    case handshake::CmpIPredicate::sge:
+      return ">=";
+    case handshake::CmpIPredicate::ugt:
+    case handshake::CmpIPredicate::sgt:
+      return ">";
+    case handshake::CmpIPredicate::ule:
+    case handshake::CmpIPredicate::sle:
+      return "<=";
+    case handshake::CmpIPredicate::ult:
+    case handshake::CmpIPredicate::slt:
+      return "<";
+    }
+      })
+    .Case<handshake::CmpFOp>([&](handshake::CmpFOp op) {
+    switch (op.getPredicate()) {
+    case handshake::CmpFPredicate::OEQ:
+    case handshake::CmpFPredicate::UEQ:
+      return "==";
+    case handshake::CmpFPredicate::ONE:
+    case handshake::CmpFPredicate::UNE:
+      return "!=";
+    case handshake::CmpFPredicate::OGE:
+    case handshake::CmpFPredicate::UGE:
+      return ">=";
+    case handshake::CmpFPredicate::OGT:
+    case handshake::CmpFPredicate::UGT:
+      return ">";
+    case handshake::CmpFPredicate::OLE:
+    case handshake::CmpFPredicate::ULE:
+      return "<=";
+    case handshake::CmpFPredicate::OLT:
+    case handshake::CmpFPredicate::ULT:
+      return "<";
+    case handshake::CmpFPredicate::ORD:
+      return "ordered?";
+    case handshake::CmpFPredicate::UNO:
+      return "unordered?";
+    case handshake::CmpFPredicate::AlwaysFalse:
+      return "false";
+    case handshake::CmpFPredicate::AlwaysTrue:
+      return "true";
+    }
+      })
+    .Default([&](auto) {
+    StringRef dialect = op->getDialect()->getNamespace();
+    std::string label = op->getName().getStringRef().str();
+    label.erase(0, dialect.size() + 1);
+    return label;
       });
 }
 
-static StringRef getNodeColor(Operation *op) {
-  return llvm::TypeSwitch<Operation *, StringRef>(op)
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
-          [&](auto) { return "lavender"; })
-      .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
-      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
-      .Case<handshake::EndOp>([&](auto) { return "gold"; })
-      .Case<handshake::SourceOp, handshake::SinkOp>(
-          [&](auto) { return "gainsboro"; })
-      .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
-      .Case<handshake::MemoryOpInterface, handshake::LoadOp,
-            handshake::StoreOp>([&](auto) { return "coral"; })
-      .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
-          [&](auto) { return "lightblue"; })
-      .Case<handshake::BranchOp, handshake::ConditionalBranchOp,
-            handshake::DemuxOp>([&](auto) { return "tan2"; })
-      .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
-            handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
-      .Case<handshake::TaggerOp, handshake::UntaggerOp,
-            handshake::FreeTagsFifoOp>([&](auto) { return "cyan"; })
-      .Default([&](auto) { return "moccasin"; });
+static StringRef getNodeColor(Operation* op) {
+  return llvm::TypeSwitch<Operation*, StringRef>(op)
+    .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
+      [&](auto) { return "lavender"; })
+    .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
+    .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
+    .Case<handshake::EndOp>([&](auto) { return "gold"; })
+    .Case<handshake::SourceOp, handshake::SinkOp>(
+      [&](auto) { return "gainsboro"; })
+    .Case<handshake::ConstantOp>([&](auto) { return "plum"; })
+    .Case<handshake::MemoryOpInterface, handshake::LoadOp,
+    handshake::StoreOp>([&](auto) { return "coral"; })
+    .Case<handshake::MergeOp, handshake::ControlMergeOp, handshake::MuxOp>(
+      [&](auto) { return "lightblue"; })
+    .Case<handshake::BranchOp, handshake::ConditionalBranchOp,
+    handshake::DemuxOp>([&](auto) { return "tan2"; })
+    .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
+    handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
+    handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
+    .Case<handshake::TaggerOp, handshake::UntaggerOp,
+    handshake::FreeTagsFifoOp>([&](auto) { return "cyan"; })
+    .Default([&](auto) { return "moccasin"; });
 }
 
-static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
+static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph& graph) {
   DOTGraph::Builder builder(graph);
-  mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
-  DOTGraph::Subgraph *root = &builder.getRoot();
+  mlir::DenseMap<unsigned, DOTGraph::Subgraph*> bbSubgraphs;
+  DOTGraph::Subgraph* root = &builder.getRoot();
 
   // Collect port names for all operations and the top-level function
-  using PortNames = mlir::DenseMap<Operation *, handshake::PortNamer>;
+  using PortNames = mlir::DenseMap<Operation*, handshake::PortNamer>;
   PortNames portNames;
   portNames.try_emplace(funcOp, funcOp);
-  for (Operation &op : funcOp.getOps())
+  for (Operation& op : funcOp.getOps())
     portNames.try_emplace(&op, &op);
 
-  auto addNode = [&](Operation *op,
-                     DOTGraph::Subgraph &subgraph) -> LogicalResult {
-    // The node's DOT "mlir_op" attribute
-    std::string mlirOpName = op->getName().getStringRef().str();
-    std::string prettyLabel;
-    switch (labelType) {
-    case LabelType::TYPE:
-      prettyLabel = getPrettyNodeLabel(op);
-      break;
-    case LabelType::UNAME:
-      prettyLabel = getUniqueName(op);
-      break;
-    }
-    if (isa<handshake::CmpIOp, handshake::CmpFOp>(op))
-      mlirOpName += prettyLabel;
+  auto addNode = [&](Operation* op,
+    DOTGraph::Subgraph& subgraph) -> LogicalResult {
+      // The node's DOT "mlir_op" attribute
+      std::string mlirOpName = op->getName().getStringRef().str();
+      std::string prettyLabel;
+      switch (labelType) {
+      case LabelType::TYPE:
+        prettyLabel = getPrettyNodeLabel(op);
+        break;
+      case LabelType::UNAME:
+        prettyLabel = getUniqueName(op);
+        break;
+      }
+      if (isa<handshake::CmpIOp, handshake::CmpFOp>(op))
+        mlirOpName += prettyLabel;
 
-    // The node's DOT "shape" attribute
-    StringRef shape;
-    if (isa<handshake::ArithOpInterface>(op))
-      shape = "oval";
-    else
-      shape = "box";
+      // The node's DOT "shape" attribute
+      StringRef shape;
+      if (isa<handshake::ArithOpInterface>(op))
+        shape = "oval";
+      else
+        shape = "box";
 
-    // The node's DOT "style" attribute
-    std::string style = "filled";
-    if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op)) {
-      if (controlInterface.isControl())
-        style += ", " + DOTTED.str();
-    }
+      // The node's DOT "style" attribute
+      std::string style = "filled";
+      if (auto controlInterface = dyn_cast<handshake::ControlInterface>(op)) {
+        if (controlInterface.isControl())
+          style += ", " + DOTTED.str();
+      }
 
-    DOTGraph::Node *node = builder.addNode(getUniqueName(op), subgraph);
-    if (!node)
-      return op->emitError() << "failed to create node for operation";
-    node->addAttr("mlir_op", mlirOpName);
-    node->addAttr("label", prettyLabel);
-    node->addAttr("fillcolor", getNodeColor(op));
-    node->addAttr("shape", shape);
-    node->addAttr("style", style);
-    return success();
-  };
+      DOTGraph::Node* node = builder.addNode(getUniqueName(op), subgraph);
+      if (!node)
+        return op->emitError() << "failed to create node for operation";
+      node->addAttr("mlir_op", mlirOpName);
+      node->addAttr("label", prettyLabel);
+      node->addAttr("fillcolor", getNodeColor(op));
+      node->addAttr("shape", shape);
+      node->addAttr("style", style);
+      return success();
+    };
 
-  auto addEdge = [&](OpOperand &oprd, DOTGraph::Subgraph &subgraph) -> void {
+  auto addEdge = [&](OpOperand& oprd, DOTGraph::Subgraph& subgraph) -> void {
     Value val = oprd.get();
-    Operation *dstOp = oprd.getOwner();
+    Operation* dstOp = oprd.getOwner();
 
     // Determine the edge's source
     std::string srcNodeName, srcPortName;
     unsigned srcIdx;
     if (auto res = dyn_cast<OpResult>(val)) {
-      Operation *srcOp = res.getDefiningOp();
+      Operation* srcOp = res.getDefiningOp();
       srcNodeName = getUniqueName(srcOp).str();
       srcIdx = res.getResultNumber();
       srcPortName = portNames.at(srcOp).getOutputName(srcIdx);
-    } else {
-      Operation *parentOp = val.getParentBlock()->getParentOp();
+    }
+    else {
+      Operation* parentOp = val.getParentBlock()->getParentOp();
       srcIdx = cast<BlockArgument>(val).getArgNumber();
       srcNodeName = srcPortName = portNames.at(parentOp).getInputName(srcIdx);
     }
@@ -374,16 +378,17 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     std::string dstNodeName, dstPortName;
     unsigned dstIdx;
     if (isa<handshake::EndOp>(dstOp)) {
-      Operation *parentOp = dstOp->getParentOp();
+      Operation* parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
       dstNodeName = dstPortName = portNames.at(parentOp).getOutputName(dstIdx);
-    } else {
+    }
+    else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
       dstPortName = portNames.at(dstOp).getInputName(dstIdx);
     }
 
-    DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
+    DOTGraph::Edge& edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
     edge.addAttr("from", srcPortName);
     edge.addAttr("from_idx", std::to_string(srcIdx));
     edge.addAttr("to", dstPortName);
@@ -394,11 +399,11 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     edge.addAttr("arrowhead", getArrowheadStyle(oprd));
     if (isBackedge(val, dstOp))
       edge.addAttr("color", "blue");
-  };
+    };
 
   // Create nodes and outgoing edges for all function arguments
   std::string funcOpName = funcOp->getName().getStringRef().str();
-  for (const auto &[idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+  for (const auto& [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     if (isa<MemRefType>(arg.getType()))
       // Arguments with memref types are represented by memory interfaces
       // inside the function so they are not displayed
@@ -406,7 +411,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
 
     // Create a node for the argument
     StringRef argName = portNames.at(funcOp).getInputName(idx);
-    DOTGraph::Node *node = builder.addNode(argName, *root);
+    DOTGraph::Node* node = builder.addNode(argName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
     node->addAttr("label", argName);
@@ -415,15 +420,15 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     node->addAttr("style", getStyle(arg));
 
     // Create edges between the argument and operand uses in the function
-    for (OpOperand &oprd : arg.getUses())
+    for (OpOperand& oprd : arg.getUses())
       addEdge(oprd, *root);
   }
 
   // Create nodes for all function results
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
-  for (const auto &[idx, res] : llvm::enumerate(results)) {
+  for (const auto& [idx, res] : llvm::enumerate(results)) {
     StringRef resName = portNames.at(funcOp).getOutputName(idx);
-    DOTGraph::Node *node = builder.addNode(resName, *root);
+    DOTGraph::Node* node = builder.addNode(resName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
     node->addAttr("label", resName);
@@ -432,21 +437,22 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     node->addAttr("style", getStyle(res));
   }
 
-  for (Operation &op : funcOp.getOps()) {
+  for (Operation& op : funcOp.getOps()) {
     if (isa<handshake::EndOp>(op))
       continue;
 
     // Determine the subgraph in which to insert the operation
-    DOTGraph::Subgraph *bbSub = root;
+    DOTGraph::Subgraph* bbSub = root;
     std::optional<unsigned> bb = getLogicBB(&op);
     if (bb) {
       if (auto subIt = bbSubgraphs.find(*bb); subIt != bbSubgraphs.end()) {
         bbSub = subIt->second;
-      } else {
+      }
+      else {
         std::string name = "cluster" + std::to_string(*bb);
         bbSub = &builder.addSubgraph(name, *root);
         bbSub->addAttr("label", "BB " + std::to_string(*bb));
-        bbSubgraphs.insert({*bb, bbSub});
+        bbSubgraphs.insert({ *bb, bbSub });
       }
     }
 
@@ -456,11 +462,11 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
 
     // Create an edge for each use of each result of the operation
     for (OpResult res : op.getResults()) {
-      for (OpOperand &oprd : res.getUses()) {
+      for (OpOperand& oprd : res.getUses()) {
         // Determine the subgraph in which to insert the edge
-        DOTGraph::Subgraph *edgeSub = root;
+        DOTGraph::Subgraph* edgeSub = root;
         if (bbSub != root) {
-          Operation *userOp = oprd.getOwner();
+          Operation* userOp = oprd.getOwner();
           std::optional<unsigned> userBB = getLogicBB(userOp);
           if (userBB && bb == userBB && !isa<handshake::EndOp>(userOp))
             edgeSub = bbSub;
@@ -473,20 +479,20 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   return success();
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   InitLLVM y(argc, argv);
 
   cl::ParseCommandLineOptions(
-      argc, argv,
-      "Exports a DOT graph corresponding to the module for visualization\n"
-      "and legacy-compatibility purposes.The pass only supports exporting\n"
-      "the graph of a single Handshake function at the moment, and will fail\n"
-      "if there is more than one Handhsake function in the module.");
+    argc, argv,
+    "Exports a DOT graph corresponding to the module for visualization\n"
+    "and legacy-compatibility purposes.The pass only supports exporting\n"
+    "the graph of a single Handshake function at the moment, and will fail\n"
+    "if there is more than one Handhsake function in the module.");
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
   if (std::error_code error = fileOrErr.getError()) {
     llvm::errs() << argv[0] << ": could not open input file '" << inputFileName
-                 << "': " << error.message() << "\n";
+      << "': " << error.message() << "\n";
     return 1;
   }
 
@@ -495,14 +501,14 @@ int main(int argc, char **argv) {
   // cases
   MLIRContext context;
   context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
-                      handshake::HandshakeDialect, math::MathDialect>();
+    handshake::HandshakeDialect, math::MathDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module
   SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
   mlir::OwningOpRef<mlir::ModuleOp> modOp(
-      mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
+    mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!modOp)
     return 1;
 
@@ -513,7 +519,7 @@ int main(int argc, char **argv) {
       continue;
     if (funcOp) {
       modOp->emitOpError() << "we currently only support one non-external "
-                              "handshake function per module";
+        "handshake function per module";
       return 1;
     }
     funcOp = op;
