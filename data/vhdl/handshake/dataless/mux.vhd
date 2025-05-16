@@ -24,9 +24,8 @@ entity mux_dataless is
 end entity;
 
 architecture arch of mux_dataless is
-  signal tehb_ins_valid, tehb_ins_ready : std_logic;
 begin
-  process (ins_valid, outs_ready, index, index_valid, tehb_ins_ready)
+  process (ins_valid, outs_ready, index, index_valid)
     variable selectedData_valid, indexEqual : std_logic;
   begin
     selectedData_valid := '0';
@@ -41,22 +40,10 @@ begin
       if indexEqual and index_valid and ins_valid(i) then
         selectedData_valid := '1';
       end if;
-      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and tehb_ins_ready) or (not ins_valid(i));
+      ins_ready(i) <= (indexEqual and index_valid and ins_valid(i) and outs_ready) or (not ins_valid(i));
     end loop;
 
-    index_ready    <= (not index_valid) or (selectedData_valid and tehb_ins_ready);
-    tehb_ins_valid <= selectedData_valid;
+    index_ready    <= (not index_valid) or (selectedData_valid and outs_ready);
+    outs_valid     <= selectedData_valid;
   end process;
-
-  tehb : entity work.tehb_dataless(arch)
-    port map(
-      clk => clk,
-      rst => rst,
-      -- input channel
-      ins_valid => tehb_ins_valid,
-      ins_ready => tehb_ins_ready,
-      -- output channel
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
 end architecture;
