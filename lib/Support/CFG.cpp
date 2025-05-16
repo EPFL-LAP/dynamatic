@@ -706,6 +706,8 @@ bool dynamatic::isChannelOnCycle(mlir::Value channel) {
     visited.insert(current);
 
     for (mlir::Operation *user : current.getUsers()) {
+      if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user))
+        continue;
       for (mlir::Value next : user->getResults()) {
         if (dfs(next, false))
           return true;
