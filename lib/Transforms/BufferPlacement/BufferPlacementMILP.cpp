@@ -433,7 +433,7 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
-    // - Therefore: dataBuf readyBuf
+    // - Therefore: dataBuf == readyBuf
     //              R_c == dataBuf && readyBuf
     // - If R_c holds, then:
     //     - token occupancy ≥ CFDFC's throughput
