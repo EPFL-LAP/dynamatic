@@ -122,6 +122,42 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       }
     }
   }
+
+  // https://github.com/EPFL-LAP/dynamatic/issues/388
+  // To mitigate the latency asymmetry between LSQ group allocation 
+  // and the Store/Load operations, we set a minimum number of buffer 
+  // slots at Store/Load's input.
+  // This is a temporary workaround and a better solution is needed.
+  for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
+    auto memOp = findMemInterface(storeOp.getAddressResult());
+    if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+      continue;
+
+    for (Value operand : storeOp->getOperands()) {
+      Channel channel(operand, true);
+      Operation *defOp = operand.getDefiningOp();
+
+      if (defOp) {
+        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      }
+    }
+  }
+
+  for (handshake::LoadOp loadOp : funcOp.getOps<handshake::LoadOp>()) {
+    auto memOp = findMemInterface(loadOp.getAddressResult());
+    if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+      continue;
+
+    for (Value operand : loadOp->getOperands()) {
+      Channel channel(operand, true);
+      Operation *defOp = operand.getDefiningOp();
+
+      if (defOp && 
+          !isa<handshake::MemoryOpInterface, handshake::ConstantOp>(defOp)) {
+        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+      }
+    }
+  }
   
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
