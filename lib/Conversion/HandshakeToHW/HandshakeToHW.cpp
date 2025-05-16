@@ -689,6 +689,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           addUnsigned("INITIAL_VALUE", initialValue);
         } else
           addUnsigned("INITIAL_VALUE", 0);
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
