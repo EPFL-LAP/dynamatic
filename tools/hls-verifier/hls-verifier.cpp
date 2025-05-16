@@ -10,14 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Help.h"
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/WithColor.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
+
+using namespace llvm;
+using namespace mlir;
 
 using namespace hls_verify;
 
@@ -59,35 +64,23 @@ void generateVhdlTestbench(const VerificationContext &ctx) {
   std::string filepath = ctx.getVhdlTestbenchPath().c_str();
   llvm::raw_fd_ostream fileStream(filepath, ec);
   mlir::raw_indented_ostream os(fileStream);
-  vhdlTb.generateVhdlTestbench(os);
+  vhdlTb.codegen(os);
 }
 
-void checkVhdlTestbenchOutputs(const VerificationContext &ctx) {
+mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
   cout << "\n--- Comparison Results ---\n" << endl;
   for (const auto &outputParam : outputParams) {
-    bool result = compareFiles(ctx.getRefOutPath(outputParam),
-                               ctx.getVhdlOutPath(outputParam),
-                               ctx.getTokenComparator(outputParam));
+    mlir::LogicalResult result = compareFiles(
+        ctx.getCOutPath(outputParam), ctx.getVhdlOutPath(outputParam),
+        ctx.getTokenComparator(outputParam));
     cout << "Comparison of [" + outputParam.parameterName + "] : "
-         << (result ? "Pass" : "Fail") << endl;
+         << (mlir::succeeded(result) ? "Pass" : "Fail") << endl;
+    if (mlir::failed(result)) {
+      return failure();
+    }
   }
-  cout << "\n--------------------------\n" << endl;
-}
-
-bool compareCAndVhdlOutputs(const VerificationContext &ctx) {
-  const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
-  cout << "\n--- Comparison Results ---\n" << endl;
-  for (const auto &outputParam : outputParams) {
-    bool result = compareFiles(ctx.getCOutPath(outputParam),
-                               ctx.getVhdlOutPath(outputParam),
-                               ctx.getTokenComparator(outputParam));
-    cout << "Comparison of [" + outputParam.parameterName + "] : "
-         << (result ? "Pass" : "Fail") << endl;
-    return result;
-  }
-  cout << "\n--------------------------\n" << endl;
-  return false;
+  return mlir::success();
 }
 
 void executeVhdlTestbench(const VerificationContext &ctx,
@@ -141,78 +134,40 @@ void executeVhdlTestbench(const VerificationContext &ctx,
   system(("vsim -c -do " + ctx.getModelsimDoFileName()).c_str());
 }
 
-bool runVhdlVerification(vector<string> args) {
-  if (args.size() < 2) {
-    logErr(LOG_TAG, "Not enough arguments.");
-    cout << getVHDLVerificationHelpMessage() << endl;
-    return true;
-  }
-
-  vector<string> temp;
-
-  for (auto &arg : args)
-    if (arg.empty() || arg[0] != '-')
-      temp.push_back(arg);
-
-  args = temp;
-
-  string resourceDir = args[0];
-  string cTbPath = args[1];
-  string vhdlDuvEntityName = args[2];
-  string cFuvFunctionName = args.size() > 3 ? args[3] : vhdlDuvEntityName;
-
-  vector<string> otherCPaths;
-  VerificationContext ctx(cTbPath, "", cFuvFunctionName, vhdlDuvEntityName,
-                          otherCPaths);
-  executeVhdlTestbench(ctx, resourceDir);
-  checkVhdlTestbenchOutputs(ctx);
-  return true;
-}
-
-bool runCoverification(vector<string> args) {
-  if (args.size() < 5) {
-    logErr("[COVER]", "Not enough arguments.");
-    cout << getCoVerificationHelpMessage() << endl;
-    return true;
-  }
-
-  vector<string> temp;
-  for (auto &arg : args)
-    if (arg.empty() || arg[0] != '-')
-      temp.push_back(arg);
-
-  args = temp;
-
-  string resourceDir = args[0];
-  string cTbPath = args[1];
-  string cDuvPath = args[2];
-  string cFuvFunctionName = args[3];
-  string vhdlDuvEntityName = args[4];
-
-  vector<string> otherCPaths;
-  for (size_t i = 6; i < args.size(); i++)
-    otherCPaths.push_back(args[i]);
-
-  VerificationContext ctx(cTbPath, cDuvPath, cFuvFunctionName,
-                          vhdlDuvEntityName, otherCPaths);
-  executeVhdlTestbench(ctx, resourceDir);
-  return compareCAndVhdlOutputs(ctx);
-}
-
 int main(int argc, char **argv) {
-  if (argc > 1) {
-    std::string firstArg(argv[1]);
-    vector<string> remainingArgs;
-    for (int i = 2; i < argc; i++)
-      remainingArgs.emplace_back(argv[i]);
-    if (firstArg == VVER_CMD)
-      return runVhdlVerification(remainingArgs) ? 0 : -1;
-    if (firstArg == COVER_CMD)
-      return runCoverification(remainingArgs) ? 0 : -1;
-    std::cout << std::endl << "Invalid arguments!" << std::endl;
-  } else {
-    std::cout << std::endl << "No arguments!" << std::endl;
-  }
-  std::cout << getGeneralHelpMessage() << std::endl;
-  return -1;
+  cl::opt<std::string> resourcePathName(
+      "resource-path",
+      cl::desc("Name of the resource path (with two_port_RAM.vhd, "
+               "single_argument.vhd, etc.)"),
+      cl::value_desc("resource-path"), cl::Required);
+  cl::opt<std::string> cTbPathName(
+      "ctb-path", cl::desc("Name of the C file with the main function"),
+      cl::value_desc("ctb-path"), cl::Required);
+  cl::opt<std::string> cDuvPathName(
+      "cduv-path",
+      cl::desc("Name of the C file with the kernel to be verified"),
+      cl::value_desc("cduv-path"), cl::Required);
+  cl::opt<std::string> cFuvFunctionName(
+      "cfuv-function-name", cl::desc("Name of the C function name"),
+      cl::value_desc("cfuv-function-name"), cl::Required);
+
+  cl::opt<std::string> vhdlDuvEntityName(
+      "vhdl-duv-entity-name", cl::desc("Name of the VHDL entity name"),
+      cl::value_desc("vhdl-duv-entity-name"), cl::Required);
+
+  cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
+    This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
+
+    Note: All C source files should be in the same subdirectory. Assumes
+    hls-verifier is run from a subdirectory (called HLS_VERIFY), which is in the
+    same level as the subdirectories for C sources (C_SRC) and the vhdl sources
+    (VHDL_SRC). Also assumes that the golden references are in a directory
+    called C_OUT in the same level.
+    )PREFIX");
+
+  VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
+                          vhdlDuvEntityName);
+  executeVhdlTestbench(ctx, resourcePathName);
+
+  return succeeded(compareCAndVhdlOutputs(ctx));
 }

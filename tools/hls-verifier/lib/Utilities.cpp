@@ -8,6 +8,7 @@
 
 #include "Utilities.h"
 #include "HlsLogging.h"
+#include "mlir/Support/LogicalResult.h"
 #include <cmath>
 #include <dirent.h>
 #include <fstream>
@@ -15,6 +16,7 @@
 #include <unistd.h>
 
 const string LOG_TAG = "UTIL";
+using namespace mlir;
 
 namespace hls_verify {
 
@@ -57,7 +59,7 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
 }
 
 float FloatCompare::decodeToken(unsigned int token) const {
-  return *((float *) &token);
+  return *((float *)&token);
 }
 
 DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
@@ -81,7 +83,7 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
 }
 
 double DoubleCompare::decodeToken(unsigned int token) const {
-  return *((double *) &token);
+  return *((double *)&token);
 }
 
 string extractParentDirectoryPath(string filepath) {
@@ -98,17 +100,17 @@ string getApplicationDirectory() {
   return string(result, (count > 0) ? count : 0);
 }
 
-bool compareFiles(const string &refFile, const string &outFile,
-                  const TokenCompare *tokenCompare) {
+mlir::LogicalResult compareFiles(const string &refFile, const string &outFile,
+                                 const TokenCompare *tokenCompare) {
   ifstream ref(refFile.c_str());
   ifstream out(outFile.c_str());
   if (!ref.is_open()) {
     logErr(LOG_TAG, "Reference file does not exist: " + refFile);
-    return false;
+    return failure();
   }
   if (!out.is_open()) {
     logErr(LOG_TAG, "Output file does not exist: " + outFile);
-    return false;
+    return failure();
   }
   string str1, str2;
   int tn1, tn2;
@@ -119,7 +121,7 @@ bool compareFiles(const string &refFile, const string &outFile,
         continue;
       logErr("COMPARE", "Token mismatch: [" + str1 + "] and [" + str2 +
                             "] are not equal.");
-      return false;
+      return failure();
     }
     if (str1 == "[[[/runtime]]]") {
       break;
@@ -129,7 +131,7 @@ bool compareFiles(const string &refFile, const string &outFile,
       out >> tn2;
       if (tn1 != tn2) {
         logErr("COMPARE", "Transaction number mismatch!");
-        return false;
+        return failure();
       }
       continue;
     }
@@ -140,10 +142,10 @@ bool compareFiles(const string &refFile, const string &outFile,
       logErr("COMPARE", "Token mismatch: [" + str1 + "] and [" + str2 +
                             "] are not equal (at transaction id " +
                             to_string(tn1) + ").");
-      return false;
+      return failure();
     }
   }
-  return true;
+  return success();
 }
 
 string trim(const string &str) {

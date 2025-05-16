@@ -57,12 +57,10 @@ class VerificationContext {
 public:
   VerificationContext(const string &cTbPath, const string &cFuvPath,
                       const string &cFuvFunctionName,
-                      const string &vhdlDuvEntityName,
-                      vector<string> &otherCSrcPaths);
+                      const string &vhdlDuvEntityName);
 
   string getCTbPath() const;
   string getCFuvPath() const;
-  vector<string> getOtherCSrcPaths() const;
   string getCFuvFunctionName() const;
   string getVhdlDuvEntityName() const;
 
@@ -98,7 +96,6 @@ private:
   CFunction fuv;
   string cTBPath;
   string cFUVPath;
-  std::vector<string> otherCSrcPaths;
   string cFUVFunctionName;
   string vhdlDUVEntityName;
   TokenCompare defaultComparator;
