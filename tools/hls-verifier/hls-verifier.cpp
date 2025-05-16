@@ -150,11 +150,13 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
 
-    Note: All C source files should be in the same subdirectory. Assumes
-    hls-verifier is run from a subdirectory (called HLS_VERIFY), which is in the
-    same level as the subdirectories for C sources (C_SRC) and the vhdl sources
-    (VHDL_SRC). Also assumes that the golden references are in a directory
-    called C_OUT in the same level.
+    HlsVerifier assumes the following directory structure:
+    - All the C source files must be in a directory as cDuvPathName in C_SRC.
+    - All HDL sources must be in VHDL_SRC.
+    - hls-verifier must run from a subdirectory called HLS_VERIFY
+    - The golden references must be in a directory called C_OUT.
+    - C_SRC, VHDL_SRC, C_OUT, and HLS_VERIFY must be in the same directory.
+    
     )PREFIX");
 
   VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
