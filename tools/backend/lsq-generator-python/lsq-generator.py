@@ -12,7 +12,8 @@ import argparse
 import os
 import sys
 
-from vhdl_gen import *
+from configs import *
+from lsq_core import *
 
 #===----------------------------------------------------------------------===#
 # Parser Definition

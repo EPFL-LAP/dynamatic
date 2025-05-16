@@ -3,6 +3,9 @@ name: C/C++ CI
 on:
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
+  push:
+    branches:
+      - lsq-gen-lsq_core-fix-action
   pull_request:
     branches: ["main"]
 
