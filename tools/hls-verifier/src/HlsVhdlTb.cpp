@@ -32,7 +32,7 @@ use work.sim_package.all;
 )DELIM";
 
 static const string COMMON_TB_BODY = R"DELIM(
-----------------------------------------------------------------------------
+
 generate_sim_done_proc : process
 begin
   while (transaction_idx /= TRANSACTION_NUM) loop
@@ -49,7 +49,7 @@ begin
   severity failure;
   wait;
 end process;
-----------------------------------------------------------------------------
+
 gen_clock_proc : process
 begin
   tb_clk <= '0';
@@ -59,7 +59,7 @@ begin
   end loop;
   wait;
 end process;
-----------------------------------------------------------------------------
+
 gen_reset_proc : process
 begin
   tb_rst <= '1';
@@ -67,7 +67,7 @@ begin
   tb_rst <= '0';
   wait;
 end process;
-----------------------------------------------------------------------------
+
 acknowledge_tb_end: process(tb_clk,tb_rst)
 begin
   if (tb_rst = '1') then
@@ -80,7 +80,7 @@ begin
     end if;
   end if;
 end process;
-----------------------------------------------------------------------------
+
 generate_idle_signal: process(tb_clk,tb_rst)
 begin
   if (tb_rst = '1') then
@@ -95,7 +95,7 @@ begin
     end if;
   end if;
 end process generate_idle_signal;
-----------------------------------------------------------------------------
+
 generate_start_signal : process(tb_clk, tb_rst)
 begin
   if (tb_rst = '1') then
@@ -110,7 +110,7 @@ begin
     end if;
   end if;
 end process generate_start_signal;
-----------------------------------------------------------------------------
+
 transaction_increment : process
 begin
   wait until tb_rst = '0';
@@ -126,7 +126,6 @@ begin
     wait until tb_temp_idle = '0';
   end loop;
 end process;
---------------------------------------------------------------------------
 )DELIM";
 
 const char *procWriteTransactions = R"DELIM(
@@ -169,6 +168,8 @@ end process;
 Constant::Constant(const string &name, const string &type, const string &value)
     : constName(name), constType(type), constValue(value) {}
 
+// Names of the ports of the RAM model used in the testbench (i.e., the
+// dual-port RAM model).
 static const string CLK_PORT = "clk";
 static const string RST_PORT = "rst";
 static const string CE0_PORT = "ce0";
@@ -199,8 +200,6 @@ static const string END_READY = "end_ready";
 // Name of the return value, it is also called "out0" but it means something
 // else as the D_IN0_PORT (i.e., the first port of the dual-port RAM).
 static const string RET_VALUE_NAME = "out0";
-
-// class HlsVhdTb
 
 HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
   duvName = ctx.getVhdlDuvEntityName();
@@ -299,7 +298,6 @@ void declareSTL(mlir::raw_indented_ostream &os, const string &name,
 }
 
 // function to get the port name in the entitiy for each paramter
-
 void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   for (const auto &c : constants) {
     os << "constant " << c.constName << " : " << c.constType
@@ -307,6 +305,24 @@ void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
   }
 }
 
+// This is a helper class to generete a HDL instance
+// Example:
+//   Instance("my_module", "my_instance")
+//     .parameter("param1", "value1")
+//     .parameter("param2", "value2")
+//     .connect("port1", "signal1")
+//     .connect("port2", "signal2");
+//   instance.emitVhdl(os);
+// This will generate the following VHDL code:
+//   my_instance: entity work.my_module
+//     generic map(
+//       param1 => value1,
+//       param2 => value2
+//     )
+//     port map(
+//       port1 => signal1,
+//       port2 => signal2
+//     );
 class Instance {
   std::string moduleName;
   std::string instanceName;
@@ -441,6 +457,12 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
           .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
           .parameter(ADDR_WIDTH_PARAM, m.addrWidthParamValue)
           .parameter(DATA_DEPTH_PARAM, m.dataDepthParamValue)
+          // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
+          // the instantiated RAM models (e.g., two_port_RAM.vhd and
+          // single_argument.vhd). This name is not necessarily named in the
+          // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
+          // internal coverification, we have the freedom to name the interface
+          // of the RAM model however we want.
           .connect(CLK_PORT, "tb_" + CLK_PORT)
           .connect(RST_PORT, "tb_" + RST_PORT)
           .connect(CE0_PORT, m.ce0SignalName)
@@ -463,6 +485,12 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
       argInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
           .parameter(OUT_FILE_PARAM, m.outFileParamValue)
           .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
+          // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
+          // the instantiated RAM models (e.g., two_port_RAM.vhd and
+          // single_argument.vhd). This name is not necessarily named in the
+          // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
+          // internal coverification, we have the freedom to name the interface
+          // of the RAM model however we want.
           .connect(CLK_PORT, "tb_" + CLK_PORT)
           .connect(RST_PORT, "tb_" + RST_PORT)
           .connect(CE0_PORT, "'1'")
@@ -596,7 +624,6 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
-  os << "------------------------------------------------------------\n";
   os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
   for (auto &cDuvParam : cDuvParams) {
     if (cDuvParam.isOutput) {
@@ -606,7 +633,6 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
                           cDuvParam.parameterName, cDuvParam.parameterName);
     }
   }
-  os << "-----------------------------------------------------------------\n\n";
 }
 
 void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
