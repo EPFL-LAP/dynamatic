@@ -18,4 +18,4 @@ def main():
     codeGen(args.path_rtl, lsqConfig)
 
 if __name__ == "__main__":
-    main()
+    main() 
