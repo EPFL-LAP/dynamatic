@@ -928,14 +928,14 @@ def GroupAllocator(path_rtl: str, name: str, suffix: str, configs: Configs) -> s
     stq_empty_i        = Logic('stq_empty', 'i')
 
     ldq_wen_o          = LogicArray('ldq_wen', 'o', configs.numLdqEntries)
-    num_loads_o        = LogicVec('num_loads', 'o', configs.emptyLdAddrW)
-    num_loads          = LogicVec('num_loads', 'w', configs.emptyLdAddrW)
+    num_loads_o        = LogicVec('num_loads', 'o', configs.ldqAddrW)
+    num_loads          = LogicVec('num_loads', 'w', configs.ldqAddrW)
     if (configs.ldpAddrW > 0):
         ldq_port_idx_o = LogicVecArray('ldq_port_idx', 'o', configs.numLdqEntries, configs.ldpAddrW)
 
     stq_wen_o          = LogicArray('stq_wen', 'o', configs.numStqEntries)
-    num_stores_o       = LogicVec('num_stores', 'o', configs.emptyStAddrW)
-    num_stores         = LogicVec('num_stores', 'w', configs.emptyStAddrW)
+    num_stores_o       = LogicVec('num_stores', 'o', configs.stqAddrW)
+    num_stores         = LogicVec('num_stores', 'w', configs.stqAddrW)
     if (configs.stpAddrW > 0):
         stq_port_idx_o = LogicVecArray('stq_port_idx', 'o', configs.numStqEntries, configs.stpAddrW)
 
