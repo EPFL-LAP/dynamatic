@@ -681,6 +681,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr = initOp->getAttrOfType<mlir::DictionaryAttr("hw.parameters");
+        if (paramsAttr) {
+          auto initTokenAttr = paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+          int initialValue = (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else
+          addUnsigned("INITIAL_VALUE", 0);
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1791,7 +1799,6 @@ public:
                     ConvertToHWInstance<handshake::ControlMergeOp>,
                     ConvertToHWInstance<handshake::MuxOp>,
                     ConvertToHWInstance<handshake::JoinOp>,
-                    ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,
@@ -1802,6 +1809,12 @@ public:
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
+                    // Fast token delivery operation
+                    ConvertToHWInstance<handshake::InitOp>,
+
+                    // Out-of-order execution operation
+                    ConvertToHWInstance<handshake::BlockerOp>,
+    
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,
                     ConvertToHWInstance<handshake::AddIOp>,
