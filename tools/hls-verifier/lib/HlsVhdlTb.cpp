@@ -14,7 +14,9 @@
 #include "CAnalyser.h"
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace hls_verify {
@@ -87,7 +89,7 @@ begin
     tb_temp_idle <= '1';
   elsif rising_edge(tb_clk) then
     tb_temp_idle <= tb_temp_idle;
-    if (tb_start_valid = '1') then
+    if (start_valid = '1') then
       tb_temp_idle <= '0';
     end if;
     if(tb_stop = '1') then
@@ -99,14 +101,14 @@ end process generate_idle_signal;
 generate_start_signal : process(tb_clk, tb_rst)
 begin
   if (tb_rst = '1') then
-    tb_start_valid <= '0';
+    start_valid <= '0';
     tb_started <= '0';
   elsif rising_edge(tb_clk) then
     if (tb_started = '0') then
-      tb_start_valid <= '1';
+      start_valid <= '1';
       tb_started <= '1';
     else
-      tb_start_valid <= tb_start_valid and (not tb_start_ready);
+      start_valid <= start_valid and (not start_ready);
     end if;
   end if;
 end process generate_start_signal;
@@ -201,110 +203,6 @@ static const string END_READY = "end_ready";
 // else as the D_IN0_PORT (i.e., the first port of the dual-port RAM).
 static const string RET_VALUE_NAME = "out0";
 
-HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
-  duvName = ctx.getVhdlDuvEntityName();
-  tleName = ctx.getVhdlDuvEntityName() + "_tb";
-  cDuvParams = ctx.getFuvParams();
-
-  Constant hcp("HALF_CLK_PERIOD", "TIME", "2.00 ns");
-  constants.push_back(hcp);
-
-  int transNum = getTransactionNumberFromInput();
-  logInf(LOG_TAG, "Transaction number computed : " + to_string(transNum));
-  if (transNum <= 0)
-    logErr(LOG_TAG, "Invalid number of transactions detected!");
-
-  Constant tN("TRANSACTION_NUM", "INTEGER", to_string(transNum));
-  constants.push_back(tN);
-
-  for (const auto &p : cDuvParams) {
-    MemElem mElem;
-
-    Constant inFileName("INPUT_" + p.parameterName, "STRING",
-                        "\"" + getInputFilepathForParam(p) + "\"");
-    constants.push_back(inFileName);
-    mElem.inFileParamValue = inFileName.constName;
-
-    Constant outFileName("OUTPUT_" + p.parameterName, "STRING",
-                         "\"" + getOutputFilepathForParam(p) + "\"");
-    constants.push_back(outFileName);
-    mElem.outFileParamValue = outFileName.constName;
-
-    Constant dataWidth("DATA_WIDTH_" + p.parameterName, "INTEGER",
-                       to_string(p.dtWidth));
-    constants.push_back(dataWidth);
-    mElem.dataWidthParamValue = dataWidth.constName;
-
-    mElem.isArray = (p.isPointer && p.arrayLength > 1);
-
-    if (mElem.isArray) {
-
-      string addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
-      Constant addrWidth("ADDR_WIDTH_" + p.parameterName, "INTEGER",
-                         addrwidthvalue);
-      // to_string(((int) ceil(log2(p.arrayLength)))));
-      constants.push_back(addrWidth);
-      mElem.addrWidthParamValue = addrWidth.constName;
-      Constant dataDepth("DATA_DEPTH_" + p.parameterName, "INTEGER",
-                         to_string(p.arrayLength));
-      constants.push_back(dataDepth);
-      mElem.dataDepthParamValue = dataDepth.constName;
-    }
-
-    mElem.dIn0SignalName = p.parameterName + "_mem_din0";
-    mElem.dOut0SignalName = p.parameterName + "_mem_dout0";
-    mElem.we0SignalName = p.parameterName + "_mem_" + WE0_PORT;
-    mElem.ce0SignalName = p.parameterName + "_mem_" + CE0_PORT;
-    mElem.addr0SignalName = p.parameterName + "_mem_" + ADDR0_PORT;
-    mElem.dIn1SignalName = p.parameterName + "_mem_din1";
-    mElem.dOut1SignalName = p.parameterName + "_mem_dout1";
-    mElem.we1SignalName = p.parameterName + "_mem_" + WE1_PORT;
-    mElem.ce1SignalName = p.parameterName + "_mem_" + CE1_PORT;
-    mElem.addr1SignalName = p.parameterName + "_mem_" + ADDR1_PORT;
-
-    mElem.memStartSignalName = p.parameterName + "_memStart";
-    mElem.memEndSignalName = p.parameterName + "_memEnd";
-
-    memElems.push_back(mElem);
-  }
-}
-
-string HlsVhdlTb::getInputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isInput)
-    return ctx.getInputVectorPath(param);
-
-  return "";
-}
-
-string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isOutput)
-    return ctx.getVhdlOutPath(param);
-
-  return "";
-}
-
-// Declare a signal. Usage:
-// - declareSTL(os, "signal_name"); declares a std_logic signal
-// - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
-void declareSTL(mlir::raw_indented_ostream &os, const string &name,
-                std::optional<std::string> size = std::nullopt,
-                std::optional<std::string> initialValue = std::nullopt) {
-  os << "signal " << name << " : std_logic";
-  if (size)
-    os << "_vector(" << *size << " - 1 downto 0)";
-  if (initialValue)
-    os << " := " << *initialValue;
-  os << ";\n";
-}
-
-// function to get the port name in the entitiy for each paramter
-void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
-  for (const auto &c : constants) {
-    os << "constant " << c.constName << " : " << c.constType
-       << " := " << c.constValue << ";\n";
-  }
-}
-
 // This is a helper class to generete a HDL instance
 // Example:
 //   Instance("my_module", "my_instance")
@@ -376,6 +274,171 @@ public:
   }
 };
 
+HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
+  duvName = ctx.getVhdlDuvEntityName();
+  tleName = ctx.getVhdlDuvEntityName() + "_tb";
+  cDuvParams = ctx.getFuvParams();
+
+  Constant hcp("HALF_CLK_PERIOD", "TIME", "2.00 ns");
+  constants.push_back(hcp);
+
+  int transNum = getTransactionNumberFromInput();
+  logInf(LOG_TAG, "Transaction number computed : " + to_string(transNum));
+  if (transNum <= 0)
+    logErr(LOG_TAG, "Invalid number of transactions detected!");
+
+  Constant tN("TRANSACTION_NUM", "INTEGER", to_string(transNum));
+  constants.push_back(tN);
+
+  for (const auto &p : cDuvParams) {
+    MemElem mElem;
+
+    Constant inFileName("INPUT_" + p.parameterName, "STRING",
+                        "\"" + getInputFilepathForParam(p) + "\"");
+    constants.push_back(inFileName);
+    mElem.inFileParamValue = inFileName.constName;
+
+    Constant outFileName("OUTPUT_" + p.parameterName, "STRING",
+                         "\"" + getOutputFilepathForParam(p) + "\"");
+    constants.push_back(outFileName);
+    mElem.outFileParamValue = outFileName.constName;
+
+    Constant dataWidth("DATA_WIDTH_" + p.parameterName, "INTEGER",
+                       to_string(p.dtWidth));
+    constants.push_back(dataWidth);
+    mElem.dataWidthParamValue = dataWidth.constName;
+
+    mElem.isArray = (p.isPointer && p.arrayLength > 1);
+
+    if (mElem.isArray) {
+
+      string addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
+      Constant addrWidth("ADDR_WIDTH_" + p.parameterName, "INTEGER",
+                         addrwidthvalue);
+      // to_string(((int) ceil(log2(p.arrayLength)))));
+      constants.push_back(addrWidth);
+      mElem.addrWidthParamValue = addrWidth.constName;
+      Constant dataDepth("DATA_DEPTH_" + p.parameterName, "INTEGER",
+                         to_string(p.arrayLength));
+      constants.push_back(dataDepth);
+      mElem.dataDepthParamValue = dataDepth.constName;
+    }
+
+    mElem.dIn0SignalName = p.parameterName + "_din0";
+    mElem.dOut0SignalName = p.parameterName + "_dout0";
+    mElem.we0SignalName = p.parameterName + "_" + WE0_PORT;
+    mElem.ce0SignalName = p.parameterName + "_" + CE0_PORT;
+    mElem.addr0SignalName = p.parameterName + "_" + ADDR0_PORT;
+    mElem.dIn1SignalName = p.parameterName + "_din1";
+    mElem.dOut1SignalName = p.parameterName + "_dout1";
+    mElem.we1SignalName = p.parameterName + "_" + WE1_PORT;
+    mElem.ce1SignalName = p.parameterName + "_" + CE1_PORT;
+    mElem.addr1SignalName = p.parameterName + "_" + ADDR1_PORT;
+
+    mElem.memStartSignalName = p.parameterName + "_start";
+    mElem.memEndSignalName = p.parameterName + "_end";
+
+    memElems.push_back(mElem);
+  }
+}
+
+string HlsVhdlTb::getInputFilepathForParam(const CFunctionParameter &param) {
+  if (param.isInput)
+    return ctx.getInputVectorPath(param);
+
+  return "";
+}
+
+string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
+  if (param.isOutput)
+    return ctx.getVhdlOutPath(param);
+
+  return "";
+}
+
+// Declare a signal. Usage:
+// - declareSTL(os, "signal_name"); declares a std_logic signal
+// - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
+void declareSTL(mlir::raw_indented_ostream &os, const string &name,
+                std::optional<std::string> size = std::nullopt,
+                std::optional<std::string> initialValue = std::nullopt) {
+  os << "signal " << name << " : std_logic";
+  if (size)
+    os << "_vector(" << *size << " - 1 downto 0)";
+  if (initialValue)
+    os << " := " << *initialValue;
+  os << ";\n";
+}
+
+void declareConstant(mlir::raw_indented_ostream &os, const string &name,
+                     const string &type, const string &value) {
+  os << "constant " << name << " : " << type << " := " << value << ";\n";
+}
+
+// function to get the port name in the entitiy for each paramter
+void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
+
+  handshake::FuncOp *funcOp = ctx.funcOp;
+
+  std::string inputVectorPath = ctx.getInputVectorDir();
+  std::string outputFilePath = ctx.getVhdlOutDir();
+
+  declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
+  declareConstant(os, "TRANSACTION_NUM", "INTEGER", to_string(1));
+
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    // For scalar and array arguments we need to declare files that hold the
+    // values of them
+    if (isa<handshake::ChannelType, mlir::MemRefType>(arg.getType())) {
+      declareConstant(os, "INPUT_" + argName, "STRING",
+                      "\"" + inputVectorPath + "/input_" + argName + ".dat" +
+                          "\"");
+
+      declareConstant(os, "OUTPUT_" + argName, "STRING",
+                      "\"" + outputFilePath + "/output_" + argName + ".dat" +
+                          "\"");
+    }
+
+    if (handshake::ChannelType type =
+            arg.getType().dyn_cast<handshake::ChannelType>()) {
+      int dataWidth = type.getDataBitWidth();
+      declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+                      to_string(dataWidth));
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+
+      int dataWidth = type.getElementType().getIntOrFloatBitWidth();
+      declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+                      to_string(dataWidth));
+      int dataDepth = type.getNumElements();
+      declareConstant(os, "DATA_DEPTH_" + argName, "INTEGER",
+                      to_string(dataDepth));
+      int addrWidth = ((int)ceil(log2(dataDepth)));
+      declareConstant(os, "ADDR_WIDTH_" + argName, "INTEGER",
+                      to_string(addrWidth));
+    }
+  }
+
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      declareConstant(os, "INPUT_" + argName, "STRING", "\"\"");
+      declareConstant(os, "OUTPUT_" + argName, "STRING",
+                      "\"" + outputFilePath + "/output_" + argName + ".dat" +
+                          "\"");
+      int dataWidth = type.getDataBitWidth();
+      declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+                      to_string(dataWidth));
+    }
+  }
+}
+
 // This writes the signal declarations fot the testbench
 // Example:
 // signal tb_clk : std_logic := '0';
@@ -385,54 +448,84 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
   declareSTL(os, "tb_start_value", std::nullopt, "'0'");
   declareSTL(os, "tb_rst", std::nullopt, "'0'");
-  declareSTL(os, "tb_" + START_VALID, std::nullopt, "'0'");
-  declareSTL(os, "tb_" + START_READY);
+  // declareSTL(os, "tb_" + START_VALID, std::nullopt, "'0'");
+  // declareSTL(os, "tb_" + START_READY);
   declareSTL(os, "tb_started");
-  declareSTL(os, "tb_" + END_VALID);
-  declareSTL(os, "tb_" + END_READY);
-  declareSTL(os, "tb_" + RET_VALUE_NAME + "_valid");
-  declareSTL(os, "tb_" + RET_VALUE_NAME + "_ready");
+  // declareSTL(os, "tb_" + END_VALID);
+  // declareSTL(os, "tb_" + END_READY);
+  // declareSTL(os, "tb_" + RET_VALUE_NAME + "_valid");
+  // declareSTL(os, "tb_" + RET_VALUE_NAME + "_ready");
   declareSTL(os, "tb_global_valid");
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");
 
-  for (size_t i = 0; i < cDuvParams.size(); i++) {
-    CFunctionParameter p = cDuvParams[i];
-    MemElem m = memElems[i];
+  handshake::FuncOp *funcOp = ctx.funcOp;
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
-    if (m.isArray) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
-      declareSTL(os, m.ce0SignalName);
-      declareSTL(os, m.we0SignalName);
-      declareSTL(os, m.dIn0SignalName, m.dataWidthParamValue);
-      declareSTL(os, m.dOut0SignalName, m.dataWidthParamValue);
-      declareSTL(os, m.addr0SignalName, m.addrWidthParamValue);
+    if (handshake::ChannelType type =
+            arg.getType().dyn_cast<handshake::ChannelType>()) {
+      int dataWidth = type.getDataBitWidth();
+      declareSTL(os, argName + "_" + CE0_PORT);
+      declareSTL(os, argName + "_" + WE0_PORT);
 
-      declareSTL(os, m.ce1SignalName);
-      declareSTL(os, m.we1SignalName);
+      declareSTL(os, argName + "_dout0", to_string(dataWidth));
+      declareSTL(os, argName + "_din0", to_string(dataWidth));
 
-      declareSTL(os, m.dIn1SignalName, m.dataWidthParamValue);
-      declareSTL(os, m.dOut1SignalName, m.dataWidthParamValue);
-      declareSTL(os, m.addr1SignalName, m.addrWidthParamValue);
+      declareSTL(os, argName + "_dout0" + "_valid");
+      declareSTL(os, argName + "_dout0" + "_ready");
 
-      declareSTL(os, m.memStartSignalName + "_valid");
-      declareSTL(os, m.memStartSignalName + "_ready");
-      declareSTL(os, m.memEndSignalName + "_valid");
-      declareSTL(os, m.memEndSignalName + "_ready");
+    } else if (handshake::ControlType type =
+                   arg.getType().dyn_cast<handshake::ControlType>()) {
+      declareSTL(os, argName + "_valid");
+      declareSTL(os, argName + "_ready");
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
 
-    } else {
-      if ((cDuvParams[i].isReturn && cDuvParams[i].isOutput) ||
-          !cDuvParams[i].isReturn) {
+      int dataWidth = type.getElementType().getIntOrFloatBitWidth();
+      int dataDepth = type.getNumElements();
+      int addrWidth = ((int)ceil(log2(dataDepth)));
 
-        declareSTL(os, m.ce0SignalName);
-        declareSTL(os, m.we0SignalName);
+      declareSTL(os, argName + "_" + CE0_PORT);
+      declareSTL(os, argName + "_" + WE0_PORT);
+      declareSTL(os, argName + "_din0", to_string(dataWidth));
+      declareSTL(os, argName + "_dout0", to_string(dataWidth));
+      declareSTL(os, argName + "_" + ADDR0_PORT, to_string(addrWidth));
 
-        declareSTL(os, m.dOut0SignalName, m.dataWidthParamValue);
-        declareSTL(os, m.dIn0SignalName, m.dataWidthParamValue);
+      declareSTL(os, argName + "_" + CE1_PORT);
+      declareSTL(os, argName + "_" + WE1_PORT);
 
-        declareSTL(os, m.dOut0SignalName + "_valid");
-        declareSTL(os, m.dOut0SignalName + "_ready");
-      }
+      declareSTL(os, argName + "_din1", to_string(dataWidth));
+      declareSTL(os, argName + "_dout1", to_string(dataWidth));
+      declareSTL(os, argName + "_" + ADDR1_PORT, to_string(addrWidth));
+    }
+  }
+
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      int dataWidth = type.getDataBitWidth();
+      declareSTL(os, argName + "_" + CE0_PORT);
+      declareSTL(os, argName + "_" + WE0_PORT);
+
+      declareSTL(os, argName + "_dout0", to_string(dataWidth));
+      declareSTL(os, argName + "_din0", to_string(dataWidth));
+
+      // Output channel of the single_argument block
+      declareSTL(os, argName + "_dout0" + "_valid");
+      declareSTL(os, argName + "_dout0" + "_ready");
+
+      // To the input channel of the single_argument block & the tb_join
+      declareSTL(os, argName + "_valid");
+      declareSTL(os, argName + "_ready");
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(resType)) {
+      declareSTL(os, argName + "_valid");
+      declareSTL(os, argName + "_ready");
     }
   }
 
@@ -508,7 +601,7 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
             .connect(D_IN0_PORT, m.dIn0SignalName);
       } else if (!p.isInput && p.isOutput && p.isReturn) {
         // Return value of the function.
-        argInst.connect(WE0_PORT, "tb_" + RET_VALUE_NAME + "_valid")
+        argInst.connect(WE0_PORT, RET_VALUE_NAME + "_valid")
             .connect(D_IN0_PORT, m.dIn0SignalName);
       } else {
         assert(false && "Invalid parameter type");
@@ -538,9 +631,9 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
 
   if (hasReturnVal) {
     joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                     "tb_" + RET_VALUE_NAME + "_valid");
+                     RET_VALUE_NAME + "_valid");
     joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                     "tb_" + RET_VALUE_NAME + "_ready");
+                     RET_VALUE_NAME + "_ready");
   }
   for (MemElem &m : memElems) {
     if (m.isArray) {
@@ -550,9 +643,8 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
                        m.memEndSignalName + "_ready");
     }
   }
-  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", "tb_" + END_VALID);
-  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                   "tb_" + END_READY);
+  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", END_VALID);
+  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")", END_READY);
   joinInst.connect("outs_valid", "tb_global_valid");
   joinInst.connect("outs_ready", "tb_global_ready");
 
@@ -565,10 +657,10 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
 
   duvInst.connect(CLK_PORT, "tb_" + CLK_PORT)
       .connect(RST_PORT, "tb_" + RST_PORT)
-      .connect(START_VALID, "tb_" + START_VALID)
-      .connect(START_READY, "tb_" + START_READY)
-      .connect(END_VALID, "tb_" + END_VALID)
-      .connect(END_READY, "tb_" + END_READY);
+      .connect(START_VALID, START_VALID)
+      .connect(START_READY, START_READY)
+      .connect(END_VALID, END_VALID)
+      .connect(END_READY, END_READY);
 
   for (size_t i = 0; i < cDuvParams.size(); i++) {
     CFunctionParameter p = cDuvParams[i];
@@ -607,10 +699,8 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
       if (p.isOutput) {
         if (p.isReturn) {
           duvInst.connect(p.parameterName, m.dIn0SignalName)
-              .connect(p.parameterName + "_valid",
-                       "tb_" + RET_VALUE_NAME + "_valid")
-              .connect(p.parameterName + "_ready",
-                       "tb_" + RET_VALUE_NAME + "_ready");
+              .connect(p.parameterName + "_valid", RET_VALUE_NAME + "_valid")
+              .connect(p.parameterName + "_ready", RET_VALUE_NAME + "_ready");
         } else {
           duvInst.connect(p.parameterName + "_valid", m.we0SignalName)
               .connect(p.parameterName + "_din", m.dIn0SignalName)

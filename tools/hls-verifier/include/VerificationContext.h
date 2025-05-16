@@ -11,11 +11,14 @@
 
 #include "CAnalyser.h"
 #include "Utilities.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include <map>
 #include <string>
 #include <vector>
 
 using namespace std;
+using namespace dynamatic;
 
 namespace hls_verify {
 
@@ -57,7 +60,8 @@ class VerificationContext {
 public:
   VerificationContext(const string &cTbPath, const string &cFuvPath,
                       const string &cFuvFunctionName,
-                      const string &vhdlDuvEntityName);
+                      const string &vhdlDuvEntityName,
+                      handshake::FuncOp *funcOp);
 
   string getCTbPath() const;
   string getCFuvPath() const;
@@ -90,6 +94,7 @@ public:
   vector<CFunctionParameter> getFuvOutputParams() const;
   vector<CFunctionParameter> getFuvInputParams() const;
   vector<CFunctionParameter> getFuvParams() const;
+  handshake::FuncOp *funcOp;
 
 private:
   Properties properties;

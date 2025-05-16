@@ -8,6 +8,7 @@
 
 #include "VerificationContext.h"
 #include "HlsLogging.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include <cassert>
 
 namespace hls_verify {
@@ -59,9 +60,11 @@ string Properties::get(const string &key) const {
 VerificationContext::VerificationContext(const string &cTbPath,
                                          const string &cFuvPath,
                                          const string &cFuvFunctionName,
-                                         const string &vhdlDuvEntityName)
+                                         const string &vhdlDuvEntityName,
+                                         handshake::FuncOp *funcOp)
     : properties(), cTBPath(cTbPath), cFUVPath(cFuvPath),
-      cFUVFunctionName(cFuvFunctionName), vhdlDUVEntityName(vhdlDuvEntityName) {
+      cFUVFunctionName(cFuvFunctionName), vhdlDUVEntityName(vhdlDuvEntityName),
+      funcOp(funcOp) {
   string preprocessedCTb = CAnalyser::getPreprocOutput(
       getCTbPath(), extractParentDirectoryPath(getCTbPath()));
   CAnalyser::parseCFunction(preprocessedCTb, getCFuvFunctionName(), fuv);

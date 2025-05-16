@@ -16,6 +16,17 @@ add_llvm_tool(hls-verifier
 
 llvm_update_compile_flags(hls-verifier)
 
+target_link_libraries(hls-verifier PRIVATE
+  PRIVATE   
+  MLIRIR
+  MLIRParser
+  DynamaticSupport
+  DynamaticSupportRTL
+  DynamaticHandshake
+  DynamaticHW
+)
+
+
 find_package(Boost REQUIRED regex)
 target_link_libraries(hls-verifier
   PRIVATE

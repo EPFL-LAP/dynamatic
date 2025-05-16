@@ -13,8 +13,16 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "Utilities.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h" // Include the header for OwningOpRef
+#include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
@@ -23,6 +31,7 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace dynamatic;
 
 using namespace hls_verify;
 static const char SEP = std::filesystem::path::preferred_separator;
@@ -147,6 +156,10 @@ int main(int argc, char **argv) {
   cl::opt<std::string> vhdlDuvEntityName(
       "hdl-duv-entity-name", cl::desc("Name of the HDL entity name"),
       cl::value_desc("hdl-duv-entity-name"), cl::Required);
+  cl::opt<std::string> mlirPathName(
+      "handshake-mlir",
+      cl::desc("Name of the handshake MLIR file with the kernel"),
+      cl::value_desc("handshake-mlir"), cl::Required);
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
@@ -160,8 +173,30 @@ int main(int argc, char **argv) {
     
     )PREFIX");
 
+  // We only need the Handshake dialect
+  MLIRContext context;
+  context.loadDialect<handshake::HandshakeDialect>();
+
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mlirPathName.c_str());
+  if (std::error_code error = fileOrErr.getError()) {
+    llvm::errs() << argv[0] << ": could not open input file '" << mlirPathName
+                 << "': " << error.message() << "\n";
+    return 1;
+  }
+
+  // Load the MLIR module
+  SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> modOp(
+      mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
+  if (!modOp)
+    return 1;
+
+  handshake::FuncOp funcOp =
+      dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(cFuvFunctionName));
+
   VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
-                          vhdlDuvEntityName);
+                          vhdlDuvEntityName, &funcOp);
 
   // Generate hls_verify_<cFuvFunctionName>.vhd
   generateVhdlTestbench(ctx);
