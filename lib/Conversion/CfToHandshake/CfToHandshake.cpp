@@ -1338,20 +1338,27 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   } else {
     rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   }
-
+  // maybe change this to not forcefully drop all uses, instead do it in a safer&controled way
   if (!originalInitCallsToErase.empty()) {
       llvm::errs() << "did enter if originalInitCallsToErase is not empty ";
       for (Operation *initCallToErase : originalInitCallsToErase) { // These are 'func.call @__init' ops
         // Ensure the operation is still in the IR and valid
         if (initCallToErase->isRegistered() && initCallToErase->getParentRegion()) {
+          assert(initCallToErase->getNumResults() == 1 && "Expected single-result __init call"); //paranoia check
           // Forcefully drop all uses before deletion
           for (OpResult result : initCallToErase->getResults()){
-            result.dropAllUses();
+            llvm::errs() << "Entered stage where uses are being checked\n";
+            if (result.hasOneUse()) {
+              llvm::errs() << "Entered hasOneUse\n";
+              Operation *user = *result.getUsers().begin();
+              // If the one user is the current callOp being rewritten, saftly delete __init
+              if (user == callOp) {
+                result.dropAllUses();
+                rewriter.eraseOp(initCallToErase);
+                llvm::errs() << "Erased __init call used by " << callOp.getCallee() << "\n";
+              }
+            }
           }
-          rewriter.eraseOp(initCallToErase);
-          llvm::errs() << "FORCE erased __init call: " << initCallToErase->getName()
-                  << " (op: " << *initCallToErase << ")\n";
-
         }
       }
   }
