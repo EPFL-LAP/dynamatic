@@ -444,11 +444,11 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
     // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
 
     // (#427) This constraint encodes:
-    // - If dataBuf, then token occupancy >= cfdfc's throughput.
+    // - If dataBuf, then token occupancy ≥ CFDFC's throughput.
     model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
                     "throughput_data");
     // (#427) We combine the following two constraints into one:
-    // - If readyBuf holds, then bubble occupancy ≥ cfdfc's throughput.
+    // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
     // - Token occupancy + bubble occupancy ≤ buffer's slot number.
     //
     // Note: Additional buffers may be needed to prevent combinational cycles 
