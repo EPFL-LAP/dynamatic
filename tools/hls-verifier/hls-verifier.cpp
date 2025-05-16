@@ -12,6 +12,7 @@
 
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
+#include "Utilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/WithColor.h"
@@ -123,7 +124,7 @@ void executeVhdlTestbench(const VerificationContext &ctx) {
   // Executing modelsim
   command = "vsim -c -do " + ctx.getModelsimDoFileName();
   logInf(LOG_TAG, "Executing modelsim: [" + command + "]");
-  system(("vsim -c -do " + ctx.getModelsimDoFileName()).c_str());
+  executeCommand(command);
 }
 
 int main(int argc, char **argv) {
