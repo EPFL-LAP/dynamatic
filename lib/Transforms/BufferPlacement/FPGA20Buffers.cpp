@@ -52,36 +52,33 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // channel-specific buffering properties
     unsigned numSlotsToPlace = static_cast<unsigned>(
         chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
-    if (numSlotsToPlace == 0)
-      continue;
 
-    // forceBreakDVR == 1 means cut D, V, R; forceBreakDVR == 0 means cut nothing.
-    bool forceBreakDVR = chVars.signalVars[SignalType::DATA].bufPresent.get(
+    // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break nothing.
+    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
     
     PlacementResult result;
-    // 1. If breaking DVR:
-    // When numslot = 1, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-    // When numslot = 2, map to ONE_SLOT_BREAK_DV + ONE_SLOT_BREAK_R;
-    // When numslot > 2, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
-    //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
+    // 1. If breaking DV:
+    // Map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
     //
     // 2. If breaking none:
     // Map to numslot * FIFO_BREAK_NONE.
-    if (forceBreakDVR) {
-      if (numSlotsToPlace == 1) {
+    if (numSlotsToPlace >= 1) {
+      if (forceBreakDV) {
         result.numOneSlotDV = 1;
-        result.numOneSlotR = 1;
-      } else if (numSlotsToPlace == 2) {
-        result.numOneSlotDV = 1;
-        result.numOneSlotR = 1;
+        result.numFifoNone = numSlotsToPlace - 1;
       } else {
-        result.numOneSlotDV = 1;
-        result.numFifoNone = numSlotsToPlace - 2;
-        result.numOneSlotR = 1;
+        result.numFifoNone = numSlotsToPlace;
       }
-    } else {
-      result.numFifoNone = numSlotsToPlace;
+    }
+    
+    // (PR #427) In FPGA20, buffers only break the data and valid paths.
+    // We insert TEHBs after all Merge-like operations to break the ready paths.
+    // We only break the ready path if the channel is on cycle.
+    Operation *srcOp = channel.getDefiningOp();
+    if (srcOp && isa<handshake::MuxOp, handshake::MergeOp>(srcOp) &&
+        srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
+      result.numOneSlotR = 1;
     }
 
     placement[channel] = result;
@@ -180,14 +177,12 @@ void FPGA20Buffers::setup() {
       addChannelTimingConstraints(channel, SignalType::DATA, bufModel);
       addBufferPresenceConstraints(channel);
       addBufferingGroupConstraints(channel, bufGroups);
-      addChannelElasticityConstraints(channel);
     }
   }
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
     addUnitTimingConstraints(&op, SignalType::DATA);
-    addUnitElasticityConstraints(&op);
   }
 
   // Create CFDFC variables and add throughput constraints for each CFDFC that
