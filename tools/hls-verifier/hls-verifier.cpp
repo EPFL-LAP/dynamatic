@@ -165,10 +165,13 @@ int main(int argc, char **argv) {
   // Generate hls_verify_<cFuvFunctionName>.vhd
   generateVhdlTestbench(ctx);
 
-  generateModelsimScripts(ctx);
-
   // Copy two_port_RAM.vhd, single_argument.vhd, etc. to the VHDL source
   copySupplementaryFiles(ctx, resourcePathName);
+
+  // Need to first copy the supplementary files to the VHDL source before
+  // generating the scripts (it looks at the existing files to generate the
+  // scripts).
+  generateModelsimScripts(ctx);
 
   // Run modelsim to simulate the testbench and write the outputs to the
   // VHDL_OUT
