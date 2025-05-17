@@ -183,8 +183,7 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
       "out_ports": [{
           "name": "index",
           "bitwidth": index_bitwidth,
-          # TODO: Extra signals for index port are not tested
-          "extra_signals": extra_signals
+          "extra_signals": {}
       }, {
           "name": "outs",
           "bitwidth": data_bitwidth,

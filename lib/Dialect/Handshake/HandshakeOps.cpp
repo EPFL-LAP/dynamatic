@@ -2018,5 +2018,23 @@ LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
 //===----------------------------------------------------------------------===//
 LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
 
+//===----------------------------------------------------------------------===//
+// ExtractOp
+//===----------------------------------------------------------------------===//
+LogicalResult ExtractOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties, RegionRange,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+
+  Type channelLikeType = operands.front().getType();
+  if (auto channelType = dyn_cast<handshake::ChannelType>(channelLikeType)) {
+    inferredReturnTypes.push_back(ChannelType::get(channelType.getDataType()));
+  } else {
+    assert(isa<handshake::ControlType>(channelLikeType) && "expected control");
+    inferredReturnTypes.push_back(handshake::ControlType::get(context));
+  }
+  return success();
+}
+
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
