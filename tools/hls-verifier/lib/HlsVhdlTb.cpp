@@ -267,7 +267,7 @@ struct ControlOnlyConnector {
   }
 };
 
-// function to get the port name in the entitiy for each paramter
+// function to get the port name in the entity for each paramter
 void getConstantDeclaration(mlir::raw_indented_ostream &os,
                             VerificationContext &ctx) {
 
@@ -473,22 +473,19 @@ void getOutputTagGeneration(mlir::raw_indented_ostream &os,
 
   // Reading / Dumping the content of the memory into the file
   for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName, argName,
-                        argName, argName, argName);
+    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
 
   // Reading / Dumping the content of the memory into the file
   for (auto [type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName, argName,
-                        argName, argName, argName);
+    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
 
   // Reading / Dumping the content of the memory into the file
   for (auto [type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName, argName,
-                        argName, argName, argName);
+    os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
 }
 

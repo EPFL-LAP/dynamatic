@@ -130,9 +130,9 @@ write_output_transactor_{0}_runtime_proc : process
   variable token_line : LINE;
   variable token      : STRING(1 to 1024);
 begin
-  file_open(fstatus, fp, OUTPUT_{1} , WRITE_MODE);
+  file_open(fstatus, fp, OUTPUT_{0} , WRITE_MODE);
   if (fstatus /= OPEN_OK) then
-    assert false report "Open file " & OUTPUT_{2} & " failed!!!" severity note;
+    assert false report "Open file " & OUTPUT_{0} & " failed!!!" severity note;
     assert false report "ERROR: Simulation using HLS TB failed." severity failure;
   end if;
   write(token_line, string'("[[[runtime]]]"));
@@ -143,9 +143,9 @@ begin
   end loop;
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
-  file_open(fstatus, fp, OUTPUT_{3}, APPEND_MODE);
+  file_open(fstatus, fp, OUTPUT_{0}, APPEND_MODE);
   if (fstatus /= OPEN_OK) then
-    assert false report "Open file " & OUTPUT_{4} & " failed!!!" severity note;
+    assert false report "Open file " & OUTPUT_{0} & " failed!!!" severity note;
     assert false report "ERROR: Simulation using HLS TB failed." severity failure;
   end if;
   write(token_line, string'("[[[/runtime]]]"));
@@ -270,7 +270,8 @@ public:
       for (size_t i = 0; i < params.size(); ++i) {
         os << params[i].first << " => " << params[i].second;
         if (i != params.size() - 1)
-          os << ",\n";
+          os << ",";
+        os << "\n";
       }
       os.unindent();
       os << ")\n";
