@@ -136,15 +136,16 @@ struct MemRefToDualPortRAM {
 };
 
 // A helper struct for connecting the in/output channels from/to the single
-// argument.
-// The single argument block is basically an one-element RAM, with the following
-// interface signals:
+// argument.  The single argument block is basically an one-element RAM, with
+// the following interface signals:
+// - ce0: clock enable
+// - we0: if doing the write access
+// - din0: data input
+// - dout0: data output
+// - dout0_valid: output handshake
+// - dout0_ready: output handshake
 struct ChannelToSingleArgument {
 
-  SmallVector<tuple</* Signal name of the circuit */ std::string,
-                    /* Signal name of the DPRAM*/ std::string,
-                    /* Bitwidth */ unsigned>>
-      channelToSingleArgument;
   handshake::ChannelType type;
   std::string argName;
   bool isInput;
@@ -185,11 +186,11 @@ struct ChannelToSingleArgument {
     declareSTL(os, argName + "_" + CE0_PORT);
     declareSTL(os, argName + "_" + WE0_PORT);
 
-    declareSTL(os, argName + "_dout0", to_string(dataWidth));
     declareSTL(os, argName + "_din0", to_string(dataWidth));
 
-    declareSTL(os, argName + "_dout0" + "_valid");
-    declareSTL(os, argName + "_dout0" + "_ready");
+    declareSTL(os, argName + "_dout0", to_string(dataWidth));
+    declareSTL(os, argName + "_dout0_valid");
+    declareSTL(os, argName + "_dout0_ready");
   }
 
   void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os) {
@@ -230,6 +231,37 @@ struct ChannelToSingleArgument {
     } else {
       duvInst.connect(argName, argName + "_din0")
           .connect(argName + "_valid", argName + "_valid")
+          .connect(argName + "_ready", argName + "_ready");
+    }
+  }
+};
+
+// Derive the control only signals at input or output.
+// HACK: the control only signals are handled in the following ways:
+// - Input: they are driven by valid = constant 1, their ready signals are
+// ignored
+// - Output: they are driving the join
+struct ControlOnlyConnector {
+
+  handshake::ControlType type;
+  std::string argName;
+  bool isInput;
+
+  ControlOnlyConnector(handshake::ControlType type, const std::string &argName,
+                       bool isInput)
+      : type(type), argName(argName), isInput(isInput) {}
+
+  void declareSignals(mlir::raw_indented_ostream &os) {
+    declareSTL(os, argName + "_valid");
+    declareSTL(os, argName + "_ready");
+  }
+
+  void connectToDuv(Instance &duvInst) {
+    if (isInput) {
+      duvInst.connect(argName + "_valid", "\'1\'")
+          .connect(argName + "_ready", argName + "_ready");
+    } else {
+      duvInst.connect(argName + "_valid", argName + "_valid")
           .connect(argName + "_ready", argName + "_ready");
     }
   }
@@ -297,8 +329,8 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of control input channels
   for (auto [type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
+    ControlOnlyConnector c(type, argName, /* isInput = */ true);
+    c.declareSignals(os);
   }
 
   // Signals of the memory reference signals
@@ -318,8 +350,8 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of control output channels
   for (auto [type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
+    ControlOnlyConnector c(type, argName, /* isInput = */ false);
+    c.declareSignals(os);
   }
 
   os << "\n";
@@ -377,8 +409,8 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   // @Jiahui17: TODO: create a new argument for dataless input channels
   for (auto [type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    duvInst.connect(argName + "_valid", "\'1\'")
-        .connect(argName + "_ready", argName + "_ready");
+    ControlOnlyConnector c(type, argName, /* isInput = */ true);
+    c.connectToDuv(duvInst);
   }
 
   // Connect the memory elements to the DUV
@@ -397,12 +429,16 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
 
   for (auto [type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
-    duvInst.connect(argName + "_valid", argName + "_valid")
-        .connect(argName + "_ready", argName + "_ready");
+    ControlOnlyConnector c(type, argName, /* isInput = */ false);
+    c.connectToDuv(duvInst);
   }
 
   duvInst.emitVhdl(os);
+}
 
+void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
+                                  VerificationContext &ctx) {
+  handshake::FuncOp *funcOp = ctx.funcOp;
   // @Jiahui17: I assume that the results only contain handshake channels.
   unsigned joinSize = funcOp->getNumResults();
 
@@ -474,6 +510,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   os.indent();
   getDuvInstanceGeneration(os, ctx);
   getMemoryInstanceGeneration(os, ctx);
+  deriveGlobalCompletionSignal(os, ctx);
   getOutputTagGeneration(os, ctx);
   os << COMMON_TB_BODY;
   os.unindent();
