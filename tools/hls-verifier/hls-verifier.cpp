@@ -211,6 +211,7 @@ int main(int argc, char **argv) {
   // We only need the Handshake dialect
   MLIRContext context;
   context.loadDialect<handshake::HandshakeDialect>();
+  context.allowUnregisteredDialects();
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mlirPathName.c_str());
   if (std::error_code error = fileOrErr.getError()) {
