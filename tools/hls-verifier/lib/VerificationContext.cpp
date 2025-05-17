@@ -9,6 +9,7 @@
 #include "VerificationContext.h"
 #include "HlsLogging.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/Support/IndentedOstream.h"
 #include <cassert>
 
 namespace hls_verify {
@@ -57,17 +58,13 @@ string Properties::get(const string &key) const {
   return properties.at(key);
 }
 
-VerificationContext::VerificationContext(const string &cTbPath,
-                                         const string &cFuvPath,
-                                         const string &cFuvFunctionName,
+VerificationContext::VerificationContext(const string &cFuvFunctionName,
                                          const string &vhdlDuvEntityName,
-                                         handshake::FuncOp *funcOp)
-    : properties(), cTBPath(cTbPath), cFUVPath(cFuvPath),
-      cFUVFunctionName(cFuvFunctionName), vhdlDUVEntityName(vhdlDuvEntityName),
-      funcOp(funcOp) {
-  string preprocessedCTb = CAnalyser::getPreprocOutput(
-      getCTbPath(), extractParentDirectoryPath(getCTbPath()));
-  CAnalyser::parseCFunction(preprocessedCTb, getCFuvFunctionName(), fuv);
+                                         handshake::FuncOp *funcOp,
+                                         mlir::raw_indented_ostream &os)
+    : properties(), cFUVFunctionName(cFuvFunctionName),
+      vhdlDUVEntityName(vhdlDuvEntityName), funcOp(funcOp),
+      testbenchStream(os) {
   defaultComparator = TokenCompare();
   unsignedIntComparator = IntegerCompare(false);
   signedIntComparator = IntegerCompare(true);
@@ -76,10 +73,6 @@ VerificationContext::VerificationContext(const string &cTbPath,
   doubleComparator = DoubleCompare(
       stod(properties.get(Properties::KEY_FLOAT_COMPARE_THRESHOLD)));
 }
-
-string VerificationContext::getCTbPath() const { return cTBPath; }
-
-string VerificationContext::getCFuvPath() const { return cFUVPath; }
 
 string VerificationContext::getCFuvFunctionName() const {
   if (!cFUVFunctionName.empty())
@@ -93,11 +86,6 @@ string VerificationContext::getVhdlDuvEntityName() const {
   return cFUVFunctionName;
 }
 
-string VerificationContext::getCExecutablePath() const {
-  return extractParentDirectoryPath(cFUVPath) + "/" + "hls_verify_" +
-         getCFuvFunctionName() + ".out";
-}
-
 string VerificationContext::getVhdlTestbenchPath() const {
   return getVhdlSrcDir() + "/" + "hls_verify_" + getCFuvFunctionName() +
          "_tb.vhd";
@@ -105,11 +93,6 @@ string VerificationContext::getVhdlTestbenchPath() const {
 
 string VerificationContext::getModelsimDoFileName() const {
   return properties.get(Properties::KEY_MODELSIM_DO_FILE);
-}
-
-string VerificationContext::getInjectedCFuvPath() const {
-  return extractParentDirectoryPath(cFUVPath) + "/" + "hls_verify_" +
-         getCFuvFunctionName() + ".c";
 }
 
 string VerificationContext::getCOutDir() const {

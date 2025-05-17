@@ -14,6 +14,8 @@
 #include "CAnalyser.h"
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
+#include "VerificationContext.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -167,10 +169,6 @@ begin
 end process;
 )DELIM";
 
-// class Constant
-Constant::Constant(const string &name, const string &type, const string &value)
-    : constName(name), constType(type), constValue(value) {}
-
 // Names of the ports of the RAM model used in the testbench (i.e., the
 // dual-port RAM model).
 static const string CLK_PORT = "clk";
@@ -275,88 +273,6 @@ public:
   }
 };
 
-HlsVhdlTb::HlsVhdlTb(const VerificationContext &ctx) : ctx(ctx) {
-  duvName = ctx.getVhdlDuvEntityName();
-  tleName = ctx.getVhdlDuvEntityName() + "_tb";
-  cDuvParams = ctx.getFuvParams();
-
-  Constant hcp("HALF_CLK_PERIOD", "TIME", "2.00 ns");
-  constants.push_back(hcp);
-
-  int transNum = getTransactionNumberFromInput();
-  logInf(LOG_TAG, "Transaction number computed : " + to_string(transNum));
-  if (transNum <= 0)
-    logErr(LOG_TAG, "Invalid number of transactions detected!");
-
-  Constant tN("TRANSACTION_NUM", "INTEGER", to_string(transNum));
-  constants.push_back(tN);
-
-  for (const auto &p : cDuvParams) {
-    MemElem mElem;
-
-    Constant inFileName("INPUT_" + p.parameterName, "STRING",
-                        "\"" + getInputFilepathForParam(p) + "\"");
-    constants.push_back(inFileName);
-    mElem.inFileParamValue = inFileName.constName;
-
-    Constant outFileName("OUTPUT_" + p.parameterName, "STRING",
-                         "\"" + getOutputFilepathForParam(p) + "\"");
-    constants.push_back(outFileName);
-    mElem.outFileParamValue = outFileName.constName;
-
-    Constant dataWidth("DATA_WIDTH_" + p.parameterName, "INTEGER",
-                       to_string(p.dtWidth));
-    constants.push_back(dataWidth);
-    mElem.dataWidthParamValue = dataWidth.constName;
-
-    mElem.isArray = (p.isPointer && p.arrayLength > 1);
-
-    if (mElem.isArray) {
-
-      string addrwidthvalue = to_string(((int)ceil(log2(p.arrayLength))));
-      Constant addrWidth("ADDR_WIDTH_" + p.parameterName, "INTEGER",
-                         addrwidthvalue);
-      // to_string(((int) ceil(log2(p.arrayLength)))));
-      constants.push_back(addrWidth);
-      mElem.addrWidthParamValue = addrWidth.constName;
-      Constant dataDepth("DATA_DEPTH_" + p.parameterName, "INTEGER",
-                         to_string(p.arrayLength));
-      constants.push_back(dataDepth);
-      mElem.dataDepthParamValue = dataDepth.constName;
-    }
-
-    mElem.dIn0SignalName = p.parameterName + "_din0";
-    mElem.dOut0SignalName = p.parameterName + "_dout0";
-    mElem.we0SignalName = p.parameterName + "_" + WE0_PORT;
-    mElem.ce0SignalName = p.parameterName + "_" + CE0_PORT;
-    mElem.addr0SignalName = p.parameterName + "_" + ADDR0_PORT;
-    mElem.dIn1SignalName = p.parameterName + "_din1";
-    mElem.dOut1SignalName = p.parameterName + "_dout1";
-    mElem.we1SignalName = p.parameterName + "_" + WE1_PORT;
-    mElem.ce1SignalName = p.parameterName + "_" + CE1_PORT;
-    mElem.addr1SignalName = p.parameterName + "_" + ADDR1_PORT;
-
-    mElem.memStartSignalName = p.parameterName + "_start";
-    mElem.memEndSignalName = p.parameterName + "_end";
-
-    memElems.push_back(mElem);
-  }
-}
-
-string HlsVhdlTb::getInputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isInput)
-    return ctx.getInputVectorPath(param);
-
-  return "";
-}
-
-string HlsVhdlTb::getOutputFilepathForParam(const CFunctionParameter &param) {
-  if (param.isOutput)
-    return ctx.getVhdlOutPath(param);
-
-  return "";
-}
-
 // Declare a signal. Usage:
 // - declareSTL(os, "signal_name"); declares a std_logic signal
 // - declareSTL(os, "signal_name", "SIGNAL_WIDTH"); declares a std_logic_vector
@@ -377,8 +293,9 @@ void declareConstant(mlir::raw_indented_ostream &os, const string &name,
 }
 
 // function to get the port name in the entitiy for each paramter
-void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
+void getConstantDeclaration(VerificationContext &ctx) {
 
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   std::string inputVectorPath = ctx.getInputVectorDir();
@@ -444,7 +361,10 @@ void HlsVhdlTb::getConstantDeclaration(mlir::raw_indented_ostream &os) {
 // Example:
 // signal tb_clk : std_logic := '0';
 // signal tb_start_value : std_logic := '0';
-void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
+void getSignalDeclaration(VerificationContext &ctx) {
+
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  handshake::FuncOp *funcOp = ctx.funcOp;
 
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
   declareSTL(os, "tb_start_value", std::nullopt, "'0'");
@@ -454,7 +374,6 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");
 
-  handshake::FuncOp *funcOp = ctx.funcOp;
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -530,9 +449,11 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
   os << "shared variable transaction_idx : INTEGER := 0;\n";
 }
 
-void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
+void getMemoryInstanceGeneration(VerificationContext &ctx) {
 
   handshake::FuncOp *funcOp = ctx.funcOp;
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -653,7 +574,10 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
   joinInst.emitVhdl(os);
 }
 
-void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
+void getDuvInstanceGeneration(VerificationContext &ctx) {
+
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  std::string duvName = ctx.vhdlDUVEntityName;
 
   Instance duvInst(duvName, "duv_inst");
 
@@ -717,47 +641,55 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
   duvInst.emitVhdl(os);
 }
 
-void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
+void getOutputTagGeneration(VerificationContext &ctx) {
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  handshake::FuncOp *funcOp = ctx.funcOp;
   os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
-  for (auto &cDuvParam : cDuvParams) {
-    if (cDuvParam.isOutput) {
 
-      os << llvm::formatv(procWriteTransactions, cDuvParam.parameterName,
-                          cDuvParam.parameterName, cDuvParam.parameterName,
-                          cDuvParam.parameterName, cDuvParam.parameterName);
+  // Connect the memory elements to the DUV
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (isa<mlir::MemRefType, handshake::ChannelType>(arg.getType())) {
+      os << llvm::formatv(procWriteTransactions, argName, argName, argName,
+                          argName, argName);
+    }
+  }
+
+  // Connect the output channels to the DUV
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (isa<handshake::ChannelType>(resType)) {
+      os << llvm::formatv(procWriteTransactions, argName, argName, argName,
+                          argName, argName);
     }
   }
 }
 
-void HlsVhdlTb::codegen(mlir::raw_indented_ostream &os) {
+void vhdlTbCodegen(VerificationContext &ctx) {
+
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+
   os << VHDL_LIBRARY_HEADER;
-  os << "entity " + tleName + " is\n";
-  os << "end entity " + tleName + ";\n\n";
-  os << "architecture behavior of " << tleName << " is\n\n";
+  os << "entity " + ctx.vhdlDUVEntityName + "_tb" + " is\n";
+  os << "end entity " + ctx.vhdlDUVEntityName + "_tb" + ";\n\n";
+  os << "architecture behavior of " << ctx.vhdlDUVEntityName + "_tb"
+     << " is\n\n";
   os.indent();
-  getConstantDeclaration(os);
-  getSignalDeclaration(os);
+  getConstantDeclaration(ctx);
+  getSignalDeclaration(ctx);
   os.unindent();
   os << "begin\n\n";
   os.indent();
-  getDuvInstanceGeneration(os);
-  getMemoryInstanceGeneration(os);
-  getOutputTagGeneration(os);
+  getDuvInstanceGeneration(ctx);
+  getMemoryInstanceGeneration(ctx);
+  getOutputTagGeneration(ctx);
   os << COMMON_TB_BODY;
   os.unindent();
   os << "end architecture behavior;\n";
-}
-
-int HlsVhdlTb::getTransactionNumberFromInput() {
-  bool hasInput = false;
-  for (auto &cDuvParam : cDuvParams) {
-    if (cDuvParam.isInput) {
-      hasInput = true;
-      string inputPath = getInputFilepathForParam(cDuvParam);
-      return getNumberOfTransactions(inputPath);
-    }
-  }
-  return hasInput ? -1 : 1;
 }
 
 } // namespace hls_verify

@@ -13,6 +13,7 @@
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/Support/IndentedOstream.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -56,15 +57,12 @@ private:
   map<string, string> properties;
 };
 
-class VerificationContext {
-public:
-  VerificationContext(const string &cTbPath, const string &cFuvPath,
-                      const string &cFuvFunctionName,
+struct VerificationContext {
+  VerificationContext(const string &cFuvFunctionName,
                       const string &vhdlDuvEntityName,
-                      handshake::FuncOp *funcOp);
+                      handshake::FuncOp *funcOp,
+                      mlir::raw_indented_ostream &testbenchStream);
 
-  string getCTbPath() const;
-  string getCFuvPath() const;
   string getCFuvFunctionName() const;
   string getVhdlDuvEntityName() const;
 
@@ -96,11 +94,8 @@ public:
   vector<CFunctionParameter> getFuvParams() const;
   handshake::FuncOp *funcOp;
 
-private:
   Properties properties;
   CFunction fuv;
-  string cTBPath;
-  string cFUVPath;
   string cFUVFunctionName;
   string vhdlDUVEntityName;
   TokenCompare defaultComparator;
@@ -108,6 +103,7 @@ private:
   IntegerCompare unsignedIntComparator;
   FloatCompare floatComparator;
   DoubleCompare doubleComparator;
+  mlir::raw_indented_ostream &testbenchStream;
 };
 
 } // namespace hls_verify

@@ -27,6 +27,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace llvm;
@@ -63,17 +64,6 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   os << "log -r *\n";
   os << "run -all\n";
   os << "exit\n";
-}
-
-void generateVhdlTestbench(const VerificationContext &ctx) {
-  logInf(LOG_TAG,
-         "Generating VHDL testbench for entity " + ctx.getVhdlDuvEntityName());
-  HlsVhdlTb vhdlTb(ctx);
-  std::error_code ec;
-  std::string filepath = ctx.getVhdlTestbenchPath().c_str();
-  llvm::raw_fd_ostream fileStream(filepath, ec);
-  mlir::raw_indented_ostream os(fileStream);
-  vhdlTb.codegen(os);
 }
 
 void copySupplementaryFiles(const VerificationContext &ctx,
@@ -195,11 +185,19 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(cFuvFunctionName));
 
-  VerificationContext ctx(cTbPathName, cDuvPathName, cFuvFunctionName,
-                          vhdlDuvEntityName, &funcOp);
+  std::string vhdlSrcDir = "../VHDL_SRC";
+
+  std::string vhdlTestbenchPath =
+      vhdlSrcDir + SEP + "hls_verify_" + cFuvFunctionName + "_tb.vhd";
+
+  std::error_code ec;
+  llvm::raw_fd_ostream fileStream(vhdlTestbenchPath, ec);
+  mlir::raw_indented_ostream os(fileStream);
+
+  VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp, os);
 
   // Generate hls_verify_<cFuvFunctionName>.vhd
-  generateVhdlTestbench(ctx);
+  vhdlTbCodegen(ctx);
 
   // Copy two_port_RAM.vhd, single_argument.vhd, etc. to the VHDL source
   copySupplementaryFiles(ctx, resourcePathName);
