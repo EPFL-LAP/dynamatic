@@ -37,22 +37,18 @@ private:
 class FloatCompare : public TokenCompare {
 public:
   FloatCompare() = default;
-  FloatCompare(float threshold);
   bool compare(const string &token1, const string &token2) const override;
 
 private:
-  float threshold;
   float decodeToken(unsigned int token) const;
 };
 
 class DoubleCompare : public TokenCompare {
 public:
   DoubleCompare() = default;
-  DoubleCompare(double threshold);
   bool compare(const string &token1, const string &token2) const override;
 
 private:
-  double threshold;
   double decodeToken(unsigned int token) const;
 };
 

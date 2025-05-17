@@ -139,11 +139,17 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
         ctx.getCOutDir() + SEP + "output_" + argName + ".dat";
 
     LogicalResult result = failure();
-    if (isa<FloatType>(type)) {
+    if (isa<Float32Type>(type)) {
       std::unique_ptr<TokenCompare> comparator =
           std::make_unique<FloatCompare>();
       result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
-      llvm::errs() << "Comparison of [" + argName + "] : "
+      llvm::errs() << "FP32 comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    } else if (isa<Float64Type>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<DoubleCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "FP64 comparison of [" + argName + "] : "
                    << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
     } else if (isa<IntegerType>(type)) {
       std::unique_ptr<TokenCompare> comparator =

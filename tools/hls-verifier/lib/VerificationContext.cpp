@@ -34,7 +34,7 @@ const std::string Properties::DEFAULT_C_OUT_DIR = "C_OUT";
 const std::string Properties::DEFAULT_MODLELSIM_DO_FILE = "simulation.do";
 const std::string Properties::DEFAULT_REF_OUT_DIR = "REF_OUT";
 const std::string Properties::DEFAULT_HLSVERIFY_DIR = "HLS_VERIFY";
-const std::string Properties::DEFAULT_FLOAT_COMPARE_THRESHOLD = "1";
+const std::string Properties::DEFAULT_FLOAT_COMPARE_THRESHOLD = "0.00001";
 const std::string Properties::DEFAULT_DOUBLE_COMPARE_THRESHOLD =
     "0.000000000001";
 

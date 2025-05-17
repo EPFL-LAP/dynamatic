@@ -9,6 +9,7 @@
 #include "Utilities.h"
 #include "HlsLogging.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <dirent.h>
 #include <fstream>
@@ -18,6 +19,10 @@
 
 const string LOG_TAG = "UTIL";
 using namespace mlir;
+
+// @Jiahui17: Should we go for more digits?
+const float DEFAULT_FLOAT_COMPARE_THRESHOLD = 0.00001;
+const double DEFAULT_DOUBLE_COMPARE_THRESHOLD = 0.000000000001;
 
 bool TokenCompare::compare(const string &token1, const string &token2) const {
   return token1 == token2;
@@ -37,8 +42,6 @@ bool IntegerCompare::compare(const string &token1, const string &token2) const {
   return (t1 == t2);
 }
 
-FloatCompare::FloatCompare(float threshold) : threshold(threshold) {}
-
 bool FloatCompare::compare(const string &token1, const string &token2) const {
   unsigned int i1;
   unsigned int i2;
@@ -54,14 +57,12 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
     return true;
 
   float diff = abs(f1 - f2);
-  return (diff < threshold);
+  return (diff < DEFAULT_FLOAT_COMPARE_THRESHOLD);
 }
 
 float FloatCompare::decodeToken(unsigned int token) const {
   return *((float *)&token);
 }
-
-DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
 
 bool DoubleCompare::compare(const string &token1, const string &token2) const {
   unsigned long long i1;
@@ -78,7 +79,7 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
     return true;
 
   double diff = abs(d1 - d2);
-  return (diff < threshold);
+  return (diff < DEFAULT_DOUBLE_COMPARE_THRESHOLD);
 }
 
 double DoubleCompare::decodeToken(unsigned int token) const {
