@@ -92,6 +92,9 @@ struct HandshakePlaceBuffersCustomPass
     } else if (type == "one_slot_break_dvr") {
       timing = handshake::TimingInfo::break_dvr();
       bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
+    } else if (type == "shift_reg_break_dv") {
+      timing = handshake::TimingInfo::break_dv();
+      bufferType = handshake::BufferOp::SHIFT_REG_BREAK_DV;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();

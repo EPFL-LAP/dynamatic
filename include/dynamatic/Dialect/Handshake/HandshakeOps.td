@@ -263,6 +263,14 @@ def BufferOp : Handshake_Op<"buffer", [
     /// and introduces one cycle of latency on all three.
     static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
     
+    /// SHIFT_REG_BREAK_DV: This buffer breaks the D and V paths. It has multiple slots
+    /// that share a single handshake control unit, so all slots stall together or accept
+    /// inputs simultaneously. This design introduces the same latency as a chain of
+    /// ONE_SLOT_BREAK_DV buffers with the same slot number. However, when the initiation
+    /// interval is greater than one, its token capacity is lower than that of ONE_SLOT_BREAK_DV
+    /// buffers. Its main advantage is a significantly lower area cost when slot number is high.
+    static constexpr ::llvm::StringLiteral SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV";
+    
   }];
 
   let assemblyFormat = [{
