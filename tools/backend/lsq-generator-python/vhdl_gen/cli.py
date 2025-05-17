@@ -1,21 +1,22 @@
 import argparse
-from vhdl_gen.configs   import GetConfigs
-from vhdl_gen.codegen   import codeGen
+import vhdl_gen.configs as configs
+import vhdl_gen.codegen as code_gen
+
 
 def parse_args():    
     # Parse the arguments
-    # python3 main.py [-h] [--target-dir PATH_RTL] --spec-file PATH_CONFIGS
     parser = argparse.ArgumentParser()
-    parser.add_argument('--target-dir', '-t', dest='path_rtl', default = './', type = str)
-    parser.add_argument('--spec-file', '-s', required = True, dest='path_configs', default = '', type = str)
+    parser.add_argument('--target-dir', '-t', dest='target_dir', default = './', type = str)
+    parser.add_argument('--spec-file', '-s', required = True, dest='spec_file', default = '', type = str)
     args = parser.parse_args()
 
     return args
 
 def main():
     args = parse_args()
-    lsqConfig = GetConfigs(args.path_configs)
-    codeGen(args.path_rtl, lsqConfig)
+    lsqConfig = configs.GetConfigs(args.spec_file)
+    code_gen.codeGen(args.target_dir, lsqConfig)
 
 if __name__ == "__main__":
     main()
+

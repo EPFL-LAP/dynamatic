@@ -9,48 +9,59 @@ import json
 import sys
 
 # read and parse the json file
-def GetConfigs(path: str):
-    with open(path, 'r') as file:
+# example json format in README
+def GetConfigs(config_json_path: str):
+    with open(config_json_path, 'r') as file:
         configString = file.read()      
         configs = json.loads(configString)
         return Configs(configs)
 
 class Configs:
-  name:          str = 'test'
-  dataW:         int = 32
-  addrW:         int = 32
-  idW:           int = 3
-  numLdqEntries: int = 8
-  numStqEntries: int = 8
-  numLdPorts:    int = 1
-  numStPorts:    int = 1
-  numGroups:     int = 1      # The number of total Basic Blocks (BBs)
-  numLdMem:      int = 1
-  numStMem:      int = 1
+  """
+  Configuration object for LSQ code generation.
 
-  stResp:        bool = False
-  gaMulti:       bool = False
-  
-  gaNumLoads:    list = [1]   # For each BB, the number of Load instructions
-  gaNumStores:   list = [1]   # For each BB, the number of Store instructions
-  gaLdOrder:     list = [[0]] # For each BBs, the information about the order of load and store instructions in Matrix
-                              # Outer list (Row): Index for each BB
-                              # Inner list (Column): The number of store instruction aheading for each load instruction
-  gaLdPortIdx:   list = [[0]] # For each BB, related access port index
-                              # For example, let's say numLdqEntries = 8, numStqEntries = 8.
-                              # Then, non of BBs can have more than 8 loads and 8 store instructions
-                              # As a result, Port index can be among 0, 1, 2 (to access 8 LSQ entries)
-  gaStPortIdx:   list = [[0]]
+  This class is instantiated using 'GetConfigs(path_to_json_file)', which loads a JSON file
+  and overwrites all the values below using user-defined parameters.
 
-  ldqAddrW:      int = 3
-  stqAddrW:      int = 3
-  ldpAddrW:      int = 0
-  stpAddrW:      int = 0
+  The values shown below are NOT the actual values used during generation;
+  they are one of possible default configurations.
+  """
 
-  pipe0:        bool = False
-  pipe1:        bool = False
-  pipeComp:     bool = False
-  headLag:      bool = False
+
+  name:          str = 'test'     # Name prefix used for generated VHDL files
+  dataW:         int = 16         # Data width        (Number of bits for load/store data)
+  addrW:         int = 13         # Address width     (Number of bits for memory address)
+  idW:           int = 2          # ID width          (Number of bits for ID in the memory interface)
+  numLdqEntries: int = 3          # Load queue size   (Number of entries in the load queue)
+  numStqEntries: int = 10         # Store queue size  (Number of entries in the store queue)
+  numLdPorts:    int = 3          # Number of load access ports
+  numStPorts:    int = 3          # Number of store access ports
+  numGroups:     int = 2          # Number of total Basic Blocks (BBs)
+  numLdMem:      int = 1          # Number of load channels at memory interface (Fixed to 1)
+  numStMem:      int = 1          # Number of store channels at memory interface (Fixed to 1)
+
+  gaNumLoads:    list = [2, 1]    # Number of loads in each BB
+  gaNumStores:   list = [2, 1]    # Number of stores in each BB
+  gaLdOrder:     list = [[2, 2],  # The order matrix for each group
+                         [0]]     # Outer list (Row): Index for each BB
+                                  # Inner list (Column): List of store counts ahead of each load
+                                  # In this example -> BB0=[st0,st1,ld0,ld1], BB1=[ld2,st2]
+  gaLdPortIdx:   list = [[0,1],   # The related access port index for each load in BB
+                         [2]]     
+  gaStPortIdx:   list = [[0,1],   # The related access port index for each store in BB
+                         [2]]      
+  ldqAddrW:      int = 2          # Load queue address width
+  stqAddrW:      int = 4          # Store queue address width
+  ldpAddrW:      int = 2          # Load port address width
+  stpAddrW:      int = 2          # Store port address width
+
+  pipe0:        bool = False      # Enable pipeline register 0
+  pipe1:        bool = False      # Enable pipeline register 1
+  pipeComp:     bool = False      # Enable pipeline register pipeComp
+  headLag:      bool = False      # Whether the head pointer of the load queue is updated
+                                  # one cycle later than the valid bits of entries
+  stResp:        bool = False     # Whether store response channel in store access port is enabled
+  gaMulti:       bool = False     # Whether multiple groups are allowed to request an allocation at the same cycle
 
   def __init__(self, config: dict) -> None:
     self.name          = config["name"]
