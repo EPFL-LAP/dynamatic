@@ -15,6 +15,7 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -270,7 +271,7 @@ public:
       os << "\n";
     }
     os.unindent();
-    os << ");\n";
+    os << ");\n\n";
   }
 };
 
@@ -448,13 +449,7 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
   declareSTL(os, "tb_start_value", std::nullopt, "'0'");
   declareSTL(os, "tb_rst", std::nullopt, "'0'");
-  // declareSTL(os, "tb_" + START_VALID, std::nullopt, "'0'");
-  // declareSTL(os, "tb_" + START_READY);
   declareSTL(os, "tb_started");
-  // declareSTL(os, "tb_" + END_VALID);
-  // declareSTL(os, "tb_" + END_READY);
-  // declareSTL(os, "tb_" + RET_VALUE_NAME + "_valid");
-  // declareSTL(os, "tb_" + RET_VALUE_NAME + "_ready");
   declareSTL(os, "tb_global_valid");
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");
@@ -536,92 +531,102 @@ void HlsVhdlTb::getSignalDeclaration(mlir::raw_indented_ostream &os) {
 }
 
 void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
-  for (size_t i = 0; i < memElems.size(); i++) {
-    MemElem m = memElems[i];
-    CFunctionParameter p = cDuvParams[i];
 
-    if (m.isArray) {
-      // Models for array arguments
+  handshake::FuncOp *funcOp = ctx.funcOp;
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
-      Instance memInst("two_port_RAM", "mem_inst_" + p.parameterName);
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
-      memInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
-          .parameter(OUT_FILE_PARAM, m.outFileParamValue)
-          .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
-          .parameter(ADDR_WIDTH_PARAM, m.addrWidthParamValue)
-          .parameter(DATA_DEPTH_PARAM, m.dataDepthParamValue)
+    if (handshake::ChannelType type =
+            arg.getType().dyn_cast<handshake::ChannelType>()) {
+      Instance argInst("single_argument", "arg_inst_" + argName);
+
+      argInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
+          .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
+          .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
           // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
           // the instantiated RAM models (e.g., two_port_RAM.vhd and
           // single_argument.vhd). This name is not necessarily named in the
           // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
-          // internal coverification, we have the freedom to name the interface
-          // of the RAM model however we want.
-          .connect(CLK_PORT, "tb_" + CLK_PORT)
-          .connect(RST_PORT, "tb_" + RST_PORT)
-          .connect(CE0_PORT, m.ce0SignalName)
-          .connect(WE0_PORT, m.we0SignalName)
-          .connect(ADDR0_PORT, m.addr0SignalName)
-          .connect(D_OUT0_PORT, m.dOut0SignalName)
-          .connect(D_IN0_PORT, m.dIn0SignalName)
-          .connect(CE1_PORT, m.ce1SignalName)
-          .connect(WE1_PORT, m.we1SignalName)
-          .connect(ADDR1_PORT, m.addr1SignalName)
-          .connect(D_OUT1_PORT, m.dOut1SignalName)
-          .connect(D_IN1_PORT, m.dIn1SignalName)
-          .connect(DONE_PORT, "tb_stop");
-
-      memInst.emitVhdl(os);
-
-    } else {
-
-      Instance argInst("single_argument", "arg_inst_" + p.parameterName);
-      argInst.parameter(IN_FILE_PARAM, m.inFileParamValue)
-          .parameter(OUT_FILE_PARAM, m.outFileParamValue)
-          .parameter(DATA_WIDTH_PARAM, m.dataWidthParamValue)
-          // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
-          // the instantiated RAM models (e.g., two_port_RAM.vhd and
-          // single_argument.vhd). This name is not necessarily named in the
-          // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
-          // internal coverification, we have the freedom to name the interface
-          // of the RAM model however we want.
+          // internal coverification, we have the freedom to name the
+          // interface of the RAM model however we want.
           .connect(CLK_PORT, "tb_" + CLK_PORT)
           .connect(RST_PORT, "tb_" + RST_PORT)
           .connect(CE0_PORT, "'1'")
           .connect(DONE_PORT, "tb_temp_idle")
-          .connect(D_OUT0_PORT, m.dOut0SignalName)
-          .connect(D_OUT0_PORT + "_valid", m.dOut0SignalName + "_valid")
-          .connect(D_OUT0_PORT + "_ready", m.dOut0SignalName + "_ready");
-
-      if (p.isInput && !p.isOutput && !p.isReturn) {
-        // An argument that is a pure input (e.g., in_int_t).
-        argInst.connect(WE0_PORT, "'0'").connect(D_IN0_PORT, "(others => '0')");
-      } else if (p.isOutput && !p.isReturn) {
-        // An argument that is an output (e.g., inout_int_t or out_int_t).
-        argInst.connect(WE0_PORT, m.we0SignalName)
-            .connect(D_IN0_PORT, m.dIn0SignalName);
-      } else if (!p.isInput && p.isOutput && p.isReturn) {
-        // Return value of the function.
-        argInst.connect(WE0_PORT, RET_VALUE_NAME + "_valid")
-            .connect(D_IN0_PORT, m.dIn0SignalName);
-      } else {
-        assert(false && "Invalid parameter type");
-      }
-
+          .connect(D_OUT0_PORT, argName + "_dout0")
+          .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
+          .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready")
+          .connect(WE0_PORT, "'0'")
+          .connect(D_IN0_PORT, "(others => '0')");
       argInst.emitVhdl(os);
-    }
 
-    os << "\n\n";
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+
+      Instance memInst("two_port_RAM", "mem_inst_" + argName);
+
+      memInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
+          .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
+          .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
+          .parameter(ADDR_WIDTH_PARAM, "ADDR_WIDTH_" + argName)
+          .parameter(DATA_DEPTH_PARAM, "DATA_DEPTH_" + argName)
+          // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
+          // the instantiated RAM models (e.g., two_port_RAM.vhd and
+          // single_argument.vhd). This name is not necessarily named in the
+          // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
+          // internal coverification, we have the freedom to name the interface
+          // of the RAM model however we want.
+          .connect(CLK_PORT, "tb_" + CLK_PORT)
+          .connect(RST_PORT, "tb_" + RST_PORT)
+          .connect(CE0_PORT, argName + "_" + CE0_PORT)
+          .connect(WE0_PORT, argName + "_" + WE0_PORT)
+          .connect(ADDR0_PORT, argName + "_" + ADDR0_PORT)
+          .connect(D_OUT0_PORT, argName + "_dout0")
+          .connect(D_IN0_PORT, argName + "_din0")
+          .connect(CE1_PORT, argName + "_" + CE1_PORT)
+          .connect(WE1_PORT, argName + "_" + WE1_PORT)
+          .connect(ADDR1_PORT, argName + "_" + ADDR1_PORT)
+          .connect(D_OUT1_PORT, argName + "_dout1")
+          .connect(D_IN1_PORT, argName + "_din1")
+          .connect(DONE_PORT, "tb_stop");
+
+      memInst.emitVhdl(os);
+    }
   }
 
-  // Join all output valid signals into a global simulation end signal to
-  // stop the simulation
-  unsigned joinSize = 1 + std::count_if(memElems.begin(), memElems.end(),
-                                        [](MemElem &m) { return m.isArray; });
-  bool hasReturnVal = std::any_of(
-      cDuvParams.begin(), cDuvParams.end(),
-      [](CFunctionParameter &p) { return p.isOutput && p.isReturn; });
-  if (hasReturnVal)
-    joinSize += 1;
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      Instance argInst("single_argument", "arg_inst_" + argName);
+
+      argInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
+          .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
+          .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
+          // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
+          // the instantiated RAM models (e.g., two_port_RAM.vhd and
+          // single_argument.vhd). This name is not necessarily named in the
+          // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
+          // internal coverification, we have the freedom to name the
+          // interface of the RAM model however we want.
+          .connect(CLK_PORT, "tb_" + CLK_PORT)
+          .connect(RST_PORT, "tb_" + RST_PORT)
+          .connect(CE0_PORT, "'1'")
+          .connect(DONE_PORT, "tb_temp_idle")
+          .connect(D_OUT0_PORT, argName + "_dout0")
+          .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
+          .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready")
+          .connect(WE0_PORT, argName + "_valid")
+          .connect(D_IN0_PORT, argName + "_din0");
+      argInst.emitVhdl(os);
+    }
+  }
+
+  // @Jiahui17: I assume that the results only contain handshake channels.
+  unsigned joinSize = funcOp->getNumResults();
 
   unsigned idx = 0;
 
@@ -629,22 +634,19 @@ void HlsVhdlTb::getMemoryInstanceGeneration(mlir::raw_indented_ostream &os) {
 
   joinInst.parameter("SIZE", std::to_string(joinSize));
 
-  if (hasReturnVal) {
-    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                     RET_VALUE_NAME + "_valid");
-    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                     RET_VALUE_NAME + "_ready");
-  }
-  for (MemElem &m : memElems) {
-    if (m.isArray) {
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (isa<handshake::ChannelType, handshake::ControlType>(resType)) {
       joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                       m.memEndSignalName + "_valid");
+                       argName + "_valid");
       joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                       m.memEndSignalName + "_ready");
+                       argName + "_ready");
+
+    } else if (handshake::ControlType type =
+                   dyn_cast<handshake::ControlType>(resType)) {
     }
   }
-  joinInst.connect("ins_valid(" + std::to_string(idx) + ")", END_VALID);
-  joinInst.connect("ins_ready(" + std::to_string(idx++) + ")", END_READY);
   joinInst.connect("outs_valid", "tb_global_valid");
   joinInst.connect("outs_ready", "tb_global_ready");
 
@@ -656,57 +658,59 @@ void HlsVhdlTb::getDuvInstanceGeneration(mlir::raw_indented_ostream &os) {
   Instance duvInst(duvName, "duv_inst");
 
   duvInst.connect(CLK_PORT, "tb_" + CLK_PORT)
-      .connect(RST_PORT, "tb_" + RST_PORT)
-      .connect(START_VALID, START_VALID)
-      .connect(START_READY, START_READY)
-      .connect(END_VALID, END_VALID)
-      .connect(END_READY, END_READY);
+      .connect(RST_PORT, "tb_" + RST_PORT);
 
-  for (size_t i = 0; i < cDuvParams.size(); i++) {
-    CFunctionParameter p = cDuvParams[i];
-    MemElem m = memElems[i];
+  handshake::FuncOp *funcOp = ctx.funcOp;
 
-    if (m.isArray) {
-      duvInst.connect(p.parameterName + "_" + ADDR0_PORT, m.addr0SignalName)
-          .connect(p.parameterName + "_" + CE0_PORT, m.ce0SignalName)
-          .connect(p.parameterName + "_" + WE0_PORT, m.we0SignalName)
-          .connect(p.parameterName + "_" + D_IN0_PORT, m.dOut0SignalName)
-          .connect(p.parameterName + "_" + D_OUT0_PORT, m.dIn0SignalName)
-          .connect(p.parameterName + "_" + ADDR1_PORT, m.addr1SignalName)
-          .connect(p.parameterName + "_" + CE1_PORT, m.ce1SignalName)
-          .connect(p.parameterName + "_" + WE1_PORT, m.we1SignalName)
-          .connect(p.parameterName + "_" + D_IN1_PORT, m.dOut1SignalName)
-          .connect(p.parameterName + "_" + D_OUT1_PORT, m.dIn1SignalName)
+  // Connect the input channels to the DUV
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
-          // Memory start signal
-          .connect(p.parameterName + "_" + START_VALID, "'1'")
-          .connect(p.parameterName + "_" + START_READY,
-                   m.memStartSignalName + "_ready")
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
-          // Memory completion signal
-          .connect(p.parameterName + "_" + END_VALID,
-                   m.memEndSignalName + "_valid")
-          .connect(p.parameterName + "_" + END_READY,
-                   m.memEndSignalName + "_ready");
+    if (isa<handshake::ChannelType>(arg.getType())) {
+      duvInst.connect(argName, argName + "_dout0")
+          .connect(argName + "_valid", argName + "_dout0_valid")
+          .connect(argName + "_ready", argName + "_dout0_ready");
+    } else if (handshake::ControlType type =
+                   arg.getType().dyn_cast<handshake::ControlType>()) {
+      // @Jiahui17: TODO: create a new argument for dataless input channels
+      duvInst.connect(argName + "_valid", "\'1\'")
+          .connect(argName + "_ready", argName + "_ready");
+    }
+  }
 
-    } else {
-      if (p.isInput) {
-        duvInst.connect(p.parameterName, m.dOut0SignalName)
-            .connect(p.parameterName + "_valid", m.dOut0SignalName + "_valid")
-            .connect(p.parameterName + "_ready", m.dOut0SignalName + "_ready");
-      }
+  // Connect the memory elements to the DUV
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
-      if (p.isOutput) {
-        if (p.isReturn) {
-          duvInst.connect(p.parameterName, m.dIn0SignalName)
-              .connect(p.parameterName + "_valid", RET_VALUE_NAME + "_valid")
-              .connect(p.parameterName + "_ready", RET_VALUE_NAME + "_ready");
-        } else {
-          duvInst.connect(p.parameterName + "_valid", m.we0SignalName)
-              .connect(p.parameterName + "_din", m.dIn0SignalName)
-              .connect(p.parameterName + "_ready", "'1'");
-        }
-      }
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (isa<mlir::MemRefType>(arg.getType())) {
+      duvInst.connect(argName + "_" + ADDR0_PORT, argName + "_" + ADDR0_PORT)
+          .connect(argName + "_" + CE0_PORT, argName + "_" + CE0_PORT)
+          .connect(argName + "_" + WE0_PORT, argName + "_" + WE0_PORT)
+          .connect(argName + "_" + D_IN0_PORT, argName + "_" + D_OUT0_PORT)
+          .connect(argName + "_" + D_OUT0_PORT, argName + "_" + D_IN0_PORT)
+          .connect(argName + "_" + ADDR1_PORT, argName + "_" + ADDR1_PORT)
+          .connect(argName + "_" + CE1_PORT, argName + "_" + CE1_PORT)
+          .connect(argName + "_" + WE1_PORT, argName + "_" + WE1_PORT)
+          .connect(argName + "_" + D_IN1_PORT, argName + "_" + D_OUT1_PORT)
+          .connect(argName + "_" + D_OUT1_PORT, argName + "_" + D_IN1_PORT);
+    }
+  }
+
+  // Connect the output channels to the DUV
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (isa<handshake::ChannelType>(resType)) {
+      duvInst.connect(argName, argName + "_din0")
+          .connect(argName + "_valid", argName + "_valid")
+          .connect(argName + "_ready", argName + "_ready");
+    } else if (isa<handshake::ControlType>(resType)) {
+      duvInst.connect(argName + "_valid", argName + "_valid")
+          .connect(argName + "_ready", argName + "_ready");
     }
   }
 
