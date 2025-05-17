@@ -395,7 +395,8 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>, 
+  LacksExtraSignals<"selectOperand">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -433,7 +434,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
+  LacksExtraSignals<"index">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -530,6 +532,32 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+  }];
+}
+
+def ExtractOp : Handshake_Op<"extract", [
+  Pure,
+  HasExtraSignal<"operand">,
+  IsSimpleHandshake<"result">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  ]> {
+  let summary = "extract operation";
+  let description = [{
+    The extract operation takes a data channel with additional signals (such as tags or spec bits)
+    as input and removes these extra signals, returning only the core data.
+
+    Example:
+
+    ```mlir
+    extract %data : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:`  custom<HandshakeType>(type($operand)) `,`  custom<HandshakeType>(type($result))
   }];
 }
 
