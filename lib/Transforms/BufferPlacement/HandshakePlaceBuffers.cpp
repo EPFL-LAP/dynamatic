@@ -571,6 +571,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.bufferOrder) {
+      placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
       for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
         placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
       }
@@ -594,6 +595,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
         placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
       }
+      placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
     }
   }
 }
