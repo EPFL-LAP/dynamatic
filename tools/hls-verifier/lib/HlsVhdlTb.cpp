@@ -20,7 +20,7 @@
 
 using std::tuple;
 
-// Helper struct for connecting dynamatic's MemRef argument with a two-port RAM.
+// A Helper struct for connecting dynamatic's MemRef argument to a two-port RAM.
 // This grouping makes codegen more consistent in their code style, and
 // centralize the specialize handling in this struct.
 // This class provides:
@@ -236,7 +236,8 @@ struct ChannelToSingleArgument {
   }
 };
 
-// Derive the control only signals at input or output.
+// A helper construct for interfacing the control only signals of the DUV
+//
 // HACK: the control only signals are handled in the following ways:
 // - Input: they are driven by valid = constant 1, their ready signals are
 // ignored
