@@ -1859,9 +1859,8 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
                     ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-                    ConvertToHWInstance<handshake::NonSpecOp>(
-        typeConverter, funcOp->getContext()),
-
+                    ConvertToHWInstance<handshake::NonSpecOp>,
+    
                     // Out-of-order execution operations
                     ConvertToHWInstance<handshake::TaggerOp>,
                     ConvertToHWInstance<handshake::UntaggerOp>,
