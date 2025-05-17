@@ -125,8 +125,12 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
     // Force the MILP to place a minimum number of transparent slots
     model.addConstr(chVars.bufNumSlots >= props.minTrans + dataBuf,
                     "custom_minTrans");
+  } else if (props.minSlots > 0) {
+    // Force the MILP to place a minimum number of slots
+    model.addConstr(chVars.bufNumSlots >= props.minSlots,
+                    "custom_minSlots");
   }
-  if (props.minOpaque + props.minTrans > 0)
+  if (props.minOpaque + props.minTrans + props.minSlots > 0)
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
 
   // Set a maximum number of slots to be placed

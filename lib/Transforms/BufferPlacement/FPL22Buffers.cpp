@@ -105,7 +105,7 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
 
   // Force buffer presence if at least one slot is requested
-  unsigned minSlots = props.minOpaque + props.minTrans;
+  unsigned minSlots = std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
     model.addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");
