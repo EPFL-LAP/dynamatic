@@ -22,32 +22,30 @@ entity merge is
 end entity;
 
 architecture arch of merge is
-  signal tehb_data_in : std_logic_vector(DATA_TYPE - 1 downto 0);
-  signal tehb_pvalid  : std_logic;
-  signal tehb_ready   : std_logic;
 begin
-  
-  merge_ins : entity work.merge_notehb(arch) generic map (SIZE, DATA_TYPE)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins        => ins,
-      ins_valid  => ins_valid,
-      outs_ready => tehb_ready,
-      ins_ready  => ins_ready,
-      outs       => tehb_data_in,
-      outs_valid => tehb_pvalid
-    );
+  process (ins_valid, ins, outs_ready)
+    variable tmp_data_out  : unsigned(DATA_TYPE - 1 downto 0);
+    variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector(SIZE - 1 downto 0);
+  begin
+    tmp_data_out  := unsigned(ins(0));
+    tmp_valid_out := '0';
+    tmp_ready_out := (others => '0');
 
-  tehb : entity work.tehb(arch) generic map (DATA_TYPE)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => tehb_pvalid,
-      outs_ready => outs_ready,
-      outs_valid => outs_valid,
-      ins_ready  => tehb_ready,
-      ins        => tehb_data_in,
-      outs       => outs
-    );
+    for I in 0 to (SIZE - 1) loop
+      if (ins_valid(I) = '1') then
+        tmp_data_out  := unsigned(ins(I));
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
+      end if;
+    end loop;
+    
+    -- The outs channel is not persistent, meaning the data payload 
+    -- may change while valid remains high
+    outs <= std_logic_vector(resize(tmp_data_out, DATA_TYPE));
+    outs_valid  <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
+  end process;
+  
 end architecture;

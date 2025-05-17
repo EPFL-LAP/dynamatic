@@ -68,8 +68,6 @@ struct ChannelVars {
   /// For specific signals on the channel, arrival time at channel's endpoints
   /// (real, real) and buffer presence (binary).
   std::map<SignalType, ChannelSignalVars> signalVars;
-  /// Elastic arrival time at channel's endpoints (real).
-  TimeVars elastic;
   /// Presence of any buffer on the channel (binary).
   GRBVar bufPresent;
   /// Number of buffer slots on the channel (integer).
@@ -246,29 +244,6 @@ protected:
   /// constraints will be identical modulo a reordering of the terms.
   void addBufferingGroupConstraints(Value channel,
                                     ArrayRef<BufferingGroup> bufGroups);
-
-  /// Adds data flow direction constraints between the channel's input and 
-  /// output ports.
-  ///
-  /// The following two functions do not represent actual delays on a channel 
-  /// or unit. Instead, they describe the direction of data flow in a 
-  /// combinational path. The value of the later unit port in a path must be 
-  /// greater than that of earlier ones. Hence, combinational cycles are 
-  /// prevented, particularly in cases where all delays are zero and such
-  /// cycles would otherwise be undetectable by timing constraints.
-  void addChannelElasticityConstraints(Value channel);
-
-  /// Adds data flow direction constraints between the unit's input and 
-  /// output ports. A constraint is added for every input/output port pair.
-  ///
-  /// A `filter` can be provided to filter out constraints involving input or
-  /// output ports connected to channels for which the filter returns false. The
-  /// default filter always returns true. It is only valid to call this method
-  /// after having added channel variables to the model for all channels
-  /// adjacent to the unit, unless these channels are filtered out by the
-  /// `filter` function.
-  void addUnitElasticityConstraints(Operation *unit,
-                                       ChannelFilter filter = nullFilter);
 
   /// Constraints that ensure the final throughput is calculated for a reachable
   /// steady state.
