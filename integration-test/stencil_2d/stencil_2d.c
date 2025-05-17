@@ -4,11 +4,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "stencil_2d.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
+#include "stencil_2d.h"
 
-int stencil_2d(in_int_t orig[N], in_int_t filter[M], out_int_t sol[N]) {
+int stencil_2d(in_int_t orig[N], in_int_t filter[M], inout_int_t sol[N]) {
   int temp = 0;
   for (unsigned c = 0; c < 28; c++) {
     temp = 0;
@@ -23,7 +23,7 @@ int stencil_2d(in_int_t orig[N], in_int_t filter[M], out_int_t sol[N]) {
 int main(void) {
   in_int_t orig[N];
   in_int_t filter[10];
-  out_int_t sol[N];
+  inout_int_t sol[N];
 
   for (int j = 0; j < N; ++j)
     orig[j] = rand() % 100;

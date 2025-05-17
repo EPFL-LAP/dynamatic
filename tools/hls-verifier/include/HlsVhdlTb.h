@@ -54,7 +54,7 @@ public:
 class HlsVhdlTb {
 public:
   HlsVhdlTb(const VerificationContext &ctx);
-  void generateVhdlTestbench(mlir::raw_indented_ostream &os);
+  void codegen(mlir::raw_indented_ostream &os);
   string getInputFilepathForParam(const CFunctionParameter &param);
   string getOutputFilepathForParam(const CFunctionParameter &param);
 

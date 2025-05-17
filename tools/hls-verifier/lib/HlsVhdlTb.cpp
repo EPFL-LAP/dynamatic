@@ -635,7 +635,7 @@ void HlsVhdlTb::getOutputTagGeneration(mlir::raw_indented_ostream &os) {
   }
 }
 
-void HlsVhdlTb::generateVhdlTestbench(mlir::raw_indented_ostream &os) {
+void HlsVhdlTb::codegen(mlir::raw_indented_ostream &os) {
   os << VHDL_LIBRARY_HEADER;
   os << "entity " + tleName + " is\n";
   os << "end entity " + tleName + ";\n\n";
