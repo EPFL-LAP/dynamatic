@@ -131,9 +131,6 @@ void BufferPlacementMILP::addChannelVars(Value channel,
     signalVars.bufPresent = createVar(name + "BufPresent", GRB_BINARY);
   }
 
-  // Variables for elasticity constraints
-  chVars.elastic.tIn = createVar("elasIn", GRB_CONTINUOUS);
-  chVars.elastic.tOut = createVar("elasOut", GRB_CONTINUOUS);
   // Variables for placement information
   chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
@@ -358,38 +355,6 @@ void BufferPlacementMILP::addBufferingGroupConstraints(
   model.addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
 }
 
-void BufferPlacementMILP::addChannelElasticityConstraints(
-                          Value channel) {
-
-  ChannelVars &chVars = vars.channelVars[channel];
-  GRBVar &tIn = chVars.elastic.tIn;
-  GRBVar &tOut = chVars.elastic.tOut;
-
-  auto dataIt = chVars.signalVars.find(SignalType::DATA);
-  if (dataIt != chVars.signalVars.end()) {
-    GRBVar &dataBuf = dataIt->second.bufPresent;
-    // If there is a data buffer on the channel, the channel elastic
-    // arrival time at the ouput must be greater than at the input
-    model.addConstr(tOut >= tIn - largeCst * dataBuf, "elastic_data");
-  }
-}
-
-void BufferPlacementMILP::addUnitElasticityConstraints(Operation *unit,
-                                                       ChannelFilter filter) {
-
-  forEachIOPair(unit, [&](Value in, Value out) {
-    // Both channels must be eligible
-    if (!filter(in) || !filter(out))
-      return;
-
-    GRBVar &tInPort = vars.channelVars[in].elastic.tOut;
-    GRBVar &tOutPort = vars.channelVars[out].elastic.tIn;
-    // The elastic arrival time at the output port must be at least one
-    // greater than at the input port
-    model.addConstr(tOutPort >= 1 + tInPort, "elastic_unitTime");
-  });
-}
-
 void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
@@ -465,17 +430,36 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
 
     // The channel's throughput cannot exceed the number of buffer slots
     model.addConstr(chThroughput <= bufNumSlots, "throughput_channel");
-    // If there is an opaque buffer, the CFDFC throughput cannot exceed the
-    // channel throughput. If there is not, the CFDFC throughput can exceed
-    // the channel thoughput by 1
+
+    // In the FPGA'20 paper:
+    // - Buffers are assumed to break all signals simultaneously.
+    // - Therefore: dataBuf == readyBuf
+    //              R_c == dataBuf && readyBuf
+    // - If R_c holds, then:
+    //     - token occupancy ≥ CFDFC's throughput
+    //     - bubble occupancy ≥ CFDFC's throughput
+    // 
+    // In this implementation, R_c is decomposed into dataBuf and readyBuf.
+    // - If dataBuf holds, then token occupancy ≥ CFDFC's throughput.
+    // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
+
+    // (#427) This constraint encodes:
+    // - If dataBuf, then token occupancy ≥ CFDFC's throughput.
     model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
-                    "throughput_cfdfc");
-    // If there is an opaque buffer, the summed channel and CFDFC throughputs
-    // cannot exceed the number of buffer slots. If there is not, the combined
-    // throughput can exceed the number of slots by 1
-    model.addConstr(chThroughput + cfVars.throughput + dataBuf - bufNumSlots <=
-                        1,
-                    "throughput_combined");
+                    "throughput_data");
+    // (#427) We combine the following two constraints into one:
+    // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
+    // - Token occupancy + bubble occupancy ≤ buffer's slot number.
+    //
+    // Note: Additional buffers may be needed to prevent combinational cycles 
+    // if the model does not select all three signals (or only selects DATA).
+    // See extractResult() in FPGA20Buffers.cpp for an example.
+    if (chVars.signalVars.count(SignalType::READY)) {
+      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+      model.addConstr(chThroughput + cfVars.throughput + readyBuf - bufNumSlots 
+                          <= 1,
+                      "throughput_ready");
+    }
   }
 }
 

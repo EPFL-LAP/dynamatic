@@ -14,35 +14,33 @@ module merge # (
   output outs_valid,
   input  outs_ready
 );
-  wire [DATA_TYPE - 1 : 0] tehb_data_in;
-  wire tehb_pvalid;
-  wire tehb_ready;
 
-  merge_notehb #(
-    .INPUTS(SIZE),
-    .DATA_TYPE(DATA_TYPE)
-  ) merge_ins (
-    .clk        (clk          ),
-    .rst        (rst          ),
-    .ins        (ins          ),
-    .ins_valid  (ins_valid    ),
-    .ins_ready  (ins_ready    ),
-    .outs       (tehb_data_in ),
-    .outs_valid (tehb_pvalid  ),
-    .outs_ready (tehb_ready   )
-  );
+  reg tmp_valid_out;
+  reg [SIZE - 1 : 0] tmp_ready_out;
+  reg [DATA_TYPE - 1 : 0] tmp_data_out;
+  integer i;
+  integer cnt;
 
-  tehb #(
-    .DATA_TYPE(DATA_TYPE)
-  ) tehb_inst (
-    .clk        (clk         ),
-    .rst        (rst         ),
-    .ins_valid  (tehb_pvalid ),
-    .outs_ready (outs_ready  ),
-    .outs_valid (outs_valid  ),
-    .ins_ready  (tehb_ready  ),
-    .ins        (tehb_data_in),
-    .outs       (outs        )
-  );
+  always @(*) begin
+    tmp_valid_out = 0;
+    tmp_ready_out = {SIZE{1'b0}}; 
+    tmp_data_out = ins[0 +: DATA_TYPE];
+
+    cnt = 1;
+    for (i = 0; i < INPUTS; i = i + 1) begin
+      if (cnt == 1 && ins_valid[i]) begin
+        tmp_data_out = ins[i * DATA_TYPE +: DATA_TYPE];
+        tmp_valid_out = 1;
+        tmp_ready_out[i] = outs_ready;
+        cnt = 0;
+      end
+    end
+  end
+  
+  // The outs channel is not persistent, meaning the data payload 
+  // may change while valid remains high
+  assign outs = tmp_data_out;
+  assign outs_valid = tmp_valid_out;
+  assign ins_ready = tmp_ready_out;
 
 endmodule

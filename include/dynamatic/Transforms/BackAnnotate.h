@@ -80,6 +80,7 @@
 //          "maximum-trans": <integer>, /* optional, default infinity */
 //          "minimum-opaque": <integer>, /* optional, default 0 */
 //          "maximum-opaque": <integer>, /* optional, default infinity */
+//          "minimum-slots": <integer>, /* optional, default 0 */
 //          "input-delay": <float>, /* optional, default 0.0 */
 //          "output-delay": <float>, /* optional, default 0.0 */
 //          "unbuf-delay": <float> /* optional, default 0.0 */
