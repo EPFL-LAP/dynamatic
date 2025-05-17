@@ -340,9 +340,6 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
   GRBVar &shiftReg = chVars.shiftReg;
 
   // There is a buffer breaking data & valid iff dataLatency > 0
-
-  // Here are two versions, choose one of them on the final implementation
-  // First version using constraints indicators
   model.addGenConstrIndicator(dataBuf, 1, dataLatency >= 1, 
                               "dataBuf_if_dataLatency");
   model.addGenConstrIndicator(validBuf, 1, dataLatency >= 1,
@@ -352,37 +349,20 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
   model.addGenConstrIndicator(validBuf, 0, dataLatency == 0,
                               "dataLatency_if_validBuf");
 
-  // Second version using big-M
-  // Assume there are at most 100 slots on the channel
-  model.addConstr(dataLatency * 0.01 <= dataBuf, "dataBuf_if_dataLatency");
-  model.addConstr(dataLatency * 0.01 <= validBuf, "validBuf_if_dataLatency");
-  model.addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
-  model.addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
-
   // The dataBuf and validBuf must be equal
+  // This constraint is not necessary, but may assist presolve.
   model.addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
-
-  // Here are two versions, choose one of them on the final implementation
-  // First version using constraints indicators
 
   // The latency does not exceed the number of buffer slots.
   model.addGenConstrIndicator(shiftReg, 0,
                               dataLatency <= bufNumSlots,
                               "latency_le_bufSlots_if_no_shiftReg");
-  // Shift registers only introduce data (and valid) latency.
-  // If shift registers are used, there must be enough slots for them.
+  // Shift registers only introduce data and valid latency.
+  // If a shift register is used, there must be enough slots for both
+  // the shift register and the ready-breaking buffer.
   model.addGenConstrIndicator(shiftReg, 1,
                               dataLatency + readyBuf <= bufNumSlots,
                               "enough_slots_if_shiftReg_on");
-
-  // Second version using big-M
-
-  // The latency does not exceed the number of buffer slots.
-  model.addConstr(dataLatency <= bufNumSlots, "latency_le_bufSlots");
-  // Shift registers only introduce data (and valid) latency.
-  // If shift registers are used, there must be enough slots for them.
-  model.addConstr(dataLatency + readyBuf <= bufNumSlots + 100 * (1 - shiftReg),
-                  "enough_slots_for_shiftReg");
 }
 
 void BufferPlacementMILP::addBufferingGroupConstraints(
@@ -700,11 +680,12 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
     objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
 
     // Linearization of dataLatency * shiftReg
-    GRBVar latencyMulShiftReg = model.addVar(0, 100, 0.0, GRB_INTEGER,
+    GRBVar latencyMulShiftReg = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER,
                                              "latencyMulShiftReg");
-    model.addConstr(latencyMulShiftReg <= dataLatency);
-    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
-    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    model.addGenConstrIndicator(shiftReg, 1, latencyMulShiftReg == dataLatency, 
+                                "latency_if_shiftReg");
+    model.addGenConstrIndicator(shiftReg, 0, latencyMulShiftReg == 0, 
+                                "latency_if_not_shiftReg");
     objective -= maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
     objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
   }
