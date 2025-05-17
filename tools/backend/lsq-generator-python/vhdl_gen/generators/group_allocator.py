@@ -25,14 +25,14 @@ def GroupAllocator(ctx: VHDLContext, path_rtl: str, name: str, suffix: str, conf
     stq_empty_i        = Logic(ctx, 'stq_empty', 'i')
 
     ldq_wen_o          = LogicArray(ctx, 'ldq_wen', 'o', configs.numLdqEntries)
-    num_loads_o        = LogicVec(ctx, 'num_loads', 'o', configs.emptyLdAddrW)
-    num_loads          = LogicVec(ctx, 'num_loads', 'w', configs.emptyLdAddrW)
+    num_loads_o        = LogicVec(ctx, 'num_loads', 'o', configs.ldqAddrW)
+    num_loads          = LogicVec(ctx, 'num_loads', 'w', configs.ldqAddrW)
     if (configs.ldpAddrW > 0):
         ldq_port_idx_o = LogicVecArray(ctx, 'ldq_port_idx', 'o', configs.numLdqEntries, configs.ldpAddrW)
 
     stq_wen_o          = LogicArray(ctx, 'stq_wen', 'o', configs.numStqEntries)
-    num_stores_o       = LogicVec(ctx, 'num_stores', 'o', configs.emptyStAddrW)
-    num_stores         = LogicVec(ctx, 'num_stores', 'w', configs.emptyStAddrW)
+    num_stores_o       = LogicVec(ctx, 'num_stores', 'o', configs.stqAddrW)
+    num_stores         = LogicVec(ctx, 'num_stores', 'w', configs.stqAddrW)
     if (configs.stpAddrW > 0):
         stq_port_idx_o = LogicVecArray(ctx, 'stq_port_idx', 'o', configs.numStqEntries, configs.stpAddrW)
 
