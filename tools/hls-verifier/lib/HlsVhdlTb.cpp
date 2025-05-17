@@ -19,6 +19,8 @@
 #include "llvm/Support/FormatVariadic.h"
 
 namespace hls_verify {
+using std::tuple;
+
 const string LOG_TAG = "VVER";
 
 static const string VHDL_LIBRARY_HEADER = R"DELIM(
@@ -314,6 +316,111 @@ getOutputArguments(handshake::FuncOp *funcOp) {
   return interfaces;
 }
 
+// Helper struct for connecting dynamatic's MemRef argument with a two-port RAM
+// This struct can be extended / adapted to other interfaces like AXI
+struct MemRefToDualPortRAM {
+  SmallVector<tuple</* Signal name of the circuit */ std::string,
+                    /* Signal name of the DPRAM*/ std::string,
+                    /* Bitwidth */ unsigned>>
+      memrefToDPRAM;
+  mlir::MemRefType type;
+  std::string argName;
+
+  MemRefToDualPortRAM(mlir::MemRefType type, const std::string &argName)
+      : type(type), argName(argName) {
+
+    int dataWidth = type.getElementType().getIntOrFloatBitWidth();
+    int dataDepth = type.getNumElements();
+    int addrWidth = ((int)ceil(log2(dataDepth)));
+
+    // The two_port_RAM has two read/write interfaces, each has
+    // - we: write enable (must be set to 1 when writing)
+    // - ce: clock enable (must be set to 1 for both read and write).
+    // - address: address port
+    // - din: store data
+    // - dout: read data
+    // Currently, our memory controler assumes that there is only one read
+    // channel and one write channel. Therefore, many signals are not used
+
+    // This mapping only records the used signals.
+    memrefToDPRAM.emplace_back("storeEn", WE0_PORT, 1);
+    memrefToDPRAM.emplace_back("storeData", D_IN0_PORT, dataWidth);
+    memrefToDPRAM.emplace_back("storeAddr", ADDR0_PORT, addrWidth);
+    memrefToDPRAM.emplace_back("loadEn", CE1_PORT, 1);
+    memrefToDPRAM.emplace_back("loadData", D_OUT1_PORT, dataWidth);
+    memrefToDPRAM.emplace_back("loadAddr", ADDR1_PORT, addrWidth);
+  }
+
+  void declareConstants(mlir::raw_indented_ostream &os,
+                        const std::string &inputVectorPath,
+                        const std::string &outputFilePath) {
+    int dataWidth = type.getElementTypeBitWidth();
+    int dataDepth = type.getNumElements();
+    int addrWidth = ((int)ceil(log2(dataDepth)));
+    declareConstant(os, "INPUT_" + argName, "STRING",
+                    "\"" + inputVectorPath + "/input_" + argName + ".dat" +
+                        "\"");
+    declareConstant(os, "OUTPUT_" + argName, "STRING",
+                    "\"" + outputFilePath + "/output_" + argName + ".dat" +
+                        "\"");
+    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+                    to_string(dataWidth));
+    declareConstant(os, "ADDR_WIDTH_" + argName, "INTEGER",
+                    to_string(addrWidth));
+    declareConstant(os, "DATA_DEPTH_" + argName, "INTEGER",
+                    to_string(dataDepth));
+  }
+
+  // Declare signals appear in the circuit interface
+  void declareSignals(mlir::raw_indented_ostream &os) {
+    for (auto [_, sigName, bitwidth] : memrefToDPRAM) {
+      if (bitwidth == 1) {
+        declareSTL(os, argName + "_" + sigName, nullopt);
+      } else {
+        declareSTL(os, argName + "_" + sigName, std::to_string(bitwidth));
+      }
+    }
+    int dataWidth = type.getElementTypeBitWidth();
+    // Declare unused interfaces in the two port RAM
+    declareSTL(os, argName + "_" + D_OUT0_PORT, to_string(dataWidth));
+    declareSTL(os, argName + "_" + D_IN1_PORT, to_string(dataWidth),
+               "(others => \'0\')");
+    // The write enable of the read interface is not used
+    declareSTL(os, argName + "_" + WE1_PORT, nullopt, "\'0\'");
+    // The read enable of the write interface is not used
+    declareSTL(os, argName + "_" + CE0_PORT, nullopt, "\'1\'");
+  }
+
+  void instantiateInterface(mlir::raw_indented_ostream &os) {
+    Instance memInst("two_port_RAM", "mem_inst_" + argName);
+
+    memInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
+        .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
+        .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
+        .parameter(ADDR_WIDTH_PARAM, "ADDR_WIDTH_" + argName)
+        .parameter(DATA_DEPTH_PARAM, "DATA_DEPTH_" + argName)
+        .connect(CLK_PORT, "tb_" + CLK_PORT)
+        .connect(RST_PORT, "tb_" + RST_PORT)
+        .connect(DONE_PORT, "tb_stop");
+    for (auto [_, portName, bitwidth] : memrefToDPRAM) {
+      memInst.connect(portName, argName + "_" + portName);
+    }
+
+    // Declare unused interfaces in the two port RAM
+    memInst.connect(D_OUT0_PORT, argName + "_" + D_OUT0_PORT);
+    memInst.connect(D_IN1_PORT, argName + "_" + D_IN1_PORT);
+    memInst.connect(WE1_PORT, argName + "_" + WE1_PORT);
+    memInst.connect(CE0_PORT, "\'1\'");
+
+    memInst.emitVhdl(os);
+  }
+
+  void connectToDuv(Instance &duvInst) {
+    for (auto [portSuffix, sigSuffix, bitwidth] : memrefToDPRAM)
+      duvInst.connect(argName + "_" + portSuffix, argName + "_" + sigSuffix);
+  }
+};
+
 // function to get the port name in the entitiy for each paramter
 void getConstantDeclaration(mlir::raw_indented_ostream &os,
                             VerificationContext &ctx) {
@@ -344,23 +451,8 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
 
   // The files and configuration of the two port RAM model of the arrays
   for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    declareConstant(os, "INPUT_" + argName, "STRING",
-                    "\"" + inputVectorPath + "/input_" + argName + ".dat" +
-                        "\"");
-
-    declareConstant(os, "OUTPUT_" + argName, "STRING",
-                    "\"" + outputFilePath + "/output_" + argName + ".dat" +
-                        "\"");
-    int dataWidth = type.getElementType().getIntOrFloatBitWidth();
-    int dataDepth = type.getNumElements();
-    int addrWidth = ((int)ceil(log2(dataDepth)));
-
-    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
-                    to_string(dataWidth));
-    declareConstant(os, "DATA_DEPTH_" + argName, "INTEGER",
-                    to_string(dataDepth));
-    declareConstant(os, "ADDR_WIDTH_" + argName, "INTEGER",
-                    to_string(addrWidth));
+    MemRefToDualPortRAM m(type, argName);
+    m.declareConstants(os, inputVectorPath, outputFilePath);
   }
 
   // The files and configuration of the single_argument model of the data output
@@ -417,22 +509,9 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
 
   // Signals of the memory reference signals
   for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    int dataWidth = type.getElementType().getIntOrFloatBitWidth();
-    int dataDepth = type.getNumElements();
-    int addrWidth = ((int)ceil(log2(dataDepth)));
 
-    declareSTL(os, argName + "_" + CE0_PORT);
-    declareSTL(os, argName + "_" + WE0_PORT);
-    declareSTL(os, argName + "_din0", to_string(dataWidth));
-    declareSTL(os, argName + "_dout0", to_string(dataWidth));
-    declareSTL(os, argName + "_" + ADDR0_PORT, to_string(addrWidth));
-
-    declareSTL(os, argName + "_" + CE1_PORT);
-    declareSTL(os, argName + "_" + WE1_PORT);
-
-    declareSTL(os, argName + "_din1", to_string(dataWidth));
-    declareSTL(os, argName + "_dout1", to_string(dataWidth));
-    declareSTL(os, argName + "_" + ADDR1_PORT, to_string(addrWidth));
+    MemRefToDualPortRAM m(type, argName);
+    m.declareSignals(os);
   }
 
   // Signals of data output channels
@@ -501,35 +580,8 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
 
   // Instantiate dual port RAMs for the memory interfaces
   for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-
-    Instance memInst("two_port_RAM", "mem_inst_" + argName);
-
-    memInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
-        .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
-        .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
-        .parameter(ADDR_WIDTH_PARAM, "ADDR_WIDTH_" + argName)
-        .parameter(DATA_DEPTH_PARAM, "DATA_DEPTH_" + argName)
-        // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
-        // the instantiated RAM models (e.g., two_port_RAM.vhd and
-        // single_argument.vhd). This name is not necessarily named in the
-        // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
-        // internal coverification, we have the freedom to name the interface
-        // of the RAM model however we want.
-        .connect(CLK_PORT, "tb_" + CLK_PORT)
-        .connect(RST_PORT, "tb_" + RST_PORT)
-        .connect(CE0_PORT, argName + "_" + CE0_PORT)
-        .connect(WE0_PORT, argName + "_" + WE0_PORT)
-        .connect(ADDR0_PORT, argName + "_" + ADDR0_PORT)
-        .connect(D_OUT0_PORT, argName + "_dout0")
-        .connect(D_IN0_PORT, argName + "_din0")
-        .connect(CE1_PORT, argName + "_" + CE1_PORT)
-        .connect(WE1_PORT, argName + "_" + WE1_PORT)
-        .connect(ADDR1_PORT, argName + "_" + ADDR1_PORT)
-        .connect(D_OUT1_PORT, argName + "_dout1")
-        .connect(D_IN1_PORT, argName + "_din1")
-        .connect(DONE_PORT, "tb_stop");
-
-    memInst.emitVhdl(os);
+    MemRefToDualPortRAM m(type, argName);
+    m.instantiateInterface(os);
   }
 
   for (auto [type, argName] :
@@ -617,16 +669,8 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
 
   // Connect the memory elements to the DUV
   for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    duvInst.connect(argName + "_" + ADDR0_PORT, argName + "_" + ADDR0_PORT)
-        .connect(argName + "_" + CE0_PORT, argName + "_" + CE0_PORT)
-        .connect(argName + "_" + WE0_PORT, argName + "_" + WE0_PORT)
-        .connect(argName + "_" + D_IN0_PORT, argName + "_" + D_OUT0_PORT)
-        .connect(argName + "_" + D_OUT0_PORT, argName + "_" + D_IN0_PORT)
-        .connect(argName + "_" + ADDR1_PORT, argName + "_" + ADDR1_PORT)
-        .connect(argName + "_" + CE1_PORT, argName + "_" + CE1_PORT)
-        .connect(argName + "_" + WE1_PORT, argName + "_" + WE1_PORT)
-        .connect(argName + "_" + D_IN1_PORT, argName + "_" + D_OUT1_PORT)
-        .connect(argName + "_" + D_OUT1_PORT, argName + "_" + D_IN1_PORT);
+    MemRefToDualPortRAM m(type, argName);
+    m.connectToDuv(duvInst);
   }
 
   // Connect the input control channels to the DUV
