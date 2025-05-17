@@ -35,6 +35,9 @@ import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
 import generators.handshake.shli as shli
 import generators.handshake.blocker as blocker
+import generators.handshake.out_of_order_execution.tagger as tagger
+import generators.handshake.out_of_order_execution.untagger as untagger
+import generators.handshake.out_of_order_execution.free_tags_fifo as fifo
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
 
@@ -105,6 +108,12 @@ def generate_code(name, mod_type, parameters):
       return extui.generate_extui(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
+    case "tagger":
+      return tagger.generate_tagger(name, parameters)
+    case "untagger":
+      return untagger.generate_untagger(name, parameters)
+    case "free_tags_fifo":
+      return fifo.generate_free_tags_fifo(name, parameters)
     case "blocker":
       return blocker.generate_blocker(name, parameters)
     case "sitofp":
