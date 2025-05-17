@@ -99,13 +99,6 @@ string trim(const string &str);
 vector<string> split(const string &str, const string &delims = " \t\n\r\f");
 
 /**
- * Get the number of transactions in a data file.
- * @param input_path path of the data file
- * @return the number of transactions in the given file.
- */
-int getNumberOfTransactions(const string &inputPath);
-
-/**
  * Execute the given command in a shell.
  * @param command the command to be executed
  * @return true if execution returns 0, false otherwise.

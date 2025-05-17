@@ -173,23 +173,6 @@ vector<string> split(const string &str, const string &delims) {
   return cont;
 }
 
-int getNumberOfTransactions(const string &inputPath) {
-  int result = 0;
-  ifstream inf(inputPath.c_str());
-  string line;
-  while (getline(inf, line)) {
-    istringstream iss(line);
-    string dt;
-    iss >> dt;
-    if (dt == "[[[/runtime]]]")
-      break;
-    if (dt.substr(0, 15) == "[[transaction]]")
-      result = result + 1;
-  }
-  inf.close();
-  return result;
-}
-
 bool executeCommand(const string &command) {
   int status = system(command.c_str());
   if (status != 0) {

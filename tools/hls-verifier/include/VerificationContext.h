@@ -9,7 +9,6 @@
 #ifndef HLS_VERIFIER_VERIFICATION_CONTEXT_H
 #define HLS_VERIFIER_VERIFICATION_CONTEXT_H
 
-#include "CAnalyser.h"
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -60,7 +59,9 @@ private:
 struct VerificationContext {
   VerificationContext(const string &cFuvFunctionName,
                       const string &vhdlDuvEntityName,
-                      handshake::FuncOp *funcOp);
+                      handshake::FuncOp *funcOp)
+      : funcOp(funcOp), properties(), cFUVFunctionName(cFuvFunctionName),
+        vhdlDUVEntityName(vhdlDuvEntityName) {}
 
   string getCFuvFunctionName() const;
   string getVhdlDuvEntityName() const;
@@ -78,30 +79,13 @@ struct VerificationContext {
   string getVhdlOutDir() const;
   string getInputVectorDir() const;
 
-  string getCOutPath(const CFunctionParameter &param) const;
-  string getRefOutPath(const CFunctionParameter &param) const;
-  string getVhdlOutPath(const CFunctionParameter &param) const;
-  string getInputVectorPath(const CFunctionParameter &param) const;
-
   string getModelsimDoFileName() const;
 
-  const TokenCompare *getTokenComparator(const CFunctionParameter &param) const;
-
-  CFunction getCFuv() const;
-  vector<CFunctionParameter> getFuvOutputParams() const;
-  vector<CFunctionParameter> getFuvInputParams() const;
-  vector<CFunctionParameter> getFuvParams() const;
   handshake::FuncOp *funcOp;
 
   Properties properties;
-  CFunction fuv;
   string cFUVFunctionName;
   string vhdlDUVEntityName;
-  TokenCompare defaultComparator;
-  IntegerCompare signedIntComparator;
-  IntegerCompare unsignedIntComparator;
-  FloatCompare floatComparator;
-  DoubleCompare doubleComparator;
 };
 
 } // namespace hls_verify

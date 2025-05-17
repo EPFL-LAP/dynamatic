@@ -185,13 +185,6 @@ int main(int argc, char **argv) {
       cl::desc("Name of the resource path (with two_port_RAM.vhd, "
                "single_argument.vhd, etc.)"),
       cl::value_desc("resource-path"), cl::Required);
-  cl::opt<std::string> cTbPathName(
-      "ctb-path", cl::desc("Name of the C file with the main function"),
-      cl::value_desc("ctb-path"), cl::Required);
-  cl::opt<std::string> cDuvPathName(
-      "cduv-path",
-      cl::desc("Name of the C file with the kernel to be verified"),
-      cl::value_desc("cduv-path"), cl::Required);
   cl::opt<std::string> cFuvFunctionName(
       "cfuv-function-name", cl::desc("Name of the C function name"),
       cl::value_desc("cfuv-function-name"), cl::Required);

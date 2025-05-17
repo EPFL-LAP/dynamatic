@@ -6,20 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <algorithm>
-#include <cmath>
 #include <optional>
 #include <string>
 
-#include "CAnalyser.h"
-#include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "VerificationContext.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace hls_verify {

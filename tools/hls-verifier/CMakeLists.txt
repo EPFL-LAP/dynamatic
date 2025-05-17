@@ -6,7 +6,6 @@ include_directories(${DYNAMATIC_SOURCE_DIR}/tools/hls-verifier/include)
 
 add_llvm_tool(hls-verifier
   hls-verifier.cpp
-  lib/CAnalyser.cpp
   lib/Help.cpp
   lib/HlsLogging.cpp
   lib/HlsVhdlTb.cpp
