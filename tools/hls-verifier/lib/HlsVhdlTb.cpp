@@ -363,6 +363,7 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");
 
+  // Declare signals related to the input channels and the argument generators
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -384,8 +385,16 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
                    arg.getType().dyn_cast<handshake::ControlType>()) {
       declareSTL(os, argName + "_valid");
       declareSTL(os, argName + "_ready");
-    } else if (mlir::MemRefType type =
-                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+    }
+  }
+
+  // Declare signals related memory interfaces
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (mlir::MemRefType type = dyn_cast<mlir::MemRefType>(arg.getType())) {
 
       int dataWidth = type.getElementType().getIntOrFloatBitWidth();
       int dataDepth = type.getNumElements();
@@ -406,6 +415,7 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
     }
   }
 
+  // Declare signals related the output channels
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
@@ -444,6 +454,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
 
   handshake::FuncOp *funcOp = ctx.funcOp;
 
+  // Instantiate argument generator for the input channels
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -472,9 +483,16 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
           .connect(WE0_PORT, "'0'")
           .connect(D_IN0_PORT, "(others => '0')");
       argInst.emitVhdl(os);
+    }
+  }
 
-    } else if (mlir::MemRefType type =
-                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+  // Instantiate dual port RAMs for the memory interfaces
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (mlir::MemRefType type = dyn_cast<mlir::MemRefType>(arg.getType())) {
 
       Instance memInst("two_port_RAM", "mem_inst_" + argName);
 
@@ -507,6 +525,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
     }
   }
 
+  // Instantiate result receivers
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
@@ -643,8 +662,6 @@ void getOutputTagGeneration(mlir::raw_indented_ostream &os,
     std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
     if (isa<mlir::MemRefType, handshake::ChannelType>(arg.getType())) {
-      // os << "------------------------------------------------------------\n";
-      // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
@@ -655,8 +672,6 @@ void getOutputTagGeneration(mlir::raw_indented_ostream &os,
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
     if (isa<handshake::ChannelType>(resType)) {
-      // os << "------------------------------------------------------------\n";
-      // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
