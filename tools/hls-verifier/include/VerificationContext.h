@@ -9,15 +9,16 @@
 #ifndef HLS_VERIFIER_VERIFICATION_CONTEXT_H
 #define HLS_VERIFIER_VERIFICATION_CONTEXT_H
 
-#include "CAnalyser.h"
 #include "Utilities.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/Support/IndentedOstream.h"
 #include <map>
 #include <string>
 #include <vector>
 
 using namespace std;
-
-namespace hls_verify {
+using namespace dynamatic;
 
 class Properties {
 public:
@@ -53,16 +54,13 @@ private:
   map<string, string> properties;
 };
 
-class VerificationContext {
-public:
-  VerificationContext(const string &cTbPath, const string &cFuvPath,
-                      const string &cFuvFunctionName,
+struct VerificationContext {
+  VerificationContext(const string &cFuvFunctionName,
                       const string &vhdlDuvEntityName,
-                      vector<string> &otherCSrcPaths);
+                      handshake::FuncOp *funcOp)
+      : funcOp(funcOp), properties(), cFUVFunctionName(cFuvFunctionName),
+        vhdlDUVEntityName(vhdlDuvEntityName) {}
 
-  string getCTbPath() const;
-  string getCFuvPath() const;
-  vector<string> getOtherCSrcPaths() const;
   string getCFuvFunctionName() const;
   string getVhdlDuvEntityName() const;
 
@@ -79,35 +77,13 @@ public:
   string getVhdlOutDir() const;
   string getInputVectorDir() const;
 
-  string getCOutPath(const CFunctionParameter &param) const;
-  string getRefOutPath(const CFunctionParameter &param) const;
-  string getVhdlOutPath(const CFunctionParameter &param) const;
-  string getInputVectorPath(const CFunctionParameter &param) const;
-
   string getModelsimDoFileName() const;
 
-  const TokenCompare *getTokenComparator(const CFunctionParameter &param) const;
+  handshake::FuncOp *funcOp;
 
-  CFunction getCFuv() const;
-  vector<CFunctionParameter> getFuvOutputParams() const;
-  vector<CFunctionParameter> getFuvInputParams() const;
-  vector<CFunctionParameter> getFuvParams() const;
-
-private:
   Properties properties;
-  CFunction fuv;
-  string cTBPath;
-  string cFUVPath;
-  std::vector<string> otherCSrcPaths;
   string cFUVFunctionName;
   string vhdlDUVEntityName;
-  TokenCompare defaultComparator;
-  IntegerCompare signedIntComparator;
-  IntegerCompare unsignedIntComparator;
-  FloatCompare floatComparator;
-  DoubleCompare doubleComparator;
 };
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H

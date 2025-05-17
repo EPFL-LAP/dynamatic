@@ -8,15 +8,21 @@
 
 #include "Utilities.h"
 #include "HlsLogging.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <dirent.h>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <unistd.h>
 
 const string LOG_TAG = "UTIL";
+using namespace mlir;
 
-namespace hls_verify {
+// @Jiahui17: Should we go for more digits?
+const float DEFAULT_FLOAT_COMPARE_THRESHOLD = 0.00001;
+const double DEFAULT_DOUBLE_COMPARE_THRESHOLD = 0.000000000001;
 
 bool TokenCompare::compare(const string &token1, const string &token2) const {
   return token1 == token2;
@@ -36,8 +42,6 @@ bool IntegerCompare::compare(const string &token1, const string &token2) const {
   return (t1 == t2);
 }
 
-FloatCompare::FloatCompare(float threshold) : threshold(threshold) {}
-
 bool FloatCompare::compare(const string &token1, const string &token2) const {
   unsigned int i1;
   unsigned int i2;
@@ -53,14 +57,12 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
     return true;
 
   float diff = abs(f1 - f2);
-  return (diff < threshold);
+  return (diff < DEFAULT_FLOAT_COMPARE_THRESHOLD);
 }
 
 float FloatCompare::decodeToken(unsigned int token) const {
-  return *((float *) &token);
+  return *((float *)&token);
 }
-
-DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
 
 bool DoubleCompare::compare(const string &token1, const string &token2) const {
   unsigned long long i1;
@@ -77,11 +79,11 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
     return true;
 
   double diff = abs(d1 - d2);
-  return (diff < threshold);
+  return (diff < DEFAULT_DOUBLE_COMPARE_THRESHOLD);
 }
 
 double DoubleCompare::decodeToken(unsigned int token) const {
-  return *((double *) &token);
+  return *((double *)&token);
 }
 
 string extractParentDirectoryPath(string filepath) {
@@ -98,17 +100,17 @@ string getApplicationDirectory() {
   return string(result, (count > 0) ? count : 0);
 }
 
-bool compareFiles(const string &refFile, const string &outFile,
-                  const TokenCompare *tokenCompare) {
+mlir::LogicalResult compareFiles(const string &refFile, const string &outFile,
+                                 std::unique_ptr<TokenCompare> tokenCompare) {
   ifstream ref(refFile.c_str());
   ifstream out(outFile.c_str());
   if (!ref.is_open()) {
     logErr(LOG_TAG, "Reference file does not exist: " + refFile);
-    return false;
+    return failure();
   }
   if (!out.is_open()) {
     logErr(LOG_TAG, "Output file does not exist: " + outFile);
-    return false;
+    return failure();
   }
   string str1, str2;
   int tn1, tn2;
@@ -119,7 +121,7 @@ bool compareFiles(const string &refFile, const string &outFile,
         continue;
       logErr("COMPARE", "Token mismatch: [" + str1 + "] and [" + str2 +
                             "] are not equal.");
-      return false;
+      return failure();
     }
     if (str1 == "[[[/runtime]]]") {
       break;
@@ -129,7 +131,7 @@ bool compareFiles(const string &refFile, const string &outFile,
       out >> tn2;
       if (tn1 != tn2) {
         logErr("COMPARE", "Transaction number mismatch!");
-        return false;
+        return failure();
       }
       continue;
     }
@@ -140,10 +142,10 @@ bool compareFiles(const string &refFile, const string &outFile,
       logErr("COMPARE", "Token mismatch: [" + str1 + "] and [" + str2 +
                             "] are not equal (at transaction id " +
                             to_string(tn1) + ").");
-      return false;
+      return failure();
     }
   }
-  return true;
+  return success();
 }
 
 string trim(const string &str) {
@@ -170,27 +172,13 @@ vector<string> split(const string &str, const string &delims) {
   return cont;
 }
 
-int getNumberOfTransactions(const string &inputPath) {
-  int result = 0;
-  ifstream inf(inputPath.c_str());
-  string line;
-  while (getline(inf, line)) {
-    istringstream iss(line);
-    string dt;
-    iss >> dt;
-    if (dt == "[[[/runtime]]]")
-      break;
-    if (dt.substr(0, 15) == "[[transaction]]")
-      result = result + 1;
-  }
-  inf.close();
-  return result;
-}
-
 bool executeCommand(const string &command) {
   int status = system(command.c_str());
-  if (status != 0)
+  if (status != 0) {
     logErr(LOG_TAG, "Execution failed for command [" + command + "]");
+
+    assert(false && "Command execution failed!");
+  }
 
   return (status == 0);
 }
@@ -212,5 +200,3 @@ vector<string> getListOfFilesInDirectory(const string &directory,
   }
   return result;
 }
-
-} // namespace hls_verify

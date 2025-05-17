@@ -67,7 +67,10 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-"$HLS_VERIFIER_BIN" cover "$RESOURCE_DIR" "../C_SRC/$KERNEL_NAME.c" \
-  "../C_SRC/$KERNEL_NAME.c" "$KERNEL_NAME" "$KERNEL_NAME"_wrapper \
-  > "../report.txt"
+"$HLS_VERIFIER_BIN" \
+  --resource-path="$RESOURCE_DIR" \
+  --cfuv-function-name="$KERNEL_NAME" \
+  --hdl-duv-entity-name="$KERNEL_NAME" \
+  --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  > "../report.txt" 2>&1
 exit_on_fail "Simulation failed" "Simulation succeeded"
