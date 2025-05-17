@@ -12,6 +12,7 @@
 #include <cmath>
 #include <dirent.h>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <unistd.h>
 
@@ -101,7 +102,7 @@ string getApplicationDirectory() {
 }
 
 mlir::LogicalResult compareFiles(const string &refFile, const string &outFile,
-                                 const TokenCompare *tokenCompare) {
+                                 std::unique_ptr<TokenCompare> tokenCompare) {
   ifstream ref(refFile.c_str());
   ifstream out(outFile.c_str());
   if (!ref.is_open()) {

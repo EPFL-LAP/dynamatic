@@ -142,12 +142,8 @@ write_output_transactor_{0}_runtime_proc : process
 begin
   file_open(fstatus, fp, OUTPUT_{1} , WRITE_MODE);
   if (fstatus /= OPEN_OK) then
-    assert false
-    report "Open file " & OUTPUT_{2} & " failed!!!"
-    severity note;
-    assert false
-    report "ERROR: Simulation using HLS TB failed."
-    severity failure;
+    assert false report "Open file " & OUTPUT_{2} & " failed!!!" severity note;
+    assert false report "ERROR: Simulation using HLS TB failed." severity failure;
   end if;
   write(token_line, string'("[[[runtime]]]"));
   writeline(fp, token_line);
@@ -157,7 +153,7 @@ begin
   end loop;
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
-  file_open(fstatus, fp, OUTPUT_{3} , APPEND_MODE);
+  file_open(fstatus, fp, OUTPUT_{3}, APPEND_MODE);
   if (fstatus /= OPEN_OK) then
     assert false report "Open file " & OUTPUT_{4} & " failed!!!" severity note;
     assert false report "ERROR: Simulation using HLS TB failed." severity failure;
@@ -355,6 +351,7 @@ void getConstantDeclaration(VerificationContext &ctx) {
                       to_string(dataWidth));
     }
   }
+  os.flush();
 }
 
 // This writes the signal declarations fot the testbench
@@ -447,6 +444,7 @@ void getSignalDeclaration(VerificationContext &ctx) {
 
   declareSTL(os, "tb_temp_idle", std::nullopt, "'1'");
   os << "shared variable transaction_idx : INTEGER := 0;\n";
+  os.flush();
 }
 
 void getMemoryInstanceGeneration(VerificationContext &ctx) {
@@ -572,6 +570,7 @@ void getMemoryInstanceGeneration(VerificationContext &ctx) {
   joinInst.connect("outs_ready", "tb_global_ready");
 
   joinInst.emitVhdl(os);
+  os.flush();
 }
 
 void getDuvInstanceGeneration(VerificationContext &ctx) {
@@ -639,12 +638,12 @@ void getDuvInstanceGeneration(VerificationContext &ctx) {
   }
 
   duvInst.emitVhdl(os);
+  os.flush();
 }
 
 void getOutputTagGeneration(VerificationContext &ctx) {
   mlir::raw_indented_ostream &os = ctx.testbenchStream;
   handshake::FuncOp *funcOp = ctx.funcOp;
-  os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
 
   // Connect the memory elements to the DUV
   for (auto [arg, portAttr] : llvm::zip_equal(
@@ -653,6 +652,8 @@ void getOutputTagGeneration(VerificationContext &ctx) {
     std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
     if (isa<mlir::MemRefType, handshake::ChannelType>(arg.getType())) {
+      os << "------------------------------------------------------------\n";
+      os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
@@ -663,10 +664,13 @@ void getOutputTagGeneration(VerificationContext &ctx) {
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
     if (isa<handshake::ChannelType>(resType)) {
+      os << "------------------------------------------------------------\n";
+      os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
   }
+  os.flush();
 }
 
 void vhdlTbCodegen(VerificationContext &ctx) {
@@ -674,10 +678,9 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   mlir::raw_indented_ostream &os = ctx.testbenchStream;
 
   os << VHDL_LIBRARY_HEADER;
-  os << "entity " + ctx.vhdlDUVEntityName + "_tb" + " is\n";
-  os << "end entity " + ctx.vhdlDUVEntityName + "_tb" + ";\n\n";
-  os << "architecture behavior of " << ctx.vhdlDUVEntityName + "_tb"
-     << " is\n\n";
+  os << "entity tb is\n";
+  os << "end entity tb;\n\n";
+  os << "architecture behavior of tb is\n\n";
   os.indent();
   getConstantDeclaration(ctx);
   getSignalDeclaration(ctx);
@@ -690,6 +693,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   os << COMMON_TB_BODY;
   os.unindent();
   os << "end architecture behavior;\n";
+  os.flush();
 }
 
 } // namespace hls_verify

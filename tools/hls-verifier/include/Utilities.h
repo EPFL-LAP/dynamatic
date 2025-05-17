@@ -10,6 +10,7 @@
 #define HLS_VERIFIER_UTILITIES_H
 
 #include "mlir/Support/LogicalResult.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -80,7 +81,7 @@ string getApplicationDirectory();
  */
 mlir::LogicalResult compareFiles(const string &refFilePath,
                                  const string &outFile,
-                                 const TokenCompare *tokenCompare);
+                                 std::unique_ptr<TokenCompare> tokenCompare);
 
 /**
  * Trims the leading and trailing white spaces.

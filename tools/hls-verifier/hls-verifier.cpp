@@ -15,17 +15,23 @@
 #include "Utilities.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h" // Include the header for OwningOpRef
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -60,7 +66,7 @@ void generateModelsimScripts(const VerificationContext &ctx) {
 
   os << "project calculateorder\n";
   os << "project compileall\n";
-  os << "eval vsim " << ctx.getVhdlDuvEntityName() << "_tb\n";
+  os << "eval vsim tb\n";
   os << "log -r *\n";
   os << "run -all\n";
   os << "exit\n";
@@ -93,18 +99,65 @@ void copySupplementaryFiles(const VerificationContext &ctx,
 }
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
-  const vector<CFunctionParameter> &outputParams = ctx.getFuvOutputParams();
-  llvm::errs() << "\n--- Comparison Results ---\n";
-  for (const auto &outputParam : outputParams) {
-    mlir::LogicalResult result = compareFiles(
-        ctx.getCOutPath(outputParam), ctx.getVhdlOutPath(outputParam),
-        ctx.getTokenComparator(outputParam));
-    llvm::errs() << "Comparison of [" + outputParam.parameterName + "] : "
-                 << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+
+  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  handshake::FuncOp *funcOp = ctx.funcOp;
+  os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
+
+  llvm::SmallVector<std::pair<std::string, Type>> argAndTypeMap;
+
+  // Connect the memory elements to the DUV
+  for (auto [arg, portAttr] : llvm::zip_equal(
+           funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
+
+    std::string argName = portAttr.dyn_cast<StringAttr>().data();
+
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(arg.getType())) {
+      argAndTypeMap.emplace_back(argName, type.getDataType());
+
+    } else if (mlir::MemRefType type =
+                   dyn_cast<mlir::MemRefType>(arg.getType())) {
+      argAndTypeMap.emplace_back(argName, type.getElementType());
+    }
+  }
+
+  // Connect the output channels to the DUV
+  for (auto [resType, portAttr] :
+       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
+    std::string argName = portAttr.dyn_cast<StringAttr>().str();
+    if (handshake::ChannelType type =
+            dyn_cast<handshake::ChannelType>(resType)) {
+      argAndTypeMap.emplace_back(argName, type.getDataType());
+    }
+  }
+
+  for (auto [argName, type] : argAndTypeMap) {
+    std::string vhdlOutFile =
+        ctx.getVhdlOutDir() + SEP + "OUTPUT_" + argName + ".dat";
+
+    std::string cOutFile =
+        ctx.getCOutDir() + SEP + "OUTPUT_" + argName + ".dat";
+
+    LogicalResult result = failure();
+    if (isa<FloatType>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<FloatCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "Comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    } else if (isa<IntegerType>(type)) {
+      std::unique_ptr<TokenCompare> comparator =
+          std::make_unique<IntegerCompare>();
+      result = compareFiles(cOutFile, vhdlOutFile, std::move(comparator));
+      llvm::errs() << "Comparison of [" + argName + "] : "
+                   << (mlir::succeeded(result) ? "Pass" : "Fail") << "\n";
+    }
     if (failed(result)) {
       return failure();
     }
   }
+
   return mlir::success();
 }
 
