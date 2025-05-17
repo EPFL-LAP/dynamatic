@@ -1,4 +1,6 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding, generate_channel_decls
 
 
 def generate_select(name, parameters):
@@ -135,28 +137,125 @@ end architecture;
   return antitokens + entity + architecture
 
 
+def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
+  concat_decls = []
+  concat_assignments = []
+
+  # Declare trueValue_inner and falseValue_inner channels
+  concat_decls.extend(generate_channel_decls({
+      "name": "trueValue_inner",
+      "bitwidth": bitwidth + concat_layout.total_bitwidth
+  }))
+  concat_decls.extend(generate_channel_decls({
+      "name": "falseValue_inner",
+      "bitwidth": bitwidth + concat_layout.total_bitwidth
+  }))
+
+  # Concatenate trueValue data and extra signals to create trueValue_inner
+  concat_assignments.extend(generate_concat_and_handshake(
+      "trueValue", bitwidth, "trueValue_inner", concat_layout))
+
+  # Concatenate falseValue data and extra signals to create falseValue_inner
+  concat_assignments.extend(generate_concat_and_handshake(
+      "falseValue", bitwidth, "falseValue_inner", concat_layout))
+
+  return concat_assignments, concat_decls
+
+
+def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
+  slice_decls = []
+  slice_assignments = []
+
+  # Declare both result_inner_concat and result_inner channels
+  slice_decls.extend(generate_channel_decls({
+      "name": "result_inner_concat",
+      "bitwidth": bitwidth + concat_layout.total_bitwidth
+  }))
+  slice_decls.extend(generate_channel_decls({
+      "name": "result_inner",
+      "bitwidth": bitwidth,
+      "extra_signals": concat_layout.extra_signals
+  }))
+
+  # Slice result_inner_concat to create result_inner data and extra signals
+  slice_assignments.extend(generate_slice_and_handshake(
+      "result_inner_concat", "result_inner", bitwidth, concat_layout))
+
+  return slice_assignments, slice_decls
+
+
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  # TODO: Normal signal manager doesn't work for select op.
-  # I'll fix it after the refactoring of signal manager functions.
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "condition",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trueValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "falseValue",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
+  # Layout info for how extra signals are packed into one std_logic_vector
+  concat_layout = ConcatLayout(extra_signals)
+  extra_signals_total_bitwidth = concat_layout.total_bitwidth
+
+  inner_name = f"{name}_inner"
+  inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
+
+  entity = generate_entity(name, [{
+      "name": "condition",
+      "bitwidth": 1,
       "extra_signals": extra_signals
-  }, lambda name: _generate_select(name, bitwidth))
+  }, {
+      "name": "trueValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }, {
+      "name": "falseValue",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }], [{
+      "name": "result",
+      "bitwidth": bitwidth,
+      "extra_signals": extra_signals
+  }])
+
+  concat_assignments, concat_decls = _generate_concat(
+      bitwidth, concat_layout)
+  slice_assignments, slice_decls = _generate_slice(
+      bitwidth, concat_layout)
+
+  forwarding_assignments = []
+  # Signal-wise forwarding of extra signals from condition and result_inner to result
+  for signal_name in extra_signals:
+    forwarding_assignments.extend(generate_signal_wise_forwarding(
+        ["condition", "result_inner"], ["result"], signal_name))
+
+  architecture = f"""
+-- Architecture of selector signal manager
+architecture arch of {name} is
+  {"\n  ".join(concat_decls)}
+  {"\n  ".join(slice_decls)}
+begin
+  -- Concatenate extra signals
+  {"\n  ".join(concat_assignments)}
+  {"\n  ".join(slice_assignments)}
+
+  -- Forwarding logic
+  {"\n  ".join(forwarding_assignments)}
+
+  result <= result_inner;
+  result_valid <= result_inner_valid;
+  result_inner_ready <= result_ready;
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      condition => condition,
+      condition_valid => condition_valid,
+      condition_ready => condition_ready,
+      trueValue => trueValue_inner,
+      trueValue_valid => trueValue_inner_valid,
+      trueValue_ready => trueValue_inner_ready,
+      falseValue => falseValue_inner,
+      falseValue_valid => falseValue_inner_valid,
+      falseValue_ready => falseValue_inner_ready,
+      result => result_inner_concat,
+      result_ready => result_inner_concat_ready,
+      result_valid => result_inner_concat_valid
+    );
+end architecture;
+"""
+
+  return inner + entity + architecture
