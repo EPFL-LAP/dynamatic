@@ -18,7 +18,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
 
-namespace hls_verify {
 using std::tuple;
 
 const string LOG_TAG = "VVER";
@@ -740,5 +739,3 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   os << "end architecture behavior;\n";
   os.flush();
 }
-
-} // namespace hls_verify

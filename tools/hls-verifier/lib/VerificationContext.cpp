@@ -12,8 +12,6 @@
 #include "mlir/Support/IndentedOstream.h"
 #include <cassert>
 
-namespace hls_verify {
-
 const std::string Properties::KEY_MODELSIM_DIR = "MSIM_DIRECTORY";
 const std::string Properties::KEY_VHDL_SRC_DIR = "VHDL_SRC_DIRECTORY";
 const std::string Properties::KEY_VHDL_OUT_DIR = "VHDL_OUT_DIRECTORY";
@@ -103,5 +101,3 @@ string VerificationContext::getHlsVerifyDir() const { return "."; }
 string VerificationContext::getVhdlSrcDir() const {
   return getBaseDir() + "/" + properties.get(Properties::KEY_VHDL_SRC_DIR);
 }
-
-} // namespace hls_verify

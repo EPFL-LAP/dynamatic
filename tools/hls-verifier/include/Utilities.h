@@ -18,8 +18,6 @@
 
 using namespace std;
 
-namespace hls_verify {
-
 class TokenCompare {
 public:
   virtual bool compare(const string &token1, const string &token2) const;
@@ -114,7 +112,5 @@ bool executeCommand(const string &command);
  */
 vector<string> getListOfFilesInDirectory(const string &directory,
                                          const string &extension = "");
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_UTILITIES_H

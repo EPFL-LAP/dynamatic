@@ -16,10 +16,6 @@
 
 using namespace std;
 
-namespace hls_verify {
-
 void vhdlTbCodegen(VerificationContext &ctx);
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_HLS_VHDL_TB_H

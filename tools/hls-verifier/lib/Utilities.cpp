@@ -19,8 +19,6 @@
 const string LOG_TAG = "UTIL";
 using namespace mlir;
 
-namespace hls_verify {
-
 bool TokenCompare::compare(const string &token1, const string &token2) const {
   return token1 == token2;
 }
@@ -201,5 +199,3 @@ vector<string> getListOfFilesInDirectory(const string &directory,
   }
   return result;
 }
-
-} // namespace hls_verify

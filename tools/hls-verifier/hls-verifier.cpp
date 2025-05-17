@@ -40,7 +40,6 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
-using namespace hls_verify;
 static const char SEP = std::filesystem::path::preferred_separator;
 
 static const string LOG_TAG = "[HLS_VERIFIER] ";

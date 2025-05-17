@@ -20,8 +20,6 @@
 using namespace std;
 using namespace dynamatic;
 
-namespace hls_verify {
-
 class Properties {
 public:
   static const string KEY_MODELSIM_DIR;
@@ -87,7 +85,5 @@ struct VerificationContext {
   string cFUVFunctionName;
   string vhdlDUVEntityName;
 };
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H
