@@ -270,6 +270,13 @@ class IsSimpleHandshake<string name> : PredOpTrait<
     ".getType()).getNumExtraSignals() == 0">
 >;
 
+/// Constraint to ensure an operand/result has atleast 1 extra signal.
+class HasExtraSignal<string name> : PredOpTrait<
+  name # " should have atleast 1 extra signal",
+  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+    ".getType()).getNumExtraSignals() > 0">
+>;
+
 /// Constraint to ensure a variadic operand/result shouldn't have any extra signals.
 class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
@@ -367,6 +374,16 @@ class AllExtraSignalsMatchWithVariadicExcept<string except, string variadic, lis
   >.result # ", \"" # except # "\")">
 >;
 
+/// Constraint to ensure that HandshakeType has no extra signals.
+class LacksExtraSignals<string operand> : PredOpTrait<
+  operand # " should not have any extra signals",
+  CPred<[{
+    [](ExtraSignalsTypeInterface type) {
+      return type.getExtraSignals().empty();
+    }
+  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
+>;
+
 /// Constraint to ensure that the variadic has at least one element.
 class VariadicHasElement<string variadic> : PredOpTrait<
   "the variadic " # variadic # " should have at least one element",
@@ -417,5 +434,37 @@ class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   }] # "($" # inputVariadic # ".getTypes(), "
   "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
+
+// Constraints for out-of-order tags
+
+class HasUniqueTagInSecondOperand<string op0, string op1> : PredOpTrait<
+  op1 # " should have exactly one tag not present in operand " # op0 # " and all other tags should match",
+  CPred<[{
+    [](ExtraSignalsTypeInterface op0Type, ExtraSignalsTypeInterface op1Type) {
+      llvm::DenseSet<llvm::StringRef> tags0;
+      unsigned int unmatchedTagsInOp1 = 0;
+      unsigned int matchingTagsInOp1 = 0;
+
+      for (const auto &s : op0Type.getExtraSignals()) {
+        if (s.name.starts_with("tag")) {
+          tags0.insert(s.name);
+        }
+      }
+
+      for (const auto &s : op1Type.getExtraSignals()) {
+        if (s.name.starts_with("tag")) {
+          if (tags0.contains(s.name)) {
+            ++matchingTagsInOp1;
+          } else {
+            ++unmatchedTagsInOp1;
+          }
+        }
+      }
+
+      return (unmatchedTagsInOp1 == 1 && matchingTagsInOp1 == tags0.size());
+    }
+  }] # "($" # op0 # ".getType().cast<ExtraSignalsTypeInterface>(), $" # op1 # ".getType().cast<ExtraSignalsTypeInterface>())">
+>;
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

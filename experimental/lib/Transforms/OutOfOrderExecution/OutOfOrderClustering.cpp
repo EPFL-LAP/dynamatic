@@ -1,0 +1,785 @@
+//===- OutOfOrderClustering.cpp - Out-of-Order Clustering Algorithm -*-
+// C++-*-===//
+//
+// Implements the out-of-order clustering methodology
+// https://dl.acm.org/doi/10.1145/3626202.3637556
+//
+//===----------------------------------------------------------------------===//
+
+#include "experimental/Transforms/OutOfOrderExecution/OutOfOrderClustering.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cassert>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+using namespace llvm;
+using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::handshake;
+using namespace dynamatic::experimental;
+using namespace dynamatic::experimental::outoforder;
+
+/**
+ * @brief Identifies control-flow-based clusters in a handshake function.
+ * This function analyzes the handshake IR to group Muxes and
+ * ConditionalBranches into clusters based on shared control conditions.
+ * Clusters can represent:
+ * - Loops: Muxes selected by a Merge fed by a constant.
+ * - If/Else blocks: branches and muxes sharing a condition.
+ * - If-only statements: branches without corresponding muxes leading to
+ * sinks/stores.
+ *
+ * Each cluster contains:
+ * - Inputs: operands entering the region (excluding condition producers).
+ * - Outputs: values exiting the region.
+ * - Internal ops: operations within the region, excluding condition
+ * generators.
+ *
+ * Additionally, a global outer cluster covering the full function is added.
+ *
+ * @param funcOp The handshake function to analyze.
+ * @param ctx The MLIR context.
+ *
+ * @return Vector of identified clusters.
+ */
+std::vector<Cluster> outoforder::identifyClusters(FuncOp funcOp,
+                                                  MLIRContext *ctx) {
+  std::vector<Cluster> clusters;
+
+  // Step 1: Identify the MUXes and their conditions
+  llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+      condToMuxes = analyzeMuxConditions(funcOp);
+
+  // Step 2: Find all the branches that are fed by the each condition
+  llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
+      condToBranches = analyzeBranchesConditions(funcOp, condToMuxes, clusters);
+
+  // Step 3: Create clusters for each condition
+  createClusters(condToMuxes, condToBranches, clusters);
+
+  // Step 4: Define a global cluster which is the entire graph
+  createGlobalCluster(funcOp, clusters);
+
+  return clusters;
+}
+
+/**
+ * @brief Checks if a Mux is a Shannon Mux. A Mux is considered a Shannon Mux if
+ * its output drives the select line of another Mux or a ConditionalBranch.
+ *
+ * @param muxOp The Mux operation to check.
+ *
+ * @return True if it's a Shannon Mux, false otherwise.
+ */
+
+static bool isShannonMux(MuxOp muxOp) {
+  Value result = muxOp.getResult();
+
+  // If the MUX feeds the select of another MUX or a BRANCH, then it is a
+  // Shannon MUX
+  for (Operation *user : result.getUsers()) {
+    if (auto nextMux = dyn_cast<MuxOp>(user)) {
+      if (nextMux.getSelectOperand() == result)
+        return true;
+    } else if (auto branch = dyn_cast<ConditionalBranchOp>(user)) {
+      if (branch.getConditionOperand() == result)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * @brief Analyzes the MUXes in a handshake function and groups them by their
+ * conditions.
+ *
+ * @param funcOp The handshake function to analyze.
+ *
+ * @return A map of conditions to MUXes.
+ */
+llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+outoforder::analyzeMuxConditions(FuncOp funcOp) {
+  // Map each condition value to all the MUXes that it feeds as the select
+  // Each value will then correspond to a cluster
+  // All Muxes being fed by the same value or its negation will be in the
+  // same cluster
+  // The bool is used to differentiate between loop and if/else clusters
+  // True: loop cluster
+  // False: if/else cluster
+  llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+      condToMuxes;
+
+  // Step 1: Identify the MUXes and their conditions
+  for (auto muxOp : funcOp.getOps<MuxOp>()) {
+    Value cond = muxOp.getSelectOperand();
+
+    // Skip Shannon MUXes
+    if (isShannonMux(muxOp))
+      continue;
+
+    //  c1 and NOT c1 all should be in 1 cluster
+    if (isa<NotOp>(cond.getDefiningOp()))
+      cond = cond.getDefiningOp()->getOperand(0);
+
+    // If a MUX is fed by an INIT fed by condition c (or NOT c), then
+    // the MUX is a loop header
+    if (InitOp init = dyn_cast<InitOp>(cond.getDefiningOp())) {
+      cond = init.getOperand();
+      if (NotOp notOp = dyn_cast<NotOp>(cond.getDefiningOp())) {
+        cond = notOp.getOperand();
+      }
+      condToMuxes[cond].second = true;
+    }
+
+    condToMuxes[cond].first.push_back(muxOp);
+  }
+  return condToMuxes;
+}
+
+/**
+ * @brief Checks if a value eventually leads to a SinkOp or StoreOp.
+ *
+ * @param value     The starting value.
+ * @param visited   Tracks visited values to prevent cycles.
+ *
+ * @return True if a SinkOp or StoreOp is reachable, false otherwise.
+ */
+static bool leadsToSinkOrStore(Value value, llvm::DenseSet<Value> &visited) {
+  if (visited.contains(value))
+    return false;
+
+  visited.insert(value);
+
+  // Check if any of the users of this value is a SinkOp or StoreOp
+  for (auto *user : value.getUsers()) {
+    if (isa<SinkOp>(user) || isa<StoreOp>(user))
+      return true;
+
+    // Recursively check the users of the user's results (if needed)
+    for (auto userResult : user->getResults()) {
+      if (leadsToSinkOrStore(userResult, visited))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * @brief Recursively finds all operations reachable from a given operation.
+ *
+ * @param op       Starting operation.
+ * @param visited  Set of already visited operations.
+ */
+static void findReachableOps(Operation *op,
+                             llvm::DenseSet<Operation *> &visited) {
+  if (visited.contains(op))
+    return;
+
+  visited.insert(op);
+
+  for (auto result : op->getResults()) {
+    for (auto *user : result.getUsers()) {
+      findReachableOps(user, visited);
+    }
+  }
+}
+
+/**
+ * @brief Analyzes the branches and their conditions in a handshake function.
+ * For branches witout corresponding MUXes, this function immediately creates
+ * the "if statement" cluster containing the branch and all the reachable
+ * operations from it.
+ *
+ * @param funcOp The handshake function to analyze.
+ * @param condToMuxes A map of conditions to MUXes.
+ * @param clusters A vector to store the identified clusters.
+ *
+ * @return A map of conditions to branches.
+ */
+llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
+outoforder::analyzeBranchesConditions(
+    FuncOp funcOp,
+    llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+        &condToMuxes,
+    std::vector<Cluster> &clusters) {
+  llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
+      condToBranches;
+  for (auto branchOp : funcOp.getOps<ConditionalBranchOp>()) {
+    Value cond = branchOp.getConditionOperand();
+
+    //  c1 and NOT c1 all should be in 1 cluster
+    if (isa<NotOp>(cond.getDefiningOp()))
+      cond = cond.getDefiningOp()->getOperand(0);
+
+    // Case 1: if/else or loop cluster
+    // Check if this cond also feeds a MUX
+    if (condToMuxes.contains(cond)) {
+      condToBranches[cond].push_back(branchOp);
+    } else {
+      // Case 2: if statement
+      //  For branches without corresponding Muxes, we must first verify that
+      //  this branch unlitamtely feeds a sink/store
+      llvm::DenseSet<Value> visitedTrue;
+      llvm::DenseSet<Value> visitedFalse;
+
+      bool trueLeadsToSink =
+          leadsToSinkOrStore(branchOp.getTrueResult(), visitedTrue);
+      bool falseLeadsToSink =
+          leadsToSinkOrStore(branchOp.getFalseResult(), visitedFalse);
+
+      // Assert that the outputs of the branch lead to a sink/store
+      assert((trueLeadsToSink && falseLeadsToSink) &&
+             "Branch without Mux should lead to sink/store");
+
+      llvm::DenseSet<Operation *> reachableOps;
+      findReachableOps(branchOp, reachableOps);
+
+      // Create a cluster for the branch with:
+      // Inputs: the data operand of the branch
+      // Outputs: none
+      // Internal ops: all the reachable operations from the branch
+      Cluster ifCluster(ClusterType::IfClsuter,
+                        llvm::DenseSet<Value>{branchOp.getDataOperand()},
+                        llvm::DenseSet<Value>(), reachableOps);
+      clusters.push_back(ifCluster);
+    }
+  }
+  return condToBranches;
+}
+
+/**
+ * @brief Determines if the first operation has a greater bb than the second
+ *
+ * @param op1 The first operation to compare.
+ * @param op2 The second operation to compare.
+ *
+ * @return True if the bb of the first operation is greater than that of the
+ * second, false otherwise.
+ */
+static bool isBBGreater(Operation *op1, Operation *op2) {
+  auto getBBValue = [](mlir::Operation *op) -> std::optional<uint64_t> {
+    if (auto attr =
+            op->getAttr("handshake.bb").dyn_cast_or_null<mlir::IntegerAttr>())
+      return attr.getUInt();
+    return std::nullopt;
+  };
+
+  auto bb1 = getBBValue(op1);
+  auto bb2 = getBBValue(op2);
+
+  if (bb1 && bb2) {
+    return *bb1 > *bb2;
+  }
+  return false;
+}
+
+/**
+ * @brief Depth-first search to collect all valid operation paths.
+ *
+ * Recursively traverses the graph of operations, collecting paths that either:
+ * - reach a specified end node
+ * - end at a terminal node (i.e., an operation with no users)
+ *
+ * @param current     The current operation being visited.
+ * @param start       The original start operation of the traversal.
+ * @param endNodes    Set of operations that mark valid end points.
+ * @param backward    If true, enforces backward edge condition based on BB
+ * values.
+ * @param path        Current path being built during traversal.
+ * @param allPaths    Vector to collect all valid paths found.
+ * @param visited     Set to track visited operations to avoid cycles.
+ */
+static void dfs(Operation *current, Operation *start,
+                const llvm::DenseSet<Operation *> &endNodes, bool backward,
+                std::vector<Operation *> &path,
+                std::vector<std::vector<Operation *>> &allPaths,
+                llvm::DenseSet<Operation *> &visited) {
+  // Add condition to terminate when we hit an operation with a BB greater that
+  // the start operation because this means that this path is not a  backward
+  // edge.
+  // A backward edge is an edge that leads to a node with a smaller or
+  // same BB
+  if (isa<MemoryControllerOp>(current) || isa<LSQOp>(current) ||
+      (backward && isBBGreater(current, start)))
+    return;
+
+  path.push_back(current);
+  visited.insert(current);
+
+  if (endNodes.contains(current) || isa<handshake::StoreOp>(current)) {
+    allPaths.push_back(path);
+  } else {
+    for (auto res : current->getResults()) {
+      if (res.getUsers().empty()) {
+        allPaths.push_back(path);
+      } else {
+        for (Operation *neighbor : res.getUsers()) {
+          if (!visited.contains(neighbor)) {
+            dfs(neighbor, start, endNodes, backward, path, allPaths, visited);
+          }
+        }
+      }
+    }
+  }
+
+  // backtrack
+  path.pop_back();
+  visited.erase(current);
+}
+
+/**
+ * @brief Finds all valid paths from a start operation to given end nodes.
+ *
+ * Initializes a depth-first traversal using `dfs()` and gathers all paths
+ * that start at the given operation and reach an end node or a terminal node.
+ * If `backward` is true, traversal respects the basic block ordering, avoiding
+ * forward edges (to nodes with higher `handshake.bb` values).
+ *
+ * @param start       The operation from which to begin the search.
+ * @param endNodes    Set of operations considered valid endpoints.
+ * @param backward    Whether to enforce backward edge constraints.
+ * @return A vector of all valid operation paths, each represented as a vector
+ * of `Operation*`.
+ */
+static std::vector<std::vector<Operation *>>
+findAllPaths(Operation *start, const llvm::DenseSet<Operation *> &endNodes,
+             bool backward) {
+  std::vector<std::vector<Operation *>> allPaths;
+  std::vector<Operation *> path;
+  llvm::DenseSet<Operation *> visited;
+
+  dfs(start, start, endNodes, backward, path, allPaths, visited);
+  return allPaths;
+}
+
+/**
+ * @brief Recursively finds all operations(paths) that ultimately lead to any of
+ * the specified end operations or a sink or a store.
+ *
+ * @param currentOp  The operation to start from.
+ * @param end        Set of end operations to reach.
+ * @param paths      Set to store only the operations on a path to an end op.
+ * @param visited    Set used to memoize visited paths to avoid recomputation.
+ * @return true if currentOp leads to an end op, false otherwise.
+ */
+static bool findPathsBetweenOps(Operation *currentOp,
+                                const llvm::DenseSet<Operation *> &end,
+                                llvm::DenseSet<Operation *> &visited,
+                                llvm::DenseSet<Operation *> &paths) {
+
+  if (!currentOp)
+    return false;
+
+  // already known result
+  if (visited.contains(currentOp))
+    return paths.contains(currentOp);
+
+  // Memoization
+  visited.insert(currentOp);
+
+  if (isa<MemoryControllerOp>(currentOp) || isa<LSQOp>(currentOp)) {
+    visited.insert(currentOp);
+    return false;
+  }
+
+  if (end.contains(currentOp) || isa<handshake::StoreOp>(currentOp)) {
+    paths.insert(currentOp);
+    visited.insert(currentOp);
+    return true;
+  }
+
+  bool leadsToEnd = false;
+
+  for (Value result : currentOp->getResults()) {
+    // If the result has no users, then this means that the result will feed a
+    // sink op which is considered an end node.
+    if (result.getUsers().empty()) {
+      paths.insert(currentOp);
+    } else {
+      for (Operation *user : result.getUsers()) {
+
+        bool f = findPathsBetweenOps(user, end, visited, paths);
+
+        leadsToEnd |= f;
+      }
+    }
+  }
+
+  // include only if a path leads to one of the end operations
+  if (leadsToEnd)
+    paths.insert(currentOp);
+
+  visited.erase(currentOp);
+
+  return leadsToEnd;
+}
+
+/**
+ * @brief Creates clusters based on the identified MUXes and branches.
+ *
+ * @param condToMuxes A map of conditions to MUXes.
+ * @param condToBranches A map of conditions to branches.
+ * @param clusters A vector to store the created clusters.
+ */
+void outoforder::createClusters(
+    llvm::DenseMap<Value, std::pair<llvm::SmallVector<MuxOp, 4>, bool>>
+        &condToMuxes,
+    llvm::DenseMap<Value, llvm::SmallVector<ConditionalBranchOp, 4>>
+        &condToBranches,
+    std::vector<Cluster> &clusters) {
+  // IMPORTANT REMARK: The generators of the condition are considered as
+  // external to the cluster and NOT inside it. This is to ensure that the
+  // clusters relationship property (disjoint, completely nested) is not
+  // violated
+  for (auto &pair : condToMuxes) {
+    Value cond = pair.first;
+    auto muxOps = pair.second.first;
+
+    assert(condToBranches.contains(cond) && "Condition should have branches");
+
+    auto branches = condToBranches[cond];
+
+    llvm::DenseSet<Value> inputs;
+    llvm::DenseSet<Value> outputs;
+    llvm::DenseSet<Operation *> internalOps;
+
+    // Case 1.1 : loop cluster
+    // Muxes then branches
+    if (pair.second.second) {
+      // Create a cluster for the condition with:
+      // Inputs: the data operands and the selects of the MUXes
+      // Outputs: the true and false outputs of the BRANCHes
+      // Internal ops: all the MUXes and BRANCHes that are fed by this
+      // condition along with the operations between them, in addition to all
+      // the operatiosn from the MUXes to a store or a sink
+
+      llvm::DenseSet<Operation *> branchOpPtrs;
+      for (auto branchOp : condToBranches[cond]) {
+        branchOpPtrs.insert(branchOp.getOperation());
+      }
+
+      for (auto muxOp : muxOps) {
+        inputs.insert(muxOp.getDataOperands().begin(),
+                      muxOp.getDataOperands().end());
+        // inputs.insert(muxOp.getSelectOperand());
+
+        InitOp init =
+            dyn_cast<InitOp>(muxOp.getSelectOperand().getDefiningOp());
+
+        assert(init && "The select operand of a MUX in a loop header should be "
+                       "fed by an INIT");
+
+        inputs.insert(init.getOperand());
+
+        // First add all the operations between the MUXes and the BRANCHes
+        // llvm::DenseSet<Operation *> visitedMuxesToBranches;
+        // llvm::DenseSet<Operation *> pathsMuxesToBranches;
+
+        // findPathsBetweenOps(muxOp.getOperation(), branchOpPtrs,
+        //                     visitedMuxesToBranches, pathsMuxesToBranches);
+
+        // internalOps.insert(pathsMuxesToBranches.begin(),
+        //                    pathsMuxesToBranches.end());
+
+        std::vector<std::vector<Operation *>> allPaths =
+            findAllPaths(muxOp.getOperation(), branchOpPtrs, false);
+
+        for (const auto &path : allPaths) {
+          for (Operation *op : path) {
+            internalOps.insert(op);
+          }
+        }
+      }
+
+      llvm::DenseSet<Operation *> muxOpPtrs;
+      for (auto muxOp : muxOps) {
+        muxOpPtrs.insert(muxOp.getOperation());
+      }
+
+      // A loop is a while loop if one branch has no backward edge feeding a MUX
+      // directly.
+      // bool whileLoop = false;
+      // for (Operation *branch : branchOpPtrs) {
+      //   bool backwardEdgeToMux = false;
+      //   for (Value res : branch->getResults()) {
+      //     for (auto user : res.getUsers()) {
+      //       if (muxOpPtrs.contains(user))
+      //         backwardEdgeToMux = true;
+      //     }
+      //     if (!backwardEdgeToMux)
+      //       whileLoop = true;
+      //   }
+      // }
+      // Then add all the operations between the BRANCHes and the MUXes, in
+      // addition to all the operatiosn from the BRANCHes to a store or a sink.
+      // This is necessary for the while loop case where there are operations
+      // along the backward edges from the BRANCHes to the MUXes
+
+      for (auto *branchOp : branchOpPtrs) {
+        // llvm::DenseSet<Operation *> visitedBranchesToMuxes;
+        // llvm::DenseSet<Operation *> pathsBranchesToMuxes;
+
+        // findPathsBetweenOps(branchOp, muxOpPtrs, visitedBranchesToMuxes,
+        //                     pathsBranchesToMuxes);
+        // internalOps.insert(pathsBranchesToMuxes.begin(),
+        //                    pathsBranchesToMuxes.end());
+        bool backwardEdgeToMux = false;
+        for (Value res : branchOp->getResults()) {
+          for (auto *user : res.getUsers()) {
+            if (muxOpPtrs.contains(user))
+              backwardEdgeToMux = true;
+          }
+        }
+
+        if (!backwardEdgeToMux) {
+          std::vector<std::vector<Operation *>> allPaths =
+              findAllPaths(branchOp, muxOpPtrs, true);
+
+          for (const auto &path : allPaths) {
+            for (Operation *op : path) {
+              internalOps.insert(op);
+            }
+          }
+        }
+      }
+
+      for (auto branchOp : condToBranches[cond]) {
+        outputs.insert(branchOp.getTrueResult());
+        outputs.insert(branchOp.getFalseResult());
+      }
+
+      // The bachwerd edges between the BRANCHes and the MUXes are now part of
+      // the inputs and outputs, but this is wrong We need to remove them from
+      // the inputs and outputs
+
+      // 1. Find the backward edges aka the inputs being generated by internal
+      // nodes, al the outputs being consumed by internal nodes
+      llvm::DenseSet<Value> backwardEdges;
+      for (Value v : inputs) {
+        if (internalOps.contains(v.getDefiningOp()))
+          backwardEdges.insert(v);
+      }
+      for (Value v : outputs) {
+        if (!v.getUsers().empty()) {
+          bool allUsersInsideCluster = true;
+          for (auto *user : v.getUsers()) {
+            if (!internalOps.contains(user))
+              allUsersInsideCluster = false;
+            break;
+          }
+          if (allUsersInsideCluster)
+            backwardEdges.insert(v);
+        }
+      }
+
+      // 2. Erase the backward edges from the cluster's inputs and outputs
+      for (Value v : backwardEdges) {
+        inputs.erase(v);
+        outputs.erase(v);
+      }
+
+    } else {
+      // Case 1.2 : if/else statement
+      // BRANCHes then MUXes
+
+      // Create a cluster for the condition with:
+      // Inputs: the data operands and the select of the BRANCHes
+      // Outputs: the outputs of the MUXes
+      // Internal ops: all the MUXes and BRANCHes that are fed by this
+      // condition along with the operations between them, in
+      // addition to all the operatiosn from the BRANCHes to a store or a sink.
+
+      for (auto branchOp : condToBranches[cond]) {
+        inputs.insert(branchOp.getDataOperand());
+        inputs.insert(branchOp.getConditionOperand());
+
+        llvm::DenseSet<Operation *> visited;
+        llvm::DenseSet<Operation *> paths;
+        llvm::DenseSet<Operation *> muxOpPtrs;
+        for (auto muxOp : muxOps) {
+          muxOpPtrs.insert(muxOp.getOperation());
+        }
+        // findPathsBetweenOps(branchOp.getOperation(), muxOpPtrs, visited,
+        // paths);
+
+        // internalOps.insert(paths.begin(), paths.end());
+
+        std::vector<std::vector<Operation *>> allPaths =
+            findAllPaths(branchOp.getOperation(), muxOpPtrs, false);
+
+        for (const auto &path : allPaths) {
+          for (Operation *op : path) {
+            internalOps.insert(op);
+          }
+        }
+      }
+
+      for (auto muxOp : muxOps) {
+        outputs.insert(muxOp.getResult());
+      }
+    }
+    Cluster cluster(((pair.second.second) ? ClusterType::LoopCluster
+                                          : ClusterType::IfElseCluster),
+                    inputs, outputs, internalOps);
+    clusters.push_back(cluster);
+  }
+}
+
+/**
+ * @brief Constructs a global cluster for the given handshake function.
+ *
+ * Includes all non-memory, non-EndOp operations as internal nodes.
+ * Inputs: last function argument.
+ * Outputs: operands of the EndOp.
+ *
+ * @param funcOp   The handshake function.
+ * @param clusters Appends the global cluster to this vector.
+ */
+void outoforder::createGlobalCluster(FuncOp funcOp,
+                                     std::vector<Cluster> &clusters) {
+  // Inputs: start
+  // Outputs: the inputs of EndOp
+  // Internal ops: all the operations in the graph except the EndOp and Memory
+  // Ops(Memory Controller and LSQ)
+  llvm::DenseSet<Operation *> globalOps;
+  llvm::DenseSet<Value> inputs;
+  llvm::DenseSet<Value> outputs;
+
+  for (auto &op : funcOp.getBody().getOps()) {
+    if (EndOp end = dyn_cast<EndOp>(op)) {
+      outputs.insert(end.getOperands().begin(), end.getOperands().end());
+    } else if (isa<MemoryControllerOp>(op) || isa<LSQOp>(op)) {
+      continue;
+    } else {
+      globalOps.insert(&op);
+    }
+  }
+  inputs.insert((Value)funcOp.getArguments().back());
+  Cluster graphCluster(ClusterType::GlobalCluster, inputs, outputs, globalOps);
+  clusters.push_back(graphCluster);
+}
+
+/**
+ * @brief Verifies that all clusters are either disjoint or properly nested. Any
+ * partial overlap (i.e., shared operations without full containment) is
+ * considered invalid and results in failure.
+ *
+ * @param clusters Vector of clusters to verify.
+ *
+ * @return Success if all clusters are valid, failure otherwise.
+ */
+LogicalResult outoforder::verifyClusters(std::vector<Cluster> &clusters) {
+  for (size_t i = 0; i < clusters.size(); ++i) {
+    const auto &aOps = clusters[i].internalOps;
+    for (size_t j = i + 1; j < clusters.size(); ++j) {
+
+      const auto &bOps = clusters[j].internalOps;
+
+      // Check intersection: if two clusters share any operations
+      bool intersects = false;
+      for (Operation *op : aOps) {
+        if (bOps.contains(op)) {
+          intersects = true;
+          break;
+        }
+      }
+
+      if (intersects) {
+        // Check if one is fully contained in the other
+        bool aInB = llvm::all_of(
+            aOps, [&](Operation *op) { return bOps.contains(op); });
+
+        bool bInA = llvm::all_of(
+            bOps, [&](Operation *op) { return aOps.contains(op); });
+
+        if (!(aInB || bInA)) {
+          // llvm::errs() << "Invalid overlap between cluster " << i
+          //              << " and cluster " << j << "\n";
+
+          // llvm::errs() << "Operations in cluster " << i
+          //              << " but not in cluster " << j << ":\n";
+          llvm::errs() << "ops in a and not b:\n";
+          for (Operation *op : aOps) {
+            if (!bOps.contains(op)) {
+              op->print(llvm::errs());
+              llvm::errs() << "\n";
+            }
+          }
+          llvm::errs() << "done with ops in a and not b\n";
+        }
+
+        // Not nested: invalid overlap
+        if (!(aInB || bInA)) {
+          assert((aInB || bInA) && "Clusters are not nested: invalid overlap");
+          if (!aInB && !bInA)
+            return failure();
+        }
+      }
+    }
+  }
+  return success();
+}
+
+/**
+ * @brief Builds a hierarchy of cluster nodes based on nesting relationships.
+ *
+ * @param clusters The list of disjoint or nested clusters.
+ *
+ * @return A list of ClusterHierarchyNode pointers representing the
+ * hierarchy in increasing size of clusters(from innermost to outermost).
+ * @note Assumes clusters are either disjoint or properly nested.
+ */
+std::vector<ClusterHierarchyNode *>
+outoforder::buildClusterHierarchy(std::vector<Cluster> &clusters) {
+  // Sort clusters by size (number of Internal ops)
+  // This is important to ensure that the innermost clusters are processed
+  // first
+  llvm::sort(clusters.begin(), clusters.end(),
+             [](const Cluster &a, const Cluster &b) {
+               return a.internalOps.size() < b.internalOps.size();
+             });
+
+  std::vector<ClusterHierarchyNode *> nodes;
+
+  // Pre-allocate memory
+  nodes.reserve(clusters.size());
+
+  // Create node wrappers
+  for (const auto &cluster : clusters)
+    nodes.push_back(new ClusterHierarchyNode(cluster));
+
+  // For each node, find its immediate parent
+  // We know that since the clusters are sorted by size, then every 2
+  // consecutive clusters Ci and Cj can be related as follows:
+  // 1. Ci is completely disjoint from Cj
+  // 2. Ci is completely enclosed inside Cj
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    for (size_t j = i + 1; j < nodes.size(); ++j) {
+      // Check if Ci is completely enclosed inside Cj
+      if (llvm::all_of(nodes[i]->cluster.internalOps, [&](Operation *op) {
+            return nodes[j]->cluster.internalOps.contains(op);
+          })) {
+
+        // If so, set the parent of Ci to Cj
+        // and add Ci as a child of Cj
+        nodes[i]->parent = nodes[j];
+        nodes[j]->children.push_back(nodes[i]);
+        break; // Only one parent possible
+      }
+    }
+  }
+
+  return nodes;
+}

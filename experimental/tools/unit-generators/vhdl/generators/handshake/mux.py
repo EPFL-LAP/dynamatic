@@ -190,7 +190,7 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
           "name": "index",
           "bitwidth": index_bitwidth,
           # TODO: Extra signals for index port are not tested
-          "extra_signals": extra_signals
+          "extra_signals": {}
       }],
       "out_ports": [{
           "name": "outs",
@@ -198,6 +198,5 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
           "extra_signals": extra_signals
       }],
       "index_name": "index",
-      "index_dir": "in",
       "extra_signals": extra_signals
   }, lambda name: _generate_mux(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))

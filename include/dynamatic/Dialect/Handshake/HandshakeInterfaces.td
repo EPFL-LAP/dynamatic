@@ -202,6 +202,27 @@ def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   ];
 }
 
+def DataBitwidthInterface : OpInterface<"DataBitwidthInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Interface for operations that specify a data bitwidth.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      "Returns the bitwidth of the data signal.",
+      "unsigned", "getDataBitwidth", (ins),
+      "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        assert(concreteOp->getNumOperands() > 0 && "expected at least one operand");
+        auto firstOperandType = concreteOp->getOperand(0).getType();
+        assert(::mlir::isa<ChannelType>(firstOperandType) && "expected a channel type");
+        return ::mlir::cast<ChannelType>(firstOperandType).getIntOrFloatBitWidth();
+      }]
+    >,
+  ];
+}
+
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
