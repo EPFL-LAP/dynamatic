@@ -60,8 +60,7 @@ private:
 struct VerificationContext {
   VerificationContext(const string &cFuvFunctionName,
                       const string &vhdlDuvEntityName,
-                      handshake::FuncOp *funcOp,
-                      mlir::raw_indented_ostream &testbenchStream);
+                      handshake::FuncOp *funcOp);
 
   string getCFuvFunctionName() const;
   string getVhdlDuvEntityName() const;
@@ -103,7 +102,6 @@ struct VerificationContext {
   IntegerCompare unsignedIntComparator;
   FloatCompare floatComparator;
   DoubleCompare doubleComparator;
-  mlir::raw_indented_ostream &testbenchStream;
 };
 
 } // namespace hls_verify

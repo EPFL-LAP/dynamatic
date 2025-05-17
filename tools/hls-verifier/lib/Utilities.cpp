@@ -192,8 +192,11 @@ int getNumberOfTransactions(const string &inputPath) {
 
 bool executeCommand(const string &command) {
   int status = system(command.c_str());
-  if (status != 0)
+  if (status != 0) {
     logErr(LOG_TAG, "Execution failed for command [" + command + "]");
+
+    assert(false && "Command execution failed!");
+  }
 
   return (status == 0);
 }

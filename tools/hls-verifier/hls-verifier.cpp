@@ -100,9 +100,9 @@ void copySupplementaryFiles(const VerificationContext &ctx,
 
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  // mlir::raw_indented_ostream &os = ctx.testbenchStream;
   handshake::FuncOp *funcOp = ctx.funcOp;
-  os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
+  // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
 
   llvm::SmallVector<std::pair<std::string, Type>> argAndTypeMap;
 
@@ -134,10 +134,10 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   for (auto [argName, type] : argAndTypeMap) {
     std::string vhdlOutFile =
-        ctx.getVhdlOutDir() + SEP + "OUTPUT_" + argName + ".dat";
+        ctx.getVhdlOutDir() + SEP + "output_" + argName + ".dat";
 
     std::string cOutFile =
-        ctx.getCOutDir() + SEP + "OUTPUT_" + argName + ".dat";
+        ctx.getCOutDir() + SEP + "output_" + argName + ".dat";
 
     LogicalResult result = failure();
     if (isa<FloatType>(type)) {
@@ -243,11 +243,7 @@ int main(int argc, char **argv) {
   std::string vhdlTestbenchPath =
       vhdlSrcDir + SEP + "hls_verify_" + cFuvFunctionName + "_tb.vhd";
 
-  std::error_code ec;
-  llvm::raw_fd_ostream fileStream(vhdlTestbenchPath, ec);
-  mlir::raw_indented_ostream os(fileStream);
-
-  VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp, os);
+  VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp);
 
   // Generate hls_verify_<cFuvFunctionName>.vhd
   vhdlTbCodegen(ctx);

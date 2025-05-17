@@ -289,9 +289,9 @@ void declareConstant(mlir::raw_indented_ostream &os, const string &name,
 }
 
 // function to get the port name in the entitiy for each paramter
-void getConstantDeclaration(VerificationContext &ctx) {
+void getConstantDeclaration(mlir::raw_indented_ostream &os,
+                            VerificationContext &ctx) {
 
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   std::string inputVectorPath = ctx.getInputVectorDir();
@@ -351,16 +351,15 @@ void getConstantDeclaration(VerificationContext &ctx) {
                       to_string(dataWidth));
     }
   }
-  os.flush();
 }
 
 // This writes the signal declarations fot the testbench
 // Example:
 // signal tb_clk : std_logic := '0';
 // signal tb_start_value : std_logic := '0';
-void getSignalDeclaration(VerificationContext &ctx) {
+void getSignalDeclaration(mlir::raw_indented_ostream &os,
+                          VerificationContext &ctx) {
 
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
@@ -447,10 +446,10 @@ void getSignalDeclaration(VerificationContext &ctx) {
   os.flush();
 }
 
-void getMemoryInstanceGeneration(VerificationContext &ctx) {
+void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
+                                 VerificationContext &ctx) {
 
   handshake::FuncOp *funcOp = ctx.funcOp;
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
 
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
@@ -573,9 +572,9 @@ void getMemoryInstanceGeneration(VerificationContext &ctx) {
   os.flush();
 }
 
-void getDuvInstanceGeneration(VerificationContext &ctx) {
+void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
+                              VerificationContext &ctx) {
 
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
   std::string duvName = ctx.vhdlDUVEntityName;
 
   Instance duvInst(duvName, "duv_inst");
@@ -638,11 +637,10 @@ void getDuvInstanceGeneration(VerificationContext &ctx) {
   }
 
   duvInst.emitVhdl(os);
-  os.flush();
 }
 
-void getOutputTagGeneration(VerificationContext &ctx) {
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+void getOutputTagGeneration(mlir::raw_indented_ostream &os,
+                            VerificationContext &ctx) {
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Connect the memory elements to the DUV
@@ -652,8 +650,8 @@ void getOutputTagGeneration(VerificationContext &ctx) {
     std::string argName = portAttr.dyn_cast<StringAttr>().data();
 
     if (isa<mlir::MemRefType, handshake::ChannelType>(arg.getType())) {
-      os << "------------------------------------------------------------\n";
-      os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
+      // os << "------------------------------------------------------------\n";
+      // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
@@ -664,32 +662,33 @@ void getOutputTagGeneration(VerificationContext &ctx) {
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
     if (isa<handshake::ChannelType>(resType)) {
-      os << "------------------------------------------------------------\n";
-      os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
+      // os << "------------------------------------------------------------\n";
+      // os << "-- Write [[[runtime]]], [[[/runtime]]] for output transactor\n";
       os << llvm::formatv(procWriteTransactions, argName, argName, argName,
                           argName, argName);
     }
   }
-  os.flush();
 }
 
 void vhdlTbCodegen(VerificationContext &ctx) {
 
-  mlir::raw_indented_ostream &os = ctx.testbenchStream;
+  std::error_code ec;
+  llvm::raw_fd_ostream fileStream(ctx.getVhdlTestbenchPath(), ec);
+  mlir::raw_indented_ostream os(fileStream);
 
   os << VHDL_LIBRARY_HEADER;
   os << "entity tb is\n";
   os << "end entity tb;\n\n";
   os << "architecture behavior of tb is\n\n";
   os.indent();
-  getConstantDeclaration(ctx);
-  getSignalDeclaration(ctx);
+  getConstantDeclaration(os, ctx);
+  getSignalDeclaration(os, ctx);
   os.unindent();
   os << "begin\n\n";
   os.indent();
-  getDuvInstanceGeneration(ctx);
-  getMemoryInstanceGeneration(ctx);
-  getOutputTagGeneration(ctx);
+  getDuvInstanceGeneration(os, ctx);
+  getMemoryInstanceGeneration(os, ctx);
+  getOutputTagGeneration(os, ctx);
   os << COMMON_TB_BODY;
   os.unindent();
   os << "end architecture behavior;\n";

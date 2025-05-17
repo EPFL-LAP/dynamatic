@@ -60,11 +60,9 @@ string Properties::get(const string &key) const {
 
 VerificationContext::VerificationContext(const string &cFuvFunctionName,
                                          const string &vhdlDuvEntityName,
-                                         handshake::FuncOp *funcOp,
-                                         mlir::raw_indented_ostream &os)
-    : properties(), cFUVFunctionName(cFuvFunctionName),
-      vhdlDUVEntityName(vhdlDuvEntityName), funcOp(funcOp),
-      testbenchStream(os) {
+                                         handshake::FuncOp *funcOp)
+    : funcOp(funcOp), properties(), cFUVFunctionName(cFuvFunctionName),
+      vhdlDUVEntityName(vhdlDuvEntityName) {
   defaultComparator = TokenCompare();
   unsignedIntComparator = IntegerCompare(false);
   signedIntComparator = IntegerCompare(true);
