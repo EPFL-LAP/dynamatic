@@ -6,6 +6,7 @@
 
 # This file redesigned the classes to represent the signals in the VHDL file
 import re
+import math
 
 #===----------------------------------------------------------------------===#
 # VHDL Signal Type Definition 
@@ -412,4 +413,10 @@ def MaskLess(din, size) -> str:
     if (din > size):
         raise ValueError("Unknown value!")
     return '\"' + '0'*(size-din) + '1'*din + '\"'
+
+def isPow2(value: int) -> bool:
+    return (value & (value-1) == 0) and value != 0
+
+def log2Ceil(value: int) -> int:
+    return math.ceil(math.log2(value))
 

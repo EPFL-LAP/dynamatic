@@ -24,17 +24,22 @@ class Configs:
   numStqEntries: int = 8
   numLdPorts:    int = 1
   numStPorts:    int = 1
-  numGroups:     int = 1
+  numGroups:     int = 1      # The number of total Basic Blocks (BBs)
   numLdMem:      int = 1
   numStMem:      int = 1
 
   stResp:        bool = False
   gaMulti:       bool = False
   
-  gaNumLoads:    list = [1]
-  gaNumStores:   list = [1]
-  gaLdOrder:     list = [[0]]
-  gaLdPortIdx:   list = [[0]]
+  gaNumLoads:    list = [1]   # For each BB, the number of Load instructions
+  gaNumStores:   list = [1]   # For each BB, the number of Store instructions
+  gaLdOrder:     list = [[0]] # For each BBs, the information about the order of load and store instructions in Matrix
+                              # Outer list (Row): Index for each BB
+                              # Inner list (Column): The number of store instruction aheading for each load instruction
+  gaLdPortIdx:   list = [[0]] # For each BB, related access port index
+                              # For example, let's say numLdqEntries = 8, numStqEntries = 8.
+                              # Then, non of BBs can have more than 8 loads and 8 store instructions
+                              # As a result, Port index can be among 0, 1, 2 (to access 8 LSQ entries)
   gaStPortIdx:   list = [[0]]
 
   ldqAddrW:      int = 3
