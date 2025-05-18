@@ -30,36 +30,37 @@ class SmvScalarType:
         channel_pattern = r"^!handshake\.channel<([u]?i|f)(\d+)>$"
         match = re.match(channel_pattern, mlir_type)
 
-        if mlir_type == control_pattern:
-            self.bitwidth = 0
-        elif match:
-            type_prefix = match.group(1)
-            self.bitwidth = int(match.group(2))
-            if type_prefix == "f":
-                self.floating_point = True
-                if self.bitwidth != 32 and self.bitwidth != 64:
-                    raise ValueError(
-                        f"Bitwidth {self.bitwidth} is not supported for floats")
-                self.smv_type = f"unsigned word [{self.bitwidth}]"
-            else:
-                self.signed = not type_prefix.startswith("u")
-                if self.bitwidth == 1:
-                    self.smv_type = "boolean"
-                elif self.signed:
-                    self.smv_type = f"signed word [{self.bitwidth}]"
-                else:
-                    self.smv_type = f"unsigned word [{self.bitwidth}]"
+    if mlir_type == control_pattern:
+      self.bitwidth = 0
+    elif match:
+      type_prefix = match.group(1)
+      self.bitwidth = int(match.group(2))
+      if type_prefix == "f":
+        self.floating_point = True
+        self.signed = None
+        if self.bitwidth != 32 and self.bitwidth != 64:
+          raise ValueError(
+              f"Bitwidth {self.bitwidth} is not supported for floats")
+        self.smv_type = f"unsigned word [{self.bitwidth}]"
+      else:
+        self.signed = not type_prefix.startswith("u")
+        if self.bitwidth == 1:
+          self.smv_type = "boolean"
+        elif self.signed:
+          self.smv_type = f"signed word [{self.bitwidth}]"
         else:
             raise ValueError(f"Type {mlir_type} doesn't correspond to any SMV type")
 
-    def format_constant(self, value) -> str:
-        """
-        Formats a given constant value based on the type.
-        """
-        if self.bitwidth == 1:
-            return "TRUE" if bool(value) else "FALSE"
-        else:
-            return str(value)
+  def format_constant(self, value) -> str:
+    """
+    Formats a given constant value based on the type.
+    """
+    if self.bitwidth == 1:
+      return "TRUE" if bool(value) else "FALSE"
+    elif self.signed:
+      return f"0sd{self.bitwidth}_{value}"
+    else:
+      return f"0ud{self.bitwidth}_{value}"
 
     def __str__(self):
         return f"{self.smv_type}"

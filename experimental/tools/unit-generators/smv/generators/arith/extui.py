@@ -9,10 +9,10 @@ def generate_extui(name, params):
     output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
     abstract_data = params[ATTR_ABSTRACT_DATA]
 
-    if abstract_data:
-        return generate_abstract_binary_op(name, latency, output_type)
-    else:
-        return _generate_extui(name, latency, input_type, output_type)
+  if abstract_data:
+    return generate_abstract_unary_op(name, latency, output_type)
+  else:
+    return _generate_extui(name, latency, input_type, output_type)
 
 
 def _generate_extui(name, latency, input_type, output_type):

@@ -20,7 +20,7 @@ MODULE {name}(ins_valid, outs_ready)
   init(full) := FALSE;
   next(full) := outs_valid & !outs_ready;
 
-  // output
+  -- output
   DEFINE
   ins_ready := !full;
   outs_valid := ins_valid | full;
@@ -38,7 +38,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   init(data) := {data_type.format_constant(0)};
   next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
 
-  // output
+  -- output
   DEFINE
   ins_ready := inner_tehb.ins_ready;
   outs_valid := inner_tehb.outs_valid;

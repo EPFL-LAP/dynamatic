@@ -198,17 +198,26 @@ def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> s
     forwarded_extra_signals = _forward_extra_signals(
         extra_signals, in_ports)
 
-    # Assign all extra signals for each output port, based on forwarded_extra_signals.
-    # e.g., result_spec <= lhs_spec or rhs_spec;
-    extra_signal_assignments = []
-    for out_port in out_ports:
-        port_name = out_port["name"]
+  # Assign all extra signals for each output port, based on forwarded_extra_signals.
+  # e.g., result_spec <= lhs_spec or rhs_spec;
+  extra_signal_assignments = []
+  for out_port in out_ports:
+    port_name = out_port["name"]
+    port_2d = out_port.get("2d", False)
 
-        # Assign all extra signals to this output port
-        for signal_name in extra_signals:
-            extra_signal_assignments.append(
-                f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
-    return "\n".join(extra_signal_assignments).lstrip()
+    if not port_2d:
+      # Assign all extra signals to this output port
+      for signal_name in extra_signals:
+        extra_signal_assignments.append(
+            f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+    else:
+      port_size = out_port["size"]
+      for signal_name in extra_signals:
+        for i in range(port_size):
+          extra_signal_assignments.append(
+            f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
+
+  return "\n".join(extra_signal_assignments).lstrip()
 
 
 def _generate_normal_signal_manager(name, in_ports, out_ports, extra_signals, generate_inner: Callable[[str], str]) -> str:
