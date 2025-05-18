@@ -16,7 +16,8 @@ TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
-OUT_OF_ORDER_EXECUTION=$9
+OUT_OF_ORDER_EXECUTION=${10}
+
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -90,71 +91,71 @@ export_cfg() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+# rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
-# source -> affine level
-"$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
-  -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
-  -I "$DYNAMATIC_DIR/include" \
-  -S -O3 --memref-fullrank --raise-scf-to-affine \
-  > "$F_AFFINE"
-exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
+# # source -> affine level
+# "$POLYGEIST_CLANG_BIN" "$SRC_DIR/$KERNEL_NAME.c" --function="$KERNEL_NAME" \
+#   -I "$POLYGEIST_PATH/llvm-project/clang/lib/Headers" \
+#   -I "$DYNAMATIC_DIR/include" \
+#   -S -O3 --memref-fullrank --raise-scf-to-affine \
+#   > "$F_AFFINE"
+# exit_on_fail "Failed to compile source to affine" "Compiled source to affine"
 
-# affine level -> pre-processing and memory analysis
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
-  --remove-polygeist-attributes \
-  --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
-  --mark-memory-dependencies \
-  > "$F_AFFINE_MEM"
-exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
+# # affine level -> pre-processing and memory analysis
+# "$DYNAMATIC_OPT_BIN" "$F_AFFINE" --allow-unregistered-dialect \
+#   --remove-polygeist-attributes \
+#   --func-set-arg-names="source=$SRC_DIR/$KERNEL_NAME.c" \
+#   --mark-memory-dependencies \
+#   > "$F_AFFINE_MEM"
+# exit_on_fail "Failed to run memory analysis" "Ran memory analysis"
 
-# affine level -> scf level
-"$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
-  --flatten-memref-row-major --scf-simple-if-to-select \
-  --scf-rotate-for-loops \
-  > "$F_SCF"
-exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
+# # affine level -> scf level
+# "$DYNAMATIC_OPT_BIN" "$F_AFFINE_MEM" --lower-affine-to-scf \
+#   --flatten-memref-row-major --scf-simple-if-to-select \
+#   --scf-rotate-for-loops \
+#   > "$F_SCF"
+# exit_on_fail "Failed to compile affine to scf" "Compiled affine to scf"
 
-# scf level -> cf level
-"$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
-exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
+# # scf level -> cf level
+# "$DYNAMATIC_OPT_BIN" "$F_SCF" --lower-scf-to-cf > "$F_CF"
+# exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 
-# cf transformations (standard)
-"$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
-    --control-flow-sink --loop-invariant-code-motion --canonicalize \
-    > "$F_CF_TRANFORMED"
-exit_on_fail "Failed to apply standard transformations to cf" \
-  "Applied standard transformations to cf"
+# # cf transformations (standard)
+# "$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
+#     --control-flow-sink --loop-invariant-code-motion --canonicalize \
+#     > "$F_CF_TRANFORMED"
+# exit_on_fail "Failed to apply standard transformations to cf" \
+#   "Applied standard transformations to cf"
 
-# cf transformations (dynamatic)
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  --mark-memory-interfaces \
-  > "$F_CF_DYN_TRANSFORMED"
-exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-  "Applied Dynamatic transformations to cf"
+# # cf transformations (dynamatic)
+# "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+#   --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+#   --mark-memory-interfaces \
+#   > "$F_CF_DYN_TRANSFORMED"
+# exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+#   "Applied Dynamatic transformations to cf"
 
-# cf level -> handshake level
-if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
-  echo_info "Running FTD algorithm for handshake conversion"
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
-    --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
-fi
+# # cf level -> handshake level
+# if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+#   echo_info "Running FTD algorithm for handshake conversion"
+#   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+#     --ftd-lower-cf-to-handshake \
+#     --handshake-combine-steering-logic \
+#     > "$F_HANDSHAKE"
+#   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+# else
+#   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
+#     > "$F_HANDSHAKE"
+#   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+# fi
 
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+# # handshake transformations
+# "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+#   --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+#   --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+#   > "$F_HANDSHAKE_TRANSFORMED"
+# exit_on_fail "Failed to apply transformations to handshake" \
+#   "Applied transformations to handshake"
 
   # out-of-order-execution transformations
 if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then

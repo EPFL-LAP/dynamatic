@@ -96,7 +96,6 @@ namespace {
     std::optional<std::string> sourcePath = std::nullopt;
 
     FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
-    FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
 
     bool sourcePathIsSet(StringRef keyword);
 
