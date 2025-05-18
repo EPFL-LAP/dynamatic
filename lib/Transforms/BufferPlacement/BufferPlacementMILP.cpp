@@ -352,17 +352,8 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
   // The dataBuf and validBuf must be equal
   // This constraint is not necessary, but may assist presolve.
   model.addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
-
-  // The latency does not exceed the number of buffer slots.
-  model.addGenConstrIndicator(shiftReg, 0,
-                              dataLatency <= bufNumSlots,
-                              "latency_le_bufSlots_if_no_shiftReg");
-  // Shift registers only introduce data and valid latency.
-  // If a shift register is used, there must be enough slots for both
-  // the shift register and the ready-breaking buffer.
-  model.addGenConstrIndicator(shiftReg, 1,
-                              dataLatency + readyBuf <= bufNumSlots,
-                              "enough_slots_if_shiftReg_on");
+  // There must be enough slots for data and ready buffers.
+  model.addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
 }
 
 void BufferPlacementMILP::addBufferingGroupConstraints(
@@ -680,12 +671,11 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
     objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
 
     // Linearization of dataLatency * shiftReg
-    GRBVar latencyMulShiftReg = model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER,
+    GRBVar latencyMulShiftReg = model.addVar(0, 100, 0.0, GRB_INTEGER,
                                              "latencyMulShiftReg");
-    model.addGenConstrIndicator(shiftReg, 1, latencyMulShiftReg == dataLatency, 
-                                "latency_if_shiftReg");
-    model.addGenConstrIndicator(shiftReg, 0, latencyMulShiftReg == 0, 
-                                "latency_if_not_shiftReg");
+    model.addConstr(latencyMulShiftReg <= dataLatency);
+    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
     objective -= maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
     objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
   }
