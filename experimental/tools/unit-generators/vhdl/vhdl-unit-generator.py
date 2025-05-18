@@ -9,6 +9,7 @@ import generators.handshake.buffer as buffer
 import generators.handshake.cmpf as cmpf
 import generators.handshake.cmpi as cmpi
 import generators.handshake.cond_br as cond_br
+import generators.handshake.demux as demux
 import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.extsi as extsi
@@ -55,6 +56,8 @@ def generate_code(name, mod_type, parameters):
       return cmpf.generate_cmpf(name, parameters)
     case "cond_br":
       return cond_br.generate_cond_br(name, parameters)
+    case "demux":
+      return demux.generate_demux(name, parameters)
     case "constant":
       return constant.generate_constant(name, parameters)
     case "control_merge":

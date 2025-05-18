@@ -502,7 +502,8 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<DataBitwidthInterface, ["getDataBitwidth"]>,
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -531,6 +532,57 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
   }];
+  let extraClassDefinition = [{
+    unsigned $cppClass::getDataBitwidth() {
+      return ::mlir::cast<ChannelType>(getDataOperand().getType()).getIntOrFloatBitWidth();
+    }
+  }];
+}
+
+def DemuxOp : Handshake_Op<"demux", [
+  AllDataTypesMatchWithVariadic<"result", ["dataOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"result", ["dataOperand"]>,
+  LacksExtraSignals<"selectOperand">,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+]> {
+  let summary = "demux operation";
+  let description = [{
+    The demux operation represents a variadic conditional
+    branch.  The data input is propagated to one of the outputs
+    based on the condition input.
+
+    Example:
+
+    ```mlir
+    %result = demux %cond, %data : !handshake.channel<i1>,
+      !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$selectOperand,
+                       HandshakeType:$dataOperand);
+  let results = (outs Variadic<HandshakeType>:$result);
+
+  let assemblyFormat = [{
+    `[` $selectOperand `]` $dataOperand attr-dict `:` 
+      type($selectOperand) `,` functional-type($dataOperand, results)
+  }];
+
+  //let assemblyFormat = [{
+  // $selectOperand `,` $dataOperand attr-dict
+  //    `:` type($selectOperand) `,`  functional-type($dataOperand, results)
+  //}];
+  
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "index" : "ins";
+    }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 def SinkOp : Handshake_Op<"sink"> {
