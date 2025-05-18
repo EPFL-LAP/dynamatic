@@ -27,7 +27,9 @@ jobs:
           source venv/bin/activate
           pip install autopep8==2.3.2
           echo "Running autopep8..."
-          autopep8 --max-line-length 200 --diff $(git ls-files '*.py')
+          git fetch origin main --no-recurse-submodules
+          git reset FETCH_HEAD
+          autopep8 --max-line-length 200 --diff $(git ls-files '*.py' --modified)
           STATUS=$?
           echo "autopep8 exited with $STATUS"
           deactivate
