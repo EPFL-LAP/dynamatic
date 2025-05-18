@@ -7,15 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "HlsLogging.h"
+#include "llvm/Support/raw_ostream.h"
 
 void logInf(const string &tag, const string &msg) {
-  cout << "[INFO  " << tag << "] " << msg << endl;
+  llvm::errs() << "[INFO  " << tag << "] " << msg << "\n";
 }
 
 void logErr(const string &tag, const string &msg) {
-  cerr << "[ERROR " << tag << "] " << msg << endl;
+  llvm::errs() << "[ERROR " << tag << "] " << msg << "\n";
 }
 
 void logWrn(const string &tag, const string &msg) {
-  cout << "[WARN  " << tag << "] " << msg << endl;
+  llvm::errs() << "[WARN  " << tag << "] " << msg << "\n";
 }
