@@ -11,9 +11,12 @@
 #include "HlsLogging.h"
 #include "HlsVhdlTb.h"
 #include "Utilities.h"
+#include "mlir/Support/IndentedOstream.h"
+#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <system_error>
 
 namespace hls_verify {
 const string LOG_TAG = "VVER";
@@ -48,9 +51,11 @@ bool runVhdlVerification(vector<string> args) {
 
 void generateVhdlTestbench(const VerificationContext &ctx) {
   HlsVhdlTb vhdlTb(ctx);
-  ofstream fout(ctx.getVhdlTestbenchPath());
-  fout << vhdlTb.generateVhdlTestbench();
-  fout.close();
+  std::error_code ec;
+  std::string filepath = ctx.getVhdlTestbenchPath().c_str();
+  llvm::raw_fd_ostream fileStream(filepath, ec);
+  mlir::raw_indented_ostream os(fileStream);
+  vhdlTb.generateVhdlTestbench(os);
 }
 
 void generateModelsimScripts(const VerificationContext &ctx) {
