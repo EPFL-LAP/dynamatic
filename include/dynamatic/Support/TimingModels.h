@@ -195,7 +195,7 @@ public:
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
-  LogicalResult getInternalDelay(Operation *op, SignalType type,
+  LogicalResult getInternalDelay(Operation *op, SignalType signalType,
                                  double &delay) const;
 
   /// Attempts to get an operation's port delay for a specific signal and port
@@ -206,7 +206,7 @@ public:
   /// Attempts to get an operation's total delay (internal delay + input delay +
   /// output delay) for a specific signal type. On success, sets the last
   /// argument to the requested delay.
-  LogicalResult getTotalDelay(Operation *op, SignalType type,
+  LogicalResult getTotalDelay(Operation *op, SignalType signalType,
                               double &delay) const;
 
   /// Parses a JSON file whose path is given as argument and adds all the timing

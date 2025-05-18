@@ -20,19 +20,20 @@ jobs:
         run: ./build.sh --release
 
       - name: check-dynamatic
-        continue-on-error: true
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
-        continue-on-error: true
+        if: success() || failure()
         run: ninja -C build check-dynamatic-experimental
 
       - name: integration-test
+        if: success() || failure()
         run: | 
           cd build/integration-test
           ctest --output-on-failure --parallel 8
 
       - uses: actions/upload-artifact@v4
+        if: success() || failure()
         with: 
           name: integration-report
           path: |

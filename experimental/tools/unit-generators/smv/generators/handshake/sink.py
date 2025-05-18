@@ -14,7 +14,7 @@ def _generate_sink_dataless(name):
   return f"""
 MODULE {name}(ins_valid)
 
-  // output
+  -- output
   DEFINE
   ins_ready  :=  TRUE;
 """
@@ -24,7 +24,7 @@ def _generate_sink(name, data_type):
   return f"""
 MODULE {name}(ins, ins_valid)
 
-  // output
+  -- output
   DEFINE
   ins_ready  :=  TRUE;
 """

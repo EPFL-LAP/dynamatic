@@ -1,4 +1,5 @@
 from generators.support.signal_manager import generate_signal_manager
+from generators.support.utils import data
 
 
 def generate_sink(name, params):
@@ -22,7 +23,7 @@ entity {name} is
   port (
     clk, rst : in std_logic;
     -- input channel
-    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
+    {data(f"ins       : in  std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     ins_valid : in  std_logic;
     ins_ready : out std_logic
   );

@@ -537,7 +537,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getResult(0));
       })
-      .Case<handshake::JoinOp>([&](auto) {
+      .Case<handshake::JoinOp, handshake::BlockerOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
@@ -670,18 +670,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addType("INPUT_TYPE", op->getOperand(0));
         addType("OUTPUT_TYPE", op->getResult(0));
       })
-      .Case<handshake::SpeculatorOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
+      .Case<handshake::SpeculatorOp>([&](handshake::SpeculatorOp speculatorOp) {
+        addUnsigned("FIFO_DEPTH", speculatorOp.getFifoDepth());
       })
       .Case<handshake::SpecSaveOp, handshake::SpecCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) {
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::SpecSaveCommitOp>([&](auto) {
-        // TODO: Determine the FIFO size based on speculation resolution delay.
-        addUnsigned("FIFO_DEPTH", 16);
-      })
+      .Case<handshake::SpecSaveCommitOp>(
+          [&](handshake::SpecSaveCommitOp saveCommitOp) {
+            addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1792,6 +1791,7 @@ public:
                     ConvertToHWInstance<handshake::ControlMergeOp>,
                     ConvertToHWInstance<handshake::MuxOp>,
                     ConvertToHWInstance<handshake::JoinOp>,
+                    ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::SourceOp>,
                     ConvertToHWInstance<handshake::ConstantOp>,
                     ConvertToHWInstance<handshake::SinkOp>,
@@ -1836,7 +1836,8 @@ public:
                     ConvertToHWInstance<handshake::SpecSaveOp>,
                     ConvertToHWInstance<handshake::SpecSaveCommitOp>,
                     ConvertToHWInstance<handshake::SpeculatorOp>,
-                    ConvertToHWInstance<handshake::SpeculatingBranchOp>>(
+                    ConvertToHWInstance<handshake::SpeculatingBranchOp>,
+                    ConvertToHWInstance<handshake::NonSpecOp>>(
         typeConverter, funcOp->getContext());
 
     // Everything must be converted to operations in the hw dialect

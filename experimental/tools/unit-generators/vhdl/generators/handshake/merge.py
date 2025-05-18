@@ -22,7 +22,7 @@ def _generate_merge_dataless(name, size):
   tehb_name = f"{name}_tehb"
 
   dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"size": 0})
+      generate_tehb(tehb_name, {"bitwidth": 0, "size": 0})
 
   entity = f"""
 library ieee;

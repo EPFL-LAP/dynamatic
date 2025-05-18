@@ -27,6 +27,8 @@ List of options:
                                          building llvm (defaults to 2)
   --disable-build-opt | -o             : don't use clang/lld/ccache to speed up builds
   --experimental-enable-xls            : enable experimental xls integration
+  --enable-leq-binaries                : download binaries for elastic-miter equivalence
+                                         checking
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
 "
@@ -121,6 +123,7 @@ CMAKE_LLVM_BUILD_OPTIMIZATIONS="-DLLVM_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
 CMAKE_POLYGEIST_BUILD_OPTIMIZATIONS="-DPOLYGEIST_USE_LINKER=lld"
 CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS="-DDYNAMATIC_CCACHE_BUILD=ON -DLLVM_USE_LINKER=lld"
 CMAKE_DYNAMATIC_ENABLE_XLS=""
+CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES=""
 ENABLE_TESTS=0
 FORCE_CMAKE=0
 NUM_THREADS=0
@@ -189,6 +192,9 @@ do
           "--experimental-enable-xls")
               ENABLE_XLS_INTEGRATION=1
               CMAKE_DYNAMATIC_ENABLE_XLS="-DDYNAMATIC_ENABLE_XLS=ON"
+              ;;
+          "--enable-leq-binaries")
+              CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES="-DDYNAMATIC_ENABLE_LEQ_BINARIES=ON"
               ;;
           "--help" | "-h")
               print_help_and_exit
@@ -328,7 +334,7 @@ if should_run_cmake ; then
       -DLLVM_TARGETS_TO_BUILD="host" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
-      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS $CMAKE_DYNAMATIC_ENABLE_XLS
+      $CMAKE_COMPILERS $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS $CMAKE_DYNAMATIC_ENABLE_XLS $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   exit_on_fail "Failed to cmake dynamatic"
 fi
 
@@ -403,6 +409,7 @@ create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/export-dot
+create_symlink ../build/bin/export-cfg
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator

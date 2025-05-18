@@ -125,7 +125,7 @@ begin
   mux_sel     <= fifo_valid;
   fifo_nready <= outs_ready;
 
-  fifo : entity work.{fifo_inner_name}(arch) generic map (NUM_SLOTS)
+  fifo : entity work.{fifo_inner_name}(arch)
     port map(
       -- inputs
       clk        => clk,

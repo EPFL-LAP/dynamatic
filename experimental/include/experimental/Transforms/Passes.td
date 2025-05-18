@@ -63,7 +63,7 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
   	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
   	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
-  	Option<"type", "type", "std::string", "", "type of buffer, can be either oehb or tehb">
+  	Option<"type", "type", "std::string", "", "type of buffer">
   ];
 }
 
