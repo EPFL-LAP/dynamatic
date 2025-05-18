@@ -352,11 +352,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.mux" || modName == "handshake.demux") {
-    serializedParams["INDEX_BITWIDTH"] =
-        getBitwidthString(modType.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] =
-        getBitwidthString(modType.getInputType(1));
   } else if (modName == "handshake.constant") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
   } else if (modName == "handshake.control_merge") {
@@ -375,7 +370,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (modName == "handshake.mux") {
+  } else if (modName == "handshake.mux" || modName == "handshake.demux") {
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
@@ -406,11 +401,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              modName == "handshake.mulf" || modName == "handshake.subf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
-  } else if (modName == "handshake.source" || modName == "handshake.mux" || 
-             modName == "handshake.demux") {
-    serializedParams["EXTRA_SIGNALS"] =
-        serializeExtraSignals(modType.getOutputType(0));
-  } else if (modName == "mem_controller") {
+  } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
   }
 }
@@ -464,7 +455,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.speculating_branch") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-  } else if (modName == "handshake.source" || modName == "handshake.non_spec") {
+  } else if (modName == "handshake.source" || modName == "handshake.non_spec" ||
+             modName == "handshake.demux") {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (modName == "handshake.mem_controller" ||
