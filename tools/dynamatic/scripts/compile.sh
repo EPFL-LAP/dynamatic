@@ -15,6 +15,7 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
+FAST_TOKEN_DELIVERY=$9
 OUT_OF_ORDER_EXECUTION=$9
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
@@ -134,9 +135,18 @@ exit_on_fail "Failed to apply Dynamatic transformations to cf" \
   "Applied Dynamatic transformations to cf"
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
-  > "$F_HANDSHAKE"
-exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
+  echo_info "Running FTD algorithm for handshake conversion"
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
+fi
 
 # handshake transformations
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
