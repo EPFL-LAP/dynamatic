@@ -203,7 +203,8 @@ vector<CFunctionParameter> VerificationContext::getFuvOutputParams() const {
 
 vector<CFunctionParameter> VerificationContext::getFuvParams() const {
   vector<CFunctionParameter> result;
-  result.push_back(fuv.returnVal);
+  if (fuv.returnVal.isOutput)
+    result.push_back(fuv.returnVal);
   for (const auto &param : fuv.params)
     result.push_back(param);
   return result;
