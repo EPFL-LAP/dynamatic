@@ -12,7 +12,7 @@ def generate_merge_notehb(name, params):
 
 
 def _generate_merge_notehb_dataless(name, size):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   
   DEFINE
@@ -29,7 +29,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
 
 
 def _generate_merge_notehb(name, size, data_type):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
 
   DEFINE

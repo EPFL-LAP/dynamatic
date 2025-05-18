@@ -157,7 +157,7 @@ class LSQWrapper:
 
         ##
         # Define all the IOs, details can be found in the table above
-        ##! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
+        # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         # io_storeData: output
         io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.dataW)
 

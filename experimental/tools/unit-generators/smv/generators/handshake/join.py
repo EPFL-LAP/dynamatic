@@ -8,7 +8,7 @@ def generate_join(name, params):
 
 
 def _generate_join(name, size):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
 
   DEFINE

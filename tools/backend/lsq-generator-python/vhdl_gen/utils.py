@@ -438,9 +438,10 @@ def GetValue(row, i) -> int:
     else:
         return 0
 
+
 def isPow2(value: int) -> bool:
     return (value & (value-1) == 0) and value != 0
 
+
 def log2Ceil(value: int) -> int:
     return math.ceil(math.log2(value))
-

@@ -18,7 +18,7 @@ def generate_control_merge(name, params):
 
 
 def _generate_control_merge_dataless(name, size, index_type):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
@@ -45,7 +45,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
 
 
 def _generate_control_merge(name, size, index_type, data_type):
-  return f"""
+    return f"""
   MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready);

@@ -16,7 +16,7 @@ def generate_merge(name, params):
 
 
 def _generate_merge_dataless(name, size):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(inner_merge.outs_valid, outs_ready);
@@ -33,7 +33,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
 
 
 def _generate_merge(name, size, data_type):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
   inner_tehb : {name}__tehb(inner_merge.outs, inner_merge.outs_valid, outs_ready);

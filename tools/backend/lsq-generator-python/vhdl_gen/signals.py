@@ -2,7 +2,7 @@
 # VHDL Signal Definition
 #===----------------------------------------------------------------------===#
 # This section defined Python classes that generate VHDL signal declarations.
-# 
+#
 # - class Logic         : (std_logic) one‑bit signal wire / port / register
 # - class LogicVec      : (std_logic_vector) Multi-bit signal.
 # - class LogicArray    : (Multiple std_logic) Array of individual std_logic signals.
@@ -32,18 +32,19 @@ class Logic:
             'w' internal wire   (signal <name>: std_logic)
             'r' register        (<name>_q) for the registered value
                                 (<name>_d) for the next-cycled value
-    
+
     Methods:
         getNameRead(): Returns the name we should use when reading the signal. (e.g. <name>_q for a register type)
         getNameWrite(): Returns the name to write to. (e.g. <name>_d for a register type)
         signalInit(): Appends the VHDL signal/port declaration.
         regInit(): Appends the VHDL register initialization block.
     """
-        
+
     # Signal name
     name = ''
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
+
     def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', init: bool = True) -> None:
         """
         init: If True, immediately generates the corresponding std_logic in VHDL.
@@ -51,28 +52,30 @@ class Logic:
               False when we instantiate LogicVec, LogicArray, and LogicVecArray.
         """
         # Type should be one of the four types.
-        assert(type in ('i','o','w','r'))
+        assert(type in ('i', 'o', 'w', 'r'))
         self.ctx = ctx
         self.name = name
         self.type = type
         if (init):
             self.signalInit()
+
     def __repr__(self) -> str:
         """
         Print Logic with useful information.
         """
         # Signal type
         type = ''
-        if (self.type   == 'w'):
+        if (self.type == 'w'):
             type = 'wire'
         elif(self.type == 'i'):
             type = 'input'
         elif(self.type == 'o'):
             type = 'output'
-        elif(self.type  == 'r'):
+        elif(self.type == 'r'):
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: single bit\n'
-    def getNameRead(self, sufix = '') -> str:
+
+    def getNameRead(self, sufix='') -> str:
         """
         Returns the name we should use when reading the signal.
 
@@ -88,10 +91,11 @@ class Logic:
             return self.name + sufix + '_i'
         elif(self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
-    def getNameWrite(self, sufix = '') -> str:
+
+    def getNameWrite(self, sufix='') -> str:
         """
         Returns the name to write to. 
-        
+
         Example in the getNameRead() method.
         """
         if (self.type == 'w'):
@@ -102,7 +106,8 @@ class Logic:
             raise TypeError(f'Cannot write to the input signal \"{self.name}\"!')
         elif (self.type == 'o'):
             return self.name + sufix + '_o'
-    def signalInit(self, sufix = '') -> None:
+
+    def signalInit(self, sufix='') -> None:
         """
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
@@ -117,7 +122,8 @@ class Logic:
         elif(self.type == 'o'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic')
-    def regInit(self, enable = None, init = None) -> None:
+
+    def regInit(self, enable=None, init=None) -> None:
         """
         Generates a clocked process snippet that sets up the register's behavior.
         For example,
@@ -146,6 +152,8 @@ class Logic:
 #
 # std_logic_vec
 #
+
+
 class LogicVec(Logic):
     """
     Like 'class Logic', but for M-bit vectors.
@@ -155,7 +163,7 @@ class LogicVec(Logic):
 
     Attributes:
         size (int): bit-width of vector (M)
-    
+
     Methods:
         Indexable reads/writes of LogicVec components
         Access a certain i-th bit of LogicVec via getNameRead(i), getNameWrite(i)
@@ -172,37 +180,42 @@ class LogicVec(Logic):
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
     size = 1
+
     def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', size: int = 1, init: bool = True) -> None:
         Logic.__init__(self, ctx, name, type, False)
         assert(size > 0)
         self.size = size
         if (init):
             self.signalInit()
+
     def __repr__(self) -> str:
         # Signal type
         type = ''
-        if (self.type   == 'w'):
+        if (self.type == 'w'):
             type = 'wire'
         elif (self.type == 'i'):
             type = 'input'
         elif (self.type == 'o'):
             type = 'output'
-        elif(self.type  == 'r'):
+        elif(self.type == 'r'):
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: {self.size}\n'
-    def getNameRead(self, i = None, sufix = '') -> str:
+
+    def getNameRead(self, i=None, sufix='') -> str:
         if (i == None):
             return Logic.getNameRead(self, sufix)
         else:
             assert(i < self.size)
             return Logic.getNameRead(self, sufix) + f'({i})'
-    def getNameWrite(self, i = None, sufix = '') -> str:
+
+    def getNameWrite(self, i=None, sufix='') -> str:
         if (i == None):
             return Logic.getNameWrite(self, sufix)
         else:
             assert(i < self.size)
             return Logic.getNameWrite(self, sufix) + f'({i})'
-    def signalInit(self, sufix = ''):
+
+    def signalInit(self, sufix=''):
         if (self.type == 'w'):
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic_vector({self.size-1} downto 0);\n')
         elif(self.type == 'r'):
@@ -214,7 +227,8 @@ class LogicVec(Logic):
         elif(self.type == 'o'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic_vector({self.size-1} downto 0)')
-    def regInit(self, enable = None, init = None) -> None:
+
+    def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
         if (init != None):
             self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
@@ -233,6 +247,8 @@ class LogicVec(Logic):
 #
 # An array of std_logic
 #
+
+
 class LogicArray(Logic):
     """
     Represents a N-length array of one-bit VHDL std_logic.
@@ -244,34 +260,41 @@ class LogicArray(Logic):
         signal <name>_1 : std_logic;
         ...
         signal <name>_{N-1} : std_logic;
-        
+
     Attributes:
         length (int): number of elements in the array.
-    
+
     Methods:
         Indexable reads/writes of LogicArray components
         Access a certain i-th element of LogicArray via getNameRead(i), getNameWrite(i)
     """
     length = 1
+
     def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1):
         self.length = length
         Logic.__init__(self, ctx, name, type, False)
         self.signalInit()
+
     def __repr__(self) -> str:
         return Logic.__repr__(self) + f'array length: {self.length}'
+
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
         return Logic.getNameRead(self, f'_{i}')
+
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
         return Logic.getNameWrite(self, f'_{i}')
+
     def signalInit(self) -> None:
         for i in range(0, self.length):
             Logic.signalInit(self, f'_{i}')
+
     def __getitem__(self, i) -> Logic:
         assert i in range(0, self.length)
         return Logic(self.ctx, self.name + f'_{i}', self.type, False)
-    def regInit(self, enable = None, init = None) -> None:
+
+    def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
         if (init != None):
             self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')
@@ -293,6 +316,8 @@ class LogicArray(Logic):
 #
 # An array of std_logic vector
 #
+
+
 class LogicVecArray(LogicVec):
     """
     Represents a N-length array of M-bit VHDL std_logic_vec.
@@ -308,31 +333,38 @@ class LogicVecArray(LogicVec):
     Attributes:
         length (int): number of entries (N).
         size   (int): bit-width of each vector (M).
-    
+
     Methods:
         Indexable reads/writes of LogicVecArray components
         Access a certain i-th LogicVec of LogicVecArray via getNameRead(i), getNameWrite(i)
     """
     length = 1
+
     def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1, size: int = 1):
         self.length = length
         LogicVec.__init__(self, ctx, name, type, size, False)
         self.signalInit()
+
     def __repr__(self) -> str:
         return LogicVec.__repr__(self) + f'array length: {self.length}'
-    def getNameRead(self, i, j = None) -> str:
+
+    def getNameRead(self, i, j=None) -> str:
         assert i in range(0, self.length)
         return LogicVec.getNameRead(self, j, f'_{i}')
-    def getNameWrite(self, i, j = None) -> str:
+
+    def getNameWrite(self, i, j=None) -> str:
         assert i in range(0, self.length)
         return LogicVec.getNameWrite(self, j, f'_{i}')
+
     def signalInit(self) -> None:
         for i in range(0, self.length):
             LogicVec.signalInit(self, f'_{i}')
+
     def __getitem__(self, i) -> LogicVec:
         assert i in range(0, self.length)
         return LogicVec(self.ctx, self.name + f'_{i}', self.type, self.size, False)
-    def regInit(self, enable = None, init = None) -> None:
+
+    def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
         if (init != None):
             self.ctx.add_reg_str('\t\tif (rst = \'1\') then\n')

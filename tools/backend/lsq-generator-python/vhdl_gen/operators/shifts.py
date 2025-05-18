@@ -3,7 +3,6 @@ from vhdl_gen.utils import *
 from vhdl_gen.signals import *
 
 
-
 #===----------------------------------------------------------------------===#
 # Cyclic Left Shift
 #===----------------------------------------------------------------------===#
@@ -26,7 +25,7 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
         din      (LogicVec): Source vector to be shifted.
         distance (LogicVec): Binary vector representing the shift amount.
         layer    (int)     : Current recursion layer; set to "distance.size-1" when called initially.
-    
+
         The "layer" parameter is used internally to control recursion depth and
         should always start at "distance.size - 1".
 
@@ -39,7 +38,7 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
 
         When this method is called, "layer" is always "distance.size - 1".
         "layer" is just for an recursive action.
-        
+
 
     Example: 
         Input:  din  = "01110010", distance = 3
@@ -62,14 +61,15 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
         str_ret += RotateLogicVec(ctx, dout, res, distance, layer-1)
     return str_ret
 
+
 def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     """
     Recursively perform a cyclic left shift of LogicArray "din" by the amount 
     specified in "distance".
-    
+
     Identical in behavior to RotateLogicVec, but operates on multiple VHDL single-bit std_logic
     instead of std_logic_vector.
-    
+
     """
 
     str_ret = ''
@@ -88,19 +88,20 @@ def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
         str_ret += RotateLogicArray(ctx, dout, res, distance, layer-1)
     return str_ret
 
-def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:    
+
+def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     """
     Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount 
     specified in "distance".
-    
+
     Identical in behavior to RotateLogicVec, but operates on multiple VHDL vectors std_logic_vector.
     For every LogicVec in LogicVecArray, cyclic left shift by "distance".
-    
+
     Example:
         din = "11001001
                11100011"
         distance = 2
-        
+
         -> dout = "00100111     (Cyclic Left Shift of each vector by 2)
                    10001111"
     """
@@ -120,6 +121,7 @@ def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += RotateLogicVecArray(ctx, dout, res, distance, layer-1)
     return str_ret
+
 
 def CyclicLeftShift(ctx: VHDLContext, dout, din, distance) -> str:
     """

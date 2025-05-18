@@ -4,8 +4,7 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
 
-
-def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse = False) -> str:
+def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse=False) -> str:
     """
     Parameters:
         dout (LogicVecArray, LogicArray, LogicVec):
@@ -27,7 +26,7 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse = False) ->
 
            dout1= 010000        dout2= 000100      dout3= 000010
            (base to MSB)        (base to LSB)      (base to MSB -> LSB to base)
-           
+
     Behavior (with the Example 1):
         double_in            = 010110 010110
         base                 = 000000 001000
@@ -52,8 +51,8 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse = False) ->
                 str_ret += Op(ctx, (double_in, j+size), (din, j, i))
             double_out = LogicVec(ctx, ctx.get_temp(f'double_out_{i}'), 'w', size*2)
             str_ret += Op(ctx, double_out, double_in, 'and', 'not',
-                'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
-            )
+                          'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
+                          )
             for j in range(0, size):
                 str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(j, i)} <= ' + \
                     f'{double_out.getNameRead(j)} or {double_out.getNameRead(j+size)};\n'
@@ -67,13 +66,13 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse = False) ->
             for i in range(0, size):
                 str_ret += Op(ctx, (double_in, i), (din, size-1-i))
                 str_ret += Op(ctx, (double_in, i+size), (din, size-1-i))
-            base_rev   = LogicVec(ctx, ctx.get_temp('base_rev'), 'w', size)
+            base_rev = LogicVec(ctx, ctx.get_temp('base_rev'), 'w', size)
             for i in range(0, size):
                 str_ret += Op(ctx, (base_rev, i), (base, size-1-i))
             double_out = LogicVec(ctx, ctx.get_temp('double_out'), 'w', size*2)
             str_ret += Op(ctx, double_out, double_in, 'and', 'not',
-                'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base_rev, ')', ')'
-            )
+                          'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base_rev, ')', ')'
+                          )
             for i in range(0, size):
                 str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(size-1-i)} <= ' + \
                     f'{double_out.getNameRead(i)} or {double_out.getNameRead(i+size)};\n'
@@ -82,16 +81,16 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse = False) ->
                 size = din.length
                 double_in = LogicVec(ctx, ctx.get_temp('double_in'), 'w', size*2)
                 for i in range(0, size):
-                        str_ret += Op(ctx, (double_in, i), (din, i))
-                        str_ret += Op(ctx, (double_in, i+size), (din, i))
+                    str_ret += Op(ctx, (double_in, i), (din, i))
+                    str_ret += Op(ctx, (double_in, i+size), (din, i))
             else:
                 size = din.size
                 double_in = LogicVec(ctx, ctx.get_temp('double_in'), 'w', size*2)
                 str_ret += Op(ctx, double_in, din, '&', din)
             double_out = LogicVec(ctx, ctx.get_temp('double_out'), 'w', size*2)
             str_ret += Op(ctx, double_out, double_in, 'and', 'not',
-                'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
-            )
+                          'std_logic_vector(', 'unsigned(', double_in, ')', '-', 'unsigned(', (0, size), '&', base, ')', ')'
+                          )
             if (type(dout) == LogicVec):
                 str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= ' + \
                     f'{double_out.getNameRead()}({size-1} downto 0) or ' + \

@@ -10,7 +10,7 @@ def generate_nondeterministic_comparator(name, params):
 
 
 def _generate_nondeterministic_comparator(name, latency, data_type):
-  return f"""
+    return f"""
 MODULE {name}(lhs, lhs_valid, rhs, rhs_valid, result_ready)
   VAR inner_handshake_manager : {name}__handshake_manager(lhs_valid, rhs_valid, result_ready);
   VAR rand : boolean;
