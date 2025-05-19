@@ -27,7 +27,7 @@ namespace lsqsizing {
 #include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSizeLSQs(StringRef timingModels = "", StringRef collisions = "");
+createHandshakeSizeLSQs(StringRef timingModels = "", StringRef collisions = "", double targetCP);
 
 } // namespace lsqsizing
 } // namespace experimental

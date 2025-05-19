@@ -65,7 +65,7 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB) {
 
 CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
                        llvm::SetVector<unsigned> cfdfcBBs,
-                       TimingDatabase timingDB, unsigned II) {
+                       TimingDatabase timingDB, unsigned II, double targetCP) {
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block

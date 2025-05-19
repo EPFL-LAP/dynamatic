@@ -54,7 +54,8 @@ struct HandshakeSizeLSQsPass
     : public dynamatic::experimental::lsqsizing::impl::HandshakeSizeLSQsBase<
           HandshakeSizeLSQsPass> {
 
-  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions) {
+  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions, double targetCP) {
+    this->targetCP = targetCP
     this->timingModels = timingModels.str();
     this->collisions = collisions.str();
   }
@@ -194,7 +195,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
         continue;
 
       std::optional<LSQSizingResult> result = sizeLSQsForCFDFC(
-          funcOp, entry.second, timingDB, IIs.at(entry.first), collisions);
+        funcOp, entry.second, timingDB, IIs.at(entry.first), collisions, targetCP);
 
       if (result) {
         for (auto &entry : result.value()) {
@@ -232,7 +233,7 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
     TimingDatabase timingDB, unsigned initialII, std::string collisions) {
 
-  CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII);
+    CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII, targetCP);
 
   // We only want LSQ loads and stores (not MC loads and stores), therefore we
   // need to check if they are connected to an LSQ
@@ -675,6 +676,6 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(
-    StringRef timingModels, StringRef collisions) {
-  return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions);
+  StringRef timingModels, StringRef collisions, double targetCP) {
+    return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions, targetCP);
 }
