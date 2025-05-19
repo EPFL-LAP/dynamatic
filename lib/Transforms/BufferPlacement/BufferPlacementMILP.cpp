@@ -666,8 +666,13 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(ValueRange channels,
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
+  // In general, buffers that break data paths have a lower area cost per slot,
+  // while other types incur a higher cost
   double largeSlotPenaltyMul = 1e-4;
   double smallSlotPenaltyMul = 1e-5;
+  // For SHIFT_REG_BREAK_DV, a small area cost is incurred when the buffer exists
+  // Increasing the slot number only requires additional registers, not LUTs
+  // We assign a minimal cost only to constrain its slot number
   double shiftRegPenaltyMul = 1e-5;
   double shiftRegSlotPenaltyMul = 1e-7;
   for (Value channel : channels) {
