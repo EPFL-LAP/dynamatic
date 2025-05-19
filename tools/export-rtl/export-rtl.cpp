@@ -1222,23 +1222,19 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
     if (llvm::isa<AOBProperty>(property.get())) {
       auto *p = llvm::cast<AOBProperty>(property.get());
-      auto owner = p->getOwner();
-      auto ownerChannel = p->getOwnerChannel();
-      auto user = p->getUser();
-      auto userChannel = p->getUserChannel();
-      std::string validSignal = owner + "." + ownerChannel + "_valid";
-      std::string readySignal = user + "." + userChannel + "_ready";
+      std::string validSignal =
+          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
+      std::string readySignal =
+          p->getUser() + "." + p->getUserChannel() + "_ready";
 
       data.properties[p->getId()] = {validSignal + " -> " + readySignal,
                                      propertyTag};
     } else if (llvm::isa<VEQProperty>(property.get())) {
       auto *p = llvm::cast<VEQProperty>(property.get());
-      auto owner = p->getOwner();
-      auto ownerChannel = p->getOwnerChannel();
-      auto target = p->getTarget();
-      auto targetChannel = p->getTargetChannel();
-      std::string validSignal1 = owner + "." + ownerChannel + "_valid";
-      std::string validSignal2 = target + "." + targetChannel + "_valid";
+      std::string validSignal1 =
+          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
+      std::string validSignal2 =
+          p->getTarget() + "." + p->getTargetChannel() + "_valid";
 
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};

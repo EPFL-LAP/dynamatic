@@ -13,11 +13,39 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/JSON/JSON.h"
+#include "llvm/Support/JSON.h"
 #include <memory>
 #include <optional>
 #include <string>
 
 namespace dynamatic {
+
+std::optional<FormalProperty::TYPE>
+FormalProperty::typeFromStr(const std::string &s) {
+
+  auto toLower = [](const std::string &s) {
+    std::string tmp(s);
+    for (auto &c : tmp)
+      c = tolower(c);
+    return tmp;
+  };
+
+  if (toLower(s) == "aob")
+    return FormalProperty::TYPE::AOB;
+  if (toLower(s) == "veq")
+    return FormalProperty::TYPE::VEQ;
+
+  return std::nullopt;
+}
+
+std::string FormalProperty::typeToStr(TYPE t) {
+  switch (t) {
+  case TYPE::AOB:
+    return "AOB";
+  case TYPE::VEQ:
+    return "VEQ";
+  }
+}
 
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
@@ -50,19 +78,61 @@ std::string FormalProperty::tagToStr(TAG t) {
   }
 }
 
+llvm::json::Value FormalProperty::toJSON() const {
+  return llvm::json::Object({{"id", id},
+                             {"type", typeToStr(type)},
+                             {"tag", tagToStr(tag)},
+                             {"check", check},
+                             {"info", extraInfoToJSON()}});
+}
+
 // Factory implementation
 std::unique_ptr<FormalProperty>
 FormalProperty::fromJSON(const llvm::json::Value &value,
                          llvm::json::Path path) {
-  std::string propType;
+  std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.mapOptional("type", propType))
+  if (!mapper || !mapper.mapOptional("type", typeStr))
     return nullptr;
 
-  if (propType == "AOB") {
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  TYPE type = *typeOpt;
+
+  switch (type) {
+  case TYPE::AOB:
     return AOBProperty::fromJSON(value, path);
-  } else if (propType == "VEQ") {
+  case TYPE::VEQ:
     return VEQProperty::fromJSON(value, path);
+  }
+}
+
+llvm::json::Value
+FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
+                                        llvm::json::Path path) {
+  std::string typeStr, tagStr;
+  llvm::json::ObjectMapper mapper(value, path);
+
+  if (!mapper || !mapper.mapOptional("id", id) ||
+      !mapper.mapOptional("type", typeStr) ||
+      !mapper.mapOptional("tag", tagStr) || !mapper.mapOptional("check", check))
+    return nullptr;
+
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  type = *typeOpt;
+
+  auto tagOpt = tagFromStr(tagStr);
+  if (!tagOpt)
+    return nullptr;
+  tag = *tagOpt;
+
+  if (const auto *obj = value.getAsObject()) {
+    auto it = obj->find("info");
+    if (it != obj->end())
+      return it->second;
   }
   return nullptr;
 }
@@ -94,12 +164,8 @@ AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
   userChannel = userNamer.getInputName(operandIndex).str();
 }
 
-llvm::json::Object AOBProperty::toJsonObj() const {
-  return llvm::json::Object({{"id", id},
-                             {"type", "AOB"},
-                             {"tag", tagToStr(tag)},
-                             {"check", check},
-                             {"owner", owner},
+llvm::json::Value AOBProperty::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", owner},
                              {"user", user},
                              {"owner_index", ownerIndex},
                              {"user_index", userIndex},
@@ -111,29 +177,16 @@ std::unique_ptr<AOBProperty>
 AOBProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
   auto prop = std::make_unique<AOBProperty>();
 
-  llvm::json::ObjectMapper mapper(value, path);
-  std::string typeStr, tagStr;
-  if (!mapper || !mapper.mapOptional("id", prop->id) ||
-      !mapper.mapOptional("type", typeStr) ||
-      !mapper.mapOptional("tag", tagStr) ||
-      !mapper.mapOptional("check", prop->check) ||
-      !mapper.mapOptional("owner", prop->owner) ||
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.mapOptional("owner", prop->owner) ||
       !mapper.mapOptional("user", prop->user) ||
       !mapper.mapOptional("owner_index", prop->ownerIndex) ||
       !mapper.mapOptional("user_index", prop->userIndex) ||
       !mapper.mapOptional("owner_channel", prop->ownerChannel) ||
       !mapper.mapOptional("user_channel", prop->userChannel))
     return nullptr;
-
-  if (typeStr != "AOB")
-    return nullptr;
-
-  auto tagOpt = tagFromStr(tagStr);
-  if (!tagOpt)
-    return nullptr;
-
-  prop->tag = *tagOpt;
-  prop->type = TYPE::AOB;
 
   return prop;
 }
@@ -159,12 +212,8 @@ VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
   targetChannel = namer2.getOutputName(j).str();
 }
 
-llvm::json::Object VEQProperty::toJsonObj() const {
-  return llvm::json::Object({{"id", id},
-                             {"type", "VEQ"},
-                             {"tag", tagToStr(tag)},
-                             {"check", check},
-                             {"owner", owner},
+llvm::json::Value VEQProperty::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", owner},
                              {"target", target},
                              {"owner_index", ownerIndex},
                              {"target_index", targetIndex},
@@ -175,29 +224,17 @@ llvm::json::Object VEQProperty::toJsonObj() const {
 std::unique_ptr<VEQProperty>
 VEQProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
   auto prop = std::make_unique<VEQProperty>();
-  llvm::json::ObjectMapper mapper(value, path);
-  std::string typeStr, tagStr;
-  if (!mapper || !mapper.mapOptional("id", prop->id) ||
-      !mapper.mapOptional("type", typeStr) ||
-      !mapper.mapOptional("tag", tagStr) ||
-      !mapper.mapOptional("check", prop->check) ||
-      !mapper.mapOptional("owner", prop->owner) ||
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.mapOptional("owner", prop->owner) ||
       !mapper.mapOptional("target", prop->target) ||
       !mapper.mapOptional("owner_index", prop->ownerIndex) ||
       !mapper.mapOptional("target_index", prop->targetIndex) ||
       !mapper.mapOptional("owner_channel", prop->ownerChannel) ||
       !mapper.mapOptional("target_channel", prop->targetChannel))
     return nullptr;
-
-  if (typeStr != "VEQ")
-    return nullptr;
-
-  auto tagOpt = tagFromStr(tagStr);
-  if (!tagOpt)
-    return nullptr;
-
-  prop->tag = *tagOpt;
-  prop->type = TYPE::VEQ;
 
   return prop;
 }

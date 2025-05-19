@@ -78,7 +78,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
 
       VEQProperty p(uid, FormalProperty::TAG::OPT, res1, res2);
 
-      propertyTable.push_back(json::Value(p.toJsonObj()));
+      propertyTable.push_back(p.toJSON());
       uid++;
     }
   return success();
@@ -122,7 +122,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
 
           AOBProperty p(uid, FormalProperty::TAG::OPT, res);
 
-          propertyTable.push_back(json::Value(p.toJsonObj()));
+          propertyTable.push_back(p.toJSON());
           uid++;
         }
     }

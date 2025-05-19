@@ -28,12 +28,14 @@ public:
   TYPE getType() const { return type; }
   unsigned long getId() const { return id; }
 
+  static std::optional<TYPE> typeFromStr(const std::string &s);
+  static std::string typeToStr(TYPE t);
   static std::optional<TAG> tagFromStr(const std::string &s);
   static std::string tagToStr(TAG t);
 
-  inline virtual llvm::json::Object toJsonObj() const {
-    return llvm::json::Object();
-  };
+  llvm::json::Value toJSON() const;
+
+  inline virtual llvm::json::Value extraInfoToJSON() const { return nullptr; };
 
   std::unique_ptr<FormalProperty> static fromJSON(
       const llvm::json::Value &value, llvm::json::Path path);
@@ -50,6 +52,9 @@ protected:
   TAG tag;
   TYPE type;
   std::string check;
+
+  llvm::json::Value parseBaseAndExtractInfo(const llvm::json::Value &value,
+                                            llvm::json::Path path);
 };
 
 class AOBProperty : public FormalProperty {
@@ -61,7 +66,7 @@ public:
   std::string getOwnerChannel() { return ownerChannel; }
   std::string getUserChannel() { return userChannel; }
 
-  llvm::json::Object toJsonObj() const override;
+  llvm::json::Value extraInfoToJSON() const override;
   /// Attempts to deserialize a propertyfrom a JSON value.
   static std::unique_ptr<AOBProperty> fromJSON(const llvm::json::Value &value,
                                                llvm::json::Path path);
@@ -92,7 +97,7 @@ public:
   std::string getOwnerChannel() { return ownerChannel; }
   std::string getTargetChannel() { return targetChannel; }
 
-  llvm::json::Object toJsonObj() const override;
+  llvm::json::Value extraInfoToJSON() const override;
   /// Attempts to deserialize a propertyfrom a JSON value.
   static std::unique_ptr<VEQProperty> fromJSON(const llvm::json::Value &value,
                                                llvm::json::Path path);
