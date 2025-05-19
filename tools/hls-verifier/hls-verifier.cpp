@@ -46,9 +46,9 @@ static const string LOG_TAG = "[HLS_VERIFIER] ";
 
 void generateModelsimScripts(const VerificationContext &ctx) {
   vector<string> filelistVhdl =
-      getListOfFilesInDirectory(ctx.getVhdlSrcDir(), ".vhd");
+      getListOfFilesInDirectory(ctx.getHdlSrcDir(), ".vhd");
   vector<string> filelistVerilog =
-      getListOfFilesInDirectory(ctx.getVhdlSrcDir(), ".v");
+      getListOfFilesInDirectory(ctx.getHdlSrcDir(), ".v");
 
   std::error_code ec;
   llvm::raw_fd_ostream os(ctx.getModelsimDoFileName(), ec);
@@ -58,10 +58,10 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   os << "project new . simulation work modelsim.ini 0\n";
   os << "project open simulation\n";
   for (auto &it : filelistVhdl)
-    os << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << "\n";
+    os << "project addfile " << ctx.getHdlSrcDir() << "/" << it << "\n";
 
   for (auto &it : filelistVerilog)
-    os << "project addfile " << ctx.getVhdlSrcDir() << "/" << it << "\n";
+    os << "project addfile " << ctx.getHdlSrcDir() << "/" << it << "\n";
 
   os << "project calculateorder\n";
   os << "project compileall\n";
@@ -76,8 +76,8 @@ void copySupplementaryFiles(const VerificationContext &ctx,
   auto copyToVHDLDir = [&](const std::string &from,
                            const std::string &to) -> void {
     string command;
-    command = "cp " + resourcePathName + SEP + from + " " +
-              ctx.getVhdlSrcDir() + SEP + to;
+    command = "cp " + resourcePathName + SEP + from + " " + ctx.getHdlSrcDir() +
+              SEP + to;
     logInf(LOG_TAG, "Copying supplementary files: [" + command + "]");
     executeCommand(command);
   };
@@ -133,7 +133,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   for (auto [argName, type] : argAndTypeMap) {
     std::string vhdlOutFile =
-        ctx.getVhdlOutDir() + SEP + "output_" + argName + ".dat";
+        ctx.getHdlOutDir() + SEP + "output_" + argName + ".dat";
 
     std::string cOutFile =
         ctx.getCOutDir() + SEP + "output_" + argName + ".dat";
@@ -170,11 +170,11 @@ void executeVhdlTestbench(const VerificationContext &ctx) {
   string command;
 
   // Cleaning-up exisiting outputs
-  command = "rm -rf " + ctx.getVhdlOutDir();
+  command = "rm -rf " + ctx.getHdlOutDir();
   logInf(LOG_TAG, "Cleaning VHDL output files [" + command + "]");
   executeCommand(command);
 
-  command = "mkdir -p " + ctx.getVhdlOutDir();
+  command = "mkdir -p " + ctx.getHdlOutDir();
   logInf(LOG_TAG, "Creating VHDL output files directory [" + command + "]");
   executeCommand(command);
 

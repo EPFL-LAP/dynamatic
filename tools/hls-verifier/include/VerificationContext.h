@@ -70,11 +70,11 @@ struct VerificationContext {
 
   string getBaseDir() const;
   string getHlsVerifyDir() const;
-  string getVhdlSrcDir() const;
+  string getHdlSrcDir() const;
 
   string getCOutDir() const;
   string getRefOutDir() const;
-  string getVhdlOutDir() const;
+  string getHdlOutDir() const;
   string getInputVectorDir() const;
 
   string getModelsimDoFileName() const;

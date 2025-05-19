@@ -275,7 +275,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   std::string inputVectorPath = ctx.getInputVectorDir();
-  std::string outputFilePath = ctx.getVhdlOutDir();
+  std::string outputFilePath = ctx.getHdlOutDir();
 
   // The files and configuration of the single_argument model of the data input
   // channels

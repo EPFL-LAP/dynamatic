@@ -26,8 +26,8 @@ const std::string Properties::KEY_FLOAT_COMPARE_THRESHOLD =
 const std::string Properties::KEY_DOUBLE_COMPARE_THRESHOLD =
     "DOUBLE_COMPARE_THRESHOLD";
 const std::string Properties::DEFAULT_MODELSIM_DIR = "MGC_MSIM";
-const std::string Properties::DEFAULT_VHDL_SRC_DIR = "VHDL_SRC";
-const std::string Properties::DEFAULT_VHDL_OUT_DIR = "VHDL_OUT";
+const std::string Properties::DEFAULT_VHDL_SRC_DIR = "HDL_SRC";
+const std::string Properties::DEFAULT_VHDL_OUT_DIR = "HDL_OUT";
 const std::string Properties::DEFAULT_INPUT_DIR = "INPUT_VECTORS";
 const std::string Properties::DEFAULT_C_SRC_DIR = "C_SRC";
 const std::string Properties::DEFAULT_C_OUT_DIR = "C_OUT";
@@ -70,7 +70,7 @@ string VerificationContext::getVhdlDuvEntityName() const {
 }
 
 string VerificationContext::getVhdlTestbenchPath() const {
-  return getVhdlSrcDir() + "/" + "hls_verify_" + getCFuvFunctionName() +
+  return getHdlSrcDir() + "/" + "hls_verify_" + getCFuvFunctionName() +
          "_tb.vhd";
 }
 
@@ -90,7 +90,7 @@ string VerificationContext::getRefOutDir() const {
   return getBaseDir() + "/" + properties.get(Properties::KEY_REF_OUT_DIR);
 }
 
-string VerificationContext::getVhdlOutDir() const {
+string VerificationContext::getHdlOutDir() const {
   return getBaseDir() + "/" + properties.get(Properties::KEY_VHDL_OUT_DIR);
 }
 
@@ -98,6 +98,6 @@ string VerificationContext::getBaseDir() const { return ".."; }
 
 string VerificationContext::getHlsVerifyDir() const { return "."; }
 
-string VerificationContext::getVhdlSrcDir() const {
+string VerificationContext::getHdlSrcDir() const {
   return getBaseDir() + "/" + properties.get(Properties::KEY_VHDL_SRC_DIR);
 }
