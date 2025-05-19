@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(mlirPathName.c_str());
   if (std::error_code error = fileOrErr.getError()) {
-    llvm::errs() << argv[0] << ": could not open input file '" << mlirPathName
+    llvm::errs() << "Could not open input file '" << mlirPathName
                  << "': " << error.message() << "\n";
     return 1;
   }

@@ -494,6 +494,11 @@ void vhdlTbCodegen(VerificationContext &ctx) {
 
   std::error_code ec;
   llvm::raw_fd_ostream fileStream(ctx.getVhdlTestbenchPath(), ec);
+  if (ec) {
+    llvm::errs() << "Error opening file: " << ec.message() << "\n";
+    // Handle error appropriately, e.g., return, exit, etc.
+    assert(false);
+  }
   mlir::raw_indented_ostream os(fileStream);
 
   os << VHDL_LIBRARY_HEADER;

@@ -10,7 +10,6 @@ add_llvm_tool(hls-verifier
   lib/HlsLogging.cpp
   lib/HlsVhdlTb.cpp
   lib/Utilities.cpp
-  lib/VerificationContext.cpp
 )
 
 llvm_update_compile_flags(hls-verifier)

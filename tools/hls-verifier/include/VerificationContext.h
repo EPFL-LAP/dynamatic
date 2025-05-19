@@ -17,73 +17,62 @@
 #include <string>
 #include <vector>
 
-using namespace std;
 using namespace dynamatic;
 
-class Properties {
-public:
-  static const string KEY_MODELSIM_DIR;
-  static const string KEY_VHDL_SRC_DIR;
-  static const string KEY_VHDL_OUT_DIR;
-  static const string KEY_INPUT_DIR;
-  static const string KEY_C_SRC_DIR;
-  static const string KEY_C_OUT_DIR;
-  static const string KEY_MODELSIM_DO_FILE;
-  static const string KEY_REF_OUT_DIR;
-  static const string KEY_HLSVERIFY_DIR;
-  static const string KEY_FLOAT_COMPARE_THRESHOLD;
-  static const string KEY_DOUBLE_COMPARE_THRESHOLD;
-  static const string DEFAULT_MODELSIM_DIR;
-  static const string DEFAULT_VHDL_SRC_DIR;
-  static const string DEFAULT_VHDL_OUT_DIR;
-  static const string DEFAULT_INPUT_DIR;
-  static const string DEFAULT_C_SRC_DIR;
-  static const string DEFAULT_C_OUT_DIR;
-  static const string DEFAULT_MODLELSIM_DO_FILE;
-  static const string DEFAULT_REF_OUT_DIR;
-  static const string DEFAULT_HLSVERIFY_DIR;
-  static const string DEFAULT_FLOAT_COMPARE_THRESHOLD;
-  static const string DEFAULT_DOUBLE_COMPARE_THRESHOLD;
-
-  Properties();
-  Properties(const string &propertiesFileName);
-
-  string get(const string &key) const;
-
-private:
-  map<string, string> properties;
-};
+static const std::string MODELSIM_DIR = "MGC_MSIM";
+static const std::string HDL_SRC_DIR = "HDL_SRC";
+static const std::string HDL_OUT_DIR = "HDL_OUT";
+static const std::string INPUT_VECTORS_DIR = "INPUT_VECTORS";
+static const std::string C_SOURCE_DIR = "C_SRC";
+static const std::string C_OUT_DIR = "C_OUT";
+static const std::string VSIM_SCRIPT_FILE = "simulation.do";
+static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
+static const std::string FLOAT_COMPARE_THRESHOLD = "0.00001";
+static const std::string DOUBLE_COMPARE_THRESHOLD = "0.000000000001";
 
 struct VerificationContext {
-  VerificationContext(const string &cFuvFunctionName,
-                      const string &vhdlDuvEntityName,
+  VerificationContext(const std::string &cFuvFunctionName,
+                      const std::string &vhdlDuvEntityName,
                       handshake::FuncOp *funcOp)
-      : funcOp(funcOp), properties(), cFUVFunctionName(cFuvFunctionName),
+      : funcOp(funcOp), cFUVFunctionName(cFuvFunctionName),
         vhdlDUVEntityName(vhdlDuvEntityName) {}
 
-  string getCFuvFunctionName() const;
-  string getVhdlDuvEntityName() const;
+  std::string getCFuvFunctionName() const {
+    if (!cFUVFunctionName.empty())
+      return cFUVFunctionName;
+    return vhdlDUVEntityName;
+  }
 
-  string getInjectedCFuvPath() const;
-  string getCExecutablePath() const;
-  string getVhdlTestbenchPath() const;
+  std::string getVhdlDuvEntityName() const {
+    if (!vhdlDUVEntityName.empty())
+      return vhdlDUVEntityName;
+    return cFUVFunctionName;
+  }
 
-  string getBaseDir() const;
-  string getHlsVerifyDir() const;
-  string getHdlSrcDir() const;
+  std::string getBaseDir() const { return ".."; }
 
-  string getCOutDir() const;
-  string getRefOutDir() const;
-  string getHdlOutDir() const;
-  string getInputVectorDir() const;
+  std::string getVhdlTestbenchPath() const {
+    return getHdlSrcDir() + "/" + "tb_" + getCFuvFunctionName() + ".vhd";
+  }
 
-  string getModelsimDoFileName() const;
+  std::string getModelsimDoFileName() const { return VSIM_SCRIPT_FILE; }
+
+  std::string getCOutDir() const { return getBaseDir() + "/" + C_OUT_DIR; }
+
+  std::string getInputVectorDir() const {
+    return getBaseDir() + "/" + INPUT_VECTORS_DIR;
+  }
+
+  std::string getHdlOutDir() const { return getBaseDir() + "/" + HDL_OUT_DIR; }
+
+  std::string getHlsVerifyDir() const { return "."; }
+
+  std::string getHdlSrcDir() const { return getBaseDir() + "/" + HDL_SRC_DIR; }
 
   handshake::FuncOp *funcOp;
 
-  Properties properties;
-  string cFUVFunctionName;
-  string vhdlDUVEntityName;
+  std::string cFUVFunctionName;
+  std::string vhdlDUVEntityName;
 };
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H
