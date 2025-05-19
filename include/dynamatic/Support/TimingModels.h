@@ -55,7 +55,7 @@ public:
   /// sets the metric's value otherwise. For the returned metric to make any
   /// sense, the metric must be monotonically increasing with respect to the
   /// bitwidth.
-  LogicalResult getCeilMetric(unsigned bitwidth, M &metric, double targetPeriod) const {
+  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const {
     std::optional<unsigned> widthCeil;
     M metricCeil = 0.0;
 
@@ -83,8 +83,8 @@ public:
   /// Determines the value of the metric at the bitwidth that is closest and
   /// greater than or equal to the passed operation's datawidth. See override's
   /// documentation for more details.
-  LogicalResult getCeilMetric(Operation *op, M &metric, double targetPeriod) const {
-    return getCeilMetric(getOpDatawidth(op), metric, double targetPeriod);
+  LogicalResult getCeilMetric(Operation *op, M &metric) const {
+    return getCeilMetric(getOpDatawidth(op), metric);
   }
 };
 
@@ -92,17 +92,17 @@ template <typename M>
 struct FrequencyDepMetric {
 public:
   /// Data points for the metric, mapping a frequency with the metric's value
-  std::unordered_map<double, M> data;
+  std::map<unsigned, double> data;
 
   /// Determines the value of the metric at the internal operating delay that is highest, but still smaller than the target period (meaning we pick the slowest
   /// implementation that still meets timing).
-  LogicalResult getDelayCeilMetric(double , M &metric, double targetPeriod) const {
+  LogicalResult getDelayCeilMetric( double targetPeriod , M &metric) const {
     std::optional<unsigned> opDelayCeil;
     M metricFloor = 0.0;
 
     // Find highest delay that's <= targetPeriod
     for (const auto &[opDelay, val] : data) {
-      if (opDelay <= targetFreq) {
+      if (opDelay <= targetPeriod) {
         if (!opDelayCeil.has_value() || *opDelayCeil < opDelay) {
           opDelayCeil = opDelay;
           metricFloor = val;
@@ -147,7 +147,8 @@ public:
   };
 
   /// Operation's latency, depending on its bitwidth.
-  BitwidthDepMetric<double> latency;
+  BitwidthDepMetric<std::map<unsigned, double>> latency;
+  mutable FrequencyDepMetric<double> latency_freq;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
   /// Delay of valid wire.
@@ -242,7 +243,7 @@ public:
   /// output delay) for a specific signal type. On success, sets the last
   /// argument to the requested delay.
   LogicalResult getTotalDelay(Operation *op, SignalType signalType,
-                              double &delay, double targetPeriod) const;
+                              double &delay) const;
 
   /// Parses a JSON file whose path is given as argument and adds all the timing
   /// models it contains to the passed timing database.

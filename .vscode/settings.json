@@ -55,7 +55,9 @@
     "memory_resource": "cpp",
     "random": "cpp",
     "system_error": "cpp",
-    "utility": "cpp"
+    "utility": "cpp",
+    "__tree": "cpp",
+    "ios": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",

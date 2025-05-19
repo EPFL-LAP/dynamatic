@@ -2,7 +2,7 @@
   "handshake.cmpi": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -67,7 +67,7 @@
   "handshake.addi": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -132,7 +132,7 @@
   "handshake.subi": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -321,7 +321,7 @@
   "handshake.store": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -380,7 +380,7 @@
   "handshake.merge": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -799,7 +799,7 @@
   "handshake.cmpf": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -864,7 +864,7 @@
   "handshake.control_merge": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -923,7 +923,7 @@
   "handshake.fork": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -982,7 +982,7 @@
   "handshake.return": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1047,7 +1047,7 @@
   "handshake.cond_br": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1106,7 +1106,7 @@
   "handshake.end": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1165,7 +1165,7 @@
   "handshake.andi": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1225,7 +1225,7 @@
   "handshake.ori": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1285,7 +1285,7 @@
   "handshake.xori": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1345,7 +1345,7 @@
   "handshake.shli": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1410,7 +1410,7 @@
   "handshake.shrsi": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1475,7 +1475,7 @@
   "handshake.shrui": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1540,7 +1540,7 @@
   "handshake.select": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {
@@ -1599,7 +1599,7 @@
   "handshake.mux": {
     "latency": {
       "64": {
-             "1.0" : 0.0
+             "0.0" : 0.0
         }
     },
     "delay": {

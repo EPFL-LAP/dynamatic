@@ -112,7 +112,10 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
 }
 
 LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
-                                         double &latency, double targetPeriod) const {
+                                         double &latency, double targetPeriod) const // Our current timing model doesn't have latency information for valid and
+  // ready signals, assume it is 0 // Our current timing model doesn't have latency information for valid and
+  // ready signals, assume it is 0.
+{
   // Our current timing model doesn't have latency information for valid and
   // ready signals, assume it is 0.
   if (signalType != SignalType::DATA) {
@@ -120,12 +123,21 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
     return success();
   }
 
-  const TimingModel *model = getModel(op);
+  const TimingModel *model = getModel(op); //TODO : get model also needs to change, most likely
   if (!model)
     return failure();
 
-  if (failed(model->latency.getCeilMetric(op, latency)))
-    return failure();
+  std::map<unsigned, double> latency_map;
+  if (failed(model->latency.getCeilMetric(op, latency_map)))
+      return failure();
+    // or we write to the attribute here, to keeo things clean
+// Populate FrequencyDepMetric with the map data
+    model->latency_freq.data = latency_map;
+
+    // Now get the final latency value using FrequencyDepMetric
+    if (failed(model->latency_freq.getDelayCeilMetric(targetPeriod, latency)))
+      return failure();
+
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
@@ -141,7 +153,7 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
 }
 
 LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
-                                               double &delay) const {
+                                               double &delay, double targetPeriod) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
@@ -160,7 +172,7 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalT
 
 LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
                                            PortType portType,
-                                           double &delay) const {
+                                           double &delay, double targetPeriod) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
