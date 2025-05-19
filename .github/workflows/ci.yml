@@ -29,8 +29,17 @@ jobs:
           echo "Running autopep8..."
           git fetch origin main --no-recurse-submodules
           git reset FETCH_HEAD
-          autopep8 --max-line-length 200 --diff $(git ls-files '*.py' --modified)
+          FILES=$(git ls-files '*.py' --modified)
           STATUS=$?
+          if [[ $FILES ]]; then
+            if [[ $(autopep8 --max-line-length 200 --diff $FILES) ]]; then
+              STATUS=1
+            else
+              STATUS=0
+            fi
+          else
+            STATUS=0
+          fi
           echo "autopep8 exited with $STATUS"
           deactivate
           exit $STATUS
