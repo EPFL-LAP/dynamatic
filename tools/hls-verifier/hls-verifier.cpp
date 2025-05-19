@@ -237,11 +237,6 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(cFuvFunctionName));
 
-  std::string vhdlSrcDir = "../VHDL_SRC";
-
-  std::string vhdlTestbenchPath =
-      vhdlSrcDir + SEP + "hls_verify_" + cFuvFunctionName + "_tb.vhd";
-
   VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp);
 
   // Generate hls_verify_<cFuvFunctionName>.vhd

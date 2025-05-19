@@ -70,8 +70,7 @@ string VerificationContext::getVhdlDuvEntityName() const {
 }
 
 string VerificationContext::getVhdlTestbenchPath() const {
-  return getHdlSrcDir() + "/" + "hls_verify_" + getCFuvFunctionName() +
-         "_tb.vhd";
+  return getHdlSrcDir() + "/" + "tb_" + getCFuvFunctionName() + ".vhd";
 }
 
 string VerificationContext::getModelsimDoFileName() const {
