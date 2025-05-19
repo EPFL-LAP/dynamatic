@@ -59,11 +59,9 @@ string Properties::get(const string &key) const {
 VerificationContext::VerificationContext(const string &cTbPath,
                                          const string &cFuvPath,
                                          const string &cFuvFunctionName,
-                                         const string &vhdlDuvEntityName,
-                                         vector<string> &otherCSrcPaths)
+                                         const string &vhdlDuvEntityName)
     : properties(), cTBPath(cTbPath), cFUVPath(cFuvPath),
-      otherCSrcPaths(otherCSrcPaths), cFUVFunctionName(cFuvFunctionName),
-      vhdlDUVEntityName(vhdlDuvEntityName) {
+      cFUVFunctionName(cFuvFunctionName), vhdlDUVEntityName(vhdlDuvEntityName) {
   string preprocessedCTb = CAnalyser::getPreprocOutput(
       getCTbPath(), extractParentDirectoryPath(getCTbPath()));
   CAnalyser::parseCFunction(preprocessedCTb, getCFuvFunctionName(), fuv);
@@ -90,10 +88,6 @@ string VerificationContext::getVhdlDuvEntityName() const {
   if (!vhdlDUVEntityName.empty())
     return vhdlDUVEntityName;
   return cFUVFunctionName;
-}
-
-vector<string> VerificationContext::getOtherCSrcPaths() const {
-  return otherCSrcPaths;
 }
 
 string VerificationContext::getCExecutablePath() const {
