@@ -60,9 +60,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return nullptr;
 
   if (propType == "AOB") {
-    return AOBProperty::fromJson(value, path);
+    return AOBProperty::fromJSON(value, path);
   } else if (propType == "VEQ") {
-    return VEQProperty::fromJson(value, path);
+    return VEQProperty::fromJSON(value, path);
   }
   return nullptr;
 }
@@ -70,7 +70,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
 // Absence of Backpressure
 
 AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
-    : FormalProperty(id, tag) {
+    : FormalProperty(id, tag, TYPE::AOB) {
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
 
@@ -133,6 +133,7 @@ AOBProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
     return nullptr;
 
   prop->tag = *tagOpt;
+  prop->type = TYPE::AOB;
 
   return prop;
 }
@@ -141,7 +142,7 @@ AOBProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
 
 VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
                          const OpResult &res2)
-    : FormalProperty(id, tag) {
+    : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
   handshake::PortNamer namer1(op1);
@@ -196,6 +197,7 @@ VEQProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
     return nullptr;
 
   prop->tag = *tagOpt;
+  prop->type = TYPE::VEQ;
 
   return prop;
 }

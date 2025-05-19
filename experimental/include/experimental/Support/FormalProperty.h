@@ -22,8 +22,10 @@ class FormalProperty {
 
 public:
   enum class TAG { OPT, INVAR, ERROR };
+  enum class TYPE { AOB, VEQ };
 
   TAG getTag() const { return tag; }
+  TYPE getType() const { return type; }
   unsigned long getId() const { return id; }
 
   static std::optional<TAG> tagFromStr(const std::string &s);
@@ -37,19 +39,20 @@ public:
       const llvm::json::Value &value, llvm::json::Path path);
 
   FormalProperty() = default;
-  FormalProperty(unsigned long id, const std::string &tag)
-      : id(id), tag(*tagFromStr(tag)), check("unchecked") {}
-  FormalProperty(unsigned long id, TAG tag)
-      : id(id), tag(tag), check("unchecked") {}
+  FormalProperty(unsigned long id, TAG tag, TYPE type)
+      : id(id), tag(tag), type(type), check("unchecked") {}
   virtual ~FormalProperty() = default;
+
+  static bool classof(const FormalProperty *fp) { return true; }
 
 protected:
   unsigned long id;
   TAG tag;
+  TYPE type;
   std::string check;
 };
 
-class AOBProperty : FormalProperty {
+class AOBProperty : public FormalProperty {
 public:
   std::string getOwner() { return owner; }
   std::string getUser() { return user; }
@@ -67,6 +70,10 @@ public:
   AOBProperty(unsigned long id, TAG tag, const OpResult &res);
   ~AOBProperty() = default;
 
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::AOB;
+  }
+
 private:
   std::string owner;
   std::string user;
@@ -76,7 +83,7 @@ private:
   std::string userChannel;
 };
 
-class VEQProperty : FormalProperty {
+class VEQProperty : public FormalProperty {
 public:
   std::string getOwner() { return owner; }
   std::string getTarget() { return target; }
@@ -90,13 +97,14 @@ public:
   static std::unique_ptr<VEQProperty> fromJSON(const llvm::json::Value &value,
                                                llvm::json::Path path);
 
-  // std::optional<TYPE> typeFromStr(const std::string &s);
-  std::optional<TAG> tagFromStr(const std::string &s);
-
   VEQProperty() = default;
   VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
               const OpResult &res2);
   ~VEQProperty() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::VEQ;
+  }
 
 private:
   std::string owner;
@@ -122,7 +130,7 @@ public:
                        llvm::json::Path path) {
     // fromJson internally allocates the correct space for the class with
     // make_unique and returns a pointer
-    property = FormalProperty::fromJson(value, path);
+    property = FormalProperty::fromJSON(value, path);
 
     return true;
   }

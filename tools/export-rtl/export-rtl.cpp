@@ -47,6 +47,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -134,7 +135,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -322,13 +323,8 @@ public:
   HDL hdl;
 
   /// Creates the RTL writer.
-<<<<<<< HEAD
-  RTLWriter(ExportInfo &exportInfo, HDL hdl)
-      : exportInfo(exportInfo), hdl(hdl){};
-=======
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
       : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
->>>>>>> dev/gioele/generate-prop
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -1222,41 +1218,33 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
   for (const auto &[i, property] :
        llvm::enumerate(propertyInfo.table.getProperties())) {
 
-    FormalProperty::TYPE propertyType = property.getType();
-    FormalProperty::TAG propertyTag = property.getTag();
+    FormalProperty::TAG propertyTag = property->getTag();
 
-    auto path = propertyInfo.jsonPath.index(i);
-    llvm::json::ObjectMapper mapper(property.getInfo(), path);
-
-    if (propertyType == FormalProperty::TYPE::AOB) {
-      std::string owner, ownerChannel, user, userChannel;
-      if (!mapper || !mapper.mapOptional("owner", owner) ||
-          !mapper.mapOptional("owner_channel", ownerChannel) ||
-          !mapper.mapOptional("user", user) ||
-          !mapper.mapOptional("user_channel", userChannel)) {
-        return failure();
-      }
+    if (llvm::isa<AOBProperty>(property.get())) {
+      auto *p = llvm::cast<AOBProperty>(property.get());
+      auto owner = p->getOwner();
+      auto ownerChannel = p->getOwnerChannel();
+      auto user = p->getUser();
+      auto userChannel = p->getUserChannel();
       std::string validSignal = owner + "." + ownerChannel + "_valid";
       std::string readySignal = user + "." + userChannel + "_ready";
 
-      data.properties[property.getId()] = {validSignal + " -> " + readySignal,
-                                           propertyTag};
-
-    } else if (propertyType == FormalProperty::TYPE::VEQ) {
-      std::string owner, ownerChannel, target, targetChannel;
-      if (!mapper || !mapper.mapOptional("owner", owner) ||
-          !mapper.mapOptional("owner_channel", ownerChannel) ||
-          !mapper.mapOptional("target", target) ||
-          !mapper.mapOptional("target_channel", targetChannel)) {
-        return failure();
-      }
+      data.properties[p->getId()] = {validSignal + " -> " + readySignal,
+                                     propertyTag};
+    } else if (llvm::isa<VEQProperty>(property.get())) {
+      auto *p = llvm::cast<VEQProperty>(property.get());
+      auto owner = p->getOwner();
+      auto ownerChannel = p->getOwnerChannel();
+      auto target = p->getTarget();
+      auto targetChannel = p->getTargetChannel();
       std::string validSignal1 = owner + "." + ownerChannel + "_valid";
       std::string validSignal2 = target + "." + targetChannel + "_valid";
 
-      data.properties[property.getId()] = {
-          validSignal1 + " <-> " + validSignal2, propertyTag};
-    } else
+      data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
+                                     propertyTag};
+    } else {
       return failure();
+    }
   }
   return success();
 }
@@ -1272,7 +1260,6 @@ void SMVWriter::constructIOMappings(
         getInternalSignalName(signal, SignalType::VALID));
   };
   auto addReady = [&](StringRef port, OpResult res) -> void {
-<<<<<<< HEAD
     // To get the name of the ready signal we can't use the internal signal
     // name. We need to get the user of the signal, and search the name of the
     // corresponding port.
@@ -1280,45 +1267,6 @@ void SMVWriter::constructIOMappings(
     //          The ready signal needs the name of the user unit_rx.ins_ready
     auto signal = getUserSignal(res);
     if (signal != std::nullopt)
-=======
-    // To get the name of the ready signal we can't use the inetrnal signal
-    // name. We need to get the user of the signal, and search the name of
-    // the corresponding port. Example: unit_tx -> [channel] -> unit_rx
-    //          The ready signal needs the name of the user
-    //          unit_rx.ins_ready
-    auto *userOp = *res.getUsers().begin();
-    unsigned operandIndex = 0;
-    for (unsigned i = 0; i < userOp->getNumOperands(); ++i) {
-      auto operand = userOp->getOperand(i);
-      if (operand == res) {
-        operandIndex = i;
-        break;
-      }
-    }
-    std::string instName;
-    bool instFound = false;
-    if (auto argNamesAttr =
-            userOp->getAttrOfType<mlir::StringAttr>("instanceName")) {
-      instName = argNamesAttr.getValue().str();
-      instFound = true;
-    }
-    std::string argName;
-    bool argFound = false;
-    if (auto argNamesAttr =
-            userOp->getAttrOfType<mlir::ArrayAttr>("argNames")) {
-      if (operandIndex < argNamesAttr.size()) {
-        if (auto strAttr =
-                argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
-          argName = strAttr.getValue().str();
-          argFound = true;
-        }
-      }
-    }
-
-    const std::string signal = instName + "." + argName;
-
-    if (instFound && argFound)
->>>>>>> dev/gioele/generate-prop
       mappings[getTypedSignalName(port, SignalType::READY)].push_back(
           getInternalSignalName(signal.value(), SignalType::READY));
     else {
@@ -1405,18 +1353,15 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
     os << "DEFINE " << dst << " := " << src << ";\n";
   });
 
-<<<<<<< HEAD
   os << "\n\n";
 
   writeModuleInstantiations(data);
-=======
   os << "\n// properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)
       os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
   });
->>>>>>> dev/gioele/generate-prop
 
   return success();
 }
