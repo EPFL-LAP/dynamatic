@@ -5,21 +5,29 @@
 #set-src integration-test/histogram_2/histogram_2.c
 
 
-#set-src integration-test/histogram/histogram.c
+
 
 #set-src integration-test/insertion_sort/insertion_sort.c
-set-src integration-test/matrix_power/matrix_power.c
+#set-src integration-test/matrix_power/matrix_power.c
 
 
 #set-src integration-test/rouzbeh/rouzbeh.c
 #set-src integration-test/gaussian/gaussian.c
 #set-src integration-test/video_filter/video_filter.c
-#set-src integration-test/matching/matching.c
 
 set-clock-period 4
-#set-src integration-test/memory/test_memory_1/test_memory_1.c
+#set-src integration-test/memory/test_memory_2/test_memory_2.c
+#set-src integration-test/gemm/gemm.c
+
+
+#set-src integration-test/matching/matching.c
+
+
+set-src integration-test/histogram/histogram.c
+
+
 #compile --buffer-algorithm fpga20 --fast-token-delivery
-compile --skippable-seq-n 2 --optimize-zero --buffer-algorithm fpga20
+compile --skippable-seq-n 3 --optimize-zero --buffer-algorithm fpga20
 #compile --skippable-seq-n 7 --buffer-algorithm fpga20
 #compile
 write-hdl

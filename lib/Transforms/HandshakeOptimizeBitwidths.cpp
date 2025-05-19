@@ -618,6 +618,27 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
     if (optWidth == 0) {
 
       llvm::errs() << "tof tof tof tof \n" << channelVal << "\n";
+
+      llvm::errs() << "check point 1 \n";
+
+
+      // iterate over the users of the channelVal
+      for (Operation *user : channelVal.getUsers()) {
+        llvm::errs() << "user: " << *user << "\n";
+      }
+
+      llvm::errs() << "check point 1 \n";
+      
+      for (mlir::OpOperand &use : channelVal.getUses()) {
+        mlir::Operation *useOwner = use.getOwner();
+        llvm::outs() << "Value is used as operand number " 
+                     << use.getOperandNumber() << " of operation "
+                     << useOwner << "\n";
+      }
+
+      llvm::errs() << "check point 1 \n";
+      
+
     }
     if (optWidth >= dataWidth)
       return failure();
