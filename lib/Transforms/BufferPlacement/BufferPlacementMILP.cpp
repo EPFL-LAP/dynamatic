@@ -319,7 +319,7 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // If there is at least one slot, there must be a buffer
-  model.addConstr(0.01 * bufNumSlots <= bufPresent, "buffer_presence");
+  model.addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
 
   for (auto &[sig, signalVars] : chVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
@@ -339,14 +339,10 @@ void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
   GRBVar &dataLatency = chVars.dataLatency;
 
   // There is a buffer breaking data & valid iff dataLatency > 0
-  model.addGenConstrIndicator(dataBuf, 1, dataLatency >= 1, 
-                              "dataBuf_if_dataLatency");
-  model.addGenConstrIndicator(validBuf, 1, dataLatency >= 1,
-                              "validBuf_if_dataLatency");
-  model.addGenConstrIndicator(dataBuf, 0, dataLatency == 0,
-                              "dataLatency_if_dataBuf");
-  model.addGenConstrIndicator(validBuf, 0, dataLatency == 0,
-                              "dataLatency_if_validBuf");
+  model.addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
+  model.addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
+  model.addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model.addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
 
   // The dataBuf and validBuf must be equal
   // This constraint is not necessary, but may assist presolve.
