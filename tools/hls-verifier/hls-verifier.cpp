@@ -19,7 +19,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OwningOpRef.h" // Include the header for OwningOpRef
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseMap.h"
@@ -79,7 +79,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   llvm::SmallVector<std::pair<std::string, Type>> argAndTypeMap;
 
-  // Connect the memory elements to the DUV
+  // Collecting the types and names of the arguments to be compared.
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -93,6 +93,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
                    dyn_cast<mlir::MemRefType>(arg.getType())) {
       argAndTypeMap.emplace_back(argName, type.getElementType());
     }
+    // Skipping the ControlType as there is no value to be compared.
   }
 
   // Connect the output channels to the DUV
@@ -103,6 +104,7 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
             dyn_cast<handshake::ChannelType>(resType)) {
       argAndTypeMap.emplace_back(argName, type.getDataType());
     }
+    // Skipping the ControlType as there is no value to be compared.
   }
 
   for (auto [argName, type] : argAndTypeMap) {
