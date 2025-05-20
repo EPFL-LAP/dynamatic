@@ -71,32 +71,6 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   os << "exit\n";
 }
 
-void copySupplementaryFiles(const VerificationContext &ctx,
-                            const std::string &resourcePathName) {
-  auto copyToVHDLDir = [&](const std::string &from,
-                           const std::string &to) -> void {
-    string command;
-    command = "cp " + resourcePathName + SEP + from + " " + ctx.getHdlSrcDir() +
-              SEP + to;
-    logInf(LOG_TAG, "Copying supplementary files: [" + command + "]");
-    executeCommand(command);
-  };
-  auto copyToHLSDir = [&](const std::string &from,
-                          const std::string &to) -> void {
-    string command;
-    command = "cp " + resourcePathName + SEP + from + " " +
-              ctx.getHlsVerifyDir() + SEP + to;
-    logInf(LOG_TAG, "Copying supplementary files: [" + command + "]");
-    executeCommand(command);
-  };
-
-  copyToVHDLDir("template_tb_join.vhd", "tb_join.vhd");
-  copyToVHDLDir("template_two_port_RAM.vhd", "two_port_RAM.vhd");
-  copyToVHDLDir("template_single_argument.vhd", "single_argument.vhd");
-  copyToVHDLDir("template_simpackage.vhd", "simpackage.vhd");
-  copyToHLSDir("modelsim.ini", "modelsim.ini");
-}
-
 mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   // mlir::raw_indented_ostream &os = ctx.testbenchStream;
@@ -185,11 +159,6 @@ void executeVhdlTestbench(const VerificationContext &ctx) {
 }
 
 int main(int argc, char **argv) {
-  cl::opt<std::string> resourcePathName(
-      "resource-path",
-      cl::desc("Name of the resource path (with two_port_RAM.vhd, "
-               "single_argument.vhd, etc.)"),
-      cl::value_desc("resource-path"), cl::Required);
   cl::opt<std::string> cFuvFunctionName(
       "cfuv-function-name", cl::desc("Name of the C function name"),
       cl::value_desc("cfuv-function-name"), cl::Required);
@@ -241,9 +210,6 @@ int main(int argc, char **argv) {
 
   // Generate hls_verify_<cFuvFunctionName>.vhd
   vhdlTbCodegen(ctx);
-
-  // Copy two_port_RAM.vhd, single_argument.vhd, etc. to the VHDL source
-  copySupplementaryFiles(ctx, resourcePathName);
 
   // Need to first copy the supplementary files to the VHDL source before
   // generating the scripts (it looks at the existing files to generate the
