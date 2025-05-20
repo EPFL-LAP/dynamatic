@@ -57,7 +57,10 @@
     "system_error": "cpp",
     "utility": "cpp",
     "__tree": "cpp",
-    "ios": "cpp"
+    "ios": "cpp",
+    "cmath": "cpp",
+    "__hash_table": "cpp",
+    "__node_handle": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",

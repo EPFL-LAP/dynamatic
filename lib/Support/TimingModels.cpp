@@ -127,15 +127,13 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   if (!model)
     return failure();
 
-  std::map<unsigned, double> latency_map;
-  if (failed(model->latency.getCeilMetric(op, latency_map)))
+ FrequencyDepMetric<double> freqStruct;
+  if (failed(model->latency.getCeilMetric(op, freqStruct)))
       return failure();
     // or we write to the attribute here, to keeo things clean
-// Populate FrequencyDepMetric with the map data
-    model->latency_freq.data = latency_map;
 
     // Now get the final latency value using FrequencyDepMetric
-    if (failed(model->latency_freq.getDelayCeilMetric(targetPeriod, latency)))
+    if (failed(freqStruct.getDelayCeilMetric(targetPeriod, latency)))
       return failure();
 
 

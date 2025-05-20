@@ -147,8 +147,7 @@ public:
   };
 
   /// Operation's latency, depending on its bitwidth.
-  BitwidthDepMetric<std::map<unsigned, double>> latency;
-  mutable FrequencyDepMetric<double> latency_freq;
+  BitwidthDepMetric<FrequencyDepMetric<double>> latency;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
   /// Delay of valid wire.
