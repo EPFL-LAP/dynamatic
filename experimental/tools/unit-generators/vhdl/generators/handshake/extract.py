@@ -1,18 +1,20 @@
 from generators.support.signal_manager import generate_signal_manager
 
-def generate_extract(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_extract_signal_manager(name, bitwidth, extra_signals)
-  if bitwidth == 0:
-    return _generate_extract_dataless(name)
-  else:
-    return _generate_extract(name, bitwidth)
-  
+def generate_extract(name, params):
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
+
+    if extra_signals:
+        return _generate_extract_signal_manager(name, bitwidth, extra_signals)
+    if bitwidth == 0:
+        return _generate_extract_dataless(name)
+    else:
+        return _generate_extract(name, bitwidth)
+
+
 def _generate_extract(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -31,8 +33,8 @@ entity {name} is
   );
 end {name};
 """
-    
-  architecture = f"""
+
+    architecture = f"""
 -- Architecture of extract
 architecture arch of {name} is
 begin
@@ -41,10 +43,11 @@ begin
   ins_ready <= outs_ready;
 end architecture;
 """
-  return entity + architecture
+    return entity + architecture
+
 
 def _generate_extract_dataless(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -61,8 +64,8 @@ entity {name} is
   );
 end {name};
 """
-    
-  architecture = f"""
+
+    architecture = f"""
 -- Architecture of extract
 architecture arch of {name} is
 begin
@@ -70,21 +73,22 @@ begin
   ins_ready <= outs_ready;
 end architecture;
 """
-  return entity + architecture
+    return entity + architecture
+
 
 def _generate_extract_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": {}
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_extract_dataless(name) if bitwidth == 0
-      else _generate_extract(name, bitwidth))
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": {}
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_extract_dataless(name) if bitwidth == 0
+        else _generate_extract(name, bitwidth))
