@@ -27,8 +27,6 @@ static const std::string C_SOURCE_DIR = "C_SRC";
 static const std::string C_OUT_DIR = "C_OUT";
 static const std::string VSIM_SCRIPT_FILE = "simulation.do";
 static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
-static const std::string FLOAT_COMPARE_THRESHOLD = "0.00001";
-static const std::string DOUBLE_COMPARE_THRESHOLD = "0.000000000001";
 
 struct VerificationContext {
   VerificationContext(const std::string &cFuvFunctionName,
