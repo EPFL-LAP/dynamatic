@@ -135,6 +135,34 @@ struct MemRefToDualPortRAM {
   }
 };
 
+// Centralizes the signal declaration for single argument models (both as inputs
+// and outputs)
+void declareSignalsSingleArgumentModel(mlir::raw_indented_ostream &os,
+                                       const std::string &argName,
+                                       unsigned dataWidth) {
+  // The single argument block needs to define all these signals, regardless
+  // of using as an input argument or an output argument
+  declareSTL(os, argName + "_" + CE0_PORT);
+  declareSTL(os, argName + "_" + WE0_PORT);
+  declareSTL(os, argName + "_din0", to_string(dataWidth));
+  declareSTL(os, argName + "_dout0", to_string(dataWidth));
+  declareSTL(os, argName + "_dout0_valid");
+  declareSTL(os, argName + "_dout0_ready");
+}
+
+void commonSingleArgumentDeclaration(Instance &inst,
+                                     const std::string &argName) {
+  inst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
+      .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
+      .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
+      .connect(CLK_PORT, "tb_" + CLK_PORT)
+      .connect(RST_PORT, "tb_" + RST_PORT)
+      .connect(DONE_PORT, "tb_temp_idle")
+      .connect(D_OUT0_PORT, argName + "_dout0")
+      .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
+      .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
+}
+
 // A helper struct for connecting the in/output channels from/to the single
 // argument.  The single argument block is basically an one-element RAM, with
 // the following interface signals:
@@ -144,15 +172,13 @@ struct MemRefToDualPortRAM {
 // - dout0: data output
 // - dout0_valid: output handshake
 // - dout0_ready: output handshake
-struct ChannelToSingleArgument {
-
+struct StartToChannelConnector {
   handshake::ChannelType type;
   std::string argName;
-  bool isInput;
 
-  ChannelToSingleArgument(handshake::ChannelType type,
-                          const std::string &argName, bool isInput)
-      : type(type), argName(argName), isInput(isInput) {}
+  StartToChannelConnector(handshake::ChannelType type,
+                          const std::string &argName)
+      : type(type), argName(argName) {}
 
   void declareConstants(mlir::raw_indented_ostream &os,
                         const std::string &inputVectorPath,
@@ -161,8 +187,7 @@ struct ChannelToSingleArgument {
     // If the single argument is an output (e.g., the return value), we don't
     // specify any input vector file ("").
     std::string inputFile =
-        isInput ? "\"" + inputVectorPath + "/input_" + argName + ".dat" + "\""
-                : "\"\"";
+        "\"" + inputVectorPath + "/input_" + argName + ".dat" + "\"";
     declareConstant(os, "INPUT_" + argName, "STRING", inputFile);
 
     declareConstant(os, "OUTPUT_" + argName, "STRING",
@@ -174,65 +199,73 @@ struct ChannelToSingleArgument {
   }
 
   void declareSignals(mlir::raw_indented_ostream &os) {
-    unsigned dataWidth = type.getDataBitWidth();
-    if (not isInput) {
-      // The valid signal from the circuit, which drives the write enable (we)
-      // pin of the single enable module
-      declareSTL(os, argName + "_valid");
-      declareSTL(os, argName + "_ready");
-    }
-    // The single argument block needs to define all these signals, regardless
-    // of using as an input argument or an output argument
-    declareSTL(os, argName + "_" + CE0_PORT);
-    declareSTL(os, argName + "_" + WE0_PORT);
-
-    declareSTL(os, argName + "_din0", to_string(dataWidth));
-
-    declareSTL(os, argName + "_dout0", to_string(dataWidth));
-    declareSTL(os, argName + "_dout0_valid");
-    declareSTL(os, argName + "_dout0_ready");
+    declareSignalsSingleArgumentModel(os, argName, type.getDataBitWidth());
   }
 
   void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os) {
     Instance argInst("single_argument", "arg_inst_" + argName);
 
-    argInst.parameter(IN_FILE_PARAM, "INPUT_" + argName)
-        .parameter(OUT_FILE_PARAM, "OUTPUT_" + argName)
-        .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
-        // NOTE: The lhs of the connect (e.g., CLK_PORT) is the port name of
-        // the instantiated RAM models (e.g., two_port_RAM.vhd and
-        // single_argument.vhd). This name is not necessarily named in the
-        // same way as the testbench signal (e.g., tb_clk). For Dynamatic's
-        // internal coverification, we have the freedom to name the
-        // interface of the RAM model however we want.
-        .connect(CLK_PORT, "tb_" + CLK_PORT)
-        .connect(RST_PORT, "tb_" + RST_PORT)
-        .connect(DONE_PORT, "tb_temp_idle")
-        .connect(D_OUT0_PORT, argName + "_dout0")
-        .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
-        .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
-    if (isInput) {
-      argInst.connect(CE0_PORT, "'1'")
-          .connect(WE0_PORT, "'0'")
-          .connect(D_IN0_PORT, "(others => '0')");
-    } else {
-      argInst.connect(CE0_PORT, "'1'")
-          .connect(WE0_PORT, argName + "_valid")
-          .connect(D_IN0_PORT, argName + "_din0");
-    }
+    commonSingleArgumentDeclaration(argInst, argName);
+    argInst.connect(CE0_PORT, "'1'")
+        .connect(WE0_PORT, "'0'")
+        .connect(D_IN0_PORT, "(others => '0')");
     argInst.emitVhdl(os);
   }
 
   void connectToDuv(Instance &duvInst) {
-    if (isInput) {
-      duvInst.connect(argName, argName + "_dout0")
-          .connect(argName + "_valid", argName + "_dout0_valid")
-          .connect(argName + "_ready", argName + "_dout0_ready");
-    } else {
-      duvInst.connect(argName, argName + "_din0")
-          .connect(argName + "_valid", argName + "_valid")
-          .connect(argName + "_ready", argName + "_ready");
-    }
+    duvInst.connect(argName, argName + "_dout0")
+        .connect(argName + "_valid", argName + "_dout0_valid")
+        .connect(argName + "_ready", argName + "_dout0_ready");
+  }
+};
+
+struct ChannelToEndConnector {
+
+  handshake::ChannelType type;
+  std::string argName;
+
+  ChannelToEndConnector(handshake::ChannelType type, const std::string &argName)
+      : type(type), argName(argName) {}
+
+  void declareConstants(mlir::raw_indented_ostream &os,
+                        const std::string &inputVectorPath,
+                        const std::string &outputFilePath) {
+
+    // If the single argument is an output (e.g., the return value), we don't
+    // specify any input vector file ("").
+    std::string inputFile = "\"\"";
+    declareConstant(os, "INPUT_" + argName, "STRING", inputFile);
+
+    declareConstant(os, "OUTPUT_" + argName, "STRING",
+                    "\"" + outputFilePath + "/output_" + argName + ".dat" +
+                        "\"");
+    int dataWidth = type.getDataBitWidth();
+    declareConstant(os, "DATA_WIDTH_" + argName, "INTEGER",
+                    to_string(dataWidth));
+  }
+
+  void declareSignals(mlir::raw_indented_ostream &os) {
+    // The valid signal from the circuit, which drives the write enable (we)
+    // pin of the single enable module
+    declareSTL(os, argName + "_valid");
+    declareSTL(os, argName + "_ready");
+    declareSignalsSingleArgumentModel(os, argName, type.getDataBitWidth());
+  }
+
+  void instantiateSingleArgumentModel(mlir::raw_indented_ostream &os) {
+    Instance argInst("single_argument", "arg_inst_" + argName);
+
+    commonSingleArgumentDeclaration(argInst, argName);
+    argInst.connect(CE0_PORT, "'1'")
+        .connect(WE0_PORT, argName + "_valid")
+        .connect(D_IN0_PORT, argName + "_din0");
+    argInst.emitVhdl(os);
+  }
+
+  void connectToDuv(Instance &duvInst) {
+    duvInst.connect(argName, argName + "_din0")
+        .connect(argName + "_valid", argName + "_valid")
+        .connect(argName + "_ready", argName + "_ready");
   }
 };
 
@@ -242,29 +275,48 @@ struct ChannelToSingleArgument {
 // - Input: they are driven by valid = constant 1, their ready signals are
 // ignored
 // - Output: they are driving the join
-struct ControlOnlyConnector {
 
+// A helper construct for connecting the start signal to the inputs of the
+// handshake kernel
+// HACK: the control only signals are handled in the following ways:
+// - Input: they are driven by valid = constant 1, their ready signals are
+// ignored
+struct StartToControlConnector {
   handshake::ControlType type;
   std::string argName;
-  bool isInput;
 
-  ControlOnlyConnector(handshake::ControlType type, const std::string &argName,
-                       bool isInput)
-      : type(type), argName(argName), isInput(isInput) {}
+  StartToControlConnector(handshake::ControlType type,
+                          const std::string &argName)
+      : type(type), argName(argName) {}
 
   void declareSignals(mlir::raw_indented_ostream &os) {
     declareSTL(os, argName + "_valid");
     declareSTL(os, argName + "_ready");
   }
-
   void connectToDuv(Instance &duvInst) {
-    if (isInput) {
-      duvInst.connect(argName + "_valid", "\'1\'")
-          .connect(argName + "_ready", argName + "_ready");
-    } else {
-      duvInst.connect(argName + "_valid", argName + "_valid")
-          .connect(argName + "_ready", argName + "_ready");
-    }
+    duvInst.connect(argName + "_valid", "\'1\'")
+        .connect(argName + "_ready", argName + "_ready");
+  }
+};
+
+// A helper construct for connecting the outputs control only channels of the
+// handshake kernel HACK: the control only signals are handled in the following
+// ways:
+// - Input: they are driven by valid = constant 1, their ready signals are
+// ignored
+struct ControlToEndConnector {
+  handshake::ControlType type;
+  std::string argName;
+
+  ControlToEndConnector(handshake::ControlType type, const std::string &argName)
+      : type(type), argName(argName) {}
+  void declareSignals(mlir::raw_indented_ostream &os) {
+    declareSTL(os, argName + "_valid");
+    declareSTL(os, argName + "_ready");
+  }
+  void connectToDuv(Instance &duvInst) {
+    duvInst.connect(argName + "_valid", argName + "_valid")
+        .connect(argName + "_ready", argName + "_ready");
   }
 };
 
@@ -282,7 +334,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
 
-    ChannelToSingleArgument c(type, argName, /* isInput = */ true);
+    StartToChannelConnector c(type, argName);
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
 
@@ -296,7 +348,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   // channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ false);
+    ChannelToEndConnector c(type, argName);
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
   declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
@@ -323,14 +375,14 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of data input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ true);
+    StartToChannelConnector c(type, argName);
     c.declareSignals(os);
   }
 
   // Signals of control input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    ControlOnlyConnector c(type, argName, /* isInput = */ true);
+    StartToControlConnector c(type, argName);
     c.declareSignals(os);
   }
 
@@ -344,14 +396,14 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of data output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ false);
+    ChannelToEndConnector c(type, argName);
     c.declareSignals(os);
   }
 
   // Signals of control output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
-    ControlOnlyConnector c(type, argName, /* isInput = */ false);
+    ControlToEndConnector c(type, argName);
     c.declareSignals(os);
   }
 
@@ -370,7 +422,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
   // Instantiate argument generator for the input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ true);
+    StartToChannelConnector c(type, argName);
     c.instantiateSingleArgumentModel(os);
   }
 
@@ -382,7 +434,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
 
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ false);
+    ChannelToEndConnector c(type, argName);
     c.instantiateSingleArgumentModel(os);
   }
 }
@@ -402,7 +454,7 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   // Connect the input data channels to the DUV
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ true);
+    StartToChannelConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
@@ -410,7 +462,7 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   // @Jiahui17: TODO: create a new argument for dataless input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    ControlOnlyConnector c(type, argName, /* isInput = */ true);
+    StartToControlConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
@@ -424,13 +476,13 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   // @Jiahui17: TODO: create a new argument for dataless input channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToSingleArgument c(type, argName, /* isInput = */ false);
+    ChannelToEndConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
   for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
-    ControlOnlyConnector c(type, argName, /* isInput = */ false);
+    ControlToEndConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
