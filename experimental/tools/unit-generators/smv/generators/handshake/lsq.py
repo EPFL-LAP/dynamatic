@@ -81,7 +81,11 @@ def _generate_lsq_master(
   return f"""
 MODULE {name} ({lsq_in_ports})
   VAR inner_mc_control : {name}__mc_control(memStart_valid, ctrlEnd_valid, memEnd_ready, all_requests_done);
-  DEFINE all_requests_done :=  {" & ".join([f"load_requests_{n} = 0" for n in range(num_load_ports)] + [f"store_requests_{n} = 0" for n in range(num_store_ports)])};
+
+  VAR all_requests_done : boolean;
+  ASSIGN
+  init(all_requests_done) := FALSE;
+  next(all_requests_done) := {{FALSE, TRUE}};
 
   {_generate_lsq_logic(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
 
@@ -149,86 +153,29 @@ def _generate_lsq_logic(
     name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity
 ):
   return f"""
-  -------- Load queue --------
+  -- Non-deterministic ports
   VAR
-  -- Number of available slots in the load queue
-  available_load_slots : {-capacity}..{capacity};
-  -- Number of the pending requests for each load port
-  {"\n  ".join([f"load_requests_{n} : 0..{capacity};" for n in range(num_load_ports)])}
+  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(ctrl_{group_index(n, load_groups)}_valid, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
+  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(ctrl_{group_index(n, store_groups)}_valid, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
 
 
-  -- Every time a load s group is allocated the requests increase by one. Once
-  -- the request is completed (i.e. the load data has reached memory) the
-  -- pending requests decrease by one.
-  -- load_port_*_ctrl signals that the load can access memory (it has at least 1 request)
-
-  {"\n  ".join([f"""ASSIGN
-  init(load_requests_{n}) := 0;
-  next(load_requests_{n}) := load_requests_{n} + toint(ctrl_{n}_valid) - toint(inner_load_port_{n}.ldData_valid);
-  DEFINE load_port_{n}_ctrl := load_requests_{n} > 0;""" for n in range(num_load_ports)])}
-  
-  -- If a new group is allocated with the ctrl signal we decrease the available slots by the number of loads in the group
-  -- if a load happened we deallocate it increasing the available slots by one.
-  ASSIGN
-  init(available_load_slots) := {capacity};
-  next(available_load_slots) := case
-    {"\n  ".join([f"ctrl_{n}_valid : available_load_slots - (available_load_slots > 0 ? {load_groups[n]} : 0) + (load_mem_access_happened ? 1 : 0);" for n in range(num_load_ports)])}
-    TRUE : available_load_slots + (load_mem_access_happened ? 1 : 0);
-  esac;
-
-  -- Checks if at least one load port executed a load
+  -- Checks if at least one load/store port executed an access
   DEFINE
-  load_mem_access_happened := {" | ".join([f"inner_load_port_{n}.ldData_valid" for n in range(num_load_ports)])};
-  in_loadEn := load_mem_access_happened;
+  in_loadEn := {" | ".join([f"inner_load_port_{n}.ldData_valid" for n in range(num_load_ports)])};
+  in_storeEn := {" | ".join([f"inner_store_port_{n}.memData_valid" for n in range(num_store_ports)])};
 
-  -- Non-deterministic load port
+
+  -- Non-deterministic signals
   VAR
-  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(load_port_{n}_ctrl, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
-  ----- end load queue ------
+  {"\n  ".join([f"nd_ctrl_{n} : boolean;" for n in range(num_bbs)])}
 
-
-  -------- Store queue --------
-  VAR
-  -- Number of available slots in the store queue
-  available_store_slots : {-capacity}..{capacity};
-  -- Number of the pending requests for each store port
-  {"\n  ".join([f"store_requests_{n} : 0..{capacity};" for n in range(num_store_ports)])}
-
-
-  -- Every time a store s group is allocated the requests increase by one. Once
-  -- the request is completed (i.e. the store reached memory) the
-  -- pending requests decrease by one.
-  -- store_port_*_ctrl signals that the store can access memory (it has at least 1 request)
-
-  {"\n  ".join([f"""ASSIGN
-  init(store_requests_{n}) := 0;
-  next(store_requests_{n}) := store_requests_{n} + toint(ctrl_{n}_valid) - toint(inner_store_port_{n}.memData_valid);
-  DEFINE store_port_{n}_ctrl := store_requests_{n} > 0;""" for n in range(num_store_ports)])}
-  
-  -- If a new group is allocated with the ctrl signal we decrease the available slots by the number of stores in the group
-  -- if a store happened we deallocate it increasing the available slots by one.
   ASSIGN
-  init(available_store_slots) := {capacity};
-  next(available_store_slots) := case
-    {"\n  ".join([f"ctrl_{n}_valid : available_store_slots - (available_store_slots > 0 ? {store_groups[n]} : 0) + (store_mem_access_happened ? 1 : 0);" for n in range(num_store_ports)])}
-    TRUE : available_store_slots + (store_mem_access_happened ? 1 : 0);
-  esac;
-
-  -- Checks if at least one store port executed a store
-  DEFINE
-  store_mem_access_happened := {" | ".join([f"inner_store_port_{n}.memData_valid" for n in range(num_store_ports)])};
-  in_storeEn := store_mem_access_happened;
-
-  -- Non-deterministic store port
-  VAR
-  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(store_port_{n}_ctrl, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
-
-  ----- end store queue ------
-
+  {"\n  ".join([f"init(nd_ctrl_{n}) := {{FALSE, TRUE}};" for n in range(num_bbs)])}
+  {"\n  ".join([f"next(nd_ctrl_{n}) := {{FALSE, TRUE}};" for n in range(num_bbs)])}
+  
   -- output
-  -- non-deterministic signals from the non-deterministic ports
   DEFINE
-  {"\n  ".join([f"ctrl_{n}_ready := available_load_slots > 0 & available_store_slots > 0;" for n in range(num_bbs)])}
+  {"\n  ".join([f"ctrl_{n}_ready := nd_ctrl_{n};" for n in range(num_bbs)])}
 
   {"\n  ".join([f"ldAddr_{n}_ready := inner_load_port_{n}.ldAddr_ready;" for n in range(num_load_ports)])}
   {"\n  ".join([f"ldData_{n} := inner_load_port_{n}.ldData;" for n in range(num_load_ports)])}
