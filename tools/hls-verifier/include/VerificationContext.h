@@ -30,27 +30,13 @@ static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 
 struct VerificationContext {
   VerificationContext(const std::string &cFuvFunctionName,
-                      const std::string &vhdlDuvEntityName,
                       handshake::FuncOp *funcOp)
-      : funcOp(funcOp), cFUVFunctionName(cFuvFunctionName),
-        vhdlDUVEntityName(vhdlDuvEntityName) {}
-
-  std::string getCFuvFunctionName() const {
-    if (!cFUVFunctionName.empty())
-      return cFUVFunctionName;
-    return vhdlDUVEntityName;
-  }
-
-  std::string getVhdlDuvEntityName() const {
-    if (!vhdlDUVEntityName.empty())
-      return vhdlDUVEntityName;
-    return cFUVFunctionName;
-  }
+      : funcOp(funcOp), kernelName(cFuvFunctionName) {}
 
   std::string getBaseDir() const { return ".."; }
 
   std::string getVhdlTestbenchPath() const {
-    return getHdlSrcDir() + "/" + "tb_" + getCFuvFunctionName() + ".vhd";
+    return getHdlSrcDir() + "/" + "tb_" + kernelName + ".vhd";
   }
 
   std::string getModelsimDoFileName() const { return VSIM_SCRIPT_FILE; }
@@ -69,8 +55,7 @@ struct VerificationContext {
 
   handshake::FuncOp *funcOp;
 
-  std::string cFUVFunctionName;
-  std::string vhdlDUVEntityName;
+  std::string kernelName;
 };
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H

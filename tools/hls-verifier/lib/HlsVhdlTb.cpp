@@ -442,7 +442,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
 void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
                               VerificationContext &ctx) {
 
-  std::string duvName = ctx.vhdlDUVEntityName;
+  std::string duvName = ctx.kernelName;
 
   Instance duvInst(duvName, "duv_inst");
 

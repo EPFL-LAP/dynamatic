@@ -42,7 +42,7 @@ using namespace dynamatic;
 
 static const char SEP = std::filesystem::path::preferred_separator;
 
-static const string LOG_TAG = "[HLS_VERIFIER] ";
+static const string LOG_TAG = "HLS_VERIFIER";
 
 void generateModelsimScripts(const VerificationContext &ctx) {
   vector<string> filelistVhdl =
@@ -79,7 +79,9 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
   llvm::SmallVector<std::pair<std::string, Type>> argAndTypeMap;
 
-  // Collecting the types and names of the arguments to be compared.
+  // Collecting the types and names of the arguments to be compared. In
+  // Dynamatic, the input data/control channel and the memory block connected to
+  // the circuit are presented at the arguments.
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
 
@@ -93,10 +95,11 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
                    dyn_cast<mlir::MemRefType>(arg.getType())) {
       argAndTypeMap.emplace_back(argName, type.getElementType());
     }
-    // Skipping the ControlType as there is no value to be compared.
   }
 
-  // Connect the output channels to the DUV
+  // Collecting the types and names of the output channels. Skipping the
+  // ControlType as there is no value to be compared. The outputs can only be
+  // data/control channels (no arrays).
   for (auto [resType, portAttr] :
        llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
     std::string argName = portAttr.dyn_cast<StringAttr>().str();
@@ -104,7 +107,6 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
             dyn_cast<handshake::ChannelType>(resType)) {
       argAndTypeMap.emplace_back(argName, type.getDataType());
     }
-    // Skipping the ControlType as there is no value to be compared.
   }
 
   for (auto [argName, type] : argAndTypeMap) {
@@ -142,32 +144,18 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
   return mlir::success();
 }
 
+// Executing ModelSim
 void executeVhdlTestbench(const VerificationContext &ctx) {
-  string command;
-
-  // Cleaning-up exisiting outputs
-  command = "rm -rf " + ctx.getHdlOutDir();
-  logInf(LOG_TAG, "Cleaning VHDL output files [" + command + "]");
-  executeCommand(command);
-
-  command = "mkdir -p " + ctx.getHdlOutDir();
-  logInf(LOG_TAG, "Creating VHDL output files directory [" + command + "]");
-  executeCommand(command);
-
-  // Executing modelsim
-  command = "vsim -c -do " + ctx.getModelsimDoFileName();
+  std::string command = "vsim -c -do " + ctx.getModelsimDoFileName();
   logInf(LOG_TAG, "Executing modelsim: [" + command + "]");
   executeCommand(command);
 }
 
 int main(int argc, char **argv) {
-  cl::opt<std::string> cFuvFunctionName(
-      "cfuv-function-name", cl::desc("Name of the C function name"),
-      cl::value_desc("cfuv-function-name"), cl::Required);
+  cl::opt<std::string> hlsKernelName(
+      "kernel-name", cl::desc("Name of the HLS kernel"),
+      cl::value_desc("HLS kernel name"), cl::Required);
 
-  cl::opt<std::string> vhdlDuvEntityName(
-      "hdl-duv-entity-name", cl::desc("Name of the HDL entity name"),
-      cl::value_desc("hdl-duv-entity-name"), cl::Required);
   cl::opt<std::string> mlirPathName(
       "handshake-mlir",
       cl::desc("Name of the handshake MLIR file with the kernel"),
@@ -206,11 +194,11 @@ int main(int argc, char **argv) {
     return 1;
 
   handshake::FuncOp funcOp =
-      dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(cFuvFunctionName));
+      dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  VerificationContext ctx(cFuvFunctionName, vhdlDuvEntityName, &funcOp);
+  VerificationContext ctx(hlsKernelName, &funcOp);
 
-  // Generate hls_verify_<cFuvFunctionName>.vhd
+  // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
 
   // Need to first copy the supplementary files to the VHDL source before
