@@ -4,10 +4,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sobel.h"
 #include "dynamatic/Integration.h"
+#include "sobel.h"
 
-int sobel(in_int_t in[N], in_int_t gX[9], in_int_t gY[9], out_int_t out[N]) {
+int sobel(in_int_t in[N], in_int_t gX[9], in_int_t gY[9], inout_int_t out[N]) {
   int sum = 0;
   for (unsigned y = 0; y < 15; y++) {
     for (unsigned x = 0; x < 15; x++) {
@@ -62,7 +62,7 @@ int main(void) {
   in_int_t in[N];
   in_int_t gX[9];
   in_int_t gY[9];
-  out_int_t out[N];
+  inout_int_t out[N];
 
   for (int j = 0; j < N; ++j) {
     in[j] = j;
