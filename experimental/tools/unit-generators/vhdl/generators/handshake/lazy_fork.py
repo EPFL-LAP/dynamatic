@@ -1,26 +1,28 @@
 from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
 from generators.support.logic import generate_and_n
 
+
 def generate_lazy_fork(name, params):
-  # Number of output ports
-  size = params["size"]
+    # Number of output ports
+    size = params["size"]
 
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_lazy_fork_dataless(name, size)
-  else:
-    return _generate_lazy_fork(name, size, bitwidth)
-  
+    if extra_signals:
+        return _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_lazy_fork_dataless(name, size)
+    else:
+        return _generate_lazy_fork(name, size, bitwidth)
+
+
 def _generate_lazy_fork_dataless(name, size):
-  and_n_module_name = f"{name}_and_n"
+    and_n_module_name = f"{name}_and_n"
 
-  dependencies = generate_and_n(and_n_module_name, {"size": size})
+    dependencies = generate_and_n(and_n_module_name, {"size": size})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -37,8 +39,8 @@ entity {name} is
   );
 end entity;
 """
-  
-  architecture = f"""
+
+    architecture = f"""
 -- Architecture of lazy_fork_dataless
 architecture arch of {name} is
   signal allnReady : std_logic;
@@ -64,14 +66,15 @@ begin
   ins_ready <= allnReady;
 end architecture;
 """
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
+
 
 def _generate_lazy_fork(name, size, bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_lazy_fork_dataless(inner_name, size)
+    dependencies = _generate_lazy_fork_dataless(inner_name, size)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -92,7 +95,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of lazy_fork
 architecture arch of {name} is
 begin
@@ -114,24 +117,25 @@ begin
   end process;
 end architecture;
 """
-  
-  return dependencies + entity + architecture
+
+    return dependencies + entity + architecture
+
 
 def _generate_lazy_fork_signal_manager(name, size, bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals,
-          "2d": True,
-          "size": size
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_lazy_fork(name, size, bitwidth + extra_signals_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "2d": True,
+            "size": size
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_lazy_fork(name, size, bitwidth + extra_signals_bitwidth))
