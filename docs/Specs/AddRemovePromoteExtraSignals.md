@@ -21,9 +21,13 @@ Load and Store operations are connected to our memory controllers, which current
 
 As discussed in the full document on type verification, this could change in future if required, e.g. for out-of-order loads.
 
-### Operations which Add, Remove and Swap Extra Signals
+### Operations which Add, Remove and Promote Extra Signals
 
-We define an operation which adds an extra signal as an operation which receives token(s) lacking a specific extra signal, and outputs token(s) carrying that specific extra signals. 
+We define an operation which adds an extra signal as an operation which receives token(s) lacking a specific extra signal, and outputs token(s) carrying that specific extra signal. 
+
+We define an operation which drops an extra signal as an operation which receives token(s) carrying a specific extra signal, and outputs token(s) lacking that specific extra signal. 
+
+We define an operation which promotes an extra signal as an operation which receives token(s) carrying a specific extra signal, and replaces the data value of that token with the value of that specific extra signal. This means the operation also outputs token(s) lacking that specific extra signal.
 
 Due to concerns for modularity and composibility of extra signals, operations that add and remove extra signals should be introduced as rarely as possible, and as single-focusedly as possible.
 
@@ -69,7 +73,7 @@ Any additional extra signals, other than the promoted extra signal, are forwarde
 
 The below is a general description of a situation present in speculation, where incoming tokens must receive a spec bit before entering the speculative region:
 
-When tokens must receive an extra signal on arriving in a region, and lose it when exiting that region, the region should begin and end with addSignal and DropSignal:
+When tokens must receive an extra signal on arriving in a region, and lose it when exiting that region, the region should begin and end with addSignal and dropSignal:
 
 ![](figs/AddDropPromoteExtraSignals/extraSignalRegion.png)
 
