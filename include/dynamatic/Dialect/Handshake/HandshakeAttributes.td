@@ -432,9 +432,9 @@ def FormalPropertiesAttr : Handshake_Attr<"FormalProperties", "formalProperties"
     an entry in the formal_properities.json file, that contains all
     the information needed for each property.
   }];
-  
+
   let parameters = (ins ArrayRefParameter<"unsigned">:$IDs);
-  
+
   let assemblyFormat = "`[` $IDs `]`";
 }
 

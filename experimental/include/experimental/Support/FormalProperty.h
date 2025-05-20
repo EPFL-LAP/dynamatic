@@ -14,6 +14,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <fstream>
+#include <memory>
 
 namespace dynamatic {
 
@@ -26,32 +27,75 @@ public:
   TAG getTag() const { return tag; }
   TYPE getType() const { return type; }
   unsigned long getId() const { return id; }
-  llvm::json::Value getInfo() const { return info; }
 
   static std::optional<TYPE> typeFromStr(const std::string &s);
-  static std::optional<TAG> tagFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
+  static std::optional<TAG> tagFromStr(const std::string &s);
   static std::string tagToStr(TAG t);
 
-  llvm::json::Object toJsonObj() const;
+  llvm::json::Value toJSON() const;
 
-  FormalProperty() : info(nullptr) {}
-  FormalProperty(unsigned long id, const std::string &type,
-                 const std::string &tag, llvm::json::Value info)
-      : id(id), type(*typeFromStr(type)), tag(*tagFromStr(tag)),
-        check("unchecked"), info(info) {}
-  FormalProperty(unsigned long id, TYPE type, TAG tag, llvm::json::Value info)
-      : id(id), type(type), tag(tag), check("unchecked"), info(info) {}
+  inline virtual llvm::json::Value extraInfoToJSON() const { return nullptr; };
 
-  static llvm::json::Object AOBInfo(const OpResult &res);
-  static llvm::json::Object VEQInfo(const OpResult &res1, const OpResult &res2);
+  FormalProperty() = default;
+  FormalProperty(unsigned long id, TAG tag, TYPE type)
+      : id(id), tag(tag), type(type), check("unchecked") {}
+  virtual ~FormalProperty() = default;
+
+protected:
+  unsigned long id;
+  TAG tag;
+  TYPE type;
+  std::string check;
+};
+
+class AOBProperty : public FormalProperty {
+public:
+  std::string getOwner() { return owner; }
+  std::string getUser() { return user; }
+  int getOwnerIndex() { return ownerIndex; }
+  int getUserIndex() { return userIndex; }
+  std::string getOwnerChannel() { return ownerChannel; }
+  std::string getUserChannel() { return userChannel; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  AOBProperty() = default;
+  AOBProperty(unsigned long id, TAG tag, const OpResult &res);
+  ~AOBProperty() = default;
 
 private:
-  unsigned long id;
-  TYPE type;
-  TAG tag;
-  std::string check;
-  llvm::json::Value info;
+  std::string owner;
+  std::string user;
+  int ownerIndex;
+  int userIndex;
+  std::string ownerChannel;
+  std::string userChannel;
+};
+
+class VEQProperty : public FormalProperty {
+public:
+  std::string getOwner() { return owner; }
+  std::string getTarget() { return target; }
+  int getOwnerIndex() { return ownerIndex; }
+  int getTargetIndex() { return targetIndex; }
+  std::string getOwnerChannel() { return ownerChannel; }
+  std::string getTargetChannel() { return targetChannel; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  VEQProperty() = default;
+  VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
+              const OpResult &res2);
+  ~VEQProperty() = default;
+
+private:
+  std::string owner;
+  std::string target;
+  int ownerIndex;
+  int targetIndex;
+  std::string ownerChannel;
+  std::string targetChannel;
 };
 
 } // namespace dynamatic
