@@ -27,9 +27,8 @@ def generate_signal_manager(name, params, generate_inner: Callable[[str], str]) 
   elif type == "bbmerge":
     extra_signals = params["extra_signals"]
     index_name = params["index_name"]
-    index_dir = params["index_dir"]
     signal_manager = _generate_bbmerge_signal_manager(
-        name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner)
+        name, in_ports, out_ports, index_name, extra_signals, generate_inner)
   else:
     raise ValueError(f"Unsupported signal manager type: {type}")
 
@@ -124,6 +123,98 @@ entity {entity_name} is
 end entity;
 """
 
+def generate_entity_tag_operations(entity_name, in_ports, out_ports) -> str:
+  """
+  Generate entity for signal manager, based on input and output ports
+  """
+
+  # Unify input and output ports, and add direction
+  unified_ports = []
+  for port in in_ports:
+    unified_ports.append({
+        **port,
+        "direction": "in"
+    })
+  for port in out_ports:
+    unified_ports.append({
+        **port,
+        "direction": "out"
+    })
+
+  port_decls = []
+  # Add port declarations for each port
+  for port in unified_ports:
+    dir = port["direction"]
+    ready_dir = "out" if dir == "in" else "in"
+
+    name = port["name"]
+    bitwidth = port["bitwidth"]
+    extra_signals = port.get("extra_signals", {})
+    port_2d = port.get("2d", False)
+    handshaked = port.get("handshaked", True)
+
+    if not port_2d:
+      # Usual case
+
+      # Generate data signal if present
+      if bitwidth > 0:
+        port_decls.append(
+            f"    {name} : {dir} std_logic_vector({bitwidth} - 1 downto 0)")
+
+      # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+      # because they come from the extra signals of the data
+      if handshaked:
+        port_decls.append(f"    {name}_valid : {dir} std_logic")
+        port_decls.append(f"    {name}_ready : {ready_dir} std_logic")
+
+      # Generate extra signals for this input port
+      for signal_name, signal_bitwidth in extra_signals.items():
+        port_decls.append(
+            f"    {name}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+    else:
+      # Port is 2d
+      size = port["size"]
+
+      # Generate data_array signal declarations for 2d input port with bitwidth > 0
+      if bitwidth > 0:
+        port_decls.append(
+            f"    {name} : {dir} data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0)")
+
+      # Use std_logic_vector for valid/ready of 2d input port
+      port_decls.append(
+          f"    {name}_valid : {dir} std_logic_vector({size} - 1 downto 0)")
+      port_decls.append(
+          f"    {name}_ready : {ready_dir} std_logic_vector({size} - 1 downto 0)")
+
+      # Generate extra signal declarations for each item in the 2d input port
+      for i in range(size):
+        # Use the same extra signals for all items
+        current_extra_signals = extra_signals
+
+        # The netlist generator declares extra signals independently for each item,
+        # in contrast to ready/valid signals.
+        for signal_name, signal_bitwidth in current_extra_signals.items():
+          port_decls.append(
+              f"    {name}_{i}_{signal_name} : {dir} std_logic_vector({signal_bitwidth} - 1 downto 0)")
+
+  port_decls_str = ";\n".join(port_decls).lstrip()
+
+  return f"""
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.types.all;
+
+-- Entity of signal manager
+entity {entity_name} is
+  port(
+    clk : in std_logic;
+    rst : in std_logic;
+    {port_decls_str}
+  );
+end entity;
+"""
+
 
 def _get_default_extra_signal_value(extra_signal_name: str):
   return "\"0\""
@@ -132,6 +223,16 @@ def _get_default_extra_signal_value(extra_signal_name: str):
 def _get_forwarded_expression(signal_name: str, in_extra_signals: list[str]) -> str:
   if signal_name == "spec":
     return " or ".join(in_extra_signals)
+  
+  """
+  Tags are guaranteed to be the same across all input ports.
+  We can use the first input port's tag for all output ports.
+  """
+  if signal_name.startswith("tag"):
+    if in_extra_signals:
+      return in_extra_signals[0]
+    else:
+      raise ValueError("{signal_name} requires at least one signal")
 
   raise ValueError(
       f"Unsupported forwarding method for extra signal: {signal_name}")
@@ -190,6 +291,32 @@ def generate_inner_port_forwarding(ports) -> str:
 
   return ",\n".join(forwardings).lstrip()
 
+def generate_inner_port_forwarding_tag_operations(ports) -> str:
+  """
+  Generate port forwarding for inner entity
+  e.g.,
+      lhs => lhs,
+      lhs_valid => lhs_valid,
+      lhs_ready => lhs_ready
+  """
+  forwardings = []
+  for port in ports:
+    port_name = port["name"]
+    bitwidth = port["bitwidth"]
+    handshaked = port.get("handshaked", True)
+
+    # Forward data if present
+    if bitwidth > 0:
+      forwardings.append(f"      {port_name} => {port_name}")
+
+    # Input tag port of the untagger and output tag port of the tagger should not be handshaked
+    # because they come from the extra signals of the data
+    if handshaked:
+      forwardings.append(f"      {port_name}_valid => {port_name}_valid")
+      forwardings.append(f"      {port_name}_ready => {port_name}_ready")
+
+  return ",\n".join(forwardings).lstrip()
+
 
 def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> str:
   """
@@ -207,16 +334,15 @@ def _generate_normal_signal_assignments(in_ports, out_ports, extra_signals) -> s
 
     if not port_2d:
       # Assign all extra signals to this output port
-      for signal_name in extra_signals:
+      for signal_name in out_port["extra_signals"]:
         extra_signal_assignments.append(
             f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
     else:
       port_size = out_port["size"]
-      for signal_name in extra_signals:
+      for signal_name in out_port["extra_signals"]:
         for i in range(port_size):
           extra_signal_assignments.append(
             f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
-
   return "\n".join(extra_signal_assignments).lstrip()
 
 
@@ -571,37 +697,7 @@ end architecture;
 
   return inner + entity + architecture
 
-
-def _generate_bbmerge_index_extra_signal_assignments(index_name, index_extra_signals, index_dir) -> str:
-  """
-  e.g., index_tag0 <= "0";
-  """
-  # TODO: Extra signals for index port are not tested
-  if index_dir == "out" and index_extra_signals:
-    index_extra_signals_list = []
-    for signal_name in index_extra_signals:
-      index_extra_signals_list.append(
-          f"  {index_name}_{signal_name} <= {_get_default_extra_signal_value(signal_name)};")
-    return "\n".join(index_extra_signals_list)
-  return ""
-
-
-def _generate_bbmerge_signal_assignments(concat_logic, index_extra_signal_assignments) -> str:
-  template = f"""
-  -- Concatenate data and extra signals
-  {concat_logic}
-"""
-
-  if index_extra_signal_assignments:
-    template += f"""
-  -- Assign index extra signals
-  {index_extra_signal_assignments}
-"""
-
-  return template.lstrip()
-
-
-def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, index_dir, generate_inner: Callable[[str], str]):
+def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extra_signals, generate_inner: Callable[[str], str]):
   entity = generate_entity(name, in_ports, out_ports)
 
   # Get concatenation details for extra signals
@@ -619,13 +715,6 @@ def _generate_bbmerge_signal_manager(name, in_ports, out_ports, index_name, extr
   concat_logic = generate_concat_logic(
       in_ports, out_ports, concat_info, ignore=[index_name])
 
-  # Assign index extra signals
-  index_extra_signal_assignments = _generate_bbmerge_index_extra_signal_assignments(
-      index_name, extra_signals, index_dir)
-
-  signal_assignments = _generate_bbmerge_signal_assignments(
-      concat_logic, index_extra_signal_assignments)
-
   # Port forwarding for the inner entity
   forwardings = _generate_concat_forwarding(
       in_ports, out_ports, extra_signals, [index_name])
@@ -636,7 +725,8 @@ architecture arch of {name} is
   -- Concatenated data and extra signals
   {concat_signal_decls}
 begin
-  {signal_assignments}
+  -- Concatenate data and extra signals
+  {concat_logic}
 
   inner : entity work.{inner_name}(arch)
     port map(

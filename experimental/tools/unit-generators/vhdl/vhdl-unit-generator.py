@@ -13,6 +13,7 @@ import generators.handshake.constant as constant
 import generators.handshake.control_merge as control_merge
 import generators.handshake.extsi as extsi
 import generators.handshake.fork as fork
+import generators.handshake.lazy_fork as lazy_fork
 import generators.handshake.load as load
 import generators.handshake.mem_controller as mem_controller
 import generators.handshake.merge as merge
@@ -22,6 +23,11 @@ import generators.handshake.mux as mux
 import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
+import generators.handshake.speculation.spec_commit as spec_commit
+import generators.handshake.speculation.spec_save_commit as spec_save_commit
+import generators.handshake.speculation.speculating_branch as speculating_branch
+import generators.handshake.speculation.speculator as speculator
+import generators.handshake.select as select
 import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi
@@ -33,7 +39,15 @@ import generators.handshake.speculation.speculator as speculator
 import generators.handshake.speculation.non_spec as non_spec
 import generators.support.mem_to_bram as mem_to_bram
 import generators.handshake.extui as extui
+import generators.handshake.out_of_order_execution.tagger as tagger
+import generators.handshake.out_of_order_execution.untagger as untagger
+import generators.handshake.out_of_order_execution.free_tags_fifo as fifo
+import generators.handshake.demux as demux
 import generators.handshake.shli as shli
+import generators.handshake.extract as extract
+import generators.handshake.sitofp as sitofp
+import generators.handshake.fptosi as fptosi
+import generators.handshake.tehb as init
 import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
@@ -49,6 +63,8 @@ def generate_code(name, mod_type, parameters):
       return andi.generate_andi(name, parameters)
     case "buffer":
       return buffer.generate_buffer(name, parameters)
+    case "cmpf":
+      return cmpf.generate_cmpf(name, parameters)
     case "cmpi":
       return cmpi.generate_cmpi(name, parameters)
     case "cmpf":
@@ -63,6 +79,8 @@ def generate_code(name, mod_type, parameters):
       return extsi.generate_extsi(name, parameters)
     case "fork":
       return fork.generate_fork(name, parameters)
+    case "lazy_fork":
+      return lazy_fork.generate_lazy_fork(name, parameters)
     case "load":
       return load.generate_load(name, parameters)
     case "mem_controller":
@@ -81,6 +99,8 @@ def generate_code(name, mod_type, parameters):
       return sink.generate_sink(name, parameters)
     case "source":
       return source.generate_source(name, parameters)
+    case "select":
+      return select.generate_select(name, parameters)
     case "store":
       return store.generate_store(name, parameters)
     case "subf":
@@ -105,6 +125,18 @@ def generate_code(name, mod_type, parameters):
       return extui.generate_extui(name, parameters)
     case "shli":
       return shli.generate_shli(name, parameters)
+    case "tagger":
+      return tagger.generate_tagger(name, parameters)
+    case "untagger":
+      return untagger.generate_untagger(name, parameters)
+    case "free_tags_fifo":
+      return fifo.generate_free_tags_fifo(name, parameters)
+    case "demux":
+      return demux.generate_demux(name, parameters)
+    case "extract":
+      return extract.generate_extract(name, parameters)
+    case "init":
+      return init.generate_tehb(name, parameters)
     case "blocker":
       return blocker.generate_blocker(name, parameters)
     case "sitofp":
@@ -124,8 +156,7 @@ def parse_parameters(param_list):
         param_dict[key.strip()] = ast.literal_eval(value.strip())
     return param_dict
   except ValueError:
-    raise ValueError(
-        "Invalid parameter format. Use key=value key=value,...\n")
+    raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
