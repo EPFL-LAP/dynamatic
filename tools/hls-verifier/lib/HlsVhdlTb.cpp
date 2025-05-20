@@ -289,13 +289,12 @@ struct StartToControlConnector {
                           const std::string &argName)
       : type(type), argName(argName) {}
 
-  void declareSignals(mlir::raw_indented_ostream &os) {
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
-  }
+  void declareSignals(mlir::raw_indented_ostream &os) {}
+
+  // We just connect the control input channel to a constant source.
   void connectToDuv(Instance &duvInst) {
     duvInst.connect(argName + "_valid", "\'1\'")
-        .connect(argName + "_ready", argName + "_ready");
+        .connect(argName + "_ready", "open");
   }
 };
 
@@ -365,9 +364,16 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   declareSTL(os, "tb_clk", std::nullopt, "'0'");
-  declareSTL(os, "tb_start_valid", std::nullopt, "'0'");
   declareSTL(os, "tb_rst", std::nullopt, "'0'");
+
+  // The interface that indicates the global "start" signal.
+  declareSTL(os, "tb_start_valid", std::nullopt, "'0'");
+  declareSTL(os, "tb_start_ready", std::nullopt, "'0'");
+
+  // Testbench state signal.
   declareSTL(os, "tb_started");
+
+  // The interface that indicates the global "done" signal.
   declareSTL(os, "tb_global_valid");
   declareSTL(os, "tb_global_ready");
   declareSTL(os, "tb_stop");

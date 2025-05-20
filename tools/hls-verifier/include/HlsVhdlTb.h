@@ -82,7 +82,7 @@ begin
     tb_temp_idle <= '1';
   elsif rising_edge(tb_clk) then
     tb_temp_idle <= tb_temp_idle;
-    if (start_valid = '1') then
+    if (tb_start_valid = '1') then
       tb_temp_idle <= '0';
     end if;
     if(tb_stop = '1') then
@@ -94,14 +94,14 @@ end process generate_idle_signal;
 generate_start_signal : process(tb_clk, tb_rst)
 begin
   if (tb_rst = '1') then
-    start_valid <= '0';
+    tb_start_valid <= '0';
     tb_started <= '0';
   elsif rising_edge(tb_clk) then
     if (tb_started = '0') then
-      start_valid <= '1';
+      tb_start_valid <= '1';
       tb_started <= '1';
     else
-      start_valid <= start_valid and (not start_ready);
+      tb_start_valid <= tb_start_valid and (not tb_start_ready);
     end if;
   end if;
 end process generate_start_signal;
