@@ -1,4 +1,5 @@
 from generators.support.utils import *
+from generators.support.mc_control import generate_mc_control
 
 
 def generate_memory_controller(name, params):
@@ -89,7 +90,7 @@ MODULE {name}({mc_in_ports})
   storeData := inner_arbiter.data_to_memory;
 
   {_generate_write_memory_arbiter(f"{name}__write_memory_arbiter", num_stores, data_type, addr_type)}
-  {_generate_mc_control(f"{name}__mc_control")}
+  {generate_mc_control(f"{name}__mc_control")}
 """
 
 
@@ -136,7 +137,7 @@ MODULE {name}({mc_in_ports})
   storeData := {data_type.format_constant(0)};
 
   {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
-  {_generate_mc_control(f"{name}__mc_control")}
+  {generate_mc_control(f"{name}__mc_control")}
 """
 
 
@@ -204,51 +205,6 @@ MODULE {name}({mc_in_ports})
 
   {_generate_mem_controller_loadless(f"{name}__mc_loadless", num_stores, num_controls, data_type, addr_type, ctrl_type)}
   {_generate_read_memory_arbiter(f"{name}__read_memory_arbiter", num_loads, data_type, addr_type)}
-"""
-
-
-def _generate_mc_control(name):
-  return f"""
-MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
-  -- The mc_control manages the signals that control when the circuit is allowed to access memory: it controls
-  -- start and end of memory transactions and acknowledges completion.
-
-  -- Handshake Signals:
-  -- - memStart_valid / memStart_ready: Controls the start of memory operations.
-  -- - memEnd_valid / memEnd_ready: Indicates the completion of memory requests.
-  -- - ctrlEnd_valid / ctrlEnd_ready: Used to signal and acknowledge that no more memory requests will be issued.
-  -- - allRequestsDone: Flags that all pending memory operations have completed.
-  
-  VAR
-  memStart_ready_in : boolean;
-  memEnd_valid_in : boolean;
-  ctrlEnd_ready_in : boolean;
-
-  ASSIGN
-  init(memStart_ready_in) := TRUE;
-  next(memStart_ready_in) := case
-    memEnd_valid_in & memEnd_ready : TRUE;
-    memStart_valid & memStart_ready_in : FALSE;
-    TRUE : memStart_ready_in;
-  esac;
-  init(memEnd_valid_in) := FALSE;
-  next(memEnd_valid_in) := case
-    memEnd_valid_in & memEnd_ready : FALSE;
-    ctrlEnd_valid & all_requests_done : TRUE;
-    TRUE : memEnd_valid_in;
-  esac;
-  init(ctrlEnd_ready_in) := FALSE;
-  next(ctrlEnd_ready_in) := case
-    ctrlEnd_valid & ctrlEnd_ready_in : FALSE;
-    ctrlEnd_valid & all_requests_done : TRUE;
-    TRUE : ctrlEnd_ready_in;
-  esac;
-
-  // outputs
-  DEFINE
-  memStart_ready := memStart_ready_in;
-  memEnd_valid := memEnd_valid_in;
-  ctrlEnd_ready := ctrlEnd_ready_in;
 """
 
 

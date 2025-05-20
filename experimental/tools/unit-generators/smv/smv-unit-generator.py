@@ -19,7 +19,6 @@ import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.ndwire as ndwire
-import generators.handshake.lsq as lsq
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -52,6 +51,7 @@ import generators.arith.trunci as trunci
 import generators.arith.xori as xori
 
 import generators.memory.memory_controller as memory_controller
+import generators.memory.lsq as lsq
 
 
 def generate_code(name, mod_type, parameters):
