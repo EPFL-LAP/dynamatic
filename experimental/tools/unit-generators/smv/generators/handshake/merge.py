@@ -7,7 +7,7 @@ from generators.support.utils import *
 
 def generate_merge(name, params):
   size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_merge_dataless(name, size)
@@ -27,8 +27,8 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   {"\n  ".join([f"ins_{n}_ready := inner_merge.ins_{n}_ready;" for n in range(size)])}
   outs_valid := inner_tehb.outs_valid;
 
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
-{generate_tehb(f"{name}__tehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
+{generate_tehb(f"{name}__tehb_dataless", {ATTR_BITWIDTH: 0})}
 """
 
 
@@ -45,6 +45,6 @@ MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_
   outs := inner_tehb.outs;
   outs_valid := inner_tehb.outs_valid;
 
-{generate_merge_notehb(f"{name}__merge_notehb", {ATTR_SIZE: size, ATTR_DATA_TYPE: data_type.mlir_type})}
-{generate_tehb(f"{name}__tehb", {ATTR_DATA_TYPE: data_type.mlir_type})}
+{generate_merge_notehb(f"{name}__merge_notehb", {ATTR_SIZE: size, ATTR_BITWIDTH: data_type.bitwidth})}
+{generate_tehb(f"{name}__tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
