@@ -491,26 +491,28 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
 
 void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
                                   VerificationContext &ctx) {
-  handshake::FuncOp *funcOp = ctx.funcOp;
   // @Jiahui17: I assume that the results only contain handshake channels.
-  unsigned joinSize = funcOp->getNumResults();
-
   unsigned idx = 0;
 
   Instance joinInst("tb_join", "join_valids");
 
-  joinInst.parameter("SIZE", std::to_string(joinSize));
-
-  for (auto [resType, portAttr] :
-       llvm::zip_equal(funcOp->getResultTypes(), funcOp->getResNames())) {
-    std::string argName = portAttr.dyn_cast<StringAttr>().str();
-    if (isa<handshake::ChannelType, handshake::ControlType>(resType)) {
-      joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
-                       argName + "_valid");
-      joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
-                       argName + "_ready");
-    }
+  for (auto &[type, argName] :
+       getOutputArguments<handshake::ChannelType>(ctx.funcOp)) {
+    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                     argName + "_valid");
+    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                     argName + "_ready");
   }
+
+  for (auto &[type, argName] :
+       getOutputArguments<handshake::ControlType>(ctx.funcOp)) {
+    joinInst.connect("ins_valid(" + std::to_string(idx) + ")",
+                     argName + "_valid");
+    joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
+                     argName + "_ready");
+  }
+  joinInst.parameter("SIZE", std::to_string(/* Size = last index + 1 */ idx));
+
   joinInst.connect("outs_valid", "tb_global_valid");
   joinInst.connect("outs_ready", "tb_global_ready");
 
