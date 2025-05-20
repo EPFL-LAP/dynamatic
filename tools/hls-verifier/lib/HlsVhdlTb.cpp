@@ -87,7 +87,7 @@ struct MemRefToDualPortRAM {
 
   // Declare signals appear in the circuit interface
   void declareSignals(mlir::raw_indented_ostream &os) {
-    for (auto [_, sigName, bitwidth] : memrefToDPRAM) {
+    for (auto &[_, sigName, bitwidth] : memrefToDPRAM) {
       if (sigName == WE0_PORT or sigName == CE1_PORT) {
         declareSTL(os, argName + "_" + sigName, std::nullopt);
       } else {
@@ -116,7 +116,7 @@ struct MemRefToDualPortRAM {
         .connect(CLK_PORT, "tb_" + CLK_PORT)
         .connect(RST_PORT, "tb_" + RST_PORT)
         .connect(DONE_PORT, "tb_stop");
-    for (auto [_, portName, bitwidth] : memrefToDPRAM) {
+    for (auto &[_, portName, bitwidth] : memrefToDPRAM) {
       memInst.connect(portName, argName + "_" + portName);
     }
 
@@ -130,7 +130,7 @@ struct MemRefToDualPortRAM {
   }
 
   void connectToDuv(Instance &duvInst) {
-    for (auto [portSuffix, sigSuffix, bitwidth] : memrefToDPRAM)
+    for (auto &[portSuffix, sigSuffix, bitwidth] : memrefToDPRAM)
       duvInst.connect(argName + "_" + portSuffix, argName + "_" + sigSuffix);
   }
 };
@@ -279,7 +279,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
 
   // The files and configuration of the single_argument model of the data input
   // channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
 
     ChannelToSingleArgument c(type, argName, /* isInput = */ true);
@@ -287,14 +287,14 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   }
 
   // The files and configuration of the two port RAM model of the arrays
-  for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     MemRefToDualPortRAM m(type, argName);
     m.declareConstants(os, inputVectorPath, outputFilePath);
   }
 
   // The files and configuration of the single_argument model of the data output
   // channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ false);
     c.declareConstants(os, inputVectorPath, outputFilePath);
@@ -321,35 +321,35 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   declareSTL(os, "tb_stop");
 
   // Signals of data input channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ true);
     c.declareSignals(os);
   }
 
   // Signals of control input channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
     ControlOnlyConnector c(type, argName, /* isInput = */ true);
     c.declareSignals(os);
   }
 
   // Signals of the memory reference signals
-  for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
 
     MemRefToDualPortRAM m(type, argName);
     m.declareSignals(os);
   }
 
   // Signals of data output channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ false);
     c.declareSignals(os);
   }
 
   // Signals of control output channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
     ControlOnlyConnector c(type, argName, /* isInput = */ false);
     c.declareSignals(os);
@@ -368,19 +368,19 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Instantiate argument generator for the input channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ true);
     c.instantiateSingleArgumentModel(os);
   }
 
   // Instantiate dual port RAMs for the memory interfaces
-  for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     MemRefToDualPortRAM m(type, argName);
     m.instantiateRAMModel(os);
   }
 
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ false);
     c.instantiateSingleArgumentModel(os);
@@ -400,7 +400,7 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Connect the input data channels to the DUV
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ true);
     c.connectToDuv(duvInst);
@@ -408,27 +408,27 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
 
   // Connect the input control channels to the DUV
   // @Jiahui17: TODO: create a new argument for dataless input channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
     ControlOnlyConnector c(type, argName, /* isInput = */ true);
     c.connectToDuv(duvInst);
   }
 
   // Connect the memory elements to the DUV
-  for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     MemRefToDualPortRAM m(type, argName);
     m.connectToDuv(duvInst);
   }
 
   // Connect the input control channels to the DUV
   // @Jiahui17: TODO: create a new argument for dataless input channels
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     ChannelToSingleArgument c(type, argName, /* isInput = */ false);
     c.connectToDuv(duvInst);
   }
 
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
     ControlOnlyConnector c(type, argName, /* isInput = */ false);
     c.connectToDuv(duvInst);
@@ -457,9 +457,6 @@ void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
                        argName + "_valid");
       joinInst.connect("ins_ready(" + std::to_string(idx++) + ")",
                        argName + "_ready");
-
-    } else if (handshake::ControlType type =
-                   dyn_cast<handshake::ControlType>(resType)) {
     }
   }
   joinInst.connect("outs_valid", "tb_global_valid");
@@ -473,18 +470,18 @@ void getOutputTagGeneration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Reading / Dumping the content of the memory into the file
-  for (auto [type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
     os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
 
   // Reading / Dumping the content of the memory into the file
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
     os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
 
   // Reading / Dumping the content of the memory into the file
-  for (auto [type, argName] :
+  for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
     os << llvm::formatv(PROC_WRITE_TRANSACTIONS.c_str(), argName);
   }
