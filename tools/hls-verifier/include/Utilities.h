@@ -9,6 +9,7 @@
 #ifndef HLS_VERIFIER_UTILITIES_H
 #define HLS_VERIFIER_UTILITIES_H
 
+#include "mlir/Support/LogicalResult.h"
 #include <string>
 #include <vector>
 
@@ -77,8 +78,9 @@ string getApplicationDirectory();
  * @param token_compare the comparator to be used for comparing two tokens
  * @return true if all comparisons succeed, false otherwise.
  */
-bool compareFiles(const string &refFilePath, const string &outFile,
-                  const TokenCompare *tokenCompare);
+mlir::LogicalResult compareFiles(const string &refFilePath,
+                                 const string &outFile,
+                                 const TokenCompare *tokenCompare);
 
 /**
  * Trims the leading and trailing white spaces.
