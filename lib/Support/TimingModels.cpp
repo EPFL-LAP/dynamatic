@@ -127,13 +127,15 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   if (!model)
     return failure();
 
- FrequencyDepMetric<double> freqStruct;
-  if (failed(model->latency.getCeilMetric(op, freqStruct)))
+ CombDelayDepMetric<double> CombDelayStruct;
+ std::map<double, double> CombDelaymap;
+  if (failed(model->latency.getCeilMetric(op, CombDelaymap)))
       return failure();
     // or we write to the attribute here, to keeo things clean
 
     // Now get the final latency value using FrequencyDepMetric
-    if (failed(freqStruct.getDelayCeilMetric(targetPeriod, latency)))
+    CombDelayStruct.data = CombDelaymap;
+    if (failed(CombDelayStruct.getDelayCeilMetric(targetPeriod, latency)))
       return failure();
 
 
@@ -310,6 +312,48 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   }
   return true;
 }
+
+
+bool dynamatic::fromJSON(const ljson::Value &value,
+  BitwidthDepMetric<std::map<double, double>> &metric, 
+  ljson::Path path) {
+const ljson::Object *object = value.getAsObject();
+if (!object) {
+path.report("expected JSON object");
+return false;
+}
+
+for (const auto &[bitwidthKey, metricValue] : *object) {
+unsigned bitwidth;
+if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
+return false;
+metric.data[bitwidth] = std::map<double, double>();
+
+const ljson::Object *nestedMap = metricValue.getAsObject();
+if (!nestedMap) {
+path.field(bitwidthKey).report("expected nested map object");
+return false;
+}
+for (const auto &[doubleKey, doubleValue] : *nestedMap) {
+double key;
+try {
+key = std::stod(doubleKey.str());
+} catch (const std::exception &) {
+path.field(bitwidthKey).field(doubleKey).report("expected double as key");
+return false;
+}
+
+double value;
+if (!fromJSON(doubleValue, value, path.field(bitwidthKey).field(doubleKey)))
+return false;
+metric.data[bitwidth][key] = value; //we stick to the approach of the base code, but now account for the extra level of nesting
+}
+}
+return true;
+}
+
+
+
 
 static const std::string LATENCY[] = {"latency"};
 static const std::string DELAY[] = {"delay", "data"};

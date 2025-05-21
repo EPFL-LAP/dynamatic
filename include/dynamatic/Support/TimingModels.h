@@ -89,10 +89,10 @@ public:
 };
 
 template <typename M>
-struct FrequencyDepMetric {
+struct CombDelayDepMetric {
 public:
   /// Data points for the metric, mapping a frequency with the metric's value
-  std::map<unsigned, double> data;
+  std::map<double, double> data;
 
   /// Determines the value of the metric at the internal operating delay that is highest, but still smaller than the target period (meaning we pick the slowest
   /// implementation that still meets timing).
@@ -129,6 +129,10 @@ public:
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
+bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<std::map<double, double>> &metric,
+  llvm::json::Path path);
+
+
 /// Stores the timing model for an operation's type, usually parsed from a JSON
 /// file. It stores the operation's (datawidth-dependent) latencies,
 /// (datawidth-dependent) data delays, valid wire delay, and ready wire delay.
@@ -147,7 +151,7 @@ public:
   };
 
   /// Operation's latency, depending on its bitwidth.
-  BitwidthDepMetric<FrequencyDepMetric<double>> latency;
+  BitwidthDepMetric<std::map<double, double>> latency;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
   /// Delay of valid wire.
@@ -197,6 +201,9 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model,
 /// documentation for a longer description of this function's behavior.
 bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
+
+
+
 
 /// Holds the timing models for a set of operations (internally identified by
 /// their unique name), usually parsed from a JSON file. The class provides
