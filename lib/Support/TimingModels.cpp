@@ -336,13 +336,7 @@ return false;
 }
 for (const auto &[doubleKey, doubleValue] : *nestedMap) {
 double key;
-try {
 key = std::stod(doubleKey.str());
-} catch (const std::exception &) {
-path.field(bitwidthKey).field(doubleKey).report("expected double as key");
-return false;
-}
-
 double value;
 if (!fromJSON(doubleValue, value, path.field(bitwidthKey).field(doubleKey)))
 return false;

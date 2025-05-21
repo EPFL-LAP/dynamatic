@@ -57,7 +57,7 @@ public:
   /// bitwidth.
   LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const {
     std::optional<unsigned> widthCeil;
-    M metricCeil = 0.0;
+    M metricCeil{};
 
     // Iterate over the available bitwidths and determine which is the closest
     // one above the operation's bitwidth
@@ -128,6 +128,7 @@ public:
 /// function's behavior.
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
+
 
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<std::map<double, double>> &metric,
   llvm::json::Path path);

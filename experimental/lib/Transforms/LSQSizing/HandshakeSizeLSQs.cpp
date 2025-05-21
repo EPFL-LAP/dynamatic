@@ -55,7 +55,7 @@ struct HandshakeSizeLSQsPass
           HandshakeSizeLSQsPass> {
 
   HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions, double targetCP) {
-    this->targetCP = targetCP
+    this->targetCP = targetCP;
     this->timingModels = timingModels.str();
     this->collisions = collisions.str();
   }
@@ -75,7 +75,7 @@ private:
   std::optional<LSQSizingResult>
   sizeLSQsForCFDFC(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
                    TimingDatabase timingDB, unsigned initialII,
-                   std::string collisions);
+                   std::string collisions,  double targetCP);
 
   /// Finds the Start Node in a CFDFC
   /// The start node, is the node with the longest non-cyclic path to any other
@@ -231,7 +231,7 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
 std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-    TimingDatabase timingDB, unsigned initialII, std::string collisions) {
+    TimingDatabase timingDB, unsigned initialII, std::string collisions, double targetCP) {
 
     CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII, targetCP);
 
