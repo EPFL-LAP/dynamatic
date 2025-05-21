@@ -138,7 +138,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       Operation *defOp = operand.getDefiningOp();
 
       if (defOp) {
-        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
       }
     }
   }
@@ -154,7 +154,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
 
       if (defOp && 
           !isa<handshake::MemoryOpInterface, handshake::ConstantOp>(defOp)) {
-        channel.props->minTrans = std::max(channel.props->minTrans, 1U);
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
       }
     }
   }

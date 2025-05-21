@@ -3,7 +3,7 @@ from generators.support.utils import *
 
 def generate_merge_notehb(name, params):
   size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_merge_notehb_dataless(name, size)
