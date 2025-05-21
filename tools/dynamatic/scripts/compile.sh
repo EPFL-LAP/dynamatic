@@ -17,6 +17,7 @@ POLYGEIST_PATH=$7
 USE_SHARING=$8
 FAST_TOKEN_DELIVERY=$9
 OUT_OF_ORDER_EXECUTION=${10}
+STRAIGHT_TO_QUEUE=${11}
 
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
@@ -44,6 +45,7 @@ F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 F_HANDSHAKE_OOE="$COMP_DIR/out_of_order.mlir"
+F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 
 # ============================================================================ #
 # Helper funtions
@@ -149,13 +151,38 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-  --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-  > "$F_HANDSHAKE_TRANSFORMED"
-exit_on_fail "Failed to apply transformations to handshake" \
-  "Applied transformations to handshake"
+if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
+
+  echo_info "Using FPGA'23 for LSQ connection"
+
+  # FPT19 should run before straight to the queue, so that no useless components are instantiated.
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage \
+    --handshake-replace-memory-interfaces \
+    --handshake-straight-to-queue \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_SQ"
+  exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
+
+  F_HANDSHAKE=$F_HANDSHAKE_SQ
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+
+else 
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+fi
 
   # out-of-order-execution transformations
 if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then
