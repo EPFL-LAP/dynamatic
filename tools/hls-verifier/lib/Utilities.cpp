@@ -14,6 +14,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <dirent.h>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -203,6 +204,7 @@ bool executeCommand(const string &command) {
 vector<string> getListOfFilesInDirectory(const string &directory,
                                          const string &extension) {
   vector<string> result;
+  char sep = std::filesystem::path::preferred_separator;
   DIR *dirp = opendir(directory.c_str());
   struct dirent *dp;
   if (dirp != nullptr) {
@@ -211,7 +213,7 @@ vector<string> getListOfFilesInDirectory(const string &directory,
       if (temp.length() >= extension.length() &&
           temp.substr(temp.length() - extension.length(), extension.length())
                   .compare(extension) == 0)
-        result.emplace_back(dp->d_name);
+        result.emplace_back(directory + sep + dp->d_name);
     }
     closedir(dirp);
   }

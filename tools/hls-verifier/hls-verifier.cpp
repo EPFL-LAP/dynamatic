@@ -18,13 +18,10 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -57,11 +54,14 @@ void generateModelsimScripts(const VerificationContext &ctx) {
   os << "vmap work work\n";
   os << "project new . simulation work modelsim.ini 0\n";
   os << "project open simulation\n";
+
+  // We use the same VHDL TB for simulating both the VHDL and Verilog designs in
+  // ModelSim.
   for (auto &it : filelistVhdl)
-    os << "project addfile " << ctx.getHdlSrcDir() << "/" << it << "\n";
+    os << "project addfile " << it << "\n";
 
   for (auto &it : filelistVerilog)
-    os << "project addfile " << ctx.getHdlSrcDir() << "/" << it << "\n";
+    os << "project addfile " << it << "\n";
 
   os << "project calculateorder\n";
   os << "project compileall\n";

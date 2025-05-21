@@ -163,7 +163,7 @@ void commonSingleArgumentDeclaration(Instance &inst,
       .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
 }
 
-// A helper struct for connecting the in/output channels from/to the single
+// Helper structs for connecting the in/output channels from/to the single
 // argument.  The single argument block is basically an one-element RAM, with
 // the following interface signals:
 // - ce0: clock enable
@@ -269,13 +269,6 @@ struct ChannelToEndConnector {
   }
 };
 
-// A helper construct for interfacing the control only signals of the DUV
-//
-// HACK: the control only signals are handled in the following ways:
-// - Input: they are driven by valid = constant 1, their ready signals are
-// ignored
-// - Output: they are driving the join
-
 // A helper construct for connecting the start signal to the inputs of the
 // handshake kernel
 // HACK: the control only signals are handled in the following ways:
@@ -301,8 +294,8 @@ struct StartToControlConnector {
 // A helper construct for connecting the outputs control only channels of the
 // handshake kernel HACK: the control only signals are handled in the following
 // ways:
-// - Input: they are driven by valid = constant 1, their ready signals are
-// ignored
+// - The outputs drive the TB_join (all the output channel must produce a token
+// before the TB signals that the simulation is done).
 struct ControlToEndConnector {
   handshake::ControlType type;
   std::string argName;
