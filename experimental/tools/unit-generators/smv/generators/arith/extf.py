@@ -4,8 +4,8 @@ from generators.support.utils import *
 
 def generate_extf(name, params):
   latency = params[ATTR_LATENCY]
-  input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
-  output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  input_type = SmvScalarType(32)
+  output_type = SmvScalarType(64)
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:

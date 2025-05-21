@@ -5,8 +5,8 @@ from generators.support.utils import *
 
 def generate_extui(name, params):
   latency = params[ATTR_LATENCY]
-  input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
-  output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  input_type = SmvScalarType(params[ATTR_IN_BITWIDTH])
+  output_type = SmvScalarType(params[ATTR_OUT_BITWIDTH])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:

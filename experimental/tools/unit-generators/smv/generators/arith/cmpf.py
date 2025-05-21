@@ -6,7 +6,7 @@ def generate_cmpf(name, params):
   predicate = params[ATTR_PREDICATE]
   symbol = get_symbol_from_predicate(predicate)
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["lhs"])
+  is_double = params[ATTR_IS_DOUBLE]
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
