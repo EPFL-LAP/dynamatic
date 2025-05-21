@@ -21,7 +21,7 @@ class SmvScalarType:
   bitwidth: int
   smv_type: str
 
-  def __init__(self, bitwidth: str):
+  def __init__(self, bitwidth: int):
     """
     Constructor for SmvScalarType.
     """
