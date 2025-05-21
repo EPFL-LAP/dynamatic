@@ -104,15 +104,9 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
   let description = [{
     Make all channels rigid. 
   }];
-  let constructor = "dynamatic::experimental::rigidification::createHandshakeRigidificationPass()";
-}
-
-def HWRigidification : DynamaticPass<"hw-rigidification"> {
-  let summary = "Make all channels rigid.";
-  let description = [{
-    Make all channels rigid. 
-  }];
-  let constructor = "dynamatic::experimental::rigidification::createHWRigidificationPass()";
+  let constructor = "dynamatic::experimental::rigidification::createRigidification()";
+  let options = [ Option<"jsonPath", "json-path", "std::string", "",
+    "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

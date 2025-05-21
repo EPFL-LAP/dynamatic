@@ -1,6 +1,8 @@
-add_dynamatic_library(DynamaticExperimentalTestTransforms
-  TestCDGAnalysis.cpp
-  TestHandshakeSimulator.cpp
+add_dynamatic_library(DynamaticRigidification
+  HandshakeRigidification.cpp
+
+  DEPENDS
+  DynamaticExperimentalTransformsPassIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -8,7 +10,7 @@ add_dynamatic_library(DynamaticExperimentalTestTransforms
   MLIRFuncDialect
   MLIRSupport
   MLIRTransformUtils
-  DynamaticSupport
   DynamaticHandshake
+  DynamaticSupport
   DynamaticExperimentalSupport
-)
+  )
