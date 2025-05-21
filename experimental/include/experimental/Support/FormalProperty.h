@@ -57,12 +57,12 @@ struct Channel {
 
 class AbsenceOfBackpressure : public FormalProperty {
 public:
-  std::string getOwner() { return owner.operationName; }
-  std::string getUser() { return user.operationName; }
-  int getOwnerIndex() { return owner.index; }
-  int getUserIndex() { return owner.index; }
-  std::string getOwnerChannel() { return owner.name; }
-  std::string getUserChannel() { return user.name; }
+  std::string getOwner() { return ownerChannel.operationName; }
+  std::string getUser() { return userChannel.operationName; }
+  int getOwnerIndex() { return ownerChannel.index; }
+  int getUserIndex() { return userChannel.index; }
+  std::string getOwnerChannel() { return ownerChannel.name; }
+  std::string getUserChannel() { return userChannel.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -71,18 +71,18 @@ public:
   ~AbsenceOfBackpressure() = default;
 
 private:
-  Channel owner;
-  Channel user;
+  Channel ownerChannel;
+  Channel userChannel;
 };
 
 class ValidEquivalence : public FormalProperty {
 public:
-  std::string getOwner() { return owner.operationName; }
-  std::string getTarget() { return target.operationName; }
-  int getOwnerIndex() { return owner.index; }
-  int getTargetIndex() { return target.index; }
-  std::string getOwnerChannel() { return owner.name; }
-  std::string getTargetChannel() { return target.name; }
+  std::string getOwner() { return ownerChannel.operationName; }
+  std::string getTarget() { return targetChannel.operationName; }
+  int getOwnerIndex() { return ownerChannel.index; }
+  int getTargetIndex() { return targetChannel.index; }
+  std::string getOwnerChannel() { return ownerChannel.name; }
+  std::string getTargetChannel() { return targetChannel.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -92,8 +92,8 @@ public:
   ~ValidEquivalence() = default;
 
 private:
-  Channel owner;
-  Channel target;
+  Channel ownerChannel;
+  Channel targetChannel;
 };
 
 } // namespace dynamatic
