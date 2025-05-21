@@ -48,7 +48,7 @@ void generateModelsimScripts(const VerificationContext &ctx) {
       getListOfFilesInDirectory(ctx.getHdlSrcDir(), ".v");
 
   std::error_code ec;
-  llvm::raw_fd_ostream os(ctx.getModelsimDoFileName(), ec);
+  llvm::raw_fd_ostream os(ctx.getModelsimDoFilePath(), ec);
   // os << "vdel -all" << endl;
   os << "vlib work\n";
   os << "vmap work work\n";
@@ -146,12 +146,18 @@ mlir::LogicalResult compareCAndVhdlOutputs(const VerificationContext &ctx) {
 
 // Executing ModelSim
 void executeVhdlTestbench(const VerificationContext &ctx) {
-  std::string command = "vsim -c -do " + ctx.getModelsimDoFileName();
+  std::string command = "vsim -c -do " + ctx.getModelsimDoFilePath();
   logInf(LOG_TAG, "Executing modelsim: [" + command + "]");
   executeCommand(command);
 }
 
 int main(int argc, char **argv) {
+
+  cl::opt<std::string> simPathName(
+      "sim-path",
+      cl::desc("Path where the simulation files and directories are located"),
+      cl::value_desc("Simulation directory"), cl::Required);
+
   cl::opt<std::string> hlsKernelName(
       "kernel-name", cl::desc("Name of the HLS kernel"),
       cl::value_desc("HLS kernel name"), cl::Required);
@@ -166,10 +172,10 @@ int main(int argc, char **argv) {
 
     HlsVerifier assumes the following directory structure:
     - All the C source files must be in a directory as cDuvPathName in C_SRC.
-    - All HDL sources must be in VHDL_SRC.
+    - All HDL sources must be in HDL_SRC.
     - hls-verifier must run from a subdirectory called HLS_VERIFY
     - The golden references must be in a directory called C_OUT.
-    - C_SRC, VHDL_SRC, C_OUT, and HLS_VERIFY must be in the same directory.
+    - C_SRC, HDL_SRC, C_OUT, and HLS_VERIFY must be in the same directory.
     
     )PREFIX");
 
@@ -196,7 +202,7 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  VerificationContext ctx(hlsKernelName, &funcOp);
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);

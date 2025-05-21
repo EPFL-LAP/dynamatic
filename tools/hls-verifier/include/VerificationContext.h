@@ -13,6 +13,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Support/IndentedOstream.h"
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -29,33 +30,39 @@ static const std::string VSIM_SCRIPT_FILE = "simulation.do";
 static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 
 struct VerificationContext {
-  VerificationContext(const std::string &cFuvFunctionName,
+  VerificationContext(const std::string &simPath,
+                      const std::string &cFuvFunctionName,
                       handshake::FuncOp *funcOp)
-      : funcOp(funcOp), kernelName(cFuvFunctionName) {}
+      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName) {}
 
-  std::string getBaseDir() const { return ".."; }
+  static const char SEP = std::filesystem::path::preferred_separator;
 
-  std::string getVhdlTestbenchPath() const {
-    return getHdlSrcDir() + "/" + "tb_" + kernelName + ".vhd";
-  }
+  // Path to the simulation directory
+  std::string simPath;
 
-  std::string getModelsimDoFileName() const { return VSIM_SCRIPT_FILE; }
-
-  std::string getCOutDir() const { return getBaseDir() + "/" + C_OUT_DIR; }
-
-  std::string getInputVectorDir() const {
-    return getBaseDir() + "/" + INPUT_VECTORS_DIR;
-  }
-
-  std::string getHdlOutDir() const { return getBaseDir() + "/" + HDL_OUT_DIR; }
-
-  std::string getHlsVerifyDir() const { return "."; }
-
-  std::string getHdlSrcDir() const { return getBaseDir() + "/" + HDL_SRC_DIR; }
-
+  // Pointer to the funcOp of the top-level handshake function
   handshake::FuncOp *funcOp;
 
+  // The name of the top-level handshake function
   std::string kernelName;
+
+  std::string getVhdlTestbenchPath() const {
+    return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
+  }
+
+  std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }
+
+  std::string getCOutDir() const { return simPath + SEP + C_OUT_DIR; }
+
+  std::string getInputVectorDir() const {
+    return simPath + "/" + INPUT_VECTORS_DIR;
+  }
+
+  std::string getHdlOutDir() const { return simPath + "/" + HDL_OUT_DIR; }
+
+  std::string getHlsVerifyDir() const { return simPath + "/" + HLS_VERIFY_DIR; }
+
+  std::string getHdlSrcDir() const { return simPath + "/" + HDL_SRC_DIR; }
 };
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H

@@ -75,6 +75,7 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" \
+  --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   > "../report.txt" 2>&1
