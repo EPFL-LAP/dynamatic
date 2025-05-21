@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -339,11 +340,11 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
-      modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.sink" ||
-      modName == "handshake.subi" || modName == "handshake.shli" ||
-      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
-      modName == "handshake.fptosi" ||
+      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.merge" || modName == "handshake.muli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.shli" || modName == "handshake.blocker" ||
+      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -398,7 +399,10 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
-             modName == "handshake.mulf" || modName == "handshake.subf") {
+             modName == "handshake.mulf" || modName == "handshake.subf" ||
+             modName == "handshake.divf" || modName == "handshake.negf" ||
+             modName == "handshake.maximumf" ||
+             modName == "handshake.minimumf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
