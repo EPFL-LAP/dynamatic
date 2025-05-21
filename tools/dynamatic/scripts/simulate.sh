@@ -13,7 +13,7 @@ OUTPUT_DIR=$3
 KERNEL_NAME=$4
 
 # Generated directories/files
-SIM_DIR="$OUTPUT_DIR/sim"
+SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
 C_SRC_DIR="$SIM_DIR/C_SRC"
 C_OUT_DIR="$SIM_DIR/C_OUT"
 COSIM_HDL_SRC_DIR="$SIM_DIR/HDL_SRC"
