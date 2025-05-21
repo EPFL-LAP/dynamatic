@@ -49,53 +49,51 @@ protected:
   std::string check;
 };
 
-class AOBProperty : public FormalProperty {
-public:
-  std::string getOwner() { return owner; }
-  std::string getUser() { return user; }
-  int getOwnerIndex() { return ownerIndex; }
-  int getUserIndex() { return userIndex; }
-  std::string getOwnerChannel() { return ownerChannel; }
-  std::string getUserChannel() { return userChannel; }
-
-  llvm::json::Value extraInfoToJSON() const override;
-
-  AOBProperty() = default;
-  AOBProperty(unsigned long id, TAG tag, const OpResult &res);
-  ~AOBProperty() = default;
-
-private:
-  std::string owner;
-  std::string user;
-  int ownerIndex;
-  int userIndex;
-  std::string ownerChannel;
-  std::string userChannel;
+struct Channel {
+  std::string operationName;
+  std::string name;
+  unsigned index;
 };
 
-class VEQProperty : public FormalProperty {
+class AbsenceOfBackpressure : public FormalProperty {
 public:
-  std::string getOwner() { return owner; }
-  std::string getTarget() { return target; }
-  int getOwnerIndex() { return ownerIndex; }
-  int getTargetIndex() { return targetIndex; }
-  std::string getOwnerChannel() { return ownerChannel; }
-  std::string getTargetChannel() { return targetChannel; }
+  std::string getOwner() { return owner.operationName; }
+  std::string getUser() { return user.operationName; }
+  int getOwnerIndex() { return owner.index; }
+  int getUserIndex() { return owner.index; }
+  std::string getOwnerChannel() { return owner.name; }
+  std::string getUserChannel() { return user.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
-  VEQProperty() = default;
-  VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
-              const OpResult &res2);
-  ~VEQProperty() = default;
+  AbsenceOfBackpressure() = default;
+  AbsenceOfBackpressure(unsigned long id, TAG tag, const OpResult &res);
+  ~AbsenceOfBackpressure() = default;
 
 private:
-  std::string owner;
-  std::string target;
-  int ownerIndex;
-  int targetIndex;
-  std::string ownerChannel;
-  std::string targetChannel;
+  Channel owner;
+  Channel user;
+};
+
+class ValidEquivalence : public FormalProperty {
+public:
+  std::string getOwner() { return owner.operationName; }
+  std::string getTarget() { return target.operationName; }
+  int getOwnerIndex() { return owner.index; }
+  int getTargetIndex() { return target.index; }
+  std::string getOwnerChannel() { return owner.name; }
+  std::string getTargetChannel() { return target.name; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  ValidEquivalence() = default;
+  ValidEquivalence(unsigned long id, TAG tag, const OpResult &res1,
+                   const OpResult &res2);
+  ~ValidEquivalence() = default;
+
+private:
+  Channel owner;
+  Channel target;
 };
 
 } // namespace dynamatic

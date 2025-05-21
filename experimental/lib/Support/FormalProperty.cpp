@@ -88,7 +88,8 @@ llvm::json::Value FormalProperty::toJSON() const {
 
 // Absence of Backpressure
 
-AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
+AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
+                                             const OpResult &res)
     : FormalProperty(id, tag, TYPE::AOB) {
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
@@ -113,7 +114,7 @@ AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
   userChannel = userNamer.getInputName(operandIndex).str();
 }
 
-llvm::json::Value AOBProperty::extraInfoToJSON() const {
+llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", owner},
                              {"user", user},
                              {"owner_index", ownerIndex},
@@ -124,8 +125,8 @@ llvm::json::Value AOBProperty::extraInfoToJSON() const {
 
 // Valid Equivalence
 
-VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
-                         const OpResult &res2)
+ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
+                                   const OpResult &res1, const OpResult &res2)
     : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
@@ -143,7 +144,7 @@ VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
   targetChannel = namer2.getOutputName(j).str();
 }
 
-llvm::json::Value VEQProperty::extraInfoToJSON() const {
+llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", owner},
                              {"target", target},
                              {"owner_index", ownerIndex},
