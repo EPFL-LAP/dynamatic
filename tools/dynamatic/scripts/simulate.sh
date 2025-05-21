@@ -30,6 +30,7 @@ HDL_DIR="$OUTPUT_DIR/hdl"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
 HLS_VERIFIER_BIN="$DYNAMATIC_DIR/bin/hls-verifier"
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/hls-verifier/resources"
+VIVADO_IP_ADAPTER="$DYNAMATIC_DIR/build/bin/vivado-ip-adapter"
 
 # ============================================================================ #
 # Simulation flow
@@ -79,6 +80,11 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 # Generate IO
 "$IO_GEN_BIN"
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
+
+# Generate the IP with a simple handshake interface
+$VIVADO_IP_ADAPTER \
+  "$OUTPUT_DIR/comp/handshake_export.mlir" \
+  > "$COSIM_HDL_SRC_DIR/${KERNEL_NAME}_ip.v"
 
 # Simulate and verify design
 echo_info "Launching simulation ($SIMULATOR_NAME)"

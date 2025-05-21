@@ -158,9 +158,7 @@ void commonSingleArgumentDeclaration(Instance &inst,
       .connect(CLK_PORT, "tb_" + CLK_PORT)
       .connect(RST_PORT, "tb_" + RST_PORT)
       .connect(DONE_PORT, "tb_temp_idle")
-      .connect(D_OUT0_PORT, argName + "_dout0")
-      .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
-      .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
+      .connect(D_OUT0_PORT, argName + "_dout0");
 }
 
 // Helper structs for connecting the in/output channels from/to the single
@@ -175,10 +173,11 @@ void commonSingleArgumentDeclaration(Instance &inst,
 struct StartToChannelConnector {
   handshake::ChannelType type;
   std::string argName;
+  VerificationContext &ctx;
 
   StartToChannelConnector(handshake::ChannelType type,
-                          const std::string &argName)
-      : type(type), argName(argName) {}
+                          const std::string &argName, VerificationContext &ctx)
+      : type(type), argName(argName), ctx(ctx) {}
 
   void declareConstants(mlir::raw_indented_ostream &os,
                         const std::string &inputVectorPath,
@@ -209,13 +208,31 @@ struct StartToChannelConnector {
     argInst.connect(CE0_PORT, "'1'")
         .connect(WE0_PORT, "'0'")
         .connect(D_IN0_PORT, "(others => '0')");
+
+    if (ctx.isSeparateHandshake) {
+      // Connect handshake signals only when every input has a separate
+      // handshake
+      argInst.connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
+          .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
+    } else {
+      // Otherwise, the input argument memory does not need to be connected to
+      // anything
+      argInst.connect(D_OUT0_PORT + "_valid", "open")
+          .connect(D_OUT0_PORT + "_ready", "\'1\'");
+    }
     argInst.emitVhdl(os);
   }
 
   void connectToDuv(Instance &duvInst) {
-    duvInst.connect(argName, argName + "_dout0")
-        .connect(argName + "_valid", argName + "_dout0_valid")
-        .connect(argName + "_ready", argName + "_dout0_ready");
+    duvInst.connect(argName, argName + "_dout0");
+    if (ctx.isSeparateHandshake) {
+      // Connect handshake signals only when every input has a separate
+      // handshake
+      duvInst.connect(argName + "_valid", argName + "_dout0_valid")
+          .connect(argName + "_ready", argName + "_dout0_ready");
+    }
+    // Otherwise, the circuit has no handshake interface and we don't need to do
+    // anything
   }
 };
 
@@ -223,9 +240,11 @@ struct ChannelToEndConnector {
 
   handshake::ChannelType type;
   std::string argName;
+  VerificationContext &ctx;
 
-  ChannelToEndConnector(handshake::ChannelType type, const std::string &argName)
-      : type(type), argName(argName) {}
+  ChannelToEndConnector(handshake::ChannelType type, const std::string &argName,
+                        VerificationContext &ctx)
+      : type(type), argName(argName), ctx(ctx) {}
 
   void declareConstants(mlir::raw_indented_ostream &os,
                         const std::string &inputVectorPath,
@@ -247,8 +266,12 @@ struct ChannelToEndConnector {
   void declareSignals(mlir::raw_indented_ostream &os) {
     // The valid signal from the circuit, which drives the write enable (we)
     // pin of the single enable module
-    declareSTL(os, argName + "_valid");
-    declareSTL(os, argName + "_ready");
+    if (ctx.isSeparateHandshake) {
+      // Connect handshake signals only when every input has a separate
+      // handshake
+      declareSTL(os, argName + "_valid");
+      declareSTL(os, argName + "_ready");
+    }
     declareSignalsSingleArgumentModel(os, argName, type.getDataBitWidth());
   }
 
@@ -256,16 +279,26 @@ struct ChannelToEndConnector {
     Instance argInst("single_argument", "arg_inst_" + argName);
 
     commonSingleArgumentDeclaration(argInst, argName);
-    argInst.connect(CE0_PORT, "'1'")
-        .connect(WE0_PORT, argName + "_valid")
-        .connect(D_IN0_PORT, argName + "_din0");
+    argInst.connect(CE0_PORT, "'1'").connect(D_IN0_PORT, argName + "_din0");
+
+    if (ctx.isSeparateHandshake) {
+      argInst.connect(WE0_PORT, argName + "_valid")
+          .connect(D_OUT0_PORT + "_valid", argName + "_dout0_valid")
+          .connect(D_OUT0_PORT + "_ready", argName + "_dout0_ready");
+    } else {
+      argInst.connect(WE0_PORT, "tb_global_valid")
+          .connect(D_OUT0_PORT + "_valid", "open")
+          .connect(D_OUT0_PORT + "_ready", "tb_start_ready");
+    }
     argInst.emitVhdl(os);
   }
 
   void connectToDuv(Instance &duvInst) {
-    duvInst.connect(argName, argName + "_din0")
-        .connect(argName + "_valid", argName + "_valid")
-        .connect(argName + "_ready", argName + "_ready");
+    duvInst.connect(argName, argName + "_din0");
+    if (ctx.isSeparateHandshake) {
+      duvInst.connect(argName + "_valid", argName + "_valid")
+          .connect(argName + "_ready", argName + "_ready");
+    }
   }
 };
 
@@ -274,10 +307,11 @@ struct ChannelToEndConnector {
 struct StartToControlConnector {
   handshake::ControlType type;
   std::string argName;
+  VerificationContext &ctx;
 
   StartToControlConnector(handshake::ControlType type,
-                          const std::string &argName)
-      : type(type), argName(argName) {}
+                          const std::string &argName, VerificationContext &ctx)
+      : type(type), argName(argName), ctx(ctx) {}
 
   void declareSignals(mlir::raw_indented_ostream &os) {}
 
@@ -295,8 +329,10 @@ struct StartToControlConnector {
       // ready signals are ignored.
       //
       // [TODO] Should this handshake also happen only once per TB transaction?
-      duvInst.connect(argName + "_valid", "\'1\'")
-          .connect(argName + "_ready", "open");
+      if (ctx.isSeparateHandshake) {
+        duvInst.connect(argName + "_valid", "\'1\'")
+            .connect(argName + "_ready", "open");
+      }
     }
   }
 };
@@ -309,16 +345,20 @@ struct StartToControlConnector {
 struct ControlToEndConnector {
   handshake::ControlType type;
   std::string argName;
+  VerificationContext &ctx;
 
-  ControlToEndConnector(handshake::ControlType type, const std::string &argName)
-      : type(type), argName(argName) {}
+  ControlToEndConnector(handshake::ControlType type, const std::string &argName,
+                        VerificationContext &ctx)
+      : type(type), argName(argName), ctx(ctx) {}
   void declareSignals(mlir::raw_indented_ostream &os) {
     declareSTL(os, argName + "_valid");
     declareSTL(os, argName + "_ready");
   }
   void connectToDuv(Instance &duvInst) {
-    duvInst.connect(argName + "_valid", argName + "_valid")
-        .connect(argName + "_ready", argName + "_ready");
+    if (ctx.isSeparateHandshake) {
+      duvInst.connect(argName + "_valid", argName + "_valid")
+          .connect(argName + "_ready", argName + "_ready");
+    }
   }
 };
 
@@ -336,7 +376,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
 
-    StartToChannelConnector c(type, argName);
+    StartToChannelConnector c(type, argName, ctx);
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
 
@@ -350,7 +390,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
   // channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToEndConnector c(type, argName);
+    ChannelToEndConnector c(type, argName, ctx);
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
   declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
@@ -385,14 +425,14 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of data input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(type, argName);
+    StartToChannelConnector c(type, argName, ctx);
     c.declareSignals(os);
   }
 
   // Signals of control input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    StartToControlConnector c(type, argName);
+    StartToControlConnector c(type, argName, ctx);
     c.declareSignals(os);
   }
 
@@ -406,14 +446,14 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   // Signals of data output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToEndConnector c(type, argName);
+    ChannelToEndConnector c(type, argName, ctx);
     c.declareSignals(os);
   }
 
   // Signals of control output channels
   for (auto &[type, argName] :
        getOutputArguments<handshake::ControlType>(funcOp)) {
-    ControlToEndConnector c(type, argName);
+    ControlToEndConnector c(type, argName, ctx);
     c.declareSignals(os);
   }
 
@@ -432,7 +472,7 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
   // Instantiate argument generator for the input channels
   for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(type, argName);
+    StartToChannelConnector c(type, argName, ctx);
     c.instantiateSingleArgumentModel(os);
   }
 
@@ -444,63 +484,12 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
 
   for (auto &[type, argName] :
        getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToEndConnector c(type, argName);
+    ChannelToEndConnector c(type, argName, ctx);
     c.instantiateSingleArgumentModel(os);
   }
 }
-
-void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
-                              VerificationContext &ctx) {
-
-  std::string duvName = ctx.kernelName;
-
-  Instance duvInst(duvName, "duv_inst");
-
-  duvInst.connect(CLK_PORT, "tb_" + CLK_PORT)
-      .connect(RST_PORT, "tb_" + RST_PORT);
-
-  handshake::FuncOp *funcOp = ctx.funcOp;
-
-  // Connect the input data channels to the DUV
-  for (auto &[type, argName] :
-       getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(type, argName);
-    c.connectToDuv(duvInst);
-  }
-
-  // Connect the input control channels to the DUV
-  // @Jiahui17: TODO: create a new argument for dataless input channels
-  for (auto &[type, argName] :
-       getInputArguments<handshake::ControlType>(funcOp)) {
-    StartToControlConnector c(type, argName);
-    c.connectToDuv(duvInst);
-  }
-
-  // Connect the memory elements to the DUV
-  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    MemRefToDualPortRAM m(type, argName);
-    m.connectToDuv(duvInst);
-  }
-
-  // Connect the input control channels to the DUV
-  // @Jiahui17: TODO: create a new argument for dataless input channels
-  for (auto &[type, argName] :
-       getOutputArguments<handshake::ChannelType>(funcOp)) {
-    ChannelToEndConnector c(type, argName);
-    c.connectToDuv(duvInst);
-  }
-
-  for (auto &[type, argName] :
-       getOutputArguments<handshake::ControlType>(funcOp)) {
-    ControlToEndConnector c(type, argName);
-    c.connectToDuv(duvInst);
-  }
-
-  duvInst.emitVhdl(os);
-}
-
-void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
-                                  VerificationContext &ctx) {
+void deriveGlobalValidSignal(mlir::raw_indented_ostream &os,
+                             VerificationContext &ctx) {
   // @Jiahui17: I assume that the results only contain handshake channels.
   unsigned idx = 0;
 
@@ -527,6 +516,70 @@ void deriveGlobalCompletionSignal(mlir::raw_indented_ostream &os,
   joinInst.connect("outs_ready", "tb_global_ready");
 
   joinInst.emitVhdl(os);
+}
+
+void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
+                              VerificationContext &ctx) {
+
+  std::string duvName = ctx.kernelName + (ctx.isSeparateHandshake ? "" : "_ip");
+
+  Instance duvInst(duvName, "duv_inst");
+
+  duvInst.connect(CLK_PORT, "tb_" + CLK_PORT)
+      .connect(RST_PORT, "tb_" + RST_PORT);
+
+  if (!ctx.isSeparateHandshake) {
+    duvInst.connect("ap_start", "tb_start_valid");
+    duvInst.connect("ap_ready", "tb_start_ready");
+  }
+
+  handshake::FuncOp *funcOp = ctx.funcOp;
+
+  // Connect the input data channels to the DUV
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ChannelType>(funcOp)) {
+    StartToChannelConnector c(type, argName, ctx);
+    c.connectToDuv(duvInst);
+  }
+
+  // Connect the input control channels to the DUV
+  // @Jiahui17: TODO: create a new argument for dataless input channels
+  for (auto &[type, argName] :
+       getInputArguments<handshake::ControlType>(funcOp)) {
+    StartToControlConnector c(type, argName, ctx);
+    c.connectToDuv(duvInst);
+  }
+
+  // Connect the memory elements to the DUV
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+    MemRefToDualPortRAM m(type, argName);
+    m.connectToDuv(duvInst);
+  }
+
+  // Connect the input control channels to the DUV
+  // @Jiahui17: TODO: create a new argument for dataless input channels
+  for (auto &[type, argName] :
+       getOutputArguments<handshake::ChannelType>(funcOp)) {
+    ChannelToEndConnector c(type, argName, ctx);
+    c.connectToDuv(duvInst);
+  }
+
+  for (auto &[type, argName] :
+       getOutputArguments<handshake::ControlType>(funcOp)) {
+    ControlToEndConnector c(type, argName, ctx);
+    c.connectToDuv(duvInst);
+  }
+
+  if (ctx.isSeparateHandshake) {
+    // If the circuit has a separate handshake for each output, we use a join to
+    // derive the global valid signal
+    deriveGlobalValidSignal(os, ctx);
+  } else {
+    // Otherwise, the ap_done signal is the global valid signal
+    duvInst.connect("ap_done", "tb_global_valid");
+  }
+
+  duvInst.emitVhdl(os);
 }
 
 void getOutputTagGeneration(mlir::raw_indented_ostream &os,
@@ -574,7 +627,6 @@ void vhdlTbCodegen(VerificationContext &ctx) {
   os.indent();
   getDuvInstanceGeneration(os, ctx);
   getMemoryInstanceGeneration(os, ctx);
-  deriveGlobalCompletionSignal(os, ctx);
   getOutputTagGeneration(os, ctx);
   os << COMMON_TB_BODY;
   os.unindent();

@@ -34,9 +34,10 @@ static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp, bool vivadoFPU)
+                      handshake::FuncOp *funcOp, bool vivadoFPU,
+                      bool isSeparateHandshake)
       : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
-        vivadoFPU(vivadoFPU) {}
+        vivadoFPU(vivadoFPU), isSeparateHandshake(isSeparateHandshake) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -53,6 +54,9 @@ struct VerificationContext {
   bool vivadoFPU;
 
   bool useVivadoFPU() const { return vivadoFPU; }
+  // Should every function argument and result have a separate handshake
+  // interface?
+  bool isSeparateHandshake;
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
