@@ -49,7 +49,7 @@ protected:
   std::string check;
 };
 
-struct Channel {
+struct SignalName {
   std::string operationName;
   std::string name;
   unsigned index;
@@ -71,8 +71,8 @@ public:
   ~AbsenceOfBackpressure() = default;
 
 private:
-  Channel ownerChannel;
-  Channel userChannel;
+  SignalName ownerChannel;
+  SignalName userChannel;
 };
 
 class ValidEquivalence : public FormalProperty {
@@ -92,8 +92,8 @@ public:
   ~ValidEquivalence() = default;
 
 private:
-  Channel ownerChannel;
-  Channel targetChannel;
+  SignalName ownerChannel;
+  SignalName targetChannel;
 };
 
 } // namespace dynamatic
