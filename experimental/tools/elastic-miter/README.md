@@ -10,9 +10,6 @@ By default the tool uses NuSMV for the verification. The official version on sup
 Make sure to use the `--enable-leq-binaries` flag when using `build.sh`
 
 
-Currently, the conversion to SMV requires the dot2smv converter. It is also downloaded when using the  `--enable-leq-binaries` flag.
-
-
 The tool supports following options:
 ```bash
 elastic-miter --lhs=<lhs-file-path> --rhs=<lhs-file-path> -o <out-dir> [--loop=<string>] [--loop_strict=<string>] [--seq_length=<string>] [--token_limit=<string>] [--cex]

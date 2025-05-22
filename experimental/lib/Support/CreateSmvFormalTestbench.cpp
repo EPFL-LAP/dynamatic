@@ -50,15 +50,10 @@ static std::string instantiateModuleUnderTest(
 
     llvm::TypeSwitch<Type, void>(argumentType)
         .Case<handshake::ControlType>([&](handshake::ControlType) {
-          if (!LEGACY_DOT2SMV_COMPATIBLE) {
-            inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                     SEQUENCE_GENERATOR_VALID_NAME.str());
-          } else {
-            inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                     SEQUENCE_GENERATOR_DATA_NAME.str());
-            inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                     SEQUENCE_GENERATOR_VALID_NAME.str());
-          }
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_DATA_NAME.str());
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_VALID_NAME.str());
         })
         .Case<handshake::ChannelType>([&](handshake::ChannelType) {
           inputVariables.push_back("seq_generator_" + argumentName + "." +
