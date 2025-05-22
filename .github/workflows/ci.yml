@@ -32,7 +32,7 @@ jobs:
           FILES=$(git ls-files '*.py' --modified)
           STATUS=$?
           if [[ $FILES ]]; then
-            if [[ $(autopep8 --max-line-length 200 --diff $FILES) ]]; then
+            if [[ $(autopep8 --max-line-length 200 --indent-size=2 --ignore=E121 --diff $FILES) ]]; then
               STATUS=1
             else
               STATUS=0
