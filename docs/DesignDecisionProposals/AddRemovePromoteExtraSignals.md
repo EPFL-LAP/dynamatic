@@ -1,4 +1,7 @@
 
+> [!NOTE]
+> This is a proposal, and has not yet been implemented. 
+
 # Operations which Add and Remove Extra Signals
 
 As described in detail [here](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/ExtraSignalsTypeVerification.md), our Handshake IR uses a custom type system: each operand between two operations represents a handshake channel, enabling data to move through the circuit.
