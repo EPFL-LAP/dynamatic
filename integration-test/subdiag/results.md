@@ -8,4 +8,4 @@ Additionally, the current implementation of `cmpf` seems to generate output with
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 15               | 1                 |
 | II                   | 16               | 2                 |
-| Cycles (Test Bench)  | 1623 (End: 1621) | 230 (End: 224)    |
+| Cycles (Test Bench)  | 1623 (End: 1621) | 228 (End: 222)    |
