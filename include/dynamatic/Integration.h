@@ -158,6 +158,9 @@ std::string formatElement(const T &element) {
     // int8_t might be interpreted and printed as a char, so we need to convert
     // it to an int before printing it to stdout.
     oss << static_cast<int>(element);
+  } else if constexpr (std::is_same_v<T, char>) {
+    // A char can be directly printed as a integer (i.e., its ASCII code)
+    oss << int(element);
   } else {
     static_assert(always_false<T>, "Unsupported type!");
   }
@@ -240,6 +243,14 @@ static unsigned _transactionID_ = 0;
 static std::string _outPrefix_;
 
 // NOLINTEND(readability-identifier-naming)
+
+/// Specialization of the scalar printer for char.
+template <>
+void scalarPrinter<char>(const char &arg, OS &os) {
+  // Print the char as a 2-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << (static_cast<int>(arg)) << std::endl;
+}
 
 /// Specialization of the scalar printer for int8_t.
 template <>
