@@ -260,6 +260,8 @@ namespace {
     static constexpr llvm::StringLiteral SHARING = "sharing";
     static constexpr llvm::StringLiteral OUT_OF_ORDER_EXECUTION =
       "out-of-order-execution";
+    static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE =
+      "straight-to-queue";
 
     Compile(FrontendState& state)
       : Command("compile",
@@ -275,6 +277,8 @@ namespace {
       addFlag({ FAST_TOKEN_DELIVERY,
                "Use fast token delivery strategy to build the circuit" });
       addFlag({ OUT_OF_ORDER_EXECUTION, "Use out-of-order execution strategy" });
+      addFlag({ STRAIGHT_TO_QUEUE, 
+                "Use straight to queue to connect the circuit to the LSQ" });
     }
 
     CommandResult execute(CommandArguments& args) override;
@@ -587,6 +591,8 @@ CommandResult Compile::execute(CommandArguments& args) {
     args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string outOfOrderExecution =
     args.flags.contains(OUT_OF_ORDER_EXECUTION) ? "1" : "0";
+  std::string straightToQueue =
+    args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -610,7 +616,7 @@ CommandResult Compile::execute(CommandArguments& args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
     state.getOutputDir(), state.getKernelName(), buffers,
     floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-    fastTokenDelivery, outOfOrderExecution);
+    fastTokenDelivery, outOfOrderExecution, straightToQueue);
 }
 
 CommandResult WriteHDL::execute(CommandArguments& args) {
