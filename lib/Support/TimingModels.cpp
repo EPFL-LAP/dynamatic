@@ -325,54 +325,47 @@ bool dynamatic::fromJSON(const ljson::Value &value,
 
 
 bool dynamatic::fromJSON(const ljson::Value &value,
-  BitwidthDepMetric<DelayDepMetric> &metric,
-  ljson::Path path) {
-const ljson::Object *object = value.getAsObject();
-if (!object) {
-path.report("expected JSON object");
-return false;
+  BitwidthDepMetric<DelayDepMetric<double>> &metric,
+ ljson::Path path) {
+ const ljson::Object *object = value.getAsObject();
+ if (!object) {
+ path.report("expected JSON object");
+ return false;
+ }
+ for (const auto &[bitwidthKey, metricValue] : *object) {
+ unsigned bitwidth;
+ if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
+ return false;
+ std::map<double, double> LatencyMap;
+ 
+ const ljson::Object *nestedMap = metricValue.getAsObject();
+ if (!nestedMap) {
+     path.field(bitwidthKey).report("expected nested map object");
+     return false;
+ }
+ 
+ for (const auto &[doubleKey, doubleValue] : *nestedMap) {
+     double key;
+     key = std::stod(doubleKey.str());
+ 
+     double value;
+     if (!fromJSON(doubleValue, value, path.field(bitwidthKey).field(doubleKey)))
+         return false;
+ 
+     LatencyMap[key] = value;
+ }
+ DelayDepMetric<double> LatencyStruct;
+ LatencyStruct.data = LatencyMap; 
+ metric.data[bitwidth] = LatencyStruct;
 }
 
-for (const auto &[bitwidthKey, metricValue] : *object) {
-unsigned bitwidth;
-if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
-return false;
-
-// Create a new DelayDepMetric instance
-metric.data[bitwidth] = DelayDepMetric<double>;
-
-const ljson::Object *nestedMap = metricValue.getAsObject();
-if (!nestedMap) {
-path.field(bitwidthKey).report("expected nested map object");
-return false;
+llvm::errs() << "Parsed metric.data contents:\n";
+for (const auto &[bitwidth, delayMetric] : metric.data) {
+    llvm::errs() << "  Bitwidth: " << bitwidth << "\n";
+    for (const auto &[latencyKey, latencyValue] : delayMetric.data) {
+        llvm::errs() << "    " << latencyKey << " -> " << latencyValue << "\n";
+    }
 }
-
-for (const auto &[doubleKey, doubleValue] : *nestedMap) {
-double key = std::stod(doubleKey.str());
-double value;
-if (!fromJSON(doubleValue, value, path.field(bitwidthKey).field(doubleKey)))
-return false;
-
-// Now populate the data field of the DelayDepMetric struct
-metric.data[bitwidth].data[key] = value;
-}
-}
-
-return true;
-}
-
-
-llvm::errs() << "=== Debug: Final Built BitwidthDepMetric Array ===\n";
-llvm::errs() << "Total bitwidths parsed: " << metric.data.size() << "\n";
-for (const auto &[bitwidth, innerMap] : metric.data) {
-  llvm::errs() << "Bitwidth: " << bitwidth << " (" << innerMap.size() << " entries)\n";
-  for (const auto &[key, value] : innerMap) {
-    llvm::errs() << "  " << key << " -> " << value << "\n";
-  }
-}
-llvm::errs() << "================================================\n";
-
-
 
 return true;
 }
