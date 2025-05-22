@@ -3,7 +3,7 @@ from generators.support.utils import *
 
 
 def generate_cond_br(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["data"])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_cond_br_dataless(name)

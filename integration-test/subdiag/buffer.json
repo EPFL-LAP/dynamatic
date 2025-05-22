@@ -3,144 +3,144 @@
     "pred": "cmpi1",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork1",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork2",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork2",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork8",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "speculator0",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "speculator0",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "speculator0",
     "outid": 2,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "merge0",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "speculator0",
     "outid": 5,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork4",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork4",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork4",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "buffer5",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork7",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork7",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 0,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 1,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 2,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 3,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 5,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 6,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 7,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   },
   {
     "pred": "fork6",
     "outid": 8,
     "slots": 16,
-    "type": "tehb"
+    "type": "fifo_break_none"
   }
 ]
