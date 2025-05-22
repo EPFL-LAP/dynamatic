@@ -285,7 +285,7 @@ void createModuleInterface(VerilogModule &module, handshake::FuncOp funcOp,
   module.port(RST, 1, false);
   module.port(CLK, 1, false);
   module.port(GLOBAL_START, 1, false);
-  module.port(GLOBAL_READY, 1, false);
+  module.port(GLOBAL_READY, 1, true);
   module.port(GLOBAL_FINISH, 1, true);
 
   // Only create the data interface for each input channel
