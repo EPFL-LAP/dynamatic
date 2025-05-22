@@ -2,6 +2,8 @@
 
 This document explains how to add a new component to Dynamatic.
 
+This document does **not** cover when a new component *should* be created or how it *should* be designed. A separate guideline for that will be added.
+
 ### Summary of Steps
 
 - Define a Handshake Op.
@@ -10,9 +12,9 @@ This document explains how to add a new component to Dynamatic.
 
 ## 1. Define a Handshake Op
 
-The first step is to define a Handshake op. In MLIR, an op refers to a specific, concrete operation (see [Op vs Operation](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#op-vs-operation) for more details).
+The first step is to define a Handshake *op*. Note that in MLIR, an op refers to a specific, concrete operation (see [Op vs Operation](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#op-vs-operation) for more details).
 
-Handshake ops are defined using the [LLVM TableGen format](https://llvm.org/docs/TableGen/index.html), typically in either `include/dynamatic/Dialect/Handshake/HandshakeOps.td` or `HandshakeArithOps.td`.
+Handshake ops are defined using the [LLVM TableGen format](https://llvm.org/docs/TableGen/index.html), in either `include/dynamatic/Dialect/Handshake/HandshakeOps.td` or `HandshakeArithOps.td`.
 
 The simplest way to define your op is to mimic an existing, similar one. A typical op declaration looks like this:
 
@@ -36,7 +38,7 @@ def SomethingOp : Handshake_Op<"something", [
 
   let arguments = (ins HandshakeType:$operand1,
                        ChannelType:$operand2,
-                       UI32Attr:$fifoDepth);
+                       UI32Attr:$attr1);
   let results = (outs HandshakeType:$result1,
                       HandshakeType:$result2);
 
@@ -74,11 +76,11 @@ Here’s a breakdown of each part of the op definition:
    These provide a short summary and a longer description of the op.
 
 - `let arguments = ...`
-   Defines the op's inputs, which can be operands or attributes (or properties, which are not used).
+   Defines the op's inputs, which can be operands, attributes, or properties.
 
   - `HandshakeType:$operand1`: Defines `operand1` as an operand of type `HandshakeType`.
 
-  - `UI32Attr:$fifoDepth`: Defines `fifoDepth` as an attribute of type `UI32Attr`.
+  - `UI32Attr:$attr1`: Defines `attr1` as an attribute of type `UI32Attr`.
 
 - `let results = ...`
    Defines the results produced by the op.
@@ -89,9 +91,25 @@ Here’s a breakdown of each part of the op definition:
 - `let extraClassDeclaration = ...`
    Declares additional C++ methods for the op.
   - You should implement `getOperandName` and `getResultName` from `NamedIOInterface` here, in this declaration block, to follow the single-source-of-truth principle.
-  - These methods are necessary because operand/result names defined in TableGen are not accessible from C++; MLIR internally identifies them only by index. The names are primarily used during static code generation via [ODS (Operation Definition Specification)](https://mlir.llvm.org/docs/DefiningDialects/Operations/).
+    - These methods are necessary because operand/result names defined in TableGen are not accessible from C++; MLIR internally identifies them only by index. The names are primarily used during static code generation via [ODS (Operation Definition Specification)](https://mlir.llvm.org/docs/DefiningDialects/Operations/).
+    - Some existing ops declare these methods in external C++ files, which should be avoided as it reduces traceability.
 
 For more details, refer to the [MLIR documentation](https://mlir.llvm.org/docs/DefiningDialects/). However, in practice, reviewing existing op declarations in the Handshake or HW dialects, or even in [CIRCT](https://github.com/llvm/circt) often provides a more concrete and intuitive understanding.
+
+### Design Guidelines
+
+A complete guideline for designing an op will be provided in a separate document. Below are some key points to keep in mind:
+
+- **Define operands and results clearly.** Here's an example of poor design, where the declaration gives no insight into the operands:
+  https://github.com/EPFL-LAP/dynamatic/blob/13f600398f6f028adc9538ab29390973bff44503/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1398
+  Use precise and meaningful types for operands and results. Avoid using variadic operands/results for fundamentally different values. This makes the op's intent explicit and helps prevent it from being used in unintended ways that could cause incorrect behavior.
+- **Use traits to enforce type constraints.** Apply appropriate type constraints directly using traits in TableGen. Avoid relying on op-specific verify methods for this purpose unless absolutely necessary.
+Below are poor examples from CMerge and Mux, for two main reasons:
+  (1) The constraints should be expressed as traits, and
+  (2) They should be written in the TableGen definition for better traceability.
+  https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
+  https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
+- **Prefer declarative definitions over external C++ implementations.** Write methods in TableGen whenever possible. Only use external C++ definitions if the method becomes too long or compromises readability.
 
 ## 2. Implement Propagation Logic to the Backend
 
@@ -115,7 +133,7 @@ Then, implement the corresponding rewrite pattern. Most of the infrastructure is
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
 
-For the **beta backend**, even if your op doesn't require any `hw.parameters`, you still need to add a case for it, like in this example:
+For the **beta backend**, registration is handled in `RTL.cpp`. However, you still need to add an empty case for it here, as shown in this example:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679
 
@@ -123,7 +141,7 @@ https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2
 
 Second, to support the **beta backend**, you need to update `lib/Support/RTL/RTL.cpp`, which handles RTL generation. Specifically, you'll need to add **parameter analysis** for your op, which extracts information such as bitwidths or additional signals required during RTL generation.
 
-In most cases, if your op enforces traits like `AllTypesMatch` across all operands and results, extracting a single bitwidth or `extra_signals` is sufficient. Examples:
+In most cases, if your op enforces traits like `AllTypesMatch` across all operands and results, extracting a single bitwidth or `extra_signals` is sufficient. Examples (you can **scroll** these code blocks):
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L338-L350
 
@@ -166,7 +184,7 @@ To complete support for your op, you need to provide an RTL implementation for t
 
 To fully integrate your op into Dynamatic, additional steps may be required. These steps are spread throughout the codebase, but in the future, they should all be tied to the **tablegen definition** (as interfaces or other means) to maintain the single-source-of-truth principle and improve readability. The RTL propagation logic (Step 2) is also planned to be implemented as an interface through the backend redesign.
 
-- Timing/Latency Models: Register the timing and latency values in `data/components.json`. Additionally, add a case for your op in `lib/Support/TimingModels.cpp`. Further modifications may be required.
+- Timing/Latency Models: To support MLIP-based buffering algorithms, register the timing and latency values in `data/components.json`. Additionally, add a case for your op in `lib/Support/TimingModels.cpp` if needed. Further modifications may be required.
 
 - `export-dot`: To assign a color to your op in the visualized circuit, you’ll need to add a case for it in `tools/export-dot/export-dot.cpp`:
 
