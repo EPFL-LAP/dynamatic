@@ -150,7 +150,10 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
     if (isa_and_present<handshake::LSQOp>(memOp))
       latency += 3;
   }
-
+  llvm::errs() << "=== Debug: Final Result ===\n";
+  llvm::errs() << "Operation: " << op->getName().getStringRef() << "\n";
+  llvm::errs() << "Final latency value: " << latency << "\n";
+  llvm::errs() << "================================\n\n";
   llvm::errs() << "=== Debug: Final Result ===\n";
   llvm::errs() << "Final latency value: " << latency << "\n";
   llvm::errs() << "================================\n\n";
@@ -182,7 +185,7 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalT
 
 LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
                                            PortType portType,
-                                           double &delay, double targetPeriod) const {
+                                           double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
