@@ -9,7 +9,7 @@ module {
     sink %t_1 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_0"} : <i32>
     %t_0, %f_0 = cond_br %c_not, %mux_forked#0 {handshake.bb = 1 : ui32, handshake.name = "supp_br_1"} : <i1>, <i32>
     sink %t_0 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_1"} : <i32>
-    %f_0_buf = buffer %f_0 {handshake.bb = 1 : ui32, handshake.name = "buf", hw.parameters = {NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
+    %f_0_buf = buffer %f_0 {handshake.bb = 1 : ui32, handshake.name = "buf", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
     end {handshake.bb = 4 : ui32, handshake.name = "end0"} %f_1 : <i32>
   }
 }
