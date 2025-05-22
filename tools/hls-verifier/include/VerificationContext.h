@@ -9,102 +9,60 @@
 #ifndef HLS_VERIFIER_VERIFICATION_CONTEXT_H
 #define HLS_VERIFIER_VERIFICATION_CONTEXT_H
 
-#include "CAnalyser.h"
 #include "Utilities.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/Support/IndentedOstream.h"
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
 
-using namespace std;
+using namespace dynamatic;
 
-namespace hls_verify {
+static const std::string MODELSIM_DIR = "MGC_MSIM";
+static const std::string HDL_SRC_DIR = "HDL_SRC";
+static const std::string HDL_OUT_DIR = "HDL_OUT";
+static const std::string INPUT_VECTORS_DIR = "INPUT_VECTORS";
+static const std::string C_SOURCE_DIR = "C_SRC";
+static const std::string C_OUT_DIR = "C_OUT";
+static const std::string VSIM_SCRIPT_FILE = "simulation.do";
+static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 
-class Properties {
-public:
-  static const string KEY_MODELSIM_DIR;
-  static const string KEY_VHDL_SRC_DIR;
-  static const string KEY_VHDL_OUT_DIR;
-  static const string KEY_INPUT_DIR;
-  static const string KEY_C_SRC_DIR;
-  static const string KEY_C_OUT_DIR;
-  static const string KEY_MODELSIM_DO_FILE;
-  static const string KEY_REF_OUT_DIR;
-  static const string KEY_HLSVERIFY_DIR;
-  static const string KEY_FLOAT_COMPARE_THRESHOLD;
-  static const string KEY_DOUBLE_COMPARE_THRESHOLD;
-  static const string DEFAULT_MODELSIM_DIR;
-  static const string DEFAULT_VHDL_SRC_DIR;
-  static const string DEFAULT_VHDL_OUT_DIR;
-  static const string DEFAULT_INPUT_DIR;
-  static const string DEFAULT_C_SRC_DIR;
-  static const string DEFAULT_C_OUT_DIR;
-  static const string DEFAULT_MODLELSIM_DO_FILE;
-  static const string DEFAULT_REF_OUT_DIR;
-  static const string DEFAULT_HLSVERIFY_DIR;
-  static const string DEFAULT_FLOAT_COMPARE_THRESHOLD;
-  static const string DEFAULT_DOUBLE_COMPARE_THRESHOLD;
+struct VerificationContext {
+  VerificationContext(const std::string &simPath,
+                      const std::string &cFuvFunctionName,
+                      handshake::FuncOp *funcOp)
+      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName) {}
 
-  Properties();
-  Properties(const string &propertiesFileName);
+  static const char SEP = std::filesystem::path::preferred_separator;
 
-  string get(const string &key) const;
+  // Path to the simulation directory
+  std::string simPath;
 
-private:
-  map<string, string> properties;
+  // Pointer to the funcOp of the top-level handshake function
+  handshake::FuncOp *funcOp;
+
+  // The name of the top-level handshake function
+  std::string kernelName;
+
+  std::string getVhdlTestbenchPath() const {
+    return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
+  }
+
+  std::string getModelsimDoFilePath() const { return VSIM_SCRIPT_FILE; }
+
+  std::string getCOutDir() const { return simPath + SEP + C_OUT_DIR; }
+
+  std::string getInputVectorDir() const {
+    return simPath + "/" + INPUT_VECTORS_DIR;
+  }
+
+  std::string getHdlOutDir() const { return simPath + "/" + HDL_OUT_DIR; }
+
+  std::string getHlsVerifyDir() const { return simPath + "/" + HLS_VERIFY_DIR; }
+
+  std::string getHdlSrcDir() const { return simPath + "/" + HDL_SRC_DIR; }
 };
-
-class VerificationContext {
-public:
-  VerificationContext(const string &cTbPath, const string &cFuvPath,
-                      const string &cFuvFunctionName,
-                      const string &vhdlDuvEntityName);
-
-  string getCTbPath() const;
-  string getCFuvPath() const;
-  string getCFuvFunctionName() const;
-  string getVhdlDuvEntityName() const;
-
-  string getInjectedCFuvPath() const;
-  string getCExecutablePath() const;
-  string getVhdlTestbenchPath() const;
-
-  string getBaseDir() const;
-  string getHlsVerifyDir() const;
-  string getVhdlSrcDir() const;
-
-  string getCOutDir() const;
-  string getRefOutDir() const;
-  string getVhdlOutDir() const;
-  string getInputVectorDir() const;
-
-  string getCOutPath(const CFunctionParameter &param) const;
-  string getRefOutPath(const CFunctionParameter &param) const;
-  string getVhdlOutPath(const CFunctionParameter &param) const;
-  string getInputVectorPath(const CFunctionParameter &param) const;
-
-  string getModelsimDoFileName() const;
-
-  const TokenCompare *getTokenComparator(const CFunctionParameter &param) const;
-
-  CFunction getCFuv() const;
-  vector<CFunctionParameter> getFuvOutputParams() const;
-  vector<CFunctionParameter> getFuvInputParams() const;
-  vector<CFunctionParameter> getFuvParams() const;
-
-private:
-  Properties properties;
-  CFunction fuv;
-  string cTBPath;
-  string cFUVPath;
-  string cFUVFunctionName;
-  string vhdlDUVEntityName;
-  TokenCompare defaultComparator;
-  IntegerCompare signedIntComparator;
-  IntegerCompare unsignedIntComparator;
-  FloatCompare floatComparator;
-  DoubleCompare doubleComparator;
-};
-
-} // namespace hls_verify
 
 #endif // HLS_VERIFIER_VERIFICATION_CONTEXT_H
