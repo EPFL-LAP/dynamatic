@@ -89,7 +89,7 @@ public:
 };
 
 template <typename M>
-struct CombDelayDepMetric {
+struct DelayDepMetric {
 public:
   /// Data points for the metric, mapping a frequency with the metric's value
   std::map<double, double> data;
@@ -130,7 +130,7 @@ bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
 
-bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<std::map<double, double>> &metric,
+bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<DelayDepMetric<double>> &metric,
   llvm::json::Path path);
 
 
@@ -152,7 +152,7 @@ public:
   };
 
   /// Operation's latency, depending on its bitwidth.
-  BitwidthDepMetric<std::map<double, double>> latency;
+  BitwidthDepMetric<DelayDepMetric<double>> latency;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
   /// Delay of valid wire.

@@ -60,7 +60,8 @@
     "ios": "cpp",
     "cmath": "cpp",
     "__hash_table": "cpp",
-    "__node_handle": "cpp"
+    "__node_handle": "cpp",
+    "span": "cpp"
   },
   "cmake.configureSettings": {
     "MLIR_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/mlir",
