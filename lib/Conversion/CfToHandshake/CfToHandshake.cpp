@@ -1308,6 +1308,11 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
+
+  // attach parameters to the new Instance as attributes
+  for (const auto &param : parameterMap) {
+    instOp->setAttr(param.first, param.second);
+  }
   // Rewiring: If the called function was not already rewritten to a handshake::FuncOp,
   // manually rewire users of the original outputs to now use the InstanceOp results.
   if (!calledHandshakeFuncOp) {
