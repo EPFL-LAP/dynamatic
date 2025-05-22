@@ -32,7 +32,9 @@ jobs:
           FILES=$(git ls-files '*.py' --modified)
           STATUS=$?
           if [[ $FILES ]]; then
-            OUTPUT=$(autopep8 --max-line-length 200 --indent-size=2 --ignore=E121 --diff $FILES)
+            exec 3>&1
+            OUTPUT=$(autopep8 --max-line-length 200 --indent-size=2 --ignore=E121 --diff $FILES 3&- | tee /dev/fd/3)
+            exec 3>&-
             if [[ $OUTPUT ]]; then
               echo $OUTPUT
               STATUS=1
