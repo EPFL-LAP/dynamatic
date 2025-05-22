@@ -23,6 +23,7 @@ def VecToArray(ctx: VHDLContext, dout, din) -> str:
         str_ret += Op(ctx, (dout, i), (din, i))
     return str_ret
 
+
 def BitsToOH(ctx: VHDLContext, dout, din) -> str:
     """
     Convert a binary vector into its one-hot representation in VHDL.
@@ -38,6 +39,7 @@ def BitsToOH(ctx: VHDLContext, dout, din) -> str:
             f'\'1\' when {din.getNameRead()} = {IntToBits(i, din.size)} else \'0\';\n'
     str_ret += ctx.get_current_indent() + '-- Bits To One-Hot End\n\n'
     return str_ret
+
 
 def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
     """
@@ -56,6 +58,7 @@ def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
     str_ret += ctx.get_current_indent() + '-- Bits To One-Hot End\n\n'
     return str_ret
 
+
 def OHToBits(ctx: VHDLContext, dout, din) -> str:
     """
     Generate VHDL code to convert a one-hot vector into its binary index.
@@ -64,14 +67,14 @@ def OHToBits(ctx: VHDLContext, dout, din) -> str:
         din  = "0010"
         dout = "01"
     """
-    
+
     str_ret = ctx.get_current_indent() + '-- One-Hot To Bits Begin\n'
     str_ret += ctx.get_current_indent() + f'-- OHToBits({dout.name}, {din.name})\n'
-    size    = dout.size
+    size = dout.size
     size_in = din.size
     ctx.use_temp()
     for i in range(0, size):
-        temp_in  = LogicArray(ctx, ctx.get_temp(f'in_{i}'), 'w', size_in)
+        temp_in = LogicArray(ctx, ctx.get_temp(f'in_{i}'), 'w', size_in)
         temp_out = Logic(ctx, ctx.get_temp(f'out_{i}'), 'w')
         for j in range(0, size_in):
             if ((j // (2**i)) % 2 == 1):

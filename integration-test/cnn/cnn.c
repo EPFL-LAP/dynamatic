@@ -11,7 +11,7 @@
 // The inner loops, they are written in this way to make manual unrolling
 // easier
 #define PO_INIT(i, h, w, po)                                                   \
-  index_c = (po)*ParallelOut + (h)*ImSize + (w);                               \
+  index_c = (po) * ParallelOut + (h) * ImSize + (w);                           \
   C[index_c] = bias[((i) << 1) + (po)];
 
 #define PO_CONV(i, j, h, w, po)                                                \
@@ -19,19 +19,19 @@
     for (int q = 0; q < kKernel; ++q) {                                        \
       index_weight = (i) + (po) + (j) + (q) + (p);                             \
       index_input = (j) + (h) + (p) + (w) + (q);                               \
-      index_c = (po)*ParallelOut + (h)*ImSize + (w);                           \
+      index_c = (po) * ParallelOut + (h) * ImSize + (w);                       \
       C[index_c] += weight[index_weight] * input[index_input];                 \
     }                                                                          \
   }
 
 #define PO_RELU(i, h, w, po)                                                   \
-  index_c = (po)*ParallelOut + (h)*OutImSize + (w);                            \
+  index_c = (po) * ParallelOut + (h) * OutImSize + (w);                        \
   tmp1 = C[index_c];                                                           \
   if (tmp1 > 0)                                                                \
     tmp2 = tmp1;                                                               \
   else                                                                         \
     tmp2 = 0;                                                                  \
-  index_out = (i) * (NumOut / ParallelOut) + (h)*OutImSize + (w);              \
+  index_out = (i) * (NumOut / ParallelOut) + (h) * OutImSize + (w);            \
   output[index_out] = tmp2;
 
 void cnn(in_int_t input[inputSize], in_int_t bias[biasSize],

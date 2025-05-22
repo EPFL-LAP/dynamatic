@@ -2,19 +2,19 @@ from generators.support.signal_manager import generate_signal_manager
 
 
 def generate_extui(name, params):
-  input_bitwidth = params["input_bitwidth"]
-  output_bitwidth = params["output_bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    input_bitwidth = params["input_bitwidth"]
+    output_bitwidth = params["output_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
-  else:
-    return _generate_extui(name, input_bitwidth, output_bitwidth)
+    if extra_signals:
+        return _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals)
+    else:
+        return _generate_extui(name, input_bitwidth, output_bitwidth)
 
 
 def _generate_extui(name, input_bitwidth, output_bitwidth):
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -34,7 +34,7 @@ port (
   );
 end entity;
 """
-  architecture = f"""
+    architecture = f"""
 -- Architecture of extui
 architecture arch of {name} is
 
@@ -45,21 +45,21 @@ begin
   ins_ready                                 <= outs_ready;
 end architecture;
 """
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_extui_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": input_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": output_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_extui(name, input_bitwidth, output_bitwidth))
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": input_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": output_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_extui(name, input_bitwidth, output_bitwidth))

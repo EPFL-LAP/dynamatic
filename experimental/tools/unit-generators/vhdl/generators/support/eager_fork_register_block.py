@@ -1,5 +1,5 @@
 def generate_eager_fork_register_block(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -18,7 +18,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of eager_fork_register_block
 architecture arch of {name} is
   signal transmitValue, keepValue : std_logic;
@@ -41,4 +41,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture

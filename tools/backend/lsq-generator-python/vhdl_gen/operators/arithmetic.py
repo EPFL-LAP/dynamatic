@@ -10,7 +10,7 @@ def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
     else:
         "sum", "res" -> one extra bit to extend the bit-width
         Concatenates '0' to each input to extend the bit-width
-        
+
         sum = in_a + in_b
 
         if sum >= max:
@@ -37,6 +37,7 @@ def WrapAdd(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
 
+
 def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
     """
     if "max" is power of 2:
@@ -61,6 +62,7 @@ def WrapAddConst(ctx: VHDLContext, out, in_a, const: int, max: int) -> str:
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
 
+
 def WrapSub(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
     """
     if "max" is power of 2:
@@ -84,4 +86,3 @@ def WrapSub(ctx: VHDLContext, out, in_a, in_b, max: int) -> str:
             f'std_logic_vector({max} - unsigned({in_b.getNameRead()}) + unsigned({in_a.getNameRead()}));\n'
     str_ret += ctx.get_current_indent() + '-- WrapAdd End\n\n'
     return str_ret
-

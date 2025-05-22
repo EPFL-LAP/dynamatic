@@ -5,15 +5,15 @@ from generators.handshake.oehb import generate_oehb
 
 
 def generate_buffer(name, params):
-  num_slots = params["num_slots"]
-  transparent = params["transparent"]
+    num_slots = params["num_slots"]
+    transparent = params["transparent"]
 
-  if transparent and num_slots > 1:
-    return generate_tfifo(name, params)
-  elif transparent and num_slots == 1:
-    return generate_tehb(name, params)
-  elif not transparent and num_slots > 1:
-    return generate_ofifo(name, params)
-  elif not transparent and num_slots == 1:
-    return generate_oehb(name, params)
-  raise ValueError("Invalid buffer configuration")
+    if transparent and num_slots > 1:
+        return generate_tfifo(name, params)
+    elif transparent and num_slots == 1:
+        return generate_tehb(name, params)
+    elif not transparent and num_slots > 1:
+        return generate_ofifo(name, params)
+    elif not transparent and num_slots == 1:
+        return generate_oehb(name, params)
+    raise ValueError("Invalid buffer configuration")
