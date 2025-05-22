@@ -4,9 +4,9 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
 
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # Multiplexer
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # Mux1H    : One-hot select elements of `din` using `sel`
 # Mux1HROM : Special multiplexer for the Group Allocator ROM.
 # MuxIndex : Generate a VHDL array-index expression for selecting an element.

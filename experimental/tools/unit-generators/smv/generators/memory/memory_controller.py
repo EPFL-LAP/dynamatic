@@ -2,20 +2,20 @@ from generators.support.utils import *
 
 
 def generate_memory_controller(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
-  addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
-  ctrl_type = SmvScalarType(32)
+    data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+    addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
+    ctrl_type = SmvScalarType(32)
 
     num_loads = params["num_loads"]
-    num_stores = params["num_stores"]
-    num_controls = params["num_controls"]
+     num_stores = params["num_stores"]
+      num_controls = params["num_controls"]
 
-    if num_loads == 0:
-        return _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type)
-    elif num_stores == 0:
-        return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type)
-    else:
-        return _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type)
+       if num_loads == 0:
+            return _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type)
+        elif num_stores == 0:
+            return _generate_mem_controller_storeless(name, num_loads, data_type, addr_type)
+        else:
+            return _generate_mem_controller(name, num_loads, num_stores, num_controls, data_type, addr_type, ctrl_type)
 
 
 def _generate_mem_controller_loadless(name, num_stores, num_controls, data_type, addr_type, ctrl_type):

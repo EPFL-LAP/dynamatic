@@ -3,13 +3,13 @@ from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
 
 def generate_tfifo(name, params):
-  slots = params[ATTR_SLOTS]
-  data_type = SmvScalarType(params[ATTR_BITWIDTH])
+    slots = params[ATTR_SLOTS]
+    data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-    if data_type.bitwidth == 0:
-        return _generate_tfifo_dataless(name, slots)
-    else:
-        return _generate_tfifo(name, slots, data_type)
+       if data_type.bitwidth == 0:
+            return _generate_tfifo_dataless(name, slots)
+        else:
+            return _generate_tfifo(name, slots, data_type)
 
 
 def _generate_tfifo_dataless(name, slots):

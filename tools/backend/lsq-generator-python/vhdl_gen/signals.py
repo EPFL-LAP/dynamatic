@@ -1,6 +1,6 @@
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # VHDL Signal Definition
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # This section defined Python classes that generate VHDL signal declarations.
 #
 # - class Logic         : (std_logic) one‑bit signal wire / port / register
@@ -52,7 +52,7 @@ class Logic:
               False when we instantiate LogicVec, LogicArray, and LogicVecArray.
         """
         # Type should be one of the four types.
-        assert(type in ('i', 'o', 'w', 'r'))
+        assert (type in ('i', 'o', 'w', 'r'))
         self.ctx = ctx
         self.name = name
         self.type = type
@@ -67,11 +67,11 @@ class Logic:
         type = ''
         if (self.type == 'w'):
             type = 'wire'
-        elif(self.type == 'i'):
+        elif (self.type == 'i'):
             type = 'input'
-        elif(self.type == 'o'):
+        elif (self.type == 'o'):
             type = 'output'
-        elif(self.type == 'r'):
+        elif (self.type == 'r'):
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: single bit\n'
 
@@ -85,11 +85,11 @@ class Logic:
         """
         if (self.type == 'w'):
             return self.name + sufix
-        elif(self.type == 'r'):
+        elif (self.type == 'r'):
             return self.name + sufix + '_q'
-        elif(self.type == 'i'):
+        elif (self.type == 'i'):
             return self.name + sufix + '_i'
-        elif(self.type == 'o'):
+        elif (self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
 
     def getNameWrite(self, sufix='') -> str:
@@ -113,13 +113,13 @@ class Logic:
         """
         if (self.type == 'w'):
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic;\n')
-        elif(self.type == 'r'):
+        elif (self.type == 'r'):
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic;\n')
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic;\n')
-        elif(self.type == 'i'):
+        elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic')
-        elif(self.type == 'o'):
+        elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic')
 
@@ -183,7 +183,7 @@ class LogicVec(Logic):
 
     def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', size: int = 1, init: bool = True) -> None:
         Logic.__init__(self, ctx, name, type, False)
-        assert(size > 0)
+        assert (size > 0)
         self.size = size
         if (init):
             self.signalInit()
@@ -197,7 +197,7 @@ class LogicVec(Logic):
             type = 'input'
         elif (self.type == 'o'):
             type = 'output'
-        elif(self.type == 'r'):
+        elif (self.type == 'r'):
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: {self.size}\n'
 
@@ -205,26 +205,26 @@ class LogicVec(Logic):
         if (i == None):
             return Logic.getNameRead(self, sufix)
         else:
-            assert(i < self.size)
+            assert (i < self.size)
             return Logic.getNameRead(self, sufix) + f'({i})'
 
     def getNameWrite(self, i=None, sufix='') -> str:
         if (i == None):
             return Logic.getNameWrite(self, sufix)
         else:
-            assert(i < self.size)
+            assert (i < self.size)
             return Logic.getNameWrite(self, sufix) + f'({i})'
 
     def signalInit(self, sufix=''):
         if (self.type == 'w'):
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic_vector({self.size-1} downto 0);\n')
-        elif(self.type == 'r'):
+        elif (self.type == 'r'):
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic_vector({self.size-1} downto 0);\n')
             self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic_vector({self.size-1} downto 0);\n')
-        elif(self.type == 'i'):
+        elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic_vector({self.size-1} downto 0)')
-        elif(self.type == 'o'):
+        elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
             self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic_vector({self.size-1} downto 0)')
 

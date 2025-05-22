@@ -4,9 +4,9 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
 
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # Reduction
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # The following functions implement cyclic left shifts:
 #   ReduceLogicVec()      : Recursively reduce a single vector.
 #   ReduceLogicArray()    : Recursively reduce an array of single-bit elements.

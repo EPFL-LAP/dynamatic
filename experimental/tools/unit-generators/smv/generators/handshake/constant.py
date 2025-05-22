@@ -2,8 +2,8 @@ from generators.support.utils import *
 
 
 def generate_constant(name, params):
-  value = params[ATTR_VALUE]
-  data_type = SmvScalarType(params[ATTR_BITWIDTH])
+    value = params[ATTR_VALUE]
+    data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     return _generate_constant(name, value, data_type)
 

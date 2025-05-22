@@ -42,7 +42,7 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse=False) -> s
     str_ret += ctx.get_current_indent() + f'-- CyclicPriorityMask({dout.name}, {din.name}, {base.name})\n'
     ctx.use_temp()
     if (type(din) == LogicVecArray):
-        assert(reverse == False)
+        assert (reverse == False)
         for i in range(0, din.size):
             size = din.length
             double_in = LogicVec(ctx, ctx.get_temp(f'double_in_{i}'), 'w', size*2)

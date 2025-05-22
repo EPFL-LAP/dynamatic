@@ -394,7 +394,7 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
         load_idx_oh = LogicVecArray(ctx, 'load_idx_oh', 'w', configs.numLdMem, configs.numLdqEntries)
         load_en = LogicArray(ctx, 'load_en', 'w', configs.numLdMem)
 
-        assert(configs.numStMem == 1)  # Multiple store channels not yet implemented
+        assert (configs.numStMem == 1)  # Multiple store channels not yet implemented
         store_idx = LogicVec(ctx, 'store_idx', 'w', configs.stqAddrW)
         store_en = Logic(ctx, 'store_en', 'w')
 
@@ -770,7 +770,7 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
         load_idx_oh = LogicVecArray(ctx, 'load_idx_oh', 'w', configs.numLdMem, configs.numLdqEntries)
         load_en = LogicArray(ctx, 'load_en', 'w', configs.numLdMem)
 
-        assert(configs.numStMem == 1)  # Multiple store channels not yet implemented
+        assert (configs.numStMem == 1)  # Multiple store channels not yet implemented
         store_idx = LogicVec(ctx, 'store_idx', 'w', configs.stqAddrW)
         store_en = Logic(ctx, 'store_en', 'w')
 

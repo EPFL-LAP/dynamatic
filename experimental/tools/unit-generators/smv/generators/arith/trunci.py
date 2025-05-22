@@ -4,15 +4,15 @@ from generators.support.utils import *
 
 
 def generate_trunci(name, params):
-  latency = params[ATTR_LATENCY]
-  input_type = SmvScalarType(params[ATTR_IN_BITWIDTH])
-  output_type = SmvScalarType(params[ATTR_OUT_BITWIDTH])
-  abstract_data = params[ATTR_ABSTRACT_DATA]
+    latency = params[ATTR_LATENCY]
+    input_type = SmvScalarType(params[ATTR_IN_BITWIDTH])
+    output_type = SmvScalarType(params[ATTR_OUT_BITWIDTH])
+    abstract_data = params[ATTR_ABSTRACT_DATA]
 
-  if abstract_data:
-    return generate_abstract_unary_op(name, latency, output_type)
-  else:
-    return _generate_trunci(name, latency, input_type, output_type)
+    if abstract_data:
+        return generate_abstract_unary_op(name, latency, output_type)
+    else:
+        return _generate_trunci(name, latency, input_type, output_type)
 
 
 def _generate_trunci(name, latency, input_type, output_type):

@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_select(name, params):
-  data_type = SmvScalarType(params[ATTR_BITWIDTH])
+    data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     return _generate_select(name, data_type)
 

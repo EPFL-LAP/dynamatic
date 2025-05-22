@@ -3,16 +3,16 @@ from generators.support.utils import *
 
 
 def generate_cmpf(name, params):
-  predicate = params[ATTR_PREDICATE]
-  symbol = get_symbol_from_predicate(predicate)
-  latency = params[ATTR_LATENCY]
-  is_double = params[ATTR_IS_DOUBLE]
-  abstract_data = params[ATTR_ABSTRACT_DATA]
+    predicate = params[ATTR_PREDICATE]
+    symbol = get_symbol_from_predicate(predicate)
+    latency = params[ATTR_LATENCY]
+    is_double = params[ATTR_IS_DOUBLE]
+    abstract_data = params[ATTR_ABSTRACT_DATA]
 
-    if abstract_data:
-        return generate_nondeterministic_comparator(name, params)
-    else:
-        raise ValueError("Floating point operations support abstract data only")
+       if abstract_data:
+            return generate_nondeterministic_comparator(name, params)
+        else:
+            raise ValueError("Floating point operations support abstract data only")
 
 
 def get_symbol_from_predicate(pred):

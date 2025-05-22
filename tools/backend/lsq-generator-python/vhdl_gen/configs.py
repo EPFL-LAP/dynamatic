@@ -101,11 +101,11 @@ class Configs:
         self.pipeComp = bool(config["pipeCompEn"])
         self.headLag = bool(config["headLagEn"])
 
-        assert(self.idW >= self.ldqAddrW)
+        assert (self.idW >= self.ldqAddrW)
 
         # list size checking
-        assert(len(self.gaNumLoads) == self.numGroups)
-        assert(len(self.gaNumStores) == self.numGroups)
-        assert(len(self.gaLdOrder) == self.numGroups)
-        assert(len(self.gaLdPortIdx) == self.numGroups)
-        assert(len(self.gaStPortIdx) == self.numGroups)
+        assert (len(self.gaNumLoads) == self.numGroups)
+        assert (len(self.gaNumStores) == self.numGroups)
+        assert (len(self.gaLdOrder) == self.numGroups)
+        assert (len(self.gaLdPortIdx) == self.numGroups)
+        assert (len(self.gaStPortIdx) == self.numGroups)

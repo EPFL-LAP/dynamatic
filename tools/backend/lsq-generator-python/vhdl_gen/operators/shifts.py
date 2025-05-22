@@ -3,9 +3,9 @@ from vhdl_gen.utils import *
 from vhdl_gen.signals import *
 
 
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # Cyclic Left Shift
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # The following functions implement cyclic left shifts:
 #   RotateLogicVec()      : Recursively shift a single vector.
 #   RotateLogicArray()    : Recursively shift an array of single-bit elements.
@@ -49,13 +49,13 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
     length = din.size
     if (layer == 0):
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
     else:
         ctx.use_temp()
         res = LogicVec(ctx, ctx.get_temp('res'), 'w', length)
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += RotateLogicVec(ctx, dout, res, distance, layer-1)
@@ -76,13 +76,13 @@ def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     length = din.length
     if (layer == 0):
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
     else:
         ctx.use_temp()
         res = LogicArray(ctx, ctx.get_temp('res'), 'w', length)
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += RotateLogicArray(ctx, dout, res, distance, layer-1)
@@ -110,13 +110,13 @@ def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     length = din.length
     if (layer == 0):
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
     else:
         ctx.use_temp()
         res = LogicVecArray(ctx, ctx.get_temp('res'), 'w', length, dout.size)
         for i in range(0, length):
-            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer)%length)} ' + \
+            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= {din.getNameRead((i-2**layer) % length)} ' + \
                 f'when {distance.getNameRead(layer)} else {din.getNameRead(i)};\n'
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += RotateLogicVecArray(ctx, dout, res, distance, layer-1)
