@@ -2,7 +2,7 @@
 
 This document explains how to add a new component to Dynamatic.
 
-This document does **not** cover when a new component *should* be created or how it *should* be designed. A separate guideline for that will be added.
+It does **not** cover when a new component *should* be created or how it *should* be designed. A separate guideline for that will be added.
 
 ### Summary of Steps
 
@@ -103,9 +103,9 @@ A complete guideline for designing an op will be provided in a separate document
 - **Define operands and results clearly.** Here's an example of poor design, where the declaration gives no insight into the operands:
   https://github.com/EPFL-LAP/dynamatic/blob/13f600398f6f028adc9538ab29390973bff44503/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1398
   Use precise and meaningful types for operands and results. Avoid using variadic operands/results for fundamentally different values. This makes the op's intent explicit and helps prevent it from being used in unintended ways that could cause incorrect behavior.
-- **Use traits to enforce type constraints.** Apply appropriate type constraints directly using traits in TableGen. Avoid relying on op-specific verify methods for this purpose unless absolutely necessary.
-Below are poor examples from CMerge and Mux, for two main reasons:
-  (1) The constraints should be expressed as traits, and
+- **Use traits to enforce type constraints.** Apply appropriate type constraints directly using traits in TableGen. Avoid relying on op-specific verify methods for this purpose unless absolutely necessary.  
+Below are poor examples from CMerge and Mux, for two main reasons:  
+  (1) The constraints should be expressed as traits, and  
   (2) They should be written in the TableGen definition for better traceability.
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
