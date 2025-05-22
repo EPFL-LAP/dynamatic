@@ -39,9 +39,10 @@ If possible, the generic addSignal operation should be used:
 
 This separates how the value of the extra signal is generated from how the type of the input token is altered. 
 
-The name of the new extra signal is represented purely in the type system, rather than being redundantly represented also inside of the addSignal operation itself.
-
 Only a single new extra signal can be added per addSignal operation.
+
+
+Two extra signals parameters affect generation: the list of extra signals present at the input, and the added extra signal present at the output. These should be extracted from the type system just before the unit is generated, using an interface function present on the operation.
 
 ---
 
@@ -49,9 +50,9 @@ If possible, the generic dropSignal operation should be used:
 
 ![](figs/AddDropPromoteExtraSignals/dropSignal.png)
 
-The name of the removed extra signal is represented purely in the type system, rather than being redundantly represented also inside of the dropSignal operation itself.
-
 Only a single extra signal can be dropped per dropSignal operation.
+
+Two extra signals parameters affect generation: the list of extra signals present at the output, and the dropped extra signal present at the input. These should be extracted from the type system just before the unit is generated, using an interface function present on the operation.
 
 ---
 
@@ -61,9 +62,9 @@ If possible, the generic promoteSignal operation should be used:
 
 The promoteSignal operation promotes one extra signal to be the data signal, discarding the previous data signal.
 
-The name of the promoted extra signal is represented purely in the type system, rather than being redundantly represented also inside of the promoteSignal operation itself.
-
 Any additional extra signals, other than the promoted extra signal, are forwarded normally.
+
+Two extra signals parameters affect generation: the list of extra signals present at the output, and the promoted extra signal present at the input. These should be extracted from the type system just before the unit is generated, using an interface function present on the operation.
 
 ---
 
