@@ -1411,6 +1411,25 @@ SameOperandsAndResultType
   }];
 }
 
+def ValidMergerOp : Handshake_Op<"valid-merger",[
+SameOperandsAndResultType
+]> {
+  let summary = [{
+    Rigidifies a channel by setting the output valid signal to 1 and input valid signal to a open.
+  }];
+  let description = [{
+    Rigidifies a channel by setting the output valid signal to 1 and input valid signal to a open.
+  }];
+
+  let arguments = (ins ChannelType:$lhsIn, ChannelType:$rhsIn);
+  let results = (outs ChannelType:$lhsOut, ChannelType:$rhsOut);
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+  }];
+}
+
+
 def ChannelReshapeTypeAttr : I32EnumAttr<
     "ChannelReshapeType", "",
     [

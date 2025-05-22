@@ -23,6 +23,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 // #include "experimental/Support/FormalProperty.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
@@ -55,30 +56,74 @@ struct HandshakeRigidificationPass
   void runDynamaticPass() override;
 
 private:
+  LogicalResult insertRigidifier(AbsenceOfBackpressure prop, MLIRContext *ctx);
+  LogicalResult insertValidMerger(ValidEquivalence prop, MLIRContext *ctx);
   json::Array propertyTable;
 };
 } // namespace
 
 void HandshakeRigidificationPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
+  // ModuleOp modOp = getOperation();
   llvm::json::Array propTable;
+  MLIRContext *ctx = &getContext();
 
-  // for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-  //   for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
-  //     auto propIDs = getFormalProperties(&op);
-  //     for (auto propID : propIDs) {
-  //       llvm::json::Value v = findProperty(propID);
-  //       auto property = FormalProperty::fromJSON();
-  //       if (property.tag == FormalProperty::TAG::OPT) {
-  //         if (isa<AOBProperty>(property)) {
-  //           insertChannelRigidifier(op, property);
-  //         } else if (isa<VEQProperty>(property)) {
-  //           insertValidMerger(op, property);
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+  for (auto jsonProp : propTable) {
+    if (property.tag == FormalProperty::TAG::OPT) {
+      if (isa<AOBProperty>(property)) {
+        if (failed(insertRigidifier(property, ctx)))
+          return signalPassFailure();
+      } else if (isa<VEQProperty>(property)) {
+        if (failed(insertValidMerger(property, ctx)))
+          return signalPassFailure();
+      }
+    }
+  }
+}
+
+LogicalResult
+HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop,
+                                              MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+
+  Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
+  // Operation *userOp = getAnalysis<NameAnalysis>().getOp(prop.getUser());
+
+  auto channel = ownerOp->getResult(prop.getOwnerIndex());
+
+  builder.setInsertionPointAfter(ownerOp);
+  auto loc = channel.getLoc();
+
+  auto newOp = builder.create<handshake::RigidifierOp>(loc, channel);
+  Value rigidificationRes = newOp.getResult();
+
+  for (auto &use : llvm::make_early_inc_range(channel.getUses())) {
+    if (use.getOwner() != newOp) {
+      use.set(rigidificationRes);
+    }
+  }
+}
+
+LogicalResult
+HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
+                                               MLIRContext *ctx) {
+  OpBuilder builder(ctx);
+
+  Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
+  // Operation *userOp = getAnalysis<NameAnalysis>().getOp(prop.getUser());
+
+  auto channel = ownerOp->getResult(prop.getOwnerIndex());
+
+  builder.setInsertionPointAfter(ownerOp);
+  auto loc = channel.getLoc();
+
+  auto newOp = builder.create<handshake::ValidMergerOp>(loc, channel);
+  Value rigidificationRes = newOp.getResult();
+
+  for (auto &use : llvm::make_early_inc_range(channel.getUses())) {
+    if (use.getOwner() != newOp) {
+      use.set(rigidificationRes);
+    }
+  }
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
@@ -90,7 +135,8 @@ dynamatic::experimental::rigidification::createRigidification(
 // namespace {
 // /// Rewrite pattern that will match on all muxes in the IR and replace each
 // of
-// /// them with a merge taking the same inputs (except the `select` input which
+// /// them with a merge taking the same inputs (except the `select` input
+// which
 // /// merges do not have due to their undeterministic nature).
 // struct HandshakeRigidification : public OpRewritePattern<Operation> {
 //   using OpRewritePattern<Operation>::OpRewritePattern;
@@ -105,7 +151,8 @@ dynamatic::experimental::rigidification::createRigidification(
 
 // /// Simple driver for the pass that replaces all muxes with merges.
 // struct HandshakeRigidificationPass
-//     : public impl::HandshakeRigidificationBase<HandshakeRigidificationPass> {
+//     : public impl::HandshakeRigidificationBase<HandshakeRigidificationPass>
+//     {
 
 //   void runDynamaticPass() override {
 //     // Get the MLIR context for the current operation being transformed
@@ -129,7 +176,8 @@ dynamatic::experimental::rigidification::createRigidification(
 //     //               use.getOwner()))
 //     //         is_mem = true;
 //     //     Type resType = ch.getType();
-//     //     if (llvm::dyn_cast<handshake::ChannelType>(resType) && !is_mem) {
+//     //     if (llvm::dyn_cast<handshake::ChannelType>(resType) && !is_mem)
+//     {
 //     //       rigidifyChannel(&ch, ctx);
 //     //     }
 //     //   }
@@ -142,7 +190,8 @@ dynamatic::experimental::rigidification::createRigidification(
 
 //     // patterns.add<HandshakeRigidification<handshake::MuxOp>>(ctx);
 
-//     // // Run a greedy pattern rewriter on the entire IR under the top-level
+//     // // Run a greedy pattern rewriter on the entire IR under the
+//     top-level
 //     // // module
 //     // // operation
 //     // mlir::GreedyRewriteConfig config;
@@ -175,5 +224,6 @@ dynamatic::experimental::rigidification::createRigidification(
 
 // } // namespace
 
-// /// Implementation of our pass constructor, which just returns an instance of
+// /// Implementation of our pass constructor, which just returns an instance
+// of
 // /// the `HandshakeMuxToMergePass` struct.
