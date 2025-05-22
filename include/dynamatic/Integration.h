@@ -218,6 +218,7 @@ static Res callKernel(Res (*kernel)(void)) {
 /// after kernel execution. Also logs the kernel's return value, if it has one.
 #ifdef HLS_VERIFICATION
 #include "stdint.h"
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -258,11 +259,12 @@ void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
      << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
 }
 
-/// Specialization of the scalar printer for float.
 template <>
 void scalarPrinter<float>(const float &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
-     << *((const unsigned int *)(&arg)) << std::endl;
+  uint32_t bits;
+  std::memcpy(&bits, &arg, sizeof(bits));
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << bits
+     << std::endl;
 }
 
 /// Specialization of the scalar printer for double.

@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_tehb(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_tehb_dataless(name)
