@@ -32,7 +32,7 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-{generate_oehb(f"{name}__oehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_oehb(f"{name}__oehb_dataless", {ATTR_BITWIDTH: 0})}
 """
 
 
@@ -52,5 +52,5 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE ins_ready := inner_oehb.ins_ready;
   DEFINE outs_valid := inner_oehb.outs_valid;
 
-{generate_oehb(f"{name}__oehb_dataless", {ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
+{generate_oehb(f"{name}__oehb_dataless", {ATTR_BITWIDTH: 0})}
 """

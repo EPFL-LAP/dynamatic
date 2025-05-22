@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_sink(name, params):
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if data_type.bitwidth == 0:
         return _generate_sink_dataless(name)

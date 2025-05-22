@@ -3,8 +3,8 @@ from generators.support.arith_utils import *
 
 
 def generate_nondeterministic_comparator(name, params):
-    latency = params[ATTR_LATENCY]
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["lhs"])
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     return _generate_nondeterministic_comparator(name, latency, data_type)
 

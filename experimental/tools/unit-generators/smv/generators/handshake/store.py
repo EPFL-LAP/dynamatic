@@ -2,8 +2,8 @@ from generators.support.utils import *
 
 
 def generate_store(name, params):
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["dataIn"])
-    addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addrIn"])
+  data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+  addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
 
     return _generate_store(name, data_type, addr_type)
 

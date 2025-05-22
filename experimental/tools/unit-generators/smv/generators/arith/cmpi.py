@@ -4,12 +4,12 @@ from generators.support.nondeterministic_comparator import generate_nondetermini
 
 
 def generate_cmpi(name, params):
-    predicate = params[ATTR_PREDICATE]
-    symbol = get_symbol_from_predicate(predicate)
-    sign = get_sign_from_predicate(predicate)
-    latency = params[ATTR_LATENCY]
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["lhs"])
-    abstract_data = params[ATTR_ABSTRACT_DATA]
+  predicate = params[ATTR_PREDICATE]
+  symbol = get_symbol_from_predicate(predicate)
+  sign = get_sign_from_predicate(predicate)
+  latency = params[ATTR_LATENCY]
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
+  abstract_data = params[ATTR_ABSTRACT_DATA]
 
     if abstract_data:
         return generate_nondeterministic_comparator(name, params)

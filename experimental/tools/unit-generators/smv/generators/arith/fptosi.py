@@ -3,10 +3,9 @@ from generators.support.utils import *
 
 
 def generate_fptosi(name, params):
-    latency = params[ATTR_LATENCY]
-    input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
-    output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
-    abstract_data = params[ATTR_ABSTRACT_DATA]
+  latency = params[ATTR_LATENCY]
+  output_type = SmvScalarType(params[ATTR_BITWIDTH])
+  abstract_data = params[ATTR_ABSTRACT_DATA]
 
     if abstract_data:
         return generate_abstract_unary_op(name, latency, output_type)

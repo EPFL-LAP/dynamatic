@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_oehb(name, params):
-    data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if data_type.bitwidth == 0:
         return _generate_oehb_dataless(name)

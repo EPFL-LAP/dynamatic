@@ -2,12 +2,9 @@ from generators.support.utils import *
 
 
 def generate_memory_controller(name, params):
-    addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["stAddr_0"]) if "stAddr_0" in params[ATTR_PORT_TYPES].keys(
-    ) else SmvScalarType(params[ATTR_PORT_TYPES]["ldAddr_0"])
-    data_type = SmvScalarType(params[ATTR_PORT_TYPES]["ldData_0"]) if "ldData_0" in params[ATTR_PORT_TYPES].keys(
-    ) else SmvScalarType(params[ATTR_PORT_TYPES]["stData_0"])
-    ctrl_type = SmvScalarType(params[ATTR_PORT_TYPES]["ctrl_0"]
-                              ) if "ctrl_0" in params[ATTR_PORT_TYPES].keys() else None
+  data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+  addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
+  ctrl_type = SmvScalarType(32)
 
     num_loads = params["num_loads"]
     num_stores = params["num_stores"]
