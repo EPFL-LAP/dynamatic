@@ -247,8 +247,7 @@ static std::string _outPrefix_;
 /// Specialization of the scalar printer for char.
 template <>
 void scalarPrinter<char>(const char &arg, OS &os) {
-  // Since int8_t only has 8 bits, it is sufficient to print it as a 2-digits
-  // hexadecimal number.
+  // Print the char as a 2-digits hexadecimal number.
   os << "0x" << std::hex << std::setfill('0') << std::setw(2)
      << (static_cast<int>(arg)) << std::endl;
 }
