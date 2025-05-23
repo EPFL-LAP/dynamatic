@@ -4,7 +4,9 @@ from generators.support.signal_manager import generate_signal_manager, get_conca
 def generate_tehb(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
+  # Flag indicating whether the buffer is initialized when created
   initialized = params.get("initialized", 0)
+  # The initial value to use for the buffer
   initial_value = params.get("initial_value", 0)
 
   if extra_signals:
@@ -68,10 +70,7 @@ def _generate_tehb(name, bitwidth, initialized, initial_value):
   dependencies = _generate_tehb_dataless(
       tehb_dataless_name, initialized)
 
-  if initialized == 1:
-    dataReg_init = f"'{initial_value}'"
-  else:
-    dataReg_init = "'0'"
+  dataReg_init = f"'{initial_value}'"
 
   entity = f"""
 library ieee;
@@ -156,3 +155,4 @@ def _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, in
       }],
       "extra_signals": extra_signals
   }, lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth, initialized, initial_value))
+  
