@@ -509,7 +509,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let description = [{
     The cbranch operation represents a conditional
     branch.  The data input is propagated to one of the two outputs
-    based on the condition input.
+    based on the select input.
 
     Example:
 
