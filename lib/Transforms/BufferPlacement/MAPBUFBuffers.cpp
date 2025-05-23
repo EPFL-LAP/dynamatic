@@ -683,13 +683,11 @@ void MAPBUFBuffers::setup() {
 
   connectSubjectGraphs();
 
-  // Generates the cuts and saves them in the static
-  // experimental::CutManager::cuts map
-  experimental::CutManager generateCuts(blifData, 6);
-
+  auto cuts = experimental::generateCuts(blifData, 6);
+  
   addClockPeriodConstraintsNodes();
 
-  for (auto &[rootNode, cutVector] : experimental::CutManager::cuts) {
+  for (auto &[rootNode, cutVector] : cuts) {
     addCutSelectionConstraints(cutVector);
     addDelayPropagationConstraints(rootNode, cutVector);
   }

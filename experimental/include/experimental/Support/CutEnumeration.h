@@ -29,18 +29,12 @@ namespace experimental {
 
 class Cut {
 public:
-  Cut(Node *root, int depth = 0) : depth(depth), root(root){};
+  Cut(Node *root, int depth = 0) : depth(depth), root(root) {};
   // for trivial cuts
   Cut(Node *root, Node *leaf, int depth = 0)
-      : depth(depth), leaves({leaf}), root(root){};
+      : depth(depth), leaves({leaf}), root(root) {};
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
-      : depth(depth), leaves({leaves}), root(root){};
-
-  void addLeaves(Node *leaf) { this->leaves.insert(leaf); }
-
-  void addLeaves(std::set<Node *> &leavesToAdd) {
-    this->leaves.insert(leavesToAdd.begin(), leavesToAdd.end());
-  }
+      : depth(depth), leaves({leaves}), root(root) {};
 
   int getDepth() { return depth; }
 
@@ -50,22 +44,16 @@ public:
 
   std::set<Node *> &getLeaves() { return leaves; }
 
-  void setLeaves(std::set<Node *> &leavesToSet) { this->leaves = leavesToSet; }
-
 private:
-  // depth of the cut
   int depth;
-  // Gurobi variable for cut selection
   GRBVar cutSelection;
-  // leaves of the cut
-  std::set<Node *> leaves;
-  // root of the cut
   Node *root;
+  std::set<Node *> leaves;
 };
 
 struct NodePtrHash {
   std::size_t operator()(const Node *node) const {
-    return std::hash<std::string>()(node->name); // Hash the name
+    return std::hash<std::string>()(node->name); 
   }
 };
 
@@ -78,27 +66,9 @@ struct NodePtrEqual {
 using NodeToCuts =
     std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>;
 
-class CutManager {
-public:
-  CutManager(LogicNetwork *blif, int lutSize);
+NodeToCuts generateCuts(LogicNetwork *blif, int lutSize);
 
-  // Node to Cuts Map
-  static inline NodeToCuts cuts;
-  // Prints cuts to a file
-  static void printCuts(const std::string &filename);
-
-private:
-  // how many times to expand the cutless cuts when including channels
-  const int expansionWithChannels = 6;
-  // size of the LUT
-  int lutSize{};
-  // AIG that the cut enumeration is performed on
-  experimental::LogicNetwork *blif;
-
-  // Cutless algorithm
-  NodeToCuts cutless(bool includeChannels);
-};
-
+void printCuts(NodeToCuts cuts, std::string &filename);
 } // namespace experimental
 } // namespace dynamatic
 

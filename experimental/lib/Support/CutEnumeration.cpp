@@ -23,106 +23,152 @@
 
 using namespace dynamatic::experimental;
 
+int expansionWithChannels = 6;
+
 void sortAndEraseCuts(std::unordered_map<Node *, std::vector<Cut>, NodePtrHash,
                                          NodePtrEqual> &cuts) {
   for (auto &[node, cutVector] : cuts) {
     std::sort(cutVector.begin(), cutVector.end(), [](Cut &a, Cut &b) {
-      // Get the sets first
+
       const auto leavesA = a.getLeaves();
       const auto leavesB = b.getLeaves();
 
-      // First compare by size
+
       if (leavesA.size() != leavesB.size()) {
         return leavesA.size() < leavesB.size();
       }
 
-      // Compare elements using set's iterators
-      auto itA = leavesA.begin();
-      auto itB = leavesB.begin();
-      while (itA != leavesA.end() && itB != leavesB.end()) {
-        const Node *nodeA = *itA;
-        const Node *nodeB = *itB;
-
-        // Handle null pointers
-        if (!nodeA || !nodeB) {
-          if (nodeA == nodeB) {
-            ++itA;
-            ++itB;
-            continue;
-          }
-          return !nodeA;
-        }
-
-        // Compare names
-        if (nodeA->name != nodeB->name) {
-          return nodeA->name < nodeB->name;
-        }
-
-        ++itA;
-        ++itB;
-      }
-      return false; // Sets are equal
+      return std::lexicographical_compare(
+          leavesA.begin(), leavesA.end(), leavesB.begin(), leavesB.end(),
+          [](const Node *nodeA, const Node *nodeB) {
+            return nodeA->name < nodeB->name;
+          });
     });
 
-    // Remove duplicates
     cutVector.erase(std::unique(cutVector.begin(), cutVector.end(),
-                                [](Cut &a, Cut &b) {
-                                  const auto leavesA = a.getLeaves();
-                                  const auto leavesB = b.getLeaves();
+      [](Cut &a, Cut &b) {
+        const auto &leavesA = a.getLeaves();
+        const auto &leavesB = b.getLeaves();
 
-                                  if (leavesA.size() != leavesB.size()) {
-                                    return false;
-                                  }
+        // Compare the sizes first
+        if (leavesA.size() != leavesB.size()) {
+          return false;
+        }
 
-                                  // Compare sets
-                                  auto itA = leavesA.begin();
-                                  auto itB = leavesB.begin();
-                                  while (itA != leavesA.end() &&
-                                         itB != leavesB.end()) {
-                                    const Node *nodeA = *itA;
-                                    const Node *nodeB = *itB;
-
-                                    // Handle null pointers
-                                    if (!nodeA || !nodeB) {
-                                      if (nodeA != nodeB) {
-                                        return false;
-                                      }
-                                      ++itA;
-                                      ++itB;
-                                      continue;
-                                    }
-
-                                    // Compare names
-                                    if (nodeA->name != nodeB->name) {
-                                      return false;
-                                    }
-
-                                    ++itA;
-                                    ++itB;
-                                  }
-                                  return true; // Sets are equal
-                                }),
-                    cutVector.end());
+        // Compare elements in the set based on Node's
+        // name strings
+        return std::equal(
+            leavesA.begin(), leavesA.end(),
+            leavesB.begin(), leavesB.end(),
+            [](const Node *nodeA, const Node *nodeB) {
+              return nodeA->name == nodeB->name;
+            });
+        }), cutVector.end());
   }
 }
 
-CutManager::CutManager(LogicNetwork *blif, int lutSize)
-    : lutSize(lutSize), blif(blif) {
-  // Call the cutless algorithm, if argument is true, include channels in the
-  // Primary Inputs set as well
-  auto cutsWithoutChannels = cutless(false);
-  auto cutsWithChannels = cutless(true);
+std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
+  std::set<Node *> wavyInputs;
+  std::set<Node *> visited;
+
+  // DFS to find the wavy inputs of the node.
+  std::function<void(Node *)> dfs = [&](Node *currentNode) {
+    if (visited.count(currentNode) > 0) {
+      return;
+    }
+
+    visited.insert(currentNode);
+
+    if (wavyLine.count(currentNode) > 0) {
+      wavyInputs.insert(currentNode);
+      return;
+    }
+
+    for (const auto &fanin : currentNode->fanins) {
+      dfs(fanin);
+    }
+  };
+
+  // Erase a channel node from the wavyLine temporarily, so the search does
+  // not end prematurely.
+  bool erased = false;
+  if (node->isChannelEdge && wavyLine.count(node) > 0) {
+    wavyLine.erase(node);
+    erased = true;
+  }
+
+  dfs(node);
+
+  if (erased) {
+    wavyLine.insert(node);
+  }
+
+  return wavyInputs;
+}
+
+NodeToCuts cutAlgorithm(LogicNetwork *blif, int lutSize, bool includeChannels) {
+  NodeToCuts cuts;
+  
+  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
+
+  if (includeChannels) {
+    for (auto *channel : blif->getChannels()) {
+      currentWavyLine.insert(channel);
+    }
+  }
+
+  int expansionCount = 0;
+  
+  // Keep expanding until we hit the expansion limit
+  while (!(includeChannels && (expansionCount >= expansionWithChannels))) {
+    std::set<Node *> nextWavyLine;
+
+    for (auto &node : blif->getNodesInOrder()) {
+      std::set<Node *> wavyInputs = findWavyInputsOfNode(node, currentWavyLine);
+      // if the number of wavy inputs is less than or equal to the limit (less
+      // than the LUT size), add to the set
+      if (wavyInputs.size() <= lutSize) {
+        nextWavyLine.insert(node);
+        cuts[node].emplace_back(node, wavyInputs, expansionCount);
+      }
+    }
+
+    // break if no more Nodes can be added to the wavy line
+    if ((nextWavyLine.size() == currentWavyLine.size())) {
+      break;
+    }
+
+    expansionCount++;
+    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
+  }
+
+  return cuts;
+}
+
+NodeToCuts dynamatic::experimental::generateCuts(LogicNetwork *blif,
+                                                 int lutSize) {
+  auto cutsWithoutChannels = cutAlgorithm(blif, lutSize, false);
+  auto cutsWithChannels = cutAlgorithm(blif, lutSize, true);
 
   // Merge cuts
-  cuts = std::move(cutsWithoutChannels);
+  NodeToCuts cuts;
+
+  for (const auto &[node, cutVector] : cutsWithoutChannels) {
+    cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
+  }
+
   for (const auto &[node, cutVector] : cutsWithChannels) {
     cuts[node].insert(cuts[node].end(), cutVector.begin(), cutVector.end());
   }
 
+  // Sort and erase duplicate cuts
   sortAndEraseCuts(cuts);
-};
 
-void CutManager::printCuts(const std::string &filename) {
+  return cuts;
+}
+
+// Prints the cuts, can be used for debugging
+void dynamatic::experimental::printCuts(NodeToCuts cuts, std::string &filename) {
   std::ofstream outFile("../mapbuf/" + filename);
   if (!outFile.is_open()) {
     llvm::errs() << "Error: Unable to open file for writing.\n";
@@ -149,59 +195,4 @@ void CutManager::printCuts(const std::string &filename) {
     }
   }
   outFile.close();
-}
-
-NodeToCuts CutManager::cutless(bool includeChannels) {
-  int n = 0;
-  std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
-  std::set<Node *> nextWavyLine;
-  NodeToCuts cutlessCuts;
-
-  if (includeChannels) {
-    for (auto *channel : blif->getChannels()) {
-      currentWavyLine.insert(channel);
-    }
-  }
-
-  while (true) {
-    nextWavyLine =
-        blif->findNodesWithLimitedWavyInputs(lutSize, currentWavyLine);
-    if ((nextWavyLine.size() == currentWavyLine.size()) ||
-        (includeChannels && (n >= expansionWithChannels))) {
-      break;
-    }
-
-    for (auto *node : nextWavyLine) {
-      cutlessCuts[node].emplace_back(
-          node, blif->findWavyInputsOfNode(node, currentWavyLine), n);
-    }
-
-    n++;
-    currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
-  }
-
-  for (auto &[node, cuts] : cutlessCuts) {
-    cuts.erase(std::unique(cuts.begin(), cuts.end(),
-                           [](Cut &a, Cut &b) {
-                             const auto &leavesA = a.getLeaves();
-                             const auto &leavesB = b.getLeaves();
-
-                             // Compare the sizes first as an optimization
-                             if (leavesA.size() != leavesB.size()) {
-                               return false;
-                             }
-
-                             // Compare elements in the set based on Node's name
-                             // strings
-                             return std::equal(
-                                 leavesA.begin(), leavesA.end(),
-                                 leavesB.begin(), leavesB.end(),
-                                 [](const Node *nodeA, const Node *nodeB) {
-                                   return nodeA->name == nodeB->name;
-                                 });
-                           }),
-               cuts.end());
-  }
-
-  return cutlessCuts;
 }

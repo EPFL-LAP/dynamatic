@@ -203,17 +203,6 @@ public:
   // Finds the path from "start" to "end" using bfs.
   std::vector<Node *> findPath(Node *start, Node *end);
 
-  // Implements the "Cutless FPGA Mapping" algorithm.Returns the nodes in the
-  // circuit that can be implemented with "limit" number of nodes from the set
-  // "wavyLine". For example, if the limit is 6 (6-input LUT), returns all the
-  // nodes that can be implemented with 6 Nodes from wavyLine set.
-  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
-                                                  std::set<Node *> &wavyLine);
-
-  // Helper function for findNodesWithLimitedWavyInputs. Finds the wavy inputs
-  // using dfs.
-  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
-
   // Returns all of the Nodes.
   std::set<Node *> getAllNodes();
 
