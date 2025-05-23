@@ -19,7 +19,6 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -236,4 +235,3 @@ public:
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
-
