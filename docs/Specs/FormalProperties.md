@@ -45,14 +45,16 @@ The main goal of this infrastructure is to support the integration of as many fo
 
 To illustrate how a new property can be integrated, we take an example from the paper [Automatic Inductive Invariant Generation for Scalable Dataflow Circuit Verification](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/10/Xu_IWLS23_Inductive_Invariants.pdf).
 
-  > [Disclaimer]: This is intended as a conceptual illustration of how to add new properties to the system, not a step-by-step tutorial. Many implementation details are intentionally left out. The design decisions presented here are meant for illustration purposes, not necessarily as the optimal solution for this particular problem.
+> [!NOTE]
+>  This is intended as a conceptual illustration of how to add new properties to the system, not a step-by-step tutorial. Many implementation details are intentionally left out. The design decisions presented here are meant for illustration purposes, not necessarily as the optimal solution for this particular problem.
 
 In this example, we want to introduce a new invariant that states:
 "for any fork the number of outptus that are sent state must be saller than the total number of fork outputs".
 
 As is often the case with new properties, this one introduces requirements not previously encountered. Specifically, it refers to a state variable named "sent" inside an operation, which is not represented in the IR at all. We'll now explore one possible approach to handling this scenario.
 
-  > If you decide to implement this or a different approach, please remember to update this documentation accordingly.
+> [!NOTE]
+> If you decide to implement this or a different approach, please remember to update this documentation accordingly.
 
 
 ### Define your derived class
