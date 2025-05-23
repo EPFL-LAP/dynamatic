@@ -11,10 +11,9 @@ The infrastructure introduces a compiler pass called `annotate-properties`, whic
 Properties are defined as derived classes of `FormalProperty`. The `FormalProperty` class contains the base information common to all properties and should not be modified when introducing new kinds of properties.
 
 The base fields are:
-The base fields are the following:
-- type: Categorizes the formal property (currently: aob, veq).
-- tag: Purpose of the property (e.g., opt for optimization, invar for invariants).
-- check: Outcome of formal verification (true, false, or unchecked).
+- `type`: Categorizes the formal property (currently: aob, veq).
+- `tag`: Purpose of the property (e.g., opt for optimization, invar for invariants).
+- `check`: Outcome of formal verification (true, false, or unchecked).
 
 Any additional fields required for specific property types can—and should—be implemented in the derived classes. We intentionally allow complete freedom in defining these extra fields, as the range of possible properties is broad and they often require different types of information.
 
@@ -44,9 +43,9 @@ Formal properties are stored in a shared JSON database, with each property entry
 
 The main goal of this infrastructure is to support the integration of as many formal properties as possible, so we have designed the process to be as simple and extensible as possible.
 
-To illustrate how a new property can be integrated, we take an example from the paper Automatic Inductive Invariant Generation for Scalable Dataflow Circuit Verification [paper](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/10/Xu_IWLS23_Inductive_Invariants.pdf).
+To illustrate how a new property can be integrated, we take an example from the paper [Automatic Inductive Invariant Generation for Scalable Dataflow Circuit Verification](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2023/10/Xu_IWLS23_Inductive_Invariants.pdf).
 
-  >Disclaimer: This is intended as a conceptual illustration of how to add new properties to the system, not a step-by-step tutorial. Many implementation details are intentionally left out. The design decisions presented here are meant for illustration purposes, not necessarily as the optimal solution for this particular problem.
+  > [Disclaimer]: This is intended as a conceptual illustration of how to add new properties to the system, not a step-by-step tutorial. Many implementation details are intentionally left out. The design decisions presented here are meant for illustration purposes, not necessarily as the optimal solution for this particular problem.
 
 In this example, we want to introduce a new invariant that states:
 "for any fork the number of outptus that are sent state must be saller than the total number of fork outputs".
@@ -93,7 +92,7 @@ private:
 
 Serialization and deserialization methods should be easy to implement once the fields for the derived class are decided. For our example they will look like this:
 
-'''
+```
 llvm::json::Value MyNewInvariant::extraInfoToJSON() const {
     llvm::json::Array namesArray;
     for (const auto &item : namesArray) {
@@ -104,9 +103,9 @@ llvm::json::Value MyNewInvariant::extraInfoToJSON() const {
                              {"size", size},
                              {"signal_names", namesArray}});
 }
-'''
+```
 
-'''
+```
 std::unique_ptr<MyNewInvariant>
 MyNewInvariant::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
   auto prop = std::make_unique<MyNewInvariant>();
@@ -123,10 +122,10 @@ MyNewInvariant::fromJSON(const llvm::json::Value &value, llvm::json::Path path) 
 
   return prop;
 }
-'''
+```
 ### Implement the constructor
 
-This is the most important method of your formal porperty class. The contructor is resonsible for creating the property and extracting the information from MLIR so that it can be easily assembled by any downstream tool later. For our example the constructur will look like this:
+This is the most important method of your formal porperty class. The contructor is responsible for creating the property and extracting the information from MLIR so that it can be easily assembled by any downstream tool later. For our example the constructur will look like this:
 
 ```
 MyNewInvariant::MyNewInvariant(unsigned long id, TAG tag, const Operation& op)
@@ -193,20 +192,6 @@ if (llvm::isa<MyNewInvariant>(property.get())) {
       data.properties[p->getId()] = {s, propertyTag};
     }
 ```
-
-
-Why use JSON?
-
-    Enables decoupling between IR-level compiler passes and downstream tools.
-
-    Easily inspectable and extensible.
-
-    Acts as a contract between the compiler and formal verification tools.
-
-What properties can I express with this infrastructure?
-
-This infrastructure is designed to express runtime properties, meaning properties that manifest in the final circuit or SMV model and are verified during simulation or model checking. It is not intended for compile-time checks — such checks should be handled using the MLIR infrastructure.
-
 
 ## FAQs
 ### Why use JSON?
