@@ -1,0 +1,211 @@
+[33mcommit edf04794fc99ec4f91905819774ce4787891bf68[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev/KillianMcCourt/MultipleLatencySupport[m[33m)[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Thu May 22 23:35:36 2025 +0200
+
+    final stage - seems to work as intendded
+
+[33mcommit f28dd17e277852f59cbb0e3370977d488627783b[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Thu May 22 22:19:10 2025 +0200
+
+    full update to Carmine-suggested version
+
+[33mcommit a82543f5a6d52c0511c4da5bab417cecc7a110a6[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Thu May 22 19:43:57 2025 +0200
+
+    starting changes
+
+[33mcommit cbab9e8ac7dae21fe7566d8d8c842ce945426f17[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Wed May 21 22:41:14 2025 +0200
+
+    building version
+
+[33mcommit af5209acd7f5cc9dab5738d52f279e4d9ac74550[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Wed May 21 21:43:59 2025 +0200
+
+    parser updated - lSQ definition issues fixed
+
+[33mcommit 20297e3ad560162ce2bac56935d1de97516a6ec0[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Tue May 20 13:36:55 2025 +0200
+
+    minor changes
+
+[33mcommit 524a2298444aadc551300c254119bb5348ffc7ce[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Mon May 19 15:00:59 2025 +0200
+
+    did all listed changes, now need to handle fixing
+
+[33mcommit 7862533b7a7fe11c1a1e3fa2d4fc69cc11917d96[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Mon May 19 11:38:10 2025 +0200
+
+    Crush done
+
+[33mcommit 3acdad0c21d0756e90be3214380776b70170fbe7[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Mon May 19 11:19:49 2025 +0200
+
+    added mutable; only handled latency for now
+
+[33mcommit c7508fb77b10fa4d9957c9fceb499b93edccb774[m
+Author: Killian McCourt <killian.mccourt@free.fr>
+Date:   Thu May 15 13:32:48 2025 +0200
+
+    exploratory first changes - rebase to destroy these commits later
+
+[33mcommit aa820283f595b65a464a4c46bb4a783f8c4a0505[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: QinYuan2000 <67152109+QinYuan2000@users.noreply.github.com>
+Date:   Wed May 14 22:38:11 2025 +0200
+
+    [Buffers] Making Buffer Instantiation Consistent with the MILP Models (#429)
+    
+    Previously, buffer placement was inconsistent with the MILP model.
+    
+    In `FPGA20Buffers`, a ONE_SLOT_BREAK_R (TEHB) was used for buffers that
+    break no signal paths (i.e., transparent buffers) and have one slot.
+    This is incorrect. ONE_SLOT_BREAK_R breaks the READY signal and reduces
+    throughput compared to a truly transparent buffer. Therefore, we now
+    place FIFO_BREAK_NONE when the MILP assigns a one-slot buffer that
+    breaks no signals.
+    
+    In `FPL22Buffers`, the buffer attributes (Break DV and Break R) are
+    currently inconsistent with the MILP constraints. As a result, any
+    buffer placement derived from them is not valid until the MILP is
+    corrected. This PR does not fix the MILP, but clarifies what the ideal
+    buffer placement should be.
+
+[33mcommit 406986e3576bd1f0d468df52bcf47128cadfce34[m
+Author: QinYuan2000 <67152109+QinYuan2000@users.noreply.github.com>
+Date:   Wed May 14 17:10:55 2025 +0200
+
+    [Refactoring] Modularize Buffer Placement MILP Constraints (#392)
+    
+    This PR is part of the work towards issue
+    [#228](https://github.com/EPFL-LAP/dynamatic/issues/228). It focuses on
+    refactoring and modularizing the MILP constraints in
+    `BufferPlacementMILP`.
+    
+    - The constraint functions have been split into smaller, focused
+    components.
+    - This improves code clarity and allows different MILPs to selectively
+    reuse specific constraints.
+    
+    Future PRs will build on this structure to implement new MILP variants
+    with minimal duplication.
+    
+    ---
+    
+    *Update:*
+    
+    Certain constraints previously used to prevent zero-delay combinational
+    cycles have been removed. Instead, a `std::max(delay, 0.001)` expression
+    is used to ensure that all unit delays remain positive.
+
+[33mcommit 79ebc1e1332388a7d7949083ba4f5fdb19b4223a[m
+Author: danako <103267380+DanaKossaybati@users.noreply.github.com>
+Date:   Tue May 13 16:44:14 2025 +0200
+
+    [Backend] Add Blocker Op (#366)
+    
+    This PR:
+    
+    1- Adds the python generators for the shli and extui operations along
+    with passing the correct params.
+    
+    2- Changes the JoinOp from control-only to having 2 versions: data-less
+    (control-only) and data-loaded.
+    
+    ---------
+    
+    Co-authored-by: shundroid <shundroid@users.noreply.github.com>
+
+[33mcommit 1887ba219bbbc08438301e22fbb7487e019f2dbe[m
+Author: shundroid <shundroid@users.noreply.github.com>
+Date:   Mon May 12 11:45:18 2025 +0200
+
+    [RTL] Suppress "Uncaught module" warning (#422)
+    
+    Currently, during parameter analysis, we emit a warning like `Uncaught
+    module: ori` if a module isn't handled in the bitwidth or extra signal
+    extraction.
+    However, this warning isn't relevant for users relying on the existing
+    backend.
+    Moreover, it's already clear on the new backend whether a module is
+    analyzed, during Python generation. If the relevant parameter isn't
+    passed, Python emits an error.
+
+[33mcommit 9001df886f6d18fde88fff50b30207f45dfe1ce9[m
+Author: shundroid <shundroid@users.noreply.github.com>
+Date:   Fri May 9 12:39:00 2025 +0200
+
+    [Speculation] Added my final report to docs/Speculation (#421)
+    
+    I've added my final report for the 20-Credit Project to the
+    `docs/Speculation` folder. It covers the basics of speculation,
+    implementation details, and our new backend.
+
+[33mcommit 3e46426c34a0d87f2b80b2da184d0fa04990ac21[m
+Author: shundroid <shundroid@users.noreply.github.com>
+Date:   Fri May 9 12:33:11 2025 +0200
+
+    [Speculation] Updated buffer.json (#419)
+    
+    I'm planning to make a PR on tightened buffering in a few days, so this
+    is only intended to make current speculation tests work and make the
+    tests of other PRs smoother.
+    
+    Applied quick fixes to replace `tehb` with `fifo_break_none`, aligning
+    with changes introduced in #317.
+    
+    Note: `tehb` maps to `one_slot_break_r`, while `tfifo` maps to
+    `fifo_break_none`. Using `tfifo` was actually appropriate here, as the
+    number of slots is typically greater than one.
+
+[33mcommit 7f98a64bddd65c104c0cea521266de2d1b3c1a74[m
+Author: Gioele Gottardo <72650449+gioelegott@users.noreply.github.com>
+Date:   Fri May 9 10:37:22 2025 +0200
+
+    [SMV] Add internal signals for Input Ports (#397)
+    
+    We define internal signals for the input ports in SMV so that we can
+    output the ready signal of the input channels.
+    
+    While in VHDL connecting the input channels to the internal units
+    already drives the ready signal, this is not true for SMV. In SMV we
+    need to explicitly define internal signals for the ready signals that
+    are sent outside the module. To do so we use the same approach as for
+    output channels with the `WriteModData::writeSignalAssignments`, but
+    inverting the directions (data and valid go in, ready goes out).
+    
+    `WriteModData::writeSignalAssignments` is used in all HDLs, but the
+    internal signals for inputs are assigned only in SMV. If in the future
+    those signals will be needed also for VHDL and SV, they can be added
+    with very small changes.
+
+[33mcommit 80566d6cd8261282cfe7d2eeb5a2906600e9f6f7[m
+Author: Jiahui Xu <48123265+Jiahui17@users.noreply.github.com>
+Date:   Thu May 8 13:26:11 2025 +0200
+
+    [HDL][Bitwidth] Workarounds for 1-bit array (#415)
+    
+    - Workarounds for 1-bit or 1-element arrays in RTL gen.
+    - Disable bitwidth optimization for left shift (if left shift is used as
+    a means for reducing the arithmetic strength of a multiplication, we
+    shouldn't shrink the bitwidth).
+    
+    fixes #383
+
+[33mcommit b0f8a594454e81a7114c8393f2d760588928bedb[m
+Author: choyoungjung <45508161+choyoungjung@users.noreply.github.com>
+Date:   Thu May 8 01:50:41 2025 +0200
+
+    [Refactoring] Essential Updates in lsq_core.py (#412)
+    
+    # Detailed presentation slide
+    
+    [20250430_lsq_

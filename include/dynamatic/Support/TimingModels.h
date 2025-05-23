@@ -88,15 +88,26 @@ public:
   }
 };
 
+/// Represents a metric of type M that is delay-dependent i.e., whose value
+/// changes depending on the delay of the signal it refers to. Internally, it
+/// maps any number of the metric's data points (with no specific order) with
+/// the delay at which they were measured.
 template <typename M>
 struct DelayDepMetric {
 public:
   /// Data points for the metric, mapping a frequency with the metric's value
   std::map<double, double> data;
 
-  /// Determines the value of the metric at the internal operating delay that is highest, but still smaller than the target period (meaning we pick the slowest
-  /// implementation that still meets timing).
-  LogicalResult getDelayCeilMetric( double targetPeriod , M &metric) const {
+  /// Determines the value of the metric at the internal operating delay that is
+  /// highest, but still smaller than the target period (meaning we pick the
+  /// slowest implementation that still meets timing).The metric is expected to
+  /// be monotonically increasing when the delay decreases, meaning that the
+  /// metric's value at a lower delay is always greater than or equal to the
+  /// metric's value at a higher delay. This is not enforced in the code, but
+  /// should be kept in mind when using this class, otherwise sub-optimal
+  /// choices may be made.
+
+  LogicalResult getDelayCeilMetric(double targetPeriod, M &metric) const {
     std::optional<unsigned> opDelayCeil;
     M metricFloor = 0.0;
 
@@ -118,21 +129,17 @@ public:
   }
 };
 
-
-
-
-
-
 /// Deserializes a JSON value into a BitwidthDepMetric<double>. See
 /// ::llvm::json::Value's documentation for a longer description of this
 /// function's behavior.
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
-
-bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<DelayDepMetric<double>> &metric,
-  llvm::json::Path path);
-
+/// Deserializes a JSON value into a BitwidthDepMetric<DelayDepMetric<double>>,
+/// ie containing the custom, struct for combinational delay to latency map.
+bool fromJSON(const llvm::json::Value &value,
+              BitwidthDepMetric<DelayDepMetric<double>> &metric,
+              llvm::json::Path path);
 
 /// Stores the timing model for an operation's type, usually parsed from a JSON
 /// file. It stores the operation's (datawidth-dependent) latencies,
@@ -202,9 +209,6 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model,
 /// documentation for a longer description of this function's behavior.
 bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
-
-
-
 
 /// Holds the timing models for a set of operations (internally identified by
 /// their unique name), usually parsed from a JSON file. The class provides

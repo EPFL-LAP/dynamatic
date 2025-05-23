@@ -111,39 +111,37 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   return getModel(op->getName());
 }
 
-LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
-                                         double &latency, double targetPeriod) const // Our current timing model doesn't have latency information for valid and
-  // ready signals, assume it is 0 // Our current timing model doesn't have latency information for valid and
-  // ready signals, assume it is 0.
+LogicalResult TimingDatabase::getLatency(
+    Operation *op, SignalType signalType, double &latency,
+    double targetPeriod) const // Our current timing model doesn't have latency
+                               // information for valid and
+// ready signals, assume it is 0
 {
-  // Our current timing model doesn't have latency information for valid and
-  // ready signals, assume it is 0.
+
   if (signalType != SignalType::DATA) {
     latency = 0.0;
     return success();
   }
 
-  const TimingModel *model = getModel(op); //TODO : get model also needs to change, most likely
+  const TimingModel *model = getModel(op);
   if (!model)
     return failure();
 
- DelayDepMetric<double> DelayStruct;
- 
+  // This section now must handle the fact that all latency values are now
+  // contained inside an instance of DelayDepMetric. We therefore extract this
+  // structure, and use its method to obtain the latency value at the
+  // targetPeriod provided.
+  DelayDepMetric<double> DelayStruct;
+
   if (failed(model->latency.getCeilMetric(op, DelayStruct)))
-      return failure();
-    // or we write to the attribute here, to keeo things clean
-
-    // Now get the final latency value using FrequencyDepMetric
-
-    
-    if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
-      return failure();
-
+    return failure();
+  if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
+    return failure();
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
   // currenty unable to account for this. It's obviosuly very bad to
-  // special-case this here so we should find a waay to properly express this
+  // special-case this here so we should find a way to properly express this
   // information in our models.
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     auto memOp = findMemInterface(loadOp.getAddressResult());
@@ -158,15 +156,13 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   llvm::errs() << "Final latency value: " << latency << "\n";
   llvm::errs() << "================================\n\n";
 
-
-
-
-
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
-                                               double &delay, double targetPeriod) const {
+LogicalResult TimingDatabase::getInternalDelay(Operation *op,
+                                               SignalType signalType,
+                                               double &delay,
+                                               double targetPeriod) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
@@ -205,7 +201,8 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op,
+                                            SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
@@ -326,55 +323,52 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   return true;
 }
 
-
 bool dynamatic::fromJSON(const ljson::Value &value,
-  BitwidthDepMetric<DelayDepMetric<double>> &metric,
- ljson::Path path) {
- const ljson::Object *object = value.getAsObject();
- if (!object) {
- path.report("expected JSON object");
- return false;
- }
- for (const auto &[bitwidthKey, metricValue] : *object) {
- unsigned bitwidth;
- if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
- return false;
- std::map<double, double> LatencyMap;
- 
- const ljson::Object *nestedMap = metricValue.getAsObject();
- if (!nestedMap) {
-     path.field(bitwidthKey).report("expected nested map object");
-     return false;
- }
- 
- for (const auto &[doubleKey, doubleValue] : *nestedMap) {
-     double key;
-     key = std::stod(doubleKey.str());
- 
-     double value;
-     if (!fromJSON(doubleValue, value, path.field(bitwidthKey).field(doubleKey)))
-         return false;
- 
-     LatencyMap[key] = value;
- }
- DelayDepMetric<double> LatencyStruct;
- LatencyStruct.data = LatencyMap; 
- metric.data[bitwidth] = LatencyStruct;
-}
+                         BitwidthDepMetric<DelayDepMetric<double>> &metric,
+                         ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
+  for (const auto &[bitwidthKey, metricValue] : *object) {
+    unsigned bitwidth;
+    if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
+      return false;
+    std::map<double, double> LatencyMap;
 
-llvm::errs() << "Parsed metric.data contents:\n";
-for (const auto &[bitwidth, delayMetric] : metric.data) {
+    const ljson::Object *nestedMap = metricValue.getAsObject();
+    if (!nestedMap) {
+      path.field(bitwidthKey).report("expected nested map object");
+      return false;
+    }
+
+    for (const auto &[doubleKey, doubleValue] : *nestedMap) {
+      double key;
+      key = std::stod(doubleKey.str());
+
+      double value;
+      if (!fromJSON(doubleValue, value,
+                    path.field(bitwidthKey).field(doubleKey)))
+        return false;
+
+      LatencyMap[key] = value;
+    }
+    DelayDepMetric<double> LatencyStruct;
+    LatencyStruct.data = LatencyMap;
+    metric.data[bitwidth] = LatencyStruct;
+  }
+
+  llvm::errs() << "Parsed metric.data contents:\n";
+  for (const auto &[bitwidth, delayMetric] : metric.data) {
     llvm::errs() << "  Bitwidth: " << bitwidth << "\n";
     for (const auto &[latencyKey, latencyValue] : delayMetric.data) {
-        llvm::errs() << "    " << latencyKey << " -> " << latencyValue << "\n";
+      llvm::errs() << "    " << latencyKey << " -> " << latencyValue << "\n";
     }
+  }
+
+  return true;
 }
-
-return true;
-}
-
-
-
 
 static const std::string LATENCY[] = {"latency"};
 static const std::string DELAY[] = {"delay", "data"};
