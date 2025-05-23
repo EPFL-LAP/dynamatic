@@ -158,8 +158,8 @@ def _generate_elastic_fifo_inner(name, size, bitwidth, initialized):
   if initialized:
     fifo_valid_init = "'1'"
     memory_init_code = (
-        "for i in Memory'range loop\n"
-        "  Memory(i) <= std_logic_vector(to_unsigned(i, Memory(i)'length));\n"
+        "for i in Memory'range loop"
+        "  Memory(i) <= std_logic_vector(to_unsigned(i, Memory(i)'length));"
         "end loop;"
     )
     tail_init = f"{size} - 1"
@@ -168,8 +168,8 @@ def _generate_elastic_fifo_inner(name, size, bitwidth, initialized):
   else:
     fifo_valid_init = "'0'"
     memory_init_code = (
-        "for i in Memory'range loop\n"
-        "  Memory(i) <= (others => '0');\n"
+        "for i in Memory'range loop"
+        "  Memory(i) <= (others => '0');"
         "end loop;"
     )
     tail_init = "0"
