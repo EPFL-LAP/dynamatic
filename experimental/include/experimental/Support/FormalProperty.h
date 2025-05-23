@@ -37,16 +37,24 @@ public:
 
   inline virtual llvm::json::Value extraInfoToJSON() const { return nullptr; };
 
+  std::unique_ptr<FormalProperty> static fromJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+
   FormalProperty() = default;
   FormalProperty(unsigned long id, TAG tag, TYPE type)
       : id(id), tag(tag), type(type), check("unchecked") {}
   virtual ~FormalProperty() = default;
+
+  static bool classof(const FormalProperty *fp) { return true; }
 
 protected:
   unsigned long id;
   TAG tag;
   TYPE type;
   std::string check;
+
+  llvm::json::Value parseBaseAndExtractInfo(const llvm::json::Value &value,
+                                            llvm::json::Path path);
 };
 
 struct SignalName {
@@ -65,10 +73,16 @@ public:
   std::string getUserChannel() { return userChannel.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<AbsenceOfBackpressure>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   AbsenceOfBackpressure() = default;
   AbsenceOfBackpressure(unsigned long id, TAG tag, const OpResult &res);
   ~AbsenceOfBackpressure() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::VEQ;
+  }
 
 private:
   SignalName ownerChannel;
@@ -85,15 +99,46 @@ public:
   std::string getTargetChannel() { return targetChannel.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ValidEquivalence>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   ValidEquivalence() = default;
   ValidEquivalence(unsigned long id, TAG tag, const OpResult &res1,
                    const OpResult &res2);
   ~ValidEquivalence() = default;
 
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::VEQ;
+  }
+
 private:
   SignalName ownerChannel;
   SignalName targetChannel;
+};
+
+class FormalPropertyTable {
+public:
+  FormalPropertyTable() = default;
+
+  LogicalResult addPropertiesFromJSON(StringRef filepath);
+
+  const std::vector<std::unique_ptr<FormalProperty>> &getProperties() const {
+    return properties;
+  }
+
+  inline bool fromJSON(const llvm::json::Value &value,
+                       std::unique_ptr<FormalProperty> &property,
+                       llvm::json::Path path) {
+    // fromJson internally allocates the correct space for the class with
+    // make_unique and returns a pointer
+    property = FormalProperty::fromJSON(value, path);
+
+    return true;
+  }
+
+private:
+  /// List of properties.
+  std::vector<std::unique_ptr<FormalProperty>> properties;
 };
 
 } // namespace dynamatic

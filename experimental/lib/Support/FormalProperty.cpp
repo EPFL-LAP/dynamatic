@@ -86,6 +86,57 @@ llvm::json::Value FormalProperty::toJSON() const {
                              {"info", extraInfoToJSON()}});
 }
 
+// Factory implementation
+std::unique_ptr<FormalProperty>
+FormalProperty::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  std::string typeStr;
+  llvm::json::ObjectMapper mapper(value, path);
+  if (!mapper || !mapper.mapOptional("type", typeStr))
+    return nullptr;
+
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  TYPE type = *typeOpt;
+
+  switch (type) {
+  case TYPE::AOB:
+    return AbsenceOfBackpressure::fromJSON(value, path);
+  case TYPE::VEQ:
+    return ValidEquivalence::fromJSON(value, path);
+  }
+}
+
+llvm::json::Value
+FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
+                                        llvm::json::Path path) {
+  std::string typeStr, tagStr;
+  llvm::json::ObjectMapper mapper(value, path);
+
+  if (!mapper || !mapper.mapOptional("id", id) ||
+      !mapper.mapOptional("type", typeStr) ||
+      !mapper.mapOptional("tag", tagStr) || !mapper.mapOptional("check", check))
+    return nullptr;
+
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  type = *typeOpt;
+
+  auto tagOpt = tagFromStr(tagStr);
+  if (!tagOpt)
+    return nullptr;
+  tag = *tagOpt;
+
+  if (const auto *obj = value.getAsObject()) {
+    auto it = obj->find("info");
+    if (it != obj->end())
+      return it->second;
+  }
+  return nullptr;
+}
+
 // Absence of Backpressure
 
 AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
@@ -123,6 +174,26 @@ llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
                              {"user_channel", userChannel.name}});
 }
 
+std::unique_ptr<AbsenceOfBackpressure>
+AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
+                                llvm::json::Path path) {
+  auto prop = std::make_unique<AbsenceOfBackpressure>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("user", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("user_index", prop->ownerChannel.name) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("user_channel", prop->userChannel.name))
+    return nullptr;
+
+  return prop;
+}
+
 // Valid Equivalence
 
 ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
@@ -153,4 +224,67 @@ llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
                              {"target_channel", targetChannel.name}});
 }
 
+std::unique_ptr<ValidEquivalence>
+ValidEquivalence::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<ValidEquivalence>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("target", prop->targetChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("target_index", prop->targetChannel.index) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("target_channel", prop->targetChannel.name))
+    return nullptr;
+
+  return prop;
+}
+
+LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
+  // Open the properties' database
+  std::ifstream inputFile(filepath.str());
+  if (!inputFile.is_open()) {
+    llvm::errs() << "[WARNING] Failed to open property database file @ \""
+                 << filepath << "\"\n";
+    return failure();
+  }
+
+  // Read the JSON content from the file and into a string
+  std::string jsonString;
+  std::string line;
+  while (std::getline(inputFile, line))
+    jsonString += line;
+
+  // Try to parse the string as a JSON
+  llvm::Expected<llvm::json::Value> value = llvm::json::parse(jsonString);
+  if (!value) {
+    llvm::errs() << "Failed to parse property table @ \"" << filepath
+                 << "\" as JSON.\n-> " << toString(value.takeError()) << "\n";
+    return failure();
+  }
+
+  llvm::json::Path::Root jsonRoot(filepath);
+  llvm::json::Path jsonPath(jsonRoot);
+
+  llvm::json::Array *jsonComponents = value->getAsArray();
+  if (!jsonComponents) {
+    jsonPath.report(json::ERR_EXPECTED_ARRAY);
+    jsonRoot.printErrorContext(*value, llvm::errs());
+    return failure();
+  }
+
+  for (auto [idx, jsonComponent] : llvm::enumerate(*jsonComponents)) {
+    std::unique_ptr<FormalProperty> &property = properties.emplace_back();
+    if (!fromJSON(jsonComponent, property, jsonPath.index(idx))) {
+      jsonRoot.printErrorContext(*value, llvm::errs());
+      return failure();
+    }
+  }
+
+  return success();
+}
 } // namespace dynamatic
