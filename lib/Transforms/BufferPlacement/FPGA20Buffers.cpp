@@ -72,7 +72,8 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
       }
     }
     
-    // (PR #427) In FPGA20, buffers only break the data and valid paths.
+    // See docs/Specs/Buffering.md
+    // In FPGA20, buffers only break the data and valid paths.
     // We insert TEHBs after all Merge-like operations to break the ready paths.
     // We only break the ready path if the channel is on cycle.
     Operation *srcOp = channel.getDefiningOp();

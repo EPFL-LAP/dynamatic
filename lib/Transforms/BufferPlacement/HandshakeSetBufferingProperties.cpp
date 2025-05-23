@@ -109,6 +109,7 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 }
 
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
+  // See docs/Specs/Buffering.md
   // A merge with more than one input should have at least one
   // buffer slot at its output, and this is necessary only if 
   // the merge is on a cycle.
@@ -123,7 +124,7 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
-  // https://github.com/EPFL-LAP/dynamatic/issues/388
+  // See docs/Specs/Buffering.md
   // To mitigate the latency asymmetry between LSQ group allocation 
   // and the Store/Load operations, we set a minimum number of buffer 
   // slots at Store/Load's input.
