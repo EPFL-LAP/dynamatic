@@ -1,7 +1,6 @@
 #include "external_integration.h"
 #include "dynamatic/Integration.h"
 
-
 int external_integration(in_int_t a) {
   int c = a * 57;
   int d = a * a;
@@ -9,7 +8,6 @@ int external_integration(in_int_t a) {
   port_A(c);
   port_B(d);
   return e;
-  
 }
 
 int main(void) {

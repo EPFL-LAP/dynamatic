@@ -7,8 +7,8 @@
 //
 //===-------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "gemm.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 #define N 4000
 

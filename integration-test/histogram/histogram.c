@@ -1,7 +1,7 @@
 //===- histogram.c ---------------------------------------------*- C -*-===//
 
-#include "dynamatic/Integration.h"
 #include "histogram.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void histogram(in_int_t feature[1000], in_float_t weight[1000],
