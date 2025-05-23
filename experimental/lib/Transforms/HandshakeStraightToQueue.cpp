@@ -347,7 +347,7 @@ connectForkGraph(handshake::FuncOp &funcOp,
   return success();
 }
 
-/// Remove the network of cmerges in case the function is void. The SQ pass
+/// Remove the network of cmerges in case the function is not void. The SQ pass
 /// guarantees that no network is required any longer. All the remaining
 /// connections (to the number of store constants and to the memory controllers)
 /// are substitued with start.
@@ -496,8 +496,14 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   experimental::ftd::addSupp(funcOp, rewriter);
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
-  // Try to remove the network of cmerges if possible (i.e. if the function was
-  // void)
+  // Aya: Calling this function is useful to remove the unnecessary network of
+  // CMerges that bottleneck the performance However, because Dynamatic currenty
+  // has no true memory completion signals, when we remove this function we may
+  // terminate before the final store actually completes This problem should be
+  // addressed by adding ACK signals to store operations and letting them al
+  // feed end through fast token delivery
+  // Try to remove the network of cmerges
+  // if possible (i.e. if the function was not void)
   removeNetworkCMerges(funcOp, rewriter);
 
   // Remove the blocks and terminators
