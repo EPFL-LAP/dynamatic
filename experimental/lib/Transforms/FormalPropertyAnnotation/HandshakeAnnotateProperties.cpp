@@ -1,4 +1,4 @@
-//===- HandshakeSizeLSQs.cpp - LSQ Sizing -----------------------*- C++ -*-===//
+//===- HandshakeAnnotateProperties.cpp - Property annotation ----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -63,7 +63,6 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
-  void addPropertyId(Operation *op, unsigned id);
 };
 } // namespace
 
@@ -74,9 +73,8 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     for (auto res2 : op2.getResults()) {
       if (res1 == res2)
         continue;
-      addPropertyId(&op1, uid);
 
-      VEQProperty p(uid, FormalProperty::TAG::OPT, res1, res2);
+      ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
       propertyTable.push_back(p.toJSON());
       uid++;
@@ -118,9 +116,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
           if (userOp->getName().getStringRef() == "handshake.end")
             continue;
 
-          addPropertyId(&op, uid);
-
-          AOBProperty p(uid, FormalProperty::TAG::OPT, res);
+          AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
 
           propertyTable.push_back(p.toJSON());
           uid++;
@@ -128,20 +124,6 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
     }
   }
   return success();
-}
-
-void HandshakeAnnotatePropertiesPass::addPropertyId(Operation *op,
-                                                    unsigned id) {
-  auto formalAttr = op->getAttrOfType<FormalPropertiesAttr>("formalProperties");
-
-  SmallVector<unsigned> ids;
-  if (formalAttr) {
-    ids.append(formalAttr.getIDs().begin(), formalAttr.getIDs().end());
-  }
-  ids.push_back(id);
-
-  auto newAttr = FormalPropertiesAttr::get(op->getContext(), ids);
-  op->setAttr("formalProperties", newAttr);
 }
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {

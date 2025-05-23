@@ -102,9 +102,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
 
   switch (type) {
   case TYPE::AOB:
-    return AOBProperty::fromJSON(value, path);
+    return AbsenceOfBackpressure::fromJSON(value, path);
   case TYPE::VEQ:
-    return VEQProperty::fromJSON(value, path);
+    return ValidEquivalence::fromJSON(value, path);
   }
 }
 
@@ -139,7 +139,8 @@ FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
 
 // Absence of Backpressure
 
-AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
+AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
+                                             const OpResult &res)
     : FormalProperty(id, tag, TYPE::AOB) {
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
@@ -156,36 +157,38 @@ AOBProperty::AOBProperty(unsigned long id, TAG tag, const OpResult &res)
   }
   assert(operandIndex < userOp->getNumOperands());
 
-  owner = getUniqueName(ownerOp).str();
-  user = getUniqueName(userOp).str();
-  ownerIndex = res.getResultNumber();
-  userIndex = operandIndex;
-  ownerChannel = ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel = userNamer.getInputName(operandIndex).str();
+  ownerChannel.operationName = getUniqueName(ownerOp).str();
+  userChannel.operationName = getUniqueName(userOp).str();
+  ownerChannel.index = res.getResultNumber();
+  userChannel.index = operandIndex;
+  ownerChannel.name = ownerNamer.getOutputName(res.getResultNumber()).str();
+  userChannel.name = userNamer.getInputName(operandIndex).str();
 }
 
-llvm::json::Value AOBProperty::extraInfoToJSON() const {
-  return llvm::json::Object({{"owner", owner},
-                             {"user", user},
-                             {"owner_index", ownerIndex},
-                             {"user_index", userIndex},
-                             {"owner_channel", ownerChannel},
-                             {"user_channel", userChannel}});
+llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", ownerChannel.operationName},
+                             {"user", userChannel.operationName},
+                             {"owner_index", ownerChannel.index},
+                             {"user_index", userChannel.index},
+                             {"owner_channel", ownerChannel.name},
+                             {"user_channel", userChannel.name}});
 }
 
-std::unique_ptr<AOBProperty>
-AOBProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
-  auto prop = std::make_unique<AOBProperty>();
+std::unique_ptr<AbsenceOfBackpressure>
+AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
+                                llvm::json::Path path) {
+  auto prop = std::make_unique<AbsenceOfBackpressure>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper || !mapper.mapOptional("owner", prop->owner) ||
-      !mapper.mapOptional("user", prop->user) ||
-      !mapper.mapOptional("owner_index", prop->ownerIndex) ||
-      !mapper.mapOptional("user_index", prop->userIndex) ||
-      !mapper.mapOptional("owner_channel", prop->ownerChannel) ||
-      !mapper.mapOptional("user_channel", prop->userChannel))
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("user", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("user_index", prop->ownerChannel.name) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("user_channel", prop->userChannel.name))
     return nullptr;
 
   return prop;
@@ -193,8 +196,8 @@ AOBProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
 
 // Valid Equivalence
 
-VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
-                         const OpResult &res2)
+ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
+                                   const OpResult &res1, const OpResult &res2)
     : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
@@ -204,36 +207,38 @@ VEQProperty::VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
   unsigned int j = res2.getResultNumber();
   handshake::PortNamer namer2(op2);
 
-  owner = getUniqueName(op1).str();
-  target = getUniqueName(op2).str();
-  ownerIndex = i;
-  targetIndex = j;
-  ownerChannel = namer1.getOutputName(i).str();
-  targetChannel = namer2.getOutputName(j).str();
+  ownerChannel.operationName = getUniqueName(op1).str();
+  targetChannel.operationName = getUniqueName(op2).str();
+  ownerChannel.index = i;
+  targetChannel.index = j;
+  ownerChannel.name = namer1.getOutputName(i).str();
+  targetChannel.name = namer2.getOutputName(j).str();
 }
 
-llvm::json::Value VEQProperty::extraInfoToJSON() const {
-  return llvm::json::Object({{"owner", owner},
-                             {"target", target},
-                             {"owner_index", ownerIndex},
-                             {"target_index", targetIndex},
-                             {"owner_channel", ownerChannel},
-                             {"target_channel", targetChannel}});
+llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", ownerChannel.operationName},
+                             {"target", targetChannel.operationName},
+                             {"owner_index", ownerChannel.index},
+                             {"target_index", targetChannel.index},
+                             {"owner_channel", ownerChannel.name},
+                             {"target_channel", targetChannel.name}});
 }
 
-std::unique_ptr<VEQProperty>
-VEQProperty::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
-  auto prop = std::make_unique<VEQProperty>();
+std::unique_ptr<ValidEquivalence>
+ValidEquivalence::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<ValidEquivalence>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper || !mapper.mapOptional("owner", prop->owner) ||
-      !mapper.mapOptional("target", prop->target) ||
-      !mapper.mapOptional("owner_index", prop->ownerIndex) ||
-      !mapper.mapOptional("target_index", prop->targetIndex) ||
-      !mapper.mapOptional("owner_channel", prop->ownerChannel) ||
-      !mapper.mapOptional("target_channel", prop->targetChannel))
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("target", prop->targetChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("target_index", prop->targetChannel.index) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("target_channel", prop->targetChannel.name))
     return nullptr;
 
   return prop;

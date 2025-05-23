@@ -57,67 +57,63 @@ protected:
                                             llvm::json::Path path);
 };
 
-class AOBProperty : public FormalProperty {
-public:
-  std::string getOwner() { return owner; }
-  std::string getUser() { return user; }
-  int getOwnerIndex() { return ownerIndex; }
-  int getUserIndex() { return userIndex; }
-  std::string getOwnerChannel() { return ownerChannel; }
-  std::string getUserChannel() { return userChannel; }
-
-  llvm::json::Value extraInfoToJSON() const override;
-  /// Attempts to deserialize a propertyfrom a JSON value.
-  static std::unique_ptr<AOBProperty> fromJSON(const llvm::json::Value &value,
-                                               llvm::json::Path path);
-
-  AOBProperty() = default;
-  AOBProperty(unsigned long id, TAG tag, const OpResult &res);
-  ~AOBProperty() = default;
-
-  static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::AOB;
-  }
-
-private:
-  std::string owner;
-  std::string user;
-  int ownerIndex;
-  int userIndex;
-  std::string ownerChannel;
-  std::string userChannel;
+struct SignalName {
+  std::string operationName;
+  std::string name;
+  unsigned index;
 };
 
-class VEQProperty : public FormalProperty {
+class AbsenceOfBackpressure : public FormalProperty {
 public:
-  std::string getOwner() { return owner; }
-  std::string getTarget() { return target; }
-  int getOwnerIndex() { return ownerIndex; }
-  int getTargetIndex() { return targetIndex; }
-  std::string getOwnerChannel() { return ownerChannel; }
-  std::string getTargetChannel() { return targetChannel; }
+  std::string getOwner() { return ownerChannel.operationName; }
+  std::string getUser() { return userChannel.operationName; }
+  int getOwnerIndex() { return ownerChannel.index; }
+  int getUserIndex() { return userChannel.index; }
+  std::string getOwnerChannel() { return ownerChannel.name; }
+  std::string getUserChannel() { return userChannel.name; }
 
   llvm::json::Value extraInfoToJSON() const override;
-  /// Attempts to deserialize a propertyfrom a JSON value.
-  static std::unique_ptr<VEQProperty> fromJSON(const llvm::json::Value &value,
-                                               llvm::json::Path path);
+  static std::unique_ptr<AbsenceOfBackpressure>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
-  VEQProperty() = default;
-  VEQProperty(unsigned long id, TAG tag, const OpResult &res1,
-              const OpResult &res2);
-  ~VEQProperty() = default;
+  AbsenceOfBackpressure() = default;
+  AbsenceOfBackpressure(unsigned long id, TAG tag, const OpResult &res);
+  ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
     return fp->getType() == TYPE::VEQ;
   }
 
 private:
-  std::string owner;
-  std::string target;
-  int ownerIndex;
-  int targetIndex;
-  std::string ownerChannel;
-  std::string targetChannel;
+  SignalName ownerChannel;
+  SignalName userChannel;
+};
+
+class ValidEquivalence : public FormalProperty {
+public:
+  std::string getOwner() { return ownerChannel.operationName; }
+  std::string getTarget() { return targetChannel.operationName; }
+  int getOwnerIndex() { return ownerChannel.index; }
+  int getTargetIndex() { return targetChannel.index; }
+  std::string getOwnerChannel() { return ownerChannel.name; }
+  std::string getTargetChannel() { return targetChannel.name; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ValidEquivalence>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  ValidEquivalence() = default;
+  ValidEquivalence(unsigned long id, TAG tag, const OpResult &res1,
+                   const OpResult &res2);
+  ~ValidEquivalence() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::VEQ;
+  }
+
+private:
+  SignalName ownerChannel;
+  SignalName targetChannel;
 };
 
 class FormalPropertyTable {

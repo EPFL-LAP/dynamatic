@@ -1220,8 +1220,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
     FormalProperty::TAG propertyTag = property->getTag();
 
-    if (llvm::isa<AOBProperty>(property.get())) {
-      auto *p = llvm::cast<AOBProperty>(property.get());
+    if (llvm::isa<AbsenceOfBackpressure>(property.get())) {
+      auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
       std::string validSignal =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string readySignal =
@@ -1229,8 +1229,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal + " -> " + readySignal,
                                      propertyTag};
-    } else if (llvm::isa<VEQProperty>(property.get())) {
-      auto *p = llvm::cast<VEQProperty>(property.get());
+    } else if (llvm::isa<ValidEquivalence>(property.get())) {
+      auto *p = llvm::cast<ValidEquivalence>(property.get());
       std::string validSignal1 =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string validSignal2 =

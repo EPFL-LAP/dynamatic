@@ -2,7 +2,7 @@ from generators.support.utils import *
 
 
 def generate_br(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_br_dataless(name)

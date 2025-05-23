@@ -121,7 +121,6 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
   let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">];
-
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
