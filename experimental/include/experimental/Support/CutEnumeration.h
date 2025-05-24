@@ -27,10 +27,10 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
+/// Represents a cut that is used for technology mapping to LUTs.
 class Cut {
 public:
-  Cut(Node *root, int depth = 0) : depth(depth), root(root) {};
-  // for trivial cuts
+  // Constructor for trivial cuts, which only have itself as a leaf.
   Cut(Node *root, Node *leaf, int depth = 0)
       : depth(depth), leaves({leaf}), root(root) {};
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
@@ -45,15 +45,15 @@ public:
   std::set<Node *> &getLeaves() { return leaves; }
 
 private:
-  int depth;
-  GRBVar cutSelection;
-  Node *root;
-  std::set<Node *> leaves;
+  int depth;               // Depth of the cut
+  GRBVar cutSelection;     // Cut selection variable for MILP of MapBuf
+  Node *root;              // Root node of the cut
+  std::set<Node *> leaves; // Set of leaves in the cut
 };
 
 struct NodePtrHash {
   std::size_t operator()(const Node *node) const {
-    return std::hash<std::string>()(node->name); 
+    return std::hash<std::string>()(node->name);
   }
 };
 
@@ -63,11 +63,14 @@ struct NodePtrEqual {
   }
 };
 
+// Maps Nodes to their corresponding cuts.
 using NodeToCuts =
     std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>;
 
+// Cut generation algorithm that finds cuts for a given AIG.
 NodeToCuts generateCuts(LogicNetwork *blif, int lutSize);
 
+// Prints the cuts, used for debugging
 void printCuts(NodeToCuts cuts, std::string &filename);
 } // namespace experimental
 } // namespace dynamatic

@@ -683,8 +683,9 @@ void MAPBUFBuffers::setup() {
 
   connectSubjectGraphs();
 
-  auto cuts = experimental::generateCuts(blifData, 6);
-  
+  int lutSize = 6;
+  auto cuts = experimental::generateCuts(blifData, lutSize);
+
   addClockPeriodConstraintsNodes();
 
   for (auto &[rootNode, cutVector] : cuts) {
