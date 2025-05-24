@@ -8,7 +8,7 @@ def generate_extf(name, params):
     output_type = SmvScalarType(64)
     abstract_data = params[ATTR_ABSTRACT_DATA]
 
-       if abstract_data:
-            return generate_abstract_unary_op(name, latency, output_type)
-        else:
-            raise ValueError("Floating point operations support abstract data only")
+    if abstract_data:
+        return generate_abstract_unary_op(name, latency, output_type)
+    else:
+        raise ValueError("Floating point operations support abstract data only")

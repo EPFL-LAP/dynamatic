@@ -11,10 +11,10 @@ def generate_control_merge(name, params):
     data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
     index_type = SmvScalarType(params[ATTR_INDEX_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_control_merge_dataless(name, size, index_type)
-        else:
-            return _generate_control_merge(name, size, index_type, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_control_merge_dataless(name, size, index_type)
+    else:
+        return _generate_control_merge(name, size, index_type, data_type)
 
 
 def _generate_control_merge_dataless(name, size, index_type):

@@ -7,10 +7,10 @@ def generate_ori(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
     abstract_data = params[ATTR_ABSTRACT_DATA]
 
-       if abstract_data:
-            return generate_abstract_binary_op(name, latency, data_type)
-        else:
-            return _generate_ori(name, latency, data_type)
+    if abstract_data:
+        return generate_abstract_binary_op(name, latency, data_type)
+    else:
+        return _generate_ori(name, latency, data_type)
 
 
 def _generate_ori(name, latency, data_type):

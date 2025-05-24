@@ -3,9 +3,9 @@ from generators.support.utils import *
 
 
 def generate_mux(name, params):
-  size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
-  select_type = SmvScalarType(params[ATTR_INDEX_BITWIDTH])
+    size = params[ATTR_SIZE]
+    data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+    select_type = SmvScalarType(params[ATTR_INDEX_BITWIDTH])
 
     if data_type.bitwidth == 0:
         return _generate_mux_dataless(name, size, select_type)
@@ -14,7 +14,7 @@ def generate_mux(name, params):
 
 
 def _generate_mux_dataless(name, size, select_type):
-  return f"""
+    return f"""
 MODULE {name}(index, index_valid, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
   inner_tehb : {name}__tehb_dataless(tehb_ins_valid, outs_ready);
@@ -36,26 +36,19 @@ MODULE {name}(index, index_valid, {", ".join([f"ins_{n}_valid" for n in range(si
 
 
 def _generate_mux(name, size, data_type, select_type):
-
-
-<< << << < HEAD
     return f"""
-MODULE {name}({", ".join([f"ins_{n}, ins_valid_{n}" for n in range(size)])}, index, index_valid, outs_ready)
-=======
-  return f"""
 MODULE {name}(index, index_valid, {", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
->>>>>> > main
   VAR
-  inner_tehb: {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
+  inner_tehb : {name}__tehb(tehb_ins, tehb_ins_valid, outs_ready);
 
   DEFINE
   tehb_ins := case
     {"\n    ".join([f"index = {select_type.format_constant(n)} & index_valid & ins_{n}_valid : ins_{n};" for n in range(size)])}
-    TRUE: ins_0;
+    TRUE : ins_0;
   esac;
   tehb_ins_valid := case
     {"\n    ".join([f"index = {select_type.format_constant(n)} : index_valid & ins_{n}_valid;" for n in range(size)])}
-    TRUE: FALSE;
+    TRUE : FALSE;
   esac;
 
   -- output

@@ -194,8 +194,8 @@ def main():
 
     parameters[ATTR_ABSTRACT_DATA] = args.abstract_data
 
-  # Printing parameters for diagnostic purposes
-  header = f"-- {args.name} : {args.type}({args.parameters})\n\n"
+    # Printing parameters for diagnostic purposes
+    header = f"-- {args.name} : {args.type}({args.parameters})\n\n"
 
     with open(args.output, "w") as file:
         print(header + generate_code(args.name, args.type, parameters), file=file)

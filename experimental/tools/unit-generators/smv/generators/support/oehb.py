@@ -4,10 +4,10 @@ from generators.support.utils import *
 def generate_oehb(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_oehb_dataless(name)
-        else:
-            return _generate_oehb(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_oehb_dataless(name)
+    else:
+        return _generate_oehb(name, data_type)
 
 
 def _generate_oehb_dataless(name):

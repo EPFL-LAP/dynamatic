@@ -7,10 +7,10 @@ def generate_ofifo(name, params):
     slots = params[ATTR_SLOTS]
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_ofifo_dataless(name, slots)
-        else:
-            return _generate_ofifo(name, slots, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_ofifo_dataless(name, slots)
+    else:
+        return _generate_ofifo(name, slots, data_type)
 
 
 def _generate_ofifo_dataless(name, slots):
