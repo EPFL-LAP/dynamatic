@@ -352,61 +352,6 @@ std::vector<Node *> LogicNetwork::findPath(Node *start, Node *end) {
   return {};
 }
 
-std::set<Node *>
-LogicNetwork::findNodesWithLimitedWavyInputs(size_t limit,
-                                             std::set<Node *> &wavyLine) {
-  std::set<Node *> nodesWithLimitedWavyInputs;
-
-  for (auto &node : nodesTopologicalOrder) {
-    bool erased = false;
-    // Erase a channel node from the wavyLine temporarily, so the search does
-    // not end prematurely.
-    if (node->isChannelEdge) {
-      if (wavyLine.count(node) > 0) {
-        wavyLine.erase(node);
-        erased = true;
-      }
-    }
-    std::set<Node *> wavyInputs = findWavyInputsOfNode(node, wavyLine);
-    // if the number of wavy inputs is less than or equal to the limit (less
-    // than the LUT size), add to the set
-    if (wavyInputs.size() <= limit) {
-      nodesWithLimitedWavyInputs.insert(node);
-    }
-
-    if (erased) {
-      wavyLine.insert(node);
-    }
-  }
-  return nodesWithLimitedWavyInputs;
-}
-
-std::set<Node *>
-LogicNetwork::findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
-  std::set<Node *> wavyInputs;
-  std::set<Node *> visited;
-
-  // DFS to find the wavy inputs of the node.
-  std::function<void(Node *)> dfs = [&](Node *currentNode) {
-    if (visited.count(currentNode) > 0) {
-      return;
-    }
-    visited.insert(currentNode);
-
-    if (wavyLine.count(currentNode) > 0) {
-      wavyInputs.insert(currentNode);
-      return;
-    }
-
-    for (const auto &fanin : currentNode->fanins) {
-      dfs(fanin);
-    }
-  };
-
-  dfs(node);
-  return wavyInputs;
-}
-
 void BlifWriter::writeToFile(LogicNetwork &network,
                              const std::string &filename) {
   std::ofstream file(filename);
