@@ -21,11 +21,11 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/STLExtras.h"
-#include "dynamatic/Support/CFG.h"
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -111,7 +111,7 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
 void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   // See docs/Specs/Buffering.md
   // A merge with more than one input should have at least one
-  // buffer slot at its output, and this is necessary only if 
+  // buffer slot at its output, and this is necessary only if
   // the merge is on a cycle.
   for (handshake::MergeOp mergeOp : funcOp.getOps<handshake::MergeOp>()) {
     if (mergeOp->getNumOperands() > 1) {
@@ -125,8 +125,8 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   }
 
   // See docs/Specs/Buffering.md
-  // To mitigate the latency asymmetry between LSQ group allocation 
-  // and the Store/Load operations, we set a minimum number of buffer 
+  // To mitigate the latency asymmetry between LSQ group allocation
+  // and the Store/Load operations, we set a minimum number of buffer
   // slots at Store/Load's input.
   // This is a temporary workaround and a better solution is needed.
   for (handshake::StoreOp storeOp : funcOp.getOps<handshake::StoreOp>()) {
@@ -153,13 +153,13 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
       Channel channel(operand, true);
       Operation *defOp = operand.getDefiningOp();
 
-      if (defOp && 
+      if (defOp &&
           !isa<handshake::MemoryOpInterface, handshake::ConstantOp>(defOp)) {
         channel.props->minSlots = std::max(channel.props->minSlots, 1U);
       }
     }
   }
-  
+
   // See docs/Specs/Buffering.md
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments())
