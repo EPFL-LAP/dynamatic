@@ -1,6 +1,4 @@
-//===-- CutEnumeration.cpp - Exp. support for MAPBUF buffer placement -----*-
-// C++
-//-*-===//
+//===- CutlessMapping.cpp - Exp. support for MAPBUF -------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the declarations of cut enumeration algorithms and Cut
+// This file contains the declarations of cutless mapping algorithm and Cut
 // class.
 //
 //===----------------------------------------------------------------------===//
@@ -18,12 +16,10 @@
 #include <string>
 #include <vector>
 
-#include "experimental/Support/CutEnumeration.h"
+#include "experimental/Support/CutlessMapping.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace dynamatic::experimental;
-
-int expansionWithChannels = 6;
 
 // Sorts the cuts based on the lexicographical order, and erases the duplicate
 // cuts of a Node.
@@ -126,6 +122,7 @@ NodeToCuts cutAlgorithm(LogicNetwork *blif, int lutSize, bool includeChannels) {
   }
 
   int expansionCount = 0;
+  int expansionWithChannels = 6; // The limit for the expansion of the algorithm
 
   // Keep expanding until we hit the expansion limit
   while (!(includeChannels && (expansionCount >= expansionWithChannels))) {
@@ -187,7 +184,7 @@ NodeToCuts dynamatic::experimental::generateCuts(LogicNetwork *blif,
 
 void dynamatic::experimental::printCuts(NodeToCuts cuts,
                                         std::string &filename) {
-  std::ofstream outFile("../mapbuf/" + filename);
+  std::ofstream outFile("./" + filename);
   if (!outFile.is_open()) {
     llvm::errs() << "Error: Unable to open file for writing.\n";
     return;

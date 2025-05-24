@@ -1,5 +1,4 @@
-//===- CutEnumeration.h - Exp. support for MAPBUF buffer placement -------*- C++
-//-*-===//
+//===- CutlessMapping.cpp - Exp. support for MAPBUF -------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the declarations of cut enumeration algorithms and Cut
+// This file contains the declarations of cutless mapping algorithm and Cut
 // class.
 //
 //===-----------------------------------------------------------------===//
