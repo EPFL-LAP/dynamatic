@@ -267,7 +267,7 @@ void createArgumentBuffer(VerilogModule &m, const std::string &sigName,
   Instance instDataReg("kernel_arg_buffer", sigName + "_data_reg_inst",
                        {bitWidth});
 
-  std::string dataIn = dataWidth ? sigName : "1";
+  std::string dataIn = dataWidth ? sigName : "1'b1";
   std::string dataOut = dataWidth ? sigName + "_" + REG_OUT : "";
   instDataReg.connect(CLK, CLK)
       .connect(RST, RST)
@@ -367,7 +367,7 @@ void createInternalSignals(VerilogModule &module, handshake::FuncOp funcOp) {
   adapterJoin.connect("ins_" + READY,
                       "{" + llvm::join(outputReadySignals, ", ") + "}");
   adapterJoin.connect("outs_" + VALID, "all_finish");
-  adapterJoin.connect("outs_" + READY, "1");
+  adapterJoin.connect("outs_" + READY, "1'b1");
   module.instantiate(adapterJoin);
 }
 
