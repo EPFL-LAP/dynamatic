@@ -9,16 +9,23 @@
 #include "Utilities.h"
 #include "HlsLogging.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <dirent.h>
+#include <filesystem>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <unistd.h>
 
 const string LOG_TAG = "UTIL";
 using namespace mlir;
 
-namespace hls_verify {
+// @Jiahui17: Should we go for more digits?
+const float DEFAULT_FLOAT_COMPARE_THRESHOLD = 0.00001;
+const double DEFAULT_DOUBLE_COMPARE_THRESHOLD = 0.000000000001;
 
 bool TokenCompare::compare(const string &token1, const string &token2) const {
   return token1 == token2;
@@ -38,52 +45,63 @@ bool IntegerCompare::compare(const string &token1, const string &token2) const {
   return (t1 == t2);
 }
 
-FloatCompare::FloatCompare(float threshold) : threshold(threshold) {}
+// A safe and protable way of decoding a hex string into a 32-bit IEEE single
+// precision float number
+float hexStringToFloat(std::string hexStr) {
+  if (hexStr.rfind("0x", 0) == 0 || hexStr.rfind("0X", 0) == 0) {
+    hexStr = hexStr.substr(2);
+  }
+
+  uint32_t intVal;
+  std::stringstream ss;
+  ss << std::hex << hexStr;
+  ss >> intVal;
+
+  llvm::APInt bits(32, intVal);
+  llvm::APFloat f(llvm::APFloat::IEEEsingle(), bits);
+
+  return f.convertToFloat();
+}
 
 bool FloatCompare::compare(const string &token1, const string &token2) const {
-  unsigned int i1;
-  unsigned int i2;
-  stringstream is1(token1);
-  stringstream is2(token2);
-  is1 >> hex >> i1;
-  is2 >> hex >> i2;
 
-  float f1 = decodeToken(i1);
-  float f2 = decodeToken(i2);
+  float f1 = hexStringToFloat(token1);
+  float f2 = hexStringToFloat(token2);
 
   if (isnan(f1) && isnan(f2))
     return true;
 
   float diff = abs(f1 - f2);
-  return (diff < threshold);
+  return (diff < DEFAULT_FLOAT_COMPARE_THRESHOLD);
 }
 
-float FloatCompare::decodeToken(unsigned int token) const {
-  return *((float *)&token);
-}
+// A safe and protable way of decoding a hex string into a 32-bit IEEE double
+// precision float number
+double hexStringToDouble(std::string hexStr) {
+  if (hexStr.rfind("0x", 0) == 0 || hexStr.rfind("0X", 0) == 0) {
+    hexStr = hexStr.substr(2);
+  }
+  uint64_t intVal;
+  std::stringstream ss;
+  ss << std::hex << hexStr;
+  ss >> intVal;
 
-DoubleCompare::DoubleCompare(double threshold) : threshold(threshold) {}
+  llvm::APInt bits(64, intVal);
+  llvm::APFloat f(llvm::APFloat::IEEEdouble(), bits);
+
+  return f.convertToDouble();
+}
 
 bool DoubleCompare::compare(const string &token1, const string &token2) const {
-  unsigned long long i1;
-  unsigned long long i2;
-  stringstream is1(token1);
-  stringstream is2(token2);
-  is1 >> hex >> i1;
-  is2 >> hex >> i2;
 
-  double d1 = decodeToken(i1);
-  double d2 = decodeToken(i2);
+  double d1 = hexStringToDouble(token1);
+  double d2 = hexStringToDouble(token2);
 
   if (isnan(d1) && isnan(d2))
     return true;
 
   double diff = abs(d1 - d2);
-  return (diff < threshold);
-}
-
-double DoubleCompare::decodeToken(unsigned int token) const {
-  return *((double *)&token);
+  return (diff < DEFAULT_DOUBLE_COMPARE_THRESHOLD);
 }
 
 string extractParentDirectoryPath(string filepath) {
@@ -101,7 +119,7 @@ string getApplicationDirectory() {
 }
 
 mlir::LogicalResult compareFiles(const string &refFile, const string &outFile,
-                                 const TokenCompare *tokenCompare) {
+                                 std::unique_ptr<TokenCompare> tokenCompare) {
   ifstream ref(refFile.c_str());
   ifstream out(outFile.c_str());
   if (!ref.is_open()) {
@@ -172,27 +190,13 @@ vector<string> split(const string &str, const string &delims) {
   return cont;
 }
 
-int getNumberOfTransactions(const string &inputPath) {
-  int result = 0;
-  ifstream inf(inputPath.c_str());
-  string line;
-  while (getline(inf, line)) {
-    istringstream iss(line);
-    string dt;
-    iss >> dt;
-    if (dt == "[[[/runtime]]]")
-      break;
-    if (dt.substr(0, 15) == "[[transaction]]")
-      result = result + 1;
-  }
-  inf.close();
-  return result;
-}
-
 bool executeCommand(const string &command) {
   int status = system(command.c_str());
-  if (status != 0)
+  if (status != 0) {
     logErr(LOG_TAG, "Execution failed for command [" + command + "]");
+
+    assert(false && "Command execution failed!");
+  }
 
   return (status == 0);
 }
@@ -200,6 +204,7 @@ bool executeCommand(const string &command) {
 vector<string> getListOfFilesInDirectory(const string &directory,
                                          const string &extension) {
   vector<string> result;
+  char sep = std::filesystem::path::preferred_separator;
   DIR *dirp = opendir(directory.c_str());
   struct dirent *dp;
   if (dirp != nullptr) {
@@ -208,11 +213,9 @@ vector<string> getListOfFilesInDirectory(const string &directory,
       if (temp.length() >= extension.length() &&
           temp.substr(temp.length() - extension.length(), extension.length())
                   .compare(extension) == 0)
-        result.emplace_back(dp->d_name);
+        result.emplace_back(directory + sep + dp->d_name);
     }
     closedir(dirp);
   }
   return result;
 }
-
-} // namespace hls_verify
