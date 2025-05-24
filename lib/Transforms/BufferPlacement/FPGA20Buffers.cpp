@@ -50,13 +50,14 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
 
-    // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break nothing.
+    // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
+    // nothing.
     bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
-                           GRB_DoubleAttr_X) > 0;
-    
+                            GRB_DoubleAttr_X) > 0;
+
     PlacementResult result;
     // 1. If breaking DV:
     // Map to ONE_SLOT_BREAK_DV + (numslot - 1) * FIFO_BREAK_NONE.
@@ -71,7 +72,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
         result.numFifoNone = numSlotsToPlace;
       }
     }
-    
+
     // (PR #427) In FPGA20, buffers only break the data and valid paths.
     // We insert TEHBs after all Merge-like operations to break the ready paths.
     // We only break the ready path if the channel is on cycle.
@@ -127,8 +128,7 @@ void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
                     "custom_minTrans");
   } else if (props.minSlots > 0) {
     // Force the MILP to place a minimum number of slots
-    model.addConstr(chVars.bufNumSlots >= props.minSlots,
-                    "custom_minSlots");
+    model.addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
   }
   if (props.minOpaque + props.minTrans + props.minSlots > 0)
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");

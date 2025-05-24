@@ -47,8 +47,8 @@ static StringRef getSignalName(SignalType signalType) {
 /// type. If the type is `SignalType::DATA`, the channel's bitwidth is used as a
 /// parameter to determine the delays. If the model is nullptr, delays are
 /// assumed to be 0.
-static std::pair<double, double> getPortDelays(Value channel, SignalType signalType,
-                                               const TimingModel *model) {
+static std::pair<double, double>
+getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
   if (!model)
     return {0.0, 0.0};
 
@@ -134,6 +134,8 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   // Variables for placement information
   chVars.bufPresent = createVar("bufPresent", GRB_BINARY);
   chVars.bufNumSlots = createVar("bufNumSlots", GRB_INTEGER);
+  chVars.dataLatency = createVar("dataLatency", GRB_INTEGER);
+  chVars.shiftReg = createVar("shiftReg", GRB_BINARY);
 
   // Update the model before returning so that these variables can be referenced
   // safely during the rest of model creation
@@ -239,8 +241,8 @@ void BufferPlacementMILP::addChannelTimingConstraints(
 }
 
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
-                                                 SignalType signalType,
-                                                 ChannelFilter filter) {
+                                                   SignalType signalType,
+                                                   ChannelFilter filter) {
   // Add path constraints for units
   double latency;
   if (failed(timingDB.getLatency(unit, signalType, latency)))
@@ -284,7 +286,8 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       continue;
 
     double inPortDelay;
-    if (failed(timingDB.getPortDelay(unit, signalType, PortType::IN, inPortDelay)))
+    if (failed(
+            timingDB.getPortDelay(unit, signalType, PortType::IN, inPortDelay)))
       inPortDelay = 0.0;
 
     TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
@@ -300,7 +303,8 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       continue;
 
     double outPortDelay;
-    if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT, outPortDelay)))
+    if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT,
+                                     outPortDelay)))
       outPortDelay = 0.0;
 
     TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
@@ -317,7 +321,7 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
   GRBVar &bufNumSlots = chVars.bufNumSlots;
 
   // If there is at least one slot, there must be a buffer
-  model.addConstr(0.01 * bufNumSlots <= bufPresent, "buffer_presence");
+  model.addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
 
   for (auto &[sig, signalVars] : chVars.signalVars) {
     // If there is a buffer present on a signal, then there is a buffer present
@@ -325,6 +329,28 @@ void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
     model.addConstr(signalVars.bufPresent <= bufPresent,
                     getSignalName(sig).str() + "_Presence");
   }
+}
+
+void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  GRBVar &bufNumSlots = chVars.bufNumSlots;
+  GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  GRBVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
+  GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+  GRBVar &dataLatency = chVars.dataLatency;
+
+  // There is a buffer breaking data & valid iff dataLatency > 0
+  model.addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
+  model.addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
+  model.addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model.addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
+
+  // The dataBuf and validBuf must be equal
+  // This constraint is not necessary, but may assist presolve.
+  model.addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
+  // There must be enough slots for data and ready buffers.
+  model.addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
 }
 
 void BufferPlacementMILP::addBufferingGroupConstraints(
@@ -393,8 +419,8 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
   }
 }
 
-void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel(
-                          CFDFC &cfdfc) {
+void BufferPlacementMILP::
+    addChannelThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
@@ -438,7 +464,7 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
     // - If R_c holds, then:
     //     - token occupancy ≥ CFDFC's throughput
     //     - bubble occupancy ≥ CFDFC's throughput
-    // 
+    //
     // In this implementation, R_c is decomposed into dataBuf and readyBuf.
     // - If dataBuf holds, then token occupancy ≥ CFDFC's throughput.
     // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
@@ -451,15 +477,88 @@ void BufferPlacementMILP::addChannelThroughputConstraintsForBinaryLatencyChannel
     // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
     // - Token occupancy + bubble occupancy ≤ buffer's slot number.
     //
-    // Note: Additional buffers may be needed to prevent combinational cycles 
+    // Note: Additional buffers may be needed to prevent combinational cycles
     // if the model does not select all three signals (or only selects DATA).
     // See extractResult() in FPGA20Buffers.cpp for an example.
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      model.addConstr(chThroughput + cfVars.throughput + readyBuf - bufNumSlots 
-                          <= 1,
-                      "throughput_ready");
+      model.addConstr(
+          chThroughput + cfVars.throughput + readyBuf - bufNumSlots <= 1,
+          "throughput_ready");
     }
+  }
+}
+
+void BufferPlacementMILP::
+    addChannelThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
+    Operation *dstOp = *channel.getUsers().begin();
+
+    // No throughput constraints on channels going to stores
+    /// TODO: this is from legacy implementation, we should understand why we
+    /// really do this and figure out if it makes sense (@lucas-rami: I don't
+    /// think it does)
+    if (isa<handshake::StoreOp>(dstOp))
+      continue;
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // The channel must have variables for the data signal
+    ChannelVars &chVars = vars.channelVars[channel];
+    auto dataVars = chVars.signalVars.find(SignalType::DATA);
+    bool dataFound = dataVars != chVars.signalVars.end();
+    assert(dataFound && "missing data signal variables on channel variables");
+
+    // Retrieve the MILP variables we need
+    GRBVar &bufNumSlots = chVars.bufNumSlots;
+    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &throughput = cfVars.throughput;
+    GRBVar &dataLatency = chVars.dataLatency;
+    GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    GRBVar &shiftReg = chVars.shiftReg;
+
+    // Token occupancy ≥ data latency * CFDFC's throughput.
+    model.addQConstr(dataLatency * throughput <= chThroughput,
+                     "throughput_tokens_lb");
+    std::string channelName = getUniqueName(*channel.getUses().begin());
+    std::string shiftRegUbName = "shiftReg_ub_" + channelName;
+    // Shift registers have more bubbles if II is higher than 1 (i.e.,
+    // throughput < 1). In a shift register, every slot forwards data
+    // simultaneously, but new tokens only arrive every II cycles. This means
+    // that among every II consecutive slots, only one contains a token while
+    // the rest are bubbles. Therefore, token occupancy is lower compared to
+    // other buffer types with the same slot number.
+    //
+    // Create an intermediate variable to represent the token occupancy
+    // of the SHIFT_REG_BREAK_DV buffer when it contains tokens as many as
+    // possible.
+    GRBVar shiftRegUb =
+        model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegUbName);
+
+    // The token occupancy of a SHIFT_REG_BREAK_DV buffer is at most the
+    // ceiling of the product of data latency and CFDFC throughput.
+    model.addQConstr(shiftRegUb <= dataLatency * throughput + 0.99,
+                     shiftRegUbName);
+
+    // Combine the following constraints into one unified constraint:
+    // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput
+    // 2. Token occupancy + bubble occupancy ≤ slot number
+    // 3. Extra bubbles due to SHIFT_REG_BREAK_DV =
+    //    its slots (dataLatency) - actual token occupancy (shiftRegUb)
+    model.addQConstr(chThroughput + readyBuf * throughput +
+                             shiftReg * (dataLatency - shiftRegUb) <=
+                         bufNumSlots,
+                     "throughput_tokens_ub");
   }
 }
 
@@ -501,7 +600,7 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
 }
 
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
-                                       ArrayRef<CFDFC *> cfdfcs) {
+                                                    ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
@@ -543,6 +642,73 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   model.setObjective(objective, GRB_MAXIMIZE);
 }
 
+void BufferPlacementMILP::addBufferAreaAwareObjective(
+    ValueRange channels, ArrayRef<CFDFC *> cfdfcs) {
+  // Compute the total number of executions over channels that are part of any
+  // CFDFC
+  unsigned totalExecs = 0;
+  for (Value channel : channels) {
+    totalExecs += getChannelNumExecs(channel);
+  }
+
+  // Create the expression for the MILP objective
+  GRBLinExpr objective = 0;
+
+  // For each CFDFC, add a throughput contribution to the objective, weighted
+  // by the "importance" of the CFDFC
+  double maxCoefCFDFC = 0.0;
+  double fTotalExecs = static_cast<double>(totalExecs);
+  if (totalExecs != 0) {
+    for (CFDFC *cfdfc : cfdfcs) {
+      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      objective += coef * vars.cfdfcVars[cfdfc].throughput;
+      maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+    }
+  }
+
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
+  if (maxCoefCFDFC == 0.0)
+    maxCoefCFDFC = 1.0;
+
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
+  double bufPenaltyMul = 1e-4;
+  // In general, buffers that break data paths have a lower area cost per slot,
+  // while other types incur a higher cost
+  double largeSlotPenaltyMul = 1e-4;
+  double smallSlotPenaltyMul = 1e-5;
+  // For SHIFT_REG_BREAK_DV, a small area cost is incurred when the buffer
+  // exists Increasing the slot number only requires additional registers, not
+  // LUTs We assign a minimal cost only to constrain its slot number
+  double shiftRegPenaltyMul = 1e-5;
+  double shiftRegSlotPenaltyMul = 1e-7;
+  for (Value channel : channels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    GRBVar &bufPresent = chVars.bufPresent;
+    GRBVar &bufNumSlots = chVars.bufNumSlots;
+    GRBVar &dataLatency = chVars.dataLatency;
+    GRBVar &shiftReg = chVars.shiftReg;
+    objective -= maxCoefCFDFC * bufPenaltyMul * bufPresent;
+    objective -=
+        maxCoefCFDFC * largeSlotPenaltyMul * (bufNumSlots - dataLatency);
+    objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
+
+    // Linearization of dataLatency * shiftReg
+    GRBVar latencyMulShiftReg =
+        model.addVar(0, 100, 0.0, GRB_INTEGER, "latencyMulShiftReg");
+    model.addConstr(latencyMulShiftReg <= dataLatency);
+    model.addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model.addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    objective -=
+        maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
+    objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
+  }
+
+  // Finally, set the MILP objective
+  model.setObjective(objective, GRB_MAXIMIZE);
+}
+
 void BufferPlacementMILP::forEachIOPair(
     Operation *op, const std::function<void(Value, Value)> &callback) {
   for (Value opr : op->getOperands()) {
@@ -568,8 +734,8 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
       continue;
 
     // Extract number and type of slots
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
 
     PlacementResult result = placement[value];
     ChannelBufProps &props = channelProps[value];
