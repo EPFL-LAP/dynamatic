@@ -1515,10 +1515,6 @@ SameOperandsAndResultType
 
   let arguments = (ins ChannelType:$lhsIn, ChannelType:$rhsIn);
   let results = (outs ChannelType:$lhsOut, ChannelType:$rhsOut);
-
-  let assemblyFormat = [{
-    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
-  }];
 }
 
 

@@ -116,6 +116,8 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     Make all channels rigid. 
   }];
   let constructor = "dynamatic::experimental::rigidification::createRigidification()";
+  let options = [ Option<"jsonPath", "json-path", "std::string", "",
+    "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
 

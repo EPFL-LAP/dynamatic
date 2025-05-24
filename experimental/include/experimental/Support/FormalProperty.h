@@ -27,6 +27,7 @@ public:
   TAG getTag() const { return tag; }
   TYPE getType() const { return type; }
   unsigned long getId() const { return id; }
+  std::string getCheck() const { return check; }
 
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -22,9 +24,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-// #include "experimental/Support/FormalProperty.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
+#include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -58,22 +58,25 @@ struct HandshakeRigidificationPass
 private:
   LogicalResult insertRigidifier(AbsenceOfBackpressure prop, MLIRContext *ctx);
   LogicalResult insertValidMerger(ValidEquivalence prop, MLIRContext *ctx);
-  json::Array propertyTable;
 };
 } // namespace
 
 void HandshakeRigidificationPass::runDynamaticPass() {
-  // ModuleOp modOp = getOperation();
-  llvm::json::Array propTable;
   MLIRContext *ctx = &getContext();
+  FormalPropertyTable table;
+  if (failed(table.addPropertiesFromJSON(jsonPath)))
+    llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
-  for (auto jsonProp : propTable) {
-    if (property.tag == FormalProperty::TAG::OPT) {
-      if (isa<AOBProperty>(property)) {
-        if (failed(insertRigidifier(property, ctx)))
+  for (auto &property : table.getProperties()) {
+    if (property->getTag() == FormalProperty::TAG::OPT &&
+        property->getCheck() == "true") {
+      if (isa<AbsenceOfBackpressure>(property)) {
+        auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
+        if (failed(insertRigidifier(*p, ctx)))
           return signalPassFailure();
-      } else if (isa<VEQProperty>(property)) {
-        if (failed(insertValidMerger(property, ctx)))
+      } else if (isa<ValidEquivalence>(property)) {
+        auto *p = llvm::cast<ValidEquivalence>(property.get());
+        if (failed(insertValidMerger(*p, ctx)))
           return signalPassFailure();
       }
     }
@@ -86,8 +89,6 @@ HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop,
   OpBuilder builder(ctx);
 
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
-  // Operation *userOp = getAnalysis<NameAnalysis>().getOp(prop.getUser());
-
   auto channel = ownerOp->getResult(prop.getOwnerIndex());
 
   builder.setInsertionPointAfter(ownerOp);
@@ -101,6 +102,7 @@ HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop,
       use.set(rigidificationRes);
     }
   }
+  return success();
 }
 
 LogicalResult
@@ -109,21 +111,29 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
   OpBuilder builder(ctx);
 
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
-  // Operation *userOp = getAnalysis<NameAnalysis>().getOp(prop.getUser());
+  Operation *targetOp = getAnalysis<NameAnalysis>().getOp(prop.getTarget());
+  auto ownerChannel = ownerOp->getResult(prop.getOwnerIndex());
+  auto targetChannel = targetOp->getResult(prop.getTargetIndex());
 
-  auto channel = ownerOp->getResult(prop.getOwnerIndex());
+  builder.setInsertionPointAfter(targetOp);
+  auto loc = ownerChannel.getLoc();
 
-  builder.setInsertionPointAfter(ownerOp);
-  auto loc = channel.getLoc();
+  auto newOp = builder.create<handshake::ValidMergerOp>(loc, ownerChannel,
+                                                        targetChannel);
+  auto mergerRes0 = newOp.getResult(0);
+  auto mergerRes1 = newOp.getResult(1);
 
-  auto newOp = builder.create<handshake::ValidMergerOp>(loc, channel);
-  Value rigidificationRes = newOp.getResult();
-
-  for (auto &use : llvm::make_early_inc_range(channel.getUses())) {
+  for (auto &use : llvm::make_early_inc_range(ownerChannel.getUses())) {
     if (use.getOwner() != newOp) {
-      use.set(rigidificationRes);
+      use.set(mergerRes0);
     }
   }
+  for (auto &use : llvm::make_early_inc_range(targetChannel.getUses())) {
+    if (use.getOwner() != newOp) {
+      use.set(mergerRes1);
+    }
+  }
+  return success();
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
@@ -131,99 +141,3 @@ dynamatic::experimental::rigidification::createRigidification(
     const std::string &jsonPath) {
   return std::make_unique<HandshakeRigidificationPass>(jsonPath);
 }
-
-// namespace {
-// /// Rewrite pattern that will match on all muxes in the IR and replace each
-// of
-// /// them with a merge taking the same inputs (except the `select` input
-// which
-// /// merges do not have due to their undeterministic nature).
-// struct HandshakeRigidification : public OpRewritePattern<Operation> {
-//   using OpRewritePattern<Operation>::OpRewritePattern;
-
-//   LogicalResult matchAndRewrite(Operation muxOp,
-//                                 PatternRewriter &rewriter) const override {
-
-//     rewriter.insert(op);
-//     return success();
-//   }
-// };
-
-// /// Simple driver for the pass that replaces all muxes with merges.
-// struct HandshakeRigidificationPass
-//     : public impl::HandshakeRigidificationBase<HandshakeRigidificationPass>
-//     {
-
-//   void runDynamaticPass() override {
-//     // Get the MLIR context for the current operation being transformed
-//     MLIRContext *ctx = &getContext();
-//     // Get the operation being transformed (the top level module)
-//     ModuleOp mod = getOperation();
-
-//     for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
-//       auto name = funcOp->getName();
-//       // llvm::errs() << funcOp << "\n\n\n\n";
-//       if (failed(performRigidification(funcOp, ctx)))
-//         return signalPassFailure();
-//     }
-//     // mod->walk([&](Operation *op) {
-//     //   auto name = op->getName();
-//     //   llvm::errs() << name.getIdentifier().str() << "\n";
-//     //   for (auto ch : op->getResults()) {
-//     //     bool is_mem = false;
-//     //     for (auto &use : llvm::make_early_inc_range(ch.getUses()))
-//     //       if (isa<handshake::LSQOp, handshake::MemoryControllerOp>(
-//     //               use.getOwner()))
-//     //         is_mem = true;
-//     //     Type resType = ch.getType();
-//     //     if (llvm::dyn_cast<handshake::ChannelType>(resType) && !is_mem)
-//     {
-//     //       rigidifyChannel(&ch, ctx);
-//     //     }
-//     //   }
-//     // });
-
-//     // MLIRContext *ctx = &getContext();
-
-//     // // Define the set of rewrite patterns we want to apply to the IR
-//     // RewritePatternSet patterns(ctx);
-
-//     // patterns.add<HandshakeRigidification<handshake::MuxOp>>(ctx);
-
-//     // // Run a greedy pattern rewriter on the entire IR under the
-//     top-level
-//     // // module
-//     // // operation
-//     // mlir::GreedyRewriteConfig config;
-//     // if (failed(
-//     //         applyPatternsAndFoldGreedily(mod, std::move(patterns),
-//     //         config))) {
-//     //   // If the greedy pattern rewriter fails, the pass must also fail
-//     //   return signalPassFailure();
-//     // }
-//   };
-//   static LogicalResult performRigidification(handshake::FuncOp funcOp,
-//                                              MLIRContext *ctx) {
-//     for (mlir::Block &block : funcOp) {
-//       for (auto it = block.begin(), end = block.end(); it != end;
-//            /* no increment here */) {
-//         mlir::Operation &op = *it;
-//         ++it; // Increment before modifying the block to avoid iterator
-//         // invalidation
-//         for (auto res : op.getResults()) {
-//           Type opType = res.getType();
-//           if (llvm::dyn_cast<handshake::ChannelType>(opType) &&
-//               op.getAttrOfType<mlir::ArrayAttr>("resultNames"))
-//             rigidifyChannel(res, ctx);
-//         }
-//       }
-//     }
-//     return success();
-//   }
-// };
-
-// } // namespace
-
-// /// Implementation of our pass constructor, which just returns an instance
-// of
-// /// the `HandshakeMuxToMergePass` struct.
