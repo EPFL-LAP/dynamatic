@@ -145,7 +145,8 @@ protected:
 
     /// Simple member-by-member constructor. At least one signal must be
     /// provided, otherwise the cosntructor will assert.
-    BufferingGroup(ArrayRef<SignalType> signalTypes, const TimingModel *bufModel)
+    BufferingGroup(ArrayRef<SignalType> signalTypes,
+                   const TimingModel *bufModel)
         : signalTypes(signalTypes), bufModel(bufModel) {
       assert(!signalTypes.empty() && "list of signals cannot be empty");
     }
@@ -211,9 +212,9 @@ protected:
   /// It is only valid to call this method after having added channel variables
   /// for the specific signal to the model.
   void addChannelTimingConstraints(Value channel, SignalType signalType,
-                                 const TimingModel *bufModel,
-                                 ArrayRef<BufferingGroup> before = {},
-                                 ArrayRef<BufferingGroup> after = {});
+                                   const TimingModel *bufModel,
+                                   ArrayRef<BufferingGroup> before = {},
+                                   ArrayRef<BufferingGroup> after = {});
 
   /// Adds path constraints for a specific signal type between the unit's input
   /// and output ports. If the internal path for the signal is combinational, a
@@ -227,8 +228,8 @@ protected:
   /// adjacent to the unit, unless these channels are filtered out by the
   /// `filter` function.
   void addUnitTimingConstraints(Operation *unit, SignalType signalType,
-                              ChannelFilter filter = nullFilter);
-  
+                                ChannelFilter filter = nullFilter);
+
   /// This function models the facts that:
   /// - Signal buffer presence -> buffer presence
   /// - Num slots > 1 -> buffer presence
@@ -240,18 +241,18 @@ protected:
   /// - If shiftReg is used, a buffer slot can either break data/valid or
   ///   ready signal. The buffer slot breaking ready signal is at most 1.
   ///   This is because the buffer breaking ready signal restricts throughput
-  ///   and has no advantage on area cost. Only one slot on the channel is 
+  ///   and has no advantage on area cost. Only one slot on the channel is
   ///   enough for breaking the timing path.
   void addBufferLatencyConstraints(Value channel);
 
-  /// Adds buffering group constraints for the channel. The buffering groups 
-  /// should contain all the signal types with which channel variables for 
-  /// the specific channel were added exactly once. Groups force the MILP to 
-  /// place buffers for all signals within each group at the same locations. 
-  /// For example, if one can only place two buffer types, one which cuts both 
-  /// the data and valid signals and one which cuts the ready signal only, and 
-  /// channel variables were created for all those signals, then one should 
-  /// pass two groups: one containing tne SignalType::DATA and SignalType::VALID 
+  /// Adds buffering group constraints for the channel. The buffering groups
+  /// should contain all the signal types with which channel variables for
+  /// the specific channel were added exactly once. Groups force the MILP to
+  /// place buffers for all signals within each group at the same locations.
+  /// For example, if one can only place two buffer types, one which cuts both
+  /// the data and valid signals and one which cuts the ready signal only, and
+  /// channel variables were created for all those signals, then one should
+  /// pass two groups: one containing tne SignalType::DATA and SignalType::VALID
   /// signal types and one containing the SignalType::READY signal only.
   ///
   /// The order of signals within each group is irrelevant; the resulting
@@ -270,10 +271,11 @@ protected:
   /// It is only valid to call this method after having added variables for the
   /// CFDFC and variables for the data signal of all channels inside the CFDFC
   /// to the model.
-  /// 
-  /// The function assumes that the buffer's latency is a binary value. Choose 
-  /// only one function between 'addChannelThroughputConstraintsForBinaryLatencyChannel'
-  /// and 'addChannelThroughputConstraintsForIntegerLatencyChannel'.
+  ///
+  /// The function assumes that the buffer's latency is a binary value. Choose
+  /// only one function between
+  /// 'addChannelThroughputConstraintsForBinaryLatencyChannel' and
+  /// 'addChannelThroughputConstraintsForIntegerLatencyChannel'.
   void addChannelThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc);
 
   // Channel throughput constraints considering the integer buffer latency on
