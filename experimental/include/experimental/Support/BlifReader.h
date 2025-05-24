@@ -18,6 +18,7 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
+#include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
 #include <boost/functional/hash/extensions.hpp>
 #include <set>
@@ -91,6 +92,37 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
+  // Replaces an existing fanin with a new one.
+  void replaceFanin(Node *oldFanin, Node *newFanin) {
+    fanins.erase(oldFanin);
+    fanins.insert(newFanin);
+  }
+
+  // Connects two nodes by setting the pointer of current node to the previous
+  // node. This function is used to merge different LogicNetwork objects. Input
+  // node of one LogicNetwork object is connected to the output node of
+  // LogicNetwork object that comes before it.
+  static void connectNodes(Node *currentNode, Node *previousNode) {
+    // Once Input/Output Nodes are connected, they should not be Input/Output in
+    // the BLIF, but just become internal Nodes
+    currentNode->convertIOToChannel();
+    previousNode->convertIOToChannel();
+
+    if (previousNode->isBlackboxOutput) {
+      previousNode->isInput = true;
+    }
+
+    for (auto &fanout : currentNode->fanouts) {
+      previousNode->addFanout(fanout);
+      fanout->replaceFanin(currentNode, previousNode);
+    }
+
+    // Reverse the naming for ready signals
+    if (previousNode->name.find("ready") != std::string::npos) {
+      previousNode->name = currentNode->name;
+    }
+  }
+
   // Configures the node based on the type of I/O node.
   void configureIONode(const std::string &type);
 
@@ -102,6 +134,10 @@ public:
             isBlackboxOutput);
   }
   bool isPrimaryOutput() const { return (isOutput || isLatchInput); }
+
+  // Used to merge I/O nodes. I/O is set false and isChannelEdge is set to true
+  // so that the node can be considered as a dataflow graph edge.
+  void convertIOToChannel();
 
   std::string str() const { return name; }
 
@@ -167,17 +203,6 @@ public:
   // Finds the path from "start" to "end" using bfs.
   std::vector<Node *> findPath(Node *start, Node *end);
 
-  // Implements the "Cutless FPGA Mapping" algorithm.Returns the nodes in the
-  // circuit that can be implemented with "limit" number of nodes from the set
-  // "wavyLine". For example, if the limit is 6 (6-input LUT), returns all the
-  // nodes that can be implemented with 6 Nodes from wavyLine set.
-  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
-                                                  std::set<Node *> &wavyLine);
-
-  // Helper function for findNodesWithLimitedWavyInputs. Finds the wavy inputs
-  // using dfs.
-  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
-
   // Returns all of the Nodes.
   std::set<Node *> getAllNodes();
 
@@ -236,4 +261,3 @@ public:
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
-

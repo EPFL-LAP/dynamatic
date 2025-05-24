@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
+  CutEnumeration.cpp
   CDGAnalysis.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
