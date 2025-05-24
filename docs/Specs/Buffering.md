@@ -48,12 +48,12 @@ Each buffer type corresponds to a specific RTL backend HDL module with different
 
 ## Mapping MILP Results to Buffer Types
 
-The MILP determines:
+In MILP-based buffer placement (Mixed Integer Linear Programming), such as those used in the [FPGA20](https://doi.org/10.1145/3477053) and [FPL22](https://doi.org/10.1109/FPL57034.2022.00063) algorithms, the optimization model determines:
 
 - Which signal paths (D, V, R) are broken by the buffer on each channel
-- The number of slots (`numslot`) for the buffer on each channel
+- The number of buffer slots (`numslot`) for the buffer on each channel
 
-It does not model or select buffer types directly. Instead, buffer types are assigned afterward based on the MILP results, using mapping logic specific to each buffer placement algorithm:
+The MILP does **not** model or select buffer types directly. Instead, buffer types are assigned afterward based on the MILP results, using mapping logic specific to each buffer placement algorithm:
 
 ### FPGA20 Buffers
 
