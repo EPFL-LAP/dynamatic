@@ -50,6 +50,8 @@ module mem_controller #(
   wire [ADDR_TYPE - 1 : 0] dropLoadAddr;
   wire [DATA_TYPE - 1 : 0] dropLoadData;
 
+  assign dropLoadData = {{DATA_TYPE{1'b0}}};
+
   mem_controller_loadless #(
     .NUM_CONTROLS(NUM_CONTROLS),
     .NUM_STORES  (NUM_STORES),

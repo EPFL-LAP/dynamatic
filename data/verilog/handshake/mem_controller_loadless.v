@@ -1,4 +1,6 @@
 `timescale 1ns / 1ps
+
+
 module mem_controller_loadless #(
   parameter NUM_CONTROLS = 1,
   parameter NUM_STORES   = 1,
@@ -40,8 +42,12 @@ module mem_controller_loadless #(
   // Access ports    : circuit to memory_controller;
   // Interface ports : memory_controller to memory_interface (e.g., BRAM/AXI);
 
-  // TODO: The size of this counter should be configurable
-  wire [31 : 0] remainingStores;
+  // WIDTH_COUNTER_PENDING_STORES sets the number of maximum pending stores to
+  // 2^WIDTH_COUNTER_PENDING_STORES - 1
+  // TODO: We should be able configure this number to save resources.
+  localparam WIDTH_COUNTER_PENDING_STORES=2;
+
+  wire [WIDTH_COUNTER_PENDING_STORES-1 : 0] remainingStores;
   // Indicating the store interface port that there is a valid store request
   // (currently not used).
   wire [NUM_STORES - 1 : 0] interface_port_valid;
@@ -52,7 +58,7 @@ module mem_controller_loadless #(
   wire allRequestsDone;
 
   // Local Parameter
-  localparam [31:0] zeroStore = 32'b0;
+  localparam [WIDTH_COUNTER_PENDING_STORES-1:0] zeroStore = {WIDTH_COUNTER_PENDING_STORES{1'b0}};
   localparam [NUM_CONTROLS-1:0] zeroCtrl = {NUM_CONTROLS{1'b0}};
 
   assign loadEn   = 0;
@@ -85,12 +91,12 @@ module mem_controller_loadless #(
   assign ctrl_ready   = {NUM_CONTROLS{1'b1}};
 
   integer          i;
-  reg     [31 : 0] counter = 32'd0;
+  reg     [WIDTH_COUNTER_PENDING_STORES-1 : 0] counter = {WIDTH_COUNTER_PENDING_STORES{1'd0}};
 
   // Counting Stores
   always @(posedge clk) begin
     if (rst) begin
-      counter = 32'd0;
+      counter = {WIDTH_COUNTER_PENDING_STORES{1'd0}};
     end else begin
       for (i = 0; i <= NUM_CONTROLS - 1; i = i + 1) begin
         if (ctrl_valid[i]) begin
