@@ -32,7 +32,7 @@ The `TIMING` attribute specifies how many cycles of latency the buffer introduce
 
 ## Buffer Types
 
-Each buffer type corresponds to a specific RTL backend HDL module with different timing, throughput and area characteristics.
+Each buffer type corresponds to a specific RTL backend HDL module with different timing, throughput and area characteristics. The `Legacy name` refers to the name previously used in the source code or HDL module before the standardized buffer type naming was introduced.
 
 | Type name              | Legacy name        | Latency                     | Timing                    |
 | ---------------------- | ------------------ | --------------------------- | ------------------------- |
