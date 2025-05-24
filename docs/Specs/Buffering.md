@@ -1,10 +1,19 @@
 # Buffering
 
-> This document describes the current design implementation.
-
 ## Overview
 
-Dynamatic represents dataflow circuit buffers using the `handshake::BufferOp` operation in the MLIR Handshake dialect. This operation has a single operand and result for its single input and output dataflow channel, respectively.
+This document describes the current buffer placement infrastructure in Dynamatic.
+
+Dynamatic represents dataflow circuit buffers using the `handshake::BufferOp` operation in the MLIR Handshake dialect. This operation has a single operand and a single result, representing the buffer’s input and output ends.
+
+The document provides:
+- A description of the `handshake::BufferOp` operation and its key attributes
+- An overview of available buffer types
+- Mapping strategies from MILP results to buffer types
+- Additional buffering heuristics (also referenced in code comments)
+- Clarification of RTL backend behavior
+
+It serves as a unified reference for buffer-related logic in Dynamatic.
 
 ## Buffer Operation Representation
 
