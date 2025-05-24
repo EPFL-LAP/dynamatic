@@ -9,10 +9,10 @@ def generate_cmpf(name, params):
     is_double = params[ATTR_IS_DOUBLE]
     abstract_data = params[ATTR_ABSTRACT_DATA]
 
-       if abstract_data:
-            return generate_nondeterministic_comparator(name, params)
-        else:
-            raise ValueError("Floating point operations support abstract data only")
+    if abstract_data:
+        return generate_nondeterministic_comparator(name, params)
+    else:
+        raise ValueError("Floating point operations support abstract data only")
 
 
 def get_symbol_from_predicate(pred):
