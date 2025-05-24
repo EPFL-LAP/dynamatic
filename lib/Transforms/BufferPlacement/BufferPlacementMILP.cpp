@@ -527,29 +527,34 @@ void BufferPlacementMILP::
     GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     GRBVar &shiftReg = chVars.shiftReg;
 
-    // Throughput constraints enforce lower and upper bounds on token occupancy.
-    // The lower bound of the token occupancy is the data latency multiplied by
-    // the throughput of the CFDFC.
+    // Token occupancy ≥ data latency * CFDFC's throughput.
     model.addQConstr(dataLatency * throughput <= chThroughput,
                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
     std::string shiftRegUbName = "shiftReg_ub_" + channelName;
-    // Create the intermediate variable for the token occupancy upper bound of
-    // the SHIFT_REG_BREAK_DV.
+    // Shift registers have more bubbles if II is higher than 1 (i.e.,
+    // throughput < 1). In a shift register, every slot forwards data
+    // simultaneously, but new tokens only arrive every II cycles. This means
+    // that among every II consecutive slots, only one contains a token while
+    // the rest are bubbles. Therefore, token occupancy is lower compared to
+    // other buffer types with the same slot number.
+    //
+    // Create an intermediate variable to represent the token occupancy
+    // of the SHIFT_REG_BREAK_DV buffer when it contains tokens as many as
+    // possible.
     GRBVar shiftRegUb =
         model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegUbName);
-    // The token occupancy upper bound of a SHIFT_REG_BREAK_DV buffer is the
-    // smallest integer greater than the product of the data latency and the
-    // CFDFC throughput.
+
+    // The token occupancy of a SHIFT_REG_BREAK_DV buffer is at most the
+    // ceiling of the product of data latency and CFDFC throughput.
     model.addQConstr(shiftRegUb <= dataLatency * throughput + 0.99,
                      shiftRegUbName);
-    // The upper bound of token occupancy is the sum over all buffer types:
-    // - For buffers that break the Ready path, the upper bound is their slot
-    // number
-    //   minus the throughput.
-    // - For SHIFT_REG_BREAK_DV, the value is computed as described above.
-    // - For all other types, the upper bound equals their slot number.
-    // Note: The slot number of SHIFT_REG_BREAK_DV equals the data latency.
+
+    // Combine the following constraints into one unified constraint:
+    // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput
+    // 2. Token occupancy + bubble occupancy ≤ slot number
+    // 3. Extra bubbles due to SHIFT_REG_BREAK_DV =
+    //    its slots (dataLatency) - actual token occupancy (shiftRegUb)
     model.addQConstr(chThroughput + readyBuf * throughput +
                              shiftReg * (dataLatency - shiftRegUb) <=
                          bufNumSlots,
