@@ -4,7 +4,7 @@ from generators.support.utils import *
 
 def generate_divsi(name, params):
   latency = params[ATTR_LATENCY]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["result"])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:

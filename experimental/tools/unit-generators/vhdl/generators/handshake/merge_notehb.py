@@ -1,9 +1,8 @@
 def generate_merge_notehb(name, params):
+  # Number of input ports
   size = params["size"]
-  if "bitwidth" in params:
-    bitwidth = params["bitwidth"]
-  else:
-    bitwidth = 0
+
+  bitwidth = params.get("bitwidth", 0)
 
   if bitwidth == 0:
     return _generate_merge_notehb_dataless(name, size)

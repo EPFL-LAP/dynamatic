@@ -13,12 +13,14 @@
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -26,6 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <string>
 
 using namespace llvm::sys;
@@ -36,6 +39,7 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
 namespace {
+
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::speculation::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
@@ -59,21 +63,18 @@ private:
   /// Place the operation handshake::SpeculatorOp
   LogicalResult placeSpeculator();
 
-  /// Place the operation specified in T with the control signal ctrlSignal
-  template <typename T>
-  LogicalResult placeUnits(Value ctrlSignal);
-
   /// Create the control path for commit signals by replicating branches
   LogicalResult routeCommitControl();
 
-  /// Place the Commit operations
+  /// Place commit units. Use fakeControlForCommits as a temporary control
+  /// signal.
   LogicalResult placeCommits();
 
-  /// Place the SaveCommit operations and the control path
-  LogicalResult prepareAndPlaceSaveCommits();
+  /// Generate the save-commit control path and return the control signal
+  FailureOr<Value> generateSaveCommitCtrl();
 
-  /// Place the Buffer operations
-  LogicalResult placeBuffers();
+  /// Place save-commit units.
+  LogicalResult placeSaveCommits(Value ctrlSignal);
 
   /// Adds a spec tag to the operand/result types in the speculative region.
   /// Traverses both upstream and downstream within the region, starting from
@@ -82,66 +83,12 @@ private:
   /// See the documentation for more details:
   /// docs/Speculation/AddingSpecTagsToSpecRegion.md
   LogicalResult addSpecTagToSpecRegion();
+
+  // Add NonSpecOps to the non-speculative edges of MuxOp/CMergeOp to satisfy
+  // their type requirements.
+  LogicalResult addNonSpecOp();
 };
 } // namespace
-
-template <typename T>
-LogicalResult HandshakeSpeculationPass::placeUnits(Value ctrlSignal) {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  for (OpOperand *operand : placements.getPlacements<T>()) {
-    Operation *dstOp = operand->getOwner();
-    Value srcOpResult = operand->get();
-
-    // Create and connect the new Operation
-    builder.setInsertionPoint(dstOp);
-    // resultType is tentative and will be updated in the addSpecTag algorithm
-    // later.
-    T newOp =
-        builder.create<T>(dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-                          /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal);
-    inheritBB(dstOp, newOp);
-
-    // Connect the new Operation to dstOp
-    // Note: srcOpResult.replaceAllUsesExcept cannot be used here
-    // The following bug may occur in most cases:
-    // (a) Consider a scenario where a control value from a buffer is passed to
-    // the control branch.
-    // (b) Simultaneously, a speculator uses the same control value from the
-    // buffer as a trigger signal.
-    // (c) A save-commit unit is positioned on the edge from the buffer to the
-    // control branch.
-    // (d) If we apply replaceAllUsesExcept to the value referenced by the
-    // save-commit unit, the speculator will also be placed after the
-    // save-commit unit, which is undesirable.
-    operand->set(newOp.getResult());
-  }
-
-  return success();
-}
-
-LogicalResult HandshakeSpeculationPass::placeBuffers() {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  for (OpOperand *operand : placements.getPlacements<handshake::BufferOp>()) {
-    Operation *dstOp = operand->getOwner();
-    Value srcOpResult = operand->get();
-
-    // Create a new BufferOp
-    builder.setInsertionPoint(dstOp);
-    // Buffer size is set to 16 for now
-    handshake::BufferOp newOp = builder.create<handshake::BufferOp>(
-        dstOp->getLoc(), srcOpResult, TimingInfo::tehb(), 16);
-    inheritBB(dstOp, newOp);
-
-    // Connect the new BufferOp to dstOp
-    operand->set(newOp.getResult());
-  }
-
-  return success();
-}
 
 // The list item to trace the branches that need to be replicated
 struct BranchTracingItem {
@@ -174,10 +121,10 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
     return;
   arrived.insert(currOp);
 
-  // We assume there is a direct path from the speculator to all commits, and so
-  // traversal ends if we reach a save-commit or a speculator. See detailed
-  // documentation for full explanation of the speculative region and this
-  // assumption.
+  // We assume there is a direct path to each commit from either the speculator
+  // or a save-commit, and so traversal ends if we reach a save-commit or a
+  // speculator. See detailed documentation for full explanation of the
+  // speculative region and this assumption.
   if (isa<handshake::SpeculatorOp>(currOp))
     return;
   if (isa<handshake::SpecSaveCommitOp>(currOp))
@@ -277,9 +224,19 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
 
   llvm::DenseSet<Operation *> arrived;
   std::vector<BranchTracingItem> branchTrace;
+  // Start traversal from the speculator
   for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
     routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
                                 branchTrace);
+  }
+  // Start traversal from save-commit units
+  for (auto saveCommitOp :
+       mlir::cast<FuncOp>(specOp->getParentOp()).getOps<SpecSaveCommitOp>()) {
+    for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
+      branchTrace.clear();
+      routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
+                                  branchTrace);
+    }
   }
 
   // Verify that all commits are routed to a control signal
@@ -303,9 +260,53 @@ LogicalResult HandshakeSpeculationPass::placeCommits() {
           .getResult(0);
 
   // Place commits and connect to the fake control signal
-  if (failed(
-          placeUnits<handshake::SpecCommitOp>(fakeControlForCommits.value())))
-    return failure();
+  for (OpOperand *operand : placements.getPlacements<SpecCommitOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // Create and connect the new Operation
+    builder.setInsertionPoint(dstOp);
+    // resultType is tentative and will be updated in the addSpecTag algorithm
+    // later.
+    SpecCommitOp newOp = builder.create<SpecCommitOp>(
+        dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+        /*dataIn=*/srcOpResult, /*ctrl=*/fakeControlForCommits.value());
+    inheritBB(dstOp, newOp);
+
+    // Connect the new CommitOp to dstOp
+    operand->set(newOp.getResult());
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeSpeculationPass::placeSaveCommits(Value ctrlSignal) {
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  // Get the specified FIFO depth
+  unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
+  if (fifoDepth == 0) {
+    llvm_unreachable("Save Commit FIFO depth cannot be 0");
+  }
+
+  for (OpOperand *operand : placements.getPlacements<SpecSaveCommitOp>()) {
+    Operation *dstOp = operand->getOwner();
+    Value srcOpResult = operand->get();
+
+    // Create and connect the new Operation
+    builder.setInsertionPoint(dstOp);
+    // resultType is tentative and will be updated in the addSpecTag algorithm
+    // later.
+    SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
+        dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
+        /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal,
+        /*fifoDepth=*/fifoDepth);
+    inheritBB(dstOp, newOp);
+
+    // Connect the new SaveCommitOp to dstOp
+    operand->set(newOp.getResult());
+  }
 
   return success();
 }
@@ -332,13 +333,9 @@ static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
   return nullptr;
 }
 
-LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
+FailureOr<Value> HandshakeSpeculationPass::generateSaveCommitCtrl() {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
-
-  // Don't do anything if there are no SaveCommits to place
-  if (placements.getPlacements<handshake::SpecSaveCommitOp>().empty())
-    return success();
 
   // The save commits are a result of a control branch being in the BB
   // The control path for the SC needs to replicate the branch
@@ -420,9 +417,8 @@ LogicalResult HandshakeSpeculationPass::prepareAndPlaceSaveCommits() {
                                                     mergeOperands);
   inheritBB(specOp, mergeOp);
 
-  // All the control logic is set up, now connect the Save-Commits with
-  // the result of mergeOp
-  return placeUnits<handshake::SpecSaveCommitOp>(mergeOp.getResult());
+  // The control signal is the result of the merge op.
+  return mergeOp.getResult();
 }
 
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
@@ -492,11 +488,17 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   OpBuilder builder(ctx);
   builder.setInsertionPoint(dstOp);
 
+  // Get the specified FIFO depth
+  unsigned fifoDepth = placements.getSpeculatorFifoDepth();
+  if (fifoDepth == 0) {
+    llvm_unreachable("Speculator FIFO depth cannot be 0");
+  }
+
   // resultType is tentative and will be updated in the addSpecTag algorithm
   // later.
   specOp = builder.create<handshake::SpeculatorOp>(
       dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value());
+      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value(), fifoDepth);
 
   // Replace uses of the original source operation's result with the
   // speculator's result, except in the speculator's operands (otherwise this
@@ -633,16 +635,25 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
   }
 
   if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    if (!isDownstream) {
-      // Stop the upstream traversal at ControlMergeOp or MuxOp
-      return success();
-    }
-
-    // Only perform traversal to the dataResult
-    MergeLikeOpInterface mergeLikeOp = llvm::cast<MergeLikeOpInterface>(op);
-    for (auto &operand : mergeLikeOp.getDataResult().getUses()) {
-      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
-        return failure();
+    if (isDownstream) {
+      // Continue normal downstream traversal, including the index channel
+      // (i.e., ControlMergeOp).
+      for (auto result : op->getResults()) {
+        for (auto &operand : result.getUses()) {
+          if (failed(
+                  addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+            return failure();
+        }
+      }
+    } else {
+      // Continue upstream traversal only to the MuxOp's index channel
+      if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+        for (auto &operand : muxOp.getSelectOperand().getUses()) {
+          if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
+                                                     visited)))
+            return failure();
+        }
+      }
     }
 
     return success();
@@ -688,6 +699,44 @@ LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   return success();
 }
 
+LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
+  auto funcOp = cast<FuncOp>(specOp->getParentOp());
+  OpBuilder builder(&getContext());
+
+  for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
+    auto dataResultType =
+        mergeLikeOp.getDataResult().getType().cast<ExtraSignalsTypeInterface>();
+
+    if (dataResultType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+      // This MuxOp/CMergeOp is within the speculative region.
+
+      // Iterate over the data operands and add NonSpecOps to the
+      // non-speculative edges.
+      for (auto dataOperand : mergeLikeOp.getDataOperands()) {
+        auto dataOperandType =
+            dataOperand.getType().cast<ExtraSignalsTypeInterface>();
+
+        if (!dataOperandType.hasExtraSignal(EXTRA_BIT_SPEC)) {
+          // Create a NonSpecOp to add the spec tag to the data operand
+          builder.setInsertionPointAfterValue(dataOperand);
+          auto nonSpecOp = builder.create<NonSpecOp>(
+              mergeLikeOp.getLoc(), dataOperand.getType(), dataOperand);
+          inheritBB(mergeLikeOp, nonSpecOp);
+
+          // Add the spec tag to the NonSpecOp's result
+          if (failed(addSpecTagToValue(nonSpecOp.getResult())))
+            return failure();
+
+          // Replace the data operand with the NonSpecOp's result
+          dataOperand.replaceAllUsesExcept(nonSpecOp.getResult(), nonSpecOp);
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
 void HandshakeSpeculationPass::runDynamaticPass() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
@@ -705,16 +754,28 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(placeSpeculator()))
     return signalPassFailure();
 
-  // Place Save operations
-  if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
+  // Save operations are not supported
+  if (!placements.getPlacements<SpecSaveOp>().empty()) {
+    llvm::errs() << "Error: Placement of save units is not supported.\n";
     return signalPassFailure();
+  }
+  // Place Save operations
+  // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
+  //   return signalPassFailure();
+
+  if (!placements.getPlacements<SpecSaveCommitOp>().empty()) {
+    // Generate Place SaveCommit operations and the SaveCommit control path
+    FailureOr<Value> saveCommitCtrl = generateSaveCommitCtrl();
+    if (failed(saveCommitCtrl))
+      return signalPassFailure();
+
+    // Place SaveCommit operations
+    if (failed(placeSaveCommits(saveCommitCtrl.value())))
+      return signalPassFailure();
+  }
 
   // Place Commit operations
   if (failed(placeCommits()))
-    return signalPassFailure();
-
-  // Place SaveCommit operations and the SaveCommit control path
-  if (failed(prepareAndPlaceSaveCommits()))
     return signalPassFailure();
 
   // After placing all speculative units, route the commit control signals
@@ -727,8 +788,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   if (failed(addSpecTagToSpecRegion()))
     return signalPassFailure();
 
-  // Place Buffer operations
-  if (failed(placeBuffers()))
+  // Finally, add NonSpecOps to the non-speculative edges of MuxOp/CMergeOp
+  // to satisfy their type requirements.
+  if (failed(addNonSpecOp()))
     return signalPassFailure();
 }
 

@@ -3,7 +3,9 @@ add_dynamatic_library(DynamaticExperimentalSupport
   CDGAnalysis.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
+  FtdImplementation.cpp
   FtdSupport.cpp
+  FormalProperty.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -15,6 +17,8 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+  DynamaticAnalysis
+
 )
 
 add_subdirectory(BooleanLogic)

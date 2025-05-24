@@ -27,8 +27,9 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 RTL_CONFIG=""
 if [ "$HDL" == "vhdl" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
-elif [ "$HDL" == "vhdl-spec" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-spec.json"
+elif [ "$HDL" == "vhdl-beta" ]; then
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-beta.json"
+  HDL="vhdl"
 elif [ "$HDL" == "verilog" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-verilog.json"
 elif [ "$HDL" == "smv" ]; then
@@ -36,7 +37,7 @@ elif [ "$HDL" == "smv" ]; then
 fi
 
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
-  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
+  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL --property-database "$COMP_DIR/formal_properties.json"
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"

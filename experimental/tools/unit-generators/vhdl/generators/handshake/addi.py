@@ -1,10 +1,15 @@
+from generators.support.signal_manager import generate_signal_manager
 from generators.handshake.join import generate_join
 
 
 def generate_addi(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
-  return _generate_addi(name, bitwidth)
+  if extra_signals:
+    return _generate_addi_signal_manager(name, bitwidth, extra_signals)
+  else:
+    return _generate_addi(name, bitwidth)
 
 
 def _generate_addi(name, bitwidth):
@@ -58,3 +63,24 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_addi_signal_manager(name, bitwidth, extra_signals):
+  return generate_signal_manager(name, {
+      "type": "normal",
+      "in_ports": [{
+          "name": "lhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }, {
+          "name": "rhs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "result",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_addi(name, bitwidth))

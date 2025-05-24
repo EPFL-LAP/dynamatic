@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
+  HandshakeCombineSteeringLogic.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -12,9 +13,11 @@ add_dynamatic_library(DynamaticExperimentalTransforms
   MLIRTransformUtils
   DynamaticSupport
   DynamaticAnalysis
+  DynamaticExperimentalAnalysis
 )
 
 add_subdirectory(Speculation)
 add_subdirectory(ResourceSharing)
 add_subdirectory(LSQSizing)
 add_subdirectory(Rigidification)
+add_subdirectory(FormalPropertyAnnotation)

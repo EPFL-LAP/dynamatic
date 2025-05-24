@@ -11,6 +11,7 @@
 #include <string>
 #include <utility>
 
+#include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "SmvUtils.h"
@@ -59,23 +60,45 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
 // Runs a shell command and redirects the stdout to the provided file.
 static int executeWithRedirect(const std::string &command,
                                const std::filesystem::path &stdoutFile) {
-  char buffer[128];
 
-  std::ofstream outFile(stdoutFile);
+  std::istringstream cmdStream(command);
+  std::vector<StringRef> stringRefVec;
 
-  FILE *pipe = popen(command.c_str(), "r");
-  if (!pipe) {
-    llvm::errs() << "Failed to execute the command.\n";
-    return 1;
+  // Parse the command token by token
+  std::string word;
+  std::vector<std::string> argsVector;
+  while (cmdStream >> word) {
+    argsVector.push_back(word);
   }
 
-  // Read the output from the process and print it to the provided file.
-  while (fgets(buffer, 128, pipe) != nullptr) {
-    outFile << buffer;
+  // Convert the argsVector from std::vector<std::string> to ArrayRef<StringRef>
+  stringRefVec.reserve(argsVector.size()); // Preallocate the vector
+  for (const auto &arg : argsVector) {
+    stringRefVec.emplace_back(arg);
+  }
+  ArrayRef<StringRef> argsArrayRef(stringRefVec);
+
+  // Redirect stdout, keep default of stdin and stderr
+  std::string stdoutFileString = stdoutFile.string();
+  ArrayRef<std::optional<StringRef>> redirects = {
+      std::nullopt, stdoutFileString, std::nullopt};
+
+  std::string errMsg;
+  bool executionFailed;
+  // Find the program in the PATH
+  auto programName = llvm::sys::findProgramByName(argsArrayRef[0]);
+  std::error_code ec = programName.getError();
+  if (ec) {
+    llvm::errs() << "Could not find program with name: " << argsArrayRef[0]
+                 << "\n";
+    return -1;
   }
 
-  // Return the exit code of the command
-  return pclose(pipe);
+  int exitCode =
+      sys::ExecuteAndWait(*programName, argsArrayRef, std::nullopt, redirects,
+                          0, 0, &errMsg, &executionFailed);
+
+  return exitCode;
 }
 
 int runNuXmv(const std::filesystem::path &cmdPath,
@@ -84,10 +107,19 @@ int runNuXmv(const std::filesystem::path &cmdPath,
   return executeWithRedirect(command, stdoutFile);
 }
 
+// For the equivalence checking to work a modified NuSMV is required.
+// Run build.sh with the --enable-leq-binaries flag
 int runNuSMV(const std::filesystem::path &cmdPath,
              const std::filesystem::path &stdoutFile) {
-  std::string command = "NuSMV -source " + cmdPath.string();
-  return executeWithRedirect(command, stdoutFile);
+  std::string command = "ext/NuSMV -source " + cmdPath.string();
+  int exitCode = executeWithRedirect(command, stdoutFile);
+
+  // Check if bits 15-8 are set to 0x7F. In this case the command was not found.
+  if (exitCode == -1) {
+    llvm::errs() << "NuSMV not found. Run build.sh with the "
+                    "--enable-leq-binaries flag\n";
+  }
+  return exitCode;
 }
 
 int runSmvCmd(const std::filesystem::path &cmdPath,
@@ -129,9 +161,17 @@ handshake2smv(const std::filesystem::path &mlirPath,
   // Convert the dotfile to SMV
   // The current implementation of dot2smv uses the hardcoded name "model.smv"
   // in the dotfile's directory.
+  // For the conversion to work dot2smv is required.
+  // Run build.sh with the --enable-leq-binaries flag
   std::filesystem::path smvFile = dotFile.parent_path() / "model.smv";
-  cmd = "python3 ../dot2smv/dot2smv " + dotFile.string();
+  cmd = "python3 ext/dot2smv/dot2smv " + dotFile.string();
   ret = executeWithRedirect(cmd, "/dev/null");
+  // Check if bits 15-8 are set to 0x7F. In this case the command was not
+  // found.
+  if (ret == -1) {
+    llvm::errs() << "dot2smv not found. Run build.sh with the "
+                    "--enable-leq-binaries flag\n";
+  }
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();

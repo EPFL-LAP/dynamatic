@@ -16,6 +16,17 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple 
+      outputs. This is a simplification which comes immediately after the FTD 
+      logic.
+  }];
+  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
@@ -52,7 +63,7 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
   	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
   	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
-  	Option<"type", "type", "std::string", "", "type of buffer, can be either oehb or tehb">
+  	Option<"type", "type", "std::string", "", "type of buffer">
   ];
 }
 
@@ -105,6 +116,18 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     Make all channels rigid. 
   }];
   let constructor = "dynamatic::experimental::rigidification::createRigidification()";
+}
+
+
+def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"> {
+  let summary = "Annotates Operations with Formal Properties";
+  let description = [{
+    The pass annotates each operation with property IDs and generates
+    a table that contains for each ID all the information needed to
+    define a check the property. Currently it only annotates Absence of
+    Backpressure, but it can be extended to annotate other properties.
+  }];
+  let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">];
 }

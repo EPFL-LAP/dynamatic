@@ -37,7 +37,7 @@ begin
     end loop;
   end process;
 
-  merge_ins : entity work.merge_notehb_dataless(arch) generic map (SIZE)
+  merge_ins : entity work.merge_dataless(arch) generic map (SIZE)
     port map(
       clk        => clk,
       rst        => rst,

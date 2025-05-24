@@ -1,6 +1,12 @@
+from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+
+
 def generate_oehb(name, params):
   bitwidth = params["bitwidth"]
+  extra_signals = params.get("extra_signals", None)
 
+  if extra_signals:
+    return _generate_oehb_signal_manager(name, bitwidth, extra_signals)
   if bitwidth == 0:
     return _generate_oehb_dataless(name)
   else:
@@ -110,3 +116,21 @@ end architecture;
 """
 
   return dependencies + entity + architecture
+
+
+def _generate_oehb_signal_manager(name, bitwidth, extra_signals):
+  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+  return generate_signal_manager(name, {
+      "type": "concat",
+      "in_ports": [{
+          "name": "ins",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "out_ports": [{
+          "name": "outs",
+          "bitwidth": bitwidth,
+          "extra_signals": extra_signals
+      }],
+      "extra_signals": extra_signals
+  }, lambda name: _generate_oehb(name, bitwidth + extra_signals_bitwidth))

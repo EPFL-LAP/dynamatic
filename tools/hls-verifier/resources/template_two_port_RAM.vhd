@@ -27,14 +27,14 @@ entity two_port_RAM is
     ce0       : in  std_logic;
     we0       : in  std_logic;
     address0  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
-    mem_dout0 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    mem_din0  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    dout0 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din0  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
     -- RAM port-1
     ce1       : in  std_logic;
     we1       : in  std_logic;
     address1  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
-    mem_dout1 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    mem_din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0)
+    dout1 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0)
   );
 end two_port_RAM;
 
@@ -115,12 +115,12 @@ begin
   begin
     -- Simple memory read
     if (rst = '1') then
-      mem_dout0 <= (others => '0');
+      dout0 <= (others => '0');
     elsif rising_edge(clk) then
       if (ce0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
-        mem_dout0 <= mem_din1 after 0.1 ns;
+        dout0 <= din1 after 0.1 ns;
       elsif (ce0 = '1' and (CONV_INTEGER(address0) < DEPTH)) then
-        mem_dout0 <= mem(CONV_INTEGER(address0)) after 0.1 ns;
+        dout0 <= mem(CONV_INTEGER(address0)) after 0.1 ns;
       end if;
     end if;
   end process mem_to_port0;
@@ -129,12 +129,12 @@ begin
   begin
     -- Simple memory read
     if (rst = '1') then
-      mem_dout1 <= (others => '0');
+      dout1 <= (others => '0');
     elsif rising_edge(clk) then
       if (ce0 = '1' and we0 = '1' and ce1 = '1' and address0 = address1) then
-        mem_dout1 <= mem_din0 after 0.1 ns;
+        dout1 <= din0 after 0.1 ns;
       elsif (ce1 = '1' and (CONV_INTEGER(address1) < DEPTH)) then
-        mem_dout1 <= mem(CONV_INTEGER(address1)) after 0.1 ns;
+        dout1 <= mem(CONV_INTEGER(address1)) after 0.1 ns;
       end if;
     end if;
   end process mem_to_port1;
@@ -148,9 +148,9 @@ begin
     -- Simple memory write
     if rising_edge(clk) then
       if (ce0 = '1' and we0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
-        mem(CONV_INTEGER(address0)) := mem_din1;
+        mem(CONV_INTEGER(address0)) := din1;
       elsif (ce0 = '1' and we0 = '1') then
-        mem(CONV_INTEGER(address0)) := mem_din0;
+        mem(CONV_INTEGER(address0)) := din0;
       end if;
     end if;
   end process port0_to_mem;
@@ -160,7 +160,7 @@ begin
     -- Simple memory write
     if rising_edge(clk) then
       if (ce1 = '1' and we1 = '1') then
-        mem(CONV_INTEGER(address1)) := mem_din1;
+        mem(CONV_INTEGER(address1)) := din1;
       end if;
     end if;
   end process port1_to_mem;

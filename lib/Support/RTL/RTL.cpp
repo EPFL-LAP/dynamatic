@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -279,6 +280,36 @@ static std::string serializePortTypes(hw::ModuleType &mod) {
   return portTypes.str();
 }
 
+static std::string serializeExtraSignalsInner(const Type &type) {
+  assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
+         "type should be ChannelType or ControlType");
+
+  handshake::ExtraSignalsTypeInterface extraSignalsType =
+      type.cast<handshake::ExtraSignalsTypeInterface>();
+
+  std::string extraSignalsValue;
+  llvm::raw_string_ostream extraSignals(extraSignalsValue);
+
+  extraSignals << "{";
+  bool first = true;
+  for (const handshake::ExtraSignal &extraSignal :
+       extraSignalsType.getExtraSignals()) {
+    if (!first)
+      extraSignals << ", ";
+    first = false;
+
+    extraSignals << "\"" << extraSignal.name << "\": ";
+    extraSignals << extraSignal.getBitWidth();
+  }
+  extraSignals << "}";
+
+  return extraSignals.str();
+}
+
+static std::string serializeExtraSignals(const Type &type) {
+  return "'" + serializeExtraSignalsInner(type) + "'";
+}
+
 /// Returns the bitwidth of the type as string.
 /// If the type is a control type, returns "0".
 static std::string getBitwidthString(Type type) {
@@ -286,72 +317,154 @@ static std::string getBitwidthString(Type type) {
 }
 
 void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
-  auto name =
+  auto modName =
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
-  auto mod = modOp.getModuleType();
-  // port types
-  serializedParams["PORT_TYPES"] = serializePortTypes(mod);
+  auto modType = modOp.getModuleType();
 
-  // bitwidth
-  if (name == "handshake.addi" || name == "handshake.buffer" ||
-      name == "handshake.cmpi" || name == "handshake.fork" ||
-      name == "handshake.merge" || name == "handshake.muli" ||
-      name == "handshake.sink") {
+  registerPortTypesParameter(modOp, modName, modType);
+  registerBitwidthParameter(modOp, modName, modType);
+  registerTransparentParameter(modOp, modName, modType);
+  registerExtraSignalParameters(modOp, modName, modType);
+}
+
+void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
+                                          llvm::StringRef modName,
+                                          hw::ModuleType &modType) {
+  serializedParams["PORT_TYPES"] = serializePortTypes(modType);
+}
+
+void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                         llvm::StringRef modName,
+                                         hw::ModuleType &modType) {
+  if (
+      // default (All(Data)TypesMatch)
+      modName == "handshake.addi" || modName == "handshake.andi" ||
+      modName == "handshake.buffer" || modName == "handshake.cmpi" ||
+      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.merge" || modName == "handshake.muli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.shli" || modName == "handshake.blocker" ||
+      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
+      // the first input has data bitwidth
+      modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
+      modName == "handshake.spec_save_commit" ||
+      modName == "handshake.non_spec") {
     // Default
-    serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(0));
-  } else if (name == "handshake.cond_br") {
-    serializedParams["BITWIDTH"] = getBitwidthString(mod.getInputType(1));
-  } else if (name == "handshake.constant") {
-    serializedParams["BITWIDTH"] = getBitwidthString(mod.getOutputType(0));
-  } else if (name == "handshake.control_merge") {
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
+  } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.constant") {
+    serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
+  } else if (modName == "handshake.control_merge") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
     serializedParams["INDEX_BITWIDTH"] =
-        getBitwidthString(mod.getOutputType(1));
-  } else if (name == "handshake.extsi" || name == "handshake.trunci") {
-    serializedParams["INPUT_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+        getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.extsi" || modName == "handshake.trunci" ||
+             modName == "handshake.extui") {
+    serializedParams["INPUT_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
     serializedParams["OUTPUT_BITWIDTH"] =
-        getBitwidthString(mod.getOutputType(0));
-  } else if (name == "handshake.load") {
-    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getOutputType(1));
-  } else if (name == "handshake.mux") {
-    serializedParams["INDEX_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
-  } else if (name == "handshake.store") {
-    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
-  } else if (name == "handshake.mem_controller") {
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(0));
+        getBitwidthString(modType.getOutputType(0));
+  } else if (modName == "handshake.load") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(1));
+  } else if (modName == "handshake.mux") {
+    serializedParams["INDEX_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.store") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.speculating_branch") {
+    serializedParams["SPEC_TAG_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.mem_controller") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
     // Warning: Ports differ from instance to instance.
     // Therefore, mod.getNumOutputs() is also variable.
     serializedParams["ADDR_BITWIDTH"] =
-        getBitwidthString(mod.getOutputType(mod.getNumOutputs() - 2));
-  } else if (name == "mem_to_bram") {
-    serializedParams["ADDR_BITWIDTH"] = getBitwidthString(mod.getInputType(1));
-    serializedParams["DATA_BITWIDTH"] = getBitwidthString(mod.getInputType(4));
-  } else if (name == "handshake.source" || name == "mem_controller") {
+        getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
+  } else if (modName == "mem_to_bram") {
+    serializedParams["ADDR_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(4));
+  } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
+             modName == "handshake.mulf" || modName == "handshake.subf" ||
+             modName == "handshake.divf" || modName == "handshake.negf" ||
+             modName == "handshake.maximumf" ||
+             modName == "handshake.minimumf") {
+    int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
+    serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
+  } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << name << "\n";
   }
+}
 
-  // transparent
-  if (name == "handshake.buffer") {
+void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
+                                            llvm::StringRef modName,
+                                            hw::ModuleType &modType) {
+  if (modName == "handshake.buffer") {
     auto params =
         modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::oehb())
+      if (info == handshake::TimingInfo::break_r() ||
+          info == handshake::TimingInfo::break_none()) {
         serializedParams["TRANSPARENT"] = "True";
-      else if (info == handshake::TimingInfo::tehb())
+      } else if (info == handshake::TimingInfo::break_dv() ||
+                 info == handshake::TimingInfo::break_dvr()) {
         serializedParams["TRANSPARENT"] = "False";
-      else {
+      } else {
         llvm_unreachable("Unknown timing info");
       }
     } else {
       llvm_unreachable("Unknown timing attr");
     }
+  }
+}
+
+void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                             llvm::StringRef modName,
+                                             hw::ModuleType &modType) {
+  if (
+      // default (AllExtraSignalsMatch)
+      modName == "handshake.addf" || modName == "handshake.addi" ||
+      modName == "handshake.andi" || modName == "handshake.buffer" ||
+      modName == "handshake.cmpf" || modName == "handshake.cmpi" ||
+      modName == "handshake.cond_br" || modName == "handshake.constant" ||
+      modName == "handshake.extsi" || modName == "handshake.fork" ||
+      modName == "handshake.merge" || modName == "handshake.mulf" ||
+      modName == "handshake.muli" || modName == "handshake.select" ||
+      modName == "handshake.sink" || modName == "handshake.subf" ||
+      modName == "handshake.extui" || modName == "handshake.shli" ||
+      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
+      modName == "handshake.speculator" || modName == "handshake.trunci" ||
+      modName == "handshake.mux" || modName == "handshake.control_merge" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" ||
+      // the first input has extra signals
+      modName == "handshake.load" || modName == "handshake.store" ||
+      modName == "handshake.spec_commit" ||
+      modName == "handshake.speculating_branch") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
+  } else if (modName == "handshake.source" || modName == "handshake.non_spec") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getOutputType(0));
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "mem_to_bram") {
+    // Skip
   }
 }
 
@@ -641,10 +754,10 @@ RTLComponent::getRTLPortName(StringRef mlirPortName, HDL hdl) const {
 }
 
 std::pair<std::string, bool>
-RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType type,
+RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType signalType,
                              HDL hdl) const {
   auto portName = getRTLPortName(mlirPortName, hdl);
-  return {portName.first + ioSignals.at(type), portName.second};
+  return {portName.first + ioSignals.at(signalType), portName.second};
 }
 
 bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
@@ -685,9 +798,9 @@ bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
   }
 
   /// Defines default signal type suffixes if they were not overriden
-  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
-    if (ioSignals.find(type) == ioSignals.end())
-      ioSignals[type] = suffix;
+  auto setDefaultSignalSuffix = [&](SignalType signalType, StringRef suffix) {
+    if (ioSignals.find(signalType) == ioSignals.end())
+      ioSignals[signalType] = suffix;
   };
   setDefaultSignalSuffix(SignalType::DATA, "");
   setDefaultSignalSuffix(SignalType::VALID, "_valid");
@@ -758,13 +871,13 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
   ioChannels.clear();
   for (const auto &[signalStr, jsonSuffix] : *object) {
     // Deserialize the signal type
-    SignalType type;
+    SignalType signalType;
     if (signalStr == "data") {
-      type = SignalType::DATA;
+      signalType = SignalType::DATA;
     } else if (signalStr == "valid") {
-      type = SignalType::VALID;
+      signalType = SignalType::VALID;
     } else if (signalStr == "ready") {
-      type = SignalType::READY;
+      signalType = SignalType::READY;
     } else {
       path.field(signalStr).report("unknown channel signal type: possible keys "
                                    "are 'data', 'valid', or 'ready'");
@@ -772,7 +885,7 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
     }
 
     // Deserialize the suffix (just a string)
-    if (!fromJSON(jsonSuffix, ioChannels[type], path.field(signalStr)))
+    if (!fromJSON(jsonSuffix, ioChannels[signalType], path.field(signalStr)))
       return false;
   }
 

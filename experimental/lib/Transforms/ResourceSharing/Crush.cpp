@@ -123,7 +123,7 @@ static void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
     cfIndices[cfAndOpt.first] = id;
 
   // Extract result: save global CFDFC throuhgputs into sharingInfo
-  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
 
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
