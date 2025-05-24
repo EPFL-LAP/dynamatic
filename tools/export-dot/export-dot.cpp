@@ -158,10 +158,12 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType) 
+            auto optBufferType =
+                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType)
               return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
+            if (auto bufferTypeAttr =
+                    dyn_cast<StringAttr>(optBufferType->getValue())) {
               std::string bufferTypeStr = bufferTypeAttr.getValue().str();
               if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
                 return "DV" + numSlotsStr;
@@ -173,6 +175,8 @@ static std::string getPrettyNodeLabel(Operation *op) {
                 return "NONE" + numSlotsStr;
               } else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
                 return "DVR" + numSlotsStr;
+              } else if (bufferTypeStr == "SHIFT_REG_BREAK_DV") {
+                return "SRDV" + numSlotsStr;
               }
             }
             return "buffer" + numSlotsStr;
