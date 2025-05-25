@@ -46,20 +46,20 @@ def PortToQueueDispatcher(
     ctx.tabLevel = 1
     ctx.tempCount = 0
     ctx.signalInitString = ''
-    ctx.portInitString   = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
-    arch             = ''
+    ctx.portInitString = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
+    arch = ''
 
     # IOs
-    port_bits_i        = LogicVecArray(ctx, 'port_bits', 'i', numPorts, bitsW)
-    port_valid_i       = LogicArray(ctx, 'port_valid', 'i', numPorts)
-    port_ready_o       = LogicArray(ctx, 'port_ready', 'o', numPorts)
-    entry_valid_i      = LogicArray(ctx, 'entry_valid', 'i', numEntries)
+    port_bits_i = LogicVecArray(ctx, 'port_bits', 'i', numPorts, bitsW)
+    port_valid_i = LogicArray(ctx, 'port_valid', 'i', numPorts)
+    port_ready_o = LogicArray(ctx, 'port_ready', 'o', numPorts)
+    entry_valid_i = LogicArray(ctx, 'entry_valid', 'i', numEntries)
     entry_bits_valid_i = LogicArray(ctx, 'entry_bits_valid', 'i', numEntries)
     if (numPorts != 1):
-        entry_port_idx_i   = LogicVecArray(ctx, 'entry_port_idx', 'i', numEntries, portAddrW)
-    entry_bits_o       = LogicVecArray(ctx, 'entry_bits', 'o', numEntries, bitsW)
-    entry_wen_o        = LogicArray(ctx, 'entry_wen', 'o', numEntries)
-    queue_head_oh_i    = LogicVec(ctx, 'queue_head_oh', 'i', numEntries)
+        entry_port_idx_i = LogicVecArray(ctx, 'entry_port_idx', 'i', numEntries, portAddrW)
+    entry_bits_o = LogicVecArray(ctx, 'entry_bits', 'o', numEntries, bitsW)
+    entry_wen_o = LogicArray(ctx, 'entry_wen', 'o', numEntries)
+    queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', numEntries)
 
     # one-hot port index
     entry_port_valid = LogicVecArray(ctx, 'entry_port_valid', 'w', numEntries, numPorts)
@@ -68,7 +68,7 @@ def PortToQueueDispatcher(
             arch += Op(ctx, entry_port_valid[i], 1)
         else:
             arch += BitsToOH(ctx, entry_port_valid[i], entry_port_idx_i[i])
-    
+
     # Mux for the data/addr
     for i in range(0, numEntries):
         arch += Mux1H(ctx, entry_bits_o[i], port_bits_i, entry_port_valid[i])
@@ -100,7 +100,7 @@ def PortToQueueDispatcher(
     # generates entry-port pairs that will tranfer data/address this cycle.
     entry_port_hs = LogicVecArray(ctx, 'entry_port_hs', 'w', numEntries, numPorts)
     arch += CyclicPriorityMasking(ctx, entry_port_hs, entry_port_and, queue_head_oh_i)
-    
+
     # Reduce for each entry(row), which generates write enable signal for entries
     for i in range(0, numEntries):
         arch += Reduce(ctx, entry_wen_o[i], entry_port_hs[i], 'or')
@@ -120,6 +120,7 @@ def PortToQueueDispatcher(
         file.write('begin\n' + arch + '\n')
         file.write('end architecture;\n')
     return
+
 
 def QueueToPortDispatcher(
     ctx:                VHDLContext,
@@ -161,22 +162,22 @@ def QueueToPortDispatcher(
     ctx.tabLevel = 1
     ctx.tempCount = 0
     ctx.signalInitString = ''
-    ctx.portInitString   = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
-    arch             = ''
+    ctx.portInitString = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
+    arch = ''
 
     # IOs
     if (bitsW != 0):
-        port_bits_o    = LogicVecArray(ctx, 'port_bits', 'o', numPorts, bitsW)
-    port_valid_o       = LogicArray(ctx, 'port_valid', 'o', numPorts)
-    port_ready_i       = LogicArray(ctx, 'port_ready', 'i', numPorts)
-    entry_valid_i      = LogicArray(ctx, 'entry_valid', 'i', numEntries)
+        port_bits_o = LogicVecArray(ctx, 'port_bits', 'o', numPorts, bitsW)
+    port_valid_o = LogicArray(ctx, 'port_valid', 'o', numPorts)
+    port_ready_i = LogicArray(ctx, 'port_ready', 'i', numPorts)
+    entry_valid_i = LogicArray(ctx, 'entry_valid', 'i', numEntries)
     entry_bits_valid_i = LogicArray(ctx, 'entry_bits_valid', 'i', numEntries)
     if (numPorts != 1):
         entry_port_idx_i = LogicVecArray(ctx, 'entry_port_idx', 'i', numEntries, portAddrW)
     if (bitsW != 0):
-        entry_bits_i   = LogicVecArray(ctx, 'entry_bits', 'i', numEntries, bitsW)
-    entry_reset_o      = LogicArray(ctx, 'entry_reset', 'o', numEntries)
-    queue_head_oh_i    = LogicVec(ctx, 'queue_head_oh', 'i', numEntries)
+        entry_bits_i = LogicVecArray(ctx, 'entry_bits', 'i', numEntries, bitsW)
+    entry_reset_o = LogicArray(ctx, 'entry_reset', 'o', numEntries)
+    queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', numEntries)
 
     # one-hot port index
     entry_port_valid = LogicVecArray(ctx, 'entry_port_valid', 'w', numEntries, numPorts)
@@ -205,8 +206,8 @@ def QueueToPortDispatcher(
     entry_port_request_valid = LogicVecArray(ctx, 'entry_port_request_valid', 'w', numEntries, numPorts)
     for i in range(0, numEntries):
         arch += Op(ctx, entry_port_request_valid[i], entry_port_request_prio[i],
-        'when', entry_bits_valid_i[i], 'else', 0)
-    
+                   'when', entry_bits_valid_i[i], 'else', 0)
+
     # Reduce the matrix for each port to get the valid signal:
     # If an entry is providing data/address from a certain port, valid is set high.
     port_valid_vec = LogicVec(ctx, 'port_valid_vec', 'w', numPorts)
@@ -256,6 +257,7 @@ def PortToQueueDispatcherInit(
     entry_wen_o:        LogicArray,
     queue_head_oh_i:    LogicVec
 ) -> str:
+<<<<<<< HEAD
     """
     Port-to-Queue Dispatcher Instantiation
 
@@ -281,6 +283,8 @@ def PortToQueueDispatcherInit(
     Returns:
         VHDL instantiation string for inclusion in the architecture body.
     """
+=======
+>>>>>>> origin/main
 
     arch = ctx.get_current_indent() + f'{name}_dispatcher : entity work.{name}\n'
     ctx.tabLevel += 1
@@ -310,6 +314,7 @@ def PortToQueueDispatcherInit(
     arch += ctx.get_current_indent() + f');\n'
     ctx.tabLevel -= 1
     return arch
+
 
 def QueueToPortDispatcherInit(
     ctx:                VHDLContext,
@@ -382,4 +387,3 @@ def QueueToPortDispatcherInit(
     arch += ctx.get_current_indent() + f');\n'
     ctx.tabLevel -= 1
     return arch
-
