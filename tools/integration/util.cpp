@@ -14,41 +14,9 @@
 #include <set>
 #include <regex>
 
-std::vector<fs::path> findTests(const fs::path &start) {
-  std::set<std::string> ignored;
-  fs::path ignorePath = start / "ignored_tests.txt";
-  if (fs::exists(ignorePath)) {
-    std::ifstream in(ignorePath);
-    if (in.is_open()) {
-      std::string line;
-      while (getline(in, line)) {
-        ignored.insert(line);
-      }
-    }
-    else {
-      std::cout << "[WARNING] Failed to open " << ignorePath << std::endl;
-    }
-  }
-
-  std::vector<fs::path> ret;
-  for (const auto &folder : fs::directory_iterator(start)) {
-    if (folder.is_directory()) {
-      for (const auto &entry : fs::directory_iterator(folder)) {
-        if (ignored.find(entry.path().stem()) != ignored.end()) {
-          std::cout << "[INFO] Ignoring " << entry.path() << std::endl;
-        }
-        else if (entry.is_regular_file() && entry.path().extension() == ".c") {
-          ret.push_back(entry.path());
-        }
-      }
-    }
-  }
-
-  return ret;
-}
-
-int runIntegrationTest(const fs::path &path, int &outSimTime) {
-  std::string name = path.stem();
+int runIntegrationTest(const std::string &name, int &outSimTime) {
+  fs::path path = fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+  
   std::cout << "[INFO] Running " << name << std::endl;
   std::string tmpFilename = "tmp_" + name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
