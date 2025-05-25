@@ -60,8 +60,8 @@ jobs:
       - name: integration-test
         if: success() || failure()
         run: | 
-          cd build/integration-test
-          ctest --output-on-failure --parallel 8
+          cd build
+          ninja run-integration-tests
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
