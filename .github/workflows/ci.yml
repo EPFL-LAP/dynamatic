@@ -59,9 +59,7 @@ jobs:
 
       - name: integration-test
         if: success() || failure()
-        run: | 
-          cd build
-          ninja run-integration-tests
+        run: ninja -C build run-integration-tests
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
