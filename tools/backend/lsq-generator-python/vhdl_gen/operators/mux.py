@@ -4,15 +4,15 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
 
-# ===----------------------------------------------------------------------===#
+#===----------------------------------------------------------------------===#
 # Multiplexer
-# ===----------------------------------------------------------------------===#
+#===----------------------------------------------------------------------===#
 # Mux1H    : One-hot select elements of `din` using `sel`
 # Mux1HROM : Special multiplexer for the Group Allocator ROM.
 # MuxIndex : Generate a VHDL array-index expression for selecting an element.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
-def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
+def Mux1H(ctx: VHDLContext, dout, din, sel, j = None) -> str:
     """
     Generate a one-hot multiplexer: for each element of "din", 
     write that bit/vector into a temporary and then OR-reduce into "dout".
@@ -46,7 +46,7 @@ def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
           din = "01101", sel = "00100"
           -> selects the third bit: dout = '1'
     """
-
+    
     str_ret = ctx.get_current_indent() + '-- Mux1H Begin\n'
     str_ret += ctx.get_current_indent() + f'-- Mux1H({dout.name}, {din.name}, {sel.name})\n'
     ctx.use_temp()
@@ -79,8 +79,7 @@ def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
     str_ret += ctx.get_current_indent() + '-- Mux1H End\n\n'
     return str_ret
 
-
-def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
+def Mux1HROM(ctx: VHDLContext, dout, din, sel, func = IntToBits) -> str:
     """
     Generate a one-hot ROM multiplexer for LSQ port index allocation,
     Load-Store Order Matrix construction, and tracking load/store numbers.
@@ -94,14 +93,14 @@ def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
             If LogicVec: a single M-bit vector; results from all groups are OR-reduced.
                 - num_loads
                 - num_stores
-
+        
         din (list or list of lists): 
             ROM contents. (configs.gaLdPortIdx, configs.gaStPortIdx, configs.gaLdOrder
                            configs.gaNumLoads, configs. gaNumStores)
-
+            
         sel (LogicArray):
             Indicates groups to be allocated. (group_init_hs)
-
+        
         func (callable, optional):
             Conversion function from integer to LogicVec (default: IntToBits).
             Either IntToBits() or MaskLess()
@@ -125,7 +124,7 @@ def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
             din  = configs.gaNumLoads = [3,1,2]
             sel  = "010"
             -> dout = "01" (1 load)
-
+        
         This means that the currently allocated BB is BB1 (among BB0, BB1, and BB2)
         It has 1 load. that "dout" indicates 1.
     """
@@ -133,8 +132,8 @@ def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
     str_ret = ctx.get_current_indent() + '-- Mux1H For Rom Begin\n'
     str_ret += ctx.get_current_indent() + f'-- Mux1H({dout.name}, {sel.name})\n'
     ctx.use_temp()
-    mlen = sel.length
-    size = dout.size
+    mlen   = sel.length
+    size   = dout.size
     str_zero = Zero(size)
     if (type(dout) == LogicVecArray):
         length = dout.length
@@ -162,13 +161,11 @@ def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
     str_ret += ctx.get_current_indent() + '-- Mux1H For Rom End\n\n'
     return str_ret
 
-
 def MuxIndex(din, sel) -> str:
     """
     Generate a VHDL array-index expression for selecting an element
     """
     return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
-
 
 def MuxLookUp(ctx: VHDLContext, dout, din, sel) -> str:
     """
@@ -181,7 +178,7 @@ def MuxLookUp(ctx: VHDLContext, dout, din, sel) -> str:
             Array of input signals to choose from.
         sel (LogicVec):
             Binary select vector; compared against each index using IntToBits.
-
+    
     Example:
         dout <= 
         din_0 when (sel = "0000") else
@@ -198,14 +195,15 @@ def MuxLookUp(ctx: VHDLContext, dout, din, sel) -> str:
 
         Depending on the value of "sel", "dout" is driven by the
         corresponding element of "din" or defaults to '0'.
-
+            
     """
 
     str_ret = ctx.get_current_indent() + '-- MuxLookUp Begin\n'
     str_ret += ctx.get_current_indent() + f'-- MuxLookUp({dout.name}, {din.name}, {sel.name})\n'
 
+
     length = din.length
-    size = sel.size
+    size   = sel.size
     str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= \n'
 
     for i in range(0, length):
@@ -218,3 +216,4 @@ def MuxLookUp(ctx: VHDLContext, dout, din, sel) -> str:
 
     str_ret += ctx.get_current_indent() + '-- MuxLookUp End\n\n'
     return str_ret
+
