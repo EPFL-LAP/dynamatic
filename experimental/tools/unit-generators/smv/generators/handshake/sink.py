@@ -4,10 +4,10 @@ from generators.support.utils import *
 def generate_sink(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_sink_dataless(name)
-        else:
-            return _generate_sink(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_sink_dataless(name)
+    else:
+        return _generate_sink(name, data_type)
 
 
 def _generate_sink_dataless(name):

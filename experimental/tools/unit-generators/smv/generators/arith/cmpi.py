@@ -11,13 +11,13 @@ def generate_cmpi(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
     abstract_data = params[ATTR_ABSTRACT_DATA]
 
-       if abstract_data:
-            return generate_nondeterministic_comparator(name, params)
-        elif sign is None or data_type.smv_type.split()[0] == sign:
-            return _generate_cmpi(name, latency, symbol, data_type)
-        else:
-            modifier = sign
-            return _generate_cmpi_cast(name, latency, symbol, modifier, data_type)
+    if abstract_data:
+        return generate_nondeterministic_comparator(name, params)
+    elif sign is None or data_type.smv_type.split()[0] == sign:
+        return _generate_cmpi(name, latency, symbol, data_type)
+    else:
+        modifier = sign
+        return _generate_cmpi_cast(name, latency, symbol, modifier, data_type)
 
 
 def _generate_cmpi(name, latency, symbol, data_type):
