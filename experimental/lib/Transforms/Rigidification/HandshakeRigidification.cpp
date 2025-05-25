@@ -67,7 +67,7 @@ void HandshakeRigidificationPass::runDynamaticPass() {
   if (failed(table.addPropertiesFromJSON(jsonPath)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
-  for (auto &property : table.getProperties()) {
+  for (const auto &property : table.getProperties()) {
     if (property->getTag() == FormalProperty::TAG::OPT &&
         property->getCheck() == "true") {
       if (isa<AbsenceOfBackpressure>(property)) {
