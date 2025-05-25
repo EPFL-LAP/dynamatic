@@ -22,7 +22,7 @@ using namespace dynamatic;
 
 dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   dynamatic::LogicBBs logicBBs;
-  for (auto &op : funcOp.getOps())
+  for (auto& op : funcOp.getOps())
     if (auto bbAttr = op.getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME); bbAttr)
       logicBBs.blocks[bbAttr.getValue().getZExtValue()].push_back(&op);
     else
@@ -30,14 +30,14 @@ dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   return logicBBs;
 }
 
-void dynamatic::setBB(Operation *op, int bb) {
+void dynamatic::setBB(Operation* op, int bb) {
   auto ui32 = IntegerType::get(op->getContext(), 32,
-                               IntegerType::SignednessSemantics::Unsigned);
+    IntegerType::SignednessSemantics::Unsigned);
   auto attr = IntegerAttr::get(ui32, bb);
   op->setAttr(BB_ATTR_NAME, attr);
 }
 
-bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
+bool dynamatic::inheritBB(Operation* srcOp, Operation* dstOp) {
   if (auto bb = srcOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)) {
     dstOp->setAttr(BB_ATTR_NAME, bb);
     return true;
@@ -45,15 +45,15 @@ bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
   return false;
 }
 
-bool dynamatic::inheritBBFromValue(Value val, Operation *dstOp) {
-  if (Operation *defOp = val.getDefiningOp())
+bool dynamatic::inheritBBFromValue(Value val, Operation* dstOp) {
+  if (Operation* defOp = val.getDefiningOp())
     return inheritBB(defOp, dstOp);
   dstOp->setAttr(BB_ATTR_NAME,
-                 OpBuilder(val.getContext()).getUI32IntegerAttr(ENTRY_BB));
+    OpBuilder(val.getContext()).getUI32IntegerAttr(ENTRY_BB));
   return true;
 }
 
-std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
+std::optional<unsigned> dynamatic::getLogicBB(Operation* op) {
   if (auto bb = op->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME))
     return bb.getUInt();
   return {};
@@ -61,9 +61,9 @@ std::optional<unsigned> dynamatic::getLogicBB(Operation *op) {
 
 /// Determines whether all operations are in the same basic block. If any
 /// operation has no basic block attached to it, returns false.
-static bool areOpsInSameBlock(SmallVector<Operation *> &ops) {
+static bool areOpsInSameBlock(SmallVector<Operation*>& ops) {
   std::optional<unsigned> uniqueBB;
-  for (Operation *op : ops) {
+  for (Operation* op : ops) {
     std::optional<unsigned> bb = getLogicBB(op);
     if (!bb.has_value())
       return false;
@@ -80,8 +80,8 @@ static bool areOpsInSameBlock(SmallVector<Operation *> &ops) {
 /// first block reached by recursively backtracking through the def-use chain of
 /// the operation's operands. On successfull identification of the predecessor
 /// block, returns true and sets the block; otherwise returns false.
-static bool backtrackToBlock(Operation *op, unsigned &bb,
-                             SmallPtrSet<Operation *, 4> &visited) {
+static bool backtrackToBlock(Operation* op, unsigned& bb,
+  SmallPtrSet<Operation*, 4>& visited) {
   if (!op)
     return false;
 
@@ -105,7 +105,8 @@ static bool backtrackToBlock(Operation *op, unsigned &bb,
     if (firstOperand) {
       firstOperand = false;
       bb = operandBB;
-    } else if (bb != operandBB) {
+    }
+    else if (bb != operandBB) {
       return false;
     }
   }
@@ -117,8 +118,8 @@ static bool backtrackToBlock(Operation *op, unsigned &bb,
 /// first block reached by recursively following through the uses of the
 /// operation's results. On successfull identification of the successor block,
 /// returns true and sets the block; otherwise returns false.
-static bool followToBlock(Operation *op, unsigned &bb,
-                          SmallPtrSet<Operation *, 4> &visited) {
+static bool followToBlock(Operation* op, unsigned& bb,
+  SmallPtrSet<Operation*, 4>& visited) {
   // Succeeds if the operation belongs to a basic block
   std::optional<unsigned> optBB = getLogicBB(op);
   if (optBB.has_value()) {
@@ -134,14 +135,15 @@ static bool followToBlock(Operation *op, unsigned &bb,
   // block
   bool firstOperand = true;
   for (OpResult res : op->getResults()) {
-    for (Operation *user : res.getUsers()) {
+    for (Operation* user : res.getUsers()) {
       unsigned resultBB;
       if (!followToBlock(user, resultBB, visited))
         return false;
       if (firstOperand) {
         firstOperand = false;
         bb = resultBB;
-      } else if (bb != resultBB) {
+      }
+      else if (bb != resultBB) {
         return false;
       }
     }
@@ -151,16 +153,16 @@ static bool followToBlock(Operation *op, unsigned &bb,
 
 /// Determines whether the operation is of a nature which can be traversed
 /// outside blocks during backedge identification.
-static inline bool canGoThroughOutsideBlocks(Operation *op) {
+static inline bool canGoThroughOutsideBlocks(Operation* op) {
   return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
-             handshake::TruncIOp>(op);
+    handshake::TruncIOp>(op);
 }
 
 /// Attempts to backtrack through forks and bitwidth modification operations
 /// till reaching a branch-like operation. On success, returns the branch-like
 /// operation that was backtracked to (or the passed operation if it was itself
 /// branch-like); otherwise, returns nullptr.
-static Operation *backtrackToBranch(Operation *op) {
+static Operation* backtrackToBranch(Operation* op) {
   do {
     if (!op)
       break;
@@ -179,16 +181,16 @@ static Operation *backtrackToBranch(Operation *op) {
 /// operations that all belong to the same basic block. On success, returns one
 /// of the merge-like operations reached by a def-use chain (or the passed
 /// operation if it was itself merge-like); otherwise, returns nullptr.
-static Operation *followToMerge(Operation *op) {
+static Operation* followToMerge(Operation* op) {
   if (isa<handshake::MergeLikeOpInterface>(op))
     return op;
   if (canGoThroughOutsideBlocks(op)) {
     // All users of the operation's results must lead to merges within a unique
     // block
-    SmallVector<Operation *> mergeOps;
+    SmallVector<Operation*> mergeOps;
     for (OpResult res : op->getResults()) {
-      for (Operation *user : res.getUsers()) {
-        Operation *op = followToMerge(user);
+      for (Operation* user : res.getUsers()) {
+        Operation* op = followToMerge(user);
         if (!op)
           return nullptr;
         mergeOps.push_back(op);
@@ -201,13 +203,13 @@ static Operation *followToMerge(Operation *op) {
   return nullptr;
 }
 
-bool dynamatic::getBBEndpoints(Value val, Operation *user,
-                               BBEndpoints &endpoints) {
+bool dynamatic::getBBEndpoints(Value val, Operation* user,
+  BBEndpoints& endpoints) {
   assert(llvm::find(val.getUsers(), user) != val.getUsers().end() &&
-         "expected user to have val as operand");
+    "expected user to have val as operand");
 
-  SmallPtrSet<Operation *, 4> visited;
-  Operation *defOp = val.getDefiningOp();
+  SmallPtrSet<Operation*, 4> visited;
+  Operation* defOp = val.getDefiningOp();
   unsigned srcBB, dstBB;
   if (!backtrackToBlock(defOp, srcBB, visited))
     return false;
@@ -222,14 +224,14 @@ bool dynamatic::getBBEndpoints(Value val, Operation *user,
   return true;
 }
 
-bool dynamatic::getBBEndpoints(Value val, BBEndpoints &endpoints) {
+bool dynamatic::getBBEndpoints(Value val, BBEndpoints& endpoints) {
   auto users = val.getUsers();
   assert(std::distance(users.begin(), users.end()) == 1 &&
-         "value must have a single user");
+    "value must have a single user");
   return getBBEndpoints(val, *users.begin(), endpoints);
 }
 
-bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, Operation* user, BBEndpoints* endpoints) {
   // Get the value's BB endpoints
   BBEndpoints bbs;
   if (!getBBEndpoints(val, user, bbs))
@@ -246,10 +248,10 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
 
   // If both source and destination blocks are identical, the edge must be
   // located between a branch-like operation and a merge-like operation
-  Operation *brOp = backtrackToBranch(val.getDefiningOp());
+  Operation* brOp = backtrackToBranch(val.getDefiningOp());
   if (!brOp)
     return false;
-  Operation *mergeOp = followToMerge(user);
+  Operation* mergeOp = followToMerge(user);
   if (!mergeOp)
     return false;
 
@@ -258,43 +260,69 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
   std::optional<unsigned> brBB = getLogicBB(brOp);
   std::optional<unsigned> mergeBB = getLogicBB(mergeOp);
   return brBB.has_value() && mergeBB.has_value() && *brBB == *mergeBB &&
-         *brBB == bbs.srcBB;
+    *brBB == bbs.srcBB;
 }
 
-bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, BBEndpoints* endpoints) {
   auto users = val.getUsers();
   assert(std::distance(users.begin(), users.end()) == 1 &&
-         "value must have a single user");
+    "value must have a single user");
   return isBackedge(val, *users.begin(), endpoints);
 }
 
-namespace {
-/// Define a Control-Flow Graph Edge as a OpOperand
-using CFGEdge = OpOperand;
+bool dynamatic::isBranchToMergeLike(Value val, Operation* user) {
+  auto srcBB = val.getDefiningOp()->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME);
+  auto dstBB = user->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME);
 
-/// Define a comparator between BBEndpoints
-struct EndpointComparator {
-  bool operator()(const BBEndpoints &a, const BBEndpoints &b) const {
-    if (a.srcBB != b.srcBB)
-      return a.srcBB < b.srcBB;
-    return a.dstBB < b.dstBB;
+  if (srcBB.getValue().getZExtValue() < dstBB.getValue().getZExtValue()) {
+    llvm::errs() << "\n**** BB" << srcBB.getValue().getZExtValue() << " -> BB" << dstBB.getValue().getZExtValue() << " ***\n";
+    return false;
   }
-};
+  llvm::errs() << "\n### BB" << srcBB.getValue().getZExtValue() << " -> BB" << dstBB.getValue().getZExtValue() << " ###\n";
+
+  // If the edge is between a branch-like operation and a merge-like operation
+  Operation* brOp = backtrackToBranch(val.getDefiningOp());
+  if (!brOp)
+    return false;
+  Operation* mergeOp = followToMerge(user);
+
+  return mergeOp;
+}
+
+bool dynamatic::isComingFromConditionalBranch(Value val) {
+  return(isa<handshake::ConditionalBranchOp>(val.getDefiningOp()));
+}
+
+
+namespace {
+  /// Define a Control-Flow Graph Edge as a OpOperand
+  using CFGEdge = OpOperand;
+
+  /// Define a comparator between BBEndpoints
+  struct EndpointComparator {
+    bool operator()(const BBEndpoints& a, const BBEndpoints& b) const {
+      if (a.srcBB != b.srcBB)
+        return a.srcBB < b.srcBB;
+      return a.dstBB < b.dstBB;
+    }
+  };
 
 } // namespace
 
 /// Returns the endpoints of the given CFGEdge.
 /// If a BB is not specified for each endpoint, it is set to nullopt.
-static BBEndpointsOptional getCFGEdgeEndpoints(const CFGEdge &edge) {
+static BBEndpointsOptional getCFGEdgeEndpoints(const CFGEdge& edge) {
   BBEndpointsOptional endpoints;
 
-  Operation *definingOp = edge.get().getDefiningOp();
+  Operation* definingOp = edge.get().getDefiningOp();
   if (!definingOp) {
     endpoints.srcBB = std::nullopt;
-  } else {
+  }
+  else {
     if (auto bb = getLogicBB(definingOp)) {
       endpoints.srcBB = *bb;
-    } else {
+    }
+    else {
       endpoints.srcBB = std::nullopt;
     }
   }
@@ -302,7 +330,8 @@ static BBEndpointsOptional getCFGEdgeEndpoints(const CFGEdge &edge) {
   // Owner always exists, unlike the defining op.
   if (auto bb = getLogicBB(edge.getOwner())) {
     endpoints.dstBB = *bb;
-  } else {
+  }
+  else {
     endpoints.dstBB = std::nullopt;
   }
 
@@ -315,8 +344,8 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
 
   // Traverse all operations within funcOp to find edges between BBs, including
   // self-edges, and save them in a map from the Endpoints to the edges
-  funcOp->walk([&](Operation *op) {
-    for (CFGEdge &edge : op->getOpOperands()) {
+  funcOp->walk([&](Operation* op) {
+    for (CFGEdge& edge : op->getOpOperands()) {
       BBEndpointsOptional endpoints = getCFGEdgeEndpoints(edge);
       // The dstBB should be always defined (to be consistent with
       // "BBPredecessorArcs")
@@ -326,7 +355,7 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
       // Store the edge if it is a Backedge or connects two different BBs
       if (isBackedge(edge.get(), op) || endpoints.srcBB != endpoints.dstBB) {
         bool arcExists = false;
-        for (BBArc &arc : predecessorArcs[*endpoints.dstBB]) {
+        for (BBArc& arc : predecessorArcs[*endpoints.dstBB]) {
           if (arc.srcBB == endpoints.srcBB) {
             // If the arc already exists, add the edge to it
             arc.edges.insert(&edge);
@@ -344,17 +373,17 @@ BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
         }
       }
     }
-  });
+    });
 
   return predecessorArcs;
 }
 
-bool dynamatic::cannotBelongToCFG(Operation *op) {
+bool dynamatic::cannotBelongToCFG(Operation* op) {
   return isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
 HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
-  for (Operation &op : funcOp.getOps()) {
+  for (Operation& op : funcOp.getOps()) {
     if (cannotBelongToCFG(&op))
       continue;
 
@@ -363,7 +392,7 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
     assert(srcBB && "source operation must belong to block");
 
     for (OpResult res : op.getResults()) {
-      for (Operation *user : res.getUsers()) {
+      for (Operation* user : res.getUsers()) {
         if (cannotBelongToCFG(user))
           continue;
 
@@ -378,7 +407,7 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 }
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
-                                     SmallVector<CFGPath> &paths) {
+  SmallVector<CFGPath>& paths) {
   // Both blocks must exist in the CFG
   assert(successors.contains(from) && "source block must exist in the CFG");
   assert(successors.contains(to) && "destination block must exist in the CFG");
@@ -389,31 +418,31 @@ void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
 }
 
 LogicalResult
-HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
+HandshakeCFG::getControlValues(DenseMap<unsigned, Value>& ctrlVals) {
   // Maintain a list of operations on the control path as we go through the
   // circuit
-  DenseSet<Operation *> exploredOps;
-  mlir::SetVector<Operation *> ctrlOps;
+  DenseSet<Operation*> exploredOps;
+  mlir::SetVector<Operation*> ctrlOps;
 
   // Adds the users of an operation's results to the list of control operations,
   // except if those have already been explored.
   auto addToCtrlOps = [&](auto users) {
-    for (Operation *userOp : users) {
+    for (Operation* userOp : users) {
       if (!exploredOps.contains(userOp))
         ctrlOps.insert(userOp);
     }
-  };
+    };
 
   // Updates the control value registered for a specific block in the map.
   // Fails if a control already existed and is different from the new value,
   // succeeds otherwise.
   auto updateCtrl = [&](unsigned bb, Value newCtrl) -> LogicalResult {
-    if (auto [it, newBB] = ctrlVals.insert({bb, newCtrl}); !newBB) {
+    if (auto [it, newBB] = ctrlVals.insert({ bb, newCtrl }); !newBB) {
       if (it->second != newCtrl)
         return failure();
     }
     return success();
-  };
+    };
 
   // Explore the control network one operation at a time till we've iterated
   // over all of it
@@ -424,7 +453,7 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
 
   addToCtrlOps(ctrl.getUsers());
   while (!ctrlOps.empty()) {
-    Operation *ctrlOp = ctrlOps.pop_back_val();
+    Operation* ctrlOp = ctrlOps.pop_back_val();
     exploredOps.insert(ctrlOp);
 
     // Do not care about operations that are outside the CFG
@@ -438,19 +467,19 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
     // operation types that do not forward the control signal to at least one of
     // their outputs
     LogicalResult res =
-        llvm::TypeSwitch<Operation *, LogicalResult>(ctrlOp)
-            .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-                  handshake::BranchOp, handshake::ConditionalBranchOp,
-                  handshake::MuxOp, handshake::MergeOp>([&](auto) {
-              addToCtrlOps(ctrlOp->getUsers());
-              return success();
-            })
-            .Case<handshake::MergeLikeOpInterface>([&](auto) {
-              OpResult mergeRes = ctrlOp->getResult(0);
-              addToCtrlOps(mergeRes.getUsers());
-              return updateCtrl(bb, mergeRes);
-            })
-            .Default([&](auto) { return success(); });
+      llvm::TypeSwitch<Operation*, LogicalResult>(ctrlOp)
+      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+      handshake::BranchOp, handshake::ConditionalBranchOp,
+      handshake::MuxOp, handshake::MergeOp>([&](auto) {
+      addToCtrlOps(ctrlOp->getUsers());
+      return success();
+        })
+      .Case<handshake::MergeLikeOpInterface>([&](auto) {
+      OpResult mergeRes = ctrlOp->getResult(0);
+      addToCtrlOps(mergeRes.getUsers());
+      return updateCtrl(bb, mergeRes);
+        })
+      .Default([&](auto) { return success(); });
     if (failed(res))
       return failure();
   }
@@ -458,8 +487,8 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
   return success();
 }
 
-void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
-                               unsigned to, SmallVector<CFGPath> &paths) {
+void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned>& pathSoFar,
+  unsigned to, SmallVector<CFGPath>& paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");
   for (unsigned nextBB : successors[pathSoFar.back()]) {
     if (nextBB == to) {
@@ -467,7 +496,8 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
       llvm::copy(pathSoFar, std::back_inserter(newPath));
       newPath.push_back(to);
       paths.push_back(newPath);
-    } else if (!pathSoFar.contains(nextBB)) {
+    }
+    else if (!pathSoFar.contains(nextBB)) {
       mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
       nextPathSoFar.insert(nextBB);
       findPathsTo(nextPathSoFar, to, paths);
@@ -476,26 +506,26 @@ void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
 }
 
 namespace {
-/// Internal representation for the failure/success status of a GIID
-/// backtracking process. We distinguish two types of failures:
-/// - An off-path failure, meaning the function went off the CFG path provided
-/// for the search before reaching the predecessor's block. This type of failure
-/// is generally "recoverable", in the sense that the top-level search may still
-/// succeed even if some recursive search fails in this way.
-/// - An on-path failure, meaning the function failed to reach the predecessor
-/// all-the-while staying on the path to it. This type of failure is generally
-/// "terminating", in the sense that the top-level search will probably fail
-/// as soon as some recursive search fails in this way.
-enum class GIIDStatus {
-  /// Denotes an off-path failure.
-  FAIL_OFF_PATH,
-  /// Denotes an on-path failure.
-  FAIL_ON_PATH,
-  /// Denotes a success.
-  SUCCEED
-};
+  /// Internal representation for the failure/success status of a GIID
+  /// backtracking process. We distinguish two types of failures:
+  /// - An off-path failure, meaning the function went off the CFG path provided
+  /// for the search before reaching the predecessor's block. This type of failure
+  /// is generally "recoverable", in the sense that the top-level search may still
+  /// succeed even if some recursive search fails in this way.
+  /// - An on-path failure, meaning the function failed to reach the predecessor
+  /// all-the-while staying on the path to it. This type of failure is generally
+  /// "terminating", in the sense that the top-level search will probably fail
+  /// as soon as some recursive search fails in this way.
+  enum class GIIDStatus {
+    /// Denotes an off-path failure.
+    FAIL_OFF_PATH,
+    /// Denotes an on-path failure.
+    FAIL_ON_PATH,
+    /// Denotes a success.
+    SUCCEED
+  };
 
-using GIIDFoldFunc = const std::function<GIIDStatus(Value)> &;
+  using GIIDFoldFunc = const std::function<GIIDStatus(Value)>&;
 } // namespace
 
 /// Logical "or" operator for the GIID status. Combines the returns values of
@@ -566,8 +596,8 @@ static GIIDStatus foldGIIDStatusAnd(GIIDFoldFunc func, ValueRange operands) {
 /// circuit on the CFG path. At any point, the path's last block is the one
 /// which the operand's owning operation was a part of on the parent call to
 /// `isGIIDRec`.
-static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
-                            ArrayRef<unsigned> path) {
+static GIIDStatus isGIIDRec(Value predecessor, OpOperand& oprd,
+  ArrayRef<unsigned> path) {
   Value val = oprd.get();
   if (predecessor == val)
     return GIIDStatus::SUCCEED;
@@ -575,7 +605,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
   // The defining operation must exist, otherwise it means we have reached
   // function arguments without encountering the predecessor value. It must also
   // belong to a block
-  Operation *defOp = val.getDefiningOp();
+  Operation* defOp = val.getDefiningOp();
   if (!defOp)
     return GIIDStatus::FAIL_ON_PATH;
   std::optional<unsigned> defBB = getLogicBB(defOp);
@@ -596,7 +626,8 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
     if (path.drop_back().back() != defBB)
       return GIIDStatus::FAIL_OFF_PATH;
     path = path.drop_back();
-  } else {
+  }
+  else {
     // The defining operation must be somewhere earlier in the path than before.
     // We allow the path to "jump over" BBs, since datapaths of optimized
     // circuits will sometimes skip BBs entirely
@@ -616,7 +647,7 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
       /// NOTE: Is that last part true? Is it possible to jump over the block
       /// defining the predecessor and still be on path?
       return pathSize == 1 ? GIIDStatus::FAIL_ON_PATH
-                           : GIIDStatus::FAIL_OFF_PATH;
+        : GIIDStatus::FAIL_OFF_PATH;
     }
   }
 
@@ -624,71 +655,71 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
   // to be an operand of the defining operation identified above) and changing
   // the current defining operation to be the current one
   auto recurse = [&](Value newVal) -> GIIDStatus {
-    for (OpOperand &oprd : defOp->getOpOperands()) {
+    for (OpOperand& oprd : defOp->getOpOperands()) {
       if (oprd.get() == newVal)
         return isGIIDRec(predecessor, oprd, path);
     }
     llvm_unreachable("recursive call should be on operand of defining op");
-  };
+    };
 
   // The backtracking logic depends on the type of the defining operation
-  return llvm::TypeSwitch<Operation *, GIIDStatus>(defOp)
-      .Case<handshake::ConditionalBranchOp>(
-          [&](handshake::ConditionalBranchOp condBrOp) {
-            // The data operand or the condition operand must depend on the
-            // predecessor
-            return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
-          })
-      .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
-        // The data input on the path must depend on the predecessor
-        return foldGIIDStatusAnd(recurse, defOp->getOperands());
+  return llvm::TypeSwitch<Operation*, GIIDStatus>(defOp)
+    .Case<handshake::ConditionalBranchOp>(
+      [&](handshake::ConditionalBranchOp condBrOp) {
+        // The data operand or the condition operand must depend on the
+        // predecessor
+        return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
       })
-      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-        // If the select operand depends on the predecessor, then the mux
-        // depends on the predecessor
-        if (recurse(muxOp.getSelectOperand()) == GIIDStatus::SUCCEED)
-          return GIIDStatus::SUCCEED;
+    .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
+    // The data input on the path must depend on the predecessor
+    return foldGIIDStatusAnd(recurse, defOp->getOperands());
+      })
+    .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
+    // If the select operand depends on the predecessor, then the mux
+    // depends on the predecessor
+    if (recurse(muxOp.getSelectOperand()) == GIIDStatus::SUCCEED)
+      return GIIDStatus::SUCCEED;
 
-        // Otherwise, data inputs on the path must depend on the predecessor
-        return foldGIIDStatusAnd(recurse, defOp->getOperands());
+    // Otherwise, data inputs on the path must depend on the predecessor
+    return foldGIIDStatusAnd(recurse, defOp->getOperands());
       })
-      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        if (loadOp.getDataResult() != val)
-          return GIIDStatus::FAIL_ON_PATH;
+    .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+    if (loadOp.getDataResult() != val)
+      return GIIDStatus::FAIL_ON_PATH;
 
-        // If the address operand depends on the predecessor then the data
-        // result depends on the predecessor
-        return recurse(loadOp.getAddress());
+    // If the address operand depends on the predecessor then the data
+    // result depends on the predecessor
+    return recurse(loadOp.getAddress());
       })
-      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
-        // Similarly to the mux, if the select operand depends on the
-        // predecessor, then the select depends on the predecessor
-        if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
-          return GIIDStatus::SUCCEED;
+    .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
+    // Similarly to the mux, if the select operand depends on the
+    // predecessor, then the select depends on the predecessor
+    if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
+      return GIIDStatus::SUCCEED;
 
-        // The select's true value or false value must depend on the predecessor
-        ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
-        return foldGIIDStatusAnd(recurse, values);
+    // The select's true value or false value must depend on the predecessor
+    ValueRange values{ selectOp.getTrueValue(), selectOp.getFalseValue() };
+    return foldGIIDStatusAnd(recurse, values);
       })
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-            handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
-            handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
-            handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
-            handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
-            handshake::MulFOp, handshake::SubFOp>([&](auto) {
-        // At least one operand must depend on the predecessor
-        return foldGIIDStatusOr(recurse, defOp->getOperands());
+    .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+    handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
+    handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
+    handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
+    handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
+    handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
+    handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+    handshake::MulFOp, handshake::SubFOp>([&](auto) {
+    // At least one operand must depend on the predecessor
+    return foldGIIDStatusOr(recurse, defOp->getOperands());
       })
-      .Default([&](auto) {
-        // To err on the conservative side, produce the most terminating kind of
-        // failure on encoutering an unsupported operation
-        return GIIDStatus::FAIL_ON_PATH;
+    .Default([&](auto) {
+    // To err on the conservative side, produce the most terminating kind of
+    // failure on encoutering an unsupported operation
+    return GIIDStatus::FAIL_ON_PATH;
       });
 }
 
-bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
+bool dynamatic::isGIID(Value predecessor, OpOperand& oprd, CFGPath& path) {
   assert(path.size() >= 2 && "path must have at least two blocks");
   return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
 }
@@ -697,7 +728,7 @@ bool dynamatic::isChannelOnCycle(mlir::Value channel) {
   llvm::SmallPtrSet<mlir::Value, 32> visited;
 
   std::function<bool(mlir::Value, bool)> dfs =
-      [&](mlir::Value current, bool isStart) -> bool {
+    [&](mlir::Value current, bool isStart) -> bool {
     if (!isStart && current == channel)
       return true;
 
@@ -705,7 +736,7 @@ bool dynamatic::isChannelOnCycle(mlir::Value channel) {
       return false;
     visited.insert(current);
 
-    for (mlir::Operation *user : current.getUsers()) {
+    for (mlir::Operation* user : current.getUsers()) {
       if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user))
         continue;
       for (mlir::Value next : user->getResults()) {
@@ -714,7 +745,7 @@ bool dynamatic::isChannelOnCycle(mlir::Value channel) {
       }
     }
     return false;
-  };
+    };
 
   return dfs(channel, true);
 }
