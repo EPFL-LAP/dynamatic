@@ -646,7 +646,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
             handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
             handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp>([&](auto) {
+            handshake::AbsFOp, handshake::RigidifierOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })

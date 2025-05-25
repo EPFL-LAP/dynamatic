@@ -786,6 +786,10 @@
     "module-name": "logic_not"
   },
   {
+    "name": "handshake.rigidifier",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t rigidifier -p bitwidth=$BITWIDTH"
+  },
+  {
     "name": "handshake.rigidification",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }

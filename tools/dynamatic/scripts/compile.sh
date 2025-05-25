@@ -192,8 +192,6 @@ fi
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
-  --handshake-reshape-channels \
-  --handshake-rigidification \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
@@ -201,8 +199,11 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --handshake-rigidification=json-path=formal_properties.json \
+  > "rigidified.mlir"
+
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+"$DYNAMATIC_OPT_BIN" "rigidified.mlir" --lower-handshake-to-hw \
   > "$F_HW"
 exit_on_fail "Failed to lower to HW" "Lowered to HW"
 

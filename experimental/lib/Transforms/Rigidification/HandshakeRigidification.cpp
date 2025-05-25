@@ -110,6 +110,8 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
                                                MLIRContext *ctx) {
   OpBuilder builder(ctx);
 
+  // TYPE MATCHING
+
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
   Operation *targetOp = getAnalysis<NameAnalysis>().getOp(prop.getTarget());
   auto ownerChannel = ownerOp->getResult(prop.getOwnerIndex());

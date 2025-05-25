@@ -37,6 +37,7 @@ import generators.handshake.shli as shli
 import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
+import generators.handshake.rigidifier as rigidifier
 
 
 def generate_code(name, mod_type, parameters):
@@ -111,6 +112,8 @@ def generate_code(name, mod_type, parameters):
             return sitofp.generate_sitofp(name, parameters)
         case "fptosi":
             return fptosi.generate_fptosi(name, parameters)
+        case "rigidifier":
+            return rigidifier.generate_rigidifier(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
@@ -124,7 +127,8 @@ def parse_parameters(param_list):
                 param_dict[key.strip()] = ast.literal_eval(value.strip())
         return param_dict
     except ValueError:
-        raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
+        raise ValueError(
+            "Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
