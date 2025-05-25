@@ -2,16 +2,16 @@ from generators.support.signal_manager import generate_signal_manager
 
 
 def generate_source(name, params):
-  extra_signals = params.get("extra_signals", None)
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_source_signal_manager(name, extra_signals)
-  else:
-    return _generate_source(name)
+    if extra_signals:
+        return _generate_source_signal_manager(name, extra_signals)
+    else:
+        return _generate_source(name)
 
 
 def _generate_source(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -28,7 +28,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of source
 architecture arch of {name} is
 begin
@@ -36,17 +36,17 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_source_signal_manager(name, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_source(name))
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": 0,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_source(name))

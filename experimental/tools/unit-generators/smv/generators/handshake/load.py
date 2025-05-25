@@ -3,14 +3,14 @@ from generators.support.tehb import generate_tehb
 
 
 def generate_load(name, params):
-  data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
-  addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
+    data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+    addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
 
-  return _generate_load(name, data_type, addr_type)
+    return _generate_load(name, data_type, addr_type)
 
 
 def _generate_load(name, data_type, addr_type):
-  return f"""
+    return f"""
 MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_ready, dataOut_ready)
   VAR
   inner_addr_tehb : {name}__addr_tehb(addrIn, addrIn_valid, addrOut_ready);
