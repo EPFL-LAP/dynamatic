@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines various utility functions to be used for 
+// This file defines various utility functions to be used for
 // integration testing.
 //
 //===----------------------------------------------------------------------===//
@@ -14,10 +14,10 @@
 #define UTIL_H
 
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
-#include <fstream>
-#include <filesystem>
 #include <vector>
 
 namespace fs = std::filesystem;

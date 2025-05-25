@@ -11,27 +11,28 @@
 //===----------------------------------------------------------------------===//
 #include "util.h"
 
-#include <set>
 #include <regex>
+#include <set>
 
 int runIntegrationTest(const std::string &name, int &outSimTime) {
-  fs::path path = fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
-  
+  fs::path path =
+      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+
   std::cout << "[INFO] Running " << name << std::endl;
   std::string tmpFilename = "tmp_" + name + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
     std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
     return -1;
-  } 
+  }
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
-    << "set-src " << path.string() << std::endl
-    << "compile" << std::endl
-    << "write-hdl" << std::endl
-    << "simulate" << std::endl
-    << "exit" << std::endl;
-  
+             << "set-src " << path.string() << std::endl
+             << "compile" << std::endl
+             << "write-hdl" << std::endl
+             << "simulate" << std::endl
+             << "exit" << std::endl;
+
   scriptFile.close();
 
   fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
@@ -74,11 +75,12 @@ int getSimulationTime(const fs::path &logFile) {
 
   // Search lines in reverse order
   for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
-      if (std::regex_search(*it, match, pattern)) {
-          return std::stoi(match[1]) / 4;
-      }
+    if (std::regex_search(*it, match, pattern)) {
+      return std::stoi(match[1]) / 4;
+    }
   }
 
-  std::cout << "[WARNING] Log file does not contain simulation time!" << std::endl;
+  std::cout << "[WARNING] Log file does not contain simulation time!"
+            << std::endl;
   return -1;
 }
