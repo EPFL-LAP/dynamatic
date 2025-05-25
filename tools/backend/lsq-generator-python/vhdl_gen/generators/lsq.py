@@ -6,6 +6,38 @@ from vhdl_gen.generators.dispatchers import PortToQueueDispatcherInit, QueueToPo
 from vhdl_gen.generators.group_allocator import GroupAllocatorInit
 
 def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
+    """
+    LSQ
+
+    Generates the VHDL 'entity' and 'architecture' sections for a LSQ.
+    
+    This function appneds the following to the file '<path_rtl>/<name>_core.vhd:
+        1. 'entity <name>' declaration
+        2. 'architecture arch of <name>' implementation
+        
+    The generated code also instantitates:
+        - Group Allocator
+        - Port-to-Queue Dispatcher
+            - Load Address Port Dispatcher
+            - Store Address Port Dispatcher
+            - Store Data Port Dispatcher
+        - Queue-to-Port Dispatcher
+            - Load Data Port Dispatcher
+            - (Optionally) Store Backward Port Dispatcher
+
+    Parameters:
+        ctx         : VHDLContext for code generation state.
+        path_rtl    : Output directory for VHDL files.
+        name        : Base name of the LSQ.
+        configs     : configuration generated from JSON
+
+    Output:
+        Appends the 'entity' and 'architecture' definitions
+        to the .vhd file at <path_rtl>/<name>_core.vhd.
+        Entity and architecture use the identifier: <name>
+
+    *Instantiation of LSQ is in lsq-generator.py.
+    """
 
     # Initialize the global parameters
     ctx.tabLevel = 1

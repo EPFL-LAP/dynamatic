@@ -4,6 +4,25 @@ from vhdl_gen.operators import *
 from vhdl_gen.configs import *
 
 def GroupAllocator(ctx: VHDLContext, path_rtl: str, name: str, suffix: str, configs: Configs) -> str:
+    """
+    Group Allocator
+
+    Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
+    
+    Parameters:
+        ctx         : VHDLContext for code generation state.
+        path_rtl    : Output directory for VHDL files.
+        name        : Base name of the group allocator.
+        suffix      : Suffix appended to the entity name.
+        configs     : configuration generated from JSON
+
+    Output:
+        Appends the 'entity' and 'architecture' definitions
+        to the .vhd file at <path_rtl>/<name>_core.vhd.
+        Entity and architecture use the identifier: <name><suffix>
+
+    """
+    
     # Initialize the global parameters
     ctx.tabLevel = 1
     ctx.tempCount = 0
@@ -163,6 +182,35 @@ def GroupAllocatorInit(
     stq_port_idx_o:     LogicVecArray,
     ga_ls_order_o:      LogicVecArray
 ) -> str:
+    """
+    Group Allocator Instantiation
+
+    Creates the VHDL port mapping for the group allocator entity.
+
+    Parameters:
+        ctx                  : VHDLContext for code generation state.
+        name                 : Base name of the group allocator entity.
+        configs              : configuration generated from JSON
+        group_init_valid_i   : Group Allocator handshake valid signal
+        group_init_ready_o   : Group Allocator handshake ready signal
+        ldq_tail_i           : Load queue tail
+        ldq_head_i           : Load queue head
+        ldq_empty_i          : (boolean) load queue empty
+        stq_tail_i           : Store queue tail
+        stq_head_i           : Store queue head
+        stq_empty_i          : (boolean) store queue empty
+        ldq_wen_o            : Load queue write enable
+        num_loads_o          : The number of loads
+        ldq_port_idx_o       : Load queue port index
+        stq_wen_o            : Store queue write enable
+        num_stores_o         : The number of stores
+        stq_port_idx_o       : Store queue port index
+        ga_ls_order_o        : Group Allocator load-store order matrix
+
+    Returns:
+        VHDL instantiation string for inclusion in the architecture body.
+    """
+
     arch = ctx.get_current_indent() + f'{name} : entity work.{name}\n'
     ctx.tabLevel += 1
     arch += ctx.get_current_indent() + f'port map(\n'

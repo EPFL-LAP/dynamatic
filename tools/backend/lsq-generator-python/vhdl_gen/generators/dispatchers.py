@@ -13,6 +13,35 @@ def PortToQueueDispatcher(
     bitsW:              int,
     portAddrW:          int
 ) -> str:
+    """
+    Port-to-Queue (Port-to-Entry) Dispatcher
+
+    Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
+    that passes arguments from a specific access port to a corresponding LSQ entry.
+
+    This generates three main parts in LSQ:
+        1. Load Address Port Dispatcher
+        2. Store Address Port Dispatcher
+        3. Store Data Port Dispatcher
+    
+    Parameters:
+        ctx         : VHDLContext for code generation state.
+        path_rtl    : Output directory for VHDL files.
+        name        : Base name of the dispatcher.
+        suffix      : Suffix appended to the entity name.
+        numPorts    : Number of access ports.
+        numEntries  : Number of queue entries.
+        bitsW       : Width of each data/address bus.
+        portAddrW   : Width of the port index bus.
+
+    Output:
+        Appends the 'entity' and 'architecture' definitions
+        to the .vhd file at <path_rtl>/<name>_core.vhd.
+        Entity and architecture use the identifier: <name><suffix>
+
+    """
+
+
     # Initialize the global parameters
     ctx.tabLevel = 1
     ctx.tempCount = 0
@@ -67,7 +96,7 @@ def PortToQueueDispatcher(
             arch += ctx.get_current_indent() + f'{entry_port_and.getNameWrite(i, j)} <= ' \
                 f'{entry_port_request.getNameRead(i, j)} and {port_valid_i.getNameRead(j)};\n'
 
-    # For each port, the oldest entry recieves bit this cycle. The priority masking per port(column)
+    # For each port, the oldest entry receives bit this cycle. The priority masking per port(column)
     # generates entry-port pairs that will tranfer data/address this cycle.
     entry_port_hs = LogicVecArray(ctx, 'entry_port_hs', 'w', numEntries, numPorts)
     arch += CyclicPriorityMasking(ctx, entry_port_hs, entry_port_and, queue_head_oh_i)
@@ -102,6 +131,32 @@ def QueueToPortDispatcher(
     bitsW:              int,
     portAddrW:          int
 ) -> str:
+    """
+    Queue-to-Port (Entry-to-Port) Dispatcher
+
+    Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
+    that routes data from queue entries to their access ports.
+
+    This generates one main part in LSQ:
+        1. Load Data Port Dispatcher
+    
+    Parameters:
+        ctx         : VHDLContext for code generation state.
+        path_rtl    : Output directory for VHDL files.
+        name        : Base name of the dispatcher.
+        suffix      : Suffix appended to the entity name.
+        numPorts    : Number of access ports.
+        numEntries  : Number of queue entries.
+        bitsW       : Width of each data bus.
+        portAddrW   : Width of the port index bus.
+
+    Output:
+        Appends the 'entity' and 'architecture' definitions
+        to the .vhd file at <path_rtl>/<name>_core.vhd.
+        Entity and architecture use the identifier: <name><suffix>
+
+    """
+
     # Initialize the global parameters
     ctx.tabLevel = 1
     ctx.tempCount = 0
@@ -201,7 +256,32 @@ def PortToQueueDispatcherInit(
     entry_wen_o:        LogicArray,
     queue_head_oh_i:    LogicVec
 ) -> str:
-    
+    """
+    Port-to-Queue Dispatcher Instantiation
+
+    Creates the VHDL port mapping for the Port-to-Queue dispatcher entity.
+    Connects the top-level signals (reset, clock, port and entry signals)
+    to the internal dispatcher instance named <name>_dispatcher.
+
+    Parameters:
+        ctx                  : VHDLContext for code generation state.
+        name                 : Base name of the dispatcher entity.
+        numPorts             : Number of access ports.
+        numEntries           : Number of queue entries.
+        port_bits_i          : Input data or address bits from each port
+        port_valid_i         : Valid signal for each input port (Valid data/address)
+        port_ready_o         : Ready signal indicating LSQ is ready to receive data/address
+        entry_valid_i        : Valid bit for a queue entry
+        entry_bits_valid_i   : Valid bit for the contents of a queue entry
+        entry_port_idx_i     : Indicates to which port the entry is assigned
+        entry_bits_o         : Output bits written to the entry
+        entry_wen_o          : Write enable for each entry 
+        queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
+
+    Returns:
+        VHDL instantiation string for inclusion in the architecture body.
+    """
+
     arch = ctx.get_current_indent() + f'{name}_dispatcher : entity work.{name}\n'
     ctx.tabLevel += 1
     arch += ctx.get_current_indent() + f'port map(\n'
@@ -246,6 +326,31 @@ def QueueToPortDispatcherInit(
     entry_reset_o:      LogicArray,
     queue_head_oh_i:    LogicVec
 ) -> str:
+    """
+    Queue-to-Port Dispatcher Instantiation
+
+    Creates the VHDL port mapping for the Queue-to-Port dispatcher entity.
+    Connects the top-level signals (reset, clock, entry and port signals)
+    to the internal dispatcher instance named <name>_dispatcher.
+
+    Parameters:
+        ctx                  : VHDLContext for code generation state.
+        name                 : Base name of the dispatcher entity.
+        numPorts             : Number of access ports.
+        numEntries           : Number of queue entries.
+        port_bits_o          : Output data bits from each LSQ entry
+        port_valid_o         : Valid signal for each input port (Valid data)
+        port_ready_i         : Ready signal indicating LSQ is ready to send data
+        entry_valid_i        : Valid bit for a queue entry
+        entry_bits_valid_i   : Valid bit for the contents of a queue entry
+        entry_port_idx_i     : Indicates to which port the entry is assigned
+        entry_bits_i         : Input data bits which is written in the LSQ entry
+        entry_reset_o        : Array of reset outputs for entries.
+        queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
+
+    Returns:
+        VHDL instantiation string for inclusion in the architecture body.
+    """
 
     arch = ctx.get_current_indent() + f'{name}_dispatcher : entity work.{name}\n'
     ctx.tabLevel += 1
