@@ -18,9 +18,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/MapVector.h"
-
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 namespace handshake {
