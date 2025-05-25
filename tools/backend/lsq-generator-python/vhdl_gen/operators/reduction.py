@@ -4,9 +4,10 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
 
-# ===----------------------------------------------------------------------===#
+
+#===----------------------------------------------------------------------===#
 # Reduction
-# ===----------------------------------------------------------------------===#
+#===----------------------------------------------------------------------===#
 # The following functions implement cyclic left shifts:
 #   ReduceLogicVec()      : Recursively reduce a single vector.
 #   ReduceLogicArray()    : Recursively reduce an array of single-bit elements.
@@ -26,7 +27,7 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
         operator (str)     : 'and', 'or', ...
         length   (int)     : Current recursion length;
                              set to "2**(log2Ceil(din.size) - 1)" when called initially.
-
+    
         The "length" parameter is used internally to control recursion depth and
         should always start at "2**(log2Ceil(din.size) - 1)".
 
@@ -39,7 +40,7 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
 
         When this method is called, "length" is always "2**(log2Ceil(din.size) - 1)".
         "length" is just for an recursive action.
-
+        
 
     Example: 
         1. din = "01110010", operator = 'and' -> dout = '0'
@@ -49,7 +50,7 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
                       operator "g" operator "h" operator "i" operator "j" operator "k"
                       operator "l" operator "m" operator "n" operator "o" operator "p" 
     """
-
+    
     str_ret = ''
     if (length == 1):
         str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= ' + \
@@ -59,19 +60,18 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
         res = LogicVec(ctx, ctx.get_temp('res'), 'w', length)
         for i in range(0, din.size - length):
             str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= ' + \
-                f'{din.getNameRead(i)} {operator} {din.getNameRead(i+length)};\n'
+            f'{din.getNameRead(i)} {operator} {din.getNameRead(i+length)};\n'
         for i in range(din.size - length, length):
             str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= ' + \
-                f'{din.getNameRead(i)};\n'
+            f'{din.getNameRead(i)};\n'
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += ReduceLogicVec(ctx, dout, res, operator, length//2)
     return str_ret
 
-
 def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of LogicArray "din" by "operator".
-
+    
     Identical in behavior to ReduceLogicVec, but operates on multiple VHDL single-bit std_logic
     instead of std_logic_vector.
     """
@@ -90,18 +90,17 @@ def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
         str_ret += ReduceLogicArray(ctx, dout, res, operator, length//2)
     return str_ret
 
-
 def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of the LogicVecArray "din" by "operator".
-
+    
     Parameters:
         dout     (LogicVec)     : Destination std_logic_vector to hold the reduced result.
         din      (LogicVecArray): Source LogicVecArray to be reduced.
         operator (str)          : 'and', 'or', ...
         length   (int)          : Current recursion length;
                                   set to "2**(log2Ceil(din.size) - 1)" when called initially.
-
+    
         The "length" parameter is used internally to control recursion depth and
         should always start at "2**(log2Ceil(din.size) - 1)".
 
@@ -114,14 +113,14 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
 
         When this method is called, "length" is always "2**(log2Ceil(din.size) - 1)".
         "length" is just for an recursive action.
-
+    
     Example:
         din = (LogicVecArray x with length of 8, each Vec size 16) where
         x[0]  = "a1 a2 a3 ... a16"
         x[1]  = "b1 b2 b3 ... b16"
         ...
         x[7]  = "p1 p2 p3 ... p16"
-
+        
         dout = x[0] operator x[1] operator ... operator x[7]
 
         If operator = '&',
@@ -142,7 +141,6 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
         str_ret += ctx.get_current_indent() + '-- Layer End\n'
         str_ret += ReduceLogicVecArray(ctx, dout, res, operator, length//2)
     return str_ret
-
 
 def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
     """
@@ -185,3 +183,4 @@ def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
     if (comment):
         str_ret += ctx.get_current_indent() + '-- Reduction End\n\n'
     return str_ret
+

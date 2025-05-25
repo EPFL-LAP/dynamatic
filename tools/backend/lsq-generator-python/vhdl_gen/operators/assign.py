@@ -2,8 +2,7 @@ from vhdl_gen.context import VHDLContext
 from vhdl_gen.utils import *
 from vhdl_gen.signals import *
 
-
-def Op(ctx: VHDLContext, out, *list_in) -> str:
+def Op(ctx: VHDLContext, out, *list_in) -> str:    
     """
     Generates a proper VHDL assignment statement.
 
@@ -13,7 +12,7 @@ def Op(ctx: VHDLContext, out, *list_in) -> str:
 
     Example: Op(ctx, valid, a,'when', b, 'else', 0)
             valid <= a when b else '0'
-
+    
     """
     if type(out) == tuple:
         if len(out) == 2:
