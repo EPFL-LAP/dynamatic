@@ -3,14 +3,14 @@ from generators.support.tehb import generate_tehb
 
 
 def generate_load(name, params):
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["dataOut"])
-  addr_type = SmvScalarType(params[ATTR_PORT_TYPES]["addrIn"])
+    data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+    addr_type = SmvScalarType(params[ATTR_ADDR_BITWIDTH])
 
-  return _generate_load(name, data_type, addr_type)
+    return _generate_load(name, data_type, addr_type)
 
 
 def _generate_load(name, data_type, addr_type):
-  return f"""
+    return f"""
 MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_ready, dataOut_ready)
   VAR
   inner_addr_tehb : {name}__addr_tehb(addrIn, addrIn_valid, addrOut_ready);
@@ -25,6 +25,6 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   dataOut := inner_data_tehb.outs;
   dataOut_valid := inner_data_tehb.outs_valid;
 
-{generate_tehb(f"{name}__addr_tehb", {ATTR_DATA_TYPE: addr_type.mlir_type})}
-{generate_tehb(f"{name}__data_tehb", {ATTR_DATA_TYPE: data_type.mlir_type})}
+{generate_tehb(f"{name}__addr_tehb", {ATTR_BITWIDTH: addr_type.bitwidth})}
+{generate_tehb(f"{name}__data_tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
