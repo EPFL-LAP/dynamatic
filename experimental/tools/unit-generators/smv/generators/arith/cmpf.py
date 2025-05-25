@@ -8,11 +8,13 @@ def generate_cmpf(name, params):
     latency = params[ATTR_LATENCY]
     is_double = params[ATTR_IS_DOUBLE]
     abstract_data = params[ATTR_ABSTRACT_DATA]
+    params[ATTR_BITWIDTH] = 64 if is_double else 32
 
     if abstract_data:
         return generate_nondeterministic_comparator(name, params)
     else:
-        raise ValueError("Floating point operations support abstract data only")
+        raise ValueError(
+            "Floating point operations support abstract data only")
 
 
 def get_symbol_from_predicate(pred):
