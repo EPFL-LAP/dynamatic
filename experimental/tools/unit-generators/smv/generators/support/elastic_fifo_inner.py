@@ -3,7 +3,7 @@ from generators.support.utils import *
 
 def generate_elastic_fifo_inner(name, params):
   slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
-  data_type = SmvScalarType(params[ATTR_DATA_TYPE])
+  data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
   if data_type.bitwidth == 0:
     return _generate_elastic_fifo_inner_dataless(name, slots)
@@ -17,8 +17,8 @@ MODULE {name}(ins_valid, outs_ready)
   VAR
   full : boolean;
   empty : boolean;
-  head : 0..({slots - 1});
-  tail : 0..({slots - 1});
+  head : 0..{slots - 1};
+  tail : 0..{slots - 1};
 
   DEFINE
   read_en := outs_ready & !empty;
@@ -59,9 +59,9 @@ MODULE {name}(ins_valid, outs_ready)
     TRUE : empty;
   esac;
 
-  // output
+  -- output
   DEFINE
-  ins_ready := !full & outs_ready;
+  ins_ready := !full | outs_ready;
   outs_valid := !empty;
 """
 
@@ -73,8 +73,8 @@ MODULE {name}(ins, ins_valid, outs_ready)
   VAR
   full : boolean;
   empty : boolean;
-  head : 0..({slots - 1});
-  tail : 0..({slots - 1});
+  head : 0..{slots - 1};
+  tail : 0..{slots - 1};
 
   DEFINE
   read_en := outs_ready & !empty;
@@ -119,9 +119,9 @@ MODULE {name}(ins, ins_valid, outs_ready)
     TRUE : empty;
   esac;
 
-  // output
+  -- output
   DEFINE
-  ins_ready := !full & outs_ready;
+  ins_ready := !full | outs_ready;
   outs_valid := !empty;
   outs := case
     {"\n    ".join([f"head = {n} : mem_{n};" for n in range(slots)])}

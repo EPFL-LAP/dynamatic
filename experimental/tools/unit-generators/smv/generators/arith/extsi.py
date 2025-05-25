@@ -5,12 +5,12 @@ from generators.support.utils import *
 
 def generate_extsi(name, params):
   latency = params[ATTR_LATENCY]
-  input_type = SmvScalarType(params[ATTR_PORT_TYPES]["ins"])
-  output_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
+  input_type = SmvScalarType(params[ATTR_IN_BITWIDTH])
+  output_type = SmvScalarType(params[ATTR_OUT_BITWIDTH])
   abstract_data = params[ATTR_ABSTRACT_DATA]
 
   if abstract_data:
-    return generate_abstract_binary_op(name, latency, output_type)
+    return generate_abstract_unary_op(name, latency, output_type)
   else:
     return _generate_extsi(name, latency, input_type, output_type)
 
