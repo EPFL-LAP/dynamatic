@@ -102,9 +102,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
 
   switch (type) {
   case TYPE::AOB:
-    return AbsenceOfBackpressure::fromJSON(value, path);
+    return AbsenceOfBackpressure::fromJSON(value, path.field("info"));
   case TYPE::VEQ:
-    return ValidEquivalence::fromJSON(value, path);
+    return ValidEquivalence::fromJSON(value, path.field("info"));
   }
 }
 
@@ -186,7 +186,7 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
       !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
       !mapper.mapOptional("user", prop->ownerChannel.operationName) ||
       !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
-      !mapper.mapOptional("user_index", prop->ownerChannel.name) ||
+      !mapper.mapOptional("user_index", prop->ownerChannel.index) ||
       !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
       !mapper.mapOptional("user_channel", prop->userChannel.name))
     return nullptr;

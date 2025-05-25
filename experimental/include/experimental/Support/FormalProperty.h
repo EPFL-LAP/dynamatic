@@ -81,7 +81,7 @@ public:
   ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::VEQ;
+    return fp->getType() == TYPE::AOB;
   }
 
 private:
@@ -133,7 +133,7 @@ public:
     // make_unique and returns a pointer
     property = FormalProperty::fromJSON(value, path);
 
-    return true;
+    return property != nullptr;
   }
 
 private:
