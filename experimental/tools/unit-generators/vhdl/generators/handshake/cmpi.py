@@ -3,52 +3,52 @@ from generators.handshake.join import generate_join
 
 
 def generate_cmpi(name, params):
-  bitwidth = params["bitwidth"]
-  predicate = params["predicate"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    predicate = params["predicate"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
-  else:
-    return _generate_cmpi(name, predicate, bitwidth)
+    if extra_signals:
+        return _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals)
+    else:
+        return _generate_cmpi(name, predicate, bitwidth)
 
 
 def _get_symbol_from_predicate(pred):
-  match pred:
-    case "eq":
-      return "="
-    case "neq":
-      return "/="
-    case "slt" | "ult":
-      return "<"
-    case "sle" | "ule":
-      return "<="
-    case "sgt" | "ugt":
-      return ">"
-    case "sge" | "uge":
-      return ">="
-    case _:
-      raise ValueError(f"Predicate {pred} not known")
+    match pred:
+        case "eq":
+            return "="
+        case "neq":
+            return "/="
+        case "slt" | "ult":
+            return "<"
+        case "sle" | "ule":
+            return "<="
+        case "sgt" | "ugt":
+            return ">"
+        case "sge" | "uge":
+            return ">="
+        case _:
+            raise ValueError(f"Predicate {pred} not known")
 
 
 def _get_sign_from_predicate(pred):
-  match pred:
-    case "eq" | "neq":
-      return ""
-    case "slt" | "sle" | "sgt" | "sge":
-      return "signed"
-    case "ult" | "ule" | "ugt" | "uge":
-      return "unsigned"
-    case _:
-      raise ValueError(f"Predicate {pred} not known")
+    match pred:
+        case "eq" | "neq":
+            return ""
+        case "slt" | "sle" | "sgt" | "sge":
+            return "signed"
+        case "ult" | "ule" | "ugt" | "uge":
+            return "unsigned"
+        case _:
+            raise ValueError(f"Predicate {pred} not known")
 
 
 def _generate_cmpi(name, predicate, bitwidth):
-  join_name = f"{name}_join"
+    join_name = f"{name}_join"
 
-  dependencies = generate_join(join_name, {"size": 2})
+    dependencies = generate_join(join_name, {"size": 2})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -73,10 +73,10 @@ entity {name} is
 end entity;
 """
 
-  modifier = _get_sign_from_predicate(predicate)
-  comparator = _get_symbol_from_predicate(predicate)
+    modifier = _get_sign_from_predicate(predicate)
+    comparator = _get_symbol_from_predicate(predicate)
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of cmpi
 architecture arch of {name} is
 begin
@@ -96,25 +96,25 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_cmpi_signal_manager(name, predicate, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "lhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "rhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": 1,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_cmpi(name, predicate, bitwidth))
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "result",
+            "bitwidth": 1,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_cmpi(name, predicate, bitwidth))

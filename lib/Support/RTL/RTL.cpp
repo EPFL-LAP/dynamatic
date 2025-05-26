@@ -245,40 +245,6 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
   return values;
 }
 
-/// Serializes the module's "port_types", which includes the types of all ports
-/// (operands and results) of the original operation. This is passed to the RTL
-/// generator to help it generate the correct port types. e.g., '{"lhs":
-/// "!handshake.channel<i32, [spec: i1]>",
-// "rhs": "!handshake.channel<i32, [spec: i1]>",
-// "result": "!handshake.channel<i1, [spec: i1]>"}'
-static std::string serializePortTypes(hw::ModuleType &mod) {
-  // Prepare a string stream to serialize the port types
-  std::string portTypesValue;
-  llvm::raw_string_ostream portTypes(portTypesValue);
-
-  // Wrap in single quotes for easier passing as a generator argument.
-  portTypes << "'{"; // Start of the JSON object
-
-  bool first = true;
-  for (const hw::ModulePort &port : mod.getPorts()) {
-    // Skip the clock and reset ports
-    if (port.name == "clk" || port.name == "rst")
-      continue;
-
-    if (!first)
-      portTypes << ", ";
-    first = false;
-
-    portTypes << "\"" << port.name.str() << "\": \"";
-    // TODO: Escape "" in the port type (if needed)
-    port.type.print(portTypes);
-    portTypes << "\"";
-  }
-  portTypes << "}'"; // End of the JSON object
-
-  return portTypes.str();
-}
-
 static std::string serializeExtraSignalsInner(const Type &type) {
   assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
          "type should be ChannelType or ControlType");
@@ -320,16 +286,9 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-  registerPortTypesParameter(modOp, modName, modType);
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-}
-
-void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType) {
-  serializedParams["PORT_TYPES"] = serializePortTypes(modType);
 }
 
 void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
@@ -339,11 +298,11 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
-      modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.sink" ||
-      modName == "handshake.subi" || modName == "handshake.shli" ||
-      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
-      modName == "handshake.fptosi" ||
+      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.merge" || modName == "handshake.muli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.shli" || modName == "handshake.blocker" ||
+      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -398,7 +357,10 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
-             modName == "handshake.mulf" || modName == "handshake.subf") {
+             modName == "handshake.mulf" || modName == "handshake.subf" ||
+             modName == "handshake.divf" || modName == "handshake.negf" ||
+             modName == "handshake.maximumf" ||
+             modName == "handshake.minimumf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
