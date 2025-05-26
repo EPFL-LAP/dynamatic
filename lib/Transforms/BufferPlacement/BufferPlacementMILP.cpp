@@ -547,6 +547,7 @@ void BufferPlacementMILP::
     // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
     // number (dataLatency) minus the ceiling of the product of data latency and
     // CFDFC throughput.
+    // We approximate the ceiling function numerically to keep the model linear.
     model.addQConstr(shiftRegExtraBubbles >=
                          dataLatency - dataLatency * throughput - 0.99,
                      shiftRegExtraBubblesName);
