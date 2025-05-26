@@ -70,11 +70,11 @@ FormalProperty::tagFromStr(const std::string &s) {
 std::string FormalProperty::tagToStr(TAG t) {
   switch (t) {
   case TAG::OPT:
-    return "OPT";
+    return "opt";
   case TAG::INVAR:
-    return "INVAR";
+    return "invar";
   case TAG::ERROR:
-    return "ERRR";
+    return "error";
   }
 }
 
@@ -108,19 +108,20 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
 
   ownerChannel.operationName = getUniqueName(ownerOp).str();
   userChannel.operationName = getUniqueName(userOp).str();
-  ownerChannel.index = res.getResultNumber();
-  userChannel.index = operandIndex;
-  ownerChannel.name = ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel.name = userNamer.getInputName(operandIndex).str();
+  ownerChannel.channelIndex = res.getResultNumber();
+  userChannel.channelIndex = operandIndex;
+  ownerChannel.channelName =
+      ownerNamer.getOutputName(res.getResultNumber()).str();
+  userChannel.channelName = userNamer.getInputName(operandIndex).str();
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", ownerChannel.operationName},
                              {"user", userChannel.operationName},
-                             {"owner_index", ownerChannel.index},
-                             {"user_index", userChannel.index},
-                             {"owner_channel", ownerChannel.name},
-                             {"user_channel", userChannel.name}});
+                             {"owner_index", ownerChannel.channelIndex},
+                             {"user_index", userChannel.channelIndex},
+                             {"owner_channel", ownerChannel.channelName},
+                             {"user_channel", userChannel.channelName}});
 }
 
 // Valid Equivalence
@@ -138,19 +139,19 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
 
   ownerChannel.operationName = getUniqueName(op1).str();
   targetChannel.operationName = getUniqueName(op2).str();
-  ownerChannel.index = i;
-  targetChannel.index = j;
-  ownerChannel.name = namer1.getOutputName(i).str();
-  targetChannel.name = namer2.getOutputName(j).str();
+  ownerChannel.channelIndex = i;
+  targetChannel.channelIndex = j;
+  ownerChannel.channelName = namer1.getOutputName(i).str();
+  targetChannel.channelName = namer2.getOutputName(j).str();
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", ownerChannel.operationName},
                              {"target", targetChannel.operationName},
-                             {"owner_index", ownerChannel.index},
-                             {"target_index", targetChannel.index},
-                             {"owner_channel", ownerChannel.name},
-                             {"target_channel", targetChannel.name}});
+                             {"owner_index", ownerChannel.channelIndex},
+                             {"target_index", targetChannel.channelIndex},
+                             {"owner_channel", ownerChannel.channelName},
+                             {"target_channel", targetChannel.channelName}});
 }
 
 } // namespace dynamatic

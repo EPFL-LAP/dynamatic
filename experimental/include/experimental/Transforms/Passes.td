@@ -111,12 +111,11 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
 }
 
 def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"> {
-  let summary = "Annotates Operations with Formal Properties";
+  let summary = "Annotates Formal Properties into a json database";
   let description = [{
-    The pass annotates each operation with property IDs and generates
-    a table that contains for each ID all the information needed to
-    define a check the property. Currently it only annotates Absence of
-    Backpressure, but it can be extended to annotate other properties.
+    This analysis pass generates a table that contains all the information needed to
+    define and check a set of properties. Currently it only annotates Absence of
+    Backpressure and Valid Equivalence, but it can be extended to annotate more.
   }];
   let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
