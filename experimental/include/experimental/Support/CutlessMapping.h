@@ -26,21 +26,31 @@ using namespace mlir;
 namespace dynamatic {
 namespace experimental {
 
-/// Represents a cut that is used for technology mapping to LUTs.
+/// A cut C of node n is a set of nodes (called leaves) such that every
+/// path from any combinational input to n traverses at least one
+/// leaf of C. The cuts are used to map Subject Graphs to macro-cells. The Cut
+/// class represents a single cut of node n.
 class Cut {
 public:
   // Constructor for trivial cuts, which only have itself as a leaf.
   Cut(Node *root, Node *leaf, int depth = 0)
-      : depth(depth), leaves({leaf}), root(root) {};
+      : depth(depth), root(root), leaves({leaf}) {};
+  // Constructor for non-trivial cuts
   Cut(Node *root, std::set<Node *> leaves, int depth = 0)
-      : depth(depth), leaves({leaves}), root(root) {};
+      : depth(depth), root(root), leaves({leaves}) {};
 
+  // Returns the depth of a cut, which is the number of wavy lines below the
+  // root node
   int getDepth() { return depth; }
 
+  // Returns the cut selection variable, which is a Gurobi variable used for
+  // MapBuf formulation. This variable is unique for each cut.
   GRBVar &getCutSelectionVariable() { return cutSelection; }
 
+  // Returns the root node of the cut.
   Node *getNode() { return root; }
 
+  // Returns the leaves of the cut.
   std::set<Node *> &getLeaves() { return leaves; }
 
 private:
@@ -50,23 +60,13 @@ private:
   std::set<Node *> leaves; // Set of leaves in the cut
 };
 
-struct NodePtrHash {
-  std::size_t operator()(const Node *node) const {
-    return std::hash<std::string>()(node->name);
-  }
-};
-
-struct NodePtrEqual {
-  bool operator()(const Node *lhs, const Node *rhs) const {
-    return lhs->name == rhs->name;
-  }
-};
-
-// Maps Nodes to their corresponding cuts.
+// Maps each node to all cuts that have that node as their root node.
 using NodeToCuts =
     std::unordered_map<Node *, std::vector<Cut>, NodePtrHash, NodePtrEqual>;
 
-// Cut generation algorithm that finds cuts for a given AIG.
+// Cut generation algorithm that finds the K-feasible (K given by lutSize) cuts
+// for each node inside the given LogicNetwork object (in this case this
+// corresponds to an AIG).
 NodeToCuts generateCuts(LogicNetwork *blif, int lutSize);
 
 // Prints the cuts, used for debugging

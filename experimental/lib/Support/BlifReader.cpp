@@ -378,7 +378,7 @@ void BlifWriter::writeToFile(LogicNetwork &network,
     file << ".latch " << latch.first->name << " " << latch.second->name << "\n";
   }
 
-  for (const auto &node : network.getNodesInOrder()) {
+  for (const auto &node : network.getNodesInTopologicalOrder()) {
     if (node->isConstZero || node->isConstOne) {
       file << ".names " << node->name << "\n";
       file << (node->isConstZero ? "0" : "1") << "\n";

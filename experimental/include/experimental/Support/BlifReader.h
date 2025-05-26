@@ -150,6 +150,19 @@ public:
   friend class LogicNetwork;
 };
 
+// Hash and equality functions for Node pointers, used in unordered maps
+struct NodePtrHash {
+  std::size_t operator()(const Node *node) const {
+    return std::hash<std::string>()(node->name);
+  }
+};
+
+struct NodePtrEqual {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->name == rhs->name;
+  }
+};
+
 /// Manages a collection of interconnected nodes representing a
 /// circuit, maintaining relationships between nodes including latches and
 /// topological ordering. The class provides functionality for:
@@ -224,7 +237,9 @@ public:
 
   // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
-  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
+  std::vector<Node *> getNodesInTopologicalOrder() {
+    return nodesTopologicalOrder;
+  }
 
   // Returns Inputs of the Blif file.
   std::set<Node *> getInputs();

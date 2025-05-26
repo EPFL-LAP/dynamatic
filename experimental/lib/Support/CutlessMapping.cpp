@@ -25,10 +25,13 @@ using namespace dynamatic::experimental;
 // cuts of a Node.
 void sortAndEraseCuts(NodeToCuts &cuts) {
   for (auto &[node, cutVector] : cuts) {
+    // Sort the cuts based on the lexicographical order of the names of the leaf
+    // Nodes.
     std::sort(cutVector.begin(), cutVector.end(), [](Cut &a, Cut &b) {
       const auto leavesA = a.getLeaves();
       const auto leavesB = b.getLeaves();
 
+      // Early exit if the sizes of the sets are different.
       if (leavesA.size() != leavesB.size()) {
         return leavesA.size() < leavesB.size();
       }
@@ -40,12 +43,14 @@ void sortAndEraseCuts(NodeToCuts &cuts) {
           });
     });
 
+    // If there are duplicate cuts, erase one of them.
     cutVector.erase(std::unique(cutVector.begin(), cutVector.end(),
                                 [](Cut &a, Cut &b) {
                                   const auto &leavesA = a.getLeaves();
                                   const auto &leavesB = b.getLeaves();
 
-                                  // Compare the sizes first
+                                  // Early exit if the sizes of the sets are
+                                  // different.
                                   if (leavesA.size() != leavesB.size()) {
                                     return false;
                                   }
@@ -98,6 +103,7 @@ std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
 
   dfs(node);
 
+  // Insert the node back to the wavyLine if it was erased.
   if (erased) {
     wavyLine.insert(node);
   }
@@ -105,50 +111,55 @@ std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
   return wavyInputs;
 }
 
-// Depth-oriented mapping algorithm. A wavy line is a set of nodes that can be
-// implemented on an LUT in terms of Nodes that are below it. For example, third
-// wavy line consists of the Nodes that can be implemented in terms of the first
-// and second wavy line.
+// Depth-oriented mapping algorithm. A wavy line represents a set of nodes in
+// the LogicNetwork, grouped by depth. By definition, the nodes in the n-th wavy
+// line can be implemented as a function of the nodes in any of the previous
+// wavy lines, i.e., the (n−i)-th wavy line for any i such that 0 < i ≤ n. For
+// example, nodes in the third wavy line may be implemented using nodes from the
+// first or second wavy line.
 NodeToCuts cutAlgorithm(LogicNetwork *blif, int lutSize, bool includeChannels) {
   NodeToCuts cuts;
   // First wavy line consists of the Primary Inputs of the circuit.
   std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
 
-  // Add Channel Nodes to the first wavy line
+  // Add Channel Nodes to the first wavy line if the flag is set.
   if (includeChannels) {
     for (auto *channel : blif->getChannels()) {
       currentWavyLine.insert(channel);
     }
   }
 
+  // Variable to keep track of how many times the wavy line has been expanded.
   int expansionCount = 0;
-  int expansionWithChannels = 6; // The limit for the expansion of the algorithm
+  // The limit for the expansion of the algorithm when Channels are
+  // included. Prevents infinite expansion of the wavy lines.
+  int expansionWithChannels = 6;
 
-  // Keep expanding until we hit the expansion limit
-  while (!(includeChannels && (expansionCount >= expansionWithChannels))) {
+  // Keep expanding until we hit the expansion limit.
+  while (!includeChannels || (expansionCount < expansionWithChannels)) {
     std::set<Node *> nextWavyLine;
 
-    for (auto &currentNode : blif->getNodesInOrder()) {
+    for (auto &currentNode : blif->getNodesInTopologicalOrder()) {
       // Find wavy inputs of the currentNode. Wavy inputs consists of the Nodes
       // that can be used to implement the currentNode.
       std::set<Node *> wavyInputs =
           findWavyInputsOfNode(currentNode, currentWavyLine);
-      // if the number of wavy inputs is less than or equal to the limit (the
-      // LUT size), add to the set of next wavy line
+      // If the number of wavy inputs is less than or equal to the limit (the
+      // LUT size), add to the set of nextWavyLine and update the cuts of the
+      // currentNode
       if (wavyInputs.size() <= lutSize) {
         nextWavyLine.insert(currentNode);
         cuts[currentNode].emplace_back(currentNode, wavyInputs, expansionCount);
       }
     }
 
-    // break if there are no changes to the wavy lines
+    // Break if the algorithm has converged.
     if ((nextWavyLine.size() == currentWavyLine.size())) {
       break;
     }
 
     expansionCount++;
-    // Expand the wavy line by adding the next wavy line to the current wavy
-    // line
+    // Expand the wavy line by adding nextWavyLine to currentWavyLine
     currentWavyLine.insert(nextWavyLine.begin(), nextWavyLine.end());
   }
 
