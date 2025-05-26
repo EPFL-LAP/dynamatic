@@ -150,7 +150,7 @@ public:
   friend class LogicNetwork;
 };
 
-// Hash and equality functions for Node pointers, used in unordered maps
+// Hash and Equality functions for Node pointers, used in unordered maps
 struct NodePtrHash {
   std::size_t operator()(const Node *node) const {
     return std::hash<std::string>()(node->name);

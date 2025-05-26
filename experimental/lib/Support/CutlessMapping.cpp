@@ -113,10 +113,10 @@ std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine) {
 
 // Depth-oriented mapping algorithm. A wavy line represents a set of nodes in
 // the LogicNetwork, grouped by depth. By definition, the nodes in the n-th wavy
-// line can be implemented as a function of the nodes in any of the previous
-// wavy lines, i.e., the (n−i)-th wavy line for any i such that 0 < i ≤ n. For
-// example, nodes in the third wavy line may be implemented using nodes from the
-// first or second wavy line.
+// line can be implemented as a function of K (lutSize) number of nodes in any
+// of the previous wavy lines, i.e., the (n−i)-th wavy line for any i such that
+// 0 < i ≤ n. For example, nodes in the third wavy line may be implemented using
+// nodes from the first or second wavy line.
 NodeToCuts cutAlgorithm(LogicNetwork *blif, int lutSize, bool includeChannels) {
   NodeToCuts cuts;
   // First wavy line consists of the Primary Inputs of the circuit.
