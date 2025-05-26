@@ -23,16 +23,9 @@ namespace dynamatic {
 std::optional<FormalProperty::TYPE>
 FormalProperty::typeFromStr(const std::string &s) {
 
-  auto toLower = [](const std::string &s) {
-    std::string tmp(s);
-    for (auto &c : tmp)
-      c = tolower(c);
-    return tmp;
-  };
-
-  if (toLower(s) == "aob")
+  if (s == "AOB")
     return FormalProperty::TYPE::AOB;
-  if (toLower(s) == "veq")
+  if (s == "VEQ")
     return FormalProperty::TYPE::VEQ;
 
   return std::nullopt;
@@ -50,18 +43,11 @@ std::string FormalProperty::typeToStr(TYPE t) {
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
 
-  auto toLower = [](const std::string &s) {
-    std::string tmp(s);
-    for (auto &c : tmp)
-      c = tolower(c);
-    return tmp;
-  };
-
-  if (toLower(s) == "opt")
+  if (s == "opt")
     return FormalProperty::TAG::OPT;
-  if (toLower(s) == "invar")
+  if (s == "invar")
     return FormalProperty::TAG::INVAR;
-  if (toLower(s) == "error")
+  if (s == "error")
     return FormalProperty::TAG::ERROR;
 
   return std::nullopt;
