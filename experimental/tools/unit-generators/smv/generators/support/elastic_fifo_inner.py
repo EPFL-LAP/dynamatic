@@ -5,10 +5,10 @@ def generate_elastic_fifo_inner(name, params):
     slots = params[ATTR_SLOTS] if ATTR_SLOTS in params else 1
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_elastic_fifo_inner_dataless(name, slots)
-        else:
-            return _generate_elastic_fifo_inner(name, slots, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_elastic_fifo_inner_dataless(name, slots)
+    else:
+        return _generate_elastic_fifo_inner(name, slots, data_type)
 
 
 def _generate_elastic_fifo_inner_dataless(name, slots):
