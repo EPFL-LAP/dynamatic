@@ -28,6 +28,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
@@ -107,13 +108,13 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
       for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
         if (res.getType()
                 .isa<handshake::ChannelType, handshake::ControlType>()) {
-          if (res.getUsers().empty()) {
+          if (res.getUsers().empty() ||
+              isa<handshake::MemoryControllerOp, handshake::LSQOp>(op)) {
             continue;
           }
           auto *userOp = *res.getUsers().begin();
-
-          // skip connections to the output
-          if (userOp->getName().getStringRef() == "handshake.end")
+          if (userOp->getName().getStringRef() == "handshake.end" ||
+              isa<handshake::MemoryControllerOp, handshake::LSQOp>(*userOp))
             continue;
 
           AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);

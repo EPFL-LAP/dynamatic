@@ -69,15 +69,15 @@ void HandshakeRigidificationPass::runDynamaticPass() {
 
   for (const auto &property : table.getProperties()) {
     if (property->getTag() == FormalProperty::TAG::OPT &&
-        property->getCheck() == "true") {
+        property->getCheck() == "True") {
       if (isa<AbsenceOfBackpressure>(property)) {
         auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
         if (failed(insertRigidifier(*p, ctx)))
           return signalPassFailure();
       } else if (isa<ValidEquivalence>(property)) {
-        auto *p = llvm::cast<ValidEquivalence>(property.get());
-        if (failed(insertValidMerger(*p, ctx)))
-          return signalPassFailure();
+        // auto *p = llvm::cast<ValidEquivalence>(property.get());
+        // if (failed(insertValidMerger(*p, ctx)))
+        //   return signalPassFailure();
       }
     }
   }
