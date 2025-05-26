@@ -1,4 +1,4 @@
 set(LLVM_TARGET_DEFINITIONS Passes.td)
-mlir_tablegen(Passes.h.inc -gen-pass-decls)
-add_public_tablegen_target(DynamaticExperimentalAnalisysPassIncGen)
-add_dependencies(dynamatic-headers DynamaticExperimentalAnalisysPassIncGen)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name Analysis)
+add_public_tablegen_target(DynamaticExperimentalAnalysisPassIncGen)
+add_dependencies(dynamatic-headers DynamaticExperimentalAnalysisPassIncGen)
