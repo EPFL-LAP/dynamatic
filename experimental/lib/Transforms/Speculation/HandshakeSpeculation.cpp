@@ -127,7 +127,9 @@ static Value findForkTreeTop(Value value) {
   return value;
 }
 
-/// Find all users of the MLIR values in the fork tree, starting from the value.
+/// Internal helper for `findUsersInForkTree`.
+/// Find all users of the MLIR values in the *partial* fork tree rooted at the
+/// `value`.
 static void
 findUsersInForkTreeTraversal(llvm::SmallVector<Operation *> &targets,
                              Value value) {
@@ -157,29 +159,13 @@ static bool forkTreeEquals(Value a, Value b) {
   return findForkTreeTop(a) == findForkTreeTop(b);
 }
 
-static std::optional<SpeculatingBranchOp> findExistingSpecBranch(Value specBit,
-                                                                 Value data) {
-  // Find all users of the specBit (ignoring the fork differences)
-  llvm::SmallVector<Operation *> users = findUsersInForkTree(specBit);
-  for (Operation *user : users) {
-    if (auto specBranch = dyn_cast<SpeculatingBranchOp>(user)) {
-      // Check if the data operand is also the same (ignoring the fork
-      // differences)
-      if (forkTreeEquals(specBranch.getDataOperand(), data)) {
-        // Found a branch that matches the specBit and data
-        return specBranch;
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-static std::optional<ConditionalBranchOp> findExistingBranch(Value condition,
-                                                             Value data) {
+template <typename BranchOpType>
+static std::optional<BranchOpType> findExistingBranch(Value condition,
+                                                      Value data) {
   // Find all users of the condition (ignoring the fork differences)
   llvm::SmallVector<Operation *> users = findUsersInForkTree(condition);
   for (Operation *user : users) {
-    if (auto branchOp = dyn_cast<ConditionalBranchOp>(user)) {
+    if (auto branchOp = dyn_cast<BranchOpType>(user)) {
       // Check if the data operand is also the same (ignoring the fork
       // differences)
       if (forkTreeEquals(branchOp.getDataOperand(), data)) {
@@ -237,7 +223,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       auto conditionOperand = branchOp.getConditionOperand();
 
       std::optional<SpeculatingBranchOp> branchDiscardNonSpec =
-          findExistingSpecBranch(valueForSpecTag, conditionOperand);
+          findExistingBranch<SpeculatingBranchOp>(valueForSpecTag,
+                                                  conditionOperand);
       if (!branchDiscardNonSpec.has_value()) {
         // trueResultType and falseResultType are tentative and will be updated
         // in the addSpecTag algorithm later.
@@ -250,7 +237,8 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       }
 
       std::optional<ConditionalBranchOp> branchReplicated =
-          findExistingBranch(branchDiscardNonSpec->getTrueResult(), ctrlSignal);
+          findExistingBranch<ConditionalBranchOp>(
+              branchDiscardNonSpec->getTrueResult(), ctrlSignal);
       if (!branchReplicated.has_value()) {
         // The replicated branch directs the control token based on the path the
         // speculative token took
