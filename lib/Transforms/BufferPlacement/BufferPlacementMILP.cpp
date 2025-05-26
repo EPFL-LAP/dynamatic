@@ -675,6 +675,13 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
+  // The following parameters control penalties in the MILP objective. The
+  // penalty for buffer presence is an empirical value, consistent with
+  // 'addMaxThroughputObjective'. The slot penalties for each buffer type are
+  // rough estimates, based on the number of LUTs as logic observed when each
+  // buffer type was synthesized individually. To adjust these parameters during
+  // tuning, simply modify the values here.
+
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
