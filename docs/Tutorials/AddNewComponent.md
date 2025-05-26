@@ -134,7 +134,7 @@ Then, implement the corresponding rewrite pattern. Most of the infrastructure is
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
 
 > [!NOTE]
-> You can add `hw.parameters` in the Handshake IR before the HandshakeToHW conversion (e.g., buffer units add their buffering type to `hw.parameters` in the handshake-level buffering pass). These parameters will be automatically inherited, so you don't need to add them again here.
+> You can add `hw.parameters` in the Handshake IR **before** the HandshakeToHW conversion (e.g., buffer units add their buffering type to `hw.parameters` in the handshake-level buffering pass). These parameters will be automatically inherited, so you don't need to add them again here. See [the backend doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/Backend.md#identifying-necessary-modules) for further details.
 
 For the **beta backend**, registration is handled in `RTL.cpp`. However, you still need to add an empty case for it here, as shown in this example:
 
