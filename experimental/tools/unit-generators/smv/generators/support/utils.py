@@ -18,24 +18,24 @@ ATTR_ADDR_BITWIDTH = "addr_bitwidth"
 
 class SmvScalarType:
 
-  bitwidth: int
-  smv_type: str
+    bitwidth: int
+    smv_type: str
 
-  def __init__(self, bitwidth: int):
-    """
-    Constructor for SmvScalarType.
-    """
-    self.bitwidth = bitwidth
-    self.smv_type = f"unsigned word [{bitwidth}]"
+    def __init__(self, bitwidth: int):
+        """
+        Constructor for SmvScalarType.
+        """
+        self.bitwidth = bitwidth
+        self.smv_type = f"unsigned word [{bitwidth}]"
 
-  def format_constant(self, value) -> str:
-    """
-    Formats a given constant value based on the type.
-    """
-    if self.bitwidth == 1:
-      return "TRUE" if bool(value) else "FALSE"
-    else:
-      return f"0ud{self.bitwidth}_{value}"
+    def format_constant(self, value) -> str:
+        """
+        Formats a given constant value based on the type.
+        """
+        if self.bitwidth == 1:
+            return "TRUE" if bool(value) else "FALSE"
+        else:
+            return f"0ud{self.bitwidth}_{value}"
 
-  def __str__(self):
-    return f"{self.smv_type}"
+    def __str__(self):
+        return f"{self.smv_type}"

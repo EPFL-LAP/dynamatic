@@ -47,6 +47,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -1217,41 +1218,29 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
   for (const auto &[i, property] :
        llvm::enumerate(propertyInfo.table.getProperties())) {
 
-    FormalProperty::TYPE propertyType = property.getType();
-    FormalProperty::TAG propertyTag = property.getTag();
+    FormalProperty::TAG propertyTag = property->getTag();
 
-    auto path = propertyInfo.jsonPath.index(i);
-    llvm::json::ObjectMapper mapper(property.getInfo(), path);
+    if (llvm::isa<AbsenceOfBackpressure>(property.get())) {
+      auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
+      std::string validSignal =
+          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
+      std::string readySignal =
+          p->getUser() + "." + p->getUserChannel() + "_ready";
 
-    if (propertyType == FormalProperty::TYPE::AOB) {
-      std::string owner, ownerChannel, user, userChannel;
-      if (!mapper || !mapper.mapOptional("owner", owner) ||
-          !mapper.mapOptional("owner_channel", ownerChannel) ||
-          !mapper.mapOptional("user", user) ||
-          !mapper.mapOptional("user_channel", userChannel)) {
-        return failure();
-      }
-      std::string validSignal = owner + "." + ownerChannel + "_valid";
-      std::string readySignal = user + "." + userChannel + "_ready";
+      data.properties[p->getId()] = {validSignal + " -> " + readySignal,
+                                     propertyTag};
+    } else if (llvm::isa<ValidEquivalence>(property.get())) {
+      auto *p = llvm::cast<ValidEquivalence>(property.get());
+      std::string validSignal1 =
+          p->getOwner() + "." + p->getOwnerChannel() + "_valid";
+      std::string validSignal2 =
+          p->getTarget() + "." + p->getTargetChannel() + "_valid";
 
-      data.properties[property.getId()] = {validSignal + " -> " + readySignal,
-                                           propertyTag};
-
-    } else if (propertyType == FormalProperty::TYPE::VEQ) {
-      std::string owner, ownerChannel, target, targetChannel;
-      if (!mapper || !mapper.mapOptional("owner", owner) ||
-          !mapper.mapOptional("owner_channel", ownerChannel) ||
-          !mapper.mapOptional("target", target) ||
-          !mapper.mapOptional("target_channel", targetChannel)) {
-        return failure();
-      }
-      std::string validSignal1 = owner + "." + ownerChannel + "_valid";
-      std::string validSignal2 = target + "." + targetChannel + "_valid";
-
-      data.properties[property.getId()] = {
-          validSignal1 + " <-> " + validSignal2, propertyTag};
-    } else
+      data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
+                                     propertyTag};
+    } else {
       return failure();
+    }
   }
   return success();
 }
@@ -1360,15 +1349,15 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
     os << "DEFINE " << dst << " := " << src << ";\n";
   });
 
+  os << "\n\n";
+
+  writeModuleInstantiations(data);
   os << "\n// properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)
       os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
   });
-  os << "\n\n";
-
-  writeModuleInstantiations(data);
 
   return success();
 }

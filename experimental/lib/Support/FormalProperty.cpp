@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "experimental/Support/FormalProperty.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/JSON/JSON.h"
+#include "llvm/Support/JSON.h"
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -34,6 +38,15 @@ FormalProperty::typeFromStr(const std::string &s) {
   return std::nullopt;
 }
 
+std::string FormalProperty::typeToStr(TYPE t) {
+  switch (t) {
+  case TYPE::AOB:
+    return "AOB";
+  case TYPE::VEQ:
+    return "VEQ";
+  }
+}
+
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
 
@@ -54,32 +67,181 @@ FormalProperty::tagFromStr(const std::string &s) {
   return std::nullopt;
 }
 
-bool FormalProperty::fromJSON(const llvm::json::Value &value,
-                              llvm::json::Path path) {
+std::string FormalProperty::tagToStr(TAG t) {
+  switch (t) {
+  case TAG::OPT:
+    return "OPT";
+  case TAG::INVAR:
+    return "INVAR";
+  case TAG::ERROR:
+    return "ERRR";
+  }
+}
+
+llvm::json::Value FormalProperty::toJSON() const {
+  return llvm::json::Object({{"id", id},
+                             {"type", typeToStr(type)},
+                             {"tag", tagToStr(tag)},
+                             {"check", check},
+                             {"info", extraInfoToJSON()}});
+}
+
+// Factory implementation
+std::unique_ptr<FormalProperty>
+FormalProperty::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
+  if (!mapper || !mapper.mapOptional("type", typeStr))
+    return nullptr;
+
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  TYPE type = *typeOpt;
+
+  switch (type) {
+  case TYPE::AOB:
+    return AbsenceOfBackpressure::fromJSON(value, path.field("info"));
+  case TYPE::VEQ:
+    return ValidEquivalence::fromJSON(value, path.field("info"));
+  }
+}
+
+llvm::json::Value
+FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
+                                        llvm::json::Path path) {
   std::string typeStr, tagStr;
+  llvm::json::ObjectMapper mapper(value, path);
+
   if (!mapper || !mapper.mapOptional("id", id) ||
       !mapper.mapOptional("type", typeStr) ||
       !mapper.mapOptional("tag", tagStr) || !mapper.mapOptional("check", check))
-    return false;
+    return nullptr;
+
+  auto typeOpt = typeFromStr(typeStr);
+  if (!typeOpt)
+    return nullptr;
+  type = *typeOpt;
+
+  auto tagOpt = tagFromStr(tagStr);
+  if (!tagOpt)
+    return nullptr;
+  tag = *tagOpt;
 
   if (const auto *obj = value.getAsObject()) {
     auto it = obj->find("info");
     if (it != obj->end())
-      info = it->second;
-    else
-      return false;
+      return it->second;
   }
+  return nullptr;
+}
 
-  auto typeOpt = typeFromStr(typeStr);
-  auto tagOpt = tagFromStr(tagStr);
-  if (!typeOpt || !tagOpt)
-    return false;
+// Absence of Backpressure
 
-  type = *typeOpt;
-  tag = *tagOpt;
+AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
+                                             const OpResult &res)
+    : FormalProperty(id, tag, TYPE::AOB) {
+  Operation *ownerOp = res.getOwner();
+  Operation *userOp = *res.getUsers().begin();
 
-  return true;
+  handshake::PortNamer ownerNamer(ownerOp);
+  handshake::PortNamer userNamer(userOp);
+
+  unsigned long operandIndex = userOp->getNumOperands();
+  for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
+    if (arg == res) {
+      operandIndex = j;
+      break;
+    }
+  }
+  assert(operandIndex < userOp->getNumOperands());
+
+  ownerChannel.operationName = getUniqueName(ownerOp).str();
+  userChannel.operationName = getUniqueName(userOp).str();
+  ownerChannel.index = res.getResultNumber();
+  userChannel.index = operandIndex;
+  ownerChannel.name = ownerNamer.getOutputName(res.getResultNumber()).str();
+  userChannel.name = userNamer.getInputName(operandIndex).str();
+}
+
+llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", ownerChannel.operationName},
+                             {"user", userChannel.operationName},
+                             {"owner_index", ownerChannel.index},
+                             {"user_index", userChannel.index},
+                             {"owner_channel", ownerChannel.name},
+                             {"user_channel", userChannel.name}});
+}
+
+std::unique_ptr<AbsenceOfBackpressure>
+AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
+                                llvm::json::Path path) {
+  auto prop = std::make_unique<AbsenceOfBackpressure>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("user", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("user_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("user_channel", prop->userChannel.name))
+    return nullptr;
+
+  return prop;
+}
+
+// Valid Equivalence
+
+ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
+                                   const OpResult &res1, const OpResult &res2)
+    : FormalProperty(id, tag, TYPE::VEQ) {
+  Operation *op1 = res1.getOwner();
+  unsigned int i = res1.getResultNumber();
+  handshake::PortNamer namer1(op1);
+
+  Operation *op2 = res2.getOwner();
+  unsigned int j = res2.getResultNumber();
+  handshake::PortNamer namer2(op2);
+
+  ownerChannel.operationName = getUniqueName(op1).str();
+  targetChannel.operationName = getUniqueName(op2).str();
+  ownerChannel.index = i;
+  targetChannel.index = j;
+  ownerChannel.name = namer1.getOutputName(i).str();
+  targetChannel.name = namer2.getOutputName(j).str();
+}
+
+llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
+  return llvm::json::Object({{"owner", ownerChannel.operationName},
+                             {"target", targetChannel.operationName},
+                             {"owner_index", ownerChannel.index},
+                             {"target_index", targetChannel.index},
+                             {"owner_channel", ownerChannel.name},
+                             {"target_channel", targetChannel.name}});
+}
+
+std::unique_ptr<ValidEquivalence>
+ValidEquivalence::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<ValidEquivalence>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper ||
+      !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("target", prop->targetChannel.operationName) ||
+      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
+      !mapper.mapOptional("target_index", prop->targetChannel.index) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
+      !mapper.mapOptional("target_channel", prop->targetChannel.name))
+    return nullptr;
+
+  return prop;
 }
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
@@ -116,7 +278,7 @@ LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   }
 
   for (auto [idx, jsonComponent] : llvm::enumerate(*jsonComponents)) {
-    FormalProperty &property = properties.emplace_back();
+    std::unique_ptr<FormalProperty> &property = properties.emplace_back();
     if (!fromJSON(jsonComponent, property, jsonPath.index(idx))) {
       jsonRoot.printErrorContext(*value, llvm::errs());
       return failure();

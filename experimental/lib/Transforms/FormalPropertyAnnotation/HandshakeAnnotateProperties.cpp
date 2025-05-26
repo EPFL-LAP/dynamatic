@@ -1,4 +1,4 @@
-//===- HandshakeSizeLSQs.cpp - LSQ Sizing -----------------------*- C++ -*-===//
+//===- HandshakeAnnotateProperties.cpp - Property annotation ----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -23,6 +23,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -62,39 +63,20 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
-  void addPropertyId(Operation *op, unsigned id);
 };
 } // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
-  for (auto [i, res1] : llvm::enumerate(op1.getResults()))
-    for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
-
-      if (op1.getAttr("handshake.name") == op2.getAttr("handshake.name") &&
-          i == j)
+  for (auto res1 : op1.getResults())
+    for (auto res2 : op2.getResults()) {
+      if (res1 == res2)
         continue;
 
-      addPropertyId(&op1, uid);
+      ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
-      PortNamer namer1(&op1);
-      PortNamer namer2(&op2);
-
-      propertyTable.push_back(json::Value(json::Object{
-          {"id", uid},
-          {"type", "veq"},
-          {"info",
-           json::Value(json::Object{
-               {"owner", op1.getAttrOfType<StringAttr>("handshake.name").str()},
-               {"target",
-                op2.getAttrOfType<StringAttr>("handshake.name").str()},
-               {"owner_index", i},
-               {"target_index", j},
-               {"owner_channel", namer1.getOutputName(i).str()},
-               {"target_channel", namer2.getOutputName(j).str()}})},
-          {"tag", "opt"},
-          {"check", "unchecked"}}));
+      propertyTable.push_back(p.toJSON());
       uid++;
     }
   return success();
@@ -107,8 +89,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalence(ModuleOp modOp) {
       for (auto [j, op_j] : llvm::enumerate(funcOp.getOps())) {
         // equivalence is symmetrical so it needs to be checked only once for
         // each pair of signals (therefore operations)
-        if (i <= j &&
-            op_i.getAttr("handshake.bb") == op_j.getAttr("handshake.bb")) {
+        if (i <= j && getLogicBB(&op_i) == getLogicBB(&op_i)) {
           if (failed(annotateValidEquivalenceBetweenOps(op_i, op_j))) {
             return failure();
           }
@@ -129,59 +110,20 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
           if (res.getUsers().empty()) {
             continue;
           }
-
-          addPropertyId(&op, uid);
-
           auto *userOp = *res.getUsers().begin();
 
-          PortNamer namer(&op);
-          PortNamer userNamer(userOp);
+          // skip connections to the output
+          if (userOp->getName().getStringRef() == "handshake.end")
+            continue;
 
-          unsigned long operandIndex = userOp->getNumOperands();
-          for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
-            if (arg == res) {
-              operandIndex = j;
-              break;
-            }
-          }
-          if (operandIndex >= userOp->getNumOperands())
-            return failure();
+          AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
 
-          propertyTable.push_back(json::Value(json::Object{
-              {"id", uid},
-              {"type", "aob"},
-              {"info",
-               json::Value(json::Object{
-                   {"owner",
-                    op.getAttrOfType<StringAttr>("handshake.name").str()},
-                   {"user",
-                    userOp->getAttrOfType<StringAttr>("handshake.name").str()},
-                   {"owner_index", resIndex},
-                   {"user_index", operandIndex},
-                   {"owner_channel", namer.getOutputName(resIndex).str()},
-                   {"user_channel",
-                    userNamer.getInputName(operandIndex).str()}})},
-              {"tag", "opt"},
-              {"check", "unchecked"}}));
+          propertyTable.push_back(p.toJSON());
           uid++;
         }
     }
   }
   return success();
-}
-
-void HandshakeAnnotatePropertiesPass::addPropertyId(Operation *op,
-                                                    unsigned id) {
-  auto formalAttr = op->getAttrOfType<FormalPropertiesAttr>("formalProperties");
-
-  SmallVector<unsigned> ids;
-  if (formalAttr) {
-    ids.append(formalAttr.getIDs().begin(), formalAttr.getIDs().end());
-  }
-  ids.push_back(id);
-
-  auto newAttr = FormalPropertiesAttr::get(op->getContext(), ids);
-  op->setAttr("formalProperties", newAttr);
 }
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {

@@ -3,18 +3,18 @@ from generators.support.utils import data
 
 
 def generate_spec_save_commit(name, params):
-  bitwidth = params["bitwidth"]
-  fifo_depth = params["fifo_depth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    fifo_depth = params["fifo_depth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-  return _generate_spec_save_commit(name, bitwidth, fifo_depth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
+    return _generate_spec_save_commit(name, bitwidth, fifo_depth)
 
 
 def _generate_spec_save_commit(name, bitwidth, fifo_depth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -40,7 +40,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of spec_save_commit
 architecture arch of {name} is
   signal HeadEn : std_logic := '0';
@@ -289,30 +289,30 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl",
-          "bitwidth": 3
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals_without_spec,
-      "ignore_ports": ["ctrl"]
-  }, lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl",
+            "bitwidth": 3
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals_without_spec,
+        "ignore_ports": ["ctrl"]
+    }, lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
