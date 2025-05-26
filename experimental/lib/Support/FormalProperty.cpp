@@ -184,7 +184,7 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
 
   if (!mapper ||
       !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
-      !mapper.mapOptional("user", prop->ownerChannel.operationName) ||
+      !mapper.mapOptional("user", prop->userChannel.operationName) ||
       !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
       !mapper.mapOptional("user_index", prop->ownerChannel.index) ||
       !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
