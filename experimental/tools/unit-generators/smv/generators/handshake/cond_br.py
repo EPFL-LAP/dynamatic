@@ -5,10 +5,10 @@ from generators.support.utils import *
 def generate_cond_br(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_cond_br_dataless(name)
-        else:
-            return _generate_cond_br(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_cond_br_dataless(name)
+    else:
+        return _generate_cond_br(name, data_type)
 
 
 def _generate_cond_br_dataless(name):
