@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
+#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"

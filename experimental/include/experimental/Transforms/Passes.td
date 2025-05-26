@@ -110,16 +110,4 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Three different cases for memory collsions: none/half/full">];
 }
 
-def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"> {
-  let summary = "Annotates Formal Properties into a json database";
-  let description = [{
-    This analysis pass generates a table that contains all the information needed to
-    define and check a set of properties. Currently it only annotates Absence of
-    Backpressure and Valid Equivalence, but it can be extended to annotate more.
-  }];
-  let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
-  let options = [ Option<"jsonPath", "json-path", "std::string", "",
-    "Path to JSON-formatted file where the properties' information is stored.">];
-}
-
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

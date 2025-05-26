@@ -43,11 +43,11 @@ std::string FormalProperty::typeToStr(TYPE t) {
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
 
-  if (s == "opt")
+  if (s == "OPT")
     return FormalProperty::TAG::OPT;
-  if (s == "invar")
+  if (s == "INVAR")
     return FormalProperty::TAG::INVAR;
-  if (s == "error")
+  if (s == "ERROR")
     return FormalProperty::TAG::ERROR;
 
   return std::nullopt;
@@ -56,11 +56,11 @@ FormalProperty::tagFromStr(const std::string &s) {
 std::string FormalProperty::tagToStr(TAG t) {
   switch (t) {
   case TAG::OPT:
-    return "opt";
+    return "OPT";
   case TAG::INVAR:
-    return "invar";
+    return "INVAR";
   case TAG::ERROR:
-    return "error";
+    return "ERROR";
   }
 }
 

@@ -7,3 +7,5 @@ add_dynamatic_library(DynamaticExperimentalAnalysis
   DynamaticSupport
   DynamaticExperimentalSupport
 )
+
+add_subdirectory(FormalPropertyAnnotation)
