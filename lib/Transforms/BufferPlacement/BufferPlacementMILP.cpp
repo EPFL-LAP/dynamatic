@@ -531,7 +531,7 @@ void BufferPlacementMILP::
     model.addQConstr(dataLatency * throughput <= chThroughput,
                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
-    std::string shiftRegUbName = "shiftReg_ub_" + channelName;
+    std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
     // Shift registers have more bubbles if II is higher than 1 (i.e.,
     // throughput < 1). In a shift register, every slot forwards data
     // simultaneously, but new tokens only arrive every II cycles. This means
@@ -539,24 +539,24 @@ void BufferPlacementMILP::
     // the rest are bubbles. Therefore, token occupancy is lower compared to
     // other buffer types with the same slot number.
     //
-    // Create an intermediate variable to represent the token occupancy
-    // of the SHIFT_REG_BREAK_DV buffer when it contains tokens as many as
-    // possible.
-    GRBVar shiftRegUb =
-        model.addVar(0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegUbName);
+    // Create an intermediate variable to represent the extra bubbles
+    // of the SHIFT_REG_BREAK_DV buffer.
+    GRBVar shiftRegExtraBubbles = model.addVar(
+        0, GRB_INFINITY, 0.0, GRB_INTEGER, shiftRegExtraBubblesName);
 
-    // The token occupancy of a SHIFT_REG_BREAK_DV buffer is at most the
-    // ceiling of the product of data latency and CFDFC throughput.
-    model.addQConstr(shiftRegUb <= dataLatency * throughput + 0.99,
-                     shiftRegUbName);
+    // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
+    // number (dataLatency) minus the ceiling of the product of data latency and
+    // CFDFC throughput.
+    model.addQConstr(shiftRegExtraBubbles >=
+                         dataLatency - dataLatency * throughput - 0.99,
+                     shiftRegExtraBubblesName);
 
     // Combine the following constraints into one unified constraint:
     // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput
     // 2. Token occupancy + bubble occupancy ≤ slot number
-    // 3. Extra bubbles due to SHIFT_REG_BREAK_DV =
-    //    its slots (dataLatency) - actual token occupancy (shiftRegUb)
+    // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used
     model.addQConstr(chThroughput + readyBuf * throughput +
-                             shiftReg * (dataLatency - shiftRegUb) <=
+                             shiftReg * shiftRegExtraBubbles <=
                          bufNumSlots,
                      "throughput_tokens_ub");
   }
