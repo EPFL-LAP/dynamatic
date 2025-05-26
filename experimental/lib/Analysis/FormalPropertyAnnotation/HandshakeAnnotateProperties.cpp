@@ -137,16 +137,12 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 
-  std::string outString;
-  raw_string_ostream out(outString);
-  out << formatv("{0:2}", jsonVal);
-
   std::error_code EC;
   llvm::raw_fd_ostream jsonOut(jsonPath, EC, llvm::sys::fs::OF_Text);
   if (EC)
     return;
 
-  jsonOut << outString;
+  jsonOut << formatv("{0:2}", jsonVal);
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>
