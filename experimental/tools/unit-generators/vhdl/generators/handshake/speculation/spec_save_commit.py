@@ -57,7 +57,6 @@ architecture arch of {name} is
 
   {data(f"type FIFO_Memory is array (0 to {fifo_depth} - 1) of STD_LOGIC_VECTOR ({bitwidth} - 1 downto 0);", bitwidth)}
   {data("signal Memory : FIFO_Memory;", bitwidth)}
-
 begin
   ins_ready <= not Full;
 
