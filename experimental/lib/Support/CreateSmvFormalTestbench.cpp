@@ -79,7 +79,7 @@ static std::string instantiateModuleUnderTest(
           // This is the case for data coming from memory (it has no handshake
           // signals)
           if (argumentName != "clk" && argumentName != "rst") {
-            inputVariables.push_back("0usd" +
+            inputVariables.push_back("0ud" +
                                      std::to_string(intType.getWidth()) + "_0");
           }
         })
