@@ -8,10 +8,10 @@ def generate_fork(name, params):
     size = params[ATTR_SIZE]
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-       if data_type.bitwidth == 0:
-            return _generate_fork_dataless(name, size)
-        else:
-            return _generate_fork(name, size, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_fork_dataless(name, size)
+    else:
+        return _generate_fork(name, size, data_type)
 
 
 def _generate_fork_dataless(name, size):
