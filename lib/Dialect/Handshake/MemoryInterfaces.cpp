@@ -396,20 +396,19 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
     unsigned numLoadEntries = groupPorts.getNumPorts<LoadPort>()
-                              ? groupPorts.getNumPorts<LoadPort>()
-                              : 1;
-
+                                  ? groupPorts.getNumPorts<LoadPort>()
+                                  : 1;
 
     // ldOrderOfOneGroup: the ldOrder of all the loads in one group
     // Example: ldOrder = [
-    //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this vector
-    //    [1]     
+    //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this
+    //    vector [1]
     // ]
     SmallVector<unsigned> ldOrderOfOneGroup(numLoadEntries, 0);
 
     // This for loop has two purposes:
     // 1. It iterates through all the LDs/STs in a group, for each LD/ST:
-    //   If it is an LD, then it saves how many STs have to 
+    //   If it is an LD, then it saves how many STs have to
     //   complete before it
     // 2. It records the IDs of the LDs/STs in a group.
     for (auto [portIdx, accessPort] : llvm::enumerate(groupPorts.accessPorts)) {
