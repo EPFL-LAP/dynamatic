@@ -51,8 +51,6 @@ static std::string instantiateModuleUnderTest(
     llvm::TypeSwitch<Type, void>(argumentType)
         .Case<handshake::ControlType>([&](handshake::ControlType) {
           inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                   SEQUENCE_GENERATOR_DATA_NAME.str());
-          inputVariables.push_back("seq_generator_" + argumentName + "." +
                                    SEQUENCE_GENERATOR_VALID_NAME.str());
         })
         .Case<handshake::ChannelType>([&](handshake::ChannelType) {
@@ -63,7 +61,7 @@ static std::string instantiateModuleUnderTest(
         })
         .Case<IntegerType>([&](IntegerType intType) {
           if (argumentName != "clk" && argumentName != "rst") {
-            inputVariables.push_back("0sd" +
+            inputVariables.push_back("0ud" +
                                      std::to_string(intType.getWidth()) + "_0");
           }
         });
