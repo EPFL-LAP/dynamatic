@@ -513,11 +513,14 @@ void BufferPlacementMILP::
       if (channel == selOp.getTrueValue())
         continue;
 
-    // The channel must have variables for the data signal
+    // The channel must have variables for the data and ready signals
     ChannelVars &chVars = vars.channelVars[channel];
     auto dataVars = chVars.signalVars.find(SignalType::DATA);
+    auto readyVars = chVars.signalVars.find(SignalType::READY);
     bool dataFound = dataVars != chVars.signalVars.end();
+    bool readyFound = readyVars != chVars.signalVars.end();
     assert(dataFound && "missing data signal variables on channel variables");
+    assert(readyFound && "missing ready signal variables on channel variables");
 
     // Retrieve the MILP variables we need
     GRBVar &bufNumSlots = chVars.bufNumSlots;
