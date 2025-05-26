@@ -4,7 +4,7 @@ This document describes the infrastructure for supporting formal properties in D
 
 ## Overview
 
-The infrastructure introduces a compiler pass called `annotate-properties`, which collects formal properties information from the Handshake IR, and serializes them to a shared .json database for other tools to consume (e.g., model checkers, code generators, etc.).
+The infrastructure introduces a compiler pass called `annotate-properties`, which collects formal properties information from the Handshake IR, and serializes them to a shared .json database for other tools to consume (e.g., model checkers, code generators, etc.). This infrastructure is built to express "runtime" properties, which in the context of HLS mean properties that will appear in the circuit (or in the SMV model), and will be checked only during simulation (or model checking). This infrastructure does NOT support compile-time checks. These checks should be carried out through the MLIR infrstructure.
 
 ## Properties
 
@@ -201,10 +201,6 @@ if (llvm::isa<MyNewInvariant>(property.get())) {
 - Allows decoupling between IR-level passes and later tools.
 - Easily inspectable and extensible.
 - Serves as a contract between compiler passes and formal verification tools.
-
-### What properties can I express with this infrstructure?
-
-As mentioned before this infrastructure is built to express "runtime" properties, which in the context of HLS mean properties that will appear in the circuit (or in the SMV model), and will be checked only during simulation (or model checking). This infrastructure does NOT support compile-time checks. These checks should be carried out through the MLIR infrstructure.
 
 ### Can I add properties from an IR different than Handshake?
 
