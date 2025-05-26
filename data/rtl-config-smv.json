@@ -286,12 +286,12 @@
   },
   {
     "name": "mem_to_bram",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generic": "$DYNAMATIC/data/smv/mem_to_bram.smv",
     "hdl": "smv"
   },
   {
     "name": "handshake.lsq",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generic": "$DYNAMATIC/data/smv/mem_to_bram.smv",
     "hdl": "smv"
   },
   {
