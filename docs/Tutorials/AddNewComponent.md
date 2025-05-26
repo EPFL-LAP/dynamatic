@@ -133,6 +133,9 @@ Then, implement the corresponding rewrite pattern. Most of the infrastructure is
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
 
+> [!NOTE]
+> You can add `hw.parameters` in the Handshake IR before the HandshakeToHW conversion (e.g., buffer units add their buffering type to `hw.parameters` in the handshake-level buffering pass). These parameters will be automatically inherited, so you don't need to add them again here.
+
 For the **beta backend**, registration is handled in `RTL.cpp`. However, you still need to add an empty case for it here, as shown in this example:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679
@@ -147,7 +150,12 @@ https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L434-L453
 
-Note: At this stage, you're working with HW IR, not Handshake IR, so operands and results must be accessed by index, not by name.
+`hw.parameters` is considered legacy and is not automatically forwarded to the beta backend. You need to explicitly specify the parameter in the serialized format, for example:
+
+https://github.com/EPFL-LAP/dynamatic/blob/53f5047eaa552685f620cdb57717d8cf71310619/lib/Support/RTL/RTL.cpp#L374-L392
+
+> [!NOTE]
+> At this stage, you're working with HW IR, not Handshake IR, so operands and results must be accessed by index, not by name.
 
 The reason this analysis is performed here is to bypass all earlier passes and avoid any unintended transformations or side effects.
 
