@@ -295,23 +295,27 @@ protected:
   /// extracted CFDFCs.
   unsigned getChannelNumExecs(Value channel);
 
-  /// Adds the MILP model's objective to maximize. The objective has a positive
-  /// "throughput term" for every provided CFDFC. These terms are weighted by
-  /// the "importance" of the CFDFC compared to the others, which is determined
-  /// using an estimation of the transfer frequency over each provided channel.
-  /// The objective has a negative term for each buffer placement decision and
-  /// for each buffer slot placed on any of the provide channels.
+  /// Adds the MILP model's objective to maximize. The objective maximizes
+  /// throughput while minimizing buffer usage, with throughput prioritized.
+  /// It has a positive "throughput term" for every provided CFDFC. These terms
+  /// are weighted by the "importance" of the CFDFC compared to the others,
+  /// which is determined using an estimation of the total number of executions
+  /// over each provided channel. The objective has a negative term for each
+  /// buffer placement decision and for each buffer slot placed on any of the
+  /// provide channels.
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
   void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
 
-  /// Adds the MILP model's objective to maximize. The objective has a positive
-  /// "throughput term" for every provided CFDFC. These terms are weighted by
-  /// the "importance" of the CFDFC compared to the others, which is determined
-  /// using an estimation of the transfer frequency over each provided channel.
-  /// The objective has a negative term for each buffer placement decision and
-  /// for each buffer slot depending on the buffer type.
+  /// Adds the MILP model's objective to maximize. The objective maximizes
+  /// throughput while minimizing buffer area, with throughput prioritized.
+  /// It has a positive "throughput term" for every provided CFDFC. These terms
+  /// are weighted by the "importance" of the CFDFC compared to the others,
+  /// which is determined using an estimation of the total number of executions
+  /// over each provided channel. The objective has a negative term for each
+  /// buffer placement decision and for each buffer slot depending on the buffer
+  /// type.
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
