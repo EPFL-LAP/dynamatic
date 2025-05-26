@@ -122,7 +122,7 @@ std::string getPrefixTypeName(const std::string &smvType) {
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
-std::string SMV_INPUT(const std::string &type) {
+std::string smvInput(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input(nReady0, max_tokens)\n"
          "  VAR dataOut0 : " +
@@ -142,7 +142,7 @@ std::string SMV_INPUT(const std::string &type) {
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-std::string SMV_INPUT_EXACT(const std::string &type) {
+std::string smvInputExact(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_exact(nReady0, exact_tokens)\n"
          "  VAR dataOut0 : " +
@@ -160,7 +160,7 @@ std::string SMV_INPUT_EXACT(const std::string &type) {
 }
 
 // SMV module for a sequence generator with an infinite number of tokens
-std::string SMV_INPUT_INF(const std::string &type) {
+std::string smvInputInf(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_inf(nReady0)\n"
          "  VAR dataOut0 : " +
@@ -190,10 +190,10 @@ createSequenceGenerator(const std::optional<std::string> &type,
   }
   {
     if (nrOfTokens == 0)
-      return SMV_INPUT_INF(*type);
+      return smvInputInf(*type);
     if (generateExactNrOfTokens)
-      return SMV_INPUT_EXACT(*type);
-    return SMV_INPUT(*type);
+      return smvInputExact(*type);
+    return smvInput(*type);
   }
 }
 
