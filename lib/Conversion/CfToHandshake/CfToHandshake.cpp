@@ -1180,6 +1180,8 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
   // parameterMap: Maps parameter name to its value
   llvm::DenseMap<StringRef, Attribute> parameterMap;
+  // Store and later erase const that are used to define parameters
+  llvm::SmallVector<arith::ConstantOp, 4> parameterconsts;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
 
@@ -1221,9 +1223,9 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
           if (auto constOp = operand.getDefiningOp<arith::ConstantOp>()) {
             Attribute parameterValue = constOp.getValue();
             parameterMap[parameterName] = parameterValue;
-            //? Why do we need to delete the parameter operand for callOp? Cant we
-            //? leave it behind since it wont be used as a operand for the Instance?
-            //callOp->eraseOperands(i);
+            if (!llvm::is_contained(parameterconsts, constOp)) {
+              parameterconsts.push_back(constOp);
+            }
           } else {
             assert(false && "Parameter value is not a constant at call site");
           }
@@ -1234,7 +1236,6 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       }
     }
     assert(!InstanceOpOutputIndices.empty() && "Placeholder functions must atleast have one output_ argument");
-    
     // Create Operands for InstanceOp based on collected Inputs
     // Remember that the control signal is already included in operands so start at size - 1
     // for every element check if its Index is part of Output/Parameter vector and delete it,
@@ -1288,10 +1289,20 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       SymbolRefAttr sourceCalleeAttr = sourceCallOp.getCalleeAttr();
       Operation* sourceFuncLookup = mlir::SymbolTable::lookupNearestSymbolFrom(callOp, sourceCalleeAttr);
       auto sourceFunc = dyn_cast<func::FuncOp>(sourceFuncLookup);
-      if (!sourceFunc || sourceFunc.getSymName() != "__init") continue;
+      if (!sourceFunc || !sourceFunc.getSymName().startswith("__init")) continue;
 
       if (!llvm::is_contained(originalInitCallsToErase, sourceCallOp)) {
         originalInitCallsToErase.push_back(sourceCallOp);
+      }
+    }
+    // Erase parameters from callOp
+    llvm::sort(InstanceOpParameterIndices, std::greater<>());
+    for (unsigned id : InstanceOpParameterIndices) {
+      llvm::errs() << "parameter operand id: " << id << "\n";
+      llvm::errs() << "callOp number of operands: " << callOp->getNumOperands() << "\n";
+      if (id < callOp->getNumOperands()){
+        //callOp.getOperand(id).dropAllUses(); // maybe remove this
+        callOp->eraseOperand(id);
       }
     }
   } else {
@@ -1321,10 +1332,10 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     for (auto OutputId : InstanceOpOutputIndices) {
       for (Operation *user : OutputConnections[OutputId]) {
         for (OpOperand &operand : user->getOpOperands()) {
-          // ASSUMPTION: Called placeholder functions are not placed inside loops, so cyclic
-          // data dependencies are not expected here. This rewiring logic assumes acyclic
-          // usage of callOps. If support for calls inside loops is added in the
-          // future, this assumption must be revisited.
+          // ASSUMPTION: Data dependencies are acyclic, no output from the instance 
+          // is used to (directly or indirectly) compute its own input.
+          // All uses of placeholder values must occur after the instance is inserted.
+          // This avoids SSA violations and preserves correct dataflow semantics. //! add exampel and more clear
           if (operand.get() == callOp.getOperand(OutputId)) {
             operand.set(InstanceResults[ResultId]);
           }
@@ -1343,6 +1354,26 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     rewriter.replaceOp(callOp, instOp.getResult(0));
   } else {
     rewriter.replaceOp(callOp, instOp.getResults().drop_back());
+  }
+
+  //Erase all const that where used to define parameters
+  for (arith::ConstantOp constOp : parameterconsts) {
+    if (!constOp || !constOp->getParentRegion()) {
+      llvm::errs() << "Skipping invalid or detached constant\n";
+      continue;
+    }
+    llvm::errs() << "Checking constOp: ";
+    constOp->print(llvm::errs());
+
+    // Use a SmallVector to get the count
+    llvm::SmallVector<OpOperand*> users;
+    for (OpOperand &use : constOp.getResult().getUses()) {
+        users.push_back(&use);
+    }
+    llvm::errs() << " has " << users.size() << " users\n";
+
+    //if (constOp->use_empty()) rewriter.eraseOp(constOp); //! error: operation was already replaced
+    llvm::errs() << "constop deletion happened or not \n";
   }
 
   // in case __init was used to define output variables: go through all __init calls and check if the
@@ -1528,22 +1559,22 @@ struct CfToHandshakePass
     // addIllegalDialect rule above and must be converted by a pattern.
     if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
             SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
-        return calledFn.getName() == "__init";
+        return calledFn.getSymName().startswith("__init");
     }
     // If symbol lookup fails or it's not a func::FuncOp, treat as default (illegal)
     return false;
     });
     target.addDynamicallyLegalOp<func::FuncOp>([](func::FuncOp op) {
-      return op.getName() == "__init";
+      return op.getSymName().startswith("__init");
     });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
 
     // erase __init
-    if (auto initFunc = modOp.lookupSymbol<func::FuncOp>("__init")) {
-      if (initFunc.use_empty()) {
-        initFunc.erase();
+    for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
+      if (func.getSymName().startswith("__init") && func.use_empty()) {
+        func.erase();
       }
     }
   }

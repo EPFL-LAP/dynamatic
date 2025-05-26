@@ -3,28 +3,34 @@
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-//float __tester(float input_a, float output_b, int parameter_BITWIDTH);
-float __tester(float input_a, float input_b, float output_c, float output_d, float output_e, int parameter_BITWIDTH);
+
+float __tester(float input_a, float input_b, float output_c, float output_d, 
+                int output_e, int parameter_BITWIDTH, int parameter_bitrate, int parameter_consttwice);
+int __init2();
+float __init();
 
 void float_basic(in_float_t A[30][30], in_float_t B[30][30], out_float_t y[30],
                  inout_float_t x[30]) {
   int i, j;
   int bitw = 31;
+  int bitrate = 10;
+  int consttwice = 10;
 
   for (i = 0; i < 30; i++) {
     float t_y = 0;
 
-    //float a_val = A[i][0];
-    float a_val;
+    float a_val = A[i][0];
     float b_val = A[i][1];
-    //float c_val = A[i][2];
-    float c_val;
-    float d_val = A[i][3];
-    float e_val = A[i][4];
-    float callres = __tester(a_val, b_val, c_val, d_val, e_val, bitw);
+    float c_val = __init();
+    float d_val = __init();
+    int e_val = __init2();
+
+    float result2 = c_val * d_val;
+    
+    float callres = __tester(a_val, b_val, c_val, d_val, e_val, bitw, bitrate, consttwice);
     float result = a_val + b_val + c_val - d_val - e_val;
     
-    float result2 = c_val * d_val;
+    //float result2 = c_val * d_val;
     float result3 = c_val + c_val;
 
     t_y += result;
