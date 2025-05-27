@@ -2,17 +2,12 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_llvm_tool(elastic-miter
-  elastic-miter.cpp
-  GetSequenceLength.cpp
-  FabricGeneration.cpp
-  ElasticMiterTestbench.cpp
-  SmvUtils.cpp
-  Constraints.cpp
+add_llvm_tool(smv-check-opt
+  smv-check-opt.cpp
 )
 
-llvm_update_compile_flags(elastic-miter)
-target_link_libraries(elastic-miter
+llvm_update_compile_flags(smv-check-opt)
+target_link_libraries(smv-check-opt
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf

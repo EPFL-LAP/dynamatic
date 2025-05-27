@@ -223,7 +223,7 @@
   },
   {
     "name": "handshake.not",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 is_double=$IS_DOUBLE",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -286,12 +286,17 @@
   },
   {
     "name": "mem_to_bram",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generic": "$DYNAMATIC/data/smv/mem_to_bram.smv",
     "hdl": "smv"
   },
   {
     "name": "handshake.lsq",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generic": "$DYNAMATIC/data/smv/mem_to_bram.smv",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.ndwire",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ndwire --abstract-data -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   }
 ]
