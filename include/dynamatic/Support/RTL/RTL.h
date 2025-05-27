@@ -294,9 +294,6 @@ public:
   /// (generation_params in the future)
   void registerParameters(hw::HWModuleExternOp &modOp);
 
-  void registerPortTypesParameter(hw::HWModuleExternOp &modOp,
-                                  llvm::StringRef modName,
-                                  hw::ModuleType &modType);
   void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
                                  llvm::StringRef modName,
                                  hw::ModuleType &modType);
@@ -413,8 +410,8 @@ public:
   /// non-signal-specific version of that method suffixed by a string
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
-  std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
-                                              SignalType type, HDL hdl) const;
+  std::pair<std::string, bool>
+  getRTLPortName(StringRef mlirPortName, SignalType signalType, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

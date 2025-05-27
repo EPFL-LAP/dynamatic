@@ -18,9 +18,8 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/MapVector.h"
-
+#include "llvm/ADT/StringRef.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -49,10 +48,10 @@ struct TimingInfo {
   std::optional<unsigned> readyLatency;
 
   /// Returns the optional latency associated to a signal type.
-  std::optional<unsigned> getLatency(SignalType type);
+  std::optional<unsigned> getLatency(SignalType signalType);
 
   /// Sets the latency associated to a signal type.
-  TimingInfo &setLatency(SignalType type, unsigned latency);
+  TimingInfo &setLatency(SignalType signalType, unsigned latency);
 
   /// During parsing of attributes storing instances of this type, attempts to
   /// parse the data after a key and colon were parsed (<key> <:>
@@ -83,6 +82,8 @@ struct ChannelBufProps {
   unsigned minOpaque;
   /// Maximum number of opaque slots allowed on the channel (inclusive).
   std::optional<unsigned> maxOpaque;
+  /// Minimum number of buffer slots allowed on the channel (inclusive).
+  unsigned minSlots;
   /// Combinational delay (in ns) from the output port to the buffer's input, if
   /// a buffer is placed on the channel.
   double inDelay;
@@ -100,6 +101,7 @@ struct ChannelBufProps {
                   std::optional<unsigned> maxTrans = std::nullopt,
                   unsigned minOpaque = 0,
                   std::optional<unsigned> maxOpaque = std::nullopt,
+                  unsigned minSlots = 0,
                   double inDelay = 0.0, double outDelay = 0.0,
                   double delay = 0.0);
 
@@ -126,7 +128,8 @@ template <typename Os>
 Os &operator<<(Os &os, ChannelBufProps &props) {
   os << "{\n\ttransparent slots: [" << props.minTrans << ", "
      << getMaxStr(props.maxTrans) << "\n\topaque slots: [" << props.minOpaque
-     << ", " << getMaxStr(props.maxOpaque) << "\n\tin/out delays: ("
+     << ", " << getMaxStr(props.maxOpaque) << "\n\tTotal slots: " 
+     << props.minSlots << ", " << "\n\tin/out delays: ("
      << props.inDelay << ", " << props.outDelay << ")"
      << "\n\ttotal delay: " << props.delay << "\n}\n";
   return os;

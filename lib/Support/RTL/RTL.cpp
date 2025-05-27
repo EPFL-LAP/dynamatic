@@ -245,40 +245,6 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
   return values;
 }
 
-/// Serializes the module's "port_types", which includes the types of all ports
-/// (operands and results) of the original operation. This is passed to the RTL
-/// generator to help it generate the correct port types. e.g., '{"lhs":
-/// "!handshake.channel<i32, [spec: i1]>",
-// "rhs": "!handshake.channel<i32, [spec: i1]>",
-// "result": "!handshake.channel<i1, [spec: i1]>"}'
-static std::string serializePortTypes(hw::ModuleType &mod) {
-  // Prepare a string stream to serialize the port types
-  std::string portTypesValue;
-  llvm::raw_string_ostream portTypes(portTypesValue);
-
-  // Wrap in single quotes for easier passing as a generator argument.
-  portTypes << "'{"; // Start of the JSON object
-
-  bool first = true;
-  for (const hw::ModulePort &port : mod.getPorts()) {
-    // Skip the clock and reset ports
-    if (port.name == "clk" || port.name == "rst")
-      continue;
-
-    if (!first)
-      portTypes << ", ";
-    first = false;
-
-    portTypes << "\"" << port.name.str() << "\": \"";
-    // TODO: Escape "" in the port type (if needed)
-    port.type.print(portTypes);
-    portTypes << "\"";
-  }
-  portTypes << "}'"; // End of the JSON object
-
-  return portTypes.str();
-}
-
 static std::string serializeExtraSignalsInner(const Type &type) {
   assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
          "type should be ChannelType or ControlType");
@@ -320,16 +286,9 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-  registerPortTypesParameter(modOp, modName, modType);
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
-}
-
-void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType) {
-  serializedParams["PORT_TYPES"] = serializePortTypes(modType);
 }
 
 void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
@@ -339,9 +298,11 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       // default (All(Data)TypesMatch)
       modName == "handshake.addi" || modName == "handshake.andi" ||
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
-      modName == "handshake.fork" || modName == "handshake.merge" ||
-      modName == "handshake.muli" || modName == "handshake.sink" ||
-      modName == "handshake.subi" || modName == "handshake.shli" ||
+      modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
+      modName == "handshake.merge" || modName == "handshake.muli" ||
+      modName == "handshake.sink" || modName == "handshake.subi" ||
+      modName == "handshake.shli" || modName == "handshake.blocker" ||
+      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -396,13 +357,14 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
-             modName == "handshake.mulf" || modName == "handshake.subf") {
+             modName == "handshake.mulf" || modName == "handshake.subf" ||
+             modName == "handshake.divf" || modName == "handshake.negf" ||
+             modName == "handshake.maximumf" ||
+             modName == "handshake.minimumf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
@@ -415,9 +377,11 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
     auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
-      if (info == handshake::TimingInfo::break_r() || info == handshake::TimingInfo::break_none()) {
+      if (info == handshake::TimingInfo::break_r() ||
+          info == handshake::TimingInfo::break_none()) {
         serializedParams["TRANSPARENT"] = "True";
-      } else if (info == handshake::TimingInfo::break_dv() || info == handshake::TimingInfo::break_dvr()) {
+      } else if (info == handshake::TimingInfo::break_dv() ||
+                 info == handshake::TimingInfo::break_dvr()) {
         serializedParams["TRANSPARENT"] = "False";
       } else {
         llvm_unreachable("Unknown timing info");
@@ -445,6 +409,8 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" ||
       // the first input has extra signals
       modName == "handshake.load" || modName == "handshake.store" ||
       modName == "handshake.spec_commit" ||
@@ -457,8 +423,6 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   } else if (modName == "handshake.mem_controller" ||
              modName == "mem_to_bram") {
     // Skip
-  } else {
-    llvm::errs() << "Uncaught module: " << modName << "\n";
   }
 }
 
@@ -748,10 +712,10 @@ RTLComponent::getRTLPortName(StringRef mlirPortName, HDL hdl) const {
 }
 
 std::pair<std::string, bool>
-RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType type,
+RTLComponent::getRTLPortName(StringRef mlirPortName, SignalType signalType,
                              HDL hdl) const {
   auto portName = getRTLPortName(mlirPortName, hdl);
-  return {portName.first + ioSignals.at(type), portName.second};
+  return {portName.first + ioSignals.at(signalType), portName.second};
 }
 
 bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
@@ -792,9 +756,9 @@ bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
   }
 
   /// Defines default signal type suffixes if they were not overriden
-  auto setDefaultSignalSuffix = [&](SignalType type, StringRef suffix) {
-    if (ioSignals.find(type) == ioSignals.end())
-      ioSignals[type] = suffix;
+  auto setDefaultSignalSuffix = [&](SignalType signalType, StringRef suffix) {
+    if (ioSignals.find(signalType) == ioSignals.end())
+      ioSignals[signalType] = suffix;
   };
   setDefaultSignalSuffix(SignalType::DATA, "");
   setDefaultSignalSuffix(SignalType::VALID, "_valid");
@@ -865,13 +829,13 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
   ioChannels.clear();
   for (const auto &[signalStr, jsonSuffix] : *object) {
     // Deserialize the signal type
-    SignalType type;
+    SignalType signalType;
     if (signalStr == "data") {
-      type = SignalType::DATA;
+      signalType = SignalType::DATA;
     } else if (signalStr == "valid") {
-      type = SignalType::VALID;
+      signalType = SignalType::VALID;
     } else if (signalStr == "ready") {
-      type = SignalType::READY;
+      signalType = SignalType::READY;
     } else {
       path.field(signalStr).report("unknown channel signal type: possible keys "
                                    "are 'data', 'valid', or 'ready'");
@@ -879,7 +843,7 @@ inline bool dynamatic::fromJSON(const ljson::Value &value,
     }
 
     // Deserialize the suffix (just a string)
-    if (!fromJSON(jsonSuffix, ioChannels[type], path.field(signalStr)))
+    if (!fromJSON(jsonSuffix, ioChannels[signalType], path.field(signalStr)))
       return false;
   }
 
