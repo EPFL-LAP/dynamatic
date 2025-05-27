@@ -47,98 +47,100 @@ std::string createSmvFormalTestbench(
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
-const std::string SMV_BOOL_INPUT =
-    "MODULE bool_input(nReady0, max_tokens)\n"
-    "  VAR dataOut0 : boolean;\n"
-    "  VAR counter : 0..31;\n"
-    "  FROZENVAR exact_tokens : 0..max_tokens;\n"
-    "  ASSIGN\n"
-    "    init(counter) := 0;\n"
-    "    next(counter) := case\n"
-    "      nReady0 & counter < exact_tokens : counter + 1;\n"
-    "      TRUE : counter;\n"
-    "    esac;\n"
-    "\n"
-    "  -- make sure dataOut0 is persistent\n"
-    "  ASSIGN\n"
-    "    next(dataOut0) := case\n"
-    "      valid0 & !nReady0 : dataOut0;\n"
-    "      TRUE : {TRUE, FALSE};\n"
-    "    esac;\n"
-    "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+const std::string SMV_BOOL_INPUT = R"DELIM(
+MODULE bool_input(nReady0, max_tokens)
+  VAR dataOut0 : boolean;
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure dataOut0 is persistent
+  ASSIGN
+    next(dataOut0) := case
+      valid0 & !nReady0 : dataOut0;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE valid0 := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-const std::string SMV_BOOL_INPUT_EXACT =
-    "MODULE bool_input_exact(nReady0, exact_tokens)\n"
-    "  VAR dataOut0 : boolean;\n"
-    "  VAR counter : 0..31;\n"
-    "  ASSIGN\n"
-    "    init(counter) := 0;\n"
-    "    next(counter) := case\n"
-    "      nReady0 & counter < exact_tokens : counter + 1;\n"
-    "      TRUE : counter;\n"
-    "    esac;\n"
-    "\n"
-    "  -- make sure dataOut0 is persistent\n"
-    "  ASSIGN\n"
-    "    next(dataOut0) := case\n"
-    "      valid0 & !nReady0 : dataOut0;\n"
-    "      TRUE : {TRUE, FALSE};\n"
-    "    esac;\n"
-    "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+const std::string SMV_BOOL_INPUT_EXACT = R"DELIM(
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR dataOut0 : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure dataOut0 is persistent
+  ASSIGN
+    next(dataOut0) := case
+      valid0 & !nReady0 : dataOut0;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE valid0 := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with an infinite number of tokens
-const std::string SMV_BOOL_INPUT_INF =
-    "MODULE bool_input_inf(nReady0)\n"
-    "    VAR dataOut0 : boolean;\n"
-    "    \n"
-    "    -- make sure dataOut0 is persistent\n"
-    "    ASSIGN\n"
-    "    next(dataOut0) := case \n"
-    "      valid0 & !nReady0 : dataOut0;\n"
-    "      TRUE : {TRUE, FALSE};\n"
-    "    esac;\n"
-    "    DEFINE valid0 := TRUE;\n\n";
+const std::string SMV_BOOL_INPUT_INF = R"DELIM(
+MODULE bool_input_inf(nReady0)
+    VAR dataOut0 : boolean;
+    
+    -- make sure dataOut0 is persistent
+    ASSIGN
+    next(dataOut0) := case 
+      valid0 & !nReady0 : dataOut0;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE valid0 := TRUE;)DELIM";
 
 // SMV module for a sequence generator with an infinite number of tokens
-const std::string SMV_CTRL_INPUT_INF = "MODULE ctrl_input_inf(nReady0)\n"
-                                       "    DEFINE valid0 := TRUE;\n\n";
+const std::string SMV_CTRL_INPUT_INF = R"DELIM(
+MODULE ctrl_input_inf(nReady0)
+  DEFINE valid0 := TRUE;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
-const std::string SMV_CTRL_INPUT =
-    "MODULE ctrl_input(nReady0, max_tokens)\n"
-    "  VAR counter : 0..31;\n"
-    "  FROZENVAR exact_tokens : 0..max_tokens;\n"
-    "  ASSIGN\n"
-    "    init(counter) := 0;\n"
-    "    next(counter) := case\n"
-    "      nReady0 & counter < exact_tokens : counter + 1;\n"
-    "      TRUE : counter;\n"
-    "    esac;\n"
-    "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+const std::string SMV_CTRL_INPUT = R"DELIM(
+MODULE ctrl_input(nReady0, max_tokens)
+  VAR counter : 0..31;
+  FROZENVAR exact_tokens : 0..max_tokens;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  DEFINE valid0 := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-const std::string SMV_CTRL_INPUT_EXACT =
-    "MODULE ctrl_input_exact(nReady0, exact_tokens)\n"
-    "  VAR counter : 0..31;\n"
-    "  ASSIGN\n"
-    "    init(counter) := 0;\n"
-    "    next(counter) := case\n"
-    "      nReady0 & counter < exact_tokens : counter + 1;\n"
-    "      TRUE : counter;\n"
-    "    esac;\n"
-    "\n"
-    "  DEFINE valid0 := counter < exact_tokens;\n\n";
+const std::string SMV_CTRL_INPUT_EXACT = R"DELIM(
+MODULE ctrl_input_exact(nReady0, exact_tokens)
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
 
-const std::string SMV_SINK = "MODULE sink(ins_valid)\n"
-                             "  DEFINE ready0 := TRUE;\n\n";
+  DEFINE valid0 := counter < exact_tokens;)DELIM";
+
+const std::string SMV_SINK = R"DELIM(
+MODULE sink(ins_valid)
+  DEFINE ready0 := TRUE;)DELIM";
 
 } // namespace dynamatic::experimental
 #endif // DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
