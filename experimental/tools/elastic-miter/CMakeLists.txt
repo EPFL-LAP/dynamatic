@@ -14,14 +14,10 @@ add_llvm_tool(elastic-miter
 llvm_update_compile_flags(elastic-miter)
 target_link_libraries(elastic-miter
   PRIVATE
-  AffineToScf
-  DynamaticLowerScfToCf
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticExperimentalResourceSharing
-  DynamaticCfToHandshake
   DynamaticHandshake
-  DynamaticHandshakeToHW
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
@@ -30,9 +26,7 @@ target_link_libraries(elastic-miter
   DynamaticExperimentalTransforms
 
   MLIRIR
-  MLIRAffineTransforms
   MLIRArithTransforms
-  MLIRSCFTransforms
   MLIRMemRefTransforms
   MLIRLLVMDialect
   MLIRMemRefDialect
@@ -41,5 +35,4 @@ target_link_libraries(elastic-miter
   MLIRFuncDialect
   MLIRSupport
   MLIRTransforms
-  MLIRSCFDialect
 )
