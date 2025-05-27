@@ -156,10 +156,10 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
   }
 }
 
-static std::string convertMLIRTypeToSMV(Type type) {
+static std::optional<std::string> convertMLIRTypeToSMV(Type type) {
   return llvm::TypeSwitch<Type, std::string>(type)
       .Case<handshake::ControlType>(
-          [&](handshake::ControlType cType) { return std::string(""); })
+          [&](handshake::ControlType cType) { return std::nullopt; })
       .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
         if (cType.getDataBitWidth() == 1)
           return std::string("boolean");
@@ -173,8 +173,8 @@ static std::string createSupportEntities(
 
   std::unordered_set<std::string> types;
   for (auto [_, type] : arguments)
-    if (type.isa<handshake::ControlType, handshake::ChannelType>())
-      types.insert(convertMLIRTypeToSMV(type));
+    if (type.isa<handshake::ChannelType>())
+      types.insert(convertMLIRTypeToSMV(type).value());
   std::ostringstream supportEntities;
 
   for (const auto &smvType : types) {
