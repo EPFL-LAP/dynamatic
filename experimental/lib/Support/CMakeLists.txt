@@ -6,6 +6,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   HandshakeSimulator.cpp
   FtdImplementation.cpp
   FtdSupport.cpp
+  FormalProperty.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
