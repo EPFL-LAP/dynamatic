@@ -35,8 +35,8 @@
 *.jar
 
 # Build-related directories
-build/
-bin/
+/build/
+/bin/
 .cache/
 __pycache__/
 cs
