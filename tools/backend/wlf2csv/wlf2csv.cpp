@@ -135,7 +135,7 @@ struct WireReference {
                                  READY_SUFFIX = "_ready";
 
   Value value;
-  SignalType type;
+  SignalType signalType;
   std::optional<size_t> idx;
 
   static std::optional<WireReference>
@@ -195,7 +195,7 @@ WireReference::fromSignal(StringRef signalName,
   }
 
   auto checkSingleWire = [&](StringRef suffix,
-                             SignalType type) -> std::optional<WireReference> {
+                             SignalType signalType) -> std::optional<WireReference> {
     if (!signalName.ends_with(suffix))
       return std::nullopt;
 
@@ -204,7 +204,7 @@ WireReference::fromSignal(StringRef signalName,
     auto portIt = ports.find(portName);
     if (portIt == ports.end())
       return std::nullopt;
-    return WireReference{portIt->second, type, std::nullopt};
+    return WireReference{portIt->second, signalType, std::nullopt};
   };
 
   if (auto wireOpt = checkSingleWire(VALID_SUFFIX, SignalType::VALID))
@@ -430,7 +430,7 @@ int main(int argc, char **argv) {
       ChannelState &channelState = channelStateIt->second;
       WireState wireState = wireStateFromLog(tokens[2]);
 
-      switch (wire.type) {
+      switch (wire.signalType) {
       case SignalType::VALID:
         channelState.valid = wireState;
         break;

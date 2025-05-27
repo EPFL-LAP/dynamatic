@@ -169,9 +169,9 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_3]] : <i1> to <i32>
 // CHECK:           %[[VAL_6:.*]] = constant %[[VAL_1]] {value = 1 : i2} : <>, <i2>
 // CHECK:           %[[VAL_7:.*]] = extsi %[[VAL_6]] : <i2> to <i6>
-// CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = control_merge %[[VAL_0]], %[[VAL_10:.*]]  : <>, <i1>
-// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_12:.*]]] : <i1>, <i32>
-// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_14:.*]]] : <i1>, <i5>
+// CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = control_merge [%[[VAL_0]], %[[VAL_10:.*]]]  : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_11:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_5]], %[[VAL_12:.*]]] : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_9]] {{\[}}%[[VAL_4]], %[[VAL_14:.*]]] : <i1>, [<i5>, <i5>] to <i5>
 // CHECK:           %[[VAL_15:.*]] = extsi %[[VAL_13]] : <i5> to <i6>
 // CHECK:           %[[VAL_16:.*]] = addi %[[VAL_15]], %[[VAL_7]] : <i6>
 // CHECK:           %[[VAL_17:.*]] = trunci %[[VAL_16]] : <i6> to <i5>
@@ -185,9 +185,9 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_27:.*]] = extsi %[[VAL_26]] : <i1> to <i6>
 // CHECK:           %[[VAL_28:.*]] = constant %[[VAL_24]] {value = 1 : i2} : <>, <i2>
 // CHECK:           %[[VAL_29:.*]] = extsi %[[VAL_28]] : <i2> to <i7>
-// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge %[[VAL_22]], %[[VAL_32:.*]]  : <>, <i1>
-// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_34:.*]]] : <i1>, <i32>
-// CHECK:           %[[VAL_35:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_36:.*]]] : <i1>, <i6>
+// CHECK:           %[[VAL_30:.*]], %[[VAL_31:.*]] = control_merge [%[[VAL_22]], %[[VAL_32:.*]]]  : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_33:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_20]], %[[VAL_34:.*]]] : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_35:.*]] = mux %[[VAL_31]] {{\[}}%[[VAL_27]], %[[VAL_36:.*]]] : <i1>, [<i6>, <i6>] to <i6>
 // CHECK:           %[[VAL_37:.*]] = extsi %[[VAL_35]] : <i6> to <i7>
 // CHECK:           %[[VAL_38:.*]] = addi %[[VAL_37]], %[[VAL_29]] : <i7>
 // CHECK:           %[[VAL_39:.*]] = trunci %[[VAL_38]] : <i7> to <i6>
@@ -198,7 +198,7 @@ handshake.func @simpleLoop(%start: !handshake.control<>) -> !handshake.channel<i
 // CHECK:           %[[VAL_44:.*]] = source : <>
 // CHECK:           %[[VAL_45:.*]] = constant %[[VAL_44]] {value = 10 : i5} : <>, <i5>
 // CHECK:           %[[VAL_46:.*]] = extsi %[[VAL_45]] : <i5> to <i32>
-// CHECK:           %[[VAL_47:.*]], %[[VAL_48:.*]] = control_merge %[[VAL_43]]  : <>, <i1>
+// CHECK:           %[[VAL_47:.*]], %[[VAL_48:.*]] = control_merge [%[[VAL_43]]]  : [<>] to <>, <i1>
 // CHECK:           %[[VAL_49:.*]] = merge %[[VAL_42]] : <i32>
 // CHECK:           %[[VAL_50:.*]] = addi %[[VAL_49]], %[[VAL_46]] : <i32>
 // CHECK:           %[[VAL_34]] = br %[[VAL_50]] : <i32>
@@ -217,9 +217,9 @@ handshake.func @nestedLoop(%start: !handshake.control<>) -> !handshake.channel<i
   %oneMinOut = constant %sourceOut {value = 1 : i2} : <>, <i2>
   %oneOut = extsi %oneMinOut : <i2> to <i32>
 // begin block
-  %ctrlOut, %indexOut = control_merge %start, %ctrlToOut : <>, <i32>
-  %iterOut = mux %indexOut [%zeroOut, %ltOut] : <i32>, <i32>
-  %accOut = mux %indexOut [%zeroOut, %accToOut] : <i32>, <i32>
+  %ctrlOut, %indexOut = control_merge [%start, %ctrlToOut] : [<>, <>] to <>, <i32>
+  %iterOut = mux %indexOut [%zeroOut, %ltOut] : <i32>, [<i32>, <i32>] to <i32>
+  %accOut = mux %indexOut [%zeroOut, %accToOut] : <i32>, [<i32>, <i32>] to <i32>
   %addOut = addi %iterOut, %oneOut : <i32>
   %condOut = cmpi ult, %addOut, %boundOut : <i32>
   %ltOut, %geOut = cond_br %condOut, %addOut : <i1>, <i32>
@@ -234,9 +234,9 @@ handshake.func @nestedLoop(%start: !handshake.control<>) -> !handshake.channel<i
   %oneMinIn = constant %sourceIn {value = 1 : i2} : <>, <i2>
   %oneIn = extsi %oneMinIn : <i2> to <i32>
 // begin block
-  %ctrlIn, %indexIn = control_merge %ctrlToIn, %ctrlToInFromBody : <>, <i32>
-  %iterIn = mux %indexIn [%zeroIn, %ltIn] : <i32>, <i32>
-  %accIn = mux %indexIn [%accToIn, %accToInFromBody]  : <i32>, <i32>
+  %ctrlIn, %indexIn = control_merge [%ctrlToIn, %ctrlToInFromBody] : [<>, <>] to <>, <i32>
+  %iterIn = mux %indexIn [%zeroIn, %ltIn] : <i32>, [<i32>, <i32>] to <i32>
+  %accIn = mux %indexIn [%accToIn, %accToInFromBody]  : <i32>, [<i32>, <i32>] to <i32>
   %addIn = addi %iterIn, %oneIn : <i32>
   %condIn = cmpi ult, %addIn, %boundIn : <i32>
   %ltIn, %geIn = cond_br %condIn, %addIn : <i1>, <i32>
@@ -247,13 +247,13 @@ handshake.func @nestedLoop(%start: !handshake.control<>) -> !handshake.channel<i
   %tenMinInBody = constant %sourceInBody {value = 10 : i5} : <>, <i5>
   %tenInBody = extsi %tenMinInBody : <i5> to <i32>
 // begin block
-  %ctrlInBody, %indexInBody = control_merge %ctrlToInBody : <>, <i32>
+  %ctrlInBody, %indexInBody = control_merge [%ctrlToInBody] : [<>] to <>, <i32>
   %accInBody = merge %accToInBody : <i32>
   %accInc = addi %accInBody, %tenInBody : <i32>
   %accToInFromBody = br %accInc : <i32>
   %ctrlToInFromBody = br %ctrlInBody : <>
 // ^^exit:
-  %ctrlEnd, %indexEnd = control_merge %ctrlToExit : <>, <i32>
+  %ctrlEnd, %indexEnd = control_merge [%ctrlToExit] : [<>] to <>, <i32>
   %accExit = merge %accToExit : <i32>
   end %accExit : <i32>
 }

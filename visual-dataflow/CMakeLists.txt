@@ -96,7 +96,6 @@ target_link_libraries(${GODOT_LIB_NAME}
   ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticSupport.a
   ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticHandshake.a
   ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticAnalysis.a
-  ${DYNAMATIC_BINARY_DIR}/lib/libDynamaticSpeculation.a
 
   MLIRIR
   MLIRLLVMDialect

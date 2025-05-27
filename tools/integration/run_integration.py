@@ -1,6 +1,7 @@
 """
 Script for running Dynamatic integration tests.
 """
+
 import argparse
 import os
 import sys
@@ -8,6 +9,7 @@ import shutil
 import subprocess
 import re
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 
 class CLIHandler:
@@ -24,16 +26,29 @@ class CLIHandler:
         Configures all available command line arguments.
         """
         self.parser.add_argument(
-            "-l", "--list",
-            help="Path to a text file with names of tests to run. If not given, runs all tests."
+            "-l",
+            "--list",
+            help="Path to a text file with names of tests to run. If not given, runs all tests.",
         )
         self.parser.add_argument(
-            "-i", "--ignore",
-            help="Path to a text file with names of tests to ignore (i.e. skip)."
+            "-i",
+            "--ignore",
+            help="Path to a text file with names of tests to ignore (i.e. skip).",
         )
         self.parser.add_argument(
-            "-t", "--timeout",
-            help="Custom timeout value for a single test. If not given, 500 seconds is used."
+            "-t",
+            "--timeout",
+            nargs="?",
+            type=int,
+            default=500,
+            help="Custom timeout value for a single test. Default is 500 seconds.",
+        )
+        self.parser.add_argument(
+            "-w",
+            "--workers",
+            nargs="?",
+            type=int,
+            help="Number of workers to run in parallel for testing. Default is os.cpu_count().",
         )
 
     def parse_args(self, args=None):
@@ -50,8 +65,8 @@ class CLIHandler:
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
-SCRIPT_CONTENT = \
-    f"set-dynamatic-path {DYNAMATIC_ROOT}" \
+SCRIPT_CONTENT = (
+    f"set-dynamatic-path {DYNAMATIC_ROOT}"
     + """
 set-src {src_path}
 compile
@@ -59,20 +74,21 @@ write-hdl
 simulate
 exit
 """
-DYN_FILE = DYNAMATIC_ROOT / "build" / "run_test.dyn"
+)
 
 # Note: Must use --exit-on-failure in order for run_command_with_timeout
 #       to be able to detect the status code properly
-DYNAMATIC_COMMAND = str(DYNAMATIC_ROOT / "bin" / "dynamatic") + \
+DYNAMATIC_COMMAND = (
+    str(DYNAMATIC_ROOT / "bin" / "dynamatic") +
     " --exit-on-failure --run {script_path}"
-
-# Class to have different colors while writing in terminal
+)
 
 
 class TermColors:
     """
     Contains ANSI color escape sequences for colored terminal output.
     """
+
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
     OKCYAN = "\033[96m"
@@ -138,13 +154,17 @@ def read_file(file_path):
         return file.read()
 
 
-def run_command_with_timeout(command, timeout=500):
+def run_command_with_timeout(
+    command, timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+):
     """
     Runs a command with a time limit for execution.
 
     Arguments:
     `command` -- Shell command to be executed
     `timeout` -- Execution time limit
+    `stdout`  -- File to redirect stdout to
+    `stderr`  -- File to redirect stderr to
 
     Returns: An integer representing the execution result
     0 -- if process completed without errors
@@ -157,8 +177,8 @@ def run_command_with_timeout(command, timeout=500):
             shell=True,
             timeout=timeout,
             check=True,
-            stdout=subprocess.PIPE,  # Suppress standard output
-            stderr=subprocess.PIPE,  # Suppress standard error
+            stdout=stdout,
+            stderr=stderr,
         )
         return 0
     except subprocess.CalledProcessError:
@@ -217,6 +237,71 @@ def get_sim_time(log_path):
         raise ValueError("Log file does not contain simulation time!")
 
 
+def run_test(c_file, id, timeout):
+    """
+    Runs the specified integration test.
+
+    Arguments:
+    `c_file`   -- Path to .c source file of integration test.
+    `id`       -- Index used to identify the test.
+    `timeout`  -- Timeout in seconds for running the test.
+
+    Returns:
+    Dictionary with the following keys:
+    `id`      -- Index of the test that was given as argument.
+    `msg`     -- Message indicating the result of the test.
+    `status`  -- One of 'pass', `fail` or `timeout`.
+    """
+
+    # Write .dyn script with appropriate source file name
+    dyn_file = DYNAMATIC_ROOT / "build" / f"test_{id}.dyn"
+    write_string_to_file(SCRIPT_CONTENT.format(src_path=c_file), dyn_file)
+
+    # Get out dir name
+    out_dir = replace_filename_with(c_file, "out")
+
+    # Remove previous out directory
+    if os.path.isdir(out_dir):
+        shutil.rmtree(out_dir)
+
+    Path(out_dir).mkdir()
+
+    with open(Path(out_dir) / "dynamatic_out.txt", "w") as stdout, open(
+        Path(out_dir) / "dynamatic_err.txt", "w"
+    ) as stderr:
+        # Run test and output result
+        exit_code = run_command_with_timeout(
+            DYNAMATIC_COMMAND.format(script_path=dyn_file),
+            timeout=timeout,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+        name = Path(c_file).name[:-2]
+        if exit_code == 0:
+            sim_log_path = os.path.join(out_dir, "sim", "report.txt")
+            try:
+                sim_time = get_sim_time(sim_log_path)
+                return {
+                    "id": id,
+                    "msg": f"[PASS] {name} (simulation duration: "
+                    f"{round(sim_time / 4)} cycles)",
+                    "status": "pass",
+                }
+            except ValueError:
+                # This should never happen
+                return {
+                    "id": id,
+                    "msg": f"[PASS] {name} (simulation duration: NOT FOUND)",
+                    "status": "pass",
+                }
+
+        elif exit_code == 1:
+            return {"id": id, "msg": f"[FAIL] {name}", "status": "fail"}
+        else:
+            return {"id": id, "msg": f"[TIMEOUT] {name}", "status": "timeout"}
+
+
 def main():
     """
     Entry point for the script.
@@ -238,8 +323,7 @@ def main():
                     break
 
             if not found:
-                color_print(f"[WARNING] Test '{test}' not found",
-                            TermColors.WARNING)
+                color_print(f"[WARNING] Test '{test}' not found", TermColors.WARNING)
 
         c_files = filtered_c_files
 
@@ -253,60 +337,49 @@ def main():
     passed_cnt = 0
     ignored_cnt = 0
 
-    for c_file in c_files:
-        # Write .dyn script with appropriate source file name
-        write_string_to_file(SCRIPT_CONTENT.format(src_path=c_file), DYN_FILE)
+    # ProcessPoolExecutor creates subprocesses and not threads, and as such,
+    # is not limited by Python's Global Interpreter Lock.
+    # Hence, it allows the full performance gain from parallelism to be achieved,
+    # unlike ThreadPoolExecutor, which would not make execution any faster whatsoever.
+    with ProcessPoolExecutor(max_workers=args.workers) as executor:
+        # Note: _max_workers is a private variable, as indicated by the underscore.
+        # However, we access it to get the number of workers used, since the default
+        # number (which is used when the ctor is called with max_workers=None) is
+        # os.cpu_count() or os.process_cpu_count(), depending on the Python version.
+        # This is "cheating", but is independent of the Python version.
+        color_print(
+            f"[INFO] Running with {executor._max_workers} worker(s).", TermColors.OKBLUE
+        )
 
-        # Get out dir name
-        out_dir = replace_filename_with(c_file, "out")
+        processes = []
+        for idx, c_file in enumerate(c_files):
+            # Check if test is supposed to be ignored
+            name = Path(c_file).name[:-2]
+            if name in ignored_tests:
+                ignored_cnt += 1
+                color_print(f"[IGNORED] {name}", TermColors.OKGREEN)
+                continue
 
-        # Check if test is supposed to be ignored
-        if Path(c_file).name[:-2] in ignored_tests:
-            ignored_cnt += 1
-            color_print(f"[IGNORED] {c_file}", TermColors.OKGREEN)
-            continue
+            # One more test to handle
+            test_cnt += 1
 
-        # One more test to handle
-        test_cnt += 1
+            # Run the test
+            processes.append(executor.submit(run_test, c_file, idx, args.timeout))
 
-        # Remove previous out directory
-        if os.path.isdir(out_dir):
-            shutil.rmtree(out_dir)
+            color_print(f"[INFO] Submitted {name} for execution", TermColors.OKBLUE)
+            sys.stdout.flush()
 
-        # Run test and output result
-        if args.timeout:
-            result = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=DYN_FILE),
-                timeout=int(args.timeout)
-            )
-        else:
-            result = run_command_with_timeout(
-                DYNAMATIC_COMMAND.format(script_path=DYN_FILE)
-            )
+        for p in processes:
+            result = p.result()
+            if result["status"] == "pass":
+                color_print(result["msg"], TermColors.OKGREEN)
+                passed_cnt += 1
+            elif result["status"] == "fail":
+                color_print(result["msg"], TermColors.FAIL)
+            else:
+                color_print(result["msg"], TermColors.WARNING)
 
-        if result == 0:
-            sim_log_path = os.path.join(out_dir, "sim", "report.txt")
-            try:
-                sim_time = get_sim_time(sim_log_path)
-                color_print(
-                    f"[PASS] {c_file} (simulation duration: "
-                    f"{round(sim_time / 4)} cycles)",
-                    TermColors.OKGREEN
-                )
-            except ValueError:
-                # This should never happen
-                color_print(
-                    f"[PASS] {c_file} (simulation duration: NOT FOUND)",
-                    TermColors.OKGREEN
-                )
-
-            passed_cnt += 1
-        elif result == 1:
-            color_print(f"[FAIL] {c_file}", TermColors.FAIL)
-        else:
-            color_print(f"[TIMEOUT] {c_file}", TermColors.WARNING)
-
-        sys.stdout.flush()
+            sys.stdout.flush()
 
     print(
         f"** Integration testing finished: "

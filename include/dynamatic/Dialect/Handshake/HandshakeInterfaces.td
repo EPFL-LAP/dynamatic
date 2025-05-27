@@ -48,24 +48,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       "mlir::OpResult", "getDataResult", (ins)
     >,
   ];
-
-  let verify = [{
-    auto concreteOp = mlir::cast<ConcreteOp>($_op);
-
-    auto operands = concreteOp.getDataOperands();
-
-    if (!operands.size())
-      return concreteOp.emitOpError("must have at least one data operand");
-
-    mlir::Type resultType = $_op->getResult(0).getType();
-
-    for (auto operand : operands)
-      if (operand.getType() != resultType)
-        return concreteOp.emitOpError("operand has type ") << operand.getType()
-            << ", but result has type " << resultType;
-
-    return mlir::success();
-  }];
 }
 
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
@@ -234,64 +216,5 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 }
 
 def HasClock : NativeOpTrait<"HasClock">;
-
-def SpeculationOpInterface : OpInterface<"SpeculationOpInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Identifier for operations representing speculative units.
-  }];
-}
-
-def SameExtraSignalsInterface : OpInterface<"SameExtraSignalsInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Ensures that the extra signals of specific operand/result channels
-    (`handshake::ChannelType`) are identical (even if the channels' respective
-    data type may be different). 
-  }];
-
-  let methods = [
-    InterfaceMethod<[{
-        Returns the list of operand/result channels that should have the same
-        extra signals. By default these are all channel-typed operands/results.
-      }], "::mlir::SmallVector<::mlir::TypedValue<::dynamatic::handshake::ChannelType>>",
-        "getChannelsWithSameExtraSignals", (ins), "", [{
-          return ::dynamatic::handshake::detail::getChannelsWithSameExtraSignals(
-            $_op
-          );
-      }]>
-  ];
-
-  let verify = [{
-    return ::dynamatic::handshake::detail::verifySameExtraSignalsInterface(
-      $_op, ::mlir::cast<ConcreteOp>($_op).getChannelsWithSameExtraSignals()
-    );
-  }];
-}
-
-def ReshapableChannelsInterface : OpInterface<"ReshapableChannelsInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description = [{
-    Handshake operations which do not care for the content of all extra signals
-    (and optionally, the data signal) of specific operand channels
-    (`handshake::ChannelType`) may implement this interface to let the backend
-    know that it is free to reshape these channel-typed operands. Reshaping
-    tends to simplify RTL generation. 
-  }];
-
-  let methods = [
-    InterfaceMethod<[{
-        Returns the operand channel type which can be reshaped, as well as a
-        boolean indicating whether the channel type's data signal is also
-        ignored by the operation. The returned type may be `nullptr` if no such
-        channel type exists. By default, returns the type of the first operand
-        if it is channel-typed and `false`; otherwise returns `nullptr` and an
-        unspecified boolean.
-      }], "::std::pair<::dynamatic::handshake::ChannelType, bool>",
-      "getReshapableChannelType", (ins), "", [{
-        return ::dynamatic::handshake::detail::getReshapableChannelType($_op);
-      }]>
-  ];
-}
 
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

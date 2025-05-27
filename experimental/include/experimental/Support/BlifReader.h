@@ -20,7 +20,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
 #include <unordered_map>

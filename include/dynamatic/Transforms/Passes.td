@@ -224,18 +224,6 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
-def HandshakeReshapeChannels : DynamaticPass<"handshake-reshape-channels"> {
-  let summary = "Reshape channels to simplify RTL generation.";
-  let description = [{
-    Relies on the `ReshapableChannelsInterface` (part of the Handshake dialect)
-    to simplify the shape of channels with extra signals around operations that
-    ignore the content of all extra signals (and potentially the data signal
-    too). The pass inserts `handshake::ReshapeOp` operations as needed to
-    reshape channels back and forth between their original and simplified forms.
-  }];
-  let constructor = "dynamatic::createHandshakeReshapeChannels()"; 
-}
-
 def HandshakeSetBufferingProperties :
   DynamaticPass<"handshake-set-buffering-properties"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
@@ -270,9 +258,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpga20-legacy' (same as fpga-20 but "
-    "interprets the MILP's results as legacy Dynamatic would, placing at most "
-    "a single buffer type on any given channel), 'fpl22'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,

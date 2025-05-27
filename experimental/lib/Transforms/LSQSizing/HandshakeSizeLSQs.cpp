@@ -527,7 +527,8 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
 
         handshake::TimingInfo info = timing.getInfo();
 
-        if (info == TimingInfo::tehb()) {
+        if (info == TimingInfo::break_r() ||
+            info == TimingInfo::break_none()) {
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
             // -1 because buffer can get the load result 1 cycle earlier
             // Maybe it could also be earlier for a buffer with multiple slots

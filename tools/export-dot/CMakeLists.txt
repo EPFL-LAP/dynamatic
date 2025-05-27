@@ -13,7 +13,6 @@ target_link_libraries(export-dot
   DynamaticTransforms
 
   DynamaticHandshake
-  DynamaticSpeculation
 
   MLIRIR
   MLIRParser

@@ -25,6 +25,11 @@
 #include "mlir/Transforms/Passes.h"
 #include "tutorials/CreatingPasses/InitAllPasses.h"
 
+#ifdef DYNAMATIC_ENABLE_XLS
+#include "experimental/xls/InitAllDialects.h"
+#include "experimental/xls/InitAllPasses.h"
+#endif // DYNAMATIC_ENABLE_XLS
+
 // Test passes, no public header.
 namespace dynamatic {
 namespace test {
@@ -65,6 +70,12 @@ int main(int argc, char **argv) {
   dynamatic::tutorials::registerAllPasses();
   dynamatic::experimental::registerAllPasses();
   registerTestPasses();
+
+  // If XLS integration is enabled, register the XLS dialect and passes
+#ifdef DYNAMATIC_ENABLE_XLS
+  dynamatic::experimental::xls::registerAllDialects(registry);
+  dynamatic::experimental::xls::registerAllPasses();
+#endif // DYNAMATIC_ENABLE_XLS
 
   // Register the standard passes we want
   mlir::registerCSEPass();

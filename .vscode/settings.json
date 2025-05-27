@@ -14,7 +14,7 @@
     "CLANG_DIR": "${workspaceFolder}/polygeist/llvm-project/build/lib/cmake/clang",
     "CMAKE_C_COMPILER": "clang",
     "CMAKE_CXX_COMPILER": "clang++",
-    "LLVM_ENABLE_LLD": "ON",
+    "LLVM_USE_LINKER": "lld",
     "LLVM_TARGETS_TO_BUILD": "host",
     "CMAKE_BUILD_TYPE": "Debug",
     "CMAKE_EXPORT_COMPILE_COMMAND": "ON"

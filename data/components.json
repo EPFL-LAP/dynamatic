@@ -26,8 +26,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -46,8 +44,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -93,8 +89,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -113,8 +107,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -160,8 +152,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -180,8 +170,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -221,8 +209,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -241,8 +227,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -288,8 +272,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -308,8 +290,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -349,8 +329,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -369,8 +347,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -410,8 +386,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -430,8 +404,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -471,8 +443,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -491,8 +461,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -532,8 +500,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -552,8 +518,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -593,8 +557,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -613,8 +575,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -654,8 +614,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -674,8 +632,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -715,8 +671,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -735,8 +689,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -776,8 +728,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -796,8 +746,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -843,8 +791,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -863,8 +809,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -904,8 +848,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -924,8 +866,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -965,8 +905,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -985,8 +923,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1032,8 +968,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1052,8 +986,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1093,8 +1025,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1113,8 +1043,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1154,8 +1082,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1174,8 +1100,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1216,8 +1140,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1236,8 +1158,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1278,8 +1198,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1298,8 +1216,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1340,8 +1256,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1360,8 +1274,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1407,8 +1319,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1427,8 +1337,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1474,8 +1382,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1494,8 +1400,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1541,8 +1445,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1561,8 +1463,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1602,8 +1502,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1622,8 +1520,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1664,8 +1560,6 @@
       "VD": 0
     },
     "inport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0
@@ -1684,8 +1578,6 @@
       }
     },
     "outport": {
-      "transparentBuffer": 0,
-      "opaqueBuffer": 0,
       "delay": {
         "data": {
           "64": 0

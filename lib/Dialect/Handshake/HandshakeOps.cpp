@@ -36,10 +36,12 @@
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <cassert>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -66,7 +68,7 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
 static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
   // No parsing needed.
 
-  // Make SimpleControl type
+  // Make ControlType without any extra signals
   type = ControlType::get(parser.getContext());
   return success();
 }
@@ -195,7 +197,7 @@ namespace {
 
 void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                      Value operand, const TimingInfo &timing,
-                     std::optional<unsigned> numSlots) {
+                     std::optional<unsigned> numSlots, StringRef bufferType) {
   odsState.addOperands(operand);
   odsState.addTypes(operand.getType());
 
@@ -211,20 +213,11 @@ void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                          *numSlots));
   }
 
+  attributes.emplace_back(StringAttr::get(ctx, BUFFER_TYPE_ATTR_NAME),
+                          StringAttr::get(ctx, bufferType));
+
   odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
                         DictionaryAttr::get(ctx, attributes));
-}
-
-std::pair<handshake::ChannelType, bool> BufferOp::getReshapableChannelType() {
-  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
-}
-
-//===----------------------------------------------------------------------===//
-// NDWireOp
-//===----------------------------------------------------------------------===//
-
-std::pair<handshake::ChannelType, bool> NDWireOp::getReshapableChannelType() {
-  return {dyn_cast<handshake::ChannelType>(getOperand().getType()), true};
 }
 
 //===----------------------------------------------------------------------===//
@@ -237,50 +230,51 @@ OpResult MergeOp::getDataResult() { return cast<OpResult>(getResult()); }
 // MuxOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult
-MuxOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
-                        ValueRange operands, DictionaryAttr attributes,
-                        mlir::OpaqueProperties properties,
-                        mlir::RegionRange regions,
-                        SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  // MuxOp must have at least one data operand (in addition to the select
-  // operand)
-  if (operands.size() < 2)
-    return failure();
-  // Result type is type of any data operand
-  inferredReturnTypes.push_back(operands[1].getType());
-  return success();
-}
-
 bool MuxOp::isControl() {
   return isa<handshake::ControlType>(getResult().getType());
 }
 
 ParseResult MuxOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::UnresolvedOperand selectOperand;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> allOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> dataOperands;
   handshake::ChannelType selectType;
-  Type dataType;
-  SmallVector<Type, 2> dataOperandsTypes;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+
+  // Parse until the type of the select operand
   if (parser.parseOperand(selectOperand) || parser.parseLSquare() ||
-      parser.parseOperandList(allOperands) || parser.parseRSquare() ||
+      parser.parseOperandList(dataOperands) || parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
       parser.parseCustomTypeWithFallback(selectType) || parser.parseComma() ||
-      parseHandshakeType(parser, dataType))
+      parser.parseLSquare())
     return failure();
 
-  int size = allOperands.size();
-  dataOperandsTypes.assign(size, dataType);
-  result.addTypes(dataType);
-  allOperands.insert(allOperands.begin(), selectOperand);
-  if (parser.resolveOperands(
-          allOperands,
-          llvm::concat<const Type>(ArrayRef<Type>(selectType),
-                                   ArrayRef<Type>(dataOperandsTypes)),
-          allOperandLoc, result.operands))
+  int numDataOperands = dataOperands.size();
+
+  // Parse the data operands types
+  SmallVector<Type> dataOperandsTypes(numDataOperands);
+  for (int i = 0; i < numDataOperands; i++) {
+    if (i > 0) {
+      if (parser.parseComma())
+        return failure();
+    }
+    if (parseHandshakeType(parser, dataOperandsTypes[i]))
+      return failure();
+  }
+
+  // Parse the result type
+  Type resultType;
+  if (parser.parseRSquare() || parser.parseKeyword("to") ||
+      parseHandshakeType(parser, resultType))
     return failure();
-  return success();
+  result.addTypes(resultType);
+
+  // Fill the result.operands
+  return parser.resolveOperands(
+      llvm::concat<const OpAsmParser::UnresolvedOperand>(
+          ArrayRef<OpAsmParser::UnresolvedOperand>(selectOperand),
+          dataOperands),
+      llvm::concat<const Type>(ArrayRef<Type>(selectType), dataOperandsTypes),
+      allOperandLoc, result.operands);
 }
 
 void MuxOp::print(OpAsmPrinter &p) {
@@ -292,7 +286,16 @@ void MuxOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " : ";
   p.printStrippedAttrOrType(getSelectOperand().getType());
-  p << ", ";
+  p << ", [";
+  int i = 0;
+  for (auto op : getDataOperands()) {
+    if (i > 0) {
+      p << ", ";
+    }
+    printHandshakeType(p, op.getType());
+    i++;
+  }
+  p << "] to ";
   printHandshakeType(p, getResult().getType());
 }
 
@@ -309,41 +312,67 @@ OpResult MuxOp::getDataResult() { return cast<OpResult>(getResult()); }
 
 ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand, 4> operands;
-  Type dataType;
-  handshake::ChannelType indexType;
   llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseOperandList(operands) ||
+
+  // Parse until just before the operand types
+  if (parser.parseLSquare() || parser.parseOperandList(operands) ||
+      parser.parseRSquare() ||
       parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parseHandshakeType(parser, dataType) || parser.parseComma() ||
-      parser.parseCustomTypeWithFallback(indexType))
+      parser.parseLSquare())
     return failure();
 
-  SmallVector<Type> operandTypes(operands.size(), dataType);
-  result.addTypes({dataType, indexType});
+  int numOperands = operands.size();
+
+  // Parse the operand types
+  SmallVector<Type> operandTypes(numOperands);
+  for (int i = 0; i < numOperands; i++) {
+    if (i > 0) {
+      if (parser.parseComma())
+        return failure();
+    }
+    if (parseHandshakeType(parser, operandTypes[i]))
+      return failure();
+  }
+
+  // Parse the return data type
+  Type resultDataType;
+  if (parser.parseRSquare() || parser.parseKeyword("to") ||
+      parseHandshakeType(parser, resultDataType))
+    return failure();
+
+  handshake::ChannelType indexType;
+
+  // Parse the index type
+  if (parser.parseComma() || parser.parseCustomTypeWithFallback(indexType))
+    return failure();
+
+  // Register the result types
+  result.addTypes({resultDataType, indexType});
+
+  // Fill the result.operands
   return parser.resolveOperands(operands, operandTypes, allOperandLoc,
                                 result.operands);
 }
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
-  p << " " << getOperands() << " ";
+  p << " [" << getOperands() << "] ";
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : ";
+  p << " : [";
+  int i = 0;
+  for (auto op : getOperands()) {
+    if (i > 0) {
+      p << ", ";
+    }
+    printHandshakeType(p, op.getType());
+    i++;
+  }
+  p << "] to ";
   printHandshakeType(p, getResult().getType());
   p << ", ";
   p.printStrippedAttrOrType(getIndex().getType());
 }
 
 LogicalResult ControlMergeOp::verify() {
-  TypeRange operandTypes = getOperandTypes();
-  if (operandTypes.empty())
-    return emitOpError("operation must have at least one operand");
-  Type refType = operandTypes.front();
-  for (Type type : operandTypes.drop_front()) {
-    if (refType != type)
-      return emitOpError("all operands should have the same type");
-  }
-  if (refType != getResult().getType())
-    return emitOpError("type of data result should match type of operands");
   return verifyIndexWideEnough(*this, getIndex(), getNumOperands());
 }
 
@@ -393,6 +422,33 @@ LogicalResult FuncOp::verify() {
     return failure();
   if (failed(verifyPortNameAttr("resNames", getNumResults())))
     return failure();
+
+  return success();
+}
+
+LogicalResult BufferOp::verify() {
+  auto parametersAttr = (*this)->getAttrOfType<DictionaryAttr>("hw.parameters");
+  if (!parametersAttr)
+    return success();
+
+  auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
+  if (!bufferTypeAttr)
+    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+
+  auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
+  if (!numSlotsAttr)
+    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+
+  StringRef bufferType = bufferTypeAttr.getValue();
+  unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
+
+  if ((bufferType == ONE_SLOT_BREAK_DV ||
+       bufferType == ONE_SLOT_BREAK_R ||
+       bufferType == ONE_SLOT_BREAK_DVR) &&
+      numSlots != 1) {
+    return emitOpError("buffer type '")
+           << bufferType << "' requires NUM_SLOTS = 1, but got " << numSlots;
+  }
 
   return success();
 }
@@ -540,7 +596,15 @@ LogicalResult ConstantOp::inferReturnTypes(
   OperationName opName = OperationName(getOperationName(), context);
   StringAttr attrName = getValueAttrName(opName);
   auto attr = cast<TypedAttr>(attributes.get(attrName));
-  inferredReturnTypes.push_back(handshake::ChannelType::get(attr.getType()));
+
+  auto controlType = cast<ControlType>(operands[0].getType());
+
+  // The return type is a ChannelType with:
+  // - dataType as specified by the attribute
+  // - extra signals matching the input control type
+  inferredReturnTypes.push_back(handshake::ChannelType::get(
+      attr.getType(), controlType.getExtraSignals()));
+
   return success();
 }
 
@@ -1523,81 +1587,6 @@ LogicalResult EndOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// SpeculatorOp
-//===----------------------------------------------------------------------===//
-
-ParseResult SpeculatorOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand enable, dataIn;
-  Type dataType;
-  SmallVector<Type> uniqueResTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
-  if (parser.parseLSquare() || parser.parseOperand(enable) ||
-      parser.parseRSquare() || parser.parseOperand(dataIn) ||
-      parser.parseOptionalAttrDict(result.attributes) || parser.parseColon() ||
-      parser.parseType(dataType) || parser.parseArrowTypeList(uniqueResTypes))
-    return failure();
-  if (uniqueResTypes.size() != 3)
-    return failure();
-
-  Type ctrlType = uniqueResTypes[1];
-  Type wideCtrlType = uniqueResTypes[2];
-  result.addTypes(
-      {dataType, ctrlType, ctrlType, wideCtrlType, wideCtrlType, ctrlType});
-
-  if (parser.resolveOperands({dataIn, enable},
-                             {dataType, ControlType::get(parser.getContext())},
-                             allOperandLoc, result.operands))
-    return failure();
-  return success();
-}
-
-void SpeculatorOp::print(OpAsmPrinter &p) {
-  p << " [" << getEnable() << "] " << getDataIn() << " ";
-  p.printOptionalAttrDict((*this)->getAttrs());
-  p << " : " << getDataIn().getType() << " -> (" << getDataOut().getType()
-    << ", " << getSaveCtrl().getType() << ", " << getSCSaveCtrl().getType()
-    << ")";
-}
-
-LogicalResult SpeculatorOp::inferReturnTypes(
-    MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
-    mlir::RegionRange regions,
-    SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-
-  inferredReturnTypes.push_back(operands.front().getType());
-
-  OpBuilder builder(context);
-  ChannelType ctrlType = ChannelType::get(builder.getIntegerType(1));
-  ChannelType wideControlType = ChannelType::get(builder.getIntegerType(3));
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(ctrlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(wideControlType);
-  inferredReturnTypes.push_back(ctrlType);
-  return success();
-}
-
-LogicalResult SpeculatorOp::verify() {
-  Type refBoolType = getSaveCtrl().getType();
-  if (refBoolType != getCommitCtrl().getType() ||
-      refBoolType != getSCBranchCtrl().getType()) {
-    return emitError() << "expected $saveCtrl, $commitCtrl, and $SCBranchCtrl "
-                          "to have the same type, but got "
-                       << refBoolType << ", " << getCommitCtrl().getType()
-                       << ", and " << getSCBranchCtrl().getType();
-  }
-
-  if (getSCSaveCtrl().getType() != getSCCommitCtrl().getType()) {
-    return emitError() << "expected $SCSaveCtrl and $SCCommitCtrl to have the "
-                          "same type, but got "
-                       << getSCSaveCtrl().getType() << " and "
-                       << getSCCommitCtrl().getType();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // BundleOp
 //===----------------------------------------------------------------------===//
 
@@ -1866,242 +1855,6 @@ LogicalResult UnbundleOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// ReshapeOp
-//===----------------------------------------------------------------------===//
-
-/// Returns the total number of bits needed to carry all extra downstream
-/// signals and all extra upstream signals.
-static std::pair<unsigned, unsigned> getTotalExtraWidths(ChannelType type) {
-  unsigned totalDownWidth = 0, totalUpWidth = 0;
-  for (const ExtraSignal &extra : type.getExtraSignals()) {
-    if (extra.downstream)
-      totalDownWidth += extra.getBitWidth();
-    else
-      totalUpWidth += extra.getBitWidth();
-  }
-  return {totalDownWidth, totalUpWidth};
-}
-
-void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      TypedValue<ChannelType> channel,
-                      bool mergeDownstreamIntoData) {
-  // Set the operands/attributes
-  MLIRContext *ctx = odsBuilder.getContext();
-  ChannelReshapeType reshapeType = mergeDownstreamIntoData
-                                       ? ChannelReshapeType::MergeData
-                                       : ChannelReshapeType::MergeExtra;
-  odsState.addAttribute("reshapeType",
-                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
-  odsState.addOperands(channel);
-
-  // All extra signals will be combined into at most one downstream combined
-  // signal and one upstream combined signal, compute their bitwidth
-  auto [totalDownWidth, totalUpWidth] = getTotalExtraWidths(channel.getType());
-
-  // The result channel type can be determined from the input channel type and
-  // reshaping type
-  SmallVector<ExtraSignal> extraSignals;
-  Type dataType = channel.getType().getDataType();
-  if (mergeDownstreamIntoData) {
-    if (totalDownWidth) {
-      unsigned dataWidth = channel.getType().getDataBitWidth();
-      dataType = odsBuilder.getIntegerType(totalDownWidth + dataWidth);
-    }
-  } else {
-    // At most a single downstream extra signal should remain
-    if (totalDownWidth != 0) {
-      extraSignals.emplace_back(
-          MERGED_DOWN_NAME, odsBuilder.getIntegerType(totalDownWidth), true);
-    }
-  }
-  // At most a single upstream extra signal should remain
-  if (totalUpWidth != 0) {
-    extraSignals.emplace_back(MERGED_UP_NAME,
-                              odsBuilder.getIntegerType(totalUpWidth), false);
-  }
-
-  odsState.addTypes(ChannelType::get(ctx, dataType, extraSignals));
-}
-
-void ReshapeOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                      TypedValue<ChannelType> channel,
-                      bool splitDownstreamFromData, Type reshapedType) {
-  // Set the operands/attributes
-  MLIRContext *ctx = odsBuilder.getContext();
-  ChannelReshapeType reshapeType = splitDownstreamFromData
-                                       ? ChannelReshapeType::SplitData
-                                       : ChannelReshapeType::SplitExtra;
-  odsState.addAttribute("reshapeType",
-                        ChannelReshapeTypeAttr::get(ctx, reshapeType));
-  odsState.addOperands(channel);
-
-  // The compatibility of this type with the input will be checked in the
-  // operation's verification function
-  odsState.addTypes(reshapedType);
-}
-
-LogicalResult ReshapeOp::verify() {
-  ChannelType srcType = getChannel().getType(),
-              dstType = getReshaped().getType();
-  std::pair<unsigned, unsigned> srcExtraWidths = getTotalExtraWidths(srcType),
-                                dstExtraWidths = getTotalExtraWidths(dstType);
-
-  // Fails if the merged type has at least one extra downstream signal.
-  auto checkNoExtraDownstreamSignal = [&](bool isMerge) -> LogicalResult {
-    ChannelType type = isMerge ? dstType : srcType;
-    unsigned numSignals = type.getNumDownstreamExtraSignals();
-    if (numSignals == 0)
-      return success();
-    return emitError() << "too many extra downstream signals in the "
-                       << (isMerge ? "destination" : "source")
-                       << " type, expected 0 but got " << numSignals;
-  };
-
-  // Fails if the merged type has more than one extra signal of the specified
-  // direction, or if the single extra signal of the direction is incompatible
-  // with the split type.
-  auto checkMergedExtraSignal = [&](bool isMerge,
-                                    bool isDownstream) -> LogicalResult {
-    ChannelType type = isMerge ? dstType : srcType;
-    unsigned expectedWidth, numExtra;
-    StringRef dirStr, combinedName;
-    if (isDownstream) {
-      expectedWidth = isMerge ? srcExtraWidths.first : dstExtraWidths.first;
-      numExtra = type.getNumDownstreamExtraSignals();
-      dirStr = "downstream";
-      combinedName = MERGED_DOWN_NAME;
-    } else {
-      expectedWidth = isMerge ? srcExtraWidths.second : dstExtraWidths.second;
-      numExtra = type.getNumUpstreamExtraSignals();
-      dirStr = "uptream";
-      combinedName = MERGED_UP_NAME;
-    }
-
-    // There must be either 0 or 1 extra signal of the specified direction
-    if (numExtra == 0)
-      return success();
-    if (numExtra > 1) {
-      return emitError() << "merged channel type should have at most one "
-                         << dirStr << " signal, but got " << numExtra;
-    }
-
-    // Retrieve the single extra signal of the correct direction, then check its
-    // name, bitwidth, and type
-    const ExtraSignal &extraSignal =
-        *llvm::find_if(type.getExtraSignals(), [&](const ExtraSignal &extra) {
-          return extra.downstream == isDownstream;
-        });
-
-    if (extraSignal.name != combinedName) {
-      return emitError() << "invalid name for merged extra " << dirStr
-                         << " signal, expected '" << combinedName
-                         << "' but got '" << extraSignal.name << "'";
-    }
-    if (extraSignal.getBitWidth() != expectedWidth) {
-      return emitError() << "invalid bitwidth for merged extra " << dirStr
-                         << " signal, expected " << expectedWidth << " but got "
-                         << extraSignal.getBitWidth();
-    }
-    if (!isa<IntegerType>(extraSignal.type)) {
-      return emitError() << "invalid type for merged extra " << dirStr
-                         << " signal, expected IntegerType but got "
-                         << extraSignal.type;
-    }
-    return success();
-  };
-
-  // Fails if the merged type's data type is incompatible with the split type.
-  auto checkCompatibleDataType = [&](bool isMerge) -> LogicalResult {
-    ChannelType splitType, mergeType;
-    unsigned extraWidth;
-    if (isMerge) {
-      splitType = srcType;
-      mergeType = dstType;
-      extraWidth = srcExtraWidths.first;
-    } else {
-      splitType = dstType;
-      mergeType = srcType;
-      extraWidth = dstExtraWidths.first;
-    }
-    Type mergedDataType = mergeType.getDataType();
-
-    unsigned expectedMergedDataWidth = extraWidth + splitType.getDataBitWidth();
-    if (expectedMergedDataWidth != mergeType.getDataBitWidth()) {
-      return emitError() << "invalid merged data type bitwidth, expected "
-                         << expectedMergedDataWidth << " but got "
-                         << mergeType.getDataBitWidth();
-    }
-    if (extraWidth) {
-      if (!isa<IntegerType>(mergedDataType)) {
-        return emitError() << "invalid merged data type, expected merged "
-                              "IntegerType but got "
-                           << mergedDataType;
-      }
-    } else {
-      if (splitType.getDataType() != mergedDataType) {
-        return emitError()
-               << "invalid destination data type, expected source data type "
-               << splitType.getDataType() << " but got " << mergedDataType;
-      }
-    }
-    return success();
-  };
-
-  // Fails if the merged type's and split type's data types are different.
-  auto checkSameDataType = [&]() -> LogicalResult {
-    if (srcType.getDataType() != dstType.getDataType()) {
-      return emitError() << "reshaping in this mode should not change "
-                            "the data type, expected "
-                         << srcType.getDataType() << " but got "
-                         << dstType.getDataType();
-    }
-    return success();
-  };
-
-  switch (getReshapeType()) {
-  case ChannelReshapeType::MergeData:
-    if (failed(checkNoExtraDownstreamSignal(true)) ||
-        failed(checkMergedExtraSignal(true, false)) ||
-        failed(checkCompatibleDataType(true)))
-      return failure();
-
-    break;
-  case ChannelReshapeType::MergeExtra:
-    if (failed(checkMergedExtraSignal(true, false)) ||
-        failed(checkMergedExtraSignal(true, true)) ||
-        failed(checkSameDataType()))
-      return failure();
-    break;
-  case ChannelReshapeType::SplitData:
-    if (failed(checkNoExtraDownstreamSignal(false)) ||
-        failed(checkMergedExtraSignal(false, false)) ||
-        failed(checkCompatibleDataType(false)))
-      return failure();
-    break;
-  case ChannelReshapeType::SplitExtra:
-    if (failed(checkMergedExtraSignal(false, false)) ||
-        failed(checkMergedExtraSignal(false, true)) ||
-        failed(checkSameDataType()))
-      return failure();
-    break;
-  }
-
-  return success();
-}
-
-OpFoldResult ReshapeOp::fold(FoldAdaptor adaptor) {
-  if (getChannel().getType() == getReshaped().getType())
-    return getChannel();
-
-  Operation *defOp = getChannel().getDefiningOp();
-  if (auto reshapeOp = dyn_cast_if_present<ReshapeOp>(defOp)) {
-    if (getReshaped().getType() == reshapeOp.getChannel().getType())
-      return reshapeOp.getChannel();
-  }
-  return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
 // CmpFOp
 //===----------------------------------------------------------------------===//
 
@@ -2112,7 +1865,14 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      // Note that this cast throws an error if the assumption is not met
+      operands[0].getType().cast<ChannelType>().getExtraSignals()));
   return success();
 }
 
@@ -2127,7 +1887,14 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
-  inferredReturnTypes.push_back(ChannelType::get(builder.getIntegerType(1)));
+  inferredReturnTypes.push_back(ChannelType::get(
+      builder.getIntegerType(1),
+      // We can assume that
+      // - operand[0] exists
+      // - operand[0] is a channel type
+      // - all operands have the same extra signals
+      // Note that this cast throws an error if the assumption is not met
+      operands[0].getType().cast<ChannelType>().getExtraSignals()));
   return success();
 }
 
