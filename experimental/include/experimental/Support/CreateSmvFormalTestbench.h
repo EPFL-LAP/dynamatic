@@ -25,9 +25,10 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
-static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_VALID_NAME("valid0");
-static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_DATA_NAME("dataOut0");
-static constexpr llvm::StringLiteral SINK_READY_NAME("ready0");
+static constexpr llvm::StringLiteral
+    SEQUENCE_GENERATOR_VALID_NAME("outs_valid");
+static constexpr llvm::StringLiteral SEQUENCE_GENERATOR_DATA_NAME("outs");
+static constexpr llvm::StringLiteral SINK_READY_NAME("ins_ready");
 
 // Create a wrapper for the provided SMV file.
 // includeProperties: If set also creates properties to check if all output
@@ -49,7 +50,7 @@ std::string createSmvFormalTestbench(
 // and (inclusive) max_tokens.
 const std::string SMV_BOOL_INPUT = R"DELIM(
 MODULE bool_input(nReady0, max_tokens)
-  VAR dataOut0 : boolean;
+  VAR outs : boolean;
   VAR counter : 0..31;
   FROZENVAR exact_tokens : 0..max_tokens;
   ASSIGN
@@ -59,20 +60,20 @@ MODULE bool_input(nReady0, max_tokens)
       TRUE : counter;
     esac;
 
-  -- make sure dataOut0 is persistent
+  -- make sure outs is persistent
   ASSIGN
-    next(dataOut0) := case
-      valid0 & !nReady0 : dataOut0;
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
       TRUE : {TRUE, FALSE};
     esac;
 
-  DEFINE valid0 := counter < exact_tokens;)DELIM";
+  DEFINE outs_valid := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
 const std::string SMV_BOOL_INPUT_EXACT = R"DELIM(
 MODULE bool_input_exact(nReady0, exact_tokens)
-  VAR dataOut0 : boolean;
+  VAR outs : boolean;
   VAR counter : 0..31;
   ASSIGN
     init(counter) := 0;
@@ -81,32 +82,32 @@ MODULE bool_input_exact(nReady0, exact_tokens)
       TRUE : counter;
     esac;
 
-  -- make sure dataOut0 is persistent
+  -- make sure outs is persistent
   ASSIGN
-    next(dataOut0) := case
-      valid0 & !nReady0 : dataOut0;
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
       TRUE : {TRUE, FALSE};
     esac;
 
-  DEFINE valid0 := counter < exact_tokens;)DELIM";
+  DEFINE outs_valid := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with an infinite number of tokens
 const std::string SMV_BOOL_INPUT_INF = R"DELIM(
 MODULE bool_input_inf(nReady0)
-    VAR dataOut0 : boolean;
+    VAR outs : boolean;
     
-    -- make sure dataOut0 is persistent
+    -- make sure outs is persistent
     ASSIGN
-    next(dataOut0) := case 
-      valid0 & !nReady0 : dataOut0;
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
       TRUE : {TRUE, FALSE};
     esac;
-    DEFINE valid0 := TRUE;)DELIM";
+    DEFINE outs_valid := TRUE;)DELIM";
 
 // SMV module for a sequence generator with an infinite number of tokens
 const std::string SMV_CTRL_INPUT_INF = R"DELIM(
 MODULE ctrl_input_inf(nReady0)
-  DEFINE valid0 := TRUE;)DELIM";
+  DEFINE outs_valid := TRUE;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
@@ -122,7 +123,7 @@ MODULE ctrl_input(nReady0, max_tokens)
       TRUE : counter;
     esac;
 
-  DEFINE valid0 := counter < exact_tokens;)DELIM";
+  DEFINE outs_valid := counter < exact_tokens;)DELIM";
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
@@ -136,11 +137,11 @@ MODULE ctrl_input_exact(nReady0, exact_tokens)
       TRUE : counter;
     esac;
 
-  DEFINE valid0 := counter < exact_tokens;)DELIM";
+  DEFINE outs_valid := counter < exact_tokens;)DELIM";
 
 const std::string SMV_SINK = R"DELIM(
 MODULE sink(ins_valid)
-  DEFINE ready0 := TRUE;)DELIM";
+  DEFINE ins_ready := TRUE;)DELIM";
 
 } // namespace dynamatic::experimental
 #endif // DYNAMATIC_EXPERIMENTAL_ELASTIC_MITER_CREATE_FORMAL_TESTBENCH_H
