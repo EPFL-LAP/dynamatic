@@ -50,3 +50,6 @@ metals.sbt
 
 # xls
 /xls
+
+# ElasticMiter puts external files in this directory
+/ext
