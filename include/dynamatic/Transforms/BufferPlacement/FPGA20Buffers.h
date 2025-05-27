@@ -45,26 +45,19 @@ namespace fpga20 {
 ///    penalizes the placement of many large buffers in the circuit
 class FPGA20Buffers : public BufferPlacementMILP {
 public:
-  /// Whether to use the same placement policy as legacy Dynamatic; non-legacy
-  /// placement will yield faster circuits (some opaque slots transformed into
-  /// transparent slots).
-  const bool legacyPlacement;
-
   /// Setups the entire MILP that buffers the input dataflow circuit for the
   /// target clock period, after which (absent errors) it is ready for
-  /// optimization. The `legacyPlacemnt` controls the interpretation of the
-  /// MILP's results (non-legacy placement should yield faster circuits in
-  /// general). If a channel's buffering properties are provably unsatisfiable,
-  /// the MILP will not be marked ready for optimization, ensuring that further
-  /// calls to `optimize` fail.
+  /// optimization. If a channel's buffering properties are provably
+  /// unsatisfiable, the MILP will not be marked ready for optimization,
+  /// ensuring that further calls to `optimize` fail.
   FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, bool legacyPlacement);
+                double targetPeriod);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, bool legacyPlacement, Logger &logger,
+                double targetPeriod, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:
@@ -72,9 +65,7 @@ protected:
   /// the MILP cannot encode the placement of both opaque and transparent slots
   /// on a single channel, some "interpretation" of the results is necessary to
   /// derive "mixed" placements where some buffer slots are opaque and some are
-  /// transparent. This interpretation is partically controlled by the
-  /// `legacyPlacement` flag, and always respects the channel-specific buffering
-  /// constraints.
+  /// transparent.
   void extractResult(BufferPlacement &placement) override;
 
 private:

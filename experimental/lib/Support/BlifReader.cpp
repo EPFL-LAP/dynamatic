@@ -317,7 +317,7 @@ LogicNetwork *BlifParser::parseBlifFile(const std::string &filename) {
 std::vector<Node *> LogicNetwork::findPath(Node *start, Node *end) {
   // BFS search to find the shortest path from start to end.
   std::queue<Node *> queue;
-  std::unordered_map<Node *, Node *, boost::hash<Node *>> parent;
+  std::unordered_map<Node *, Node *> parent;
   std::set<Node *> visited;
 
   queue.push(start);

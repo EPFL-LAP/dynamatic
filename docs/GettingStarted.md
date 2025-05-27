@@ -88,6 +88,13 @@ Dynamatic welcomes contributions from the open-source community and from student
 - Please create an issue if you run into a a bug or problem with Dynamatic.
 - Please create a PR to get a code review. For reviewers, it is good to look at the primary author of the code you are touching to make sure they are at least CC'd on the PR.
 
+## Relevant Documentation
+
+You may find the following documentation useful when contributing to Dynamatic:
+- [Advanced Build Instructions](./AdvancedBuild.md)
+- [Testing](./Testing.md)
+- [Development](./Development.md)
+
 ## GitHub Issues & Pull requests
 
 The project uses GitHub [issues](https://github.com/features/issues) and [pull requests (PRs)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests) to handle contributions from the community. If you are unfamiliar with those, here are some guidelines on how to use them productively:

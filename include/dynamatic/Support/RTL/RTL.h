@@ -29,7 +29,7 @@
 namespace dynamatic {
 
 /// Hardware description languages.
-enum class HDL { VHDL, VERILOG };
+enum class HDL { VHDL, VERILOG, SMV };
 
 /// Returns the file extension (without a leading '.') for files of the HDL.
 StringRef getHDLExtension(HDL hdl);
@@ -91,7 +91,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(std::move(other.name)), type(std::move(other.type)) {};
+      : name(std::move(other.name)), type(std::move(other.type)){};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = std::move(other.name);
@@ -156,7 +156,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()) {};
+      : state(state), serialized(serial.str()){};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -169,7 +169,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc) {};
+  RTLRequest(Location loc) : loc(loc){};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.
@@ -289,6 +289,21 @@ public:
   /// parameters, in the order in which the component defines them,
   llvm::MapVector<StringRef, StringRef> getGenericParameterValues() const;
 
+  /// Registers different parameters for each type of extern op.
+  /// Temporary function. These parameters should be added to hw.parameters
+  /// (generation_params in the future)
+  void registerParameters(hw::HWModuleExternOp &modOp);
+
+  void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                 llvm::StringRef modName,
+                                 hw::ModuleType &modType);
+  void registerTransparentParameter(hw::HWModuleExternOp &modOp,
+                                    llvm::StringRef modName,
+                                    hw::ModuleType &modType);
+  void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                     llvm::StringRef modName,
+                                     hw::ModuleType &modType);
+
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
   /// output directory while generated components are produced by the
@@ -395,8 +410,8 @@ public:
   /// non-signal-specific version of that method suffixed by a string
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
-  std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
-                                              SignalType type, HDL hdl) const;
+  std::pair<std::string, bool>
+  getRTLPortName(StringRef mlirPortName, SignalType signalType, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

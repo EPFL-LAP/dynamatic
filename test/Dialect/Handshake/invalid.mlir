@@ -106,72 +106,125 @@ handshake.func @invalidUnbundleChannelExtraDown(%channel: !handshake.channel<i32
 
 // -----
 
-handshake.func @invalidReshapeMergeDataExtraDown(%channel: !handshake.channel<f32, [down: i2]>) -> !handshake.channel<f32, [down: i2]> {
-  // expected-error @below {{too many extra downstream signals in the destination type, expected 0 but got 1}}
-  %reshaped = reshape [MergeData] %channel : <f32, [down: i2]> -> <f32, [down: i2]>
-  end %reshaped : !handshake.channel<f32, [down: i2]>
+handshake.func @invalidSourceAndConstantWithExtraSignal(%ctrl : !handshake.control<>) -> !handshake.control<> {
+  %ctrlWithExtraSignal = source : <[test: i2]>
+  // expected-error @below {{'handshake.constant' op failed to verify that all of {ctrl, result} have same extra signals}}
+  %valueWithoutExtraSignal = constant %ctrlWithExtraSignal {value = 100 : i32} : <[test: i2]>, <i32>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataManyUp(%channel: !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]> {
-  // expected-error @below {{merged channel type should have at most one uptream signal, but got 2}}
-  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U), up2: i2 (U)]> -> <f32, [up1: i1 (U), up2: i2 (U)]>
-  end %reshaped : !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>
+handshake.func @invalidMuxWithDifferentDataTypesOutput(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>] to <i1, [spec: i1]>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataUpName(%channel: !handshake.channel<f32, [up1: i1 (U)]>) -> !handshake.channel<f32, [up1: i1 (U)]> {
-  // expected-error @below {{invalid name for merged extra uptream signal, expected 'mergedUp' but got 'up1'}}
-  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U)]> -> <f32, [up1: i1 (U)]>
-  end %reshaped : !handshake.channel<f32, [up1: i1 (U)]>
+handshake.func @invalidMuxWithDifferentDataTypesVariadic(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1]>,
+    %data4 : !handshake.channel<i1, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result} should have the same data type}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1]>, <i1, [spec: i1]>] to <i32, [spec: i1]>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataUpWidth(%channel: !handshake.channel<f32, [up1: i1 (U), up2: i2 (U)]>) -> !handshake.channel<f32, [mergedUp: i4 (U)]> {
-  // expected-error @below {{invalid bitwidth for merged extra uptream signal, expected 3 but got 4}}
-  %reshaped = reshape [MergeData] %channel : <f32, [up1: i1 (U), up2: i2 (U)]> -> <f32, [mergedUp: i4 (U)]>
-  end %reshaped : !handshake.channel<f32, [mergedUp: i4 (U)]>
+handshake.func @invalidMuxWithDifferentExtraSignals(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i1, tag: i8]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i1, tag: i8]>, <i32, [spec: i1]>] to <i32, [spec: i1]>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataUpType(%channel: !handshake.channel<f32, [up1: f16 (U), up2: f16 (U)]>) -> !handshake.channel<f32, [mergedUp: f32 (U)]> {
-  // expected-error @below {{invalid type for merged extra uptream signal, expected IntegerType but got 'f32'}}
-  %reshaped = reshape [MergeData] %channel : <f32, [up1: f16 (U), up2: f16 (U)]> -> <f32, [mergedUp: f32 (U)]>
-  end %reshaped : !handshake.channel<f32, [mergedUp: f32 (U)]>
+handshake.func @invalidMuxWithConflictingExtraSignals(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2, [spec: i1]>,
+    %data1 : !handshake.channel<i32, [spec: i1]>,
+    %data2 : !handshake.channel<i32, [spec: i1]>,
+    %data3 : !handshake.channel<i32, [spec: i2]>,
+    %data4 : !handshake.channel<i32, [spec: i1]>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that all of {dataOperands, result, selectOperand} should have the same extra signals}}
+  %data = mux %sel [%data1, %data2, %data3, %data4] : <i2, [spec: i1]>, [<i32, [spec: i1]>, <i32, [spec: i1]>, <i32, [spec: i2]>, <i32, [spec: i1]>] to <i32, [spec: i1]>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i65> {
-  // expected-error @below {{invalid merged data type bitwidth, expected 64 but got 65}}
-  %reshaped = reshape [MergeData] %channel : <f32, [down1: i16, down2: i16]> -> <i65>
-  end %reshaped : !handshake.channel<i65>
+handshake.func @invalidMuxWithNoDataInputs(
+    %ctrl : !handshake.control<>,
+    %sel : !handshake.channel<i2>) -> !handshake.control<> {
+  // expected-error @below {{'handshake.mux' op failed to verify that the variadic dataOperands should have at least one element}}
+  %data = mux %sel [] : <i2>, [] to <i32>
+  end %ctrl : !handshake.control<>
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataWidth(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i65> {
-  // expected-error @below {{invalid merged data type, expected merged IntegerType but got 'f64'}}
-  %reshaped = reshape [MergeData] %channel : <f32, [down1: i16, down2: i16]> -> <f64>
-  end %reshaped : !handshake.channel<f64>
+handshake.func @invalidSpecCommitWithDifferentExtraSignals(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that all of {dataIn, dataOut} should have the same extra signals except for spec}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>, !handshake.channel<i32>, <i1>
+  end
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeDataNoChange(%channel: !handshake.channel<f32>) -> !handshake.channel<i32> {
-  // expected-error @below {{invalid destination data type, expected source data type 'f32' but got 'i32'}}
-  %reshaped = reshape [MergeData] %channel : <f32> -> <i32>
-  end %reshaped : !handshake.channel<i32>
+handshake.func @invalidSpecCommitWithInvalidSpec(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i2]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that should have a valid spec tag as an extra signal}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i2]>, !handshake.channel<i32, [a: i1]>, <i1>
+  end
 }
 
 // -----
 
-handshake.func @invalidReshapeMergeExtraSameData(%channel: !handshake.channel<f32, [down1: i16, down2: i16]>) -> !handshake.channel<i32, [mergedDown: i32]> {
-  // expected-error @below {{reshaping in this mode should not change the data type, expected 'f32' but got 'i32'}}
-  %reshaped = reshape [MergeExtra] %channel : <f32, [down1: i16, down2: i16]> -> <i32, [mergedDown: i32]>
-  end %reshaped : !handshake.channel<i32, [mergedDown: i32]>
+handshake.func @invalidSpecCommitWithDataOutSpec(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that shouldn't have a spec tag as an extra signal}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [a: i1, spec: i1]>, !handshake.channel<i32, [a: i1, spec: i2]>, <i1>
+  end
+}
+
+// -----
+
+handshake.func @invalidSpecCommitWithInvalidCtrl(
+    %ctrl : !handshake.channel<i2>,
+    %dataIn : !handshake.channel<i32, [spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that ctrl should be of ChannelType carrying IntegerType data of width 1}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, <i2>
+  end
+}
+
+// -----
+
+handshake.func @invalidSpecCommitWithInvalidDataTypes(
+    %ctrl : !handshake.channel<i1>,
+    %dataIn : !handshake.channel<i32, [spec: i1]>) {
+  // expected-error @below {{'handshake.spec_commit' op failed to verify that all of {dataIn, dataOut} have same data type}}
+  %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.control<>, <i1>
+  end
 }

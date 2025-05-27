@@ -50,6 +50,9 @@ struct LogicBBs {
 /// attribute of each operation.
 LogicBBs getLogicBBs(handshake::FuncOp funcOp);
 
+// Move the operation to a different BB
+void setBB(Operation *op, int bb);
+
 /// If the source operation belongs to a logical BB, makes the destination
 /// operation part of the same BB and returns true; otherwise return false.
 bool inheritBB(Operation *srcOp, Operation *dstOp);
@@ -70,6 +73,15 @@ struct BBEndpoints {
   unsigned srcBB;
   // The destination/successor basic block.
   unsigned dstBB;
+};
+
+/// A pair of BB IDs representing the blocks connected by a channel.
+/// The BB ID may be left unspecified.
+struct BBEndpointsOptional {
+  // The source/predecessor basic block.
+  std::optional<unsigned> srcBB;
+  // The destination/successor basic block.
+  std::optional<unsigned> dstBB;
 };
 
 /// Gets the basic block endpoints of a channel (represented as an MLIR value
@@ -103,9 +115,9 @@ bool isBackedge(Value val, BBEndpoints *endpoints = nullptr);
 /// two specific and potentially identical basic blocks.
 struct BBArc {
   /// The arc's source basic block.
-  unsigned srcBB;
+  std::optional<unsigned> srcBB;
   /// The arc's destination basic block.
-  unsigned dstBB;
+  std::optional<unsigned> dstBB;
   /// Set of pointers to OpOperands that uniquely identify an edge in the CFG.
   llvm::DenseSet<OpOperand *> edges;
 };
@@ -177,6 +189,9 @@ private:
 /// value along the DFG induced by the CFG path. The backtracking behavior is
 /// influenced by the type of the operation traversed at each step.
 bool isGIID(Value predecessor, OpOperand &oprd, CFGPath &path);
+
+/// Returns true if the given channel locates in a cycle.
+bool isChannelOnCycle(mlir::Value channel);
 
 } // namespace dynamatic
 

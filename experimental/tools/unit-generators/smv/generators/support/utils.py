@@ -1,46 +1,41 @@
 import re
 
+ATTR_SIZE = "size"
+ATTR_SLOTS = "num_slots"
+ATTR_TRANSPARENT = "transparent"
+ATTR_VALUE = "value"
+ATTR_LATENCY = "latency"
+ATTR_PREDICATE = "predicate"
+ATTR_ABSTRACT_DATA = "abstract_data"
+ATTR_IS_DOUBLE = "is_double"
+ATTR_BITWIDTH = "bitwidth"
+ATTR_IN_BITWIDTH = "input_bitwidth"
+ATTR_OUT_BITWIDTH = "output_bitwidth"
+ATTR_DATA_BITWIDTH = "data_bitwidth"
+ATTR_INDEX_BITWIDTH = "index_bitwidth"
+ATTR_ADDR_BITWIDTH = "addr_bitwidth"
+
 
 class SmvScalarType:
 
-  mlir_type: str
-  bitwidth: int
-  signed: bool
-  smv_type: str
+    bitwidth: int
+    smv_type: str
 
-  def __init__(self, mlir_type: str):
-    """
-    Constructor for SmvScalarType.
-    Parses an incoming MLIR type string.
-    """
-    self.mlir_type = mlir_type
+    def __init__(self, bitwidth: int):
+        """
+        Constructor for SmvScalarType.
+        """
+        self.bitwidth = bitwidth
+        self.smv_type = f"unsigned word [{bitwidth}]"
 
-    control_pattern = "!handshake.control<>"
-    channel_pattern = r"^!handshake\.channel<([u]?i)(\d+)>$"
-    match = re.match(channel_pattern, mlir_type)
+    def format_constant(self, value) -> str:
+        """
+        Formats a given constant value based on the type.
+        """
+        if self.bitwidth == 1:
+            return "TRUE" if bool(value) else "FALSE"
+        else:
+            return f"0ud{self.bitwidth}_{value}"
 
-    if mlir_type == control_pattern:
-      self.bitwidth = 0
-    elif match:
-      self.signed = not match.group(1).startswith("u")
-      self.bitwidth = int(match.group(2))
-      if self.bitwidth == 1:
-        self.smv_type = "boolean"
-      elif self.signed:
-        self.smv_type = f"signed word [{self.bitwidth}]"
-      else:
-        self.smv_type = f"unsigned word [{self.bitwidth}]"
-    else:
-      raise ValueError(f"Type {mlir_type} doesn't correspond to any SMV type")
-
-  def format_constant(self, value) -> str:
-    """
-    Formats a given constant value based on the type.
-    """
-    if self.bitwidth == 1:
-      return "TRUE" if bool(value) else "FALSE"
-    else:
-      return int(value)
-
-  def __str__(self):
-    return f"{self.smv_type}"
+    def __str__(self):
+        return f"{self.smv_type}"

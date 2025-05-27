@@ -30,6 +30,13 @@ dynamatic::LogicBBs dynamatic::getLogicBBs(handshake::FuncOp funcOp) {
   return logicBBs;
 }
 
+void dynamatic::setBB(Operation *op, int bb) {
+  auto ui32 = IntegerType::get(op->getContext(), 32,
+                               IntegerType::SignednessSemantics::Unsigned);
+  auto attr = IntegerAttr::get(ui32, bb);
+  op->setAttr(BB_ATTR_NAME, attr);
+}
+
 bool dynamatic::inheritBB(Operation *srcOp, Operation *dstOp) {
   if (auto bb = srcOp->getAttrOfType<mlir::IntegerAttr>(BB_ATTR_NAME)) {
     dstOp->setAttr(BB_ATTR_NAME, bb);
@@ -274,35 +281,70 @@ struct EndpointComparator {
   }
 };
 
-/// Define a map from BBEndpoints to the CFGEdges that connect the BBs
-using BBEndpointsMap =
-    std::map<BBEndpoints, llvm::DenseSet<CFGEdge *>, EndpointComparator>;
 } // namespace
 
+/// Returns the endpoints of the given CFGEdge.
+/// If a BB is not specified for each endpoint, it is set to nullopt.
+static BBEndpointsOptional getCFGEdgeEndpoints(const CFGEdge &edge) {
+  BBEndpointsOptional endpoints;
+
+  Operation *definingOp = edge.get().getDefiningOp();
+  if (!definingOp) {
+    endpoints.srcBB = std::nullopt;
+  } else {
+    if (auto bb = getLogicBB(definingOp)) {
+      endpoints.srcBB = *bb;
+    } else {
+      endpoints.srcBB = std::nullopt;
+    }
+  }
+
+  // Owner always exists, unlike the defining op.
+  if (auto bb = getLogicBB(edge.getOwner())) {
+    endpoints.dstBB = *bb;
+  } else {
+    endpoints.dstBB = std::nullopt;
+  }
+
+  return endpoints;
+}
+
 BBtoArcsMap dynamatic::getBBPredecessorArcs(handshake::FuncOp funcOp) {
-  BBEndpointsMap endpointEdges;
+  // Join all predecessors of a BB
+  BBtoArcsMap predecessorArcs;
+
   // Traverse all operations within funcOp to find edges between BBs, including
   // self-edges, and save them in a map from the Endpoints to the edges
   funcOp->walk([&](Operation *op) {
     for (CFGEdge &edge : op->getOpOperands()) {
-      BBEndpoints endpoints = {0, 0};
+      BBEndpointsOptional endpoints = getCFGEdgeEndpoints(edge);
+      // The dstBB should be always defined (to be consistent with
+      // "BBPredecessorArcs")
+      if (!endpoints.dstBB.has_value())
+        continue;
+
       // Store the edge if it is a Backedge or connects two different BBs
-      if (isBackedge(edge.get(), op, &endpoints) ||
-          endpoints.srcBB != endpoints.dstBB) {
-        endpointEdges[endpoints].insert(&edge);
+      if (isBackedge(edge.get(), op) || endpoints.srcBB != endpoints.dstBB) {
+        bool arcExists = false;
+        for (BBArc &arc : predecessorArcs[*endpoints.dstBB]) {
+          if (arc.srcBB == endpoints.srcBB) {
+            // If the arc already exists, add the edge to it
+            arc.edges.insert(&edge);
+            arcExists = true;
+            break;
+          }
+        }
+        if (!arcExists) {
+          // Create a new arc.
+          BBArc arc;
+          arc.srcBB = endpoints.srcBB;
+          arc.dstBB = endpoints.dstBB;
+          arc.edges.insert(&edge);
+          predecessorArcs[*endpoints.dstBB].push_back(arc);
+        }
       }
     }
   });
-
-  // Join all predecessors of a BB
-  BBtoArcsMap predecessorArcs;
-  for (const auto &[endpoints, edges] : endpointEdges) {
-    BBArc arc;
-    arc.srcBB = endpoints.srcBB;
-    arc.dstBB = endpoints.dstBB;
-    arc.edges = edges;
-    predecessorArcs[endpoints.dstBB].push_back(arc);
-  }
 
   return predecessorArcs;
 }
@@ -649,4 +691,30 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
 bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
   assert(path.size() >= 2 && "path must have at least two blocks");
   return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
+}
+
+bool dynamatic::isChannelOnCycle(mlir::Value channel) {
+  llvm::SmallPtrSet<mlir::Value, 32> visited;
+
+  std::function<bool(mlir::Value, bool)> dfs =
+      [&](mlir::Value current, bool isStart) -> bool {
+    if (!isStart && current == channel)
+      return true;
+
+    if (visited.contains(current))
+      return false;
+    visited.insert(current);
+
+    for (mlir::Operation *user : current.getUsers()) {
+      if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user))
+        continue;
+      for (mlir::Value next : user->getResults()) {
+        if (dfs(next, false))
+          return true;
+      }
+    }
+    return false;
+  };
+
+  return dfs(channel, true);
 }
