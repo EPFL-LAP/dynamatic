@@ -29,6 +29,7 @@ target_link_libraries(dynamatic-opt
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms
+  DynamaticExperimentalAnalysis
 
   MLIRIR
   MLIRAffineTransforms

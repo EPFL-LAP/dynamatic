@@ -23,16 +23,9 @@ namespace dynamatic {
 std::optional<FormalProperty::TYPE>
 FormalProperty::typeFromStr(const std::string &s) {
 
-  auto toLower = [](const std::string &s) {
-    std::string tmp(s);
-    for (auto &c : tmp)
-      c = tolower(c);
-    return tmp;
-  };
-
-  if (toLower(s) == "aob")
+  if (s == "AOB")
     return FormalProperty::TYPE::AOB;
-  if (toLower(s) == "veq")
+  if (s == "VEQ")
     return FormalProperty::TYPE::VEQ;
 
   return std::nullopt;
@@ -50,18 +43,11 @@ std::string FormalProperty::typeToStr(TYPE t) {
 std::optional<FormalProperty::TAG>
 FormalProperty::tagFromStr(const std::string &s) {
 
-  auto toLower = [](const std::string &s) {
-    std::string tmp(s);
-    for (auto &c : tmp)
-      c = tolower(c);
-    return tmp;
-  };
-
-  if (toLower(s) == "opt")
+  if (s == "OPT")
     return FormalProperty::TAG::OPT;
-  if (toLower(s) == "invar")
+  if (s == "INVAR")
     return FormalProperty::TAG::INVAR;
-  if (toLower(s) == "error")
+  if (s == "ERROR")
     return FormalProperty::TAG::ERROR;
 
   return std::nullopt;
@@ -74,7 +60,7 @@ std::string FormalProperty::tagToStr(TAG t) {
   case TAG::INVAR:
     return "INVAR";
   case TAG::ERROR:
-    return "ERRR";
+    return "ERROR";
   }
 }
 
@@ -159,19 +145,20 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
 
   ownerChannel.operationName = getUniqueName(ownerOp).str();
   userChannel.operationName = getUniqueName(userOp).str();
-  ownerChannel.index = res.getResultNumber();
-  userChannel.index = operandIndex;
-  ownerChannel.name = ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel.name = userNamer.getInputName(operandIndex).str();
+  ownerChannel.channelIndex = res.getResultNumber();
+  userChannel.channelIndex = operandIndex;
+  ownerChannel.channelName =
+      ownerNamer.getOutputName(res.getResultNumber()).str();
+  userChannel.channelName = userNamer.getInputName(operandIndex).str();
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", ownerChannel.operationName},
                              {"user", userChannel.operationName},
-                             {"owner_index", ownerChannel.index},
-                             {"user_index", userChannel.index},
-                             {"owner_channel", ownerChannel.name},
-                             {"user_channel", userChannel.name}});
+                             {"owner_index", ownerChannel.channelIndex},
+                             {"user_index", userChannel.channelIndex},
+                             {"owner_channel", ownerChannel.channelName},
+                             {"user_channel", userChannel.channelName}});
 }
 
 std::unique_ptr<AbsenceOfBackpressure>
@@ -185,10 +172,10 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
   if (!mapper ||
       !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
       !mapper.mapOptional("user", prop->userChannel.operationName) ||
-      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
-      !mapper.mapOptional("user_index", prop->userChannel.index) ||
-      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
-      !mapper.mapOptional("user_channel", prop->userChannel.name))
+      !mapper.mapOptional("owner_index", prop->ownerChannel.channelIndex) ||
+      !mapper.mapOptional("user_index", prop->userChannel.channelIndex) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.channelName) ||
+      !mapper.mapOptional("user_channel", prop->userChannel.channelName))
     return nullptr;
 
   return prop;
@@ -209,19 +196,19 @@ ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
 
   ownerChannel.operationName = getUniqueName(op1).str();
   targetChannel.operationName = getUniqueName(op2).str();
-  ownerChannel.index = i;
-  targetChannel.index = j;
-  ownerChannel.name = namer1.getOutputName(i).str();
-  targetChannel.name = namer2.getOutputName(j).str();
+  ownerChannel.channelIndex = i;
+  targetChannel.channelIndex = j;
+  ownerChannel.channelName = namer1.getOutputName(i).str();
+  targetChannel.channelName = namer2.getOutputName(j).str();
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
   return llvm::json::Object({{"owner", ownerChannel.operationName},
                              {"target", targetChannel.operationName},
-                             {"owner_index", ownerChannel.index},
-                             {"target_index", targetChannel.index},
-                             {"owner_channel", ownerChannel.name},
-                             {"target_channel", targetChannel.name}});
+                             {"owner_index", ownerChannel.channelIndex},
+                             {"target_index", targetChannel.channelIndex},
+                             {"owner_channel", ownerChannel.channelName},
+                             {"target_channel", targetChannel.channelName}});
 }
 
 std::unique_ptr<ValidEquivalence>
@@ -235,10 +222,10 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
   if (!mapper ||
       !mapper.mapOptional("owner", prop->ownerChannel.operationName) ||
       !mapper.mapOptional("target", prop->targetChannel.operationName) ||
-      !mapper.mapOptional("owner_index", prop->ownerChannel.index) ||
-      !mapper.mapOptional("target_index", prop->targetChannel.index) ||
-      !mapper.mapOptional("owner_channel", prop->ownerChannel.name) ||
-      !mapper.mapOptional("target_channel", prop->targetChannel.name))
+      !mapper.mapOptional("owner_index", prop->ownerChannel.channelIndex) ||
+      !mapper.mapOptional("target_index", prop->targetChannel.channelIndex) ||
+      !mapper.mapOptional("owner_channel", prop->ownerChannel.channelName) ||
+      !mapper.mapOptional("target_channel", prop->targetChannel.channelName))
     return nullptr;
 
   return prop;

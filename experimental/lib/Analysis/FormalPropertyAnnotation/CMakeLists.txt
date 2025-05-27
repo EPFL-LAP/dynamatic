@@ -2,7 +2,7 @@ add_dynamatic_library(DynamaticFormalPropertyAnnotation
   HandshakeAnnotateProperties.cpp
 
   DEPENDS
-  DynamaticExperimentalTransformsPassIncGen
+  DynamaticExperimentalAnalysisPassIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
