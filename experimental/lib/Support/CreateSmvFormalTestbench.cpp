@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;
 
@@ -24,8 +25,8 @@ namespace dynamatic::experimental {
 
 // Create the call to the module
 // The resulting string will look like:
-// VAR <moduleName> : <moduleName> (seq_generator_A.dataOut0,
-// seq_generator_A.valid0, ..., sink_F.ready0, ...)
+// VAR <moduleName> : <moduleName> (seq_generator_A.outs,
+// seq_generator_A.outs_valid, ..., sink_F.ins_ready, ...)
 static std::string instantiateModuleUnderTest(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
@@ -62,12 +63,9 @@ static std::string instantiateModuleUnderTest(
                                SINK_READY_NAME.str());
   }
 
-  std::ostringstream call;
-  call << "  VAR " << moduleName << " : " << moduleName << "(";
-  call << llvm::join(inputVariables, ", ");
-  call << ");\n";
-
-  return call.str();
+  return llvm::formatv("VAR {0} : {1} ({2});\n", moduleName, moduleName,
+                       llvm::join(inputVariables, ", "))
+      .str();
 }
 std::string getPrefixTypeName(const std::string &smvType) {
   size_t start = smvType.find('[');
@@ -87,7 +85,7 @@ std::string getPrefixTypeName(const std::string &smvType) {
 std::string smvInput(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input(nReady0, max_tokens)\n"
-         "  VAR dataOut0 : " +
+         "  VAR outs : " +
          type +
          ";\n"
          "  VAR counter : 0..31;\n"
@@ -99,7 +97,7 @@ std::string smvInput(const std::string &type) {
          "      TRUE : counter;\n"
          "    esac;\n"
          "\n"
-         "  DEFINE valid0 := counter < exact_tokens;\n\n";
+         "  DEFINE outs_valid := counter < exact_tokens;\n\n";
 }
 
 // SMV module for a sequence generator with a finite number of tokens. The
@@ -107,7 +105,7 @@ std::string smvInput(const std::string &type) {
 std::string smvInputExact(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_exact(nReady0, exact_tokens)\n"
-         "  VAR dataOut0 : " +
+         "  VAR outs : " +
          type +
          ";\n"
          "  VAR counter : 0..31;\n"
@@ -118,18 +116,18 @@ std::string smvInputExact(const std::string &type) {
          "      TRUE : counter;\n"
          "    esac;\n"
          "\n"
-         "  DEFINE valid0 := counter < exact_tokens;\n\n";
+         "  DEFINE outs_valid := counter < exact_tokens;\n\n";
 }
 
 // SMV module for a sequence generator with an infinite number of tokens
 std::string smvInputInf(const std::string &type) {
   return "MODULE " + getPrefixTypeName(type) +
          "_input_inf(nReady0)\n"
-         "  VAR dataOut0 : " +
+         "  VAR outs : " +
          type +
          ";\n"
-         "    -- make sure dataOut0 is persistent\n"
-         "    DEFINE valid0 := TRUE;\n\n";
+         "    -- make sure outs is persistent\n"
+         "    DEFINE outs_valid := TRUE;\n\n";
 }
 
 static std::string
@@ -186,7 +184,7 @@ static std::string createSupportEntities(
   }
 
   supportEntities << "MODULE sink_main (ins_valid)\n"
-                     "  DEFINE ready0 := TRUE;\n\n";
+                     "  DEFINE ins_ready := TRUE;\n\n";
 
   return supportEntities.str();
 }
