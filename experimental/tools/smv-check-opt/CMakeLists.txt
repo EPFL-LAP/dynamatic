@@ -1,0 +1,40 @@
+set(LLVM_LINK_COMPONENTS
+  Support
+)
+
+add_llvm_tool(smv-check-opt
+  smv-check-opt.cpp
+)
+
+llvm_update_compile_flags(smv-check-opt)
+target_link_libraries(smv-check-opt
+  PRIVATE
+  AffineToScf
+  DynamaticLowerScfToCf
+  DynamaticBufferPlacement
+  DynamaticLSQSizing
+  DynamaticExperimentalResourceSharing
+  DynamaticCfToHandshake
+  DynamaticHandshake
+  DynamaticHandshakeToHW
+  DynamaticTestTransforms
+  DynamaticTransforms
+  DynamaticTutorialsCreatingPasses
+  DynamaticExperimentalTestTransforms
+  DynamaticExperimentalSupport
+  DynamaticExperimentalTransforms
+
+  MLIRIR
+  MLIRAffineTransforms
+  MLIRArithTransforms
+  MLIRSCFTransforms
+  MLIRMemRefTransforms
+  MLIRLLVMDialect
+  MLIRMemRefDialect
+  MLIROptLib
+  MLIRParser
+  MLIRFuncDialect
+  MLIRSupport
+  MLIRTransforms
+  MLIRSCFDialect
+)
