@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+
 #include "experimental/Support/CutlessMapping.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -222,3 +224,5 @@ void dynamatic::experimental::printCuts(NodeToCuts cuts,
   }
   outFile.close();
 }
+
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
