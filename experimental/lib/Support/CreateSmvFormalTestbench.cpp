@@ -15,24 +15,13 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 
 using namespace mlir;
 
 namespace dynamatic::experimental {
-
-template <typename T>
-static std::string join(const T &v, const std::string &delim) {
-  std::ostringstream s;
-  for (const auto &i : v) {
-    if (&i != &v[0]) {
-      s << delim;
-    }
-    s << i;
-  }
-  return s.str();
-}
 
 // Create the call to the module
 // The resulting string will look like:
@@ -102,7 +91,7 @@ static std::string instantiateModuleUnderTest(
 
   std::ostringstream call;
   call << "  VAR " << moduleName << " : " << moduleName << "(";
-  call << join(inputVariables, ", ");
+  call << llvm::join(inputVariables, ", ");
   call << ");\n";
 
   return call.str();
