@@ -124,7 +124,14 @@ NodeToCuts cutAlgorithm(LogicNetwork *blif, int lutSize, bool includeChannels) {
   // First wavy line consists of the Primary Inputs of the circuit.
   std::set<Node *> currentWavyLine = blif->getPrimaryInputs();
 
-  // Add Channel Nodes to the first wavy line if the flag is set.
+  // Adds Channel Nodes to the first wavy line if the flag is set. In this case,
+  // nodes in the AIG that corresponds to channels are considered as
+  // primary inputs of the circuit. This means that for each node of a hardware
+  // module, leaves of the cut will only consist of nodes up until the channel
+  // of the module. This prevents finding the deepest cuts, however, it
+  // ensures that there are some cuts that do not cover channels, so that
+  // buffers can be placed in MapBuf without violating Cut Selection Conflict
+  // Constraints.
   if (includeChannels) {
     for (auto *channel : blif->getChannels()) {
       currentWavyLine.insert(channel);
