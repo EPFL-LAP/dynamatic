@@ -19,7 +19,7 @@ jobs:
       - name: check-format-cpp
         run: |
           git fetch origin main --no-recurse-submodules
-          git clang-format --diff FETCH_HEAD
+          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
         run: |
