@@ -157,7 +157,7 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
 }
 
 static std::optional<std::string> convertMLIRTypeToSMV(Type type) {
-  return llvm::TypeSwitch<Type, std::string>(type)
+  return llvm::TypeSwitch<Type, std::optional<std::string>>(type)
       .Case<handshake::ControlType>(
           [&](handshake::ControlType cType) { return std::nullopt; })
       .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
@@ -220,21 +220,27 @@ static std::string instantiateSequenceGenerators(
     // and the value of generateExactNrOfTokens is ignored.
     if (nrOfTokens == 0) {
       // Example: VAR seq_generator_D : bool_input_inf(model.D_ready);
-      sequenceGenerators << "  VAR seq_generator_" << argumentName
-                         << " : " + typePrefixName + "_input_inf(" << moduleName
-                         << "." << argumentName << "_ready);\n";
+      sequenceGenerators
+          << llvm::formatv(
+                 "VAR seq_generator_{0} : {1}_input_inf({2}.{0}_ready);\n",
+                 argumentName, typePrefixName, moduleName)
+                 .str();
+
     } else if (generateExactNrOfTokens) {
       // Example: VAR seq_generator_D : bool_input_exact(model.D_ready, 1);
-      sequenceGenerators << "  VAR seq_generator_" << argumentName
-                         << " : " + typePrefixName + "_input_exact("
-                         << moduleName << "." << argumentName << "_ready, "
-                         << nrOfTokens << ");\n";
+      sequenceGenerators << llvm::formatv(
+                                "VAR seq_generator_{0} : "
+                                "{1}_input_exact({2}.{0}_ready, {3});\n",
+                                argumentName, typePrefixName, moduleName,
+                                nrOfTokens)
+                                .str();
     } else {
       // Example: VAR seq_generator_D : bool_input(model.D_ready, 1);
-      sequenceGenerators << "  VAR seq_generator_" << argumentName
-                         << " : " + typePrefixName + "_input(" << moduleName
-                         << "." << argumentName << "_ready, " << nrOfTokens
-                         << ");\n";
+      sequenceGenerators << llvm::formatv("VAR seq_generator_{0} : "
+                                          "{1}_input({2}.{0}_ready, {3});\n",
+                                          argumentName, typePrefixName,
+                                          moduleName, nrOfTokens)
+                                .str();
     }
   }
   return sequenceGenerators.str();
