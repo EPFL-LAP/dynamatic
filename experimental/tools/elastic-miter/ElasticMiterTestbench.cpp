@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;
 
@@ -43,26 +44,27 @@ static std::string createMiterProperties(const std::string &moduleName,
   // INVARSPEC (model.EQ_B_valid -> model.EQ_B_out)
   for (const auto &[resultName, resultType] : config.results) {
     if (resultType.isa<handshake::ChannelType>())
-      properties << "INVARSPEC (" << moduleName
-                 << "." + resultName + "_valid -> " << moduleName
-                 << "." + resultName + "_out)\n";
+      properties << llvm::formatv("INVARSPEC ({0}.{1}_valid -> {0}.{1}_out)",
+                                  moduleName, resultName)
+                        .str();
   }
 
   // Make sure the input buffers will have pairwise the same number of tokens.
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[lhsBuffer, rhsBuffer] : config.inputBuffers) {
-    bufferProperties.push_back("(" + moduleName + "." + lhsBuffer + ".num = " +
-                               moduleName + "." + rhsBuffer + ".num)");
+    bufferProperties.push_back(llvm::formatv("({0}.{1}.num = {0}.{2}.num)",
+                                             moduleName, lhsBuffer, rhsBuffer)
+                                   .str());
   }
 
   // Make sure the output buffers will be empty.
   // This means both circuits produce the same number of output tokens.
   for (const auto &[lhsBuffer, rhsBuffer] : config.outputBuffers) {
-    bufferProperties.push_back("(" + moduleName + "." + lhsBuffer +
-                               ".num = 0)");
-    bufferProperties.push_back("(" + moduleName + "." + rhsBuffer +
-                               ".num = 0)");
+    bufferProperties.push_back(
+        llvm::formatv("({0}.{1}.num = 0)", moduleName, lhsBuffer).str());
+    bufferProperties.push_back(
+        llvm::formatv("({0}.{1}.num = 0)", moduleName, rhsBuffer).str());
   }
 
   // Make sure the buffer property will start to hold at one point and from
@@ -71,11 +73,9 @@ static std::string createMiterProperties(const std::string &moduleName,
   // & (model.lhs_in_buf_C.num = model.rhs_in_buf_C.num) &
   // (model.lhs_out_buf_A.num = 0) & (model.rhs_out_buf_A.num = 0) &
   // (model.lhs_out_buf_B.num = 0) & (model.rhs_out_buf_B.num = 0)))
-  std::string finalBufferProp =
-      "AF (AG (" + join(bufferProperties, " & ") + "))";
-  properties << "CTLSPEC " + finalBufferProp + "\n";
-
-  properties << "\n";
+  properties << llvm::formatv("CTLSPEC AF (AG ({0}))\n\n",
+                              join(bufferProperties, " & "))
+                    .str();
 
   return properties.str();
 }
