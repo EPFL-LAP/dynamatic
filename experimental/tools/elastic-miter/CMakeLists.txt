@@ -14,21 +14,12 @@ add_llvm_tool(elastic-miter
 llvm_update_compile_flags(elastic-miter)
 target_link_libraries(elastic-miter
   PRIVATE
-  DynamaticBufferPlacement
-  DynamaticLSQSizing
-  DynamaticExperimentalResourceSharing
   DynamaticHandshake
-  DynamaticTestTransforms
+  DynamaticSupport
   DynamaticTransforms
-  DynamaticTutorialsCreatingPasses
-  DynamaticExperimentalTestTransforms
-  DynamaticExperimentalSupport
-  DynamaticExperimentalTransforms
 
   MLIRIR
-  MLIRArithTransforms
   MLIRMemRefTransforms
-  MLIRLLVMDialect
   MLIRMemRefDialect
   MLIROptLib
   MLIRParser
