@@ -1504,7 +1504,7 @@ SameOperandsAndResultType
   }];
 }
 
-def ValidMergerOp : Handshake_Op<"valid-merger",[
+def ValidMergerOp : Handshake_Op<"valid_merger",[
 AllTypesMatch<["lhsIn", "lhs"]>,
 AllTypesMatch<["rhsIn", "rhs"]>
 ]> {

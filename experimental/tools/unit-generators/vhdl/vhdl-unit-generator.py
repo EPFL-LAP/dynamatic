@@ -115,6 +115,8 @@ def generate_code(name, mod_type, parameters):
             return fptosi.generate_fptosi(name, parameters)
         case "rigidifier":
             return rigidifier.generate_rigidifier(name, parameters)
+        case "valid_merger":
+            return valid_merger.generate_valid_merger(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
