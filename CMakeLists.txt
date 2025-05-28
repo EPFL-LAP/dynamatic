@@ -179,9 +179,9 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   # Download dot2smv Python scripts
   FetchContent_Declare(
     dot2smv
-    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
+    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
   )
 
   FetchContent_MakeAvailable(dot2smv)
