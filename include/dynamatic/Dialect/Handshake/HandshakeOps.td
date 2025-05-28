@@ -1506,7 +1506,8 @@ SameOperandsAndResultType
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
 AllTypesMatch<["lhsIn", "lhs"]>,
-AllTypesMatch<["rhsIn", "rhs"]>
+AllTypesMatch<["rhsIn", "rhs"]>,
+DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = [{
     Merges the valid signals of two channels.

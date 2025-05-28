@@ -164,6 +164,16 @@ std::string handshake::SelectOp::getResultName(unsigned idx) {
   return "result";
 }
 
+std::string handshake::ValidMergerOp::getOperandName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return (idx == 0) ? "lhs_ins" : "rhs_ins";
+}
+
+std::string handshake::ValidMergerOp::getResultName(unsigned idx) {
+  assert(idx < getNumOperands() && "index too high");
+  return (idx == 0) ? "lhs_outs" : "rhs_outs";
+}
+
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
