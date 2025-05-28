@@ -2,6 +2,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
   CutlessMapping.cpp
   CDGAnalysis.cpp
+  CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
   FtdImplementation.cpp
