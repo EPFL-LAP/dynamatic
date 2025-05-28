@@ -52,9 +52,14 @@ static std::string instantiateModuleUnderTest(
 
     llvm::TypeSwitch<Type, void>(argumentType)
         .Case<handshake::ControlType>([&](handshake::ControlType) {
-          // todo: once elastic-miter is updated to use the new backend this if
-          // statement needs to be removed
-          if (!syncOutput) {
+          // TODO: remove this if statement when updating the elastic-miter to
+          // the new SMV backend.
+          // This is a hack: we use syncOutput as a proxy to
+          // know if we are using the old dot2smv (in elastic-miter syncOutput
+          // is always false) or the new backend (in rigidification syncOutput
+          // is always true). This hack can be fixed as soon as elastic-miter is
+          // updated.
+          if (syncOutput) {
             inputVariables.push_back("seq_generator_" + argumentName + "." +
                                      SEQUENCE_GENERATOR_VALID_NAME.str());
           } else {
