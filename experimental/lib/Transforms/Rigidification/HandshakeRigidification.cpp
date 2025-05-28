@@ -75,9 +75,9 @@ void HandshakeRigidificationPass::runDynamaticPass() {
         if (failed(insertRigidifier(*p, ctx)))
           return signalPassFailure();
       } else if (isa<ValidEquivalence>(property)) {
-        // auto *p = llvm::cast<ValidEquivalence>(property.get());
-        // if (failed(insertValidMerger(*p, ctx)))
-        //   return signalPassFailure();
+        auto *p = llvm::cast<ValidEquivalence>(property.get());
+        if (failed(insertValidMerger(*p, ctx)))
+          return signalPassFailure();
       }
     }
   }

@@ -646,7 +646,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
             handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
             handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp, handshake::RigidifierOp>([&](auto) {
+            handshake::AbsFOp, handshake::RigidifierOp,
+            handshake::ValidMergerOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -1801,6 +1802,7 @@ public:
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
                     ConvertToHWInstance<handshake::RigidifierOp>,
+                    ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
                     // Arith operations

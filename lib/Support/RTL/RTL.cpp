@@ -305,6 +305,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.shli" || modName == "handshake.blocker" ||
       modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
       modName == "handshake.rigidifier" ||
+      modName == "handshake.valid_merger" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
