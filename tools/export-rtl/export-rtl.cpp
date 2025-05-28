@@ -1215,8 +1215,7 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
 }
 
 LogicalResult SMVWriter::createProperties(WriteModData &data) const {
-  for (const auto &[i, property] :
-       llvm::enumerate(propertyInfo.table.getProperties())) {
+  for (const auto &property : propertyInfo.table.getProperties()) {
 
     FormalProperty::TAG propertyTag = property->getTag();
 

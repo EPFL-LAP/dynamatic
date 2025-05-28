@@ -1485,4 +1485,46 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasVerifier = 1;
 }
 
+def RigidifierOp : Handshake_Op<"rigidifier",[
+SameOperandsAndResultType
+]> {
+  let summary = [{
+    Rigidifies a channel to simplify the handshake logic.
+  }];
+  let description = [{
+    Rigidifies a channel by setting the output valid signal to 1 and input ready
+    signal to a open. This allows the simplification of redundant handshake logic.
+  }];
+
+  let arguments = (ins HandshakeType:$channelIn);
+  let results = (outs HandshakeType:$channelOut);
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+  }];
+}
+
+def ValidMergerOp : Handshake_Op<"valid-merger",[
+AllTypesMatch<["lhsIn", "lhs"]>,
+AllTypesMatch<["rhsIn", "rhs"]>
+]> {
+  let summary = [{
+    Merges the valid signals of two channels.
+  }];
+  let description = [{
+    Merges the valid signal of two channels by propagating only one input
+    valid signal to both output valid signals. In this way the valid generation
+    of the second input signal can be simplified;
+  }];
+
+  let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
+  let results = (outs HandshakeType:$lhs, HandshakeType:$rhs);
+
+  let assemblyFormat = [{
+    $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
+  }];
+
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
