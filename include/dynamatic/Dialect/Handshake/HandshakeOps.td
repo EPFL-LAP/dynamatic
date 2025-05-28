@@ -1505,8 +1505,8 @@ SameOperandsAndResultType
 }
 
 def ValidMergerOp : Handshake_Op<"valid-merger",[
-AllTypesMatch<["lhsIn", "lhsOut"]>,
-AllTypesMatch<["rhsIn", "rhsOut"]>
+AllTypesMatch<["lhsIn", "lhs"]>,
+AllTypesMatch<["rhsIn", "rhs"]>
 ]> {
   let summary = [{
     Merges the valid signals of two channels.
@@ -1517,8 +1517,13 @@ AllTypesMatch<["rhsIn", "rhsOut"]>
     of the second input signal can be simplified;
   }];
 
-  let arguments = (ins ChannelType:$lhsIn, ChannelType:$rhsIn);
-  let results = (outs ChannelType:$lhsOut, ChannelType:$rhsOut);
+  let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
+  let results = (outs HandshakeType:$lhs, HandshakeType:$rhs);
+
+  let assemblyFormat = [{
+    $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
+  }];
+
 }
 
 
