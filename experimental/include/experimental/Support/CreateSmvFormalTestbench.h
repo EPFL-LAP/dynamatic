@@ -46,7 +46,7 @@ std::string createSmvFormalTestbench(
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
     const SmallVector<std::pair<std::string, mlir::Type>> &results,
     const std::string &modelSmvName, size_t nrOfTokens,
-    bool generateExactNrOfTokens = false);
+    bool generateExactNrOfTokens = false, bool syncOutput = false);
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0

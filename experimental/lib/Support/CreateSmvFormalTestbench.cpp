@@ -5,6 +5,7 @@
 #include <regex>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 
@@ -40,7 +41,8 @@ static std::string join(const T &v, const std::string &delim) {
 static std::string instantiateModuleUnderTest(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
-    const SmallVector<std::pair<std::string, mlir::Type>> &results) {
+    const SmallVector<std::pair<std::string, mlir::Type>> &results,
+    bool syncOutput = false) {
   SmallVector<std::string> inputVariables;
   for (const auto &argument : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
@@ -50,7 +52,9 @@ static std::string instantiateModuleUnderTest(
 
     llvm::TypeSwitch<Type, void>(argumentType)
         .Case<handshake::ControlType>([&](handshake::ControlType) {
-          if (!LEGACY_DOT2SMV_COMPATIBLE) {
+          // todo: once elastic-miter is updated to use the new backend this if
+          // statement needs to be removed
+          if (!syncOutput) {
             inputVariables.push_back("seq_generator_" + argumentName + "." +
                                      SEQUENCE_GENERATOR_VALID_NAME.str());
           } else {
@@ -74,11 +78,19 @@ static std::string instantiateModuleUnderTest(
         });
   }
 
-  for (const auto &[resultName, type] : results) {
-    if (type.isa<handshake::ControlType, handshake::ChannelType>())
-      inputVariables.push_back("sink_" + resultName + "." +
-                               SINK_READY_NAME.str());
-  }
+  if (syncOutput)
+    for (const auto &[i, result] : llvm::enumerate(results)) {
+      const auto &[resultName, type] = result;
+      if (type.isa<handshake::ControlType, handshake::ChannelType>())
+        inputVariables.push_back("join_global.ins_" + std::to_string(i) +
+                                 "_ready");
+    }
+  else
+    for (const auto &[resultName, type] : results) {
+      if (type.isa<handshake::ControlType, handshake::ChannelType>())
+        inputVariables.push_back("sink_" + resultName + "." +
+                                 SINK_READY_NAME.str());
+    }
 
   std::ostringstream call;
   call << "  VAR " << moduleName << " : " << moduleName << "(";
@@ -176,6 +188,30 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
   }
 }
 
+static std::string createGeneralJoin(size_t nrOfOutputs) {
+  std::ostringstream generalJoin;
+  std::vector<std::string> insValids;
+  for (size_t i = 1; i < nrOfOutputs; i++)
+    insValids.push_back("ins_" + std::to_string(i) + "_valid");
+
+  generalJoin << "MODULE join_main (";
+  generalJoin << join(insValids, ", ");
+  generalJoin << ")\n";
+
+  generalJoin << "  DEFINE\n";
+  generalJoin << join(insValids, " & ");
+  generalJoin << ";\n";
+
+  for (size_t i = 0; i < nrOfOutputs; i++) {
+    generalJoin << "  ins_" << i << "_ready :=";
+    std::vector<std::string> tmp = insValids;
+    tmp.erase(tmp.begin() + i);
+    generalJoin << join(tmp, " & ");
+    generalJoin << ";\n";
+  }
+  return generalJoin.str();
+}
+
 static std::string convertMLIRTypeToSMV(Type type) {
   return llvm::TypeSwitch<Type, std::string>(type)
       .Case<handshake::ControlType>(
@@ -189,7 +225,8 @@ static std::string convertMLIRTypeToSMV(Type type) {
 
 static std::string createSupportEntities(
     const SmallVector<std::pair<std::string, Type>> &arguments,
-    size_t nrOfTokens, bool generateExactNrOfTokens = false) {
+    size_t nrOfTokens, size_t nrOfOutputs, bool generateExactNrOfTokens = false,
+    bool syncOutput = false) {
 
   std::unordered_set<std::string> types;
   for (auto [_, type] : arguments)
@@ -202,9 +239,11 @@ static std::string createSupportEntities(
                                                generateExactNrOfTokens)
                     << "\n\n";
   }
-
-  supportEntities << "MODULE sink_main (ins_valid)\n"
-                     "  DEFINE ready0 := TRUE;\n\n";
+  if (syncOutput)
+    supportEntities << createGeneralJoin(nrOfOutputs);
+  else
+    supportEntities << "MODULE sink_main (ins_valid)\n"
+                       "  DEFINE ready0 := TRUE;\n\n";
 
   return supportEntities.str();
 }
@@ -231,11 +270,12 @@ static std::string instantiateSequenceGenerators(
             });
 
     // We support three different kinds of sequence generators:
-    // 1. Infinite sequence generator: Will create an infinite number of tokens.
+    // 1. Infinite sequence generator: Will create an infinite number of
+    // tokens.
     // 2. Standard finite generator: Will create 0 to the maximal number of
-    //    tokens. The exact number of tokens is non-deterministic.
-    // 3. Exact finite generator: Will create the exact number of tokens (if it
-    //    receives enough ready inputs).
+    // tokens. The exact number of tokens is non-deterministic.
+    // 3. Exact finite generator: Will create the exact number of tokens (if
+    // it receives enough ready inputs).
     // When nrOfTokens is set to 0, the infinite sequence generator is created
     // and the value of generateExactNrOfTokens is ignored.
     if (nrOfTokens == 0) {
@@ -263,8 +303,7 @@ static std::string instantiateSequenceGenerators(
 // Create the sinks at the outputs of the module
 static std::string
 instantiateSinks(const std::string &moduleName,
-                 const SmallVector<std::pair<std::string, Type>> &results,
-                 size_t nrOfTokens) {
+                 const SmallVector<std::pair<std::string, Type>> &results) {
   std::ostringstream sinks;
 
   for (const auto &[resultName, type] : results) {
@@ -275,27 +314,48 @@ instantiateSinks(const std::string &moduleName,
   return sinks.str();
 }
 
+// Create the join at the outputs of the module
+static std::string
+instantiateJoin(const std::string &moduleName,
+                const SmallVector<std::pair<std::string, Type>> &results) {
+  std::ostringstream str;
+  std::vector<std::string> outputValids;
+
+  str << "  VAR join_global : join_main(";
+  for (const auto &[resultName, type] : results) {
+    if (type.isa<handshake::ControlType, handshake::ChannelType>())
+      outputValids.push_back(moduleName + "." + resultName + "_valid");
+  }
+  str << join(outputValids, ", ") << ")\n";
+
+  return str.str();
+}
+
 std::string createSmvFormalTestbench(
     const SmallVector<std::pair<std::string, Type>> &arguments,
     const SmallVector<std::pair<std::string, Type>> &results,
     const std::string &modelSmvName, size_t nrOfTokens,
-    bool generateExactNrOfTokens) {
+    bool generateExactNrOfTokens, bool syncOutput) {
 
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n\n";
 
-  wrapper << createSupportEntities(arguments, nrOfTokens,
-                                   generateExactNrOfTokens);
+  wrapper << createSupportEntities(arguments, nrOfTokens, results.size(),
+                                   generateExactNrOfTokens, syncOutput);
 
   wrapper << "MODULE main\n\n";
 
   wrapper << instantiateSequenceGenerators(modelSmvName, arguments, nrOfTokens,
                                            generateExactNrOfTokens);
 
-  wrapper << instantiateModuleUnderTest(modelSmvName, arguments, results)
+  wrapper << instantiateModuleUnderTest(modelSmvName, arguments, results,
+                                        syncOutput)
           << "\n";
 
-  wrapper << instantiateSinks(modelSmvName, results, nrOfTokens) << "\n";
+  if (syncOutput)
+    wrapper << instantiateJoin(modelSmvName, results);
+  else
+    wrapper << instantiateSinks(modelSmvName, results) << "\n";
 
   return wrapper.str();
 }
