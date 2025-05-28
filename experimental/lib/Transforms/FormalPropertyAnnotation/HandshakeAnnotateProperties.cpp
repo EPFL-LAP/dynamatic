@@ -63,8 +63,25 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
+  bool isChannelModifiable(OpResult res);
 };
 } // namespace
+
+bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
+  // channels connected to input, output, memory controllers, and LSQ can't be
+  // modified
+  if (isa<handshake::EndOp, handshake::MemoryControllerOp, handshake::LSQOp>(
+          res.getOwner()))
+    return false;
+
+  if (res.getUsers().empty())
+    return false;
+
+  if (isa<handshake::EndOp, handshake::MemoryControllerOp, handshake::LSQOp>(
+          *res.getUsers().begin()))
+    return false;
+  return true;
+}
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
@@ -73,11 +90,14 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     for (auto res2 : op2.getResults()) {
       if (res1 == res2)
         continue;
+      if (res1 != res2 && isChannelModifiable(res1) &&
+          isChannelModifiable(res2)) {
 
-      ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
+        ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
-      propertyTable.push_back(p.toJSON());
-      uid++;
+        propertyTable.push_back(p.toJSON());
+        uid++;
+      }
     }
   return success();
 }
@@ -105,16 +125,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
       for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
-        if (res.getType()
-                .isa<handshake::ChannelType, handshake::ControlType>()) {
-          if (res.getUsers().empty()) {
-            continue;
-          }
-          auto *userOp = *res.getUsers().begin();
-
-          // skip connections to the output
-          if (userOp->getName().getStringRef() == "handshake.end")
-            continue;
+        if (isChannelModifiable(res)) {
 
           AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
 
