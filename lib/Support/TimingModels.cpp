@@ -148,14 +148,6 @@ LogicalResult TimingDatabase::getLatency(
     if (isa_and_present<handshake::LSQOp>(memOp))
       latency += 3;
   }
-  llvm::errs() << "=== Debug: Final Result ===\n";
-  llvm::errs() << "Operation: " << op->getName().getStringRef() << "\n";
-  llvm::errs() << "Final latency value: " << latency << "\n";
-  llvm::errs() << "================================\n\n";
-  llvm::errs() << "=== Debug: Final Result ===\n";
-  llvm::errs() << "Final latency value: " << latency << "\n";
-  llvm::errs() << "================================\n\n";
-
   return success();
 }
 
@@ -357,14 +349,6 @@ bool dynamatic::fromJSON(const ljson::Value &value,
     DelayDepMetric<double> LatencyStruct;
     LatencyStruct.data = LatencyMap;
     metric.data[bitwidth] = LatencyStruct;
-  }
-
-  llvm::errs() << "Parsed metric.data contents:\n";
-  for (const auto &[bitwidth, delayMetric] : metric.data) {
-    llvm::errs() << "  Bitwidth: " << bitwidth << "\n";
-    for (const auto &[latencyKey, latencyValue] : delayMetric.data) {
-      llvm::errs() << "    " << latencyKey << " -> " << latencyValue << "\n";
-    }
   }
 
   return true;

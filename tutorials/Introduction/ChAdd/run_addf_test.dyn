@@ -1,0 +1,7 @@
+set-dynamatic-path  .
+set-src           tutorials/Introduction/ChAdd/loop_add.c
+compile           --buffer-algorithm fpga20
+write-hdl         
+simulate
+
+exit 
