@@ -35,7 +35,7 @@ entity {name} is
     -- outputs
     lhs_outs         : out std_logic_vector({left_bitwidth} - 1 downto 0);
     lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic
+    lhs_ins_ready    : out std_logic;
     rhs_outs         : out std_logic_vector({right_bitwidth} - 1 downto 0);
     rhs_outs_valid   : out std_logic;
     rhs_ins_ready    : out std_logic
@@ -80,7 +80,7 @@ entity {name} is
     -- outputs
     lhs_outs         : out std_logic_vector({left_bitwidth} - 1 downto 0);
     lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic
+    lhs_ins_ready    : out std_logic;
     rhs_outs_valid   : out std_logic;
     rhs_ins_ready    : out std_logic
   );
@@ -122,7 +122,7 @@ entity {name} is
     rhs_outs_ready   : in std_logic;
     -- outputs
     lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic
+    lhs_ins_ready    : out std_logic;
     rhs_outs         : out std_logic_vector({right_bitwidth} - 1 downto 0);
     rhs_outs_valid   : out std_logic;
     rhs_ins_ready    : out std_logic
@@ -163,7 +163,7 @@ entity {name} is
     rhs_outs_ready   : in std_logic;
     -- outputs
     lhs_outs_valid   : out std_logic;
-    lhs_ins_ready    : out std_logic
+    lhs_ins_ready    : out std_logic;
     rhs_outs_valid   : out std_logic;
     rhs_ins_ready    : out std_logic
   );
