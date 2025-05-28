@@ -9,9 +9,9 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
     """
     LSQ
 
-    Generates the VHDL 'entity' and 'architecture' sections for a LSQ.
+    Generates the VHDL 'entity' and 'architecture' sections for an LSQ.
     
-    This function appneds the following to the file '<path_rtl>/<name>_core.vhd:
+    This function appends the following to the file '<path_rtl>/<name>.vhd:
         1. 'entity <name>' declaration
         2. 'architecture arch of <name>' implementation
         
@@ -33,8 +33,12 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
 
     Output:
         Appends the 'entity' and 'architecture' definitions
-        to the .vhd file at <path_rtl>/<name>_core.vhd.
+        to the .vhd file at <path_rtl>/<name>.vhd.
         Entity and architecture use the identifier: <name>
+
+    Example:
+        LSQ(ctx, path_rtl, name + '_core', configs)
+
 
     *Instantiation of LSQ is in lsq-generator.py.
     """
@@ -378,7 +382,7 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
     stq_issue.regInit(enable=stq_issue_en, init=0)
     stq_resp.regInit(enable=stq_resp_en, init=0)
 
-    ######   Entity Init    ######
+    ######   Entity Instantiation   ######
 
     # Group Allocator
     arch += GroupAllocatorInst(ctx, name + '_ga', configs,

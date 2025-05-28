@@ -29,6 +29,9 @@ def PortToQueueDispatcher(
         path_rtl    : Output directory for VHDL files.
         name        : Base name of the dispatcher.
         suffix      : Suffix appended to the entity name.
+            - lda: Load Address Port Dispatcher
+            - sta: Store Address Port Dispatcher
+            - std: Store Data Port Dispatcher
         numPorts    : Number of access ports.
         numEntries  : Number of queue entries.
         bitsW       : Width of each data/address bus.
@@ -39,6 +42,33 @@ def PortToQueueDispatcher(
         to the .vhd file at <path_rtl>/<name>_core.vhd.
         Entity and architecture use the identifier: <name><suffix>
 
+    Example (Load Address Port Dispatcher):
+        PortToQueueDispatcher(
+            ctx,
+            path_rtl="rtl",
+            name="config_0",
+            suffix="_core_lda",
+            numPorts=configs.numLdPorts,
+            numEntries=configs.numLdqEntries,
+            bitsW=configs.addrW,
+            portAddrW=configs.ldpAddrW
+        )
+
+        produces in rtl/config_0_core.vhd:
+
+        entity config_0_core_lda is
+            port(
+                rst           : in  std_logic;
+                clk           : in  std_logic;
+                ...
+            );
+        end entity;
+
+        architecture arch of config_0_core_lda is
+            -- signals generated here
+        begin
+            -- dispatcher logic here
+        end architecture;
     """
 
 
@@ -139,6 +169,7 @@ def QueueToPortDispatcher(
 
     This generates one main part in LSQ:
         1. Load Data Port Dispatcher
+        2. (Optionally) Store Backward Port Dispatcher
     
     Parameters:
         ctx         : VHDLContext for code generation state.
@@ -154,6 +185,34 @@ def QueueToPortDispatcher(
         Appends the 'entity' and 'architecture' definitions
         to the .vhd file at <path_rtl>/<name>_core.vhd.
         Entity and architecture use the identifier: <name><suffix>
+
+    Example (Load Data Port Dispatcher):
+        QueueToPortDispatcher(
+            ctx,
+            path_rtl="rtl",
+            name="config_0",
+            suffix="_core_ldd",
+            numPorts=configs.numLdPorts,
+            numEntries=configs.numLdqEntries,
+            bitsW=configs.addrW,
+            portAddrW=configs.ldpAddrW
+        )
+
+        produces in rtl/config_0_core.vhd:
+
+        entity config_0_core_ldd is
+            port(
+                rst           : in  std_logic;
+                clk           : in  std_logic;
+                ...
+            );
+        end entity;
+
+        architecture arch of config_0_core_ldd is
+            -- signals generated here
+        begin
+            -- dispatcher logic here
+        end architecture;
 
     """
 
@@ -280,6 +339,23 @@ def PortToQueueDispatcherInst(
 
     Returns:
         VHDL instantiation string for inclusion in the architecture body.
+    
+    Example:
+        arch += PortToQueueDispatcherInst(
+            ctx,
+            name                = name + '_lda',
+            numPorts            = configs.numLdPorts,
+            numEntries          = configs.numLdqEntries,
+            port_bits_i         = ldp_addr_i,
+            port_valid_i        = ldp_addr_valid_i,
+            port_ready_o        = ldp_addr_ready_o,
+            entry_valid_i       = ldq_valid,
+            entry_bits_valid_i  = ldq_addr_valid,
+            entry_port_idx_i    = ldq_port_idx,
+            entry_bits_o        = ldq_addr,
+            entry_wen_o         = ldq_addr_wen,
+            queue_head_oh_i     = ldq_head_oh
+        )
     """
 
     arch = ctx.get_current_indent() + f'{name}_dispatcher : entity work.{name}\n'
@@ -350,6 +426,24 @@ def QueueToPortDispatcherInst(
 
     Returns:
         VHDL instantiation string for inclusion in the architecture body.
+
+    
+    Example:
+        arch += QueueToPortDispatcherInst(
+            ctx,
+            name                = name + '_ldd',
+            numPorts            = configs.numLdPorts,
+            numEntries          = configs.numLdqEntries,
+            port_bits_o         = ldp_data_o,
+            port_valid_o        = ldp_data_valid_o,
+            port_ready_i        = ldp_data_ready_i,
+            entry_valid_i       = ldq_valid,
+            entry_bits_valid_i  = ldq_data_valid,
+            entry_port_idx_i    = ldq_port_idx,
+            entry_bits_i        = ldq_data,
+            entry_reset_o       = ldq_reset,
+            queue_head_oh_i     = ldq_head_oh
+        )
     """
 
     arch = ctx.get_current_indent() + f'{name}_dispatcher : entity work.{name}\n'

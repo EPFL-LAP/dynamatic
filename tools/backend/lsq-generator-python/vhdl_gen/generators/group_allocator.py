@@ -21,6 +21,25 @@ def GroupAllocator(ctx: VHDLContext, path_rtl: str, name: str, suffix: str, conf
         to the .vhd file at <path_rtl>/<name>_core.vhd.
         Entity and architecture use the identifier: <name><suffix>
 
+    Example (Group Allocator):
+        GroupAllocator(ctx, path_rtl, name, '_core_ga', configs)
+
+        produces in rtl/config_0_core.vhd:
+
+        entity config_0_core_ga is
+            port(
+                rst           : in  std_logic;
+                clk           : in  std_logic;
+                ...
+            );
+        end entity;
+
+        architecture arch of config_0_core_ga is
+            -- signals generated here
+        begin
+            -- group allocator logic here
+        end architecture;
+    
     """
     
     # Initialize the global parameters
@@ -209,6 +228,29 @@ def GroupAllocatorInst(
 
     Returns:
         VHDL instantiation string for inclusion in the architecture body.
+
+    Example:
+        arch += GroupAllocatorInst(
+            ctx,
+            name               = name + '_ga',
+            configs            = configs,
+            group_init_valid_i = group_init_valid_i,
+            group_init_ready_o = group_init_ready_o,
+            ldq_tail_i         = ldq_tail,
+            ldq_head_i         = ldq_head,
+            ldq_empty_i        = ldq_empty,
+            stq_tail_i         = stq_tail,
+            stq_head_i         = stq_head,
+            stq_empty_i        = stq_empty,
+            ldq_wen_o          = ldq_wen,
+            num_loads_o        = num_loads,
+            ldq_port_idx_o     = ldq_port_idx,
+            stq_wen_o          = stq_wen,
+            num_stores_o       = num_stores,
+            stq_port_idx_o     = stq_port_idx,
+            ga_ls_order_o      = ga_ls_order
+        )
+
     """
 
     arch = ctx.get_current_indent() + f'{name} : entity work.{name}\n'
