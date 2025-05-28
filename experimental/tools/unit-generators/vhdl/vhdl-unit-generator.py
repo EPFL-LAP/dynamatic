@@ -38,6 +38,7 @@ import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
 import generators.handshake.rigidifier as rigidifier
+import generators.handshake.valid_merger as valid_merger
 
 
 def generate_code(name, mod_type, parameters):

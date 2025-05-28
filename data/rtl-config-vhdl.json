@@ -790,6 +790,10 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t rigidifier -p bitwidth=$BITWIDTH"
   },
   {
+    "name": "handshake.valid_merger",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t valid_merger -p bitwidth=$BITWIDTH"
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
   },
   {
