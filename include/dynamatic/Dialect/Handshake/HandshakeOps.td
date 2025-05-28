@@ -1505,7 +1505,7 @@ SameOperandsAndResultType
 }
 
 def ValidMergerOp : Handshake_Op<"valid-merger",[
-AllTypesMatch<["lhsIn", "lhsOut"]>
+AllTypesMatch<["lhsIn", "lhsOut"]>,
 AllTypesMatch<["rhsIn", "rhsOut"]>
 ]> {
   let summary = [{
