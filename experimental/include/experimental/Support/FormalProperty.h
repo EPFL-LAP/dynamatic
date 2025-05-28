@@ -58,6 +58,13 @@ protected:
 
   llvm::json::Value parseBaseAndExtractInfo(const llvm::json::Value &value,
                                             llvm::json::Path path);
+
+private:
+  inline static const StringLiteral ID_LIT = "id";
+  inline static const StringLiteral TYPE_LIT = "type";
+  inline static const StringLiteral TAG_LIT = "tag";
+  inline static const StringLiteral INFO_LIT = "info";
+  inline static const StringLiteral CHECK_LIT = "check";
 };
 
 struct SignalName {
@@ -90,6 +97,12 @@ public:
 private:
   SignalName ownerChannel;
   SignalName userChannel;
+  inline static const StringLiteral OWNER_OP_LIT = "owner_op";
+  inline static const StringLiteral USER_OP_LIT = "user_op";
+  inline static const StringLiteral OWNER_CHANNEL_LIT = "owner_channel";
+  inline static const StringLiteral USER_CHANNEL_LIT = "user_channel";
+  inline static const StringLiteral OWNER_INDEX_LIT = "owner_index";
+  inline static const StringLiteral USER_INDEX_LIT = "user_index";
 };
 
 class ValidEquivalence : public FormalProperty {
@@ -117,6 +130,12 @@ public:
 private:
   SignalName ownerChannel;
   SignalName targetChannel;
+  inline static const StringLiteral OWNER_OP_LIT = "owner_op";
+  inline static const StringLiteral TARGET_OP_LIT = "target_op";
+  inline static const StringLiteral OWNER_CHANNEL_LIT = "owner_channel";
+  inline static const StringLiteral TARGET_CHANNEL_LIT = "target_channel";
+  inline static const StringLiteral OWNER_INDEX_LIT = "owner_index";
+  inline static const StringLiteral TARGET_INDEX_LIT = "target_index";
 };
 
 class FormalPropertyTable {
