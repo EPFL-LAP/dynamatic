@@ -120,18 +120,4 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
-
-def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"> {
-  let summary = "Annotates Operations with Formal Properties";
-  let description = [{
-    The pass annotates each operation with property IDs and generates
-    a table that contains for each ID all the information needed to
-    define a check the property. Currently it only annotates Absence of
-    Backpressure, but it can be extended to annotate other properties.
-  }];
-  let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
-  let options = [ Option<"jsonPath", "json-path", "std::string", "",
-    "Path to JSON-formatted file where the properties' information is stored.">];
-}
-
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

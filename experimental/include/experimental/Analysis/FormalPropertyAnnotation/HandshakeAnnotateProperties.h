@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_ANNOTATE_PROPERTIES_PASS_H
-#define DYNAMATIC_TRANSFORMS_ANNOTATE_PROPERTIES_PASS_H
+#ifndef DYNAMATIC_ANALYSIS_ANNOTATE_PROPERTIES_PASS_H
+#define DYNAMATIC_ANALYSIS_ANNOTATE_PROPERTIES_PASS_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
@@ -27,10 +27,10 @@ createAnnotateProperties(const std::string &jsonPath = "");
 
 #define GEN_PASS_DECL_HANDSHAKEANNOTATEPROPERTIES
 #define GEN_PASS_DEF_HANDSHAKEANNOTATEPROPERTIES
-#include "experimental/Transforms/Passes.h.inc"
+#include "experimental/Analysis/Passes.h.inc"
 
 } // namespace formalprop
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_ANNOTATE_PROPERTIES_PASS_H
+#endif // DYNAMATIC_ANALYSIS_ANNOTATE_PROPERTIES_PASS_H

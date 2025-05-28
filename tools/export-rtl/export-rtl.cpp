@@ -1485,7 +1485,8 @@ int main(int argc, char **argv) {
 
   // Pull all the properties from the property database
   FormalPropertyTable table;
-  if (failed(table.addPropertiesFromJSON(propertyFilename)))
+  if (!propertyFilename.empty() &&
+      failed(table.addPropertiesFromJSON(propertyFilename)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
   FormalPropertyInfo propertyInfo(table, outputPath);

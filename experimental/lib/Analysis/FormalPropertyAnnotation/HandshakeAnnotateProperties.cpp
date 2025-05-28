@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
+#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -113,8 +113,9 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
             continue;
           }
           auto *userOp = *res.getUsers().begin();
-          if (userOp->getName().getStringRef() == "handshake.end" ||
-              isa<handshake::MemoryControllerOp, handshake::LSQOp>(*userOp))
+
+          // skip connections to the output
+          if (isa<handshake::EndOp>(userOp))
             continue;
 
           AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
@@ -137,16 +138,12 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 
-  std::string outString;
-  raw_string_ostream out(outString);
-  out << formatv("{0:2}", jsonVal);
-
   std::error_code EC;
   llvm::raw_fd_ostream jsonOut(jsonPath, EC, llvm::sys::fs::OF_Text);
   if (EC)
     return;
 
-  jsonOut << outString;
+  jsonOut << formatv("{0:2}", jsonVal);
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>

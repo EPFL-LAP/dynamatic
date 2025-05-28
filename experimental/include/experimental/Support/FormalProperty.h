@@ -22,7 +22,10 @@ class FormalProperty {
 
 public:
   enum class TAG { OPT, INVAR, ERROR };
-  enum class TYPE { AOB, VEQ };
+  enum class TYPE {
+    AOB /* Absence Of Backpressure */,
+    VEQ /* Valid EQuivalence */
+  };
 
   TAG getTag() const { return tag; }
   TYPE getType() const { return type; }
@@ -60,18 +63,18 @@ protected:
 
 struct SignalName {
   std::string operationName;
-  std::string name;
-  unsigned index;
+  std::string channelName;
+  unsigned channelIndex;
 };
 
 class AbsenceOfBackpressure : public FormalProperty {
 public:
   std::string getOwner() { return ownerChannel.operationName; }
   std::string getUser() { return userChannel.operationName; }
-  int getOwnerIndex() { return ownerChannel.index; }
-  int getUserIndex() { return userChannel.index; }
-  std::string getOwnerChannel() { return ownerChannel.name; }
-  std::string getUserChannel() { return userChannel.name; }
+  int getOwnerIndex() { return ownerChannel.channelIndex; }
+  int getUserIndex() { return userChannel.channelIndex; }
+  std::string getOwnerChannel() { return ownerChannel.channelName; }
+  std::string getUserChannel() { return userChannel.channelName; }
 
   llvm::json::Value extraInfoToJSON() const override;
   static std::unique_ptr<AbsenceOfBackpressure>
@@ -94,10 +97,10 @@ class ValidEquivalence : public FormalProperty {
 public:
   std::string getOwner() { return ownerChannel.operationName; }
   std::string getTarget() { return targetChannel.operationName; }
-  int getOwnerIndex() { return ownerChannel.index; }
-  int getTargetIndex() { return targetChannel.index; }
-  std::string getOwnerChannel() { return ownerChannel.name; }
-  std::string getTargetChannel() { return targetChannel.name; }
+  int getOwnerIndex() { return ownerChannel.channelIndex; }
+  int getTargetIndex() { return targetChannel.channelIndex; }
+  std::string getOwnerChannel() { return ownerChannel.channelName; }
+  std::string getTargetChannel() { return targetChannel.channelName; }
 
   llvm::json::Value extraInfoToJSON() const override;
   static std::unique_ptr<ValidEquivalence>
