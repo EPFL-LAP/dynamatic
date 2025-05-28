@@ -78,10 +78,6 @@ cd "$HLS_VERIFY_DIR"
 "$HLS_VERIFIER_BIN" \
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
-  --handshake-mlir="$OUTPUT_DIR/comp/rigidified.mlir" > "rep.txt"
-  #> "../report.txt" 2>&1
-
-  #  --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" # \
-  # > "../report.txt" 2>&1
-
+  --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  > "../report.txt" 2>&1
 exit_on_fail "Simulation failed" "Simulation succeeded"
