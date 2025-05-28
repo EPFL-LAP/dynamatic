@@ -790,13 +790,6 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t rigidifier -p bitwidth=$BITWIDTH"
   },
   {
-    "name": "handshake.rigidification",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/handshake/rigidification.vhd"
-  },
-  {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"
   },
   {
