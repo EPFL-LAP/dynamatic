@@ -51,7 +51,8 @@ cp "$HDL_DIR/"*.v "$COSIM_HDL_SRC_DIR" 2> /dev/null
 
 # Copy sources to dedicated folder
 cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 
-cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR"
+# Suppress the error if the header file does not exist (it is optional).
+cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR" 2> /dev/null
 
 # Copy TB supplementary files (memory model, etc.)
 cp "$RESOURCE_DIR/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
