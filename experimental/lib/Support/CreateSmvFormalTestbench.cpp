@@ -60,8 +60,7 @@ static std::string instantiateModuleUnderTest(
           // is always true). This hack can be fixed as soon as elastic-miter is
           // updated.
           if (syncOutput) {
-            inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                     SEQUENCE_GENERATOR_VALID_NAME.str());
+            inputVariables.push_back("TRUE");
           } else {
             inputVariables.push_back("seq_generator_" + argumentName + "." +
                                      SEQUENCE_GENERATOR_DATA_NAME.str());
@@ -193,29 +192,29 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
   }
 }
 
-static std::string createGeneralJoin(size_t nrOfOutputs) {
-  std::ostringstream generalJoin;
+static std::string createTBJoin(size_t nrOfOutputs) {
+  std::ostringstream tbJoin;
   std::vector<std::string> insValids;
   for (size_t i = 0; i < nrOfOutputs; i++)
     insValids.push_back("ins_" + std::to_string(i) + "_valid");
 
-  generalJoin << "MODULE join_main (";
-  generalJoin << join(insValids, ", ");
-  generalJoin << ")\n";
+  tbJoin << "MODULE tb_join (";
+  tbJoin << join(insValids, ", ");
+  tbJoin << ", outs_ready)\n";
 
-  generalJoin << "  DEFINE\n  all_valid := ";
-  generalJoin << join(insValids, " & ");
-  generalJoin << ";\n";
+  tbJoin << "  DEFINE\n  outs_valid := ";
+  tbJoin << join(insValids, " & ");
+  tbJoin << ";\n";
 
   for (size_t i = 0; i < nrOfOutputs; i++) {
-    generalJoin << "  ins_" << i << "_ready := ";
+    tbJoin << "  ins_" << i << "_ready := ";
     std::vector<std::string> tmp = insValids;
     tmp.erase(tmp.begin() + i);
-    generalJoin << join(tmp, " & ");
-    generalJoin << ";\n";
+    tbJoin << join(tmp, " & ");
+    tbJoin << " & outs_ready;\n";
   }
-  generalJoin << "\n\n";
-  return generalJoin.str();
+  tbJoin << "\n\n";
+  return tbJoin.str();
 }
 
 static std::string convertMLIRTypeToSMV(Type type) {
@@ -253,7 +252,7 @@ static std::string createSupportEntities(
       }
     }
 
-    supportEntities << createGeneralJoin(nrOutChannels);
+    supportEntities << createTBJoin(nrOutChannels);
   } else
     supportEntities << "MODULE sink_main (ins_valid)\n"
                        "  DEFINE ready0 := TRUE;\n\n";
@@ -334,12 +333,12 @@ instantiateJoin(const std::string &moduleName,
   std::ostringstream str;
   std::vector<std::string> outputValids;
 
-  str << "  VAR join_global : join_main(";
+  str << "  VAR join_global : tb_join(";
   for (const auto &[resultName, type] : results) {
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
       outputValids.push_back(moduleName + "." + resultName + "_valid");
   }
-  str << join(outputValids, ", ") << ");\n";
+  str << join(outputValids, ", ") << ", global_ready);\n";
 
   return str.str();
 }
@@ -365,10 +364,18 @@ std::string createSmvFormalTestbench(
                                         syncOutput)
           << "\n";
 
-  if (syncOutput)
-    wrapper << instantiateJoin(modelSmvName, results);
-  else
+  if (syncOutput) {
+
+    wrapper << "  VAR global_ready : boolean;\n"
+               "  ASSIGN\n"
+               "  init(global_ready) := TRUE;\n"
+               "  next(global_ready) := join_global.outs_valid ? FALSE : "
+               "global_ready;\n\n";
+
+    wrapper << instantiateJoin(modelSmvName, results) << "\n";
+  } else {
     wrapper << instantiateSinks(modelSmvName, results) << "\n";
+  }
 
   return wrapper.str();
 }
