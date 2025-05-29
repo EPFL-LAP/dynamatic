@@ -406,7 +406,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
         continue;
 
     // Retrieve the MILP variables we need
-    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
     GRBVar &retSrc = cfVars.unitVars[srcOp].retOut;
     GRBVar &retDst = cfVars.unitVars[dstOp].retIn;
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
@@ -414,7 +414,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
     // one less than this difference
-    model.addConstr(chThroughput - backedge == retDst - retSrc,
+    model.addConstr(chTokenOccupancy - backedge == retDst - retSrc,
                     "throughput_channelRetiming");
   }
 }
@@ -452,10 +452,10 @@ void BufferPlacementMILP::
     // Retrieve the MILP variables we need
     GRBVar &dataBuf = dataVars->second.bufPresent;
     GRBVar &bufNumSlots = chVars.bufNumSlots;
-    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
 
-    // The channel's throughput cannot exceed the number of buffer slots
-    model.addConstr(chThroughput <= bufNumSlots, "throughput_channel");
+    // The channel's throughput cannot exceed the number of buffer slots.
+    model.addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
 
     // In the FPGA'20 paper:
     // - Buffers are assumed to break all signals simultaneously.
@@ -470,22 +470,35 @@ void BufferPlacementMILP::
     // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
 
     // (#427) This constraint encodes:
-    // - If dataBuf, then token occupancy ≥ CFDFC's throughput.
-    model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
+    // If dataBuf, then token occupancy ≥ CFDFC's throughput.
+    model.addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
                     "throughput_data");
     // (#427) We combine the following two constraints into one:
-    // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
-    // - Token occupancy + bubble occupancy ≤ buffer's slot number.
+    // 1. If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
+    //    (linearized as: bubble occupancy ≥ throughput + readyBuf - 1)
+    // 2. Token occupancy + bubble occupancy ≤ buffer slot number.
     //
+    // When readyBuf holds, the optimal bubble occupancy equals the CFDFC
+    // throughput, so we directly use 'throughput' as bubble occupancy.
+    //
+    // When readyBuf does not hold, the lower bound on bubble becomes
+    //    throughput - 1 ≤ 0,
+    // so the optimal bubble is 0. In this case, the merged constraint reduces
+    // to:
+    //    token occupancy ≤ slot number,
+    // which is already enforced by an earlier constraint. Hence, the following
+    // constraint becomes trivial.
+    if (chVars.signalVars.count(SignalType::READY)) {
+      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+      GRBVar &chOptimalBubbleOccupancy = cfVars.throughput;
+      model.addConstr(chTokenOccupancy + chOptimalBubbleOccupancy + readyBuf -
+                              bufNumSlots <=
+                          1,
+                      "throughput_ready");
+    }
     // Note: Additional buffers may be needed to prevent combinational cycles
     // if the model does not select all three signals (or only selects DATA).
     // See extractResult() in FPGA20Buffers.cpp for an example.
-    if (chVars.signalVars.count(SignalType::READY)) {
-      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      model.addConstr(
-          chThroughput + cfVars.throughput + readyBuf - bufNumSlots <= 1,
-          "throughput_ready");
-    }
   }
 }
 
@@ -524,14 +537,14 @@ void BufferPlacementMILP::
 
     // Retrieve the MILP variables we need
     GRBVar &bufNumSlots = chVars.bufNumSlots;
-    GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+    GRBVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
     GRBVar &throughput = cfVars.throughput;
     GRBVar &dataLatency = chVars.dataLatency;
     GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     GRBVar &shiftReg = chVars.shiftReg;
 
     // Token occupancy ≥ data latency * CFDFC's throughput.
-    model.addQConstr(dataLatency * throughput <= chThroughput,
+    model.addQConstr(dataLatency * throughput <= chTokenOccupancy,
                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
     std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
@@ -556,10 +569,12 @@ void BufferPlacementMILP::
                      shiftRegExtraBubblesName);
 
     // Combine the following constraints into one unified constraint:
-    // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput
+    // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput.
+    //    We use 'readyBuf * throughput' to represent the optimal bubble
+    //    occupancy.
     // 2. Token occupancy + bubble occupancy ≤ slot number
     // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used
-    model.addQConstr(chThroughput + readyBuf * throughput +
+    model.addQConstr(chTokenOccupancy + readyBuf * throughput +
                              shiftReg * shiftRegExtraBubbles <=
                          bufNumSlots,
                      "throughput_tokens_ub");
