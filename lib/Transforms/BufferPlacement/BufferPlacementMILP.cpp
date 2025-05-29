@@ -462,39 +462,41 @@ void BufferPlacementMILP::
     // - Therefore: dataBuf == readyBuf
     //              R_c == dataBuf && readyBuf
     // - If R_c holds, then:
-    //     - token occupancy ≥ CFDFC's throughput
-    //     - bubble occupancy ≥ CFDFC's throughput
+    //     - token occupancy >= CFDFC's throughput
+    //     - bubble occupancy >= CFDFC's throughput
     //
-    // In this implementation, R_c is decomposed into dataBuf and readyBuf.
-    // - If dataBuf holds, then token occupancy ≥ CFDFC's throughput.
-    // - If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
+    // (#427) In this implementation, R_c is decomposed into dataBuf and
+    // readyBuf.
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput.
+    //    Otherwise, token occupancy >= 0.
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput.
+    //    Otherwise, bubble occupancy >= 0.
 
-    // (#427) This constraint encodes:
-    // If dataBuf, then token occupancy ≥ CFDFC's throughput.
+    // The following constraint encodes:
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput.
+    //    Otherwise, token occupancy >= 0.
     model.addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
                     "throughput_data");
-    // (#427) We combine the following two constraints into one:
-    // 1. If readyBuf holds, then bubble occupancy ≥ CFDFC's throughput.
-    //    (linearized as: bubble occupancy ≥ throughput + readyBuf - 1)
-    // 2. Token occupancy + bubble occupancy ≤ buffer slot number.
-    //
-    // When readyBuf holds, the optimal bubble occupancy equals the CFDFC
-    // throughput, so we directly use 'throughput' as bubble occupancy.
-    //
-    // When readyBuf does not hold, the lower bound on bubble becomes
-    //    throughput - 1 ≤ 0,
-    // so the optimal bubble is 0. In this case, the merged constraint reduces
-    // to:
-    //    token occupancy ≤ slot number,
-    // which is already enforced by an earlier constraint. Hence, the following
-    // constraint becomes trivial.
+    // In terms of the constraint on readyBuf:
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput.
+    //    Otherwise, bubble occupancy >= 0.
+    // This constraint can be combined with the constraint on the number of
+    // buffer slots:
+    // -  token occupancy + bubble occupancy <= numSlots
+    // Assuming that we minimize the number of buffer slots, bubble occupancy
+    // always takes the minimum feasible value. Therefore, the combined
+    // constraints are equivalent to:
+    // -  token occupancy + CFDFC's throughput <= numSlots, if readyBuf holds;
+    // -  token occupancy <= numSlots, if not. (Already enforced by the earlier
+    // constraint named "throughput_channel")
+    // The following constraint encodes the case where readyBuf holds, and is
+    // trivially satisfied when readyBuf does not hold (since the earlier
+    // constraint already enforces it):
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
-      GRBVar &chOptimalBubbleOccupancy = cfVars.throughput;
-      model.addConstr(chTokenOccupancy + chOptimalBubbleOccupancy + readyBuf -
-                              bufNumSlots <=
-                          1,
-                      "throughput_ready");
+      model.addConstr(
+          chTokenOccupancy + cfVars.throughput + readyBuf - bufNumSlots <= 1,
+          "throughput_ready");
     }
     // Note: Additional buffers may be needed to prevent combinational cycles
     // if the model does not select all three signals (or only selects DATA).
