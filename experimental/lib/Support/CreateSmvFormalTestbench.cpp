@@ -196,24 +196,25 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
 static std::string createGeneralJoin(size_t nrOfOutputs) {
   std::ostringstream generalJoin;
   std::vector<std::string> insValids;
-  for (size_t i = 1; i < nrOfOutputs; i++)
+  for (size_t i = 0; i < nrOfOutputs; i++)
     insValids.push_back("ins_" + std::to_string(i) + "_valid");
 
   generalJoin << "MODULE join_main (";
   generalJoin << join(insValids, ", ");
   generalJoin << ")\n";
 
-  generalJoin << "  DEFINE\n";
+  generalJoin << "  DEFINE\n  all_valid := ";
   generalJoin << join(insValids, " & ");
   generalJoin << ";\n";
 
   for (size_t i = 0; i < nrOfOutputs; i++) {
-    generalJoin << "  ins_" << i << "_ready :=";
+    generalJoin << "  ins_" << i << "_ready := ";
     std::vector<std::string> tmp = insValids;
     tmp.erase(tmp.begin() + i);
     generalJoin << join(tmp, " & ");
     generalJoin << ";\n";
   }
+  generalJoin << "\n\n";
   return generalJoin.str();
 }
 
@@ -230,8 +231,8 @@ static std::string convertMLIRTypeToSMV(Type type) {
 
 static std::string createSupportEntities(
     const SmallVector<std::pair<std::string, Type>> &arguments,
-    size_t nrOfTokens, size_t nrOfOutputs, bool generateExactNrOfTokens = false,
-    bool syncOutput = false) {
+    const SmallVector<std::pair<std::string, Type>> &results, size_t nrOfTokens,
+    bool generateExactNrOfTokens = false, bool syncOutput = false) {
 
   std::unordered_set<std::string> types;
   for (auto [_, type] : arguments)
@@ -244,9 +245,16 @@ static std::string createSupportEntities(
                                                generateExactNrOfTokens)
                     << "\n\n";
   }
-  if (syncOutput)
-    supportEntities << createGeneralJoin(nrOfOutputs);
-  else
+  if (syncOutput) {
+    int nrOutChannels = 0;
+    for (const auto &[s, t] : results) {
+      if (isa<handshake::ChannelType, handshake::ControlType>(t)) {
+        nrOutChannels++;
+      }
+    }
+
+    supportEntities << createGeneralJoin(nrOutChannels);
+  } else
     supportEntities << "MODULE sink_main (ins_valid)\n"
                        "  DEFINE ready0 := TRUE;\n\n";
 
@@ -331,7 +339,7 @@ instantiateJoin(const std::string &moduleName,
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
       outputValids.push_back(moduleName + "." + resultName + "_valid");
   }
-  str << join(outputValids, ", ") << ")\n";
+  str << join(outputValids, ", ") << ");\n";
 
   return str.str();
 }
@@ -345,7 +353,7 @@ std::string createSmvFormalTestbench(
   std::ostringstream wrapper;
   wrapper << "#include \"" + modelSmvName + ".smv\"\n\n";
 
-  wrapper << createSupportEntities(arguments, nrOfTokens, results.size(),
+  wrapper << createSupportEntities(arguments, results, nrOfTokens,
                                    generateExactNrOfTokens, syncOutput);
 
   wrapper << "MODULE main\n\n";
