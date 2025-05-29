@@ -19,9 +19,10 @@ jobs:
       - name: check-format-cpp
         run: |
           git fetch origin main --no-recurse-submodules
-          git clang-format --diff FETCH_HEAD
+          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
 
       - name: check-format-python
+        if: success() || failure()
         run: |
           python3 -m venv venv
           source venv/bin/activate
@@ -48,9 +49,11 @@ jobs:
           exit $STATUS
 
       - name: build
+        if: success() || failure()
         run: ./build.sh --release
 
       - name: check-dynamatic
+        if: success() || failure()
         run: ninja -C build check-dynamatic
 
       - name: check-dynamatic-experimental
