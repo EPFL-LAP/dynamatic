@@ -13,7 +13,7 @@ def create_internal_array_decl(name: str, bitwidth: int, size: int) -> str:
     return f"signal {name} : data_array({size - 1} downto 0)({bitwidth - 1} downto 0);"
 
 
-def create_internal_extra_signal_decls(channel_name: str, extra_signals: ExtraSignals) -> list[str]:
+def create_internal_extra_signals_decl(channel_name: str, extra_signals: ExtraSignals) -> list[str]:
     """
     Generate VHDL declarations for extra signals in a channel.
     """
@@ -51,7 +51,7 @@ def create_internal_channel_decl(channel: Channel) -> list[str]:
 
         # Declare extra signals if present
         extra_signals = channel.get("extra_signals", {})
-        decls.extend(create_internal_extra_signal_decls(
+        decls.extend(create_internal_extra_signals_decl(
             channel["name"], extra_signals))
     else:
         # Channel is an array
@@ -69,7 +69,7 @@ def create_internal_channel_decl(channel: Channel) -> list[str]:
 
         # Declare extra signals if present
         extra_signals = channel.get("extra_signals", {})
-        decls.extend(create_internal_extra_signal_decls(
+        decls.extend(create_internal_extra_signals_decl(
             channel["name"], extra_signals))
 
     return decls

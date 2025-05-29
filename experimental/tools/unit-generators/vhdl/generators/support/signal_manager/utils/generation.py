@@ -1,6 +1,5 @@
-from .types import Channel, ExtraSignals
+from .types import Channel
 from .concat import ConcatLayout
-from .internal_signal import create_internal_signal_decl, create_internal_vector_decl, create_internal_array_decl
 from .forwarding import generate_forwarding_expression_for_signal
 
 
@@ -142,7 +141,7 @@ def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, ou
     return assignments
 
 
-def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
+def generate_mapping(internal_channel_name: str, channel: Channel) -> list[str]:
     """
     Generate VHDL port mappings of a channel, for the inner entity (port map (...)).
     Maps extra signals if present.
@@ -150,8 +149,8 @@ def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
     `channel` can be internally defined as `ins_inner`, while it still maps to the
     original channel name `ins` in the inner entity.
     Args:
+      internal_channel_name (str): Name of the channel in the inner entity.
       channel (Channel): Channel to generate mapping for.
-      inner_channel_name (str): Name of the channel in the inner entity.
     Returns:
       mapping (list[str]): List of VHDL mapping strings for the channel.
     """
@@ -163,15 +162,15 @@ def generate_mapping(channel: Channel, inner_channel_name: str) -> list[str]:
 
     if channel_bitwidth > 0:
         # Mapping for data signal if present
-        mapping.append(f"{inner_channel_name} => {channel_name}")
+        mapping.append(f"{internal_channel_name} => {channel_name}")
 
     # Mapping for handshake signals
-    mapping.append(f"{inner_channel_name}_valid => {channel_name}_valid")
-    mapping.append(f"{inner_channel_name}_ready => {channel_name}_ready")
+    mapping.append(f"{internal_channel_name}_valid => {channel_name}_valid")
+    mapping.append(f"{internal_channel_name}_ready => {channel_name}_ready")
 
     for signal_name in channel_extra_signals:
         mapping.append(
-            f"{inner_channel_name}_{signal_name} => {channel_name}_{signal_name}")
+            f"{internal_channel_name}_{signal_name} => {channel_name}_{signal_name}")
 
     return mapping
 
@@ -185,11 +184,12 @@ def generate_default_mappings(channels: list[Channel]) -> str:
 
     mappings = []
     for channel in channels:
-        mappings.extend(generate_mapping({
-            **channel,
-            # Exclude extra signals from the mapping
-            "extra_signals": {}
-        }, channel["name"]))
+        # Map signals without extra signals to the inner entity.
+        channel_without_extra_signals: Channel = \
+            {**channel, "extra_signals": {}}
+
+        mappings.extend(generate_mapping(
+            channel["name"], channel_without_extra_signals))
     return ",\n      ".join(mappings)
 
 
