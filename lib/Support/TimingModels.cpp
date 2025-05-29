@@ -129,8 +129,8 @@ LogicalResult TimingDatabase::getLatency(
 
   // This section now must handle the fact that all latency values are now
   // contained inside an instance of DelayDepMetric. We therefore extract this
-  // structure, and use its method to obtain the latency value at the
-  // targetPeriod provided.
+  // structure, and use the struct's internal function to obtain the latency
+  // value at the targetPeriod provided.
   DelayDepMetric<double> DelayStruct;
 
   if (failed(model->latency.getCeilMetric(op, DelayStruct)))

@@ -158,7 +158,9 @@ public:
     double readyDelay = 0.0;
   };
 
-  /// Operation's latency, depending on its bitwidth.
+  /// Operation's latency, depending on its bitwidth - allows for a map of
+  /// delay:latency pairs to be provided, using the the depdicated
+  /// DelayDepMetric structure.
   BitwidthDepMetric<DelayDepMetric<double>> latency;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
