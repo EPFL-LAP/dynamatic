@@ -5,37 +5,37 @@ from generators.handshake.oehb import generate_oehb
 
 
 def generate_subf(name, params):
-  is_double = params["is_double"]
-  extra_signals = params["extra_signals"]
+    is_double = params["is_double"]
+    extra_signals = params["extra_signals"]
 
-  if extra_signals:
-    return _generate_subf_signal_manager(name, is_double, extra_signals)
-  else:
-    return _generate_subf(name, is_double)
+    if extra_signals:
+        return _generate_subf_signal_manager(name, is_double, extra_signals)
+    else:
+        return _generate_subf(name, is_double)
 
 
 def _generate_subf(name, is_double):
-  if is_double:
-    return _generate_subf_double_precision(name)
-  else:
-    return _generate_subf_single_precision(name)
+    if is_double:
+        return _generate_subf_double_precision(name)
+    else:
+        return _generate_subf_single_precision(name)
 
 
 def _get_latency(is_double):
-  return 12 if is_double else 9  # todo
+    return 12 if is_double else 9  # todo
 
 
 def _generate_subf_single_precision(name):
-  join_name = f"{name}_join"
-  oehb_name = f"{name}_oehb"
-  buff_name = f"{name}_buff"
+    join_name = f"{name}_join"
+    oehb_name = f"{name}_oehb"
+    buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2}) + \
-      generate_oehb(oehb_name, {"bitwidth": 0}) + \
-      generate_delay_buffer(
-      buff_name, {"slots": _get_latency(is_double=False) - 1})
+    dependencies = generate_join(join_name, {"size": 2}) + \
+        generate_oehb(oehb_name, {"bitwidth": 0}) + \
+        generate_delay_buffer(
+        buff_name, {"slots": _get_latency(is_double=False) - 1})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -60,7 +60,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of subf_single_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
@@ -137,20 +137,20 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_subf_double_precision(name):
-  join_name = f"{name}_join"
-  oehb_name = f"{name}_oehb"
-  buff_name = f"{name}_buff"
+    join_name = f"{name}_join"
+    oehb_name = f"{name}_oehb"
+    buff_name = f"{name}_buff"
 
-  dependencies = generate_join(join_name, {"size": 2}) + \
-      generate_oehb(oehb_name, {"bitwidth": 1}) + \
-      generate_delay_buffer(
-      buff_name, {"slots": _get_latency(is_double=True) - 1})
+    dependencies = generate_join(join_name, {"size": 2}) + \
+        generate_oehb(oehb_name, {"bitwidth": 1}) + \
+        generate_delay_buffer(
+        buff_name, {"slots": _get_latency(is_double=True) - 1})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -175,7 +175,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of subf_double_precision
 architecture arch of {name} is
   signal join_valid : std_logic;
@@ -254,27 +254,27 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_subf_signal_manager(name, is_double, extra_signals):
-  bitwidth = 64 if is_double else 32
-  return generate_signal_manager(name, {
-      "type": "buffered",
-      "latency": _get_latency(is_double),
-      "in_ports": [{
-          "name": "lhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "rhs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "result",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_subf(name, is_double))
+    bitwidth = 64 if is_double else 32
+    return generate_signal_manager(name, {
+        "type": "buffered",
+        "latency": _get_latency(is_double),
+        "in_ports": [{
+            "name": "lhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "rhs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "result",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_subf(name, is_double))

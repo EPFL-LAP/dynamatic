@@ -3,17 +3,17 @@ from generators.support.utils import data
 
 
 def generate_sink(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_sink_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_sink(name, bitwidth)
+    if extra_signals:
+        return _generate_sink_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_sink(name, bitwidth)
 
 
 def _generate_sink(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -30,7 +30,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of sink
 architecture arch of {name} is
 begin
@@ -38,17 +38,17 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_sink_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_sink(name, bitwidth))
+    return generate_signal_manager(name, {
+        "type": "normal",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_sink(name, bitwidth))

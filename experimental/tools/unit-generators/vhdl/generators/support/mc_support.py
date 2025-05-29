@@ -1,20 +1,20 @@
 def generate_read_memory_arbiter(name, params):
-  arbiter_size = params["arbiter_size"] if "arbiter_size" in params else 2
-  addr_bitwidth = params["addr_bitwidth"] if "addr_bitwidth" in params else 32
-  data_bitwidth = params["data_bitwidth"] if "data_bitwidth" in params else 32
+    arbiter_size = params["arbiter_size"] if "arbiter_size" in params else 2
+    addr_bitwidth = params["addr_bitwidth"] if "addr_bitwidth" in params else 32
+    data_bitwidth = params["data_bitwidth"] if "data_bitwidth" in params else 32
 
-  priority_name = f"{name}_priority"
-  addressing_name = f"{name}_addressing"
-  addressReady_name = f"{name}_addressReady"
-  data_name = f"{name}_data"
+    priority_name = f"{name}_priority"
+    addressing_name = f"{name}_addressing"
+    addressReady_name = f"{name}_addressReady"
+    data_name = f"{name}_data"
 
-  dependencies = \
-      _generate_read_priority(priority_name, arbiter_size) + \
-      _generate_read_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
-      _generate_read_address_ready(addressReady_name, arbiter_size) + \
-      _generate_read_data_signals(data_name, arbiter_size, data_bitwidth)
+    dependencies = \
+        _generate_read_priority(priority_name, arbiter_size) + \
+        _generate_read_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
+        _generate_read_address_ready(addressReady_name, arbiter_size) + \
+        _generate_read_data_signals(data_name, arbiter_size, data_bitwidth)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -42,7 +42,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of read_memory_arbiter
 architecture arch of {name} is
   signal priorityOut : std_logic_vector({arbiter_size} - 1 downto 0);
@@ -94,26 +94,26 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def generate_write_memory_arbiter(name, params):
-  arbiter_size = params["arbiter_size"] if "arbiter_size" in params else 2
-  addr_bitwidth = params["addr_bitwidth"] if "addr_bitwidth" in params else 32
-  data_bitwidth = params["data_bitwidth"] if "data_bitwidth" in params else 32
+    arbiter_size = params["arbiter_size"] if "arbiter_size" in params else 2
+    addr_bitwidth = params["addr_bitwidth"] if "addr_bitwidth" in params else 32
+    data_bitwidth = params["data_bitwidth"] if "data_bitwidth" in params else 32
 
-  priority_name = f"{name}_priority"
-  addressing_name = f"{name}_addressing"
-  addressReady_name = f"{name}_addressReady"
-  data_name = f"{name}_data"
+    priority_name = f"{name}_priority"
+    addressing_name = f"{name}_addressing"
+    addressReady_name = f"{name}_addressReady"
+    data_name = f"{name}_data"
 
-  dependencies = \
-      _generate_write_priority(priority_name, arbiter_size) + \
-      _generate_write_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
-      _generate_write_address_ready(addressReady_name, arbiter_size) + \
-      _generate_write_data_signals(data_name, arbiter_size, data_bitwidth)
+    dependencies = \
+        _generate_write_priority(priority_name, arbiter_size) + \
+        _generate_write_address_mux(addressing_name, arbiter_size, addr_bitwidth) + \
+        _generate_write_address_ready(addressReady_name, arbiter_size) + \
+        _generate_write_data_signals(data_name, arbiter_size, data_bitwidth)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -144,7 +144,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of write_memory_arbiter
 architecture arch of {name} is
   signal priorityOut : std_logic_vector({arbiter_size} - 1 downto 0);
@@ -194,11 +194,11 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def generate_mc_control(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -222,7 +222,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of mc_control
 architecture arch of {name} is
 begin
@@ -259,11 +259,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_read_address_mux(name, arbiter_size, addr_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -279,7 +279,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of read_address_mux
 architecture arch of {name} is
 begin
@@ -297,11 +297,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_read_address_ready(name, arbiter_size):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -316,7 +316,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of read_address_ready
 architecture arch of {name} is
 begin
@@ -326,11 +326,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_read_data_signals(name, arbiter_size, data_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -350,7 +350,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of read_data_signals
 architecture arch of {name} is
   signal sel_prev : std_logic_vector({arbiter_size} - 1 downto 0);
@@ -413,11 +413,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_read_priority(name, arbiter_size):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -432,7 +432,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of read_priority
 architecture arch of {name} is
 begin
@@ -450,11 +450,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_write_address_mux(name, arbiter_size, addr_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -470,7 +470,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of write_address_mux
 architecture arch of {name} is
 begin
@@ -488,11 +488,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_write_address_ready(name, arbiter_size):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -508,7 +508,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of write_address_ready
 architecture arch of {name} is
 
@@ -521,11 +521,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_write_data_signals(name, arbiter_size, data_bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -545,7 +545,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of write_data_signals
 architecture arch of {name} is
 
@@ -581,11 +581,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_write_priority(name, arbiter_size):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -600,7 +600,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of write_priority
 architecture arch of {name} is
 
@@ -622,4 +622,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture

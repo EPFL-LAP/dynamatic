@@ -24,20 +24,20 @@ The following instructions can be used to setup Dynamatic from source. If you in
 
 1. **Install dependencies required by the project.**
 
-    Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with `.dot` files, Boost's regex library, and standard command-line tools like `git`.
+    Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with `.dot` files, and standard command-line tools like `git`.
   
     On `apt`-based Linux distributions:
 
     ```sh
     apt-get update
-    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz libboost-regex-dev git curl gzip libreadline-dev
+    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev
     ```
 
     On `pacman`-based Linux distributions:
 
     ```sh
     pacman -Syu
-    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz boost git curl gzip readline
+    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz git curl gzip readline
     ```
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, in step 3 call the build script with the `--disable-build-opt` flag to prevent their usage.

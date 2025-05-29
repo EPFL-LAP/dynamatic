@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "trisolv.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void trisolv(out_int_t x[N], in_int_t A[N][N], in_int_t c[N]) {

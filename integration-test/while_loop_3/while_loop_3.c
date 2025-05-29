@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "while_loop_3.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void while_loop_3(out_int_t a[ARRAY_SIZE], in_int_t bound) {

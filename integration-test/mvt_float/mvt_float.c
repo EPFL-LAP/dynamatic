@@ -6,8 +6,8 @@
 // Web address: http://polybench.sourceforge.net
 //
 //===----------------------------------------------------------------------===//
-#include "dynamatic/Integration.h"
 #include "mvt_float.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 #define N 4000

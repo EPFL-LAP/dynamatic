@@ -2,19 +2,19 @@ from generators.support.signal_manager import generate_signal_manager, get_conca
 
 
 def generate_oehb(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_oehb_signal_manager(name, bitwidth, extra_signals)
-  if bitwidth == 0:
-    return _generate_oehb_dataless(name)
-  else:
-    return _generate_oehb(name, bitwidth)
+    if extra_signals:
+        return _generate_oehb_signal_manager(name, bitwidth, extra_signals)
+    if bitwidth == 0:
+        return _generate_oehb_dataless(name)
+    else:
+        return _generate_oehb(name, bitwidth)
 
 
 def _generate_oehb_dataless(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -33,7 +33,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of oehb_dataless
 architecture arch of {name} is
   signal outputValid : std_logic;
@@ -54,15 +54,15 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_oehb(name, bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_oehb_dataless(inner_name)
+    dependencies = _generate_oehb_dataless(inner_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -83,7 +83,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of oehb
 architecture arch of {name} is
   signal regEn, inputReady : std_logic;
@@ -115,22 +115,22 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_oehb_signal_manager(name, bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_oehb(name, bitwidth + extra_signals_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_oehb(name, bitwidth + extra_signals_bitwidth))

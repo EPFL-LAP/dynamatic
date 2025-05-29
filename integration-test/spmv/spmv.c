@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "spmv.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-int spmv(in_int_t n, inout_int_t row[10], inout_int_t col[10],
+int spmv(in_int_t n, inout_int_t row[11], inout_int_t col[10],
          inout_int_t val[10], inout_int_t vec[10], inout_int_t out[10]) {
   int s = 0;
   int e = 0;
@@ -30,7 +30,8 @@ int spmv(in_int_t n, inout_int_t row[10], inout_int_t col[10],
 
 int main(void) {
   in_int_t n;
-  inout_int_t row[10];
+  // The row pointer in the CSR format has one extra element than n
+  inout_int_t row[11];
   inout_int_t col[10];
   inout_int_t val[10];
   inout_int_t vec[10];
@@ -44,5 +45,6 @@ int main(void) {
     vec[i] = rand() % 10;
     out[i] = rand() % 10;
   }
+  row[n] = rand() % 10;
   CALL_KERNEL(spmv, n, row, col, val, vec, out);
 }

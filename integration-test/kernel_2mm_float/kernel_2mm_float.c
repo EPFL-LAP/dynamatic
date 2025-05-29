@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "kernel_2mm_float.h"
 #include "dynamatic/Integration.h"
+#include "kernel_2mm_float.h"
 #include <stdlib.h>
 
 void kernel_2mm_float(in_float_t alpha, in_float_t beta,
@@ -19,7 +19,7 @@ void kernel_2mm_float(in_float_t alpha, in_float_t beta,
 
   for (i = 0; i < NI; i++)
     for (j = 0; j < NJ; j++) {
-      float x = tmp[i][j];
+      float x = 0.0;
       for (k = 0; k < NK; ++k)
         x += alpha * A[i][k] * B[k][j];
       tmp[i][j] = x;
@@ -27,7 +27,6 @@ void kernel_2mm_float(in_float_t alpha, in_float_t beta,
   for (i = 0; i < NI; i++)
     for (j = 0; j < NL; j++) {
       float x = D[i][j] * beta;
-
       for (k = 0; k < NJ; ++k)
         x += tmp[i][k] * C[k][j];
       D[i][j] = x;

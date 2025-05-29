@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  integration:
+    if: github.event.pull_request.draft == false
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: check-format-cpp
+        run: |
+          git fetch origin main --no-recurse-submodules
+          git clang-format --diff FETCH_HEAD --extensions c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hpp,hxx,inc
+
+      - name: check-format-python
+        if: success() || failure()
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install autopep8==2.3.2
+          echo "Running autopep8..."
+          git fetch origin main --no-recurse-submodules
+          git reset FETCH_HEAD
+          FILES=$(git ls-files '*.py' --modified)
+          STATUS=$?
+          if [[ $FILES ]]; then
+            exec 3>&1
+            OUTPUT=$(autopep8 --max-line-length 200 --diff $FILES 3>&- | tee /dev/fd/3)
+            exec 3>&-
+            if [[ $OUTPUT ]]; then
+              STATUS=1
+            else
+              STATUS=0
+            fi
+          else
+            STATUS=0
+          fi
+          echo "autopep8 exited with $STATUS"
+          deactivate
+          exit $STATUS
+
+      - name: build
+        if: success() || failure()
+        run: ./build.sh --release
+
+      - name: check-dynamatic
+        if: success() || failure()
+        run: ninja -C build check-dynamatic
+
+      - name: check-dynamatic-experimental
+        if: success() || failure()
+        run: ninja -C build check-dynamatic-experimental
+
+      - name: integration-test
+        if: success() || failure()
+        run: | 
+          cd tools/integration
+          python3 run_integration.py --ignore ignored_tests.txt
+
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with: 
+          name: integration-report
+          path: |
+            integration-test/*/out/sim/report.txt
+            integration-test/*/out/dynamatic_*.txt
+

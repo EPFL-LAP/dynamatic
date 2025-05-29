@@ -5,33 +5,33 @@ from generators.handshake.fork import generate_fork
 
 
 def generate_control_merge(name, params):
-  # Number of data input ports
-  size = params["size"]
+    # Number of data input ports
+    size = params["size"]
 
-  data_bitwidth = params["data_bitwidth"]
-  index_bitwidth = params["index_bitwidth"]
+    data_bitwidth = params["data_bitwidth"]
+    index_bitwidth = params["index_bitwidth"]
 
-  # e.g., {"tag0": 8, "spec": 1}
-  extra_signals = params["extra_signals"]
+    # e.g., {"tag0": 8, "spec": 1}
+    extra_signals = params["extra_signals"]
 
-  if extra_signals:
-    return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
-  elif data_bitwidth == 0:
-    return _generate_control_merge_dataless(name, size, index_bitwidth)
-  else:
-    return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
+    if extra_signals:
+        return _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals)
+    elif data_bitwidth == 0:
+        return _generate_control_merge_dataless(name, size, index_bitwidth)
+    else:
+        return _generate_control_merge(name, size, index_bitwidth, data_bitwidth)
 
 
 def _generate_control_merge_dataless(name, size, index_bitwidth):
-  merge_name = f"{name}_merge"
-  tehb_name = f"{name}_tehb"
-  fork_name = f"{name}_fork"
+    merge_name = f"{name}_merge"
+    tehb_name = f"{name}_tehb"
+    fork_name = f"{name}_fork"
 
-  dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
-      generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
-      generate_fork(fork_name, {"size": 2, "bitwidth": 0})
+    dependencies = generate_merge_notehb(merge_name, {"size": size}) + \
+        generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
+        generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -54,7 +54,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of control_merge_dataless
 architecture arch of {name} is
   signal index_tehb                                               : std_logic_vector ({index_bitwidth} - 1 downto 0);
@@ -107,16 +107,16 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_control_merge(name, size, index_bitwidth, data_bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_control_merge_dataless(
-      inner_name, size, index_bitwidth)
+    dependencies = _generate_control_merge_dataless(
+        inner_name, size, index_bitwidth)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -142,7 +142,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of control_merge
 architecture arch of {name} is
   signal index_internal : std_logic_vector({index_bitwidth} - 1 downto 0);
@@ -165,32 +165,32 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "bbmerge",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": data_bitwidth,
-          "2d": True,
-          "size": size,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "index",
-          "bitwidth": index_bitwidth,
-          # TODO: Extra signals for index port are not tested
-          "extra_signals": extra_signals
-      }, {
-          "name": "outs",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "index_name": "index",
-      "index_dir": "out",
-      "extra_signals": extra_signals
-  }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_signal_manager(name, {
+        "type": "bbmerge",
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": data_bitwidth,
+            "2d": True,
+            "size": size,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "index",
+            "bitwidth": index_bitwidth,
+            # TODO: Extra signals for index port are not tested
+            "extra_signals": extra_signals
+        }, {
+            "name": "outs",
+            "bitwidth": data_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "index_name": "index",
+        "index_dir": "out",
+        "extra_signals": extra_signals
+    }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))

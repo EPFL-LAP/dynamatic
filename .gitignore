@@ -35,8 +35,8 @@
 *.jar
 
 # Build-related directories
-build/
-bin/
+/build/
+/bin/
 .cache/
 __pycache__/
 cs
@@ -50,3 +50,6 @@ metals.sbt
 
 # xls
 /xls
+
+# ElasticMiter puts external files in this directory
+/ext

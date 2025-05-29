@@ -4,24 +4,24 @@ from generators.handshake.oehb import generate_oehb
 
 
 def generate_sitofp(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  if extra_signals:
-    return _generate_sitofp_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_sitofp(name, bitwidth)
+    if extra_signals:
+        return _generate_sitofp_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_sitofp(name, bitwidth)
 
 
 def _generate_sitofp(name, bitwidth):
-  oehb_name = f"{name}_oehb"
-  buff_name = f"{name}_buff"
+    oehb_name = f"{name}_oehb"
+    buff_name = f"{name}_buff"
 
-  dependencies = generate_oehb(oehb_name, {"bitwidth": bitwidth}) + \
-      generate_delay_buffer(
-      buff_name, {"slots": 4})
+    dependencies = generate_oehb(oehb_name, {"bitwidth": bitwidth}) + \
+        generate_delay_buffer(
+        buff_name, {"slots": 4})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -48,7 +48,7 @@ begin
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of sitofp
 architecture arch of {name} is
   signal converted : std_logic_vector({bitwidth} - 1 downto 0);
@@ -110,22 +110,22 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_sitofp_signal_manager(name, bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "buffered",
-      "latency": 5,
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_sitofp(name, bitwidth))
+    return generate_signal_manager(name, {
+        "type": "buffered",
+        "latency": 5,
+        "in_ports": [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "extra_signals": extra_signals
+    }, lambda name: _generate_sitofp(name, bitwidth))

@@ -1,7 +1,7 @@
 def generate_delay_buffer(name, params):
-  slots = params["slots"]
+    slots = params["slots"]
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -16,7 +16,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of delay_buffer
 architecture arch of {name} is
 
@@ -54,4 +54,4 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture

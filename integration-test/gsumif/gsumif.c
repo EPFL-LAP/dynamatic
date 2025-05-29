@@ -8,8 +8,8 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "gsumif.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 float gsumif(in_float_t a[1000]) {

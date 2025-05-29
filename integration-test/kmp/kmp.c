@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "kmp.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 int kmp(in_char_t pattern[PATTERN_SIZE], in_char_t input[STRING_SIZE],
