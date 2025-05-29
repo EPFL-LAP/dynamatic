@@ -436,7 +436,7 @@ static void logCFDFCUnions(FuncInfo &info, Logger &log,
 template <typename MILP, typename... Args>
 static inline LogicalResult
 checkLoggerAndSolve(Logger *logger, StringRef milpName,
-                    BufferPlacement &placement, Args &&... args) {
+                    BufferPlacement &placement, Args &&...args) {
   if (logger) {
     return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
                            milpName);
