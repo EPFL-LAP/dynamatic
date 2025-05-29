@@ -112,7 +112,7 @@ Below are poor examples from CMerge and Mux, for two main reasons:
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
 - **Prefer declarative definitions over external C++ implementations.** Write methods in TableGen whenever possible. Only use external C++ definitions if the method becomes too long or compromises readability.
-- **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute is a legacy feature in the Handshake IR for passing data directly to the backend. However, this should be handled later in a serialized form, and the beta backend does not support it. While some existing ops like `BufferOp` still use it, you should use dedicated attributes as described above.
+- **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute is a legacy feature in the *Handshake* IR for passing data directly to the backend. Information required for RTL generation should be extracted later in a serialized form. While some existing ops like `BufferOp` still use it, you should use dedicated attributes as described above.
 
 ## 2. Implement Propagation Logic to the Backend
 
@@ -136,11 +136,11 @@ Then, implement the corresponding rewrite pattern (**module discriminator**). Mo
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
 
-You also need to extract dedicated attributes at this stage:
+You should also add dedicated attributes to `hw.parameters` at this stage:
 https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L662-L664
 https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L683
 
-For the **beta backend**, most parameter registration is handled in `RTL.cpp`. However, if you define dedicated attributes, you need to pass their values into `hw.parameters` here, as shown above. Additionally, even if no extraction is needed, you still have to add an empty case for the op here, as follows:
+For the **beta backend**, most parameter registration is handled in `RTL.cpp`. However, if you define dedicated attributes, you need to pass their values into `hw.parameters` here, as shown above. Note that even if no extraction is needed, you still have to add an empty case for the op here, as follows:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679
 
@@ -165,9 +165,9 @@ You'll need to update the appropriate JSON file to enable RTL matching for your 
 
 - For the **legacy backend**, we use `data/rtl-config-vhdl.json`. You need to add a new entry specifying the VHDL file and any `hw.parameters` you registered in `HandshakeToHW.cpp`, like in this example:
   https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/data/rtl-config-vhdl.json#L10-L17
-- For the **beta backend**, we use `data/rtl-config-vhdl-beta.json`. This JSON file resolves compatibility with the current `export-rtl` tool. Simply specify the generator and pass the required parameters as arguments:
+- For the **beta backend**, we use `data/rtl-config-vhdl-beta.json`. This JSON file resolves compatibility with the current `export-rtl` tool. Basically, you just need to specify the generator and pass the required parameters as arguments:
   https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/data/rtl-config-vhdl-beta.json#L7-L10
-  However, if you define dedicated attributes and implement a module discriminator, you should pass the parameters through the matching logic, as shown here:
+  However, if you define dedicated attributes and implement a module discriminator, you should declare the parameters in the JSON, as well as specifying them as arguments, in the following way:
   https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L30-L39
   https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L211-L220
   The parameter names match those used in the `addUnsigned` or `addString` calls within each module discriminator.
