@@ -112,7 +112,7 @@ Below are poor examples from CMerge and Mux, for two main reasons:
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
 - **Prefer declarative definitions over external C++ implementations.** Write methods in TableGen whenever possible. Only use external C++ definitions if the method becomes too long or compromises readability.
-- **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute is a legacy feature in the *Handshake* IR for passing data directly to the backend. Information required for RTL generation should be extracted later in a serialized form. While some existing ops like `BufferOp` still use it, you should use dedicated attributes as described above.
+- **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute in the *Handshake* IR allows passing data directly to the backend, but it is considered legacy. Information required for RTL generation should instead be extracted later in a serialized form. While some existing ops like `BufferOp` still use it, you should use dedicated attributes as described above.
 
 ## 2. Implement Propagation Logic to the Backend
 
