@@ -11,36 +11,36 @@ def generate_default_signal_manager(
     extra_signals: ExtraSignals,
     generate_inner: Callable[[str], str]
 ) -> str:
-  """
-  Generate the full VHDL code for a default signal manager that forwards extra signals from input channels to output channels.
+    """
+    Generate the full VHDL code for a default signal manager that forwards extra signals from input channels to output channels.
 
-  Args:
-    name: Name for the signal manager entity.
-    in_channels: List of input channels for the signal manager.
-    out_channels: List of output channels for the signal manager.
-    extra_signals: Dictionary of extra signals (e.g., spec, tag) to be handled.
-    generate_inner: Function to generate the inner component.
+    Args:
+      name: Name for the signal manager entity.
+      in_channels: List of input channels for the signal manager.
+      out_channels: List of output channels for the signal manager.
+      extra_signals: Dictionary of extra signals (e.g., spec, tag) to be handled.
+      generate_inner: Function to generate the inner component.
 
-  Returns:
-    A string representing the complete VHDL architecture for the default signal manager.
-  """
-  inner_name = f"{name}_inner"
-  inner = generate_inner(inner_name)
+    Returns:
+      A string representing the complete VHDL architecture for the default signal manager.
+    """
+    inner_name = f"{name}_inner"
+    inner = generate_inner(inner_name)
 
-  entity = generate_entity(name, in_channels, out_channels)
+    entity = generate_entity(name, in_channels, out_channels)
 
-  in_channel_names = enumerate_channel_names(in_channels)
-  out_channel_names = enumerate_channel_names(out_channels)
-  extra_signal_assignments = []
-  # Signal-wise forwarding of extra signals from input channels to output channels
-  for signal_name in extra_signals:
-    extra_signal_assignments.extend(generate_signal_wise_forwarding(
-        in_channel_names, out_channel_names, signal_name))
+    in_channel_names = enumerate_channel_names(in_channels)
+    out_channel_names = enumerate_channel_names(out_channels)
+    extra_signal_assignments = []
+    # Signal-wise forwarding of extra signals from input channels to output channels
+    for signal_name in extra_signals:
+        extra_signal_assignments.extend(generate_signal_wise_forwarding(
+            in_channel_names, out_channel_names, signal_name))
 
-  # Map channels to inner component
-  mappings = generate_default_mappings(in_channels + out_channels)
+    # Map channels to inner component
+    mappings = generate_default_mappings(in_channels + out_channels)
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of signal manager (default)
 architecture arch of {name} is
 begin
@@ -56,4 +56,4 @@ begin
 end architecture;
 """
 
-  return inner + entity + architecture
+    return inner + entity + architecture

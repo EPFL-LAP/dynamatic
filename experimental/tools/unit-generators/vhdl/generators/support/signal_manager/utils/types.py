@@ -5,7 +5,7 @@ ExtraSignals = dict[str, int]
 
 
 class Channel(TypedDict):
-  name: str
-  bitwidth: int
-  extra_signals: NotRequired[ExtraSignals]
-  size: NotRequired[int]
+    name: str
+    bitwidth: int
+    extra_signals: NotRequired[ExtraSignals]
+    size: NotRequired[int]
