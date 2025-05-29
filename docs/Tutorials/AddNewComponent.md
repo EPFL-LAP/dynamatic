@@ -80,7 +80,9 @@ Here’s a breakdown of each part of the op definition:
 
   - `HandshakeType:$operand1`: Defines `operand1` as an operand of type `HandshakeType`.
 
-  - `UI32Attr:$attr1`: Defines `attr1` as an attribute of type `UI32Attr`.
+  - `UI32Attr:$attr1`: Defines `attr1` as an attribute of type `UI32Attr`. Attributes represent op-specific data, such as comparison predicates or internal FIFO depths. For example:
+  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L225
+  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1196
 
 - `let results = ...`
    Defines the results produced by the op.
@@ -110,6 +112,7 @@ Below are poor examples from CMerge and Mux, for two main reasons:
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
   https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
 - **Prefer declarative definitions over external C++ implementations.** Write methods in TableGen whenever possible. Only use external C++ definitions if the method becomes too long or compromises readability.
+- **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute is a legacy feature in the Handshake IR for passing data directly to the backend. However, this should be handled later in a serialized form, and the beta backend does not support it. While some existing ops like `BufferOp` still use it, you should use dedicated attributes as described above.
 
 ## 2. Implement Propagation Logic to the Backend
 
@@ -120,7 +123,7 @@ In this guide, we assume you're supporting both backends and outline the necessa
 > [!NOTE]
 > This process is subject to change. A backend redesign is planned, which may significantly alter these steps.
 
-### `HandshakeToHW.cpp`
+### `HandshakeToHW.cpp` (Module Discriminator)
 
 First, update the conversion pass from Handshake IR to HW IR, located in
  `lib/Conversion/HandshakeToHW/HandshakeToHW.cpp`.
@@ -129,30 +132,27 @@ Start by registering a rewrite pattern for your op, like this:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L1786
 
-Then, implement the corresponding rewrite pattern. Most of the infrastructure is already in place; you mainly need to define op-specific hardware parameters (`hw.parameters`) where applicable. For the **legacy backend**, you need to explicitly register type information and any additional data here for the RTL generation. For example:
+Then, implement the corresponding rewrite pattern (**module discriminator**). Most of the infrastructure is already in place; you mainly need to define op-specific hardware parameters (`hw.parameters`) where applicable. For the **legacy backend**, you need to explicitly register type information and any additional data here for the RTL generation. For example:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
 
-> [!NOTE]
-> You can add `hw.parameters` in the Handshake IR **before** the HandshakeToHW conversion (e.g., buffer units add their buffering type to `hw.parameters` in the handshake-level buffering pass). These parameters will be automatically inherited, so you don't need to add them again here. See [the backend doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/Backend.md#identifying-necessary-modules) for further details.
+You also need to extract dedicated attributes at this stage:
+https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L662-L664
+https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L683
 
-For the **beta backend**, registration is handled in `RTL.cpp`. However, you still need to add an empty case for it here, as shown in this example:
+For the **beta backend**, most parameter registration is handled in `RTL.cpp`. However, if you define dedicated attributes, you need to pass their values into `hw.parameters` here, as shown above. Additionally, even if no extraction is needed, you still have to add an empty case for the op here, as follows:
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679
 
-### `RTL.cpp`
+### `RTL.cpp` (Parameter Analysis)
 
-Second, to support the **beta backend**, you need to update `lib/Support/RTL/RTL.cpp`, which handles RTL generation. Specifically, you'll need to add **parameter analysis** for your op, which extracts information such as bitwidths or additional signals required during RTL generation.
+Second, to support the **beta backend**, you need to update `lib/Support/RTL/RTL.cpp`, which handles RTL generation. Specifically, you'll need to add **parameter analysis** for your op, which extracts information such as bitwidths or extra signals required during RTL generation.
 
 In most cases, if your op enforces traits like `AllTypesMatch` across all operands and results, extracting a single bitwidth or `extra_signals` is sufficient. Examples (you can **scroll** these code blocks):
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L338-L350
 
 https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L434-L453
-
-`hw.parameters` is considered legacy and is not automatically forwarded to the beta backend. You need to explicitly specify the parameter in the serialized format, for example:
-
-https://github.com/EPFL-LAP/dynamatic/blob/53f5047eaa552685f620cdb57717d8cf71310619/lib/Support/RTL/RTL.cpp#L374-L392
 
 > [!NOTE]
 > At this stage, you're working with HW IR, not Handshake IR, so operands and results must be accessed by index, not by name.
@@ -167,6 +167,10 @@ You'll need to update the appropriate JSON file to enable RTL matching for your 
   https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/data/rtl-config-vhdl.json#L10-L17
 - For the **beta backend**, we use `data/rtl-config-vhdl-beta.json`. This JSON file resolves compatibility with the current `export-rtl` tool. Simply specify the generator and pass the required parameters as arguments:
   https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/data/rtl-config-vhdl-beta.json#L7-L10
+  However, if you define dedicated attributes and implement a module discriminator, you should pass the parameters through the matching logic, as shown here:
+  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L30-L39
+  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L211-L220
+  The parameter names match those used in the `addUnsigned` or `addString` calls within each module discriminator.
 
 - You may also need to update the JSON files for other backends, such as Verilog or SMV, depending on your use case.
 
