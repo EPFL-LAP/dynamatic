@@ -4,18 +4,18 @@ from generators.support.signal_manager.utils.concat import get_concat_extra_sign
 
 
 def generate_speculator(name, params):
-  bitwidth = params["bitwidth"]
-  fifo_depth = params["fifo_depth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    fifo_depth = params["fifo_depth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-  return _generate_speculator(name, bitwidth, fifo_depth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals)
+    return _generate_speculator(name, bitwidth, fifo_depth)
 
 
 def _generate_specGen_core(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -53,7 +53,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of specgenCore
 architecture arch of {name} is
   type State_type is (IDLE, KILL, KILL_ONLY_TOKENS);
@@ -135,7 +135,8 @@ begin
     end if;
   end process;
 
-  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec, DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
+  process (State, ins, ins_spec, fifo_ins, predict_ins, predict_ins_spec,
+           DatapV, PredictpV, FifoNotEmpty, ControlnR, FifoNotFull)
   begin
     outs <= ins;
     outs_spec <= "0";
@@ -240,11 +241,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeSave(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -263,7 +264,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeSave
 architecture arch of {name} is
 begin
@@ -297,11 +298,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeCommit(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -320,7 +321,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeCommit
 architecture arch of {name} is
 begin
@@ -351,11 +352,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeBranch(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -374,7 +375,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeBranch
 architecture arch of {name} is
 begin
@@ -405,11 +406,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeSC(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -432,11 +433,12 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeSC
 architecture arch of {name} is
 begin
-  process (control_in, control_in_valid, control_out0_ready, control_out1_ready)
+  process (control_in, control_in_valid,
+           control_out0_ready, control_out1_ready)
   begin
     if (control_in = "000" or control_in = "001" or control_in = "010" or control_in = "011" or control_in = "101") then
       control_in_ready <= control_out0_ready;
@@ -474,11 +476,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_decodeOutput(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -496,7 +498,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of decodeOutput
 architecture arch of {name} is
 begin
@@ -525,11 +527,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_predictor(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -558,7 +560,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of predictor
 architecture arch of {name} is
   signal zeros : std_logic_vector({bitwidth}-2 downto 0);
@@ -593,11 +595,11 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_predFifo(name, bitwidth, fifo_depth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -618,7 +620,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of predFifo
 architecture arch of {name} is
   signal HeadEn   : std_logic := '0';
@@ -743,41 +745,41 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_speculator(name, bitwidth, fifo_depth):
-  data_fork_name = f"{name}_data_fork"
-  specGen_name = f"{name}_specGen"
-  predictor_name = f"{name}_predictor"
-  predFifo_name = f"{name}_predFifo"
-  control_fork_name = f"{name}_control_fork"
-  decodeSave_name = f"{name}_decodeSave"
-  decodeCommit_name = f"{name}_decodeCommit"
-  decodeSC_name = f"{name}_decodeSC"
-  decodeOutput_name = f"{name}_decodeOutput"
-  decodeBranch_name = f"{name}_decodeBranch"
+    data_fork_name = f"{name}_data_fork"
+    specGen_name = f"{name}_specGen"
+    predictor_name = f"{name}_predictor"
+    predFifo_name = f"{name}_predFifo"
+    control_fork_name = f"{name}_control_fork"
+    decodeSave_name = f"{name}_decodeSave"
+    decodeCommit_name = f"{name}_decodeCommit"
+    decodeSC_name = f"{name}_decodeSC"
+    decodeOutput_name = f"{name}_decodeOutput"
+    decodeBranch_name = f"{name}_decodeBranch"
 
-  dependencies = \
-      generate_fork(data_fork_name, {
-          "size": 2,
-          "bitwidth": bitwidth,
-          "extra_signals": {"spec": 1}
-      }) + \
-      _generate_specGen_core(specGen_name, bitwidth) + \
-      _generate_predictor(predictor_name, bitwidth) + \
-      _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
-      generate_fork(control_fork_name, {
-          "size": 5,
-          "bitwidth": 3
-      }) + \
-      _generate_decodeSave(decodeSave_name) + \
-      _generate_decodeCommit(decodeCommit_name) + \
-      _generate_decodeSC(decodeSC_name) + \
-      _generate_decodeOutput(decodeOutput_name) + \
-      _generate_decodeBranch(decodeBranch_name)
+    dependencies = \
+        generate_fork(data_fork_name, {
+            "size": 2,
+            "bitwidth": bitwidth,
+            "extra_signals": {"spec": 1}
+        }) + \
+        _generate_specGen_core(specGen_name, bitwidth) + \
+        _generate_predictor(predictor_name, bitwidth) + \
+        _generate_predFifo(predFifo_name, bitwidth, fifo_depth) + \
+        generate_fork(control_fork_name, {
+            "size": 5,
+            "bitwidth": 3
+        }) + \
+        _generate_decodeSave(decodeSave_name) + \
+        _generate_decodeCommit(decodeCommit_name) + \
+        _generate_decodeSC(decodeSC_name) + \
+        _generate_decodeOutput(decodeOutput_name) + \
+        _generate_decodeBranch(decodeBranch_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -820,7 +822,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of speculator
 architecture arch of {name} is
   signal fork_data_outs : data_array(1 downto 0)({bitwidth} - 1 downto 0);
@@ -994,52 +996,52 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_spec_units_signal_manager(
-      name,
-      [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "trigger",
-          "bitwidth": 0,
-          "extra_signals": extra_signals
-      }],
-      [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl_save",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_commit",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_save",
-          "bitwidth": 3,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_commit",
-          "bitwidth": 3,
-          "extra_signals": {}
-      }, {
-          "name": "ctrl_sc_branch",
-          "bitwidth": 1,
-          "extra_signals": {}
-      }],
-      extra_signals_without_spec,
-      ["ctrl_save", "ctrl_commit", "ctrl_sc_save",
-       "ctrl_sc_commit", "ctrl_sc_branch"],
-      lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_spec_units_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "trigger",
+            "bitwidth": 0,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl_save",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_commit",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_save",
+            "bitwidth": 3,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_commit",
+            "bitwidth": 3,
+            "extra_signals": {}
+        }, {
+            "name": "ctrl_sc_branch",
+            "bitwidth": 1,
+            "extra_signals": {}
+        }],
+        extra_signals_without_spec,
+        ["ctrl_save", "ctrl_commit", "ctrl_sc_save",
+         "ctrl_sc_commit", "ctrl_sc_branch"],
+        lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

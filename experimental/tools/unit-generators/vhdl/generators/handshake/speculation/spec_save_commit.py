@@ -4,18 +4,18 @@ from generators.support.utils import data
 
 
 def generate_spec_save_commit(name, params):
-  bitwidth = params["bitwidth"]
-  fifo_depth = params["fifo_depth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    fifo_depth = params["fifo_depth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
-  return _generate_spec_save_commit(name, bitwidth, fifo_depth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals)
+    return _generate_spec_save_commit(name, bitwidth, fifo_depth)
 
 
 def _generate_spec_save_commit(name, bitwidth, fifo_depth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -41,7 +41,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of spec_save_commit
 architecture arch of {name} is
   signal HeadEn : std_logic := '0';
@@ -70,7 +70,8 @@ architecture arch of {name} is
 
 begin
   ins_ready <= not Full;
-  outs_valid <= (PassEn and (not CurrEmpty or ins_valid)) or (ResendEn and not Empty);
+  outs_valid <= (PassEn and (not CurrEmpty or ins_valid)
+                 ) or (ResendEn and not Empty);
   --validArray(0) <= (PassEn and not CurrEmpty) or (ResendEn and not Empty);
 
   CurrHeadEqual <= '1' when Curr = Head else '0';
@@ -109,7 +110,8 @@ begin
   -------------------------------------------
   -- comb process for control ready
   -------------------------------------------
-  ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty, Empty, outs_ready, ctrl_valid, ins_valid)
+  ready_proc : process (PassEn, KillEn, ResendEn, CurrEmpty,
+                        Empty, outs_ready, ctrl_valid, ins_valid)
   begin
     -- Note: PassEn and KillEn can be simultaneously '1'
     -- In that case, PassEn is prioritized
@@ -136,7 +138,7 @@ begin
         outs <= ins;
       else
         outs <= Memory(Curr);
-      end if;
+      end if ;
       """, bitwidth)}
       outs_spec <= "1";
     else
@@ -290,16 +292,16 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_spec_units_signal_manager(
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_spec_units_signal_manager(
       name,
       [{
           "name": "ins",

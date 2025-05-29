@@ -1,33 +1,35 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.logic import generate_or_n
-from generators.support.eager_fork_register_block import generate_eager_fork_register_block
+from generators.support.eager_fork_register_block import (
+    generate_eager_fork_register_block,
+)
 
 
 def generate_fork(name, params):
-  # Number of output ports
-  size = params["size"]
+    # Number of output ports
+    size = params["size"]
 
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_fork_signal_manager(name, size, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_fork_dataless(name, size)
-  else:
-    return _generate_fork(name, size, bitwidth)
+    if extra_signals:
+        return _generate_fork_signal_manager(name, size, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_fork_dataless(name, size)
+    else:
+        return _generate_fork(name, size, bitwidth)
 
 
 def _generate_fork_dataless(name, size):
-  or_n_name = f"{name}_or_n"
-  regblock_name = f"{name}_regblock"
+    or_n_name = f"{name}_or_n"
+    regblock_name = f"{name}_regblock"
 
-  dependencies = \
-      generate_or_n(or_n_name, {"size": size}) + \
-      generate_eager_fork_register_block(regblock_name)
+    dependencies = generate_or_n(
+        or_n_name, {"size": size}
+    ) + generate_eager_fork_register_block(regblock_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -46,7 +48,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of fork_dataless
 architecture arch of {name} is
   signal blockStopArray : std_logic_vector({size} - 1 downto 0);
@@ -80,15 +82,15 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_fork(name, size, bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = _generate_fork_dataless(inner_name, size)
+    dependencies = _generate_fork_dataless(inner_name, size)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use work.types.all;
@@ -109,7 +111,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of fork
 architecture arch of {name} is
 begin
@@ -132,23 +134,23 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_fork_signal_manager(name, size, bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_concat_signal_manager(
-      name,
-      [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals,
-          "size": size
-      }],
-      extra_signals,
-      lambda name: _generate_fork(name, size, bitwidth + extra_signals_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals,
+            "size": size
+        }],
+        extra_signals,
+        lambda name: _generate_fork(name, size, bitwidth + extra_signals_bitwidth))

@@ -6,17 +6,17 @@ from generators.support.utils import data
 
 
 def generate_non_spec(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params["extra_signals"]
+    bitwidth = params["bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_non_spec_signal_manager(name,  bitwidth, extra_signals)
-  return _generate_non_spec(name, bitwidth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_non_spec_signal_manager(name, bitwidth, extra_signals)
+    return _generate_non_spec(name, bitwidth)
 
 
 def _generate_non_spec(name, bitwidth):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -37,7 +37,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of non_spec
 architecture arch of {name} is
 begin
@@ -48,42 +48,42 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
-  # Concat signals except spec
+    # Concat signals except spec
 
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  concat_layout = ConcatLayout(extra_signals_without_spec)
-  extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
+    concat_layout = ConcatLayout(extra_signals_without_spec)
+    extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
 
-  inner_name = f"{name}_inner"
-  inner = _generate_non_spec(inner_name, extra_signals_without_spec_bitwidth)
+    inner_name = f"{name}_inner"
+    inner = _generate_non_spec(inner_name, extra_signals_without_spec_bitwidth)
 
-  entity = generate_entity(name, [{
-      "name": "dataIn",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals_without_spec
-  }], [{
-      "name": "dataOut",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals
-  }])
+    entity = generate_entity(name, [{
+        "name": "dataIn",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals_without_spec
+    }], [{
+        "name": "dataOut",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }])
 
-  assignments = []
+    assignments = []
 
-  # Concat dataIn data and extra signals to create dataIn_concat
-  assignments.extend(generate_concat(
-      "dataIn", bitwidth, "dataIn_concat", concat_layout))
+    # Concat dataIn data and extra signals to create dataIn_concat
+    assignments.extend(generate_concat(
+        "dataIn", bitwidth, "dataIn_concat", concat_layout))
 
-  # Slice dataOut_concat to create dataOut data and extra signals (except spec)
-  assignments.extend(generate_slice(
-      "dataOut_concat", "dataOut", bitwidth, concat_layout))
+    # Slice dataOut_concat to create dataOut data and extra signals (except spec)
+    assignments.extend(generate_slice(
+        "dataOut_concat", "dataOut", bitwidth, concat_layout))
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of non_spec signal manager
 architecture arch of {name} is
   signal dataIn_concat, dataOut_concat : std_logic_vector({bitwidth + extra_signals_without_spec_bitwidth} - 1 downto 0);
@@ -105,4 +105,4 @@ begin
 end architecture;
 """
 
-  return inner + entity + architecture
+    return inner + entity + architecture

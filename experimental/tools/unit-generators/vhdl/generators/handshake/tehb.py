@@ -3,19 +3,19 @@ from generators.support.signal_manager.utils.concat import get_concat_extra_sign
 
 
 def generate_tehb(name, params):
-  bitwidth = params["bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    bitwidth = params["bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_tehb_signal_manager(name, bitwidth, extra_signals)
-  elif bitwidth == 0:
-    return _generate_tehb_dataless(name)
-  else:
-    return _generate_tehb(name, bitwidth)
+    if extra_signals:
+        return _generate_tehb_signal_manager(name, bitwidth, extra_signals)
+    elif bitwidth == 0:
+        return _generate_tehb_dataless(name)
+    else:
+        return _generate_tehb(name, bitwidth)
 
 
 def _generate_tehb_dataless(name):
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -34,7 +34,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of tehb_dataless
 architecture arch of {name} is
   signal fullReg, outputValid : std_logic;
@@ -57,15 +57,15 @@ begin
 end architecture;
 """
 
-  return entity + architecture
+    return entity + architecture
 
 
 def _generate_tehb(name, bitwidth):
-  tehb_dataless_name = f"{name}_dataless"
+    tehb_dataless_name = f"{name}_dataless"
 
-  dependencies = _generate_tehb_dataless(tehb_dataless_name)
+    dependencies = _generate_tehb_dataless(tehb_dataless_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -86,7 +86,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of tehb
 architecture arch of {name} is
   signal regEnable, regNotFull : std_logic;
@@ -129,22 +129,22 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_tehb_signal_manager(name, bitwidth, extra_signals):
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_concat_signal_manager(
-      name,
-      [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      extra_signals,
-      lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
+    return generate_concat_signal_manager(
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals,
+        lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth))

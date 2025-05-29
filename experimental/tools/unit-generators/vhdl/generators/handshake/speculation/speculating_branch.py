@@ -4,25 +4,25 @@ from generators.support.signal_manager.utils.entity import generate_entity
 
 
 def generate_speculating_branch(name, params):
-  data_bitwidth = params["data_bitwidth"]
-  spec_tag_bitwidth = params["spec_tag_bitwidth"]
-  extra_signals = params["extra_signals"]
+    data_bitwidth = params["data_bitwidth"]
+    spec_tag_bitwidth = params["spec_tag_bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_bitwidth, extra_signals)
-  return _generate_speculating_branch(name, data_bitwidth, spec_tag_bitwidth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_bitwidth, extra_signals)
+    return _generate_speculating_branch(name, data_bitwidth, spec_tag_bitwidth)
 
 
 def _generate_speculating_branch(name, data_bitwidth, spec_tag_data_bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = generate_cond_br(inner_name, {
-      "bitwidth": data_bitwidth,
-      "extra_signals": {"spec": 1}
-  })
+    dependencies = generate_cond_br(inner_name, {
+        "bitwidth": data_bitwidth,
+        "extra_signals": {"spec": 1}
+    })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -52,7 +52,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of speculating_branch
 architecture arch of {name} is
   signal cond_br_condition : std_logic_vector(0 downto 0);
@@ -84,35 +84,35 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_data_bitwidth, extra_signals):
-  # Extra signals are discarded except for `spec`
+    # Extra signals are discarded except for `spec`
 
-  inner_name = f"{name}_inner"
-  inner = _generate_speculating_branch(
-      inner_name, data_bitwidth, spec_tag_data_bitwidth)
+    inner_name = f"{name}_inner"
+    inner = _generate_speculating_branch(
+        inner_name, data_bitwidth, spec_tag_data_bitwidth)
 
-  entity = generate_entity(name, [{
-      "name": "data",
-      "bitwidth": data_bitwidth,
-      "extra_signals": extra_signals
-  }, {
-      "name": "spec_tag_data",
-      "bitwidth": spec_tag_data_bitwidth,
-      "extra_signals": extra_signals
-  }], [{
-      "name": "trueOut",
-      "bitwidth": data_bitwidth,
-      "extra_signals": {}
-  }, {
-      "name": "falseOut",
-      "bitwidth": data_bitwidth,
-      "extra_signals": {}
-  }])
+    entity = generate_entity(name, [{
+        "name": "data",
+        "bitwidth": data_bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "spec_tag_data",
+        "bitwidth": spec_tag_data_bitwidth,
+        "extra_signals": extra_signals
+    }], [{
+        "name": "trueOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }, {
+        "name": "falseOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }])
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of speculating_branch signal manager
 architecture arch of {name} is
 begin
@@ -138,4 +138,4 @@ begin
 end architecture;
 """
 
-  return inner + entity + architecture
+    return inner + entity + architecture

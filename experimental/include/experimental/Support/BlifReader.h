@@ -18,8 +18,8 @@
 #include "gurobi_c++.h"
 
 #include "dynamatic/Support/LLVM.h"
+#include "gurobi_c++.h"
 #include "llvm/Support/raw_ostream.h"
-#include <boost/functional/hash/extensions.hpp>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -114,6 +114,19 @@ public:
   friend class LogicNetwork;
 };
 
+// Hash and Equality functions for Node pointers, used in unordered maps
+struct NodePtrHash {
+  std::size_t operator()(const Node *node) const {
+    return std::hash<std::string>()(node->name);
+  }
+};
+
+struct NodePtrEqual {
+  bool operator()(const Node *lhs, const Node *rhs) const {
+    return lhs->name == rhs->name;
+  }
+};
+
 /// Manages a collection of interconnected nodes representing a
 /// circuit, maintaining relationships between nodes including latches and
 /// topological ordering. The class provides functionality for:
@@ -167,17 +180,6 @@ public:
   // Finds the path from "start" to "end" using bfs.
   std::vector<Node *> findPath(Node *start, Node *end);
 
-  // Implements the "Cutless FPGA Mapping" algorithm.Returns the nodes in the
-  // circuit that can be implemented with "limit" number of nodes from the set
-  // "wavyLine". For example, if the limit is 6 (6-input LUT), returns all the
-  // nodes that can be implemented with 6 Nodes from wavyLine set.
-  std::set<Node *> findNodesWithLimitedWavyInputs(size_t limit,
-                                                  std::set<Node *> &wavyLine);
-
-  // Helper function for findNodesWithLimitedWavyInputs. Finds the wavy inputs
-  // using dfs.
-  std::set<Node *> findWavyInputsOfNode(Node *node, std::set<Node *> &wavyLine);
-
   // Returns all of the Nodes.
   std::set<Node *> getAllNodes();
 
@@ -199,7 +201,9 @@ public:
 
   // Returns the Nodes in topological order. Nodes were sorted in topological
   // order when LogicNetwork class is instantiated.
-  std::vector<Node *> getNodesInOrder() { return nodesTopologicalOrder; }
+  std::vector<Node *> getNodesInTopologicalOrder() {
+    return nodesTopologicalOrder;
+  }
 
   // Returns Inputs of the Blif file.
   std::set<Node *> getInputs();
@@ -236,4 +240,3 @@ public:
 
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 #endif // EXPERIMENTAL_SUPPORT_BLIF_READER_H
-

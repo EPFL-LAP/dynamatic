@@ -6,25 +6,25 @@ from generators.handshake.ofifo import generate_ofifo
 
 
 def generate_load(name, params):
-  addr_bitwidth = params["addr_bitwidth"]
-  data_bitwidth = params["data_bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    addr_bitwidth = params["addr_bitwidth"]
+    data_bitwidth = params["data_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
-  else:
-    return _generate_load(name, data_bitwidth, addr_bitwidth)
+    if extra_signals:
+        return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
+    else:
+        return _generate_load(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_load(name, data_bitwidth, addr_bitwidth):
-  addr_tehb_name = f"{name}_addr_tehb"
-  data_tehb_name = f"{name}_data_tehb"
+    addr_tehb_name = f"{name}_addr_tehb"
+    data_tehb_name = f"{name}_data_tehb"
 
-  dependencies = \
-      generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
-      generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
+    dependencies = \
+        generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
+        generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -53,7 +53,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of load
 architecture arch of {name} is
 begin
@@ -87,53 +87,53 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
-  # Get concatenation details for extra signals
-  concat_layout = ConcatLayout(extra_signals)
-  extra_signals_total_bitwidth = concat_layout.total_bitwidth
+    # Get concatenation details for extra signals
+    concat_layout = ConcatLayout(extra_signals)
+    extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
-  inner_name = f"{name}_inner"
-  inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
+    inner_name = f"{name}_inner"
+    inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
 
-  # Generate ofifo to store extra signals for in-flight memory requests
-  ofifo_name = f"{name}_ofifo"
-  ofifo = generate_ofifo(ofifo_name, {
-      "bitwidth": extra_signals_total_bitwidth,
-      "num_slots": 1  # Assume LoadOp is connected to a memory controller
-  })
+    # Generate ofifo to store extra signals for in-flight memory requests
+    ofifo_name = f"{name}_ofifo"
+    ofifo = generate_ofifo(ofifo_name, {
+        "bitwidth": extra_signals_total_bitwidth,
+        "num_slots": 1  # Assume LoadOp is connected to a memory controller
+    })
 
-  entity = generate_entity(name, [{
-      "name": "addrIn",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": extra_signals
-  }, {
-      "name": "dataFromMem",
-      "bitwidth": data_bitwidth,
-      "extra_signals": {}
-  }], [{
-      "name": "addrOut",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": {}
-  }, {
-      "name": "dataOut",
-      "bitwidth": data_bitwidth,
-      "extra_signals": extra_signals
-  }])
+    entity = generate_entity(name, [{
+        "name": "addrIn",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "dataFromMem",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }], [{
+        "name": "addrOut",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": {}
+    }, {
+        "name": "dataOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": extra_signals
+    }])
 
-  assignments = []
+    assignments = []
 
-  # Concatenate addrIn extra signals to create signals_pre_buffer
-  assignments.extend(generate_concat(
-      "addrIn", 0, "signals_pre_buffer", concat_layout))
+    # Concatenate addrIn extra signals to create signals_pre_buffer
+    assignments.extend(generate_concat(
+        "addrIn", 0, "signals_pre_buffer", concat_layout))
 
-  # Slice signals_post_buffer to create dataOut data and extra signals
-  assignments.extend(generate_slice(
-      "signals_post_buffer", "dataOut", 0, concat_layout))
+    # Slice signals_post_buffer to create dataOut data and extra signals
+    assignments.extend(generate_slice(
+        "signals_post_buffer", "dataOut", 0, concat_layout))
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
   signal signals_pre_buffer, signals_post_buffer : std_logic_vector({concat_layout.total_bitwidth} - 1 downto 0);
@@ -181,4 +181,4 @@ begin
 end architecture;
 """
 
-  return inner + ofifo + entity + architecture
+    return inner + ofifo + entity + architecture

@@ -4,17 +4,17 @@ from generators.support.signal_manager.utils.generation import generate_concat_a
 
 
 def generate_select(name, parameters):
-  bitwidth = parameters["bitwidth"]
-  extra_signals = parameters["extra_signals"]
+    bitwidth = parameters["bitwidth"]
+    extra_signals = parameters["extra_signals"]
 
-  if extra_signals:
-    return _generate_select_signal_manager(name, bitwidth, extra_signals)
-  else:
-    return _generate_select(name, bitwidth)
+    if extra_signals:
+        return _generate_select_signal_manager(name, bitwidth, extra_signals)
+    else:
+        return _generate_select(name, bitwidth)
 
 
 def _generate_antitokens(name):
-  return f"""
+    return f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -69,10 +69,10 @@ end architecture;
 
 
 def _generate_select(name, bitwidth):
-  antitokens_name = f"{name}_antitokens"
-  antitokens = _generate_antitokens(antitokens_name)
+    antitokens_name = f"{name}_antitokens"
+    antitokens = _generate_antitokens(antitokens_name)
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -99,7 +99,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of selector
 architecture arch of {name} is
   signal ee, validInternal : std_logic;
@@ -134,94 +134,95 @@ begin
 end architecture;
 """
 
-  return antitokens + entity + architecture
+    return antitokens + entity + architecture
 
 
 def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
-  concat_decls = []
-  concat_assignments = []
+    concat_decls = []
+    concat_assignments = []
 
-  # Declare trueValue_inner and falseValue_inner channels
-  concat_decls.extend(generate_channel_decls({
-      "name": "trueValue_inner",
-      "bitwidth": bitwidth + concat_layout.total_bitwidth
-  }))
-  concat_decls.extend(generate_channel_decls({
-      "name": "falseValue_inner",
-      "bitwidth": bitwidth + concat_layout.total_bitwidth
-  }))
+    # Declare trueValue_inner and falseValue_inner channels
+    concat_decls.extend(generate_channel_decls({
+        "name": "trueValue_inner",
+        "bitwidth": bitwidth + concat_layout.total_bitwidth
+    }))
+    concat_decls.extend(generate_channel_decls({
+        "name": "falseValue_inner",
+        "bitwidth": bitwidth + concat_layout.total_bitwidth
+    }))
 
-  # Concatenate trueValue data and extra signals to create trueValue_inner
-  concat_assignments.extend(generate_concat_and_handshake(
-      "trueValue", bitwidth, "trueValue_inner", concat_layout))
+    # Concatenate trueValue data and extra signals to create trueValue_inner
+    concat_assignments.extend(generate_concat_and_handshake(
+        "trueValue", bitwidth, "trueValue_inner", concat_layout))
 
-  # Concatenate falseValue data and extra signals to create falseValue_inner
-  concat_assignments.extend(generate_concat_and_handshake(
-      "falseValue", bitwidth, "falseValue_inner", concat_layout))
+    # Concatenate falseValue data and extra signals to create falseValue_inner
+    concat_assignments.extend(generate_concat_and_handshake(
+        "falseValue", bitwidth, "falseValue_inner", concat_layout))
 
-  return concat_assignments, concat_decls
+    return concat_assignments, concat_decls
 
 
 def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
-  slice_decls = []
-  slice_assignments = []
+    slice_decls = []
+    slice_assignments = []
 
-  # Declare both result_inner_concat and result_inner channels
-  slice_decls.extend(generate_channel_decls({
-      "name": "result_inner_concat",
-      "bitwidth": bitwidth + concat_layout.total_bitwidth
-  }))
-  slice_decls.extend(generate_channel_decls({
-      "name": "result_inner",
-      "bitwidth": bitwidth,
-      "extra_signals": concat_layout.extra_signals
-  }))
+    # Declare both result_inner_concat and result_inner channels
+    slice_decls.extend(generate_channel_decls({
+        "name": "result_inner_concat",
+        "bitwidth": bitwidth + concat_layout.total_bitwidth
+    }))
+    slice_decls.extend(generate_channel_decls({
+        "name": "result_inner",
+        "bitwidth": bitwidth,
+        "extra_signals": concat_layout.extra_signals
+    }))
 
-  # Slice result_inner_concat to create result_inner data and extra signals
-  slice_assignments.extend(generate_slice_and_handshake(
-      "result_inner_concat", "result_inner", bitwidth, concat_layout))
+    # Slice result_inner_concat to create result_inner data and extra signals
+    slice_assignments.extend(generate_slice_and_handshake(
+        "result_inner_concat", "result_inner", bitwidth, concat_layout))
 
-  return slice_assignments, slice_decls
+    return slice_assignments, slice_decls
 
 
 def _generate_select_signal_manager(name, bitwidth, extra_signals):
-  # Layout info for how extra signals are packed into one std_logic_vector
-  concat_layout = ConcatLayout(extra_signals)
-  extra_signals_total_bitwidth = concat_layout.total_bitwidth
+    # Layout info for how extra signals are packed into one std_logic_vector
+    concat_layout = ConcatLayout(extra_signals)
+    extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
-  inner_name = f"{name}_inner"
-  inner = _generate_select(inner_name, bitwidth + extra_signals_total_bitwidth)
+    inner_name = f"{name}_inner"
+    inner = _generate_select(inner_name, bitwidth +
+                             extra_signals_total_bitwidth)
 
-  entity = generate_entity(name, [{
-      "name": "condition",
-      "bitwidth": 1,
-      "extra_signals": extra_signals
-  }, {
-      "name": "trueValue",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals
-  }, {
-      "name": "falseValue",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals
-  }], [{
-      "name": "result",
-      "bitwidth": bitwidth,
-      "extra_signals": extra_signals
-  }])
+    entity = generate_entity(name, [{
+        "name": "condition",
+        "bitwidth": 1,
+        "extra_signals": extra_signals
+    }, {
+        "name": "trueValue",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "falseValue",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }], [{
+        "name": "result",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }])
 
-  concat_assignments, concat_decls = _generate_concat(
-      bitwidth, concat_layout)
-  slice_assignments, slice_decls = _generate_slice(
-      bitwidth, concat_layout)
+    concat_assignments, concat_decls = _generate_concat(
+        bitwidth, concat_layout)
+    slice_assignments, slice_decls = _generate_slice(
+        bitwidth, concat_layout)
 
-  forwarding_assignments = []
-  # Signal-wise forwarding of extra signals from condition and result_inner to result
-  for signal_name in extra_signals:
-    forwarding_assignments.extend(generate_signal_wise_forwarding(
-        ["condition", "result_inner"], ["result"], signal_name))
+    forwarding_assignments = []
+    # Signal-wise forwarding of extra signals from condition and result_inner to result
+    for signal_name in extra_signals:
+        forwarding_assignments.extend(generate_signal_wise_forwarding(
+            ["condition", "result_inner"], ["result"], signal_name))
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of selector signal manager
 architecture arch of {name} is
   {"\n  ".join(concat_decls)}
@@ -258,4 +259,4 @@ begin
 end architecture;
 """
 
-  return inner + entity + architecture
+    return inner + entity + architecture
