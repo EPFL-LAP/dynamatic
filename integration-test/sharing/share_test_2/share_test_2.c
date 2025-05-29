@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Integration.h"
 #include "share_test_2.h"
+#include "dynamatic/Integration.h"
 #include "stdlib.h"
 
 void share_test_2(inout_int_t a[N]) {

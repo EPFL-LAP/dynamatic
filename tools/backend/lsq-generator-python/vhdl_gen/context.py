@@ -1,11 +1,12 @@
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
-#===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 class VHDLContext:
     """
     A context object to replace global variables for VHDL code generation.
     Holds indentation level, temporary name counter, and initialization strings.
     """
+
     def __init__(self):
         # Indentation level for generated code
         self.tabLevel = 0
@@ -32,7 +33,7 @@ class VHDLContext:
 
     def get_temp(self, name: str) -> str:
         return f'TEMP_{self.tempCount}_{name}'
-    
+
     def use_temp(self):
         self.tempCount += 1
 
@@ -44,4 +45,3 @@ class VHDLContext:
 
     def add_reg_str(self, code: str):
         self.regInitString += code
-
