@@ -1,6 +1,7 @@
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.entity import generate_entity
-from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding, generate_channel_decls
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding
+from generators.support.signal_manager.utils.internal_signal import create_internal_channel_decl
 
 
 def generate_select(name, parameters):
@@ -142,11 +143,11 @@ def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
     concat_assignments = []
 
     # Declare trueValue_inner and falseValue_inner channels
-    concat_decls.extend(generate_channel_decls({
+    concat_decls.extend(create_internal_channel_decl({
         "name": "trueValue_inner",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
-    concat_decls.extend(generate_channel_decls({
+    concat_decls.extend(create_internal_channel_decl({
         "name": "falseValue_inner",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
@@ -167,11 +168,11 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
     slice_assignments = []
 
     # Declare both result_inner_concat and result_inner channels
-    slice_decls.extend(generate_channel_decls({
+    slice_decls.extend(create_internal_channel_decl({
         "name": "result_inner_concat",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
-    slice_decls.extend(generate_channel_decls({
+    slice_decls.extend(create_internal_channel_decl({
         "name": "result_inner",
         "bitwidth": bitwidth,
         "extra_signals": concat_layout.extra_signals

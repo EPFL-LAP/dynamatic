@@ -1,6 +1,7 @@
 from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.signal_manager.utils.concat import ConcatLayout
-from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding, generate_channel_decls
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_signal_wise_forwarding
+from generators.support.signal_manager.utils.internal_signal import create_internal_channel_decl
 from generators.handshake.tehb import generate_tehb
 from generators.support.signal_manager.utils.types import ExtraSignals
 
@@ -183,7 +184,7 @@ def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int)
     concat_assignments = []
 
     # Declare ins_inner channel
-    concat_decls.extend(generate_channel_decls({
+    concat_decls.extend(create_internal_channel_decl({
         "name": "ins_inner",
         "bitwidth": data_bitwidth + concat_layout.total_bitwidth,
         "size": size
@@ -201,11 +202,11 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
     slice_assignments = []
 
     # Declare both outs_inner_concat and outs_inner channels
-    slice_decls.extend(generate_channel_decls({
+    slice_decls.extend(create_internal_channel_decl({
         "name": "outs_inner_concat",
         "bitwidth": data_bitwidth + concat_layout.total_bitwidth
     }))
-    slice_decls.extend(generate_channel_decls({
+    slice_decls.extend(create_internal_channel_decl({
         "name": "outs_inner",
         "bitwidth": data_bitwidth,
         "extra_signals": concat_layout.extra_signals

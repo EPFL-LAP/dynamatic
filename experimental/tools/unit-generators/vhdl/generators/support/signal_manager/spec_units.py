@@ -1,7 +1,8 @@
 from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_mapping, generate_channel_decls
+from .utils.generation import generate_concat_and_handshake, generate_slice_and_handshake, generate_mapping
+from generators.support.signal_manager.utils.internal_signal import create_internal_channel_decl
 from .utils.types import Channel, ExtraSignals
 
 
@@ -19,7 +20,7 @@ def _generate_concat(channel: Channel, concat_layout: ConcatLayout, concat_assig
     }
 
     # Declare the concat channel
-    concat_channel_decls.extend(generate_channel_decls(concat_channel))
+    concat_channel_decls.extend(create_internal_channel_decl(concat_channel))
 
     # Register the concat channel
     concat_channels[channel_name] = concat_channel
@@ -46,7 +47,7 @@ def _generate_slice(channel: Channel, concat_layout: ConcatLayout, slice_assignm
     }
 
     # Declare the concat channel
-    concat_channel_decls.extend(generate_channel_decls(concat_channel))
+    concat_channel_decls.extend(create_internal_channel_decl(concat_channel))
 
     # Register the concat channel
     concat_channels[channel_name] = concat_channel

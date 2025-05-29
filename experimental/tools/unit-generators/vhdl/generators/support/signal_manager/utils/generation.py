@@ -1,6 +1,6 @@
 from .types import Channel, ExtraSignals
 from .concat import ConcatLayout
-from .internal_signal import generate_internal_signal, generate_internal_signal_vector, generate_internal_signal_array
+from .internal_signal import create_internal_signal_decl, create_internal_vector_decl, create_internal_array_decl
 from .forwarding import generate_forwarding_expression_for_signal
 
 
@@ -245,65 +245,3 @@ def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_nam
         assignments.append(f"{signal_name} <= {expression};")
 
     return assignments
-
-
-def generate_extra_signal_decls(channel_name: str, extra_signals: ExtraSignals):
-    """
-    Generate VHDL declarations for extra signals in a channel.
-    """
-
-    return [
-        generate_internal_signal_vector(
-            f"{channel_name}_{signal_name}", signal_bitwidth)
-        for signal_name, signal_bitwidth in extra_signals.items()
-    ]
-
-
-def generate_channel_decls(channel: Channel) -> list[str]:
-    """
-    Generate VHDL declarations for a channel.
-    Args:
-      channel (Channel): Channel to generate declarations for.
-    Returns:
-      decls (list[str]): List of VHDL declarations for the channel.
-    """
-
-    decls = []
-
-    size = channel.get("size", 0)
-    if size == 0:
-        # Declare data signal if present
-        if channel["bitwidth"] > 0:
-            decls.append(generate_internal_signal_vector(
-                channel["name"], channel["bitwidth"]))
-
-        # Declare handshake signals
-        decls.append(generate_internal_signal(
-            f"{channel['name']}_valid"))
-        decls.append(generate_internal_signal(
-            f"{channel['name']}_ready"))
-
-        # Declare extra signals if present
-        extra_signals = channel.get("extra_signals", {})
-        decls.extend(generate_extra_signal_decls(
-            channel["name"], extra_signals))
-    else:
-        # Channel is an array
-
-        # Declare data signal if present
-        if channel["bitwidth"] > 0:
-            decls.append(generate_internal_signal_array(
-                channel["name"], channel["bitwidth"], size))
-
-        # Declare handshake signals
-        decls.append(generate_internal_signal_vector(
-            f"{channel['name']}_valid", size))
-        decls.append(generate_internal_signal_vector(
-            f"{channel['name']}_ready", size))
-
-        # Declare extra signals if present
-        extra_signals = channel.get("extra_signals", {})
-        decls.extend(generate_extra_signal_decls(
-            channel["name"], extra_signals))
-
-    return decls

@@ -2,8 +2,8 @@ from collections.abc import Callable
 from .utils.entity import generate_entity
 from .utils.types import Channel, ExtraSignals
 from .utils.concat import ConcatLayout
-from .utils.generation import generate_signal_wise_forwarding, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names, generate_extra_signal_decls
-from .utils.internal_signal import generate_internal_signal_vector
+from .utils.generation import generate_signal_wise_forwarding, generate_concat, generate_slice, generate_default_mappings, enumerate_channel_names
+from .utils.internal_signal import create_internal_vector_decl, create_internal_extra_signal_decls
 
 
 def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
@@ -20,7 +20,7 @@ def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
     concat_decls = []
 
     # Declare `signals_pre_buffer` signal
-    concat_decls.append(generate_internal_signal_vector(
+    concat_decls.append(create_internal_vector_decl(
         "signals_pre_buffer", concat_layout.total_bitwidth))
 
     # Concatenate `forwarded` extra signals to create `signals_pre_buffer`
@@ -35,13 +35,13 @@ def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
     slice_decls = []
 
     # Declare both `signals_post_buffer` and `sliced` signals
-    slice_decls.append(generate_internal_signal_vector(
+    slice_decls.append(create_internal_vector_decl(
         "signals_post_buffer", concat_layout.total_bitwidth))
-    slice_decls.append(generate_internal_signal_vector(
+    slice_decls.append(create_internal_vector_decl(
         "sliced", concat_layout.total_bitwidth))
 
     # Declare extra signals of `sliced` channel
-    slice_decls.extend(generate_extra_signal_decls(
+    slice_decls.extend(create_internal_extra_signal_decls(
         "sliced", concat_layout.extra_signals))
 
     # Slice `signals_post_buffer` to create `sliced` data and extra signals
@@ -112,7 +112,7 @@ def generate_buffered_signal_manager(
             in_channel_names, ["forwarded"], signal_name))
     # Declare extra signals of `forwarded` channel
     forwarding_decls.extend(
-        generate_extra_signal_decls("forwarded", extra_signals))
+        create_internal_extra_signal_decls("forwarded", extra_signals))
 
     concat_assignments, concat_decls = _generate_concat(concat_layout)
     slice_assignments, slice_decls = _generate_slice(concat_layout)
