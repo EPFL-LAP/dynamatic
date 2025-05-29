@@ -467,19 +467,20 @@ void BufferPlacementMILP::
     //
     // (#427) In this implementation, R_c is decomposed into dataBuf and
     // readyBuf.
-    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput.
-    //    Otherwise, token occupancy >= 0.
-    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput.
-    //    Otherwise, bubble occupancy >= 0.
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
+    //    otherwise, token occupancy >= 0.
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
 
     // The following constraint encodes:
-    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput.
-    //    Otherwise, token occupancy >= 0.
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
+    //    otherwise, token occupancy >= 0 (enforced by the variable’s lower
+    //    bound).
     model.addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
                     "throughput_data");
     // In terms of the constraint on readyBuf:
-    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput.
-    //    Otherwise, bubble occupancy >= 0.
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
     // This constraint can be combined with the constraint on the number of
     // buffer slots:
     // -  token occupancy + bubble occupancy <= numSlots
@@ -545,7 +546,7 @@ void BufferPlacementMILP::
     GRBVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
     GRBVar &shiftReg = chVars.shiftReg;
 
-    // Token occupancy ≥ data latency * CFDFC's throughput.
+    // Token occupancy >= data latency * CFDFC's throughput.
     model.addQConstr(dataLatency * throughput <= chTokenOccupancy,
                      "throughput_tokens_lb");
     std::string channelName = getUniqueName(*channel.getUses().begin());
@@ -570,12 +571,16 @@ void BufferPlacementMILP::
                          dataLatency - dataLatency * throughput - 0.99,
                      shiftRegExtraBubblesName);
 
-    // Combine the following constraints into one unified constraint:
-    // 1. If readyBuf is used, bubble occupancy ≥ CFDFC's throughput.
-    //    We use 'readyBuf * throughput' to represent the optimal bubble
-    //    occupancy.
-    // 2. Token occupancy + bubble occupancy ≤ slot number
-    // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used
+    // Combine the following into a unified constraint:
+    // 1. If readyBuf is used, bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
+    // 2. Token occupancy + bubble occupancy <= slot number.
+    // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used.
+    // Assuming that we minimize the number of buffer slots, bubble occupancy
+    // always takes the minimum feasible value. Therefore, constraint 1 becomes:
+    // 1. If readyBuf is used, bubble occupancy = CFDFC's throughput;
+    //    otherwise, bubble occupancy = 0.
+    // We model bubble occupancy as 'readyBuf * throughput'.
     model.addQConstr(chTokenOccupancy + readyBuf * throughput +
                              shiftReg * shiftRegExtraBubbles <=
                          bufNumSlots,
