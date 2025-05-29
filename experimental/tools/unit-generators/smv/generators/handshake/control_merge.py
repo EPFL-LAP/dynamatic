@@ -7,18 +7,18 @@ from generators.support.utils import *
 
 
 def generate_control_merge(name, params):
-  size = params[ATTR_SIZE]
-  data_type = SmvScalarType(params[ATTR_PORT_TYPES]["outs"])
-  index_type = SmvScalarType(params[ATTR_PORT_TYPES]["index"])
+    size = params[ATTR_SIZE]
+    data_type = SmvScalarType(params[ATTR_DATA_BITWIDTH])
+    index_type = SmvScalarType(params[ATTR_INDEX_BITWIDTH])
 
-  if data_type.bitwidth == 0:
-    return _generate_control_merge_dataless(name, size, index_type)
-  else:
-    return _generate_control_merge(name, size, index_type, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_control_merge_dataless(name, size, index_type)
+    else:
+        return _generate_control_merge(name, size, index_type, data_type)
 
 
 def _generate_control_merge_dataless(name, size, index_type):
-  return f"""
+    return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
@@ -38,14 +38,14 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
   index_valid := inner_fork.outs_1_valid;
   index := inner_tehb.outs;
 
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_DATA_TYPE: HANDSHAKE_CONTROL_TYPE.mlir_type})}
-{generate_tehb(f"{name}__tehb", {ATTR_DATA_TYPE: index_type.mlir_type})}
-{generate_fork(f"{name}__fork_dataless", {ATTR_SIZE: 2, ATTR_PORT_TYPES: {"ins": HANDSHAKE_CONTROL_TYPE.mlir_type}})}
+{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
+{generate_tehb(f"{name}__tehb", {ATTR_BITWIDTH: index_type.bitwidth})}
+{generate_fork(f"{name}__fork_dataless", {ATTR_SIZE: 2, ATTR_BITWIDTH: 0})}
 """
 
 
 def _generate_control_merge(name, size, index_type, data_type):
-  return f"""
+    return f"""
   MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_control_merge : {name}__control_merge_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready);

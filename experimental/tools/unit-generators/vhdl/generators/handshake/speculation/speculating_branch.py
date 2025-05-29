@@ -4,25 +4,25 @@ from generators.support.utils import data
 
 
 def generate_speculating_branch(name, params):
-  data_bitwidth = params["data_bitwidth"]
-  spec_tag_bitwidth = params["spec_tag_bitwidth"]
-  extra_signals = params["extra_signals"]
+    data_bitwidth = params["data_bitwidth"]
+    spec_tag_bitwidth = params["spec_tag_bitwidth"]
+    extra_signals = params["extra_signals"]
 
-  # Always contains spec signal
-  if len(extra_signals) > 1:
-    return _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_bitwidth, extra_signals)
-  return _generate_speculating_branch(name, data_bitwidth, spec_tag_bitwidth)
+    # Always contains spec signal
+    if len(extra_signals) > 1:
+        return _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_bitwidth, extra_signals)
+    return _generate_speculating_branch(name, data_bitwidth, spec_tag_bitwidth)
 
 
 def _generate_speculating_branch(name, data_bitwidth, spec_tag_data_bitwidth):
-  inner_name = f"{name}_inner"
+    inner_name = f"{name}_inner"
 
-  dependencies = generate_cond_br(inner_name, {
-      "bitwidth": data_bitwidth,
-      "extra_signals": {"spec": 1}
-  })
+    dependencies = generate_cond_br(inner_name, {
+        "bitwidth": data_bitwidth,
+        "extra_signals": {"spec": 1}
+    })
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -52,7 +52,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of speculating_branch
 architecture arch of {name} is
   signal cond_br_condition : std_logic_vector(0 downto 0);
@@ -84,37 +84,37 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_data_bitwidth, extra_signals):
-  extra_signals_without_spec = extra_signals.copy()
-  extra_signals_without_spec.pop("spec")
+    extra_signals_without_spec = extra_signals.copy()
+    extra_signals_without_spec.pop("spec")
 
-  extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-      extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "data",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "spec_tag_data",
-          "bitwidth": spec_tag_data_bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "trueOut",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals_without_spec
-      }, {
-          "name": "falseOut",
-          "bitwidth": data_bitwidth,
-          "extra_signals": extra_signals_without_spec
-      }],
-      "extra_signals": extra_signals_without_spec
-  }, lambda name: _generate_speculating_branch(
-      name,
-      data_bitwidth + extra_signals_bitwidth - 1,
-      spec_tag_data_bitwidth + extra_signals_bitwidth - 1))
+    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
+        extra_signals)
+    return generate_signal_manager(name, {
+        "type": "concat",
+        "in_ports": [{
+            "name": "data",
+            "bitwidth": data_bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "spec_tag_data",
+            "bitwidth": spec_tag_data_bitwidth,
+            "extra_signals": extra_signals
+        }],
+        "out_ports": [{
+            "name": "trueOut",
+            "bitwidth": data_bitwidth,
+            "extra_signals": extra_signals_without_spec
+        }, {
+            "name": "falseOut",
+            "bitwidth": data_bitwidth,
+            "extra_signals": extra_signals_without_spec
+        }],
+        "extra_signals": extra_signals_without_spec
+    }, lambda name: _generate_speculating_branch(
+        name,
+        data_bitwidth + extra_signals_bitwidth - 1,
+        spec_tag_data_bitwidth + extra_signals_bitwidth - 1))
