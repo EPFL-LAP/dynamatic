@@ -23,7 +23,7 @@ def GroupAllocator(ctx: VHDLContext, path_rtl: str, name: str, suffix: str, conf
         Entity and architecture use the identifier: <name><suffix>
 
     Example (Group Allocator):
-        GroupAllocator(ctx, path_rtl, name, '_core_ga', configs)
+        GroupAllocator(ctx, path_rtl, 'config_0', '_core_ga', configs)
 
         produces in rtl/config_0_core.vhd:
 
@@ -258,9 +258,12 @@ def GroupAllocatorInst(
         VHDL instantiation string for inclusion in the architecture body.
 
     Example:
+        # Base architecture: 'config_0_core'
+        # suffix for GroupAllocator instantiation: '_ga'
+
         arch += GroupAllocatorInst(
             ctx,
-            name               = name + '_ga',
+            name               = 'config_0_core' + '_ga',
             configs            = configs,
             group_init_valid_i = group_init_valid_i,
             group_init_ready_o = group_init_ready_o,
@@ -279,6 +282,39 @@ def GroupAllocatorInst(
             ga_ls_order_o      = ga_ls_order
         )
 
+        This generates, inside 'config_0_core.vhd' and under the 'architecture config_0_core', the following instantiation
+
+        architecture arch of config_0_core is
+            signal ...
+        begin
+            ...
+            config_0_core_ga : entity work.config_0_core_ga
+                port map(
+                    rst => rst,
+                    clk => clk,
+                    group_init_valid_0_i => group_init_valid_0_i,
+                    group_init_ready_0_o => group_init_ready_0_o,
+                    ldq_tail_i => ldq_tail_q,
+                    ldq_head_i => ldq_head_q,
+                    ldq_empty_i => ldq_empty,
+                    stq_tail_i => stq_tail_q,
+                    stq_head_i => stq_head_q,
+                    stq_empty_i => stq_empty,
+                    ldq_wen_0_o => ldq_wen_0,
+                    ldq_wen_1_o => ldq_wen_1,
+                    num_loads_o => num_loads,
+                    ldq_port_idx_0_o => ldq_port_idx_0_d,
+                    ldq_port_idx_1_o => ldq_port_idx_1_d,
+                    stq_wen_0_o => stq_wen_0,
+                    stq_wen_1_o => stq_wen_1,
+                    stq_port_idx_0_o => stq_port_idx_0_d,
+                    stq_port_idx_1_o => stq_port_idx_1_d,
+                    ga_ls_order_0_o => ga_ls_order_0,
+                    ga_ls_order_1_o => ga_ls_order_1,
+                    num_stores_o => num_stores
+                );
+            ...
+        end architecture;
     """
 
     arch = ctx.get_current_indent() + f'{name} : entity work.{name}\n'

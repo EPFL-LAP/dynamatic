@@ -38,7 +38,7 @@ def LSQ(ctx: VHDLContext, path_rtl: str, name: str, configs: Configs):
         Entity and architecture use the identifier: <name>
 
     Example:
-        LSQ(ctx, path_rtl, name + '_core', configs)
+        LSQ(ctx, path_rtl, 'config_0' + '_core', configs)
 
 
     *Instantiation of LSQ is in lsq-generator.py.

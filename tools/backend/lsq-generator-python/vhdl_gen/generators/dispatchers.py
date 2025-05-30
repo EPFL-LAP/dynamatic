@@ -359,9 +359,12 @@ def PortToQueueDispatcherInst(
         VHDL instantiation string for inclusion in the architecture body.
 
     Example:
+        # Base architecture: 'config_0_core'
+        # suffix for Load Address Dispatcher instantiation: '_lda'
+
         arch += PortToQueueDispatcherInst(
             ctx,
-            name                = name + '_lda',
+            name                = 'config_0_core' + '_lda',
             numPorts            = configs.numLdPorts,
             numEntries          = configs.numLdqEntries,
             port_bits_i         = ldp_addr_i,
@@ -374,6 +377,38 @@ def PortToQueueDispatcherInst(
             entry_wen_o         = ldq_addr_wen,
             queue_head_oh_i     = ldq_head_oh
         )
+
+        This generates, inside 'config_0_core.vhd' and under the 'architecture config_0_core', the following instantiation
+
+        architecture arch of config_0_core is
+            signal ...
+        begin
+            ...
+	        config_0_core_lda_dispatcher : entity work.config_0_core_lda
+                port map(
+                    rst => rst,
+                    clk => clk,
+                    port_bits_0_i => ldp_addr_0_i,
+                    port_bits_1_i => ldp_addr_1_i,
+                    port_ready_0_o => ldp_addr_ready_0_o,
+                    port_ready_1_o => ldp_addr_ready_1_o,
+                    port_valid_0_i => ldp_addr_valid_0_i,
+                    port_valid_1_i => ldp_addr_valid_1_i,
+                    entry_valid_0_i => ldq_valid_0_q,
+                    entry_valid_1_i => ldq_valid_1_q,
+                    entry_bits_valid_0_i => ldq_addr_valid_0_q,
+                    entry_bits_valid_1_i => ldq_addr_valid_1_q,
+                    entry_port_idx_0_i => ldq_port_idx_0_q,
+                    entry_port_idx_1_i => ldq_port_idx_1_q,
+                    entry_bits_0_o => ldq_addr_0_d,
+                    entry_bits_1_o => ldq_addr_1_d,
+                    entry_wen_0_o => ldq_addr_wen_0,
+                    entry_wen_1_o => ldq_addr_wen_1,
+                    queue_head_oh_i => ldq_head_oh
+                );
+            ...
+        end architecture;
+
     """
 
     arch = ctx.get_current_indent(
@@ -458,9 +493,12 @@ def QueueToPortDispatcherInst(
 
 
     Example:
+        # Base architecture: 'config_0_core'
+        # suffix for Load Data Dispatcher instantiation: '_ldd'
+
         arch += QueueToPortDispatcherInst(
             ctx,
-            name                = name + '_ldd',
+            name                = 'config_0' + '_ldd',
             numPorts            = configs.numLdPorts,
             numEntries          = configs.numLdqEntries,
             port_bits_o         = ldp_data_o,
@@ -473,6 +511,37 @@ def QueueToPortDispatcherInst(
             entry_reset_o       = ldq_reset,
             queue_head_oh_i     = ldq_head_oh
         )
+
+        This generates, inside 'config_0_core.vhd' and under the 'architecture config_0_core', the following instantiation
+
+        architecture arch of config_0_core is
+            signal ...
+        begin
+            ...
+            config_0_core_ldd_dispatcher : entity work.config_0_core_ldd
+                port map(
+                    rst => rst,
+                    clk => clk,
+                    port_bits_0_o => ldp_data_0_o,
+                    port_bits_1_o => ldp_data_1_o,
+                    port_ready_0_i => ldp_data_ready_0_i,
+                    port_ready_1_i => ldp_data_ready_1_i,
+                    port_valid_0_o => ldp_data_valid_0_o,
+                    port_valid_1_o => ldp_data_valid_1_o,
+                    entry_valid_0_i => ldq_valid_0_q,
+                    entry_valid_1_i => ldq_valid_1_q,
+                    entry_bits_valid_0_i => ldq_data_valid_0_q,
+                    entry_bits_valid_1_i => ldq_data_valid_1_q,
+                    entry_port_idx_0_i => ldq_port_idx_0_q,
+                    entry_port_idx_1_i => ldq_port_idx_1_q,
+                    entry_bits_0_i => ldq_data_0_q,
+                    entry_bits_1_i => ldq_data_1_q,
+                    entry_reset_0_o => ldq_reset_0,
+                    entry_reset_1_o => ldq_reset_1,
+                    queue_head_oh_i => ldq_head_oh
+                );
+            ...
+        end architecture;
     """
 
     arch = ctx.get_current_indent(
