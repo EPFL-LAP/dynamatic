@@ -688,6 +688,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
       b. A single address operand for load accesses coming through the LSQ and
          a single pair of address/data operands for store accesses coming
          through the LSQ. 
+    3. A `ctrlEnd` signal indicating all the remaining store requests have been
+         registered in the memory controller.
 
     The order of memory outputs is
     1. Load results, in program order (i.e., in load accesses order).
@@ -768,6 +770,8 @@ def LSQOp : Handshake_Op<"lsq", [
       b. Load/Store access requests from within the block, in program order.
     3. If an MC references the same memory region, a single data operand for
        load accesses coming back from an external memory through the MC.
+    4. A `ctrlEnd` signal signal indicating that no more group allocation
+        signals will come.
 
     The order of results is
     1. Load results, in program order (i.e., in load accesses order).
