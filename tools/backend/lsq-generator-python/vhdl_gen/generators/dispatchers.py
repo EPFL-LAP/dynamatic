@@ -384,7 +384,8 @@ def PortToQueueDispatcherInst(
             signal ...
         begin
             ...
-	        config_0_core_lda_dispatcher : entity work.config_0_core_lda
+
+            config_0_core_lda_dispatcher : entity work.config_0_core_lda
                 port map(
                     rst => rst,
                     clk => clk,
