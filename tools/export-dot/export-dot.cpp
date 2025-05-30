@@ -16,13 +16,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Handshake.h.inc"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "handshake.h.inc"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
