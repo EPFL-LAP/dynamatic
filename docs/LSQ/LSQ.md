@@ -2,7 +2,7 @@
 
 Detailed documentation for the `LSQ` generator, which emits a VHDL entity and architecture to assemble a complete Load-Store Queue. It instantiates and connects all dispatchers (Port-to-Queue and Queue-to-Port dispatchers), the group allocator, and optional pipeline logics into one cohesive RTL block.
 
-![LSQ](./images_lsq/lsq.png)
+![LSQ](./figs/lsq.png)
 
 ## Interface Signals
 
@@ -59,7 +59,7 @@ Detailed documentation for the `LSQ` generator, which emits a VHDL entity and ar
         - Head/tail pointers are plain binary counters with wrap-around (`ldq_tail`, `stq_head`), plus one-hot conversion (`BitsToOH` and `OHToBits`) for easy indexing.
 
 3. Full Load-Store Order Matrix `store_is_older`  
-![Pipelining](./images_lsq/load_store_order_matrix.png)
+![Pipelining](./figs/load_store_order_matrix.png)
     - Combine the initial load-store order matrix `store_is_order` with the new group's load-store order matrix. 
 
 4. Dependency Checking & Request Issue
@@ -75,7 +75,7 @@ Detailed documentation for the `LSQ` generator, which emits a VHDL entity and ar
         - Send bypassed data to load queue
 
 5. Pipelining  
-![Pipelining](./images_lsq/pipeline.png)
+![Pipelining](./figs/pipeline.png)
     - Purpose
         - The dependency-checking unit is the longest combinational path in the LSQ, so we split it into shorter timing-friendly segments.
     - Implementation

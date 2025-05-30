@@ -2,7 +2,7 @@
 
 Detailed documentation for the Queue-to-Port dispatcher generator, which emits a VHDL entity and architecture to route completed payloads from LSQ entries back to the access ports.
 
-![Queue-to-Port Dispatcher](./images_LSQ/queue_to_port.png)
+![Queue-to-Port Dispatcher](./figs/queue_to_port.png)
 > **Figure:** Queue-to-Port Dispatcher
 ## Interface Signals
 

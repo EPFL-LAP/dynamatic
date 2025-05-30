@@ -2,7 +2,7 @@
 
 Detailed documentation for the `GroupAllocator` generator, which emits a VHDL entity and architecture to coordinate issuance of load and store groups into the LSQ. It allocates free queue entries based on group size reqirements and enforces load-store ordering policies.
 
-![Group Allocator](./images_LSQ/group_allocator.png)
+![Group Allocator](./figs/group_allocator.png)
 
 ## Interface Signals
 

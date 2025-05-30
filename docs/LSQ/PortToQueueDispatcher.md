@@ -2,7 +2,7 @@
 
 Detailed documentation for the Port-to-Queue dispatcher generator, which emits a VHDL entity and architecture to route incoming data and address from access ports into LSQ entries.
 
-![Port-to-Queue Dispatcher](./images_LSQ/port_to_queue.png)
+![Port-to-Queue Dispatcher](./figs/port_to_queue.png)
 > **Figure:** Port-to-Queue Dispatcher
 
 ## Interface Signals
