@@ -75,7 +75,7 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
 
     assignments = []
 
-    # Concat dataIn data and extra signals to create dataIn_concat
+    # Concat dataIn data and extra signals (except spec) to create dataIn_concat
     assignments.extend(generate_concat(
         "dataIn", bitwidth, "dataIn_concat", concat_layout))
 

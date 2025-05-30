@@ -6,7 +6,9 @@ from generators.support.signal_manager.utils.internal_signal import create_inter
 from .utils.types import Channel, ExtraSignals
 
 
-def _generate_concat(channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
+def _generate_concat(channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], internal_channel_decls: list[str], internal_channels: dict[str, Channel]):
+    # Concat extra signals, but spec is forwarded.
+
     channel_name = channel["name"]
     internal_name = f"{channel_name}_concat"
     channel_bitwidth = channel["bitwidth"]
@@ -19,21 +21,35 @@ def _generate_concat(channel: Channel, concat_layout: ConcatLayout, concat_assig
         "extra_signals": {"spec": 1}
     }
 
-    # Declare the concat channel
-    concat_channel_decls.extend(create_internal_channel_decl(internal_channel))
+    # Declare the internal (concatenated) channel
+    # Example:
+    # signal ins_concat : std_logic_vector(39 downto 0);
+    # signal ins_concat_valid : std_logic;
+    # signal ins_concat_ready : std_logic;
+    # signal ins_concat_spec : std_logic_vector(0 downto 0);
+    internal_channel_decls.extend(
+        create_internal_channel_decl(internal_channel))
 
-    # Register the concat channel
-    concat_channels[channel_name] = internal_channel
+    # Register the internal channel
+    internal_channels[channel_name] = internal_channel
 
-    # Concatenate the input channel data and extra signals to create the concat channel
+    # Concatenate the input channel data and extra signals to create the internal channel
+    # Example:
+    # ins_concat(32 - 1 downto 0) <= ins;
+    # ins_concat(39 downto 32) <= ins_tag0;
+    # ins_concat_valid <= ins_valid;
+    # ins_ready <= ins_concat_ready;
     concat_assignments.extend(generate_concat_and_handshake(
         channel_name, channel_bitwidth, internal_name, concat_layout, channel_size))
 
     # Forward spec bit
+    # Example: ins_concat_spec <= ins_spec;
     concat_assignments.append(f"{internal_name}_spec <= {channel_name}_spec;")
 
 
-def _generate_slice(channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
+def _generate_slice(channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], internal_channel_decls: list[str], internal_channels: dict[str, Channel]):
+    # Slice extra signals, but spec is forwarded.
+
     channel_name = channel["name"]
     internal_name = f"{channel_name}_concat"
     channel_bitwidth = channel["bitwidth"]
@@ -46,17 +62,29 @@ def _generate_slice(channel: Channel, concat_layout: ConcatLayout, slice_assignm
         "extra_signals": {"spec": 1}
     }
 
-    # Declare the concat channel
-    concat_channel_decls.extend(create_internal_channel_decl(internal_channel))
+    # Declare the internal (concatenated) channel
+    # Example:
+    # signal outs_concat : std_logic_vector(39 downto 0);
+    # signal outs_concat_valid : std_logic;
+    # signal outs_concat_ready : std_logic;
+    # signal outs_concat_spec : std_logic_vector(0 downto 0);
+    internal_channel_decls.extend(
+        create_internal_channel_decl(internal_channel))
 
-    # Register the concat channel
-    concat_channels[channel_name] = internal_channel
+    # Register the internal channel
+    internal_channels[channel_name] = internal_channel
 
-    # Slice the concat channel to create the output channel data and extra signals
+    # Slice the internal channel to create the output channel data and extra signals
+    # Example:
+    # outs <= outs_concat(32 - 1 downto 0);
+    # outs_tag0 <= outs_concat(39 downto 32);
+    # outs_valid <= outs_concat_valid;
+    # outs_concat_ready <= outs_ready;
     slice_assignments.extend(generate_slice_and_handshake(
         internal_name, channel_name, channel_bitwidth, concat_layout, channel_size))
 
     # Forward spec bit
+    # Example: outs_spec <= outs_concat_spec;
     slice_assignments.append(f"{channel_name}_spec <= {internal_name}_spec;")
 
 
@@ -97,7 +125,7 @@ def generate_spec_units_signal_manager(
     ctrl_channels = [
         channel for channel in in_channels if channel["name"] in ctrl_names]
 
-    # Layout info for how extra signals are packed into one std_logic_vector
+    # Layout info for how extra signals (except for spec) are packed into one std_logic_vector
     concat_layout = ConcatLayout(extra_signals_without_spec)
 
     inner_name = f"{name}_inner"
@@ -105,20 +133,20 @@ def generate_spec_units_signal_manager(
 
     assignments: list[str] = []
     decls: list[str] = []
-    transformed_channels: dict[str, Channel] = {}
+    internal_channels: dict[str, Channel] = {}
 
     for channel in in_channel_without_ctrl:
         _generate_concat(channel, concat_layout,
-                         assignments, decls, transformed_channels)
+                         assignments, decls, internal_channels)
 
     for channel in out_channels:
         _generate_slice(channel, concat_layout,
-                        assignments, decls, transformed_channels)
+                        assignments, decls, internal_channels)
 
     mappings: list[str] = []
-    for internal_channel_name, channel in transformed_channels.items():
+    for original_channel_name, channel in internal_channels.items():
         # Internal channel name is different from the original channel name
-        mappings.extend(generate_mapping(internal_channel_name, channel))
+        mappings.extend(generate_mapping(original_channel_name, channel))
 
     for ctrl_channel in ctrl_channels:
         # Control channels are not concatenated, just mapped directly

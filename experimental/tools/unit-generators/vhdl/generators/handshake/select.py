@@ -143,20 +143,38 @@ def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
     concat_assignments = []
 
     # Declare trueValue_inner and falseValue_inner channels
+    # Example:
+    # signal trueValue_inner : std_logic_vector(32 downto 0);
+    # signal trueValue_inner_valid : std_logic;
+    # signal trueValue_inner_ready : std_logic;
     concat_decls.extend(create_internal_channel_decl({
         "name": "trueValue_inner",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
+    # Example:
+    # signal falseValue_inner : std_logic_vector(32 downto 0);
+    # signal falseValue_inner_valid : std_logic;
+    # signal falseValue_inner_ready : std_logic;
     concat_decls.extend(create_internal_channel_decl({
         "name": "falseValue_inner",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
 
     # Concatenate trueValue data and extra signals to create trueValue_inner
+    # Example:
+    # trueValue_inner(32 - 1 downto 0) <= trueValue;
+    # trueValue_inner(32 downto 32) <= trueValue_spec;
+    # trueValue_inner_valid <= trueValue_valid;
+    # trueValue_ready <= trueValue_inner_ready;
     concat_assignments.extend(generate_concat_and_handshake(
         "trueValue", bitwidth, "trueValue_inner", concat_layout))
 
     # Concatenate falseValue data and extra signals to create falseValue_inner
+    # Example:
+    # falseValue_inner(32 - 1 downto 0) <= falseValue;
+    # falseValue_inner(32 downto 32) <= falseValue_spec;
+    # falseValue_inner_valid <= falseValue_valid;
+    # falseValue_ready <= falseValue_inner_ready;
     concat_assignments.extend(generate_concat_and_handshake(
         "falseValue", bitwidth, "falseValue_inner", concat_layout))
 
@@ -168,10 +186,19 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
     slice_assignments = []
 
     # Declare both result_inner_concat and result_inner channels
+    # Example:
+    # signal result_inner_concat : std_logic_vector(32 downto 0);
+    # signal result_inner_concat_valid : std_logic;
+    # signal result_inner_concat_ready : std_logic;
     slice_decls.extend(create_internal_channel_decl({
         "name": "result_inner_concat",
         "bitwidth": bitwidth + concat_layout.total_bitwidth
     }))
+    # Example:
+    # signal result_inner : std_logic_vector(31 downto 0);
+    # signal result_inner_valid : std_logic;
+    # signal result_inner_ready : std_logic;
+    # signal result_inner_spec : std_logic_vector(0 downto 0);
     slice_decls.extend(create_internal_channel_decl({
         "name": "result_inner",
         "bitwidth": bitwidth,
@@ -179,6 +206,11 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
     }))
 
     # Slice result_inner_concat to create result_inner data and extra signals
+    # Example:
+    # result_inner <= result_inner_concat(32 - 1 downto 0);
+    # result_inner_spec <= result_inner_concat(32 downto 32);
+    # result_inner_valid <= result_inner_concat_valid;
+    # result_inner_concat_ready <= result_inner_ready;
     slice_assignments.extend(generate_slice_and_handshake(
         "result_inner_concat", "result_inner", bitwidth, concat_layout))
 
@@ -219,6 +251,7 @@ def _generate_select_signal_manager(name, bitwidth, extra_signals):
 
     forwarding_assignments = []
     # Signal-wise forwarding of extra signals from condition and result_inner to result
+    # Example: result_spec <= condition_spec or result_inner_spec;
     for signal_name in extra_signals:
         forwarding_assignments.extend(generate_signal_wise_forwarding(
             ["condition", "result_inner"], ["result"], signal_name))

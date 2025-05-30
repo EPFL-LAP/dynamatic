@@ -61,6 +61,8 @@ end architecture;
 
 
 def _generate_store_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
+    # Discard extra signals
+
     inner_name = f"{name}_inner"
     inner = _generate_store(inner_name, data_bitwidth, addr_bitwidth)
 

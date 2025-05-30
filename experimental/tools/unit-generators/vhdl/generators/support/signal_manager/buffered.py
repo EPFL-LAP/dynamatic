@@ -7,12 +7,16 @@ from .utils.internal_signal import create_internal_vector_decl, create_internal_
 
 
 def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
+    # Assignments example:
+    # transfer_in <= lhs_valid and lhs_ready;
+    # transfer_out <= result_valid and result_ready;
+
     first_in_channel_name = in_channels[0]["name"]
     first_out_channel_name = out_channels[0]["name"]
 
     return f"""transfer_in <= {first_in_channel_name}_valid and {first_in_channel_name}_ready;
   transfer_out <= {first_out_channel_name}_valid and {first_out_channel_name}_ready;""", \
-        "  signal transfer_in, transfer_out : std_logic;"
+        "signal transfer_in, transfer_out : std_logic;"
 
 
 def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
@@ -20,10 +24,13 @@ def _generate_concat(concat_layout: ConcatLayout) -> tuple[str, str]:
     concat_decls = []
 
     # Declare `signals_pre_buffer` signal
+    # Example: signal signals_pre_buffer : std_logic_vector(0 downto 0);
     concat_decls.append(create_internal_vector_decl(
         "signals_pre_buffer", concat_layout.total_bitwidth))
 
     # Concatenate `forwarded` extra signals to create `signals_pre_buffer`
+    # Example:
+    # signals_pre_buffer(0 downto 0) <= forwarded_spec;
     concat_assignments.extend(generate_concat(
         "forwarded", 0, "signals_pre_buffer", concat_layout))
 
@@ -35,16 +42,15 @@ def _generate_slice(concat_layout: ConcatLayout) -> tuple[str, str]:
     slice_decls = []
 
     # Declare both `signals_post_buffer` and `sliced` signals
+    # Example: signal signals_post_buffer : std_logic_vector(0 downto 0);
     slice_decls.append(create_internal_vector_decl(
         "signals_post_buffer", concat_layout.total_bitwidth))
-    slice_decls.append(create_internal_vector_decl(
-        "sliced", concat_layout.total_bitwidth))
-
-    # Declare extra signals of `sliced` channel
+    # Example: signal sliced_spec : std_logic_vector(0 downto 0);
     slice_decls.extend(create_internal_extra_signals_decl(
         "sliced", concat_layout.extra_signals))
 
     # Slice `signals_post_buffer` to create `sliced` data and extra signals
+    # Example: sliced_spec <= signals_post_buffer(0 downto 0);
     slice_assignments.extend(generate_slice(
         "signals_post_buffer", "sliced", 0, concat_layout))
 
@@ -107,10 +113,12 @@ def generate_buffered_signal_manager(
     forwarding_assignments = []
     forwarding_decls = []
     # Signal-wise forwarding of extra signals from in_channels to `forwarded`
+    # Example: forwarded_spec <= lhs_spec or rhs_spec;
     for signal_name in extra_signals:
         forwarding_assignments.extend(generate_signal_wise_forwarding(
             in_channel_names, ["forwarded"], signal_name))
     # Declare extra signals of `forwarded` channel
+    # Example: signal forwarded_spec : std_logic_vector(0 downto 0);
     forwarding_decls.extend(
         create_internal_extra_signals_decl("forwarded", extra_signals))
 
@@ -118,6 +126,7 @@ def generate_buffered_signal_manager(
     slice_assignments, slice_decls = _generate_slice(concat_layout)
 
     # Assign the extra signals of `sliced` to the output channel
+    # Example: result_spec <= sliced_spec;
     output_assignments = []
     for out_channel_name in out_channel_names:
         for signal_name, _ in extra_signals.items():

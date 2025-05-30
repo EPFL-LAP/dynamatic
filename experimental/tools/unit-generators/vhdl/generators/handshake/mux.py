@@ -184,6 +184,10 @@ def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int)
     concat_assignments = []
 
     # Declare ins_inner channel
+    # Example:
+    # signal ins_inner : data_array(1 downto 0)(32 downto 0);
+    # signal ins_inner_valid : std_logic_vector(1 downto 0);
+    # signal ins_inner_ready : std_logic_vector(1 downto 0);
     concat_decls.extend(create_internal_channel_decl({
         "name": "ins_inner",
         "bitwidth": data_bitwidth + concat_layout.total_bitwidth,
@@ -191,6 +195,13 @@ def _generate_concat(data_bitwidth: int, concat_layout: ConcatLayout, size: int)
     }))
 
     # Concatenate ins data and extra signals to create ins_inner
+    # Example:
+    # ins_inner(0)(32 - 1 downto 0) <= ins(0);
+    # ins_inner(0)(32 downto 32) <= ins_0_spec;
+    # ins_inner(1)(32 - 1 downto 0) <= ins(1);
+    # ins_inner(1)(32 downto 32) <= ins_1_spec;
+    # ins_inner_valid <= ins_valid;
+    # ins_ready <= ins_inner_ready;
     concat_assignments.extend(generate_concat_and_handshake(
         "ins", data_bitwidth, "ins_inner", concat_layout, size))
 
@@ -202,10 +213,20 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
     slice_assignments = []
 
     # Declare both outs_inner_concat and outs_inner channels
+    # Example:
+    # signal outs_inner_concat : std_logic_vector(32 downto 0);
+    # signal outs_inner_concat_valid : std_logic;
+    # signal outs_inner_concat_ready : std_logic;
     slice_decls.extend(create_internal_channel_decl({
         "name": "outs_inner_concat",
         "bitwidth": data_bitwidth + concat_layout.total_bitwidth
     }))
+
+    # Example:
+    # signal outs_inner : std_logic_vector(31 downto 0);
+    # signal outs_inner_valid : std_logic;
+    # signal outs_inner_ready : std_logic;
+    # signal outs_inner_spec : std_logic_vector(0 downto 0);
     slice_decls.extend(create_internal_channel_decl({
         "name": "outs_inner",
         "bitwidth": data_bitwidth,
@@ -213,6 +234,11 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
     }))
 
     # Slice outs_inner_concat to create outs_inner data and extra signals
+    # Example:
+    # outs_inner <= outs_inner_concat(32 - 1 downto 0);
+    # outs_inner_spec <= outs_inner_concat(32 downto 32);
+    # outs_inner_valid <= outs_inner_concat_valid;
+    # outs_inner_concat_ready <= outs_inner_ready;
     slice_assignments.extend(generate_slice_and_handshake(
         "outs_inner_concat", "outs_inner", data_bitwidth, concat_layout))
 
@@ -221,7 +247,10 @@ def _generate_slice(data_bitwidth: int, concat_layout: ConcatLayout) -> tuple[st
 
 def _generate_forwarding(extra_signals: ExtraSignals) -> str:
     forwarding_assignments = []
+
     # Signal-wise forwarding of extra signals from ins_inner and outs_inner to outs
+    # Example:
+    # outs_spec <= index_spec or outs_inner_spec;
     for signal_name in extra_signals:
         forwarding_assignments.extend(generate_signal_wise_forwarding(
             ["index", "outs_inner"], ["outs"], signal_name))

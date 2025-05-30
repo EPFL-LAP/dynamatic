@@ -6,7 +6,7 @@ from generators.support.signal_manager.utils.internal_signal import create_inter
 from .utils.types import Channel, ExtraSignals
 
 
-def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
+def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_assignments: list[str], internal_channel_decls: list[str], internal_channels: dict[str, Channel]):
     channel_name = in_channel["name"]
     internal_name = f"{channel_name}_concat"
     channel_bitwidth = in_channel["bitwidth"]
@@ -19,13 +19,23 @@ def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_as
         "extra_signals": {}
     }
 
-    # Declare the concat channel
-    concat_channel_decls.extend(create_internal_channel_decl(internal_channel))
+    # Declare the internal (concatenated) channel
+    # Example:
+    # signal ins_concat : std_logic_vector(32 downto 0);
+    # signal ins_concat_valid : std_logic;
+    # signal ins_concat_ready : std_logic;
+    internal_channel_decls.extend(
+        create_internal_channel_decl(internal_channel))
 
-    # Register the concat channel
-    concat_channels[channel_name] = internal_channel
+    # Register the internal channel
+    internal_channels[channel_name] = internal_channel
 
-    # Concatenate the input channel data and extra signals to create the concat channel
+    # Concatenate the input channel data and extra signals to create the internal channel
+    # Example:
+    # ins_concat(32 - 1 downto 0) <= ins;
+    # ins_concat(32 downto 32) <= ins_spec;
+    # ins_concat_valid <= ins_valid;
+    # ins_ready <= ins_concat_ready;
     concat_assignments.extend(generate_concat_and_handshake(
         channel_name,
         channel_bitwidth,
@@ -35,7 +45,7 @@ def _generate_concat(in_channel: Channel, concat_layout: ConcatLayout, concat_as
     ))
 
 
-def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], concat_channel_decls: list[str], concat_channels: dict[str, Channel]):
+def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_assignments: list[str], internal_channel_decls: list[str], internal_channels: dict[str, Channel]):
     channel_name = out_channel["name"]
     internal_name = f"{channel_name}_concat"
     channel_bitwidth = out_channel["bitwidth"]
@@ -48,13 +58,27 @@ def _generate_slice(out_channel: Channel, concat_layout: ConcatLayout, slice_ass
         "extra_signals": {}
     }
 
-    # Declare the concat channel
-    concat_channel_decls.extend(create_internal_channel_decl(internal_channel))
+    # Declare the internal (concatenated) channel
+    # Example:
+    # signal outs_concat : data_array(2 downto 0)(32 downto 0);
+    # signal outs_concat_valid : std_logic_vector(2 downto 0);
+    # signal outs_concat_ready : std_logic_vector(2 downto 0);
+    internal_channel_decls.extend(
+        create_internal_channel_decl(internal_channel))
 
-    # Register the concat channel
-    concat_channels[channel_name] = internal_channel
+    # Register the internal channel
+    internal_channels[channel_name] = internal_channel
 
-    # Slice the concat channel to create the output channel data and extra signals
+    # Slice the internal channel to create the output channel data and extra signals
+    # Example:
+    # outs(0) <= outs_concat(0)(32 - 1 downto 0);
+    # outs_0_spec <= outs_concat(0)(32 downto 32);
+    # outs(1) <= outs_concat(1)(32 - 1 downto 0);
+    # outs_1_spec <= outs_concat(1)(32 downto 32);
+    # outs(2) <= outs_concat(2)(32 - 1 downto 0);
+    # outs_2_spec <= outs_concat(2)(32 downto 32);
+    # outs_valid <= outs_concat_valid;
+    # outs_concat_ready <= outs_ready;
     slice_assignments.extend(generate_slice_and_handshake(
         internal_name,
         channel_name,
@@ -105,8 +129,13 @@ def generate_concat_signal_manager(
                         assignments, decls, channels)
 
     mappings: list[str] = []
-    for channel_name, concat_channel in channels.items():
-        mappings.extend(generate_mapping(channel_name, concat_channel))
+    for original_channel_name, concat_channel in channels.items():
+        # Example:
+        # ins => ins_concat,
+        # ins_valid => ins_concat_valid,
+        # ins_ready => ins_concat_ready,
+        mappings.extend(generate_mapping(
+            original_channel_name, concat_channel))
 
     architecture = f"""
 -- Architecture of signal manager (concat)

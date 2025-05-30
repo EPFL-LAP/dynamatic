@@ -91,6 +91,8 @@ end architecture;
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
+    # Concatenate extra signals and store them in a dedicated FIFO
+
     # Get concatenation details for extra signals
     concat_layout = ConcatLayout(extra_signals)
     extra_signals_total_bitwidth = concat_layout.total_bitwidth
