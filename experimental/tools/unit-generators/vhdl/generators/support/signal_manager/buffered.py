@@ -7,9 +7,15 @@ from .utils.internal_signal import create_internal_vector_decl, create_internal_
 
 
 def _generate_transfer_logic(in_channels: list[Channel], out_channels: list[Channel]) -> tuple[str, str]:
-    # Assignments example:
-    # transfer_in <= lhs_valid and lhs_ready;
-    # transfer_out <= result_valid and result_ready;
+    """
+    Generate transfer logic indicating when data is transferred on the input and
+    output channels. This guides the internal FIFO storing extra signals on when
+    to push or pop.
+    Returns both assignments and declarations.
+    Assignments example:
+        transfer_in <= lhs_valid and lhs_ready;
+        transfer_out <= result_valid and result_ready;
+    """
 
     first_in_channel_name = in_channels[0]["name"]
     first_out_channel_name = out_channels[0]["name"]

@@ -157,19 +157,19 @@ def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, ou
     return assignments
 
 
-def generate_mapping(internal_channel_name: str, channel: Channel) -> list[str]:
+def generate_mapping(original_channel_name: str, channel: Channel) -> list[str]:
     """
     Generate VHDL port mappings of a channel, for the inner entity (port map (...)).
     Maps extra signals if present.
-    `inner_channel_name` can differ from the name of `channel`. For example, the
+    `original_channel_name` can differ from the name of `channel`. For example, the
     `channel` can be internally defined as `ins_inner`, while it still maps to the
     original channel name `ins` in the inner entity.
     Args:
-      internal_channel_name (str): Name of the channel in the inner entity.
+      original_channel_name (str): Name of the channel in the inner entity.
       channel (Channel): Channel to generate mapping for.
     Returns:
       mapping (list[str]): List of VHDL mapping strings for the channel.
-      - Example: When `internal_channel_name` is `ins_inner` and `channel` is named `ins`,
+      - Example: When `original_channel_name` is `ins` and `channel` is named `ins_inner`,
         carrying `spec` extra signal:
         ins => ins_inner,
         ins_valid => ins_inner_valid,
@@ -184,15 +184,15 @@ def generate_mapping(internal_channel_name: str, channel: Channel) -> list[str]:
 
     if channel_bitwidth > 0:
         # Mapping for data signal if present
-        mapping.append(f"{internal_channel_name} => {channel_name}")
+        mapping.append(f"{original_channel_name} => {channel_name}")
 
     # Mapping for handshake signals
-    mapping.append(f"{internal_channel_name}_valid => {channel_name}_valid")
-    mapping.append(f"{internal_channel_name}_ready => {channel_name}_ready")
+    mapping.append(f"{original_channel_name}_valid => {channel_name}_valid")
+    mapping.append(f"{original_channel_name}_ready => {channel_name}_ready")
 
     for signal_name in channel_extra_signals:
         mapping.append(
-            f"{internal_channel_name}_{signal_name} => {channel_name}_{signal_name}")
+            f"{original_channel_name}_{signal_name} => {channel_name}_{signal_name}")
 
     return mapping
 
