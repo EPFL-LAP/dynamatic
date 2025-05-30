@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
 
 using namespace mlir;
@@ -433,17 +434,18 @@ LogicalResult BufferOp::verify() {
 
   auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
   if (!bufferTypeAttr)
-    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
 
   auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
   if (!numSlotsAttr)
-    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
 
   StringRef bufferType = bufferTypeAttr.getValue();
   unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
 
-  if ((bufferType == ONE_SLOT_BREAK_DV ||
-       bufferType == ONE_SLOT_BREAK_R ||
+  if ((bufferType == ONE_SLOT_BREAK_DV || bufferType == ONE_SLOT_BREAK_R ||
        bufferType == ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
@@ -1191,7 +1193,8 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
     expectedResIdx -= 1;
   if (resIdx != expectedResIdx) {
     return lsqPorts.memOp->emitError()
-           << "Some memory results were unnacounted for when identifying ports";
+           << "Some memory results were unnaccounted for when identifying "
+              "ports";
   }
   return success();
 }
@@ -1275,6 +1278,14 @@ SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
         // We have reached a group allocation to the same LSQ, stop the search
         // along this path
         resultsToAlloc.push_back(res);
+        break;
+      }
+
+      if (succOp == *this) {
+        // This is the LSQ itself and the control signal is not the group
+        // allocation. Which means that it is the ctrlEnd signal (i.e., no new
+        // group allocation will arrive). In this case, we do not add it to the
+        // set of allocation signals to return.
         break;
       }
 

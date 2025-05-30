@@ -75,34 +75,18 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
       if (isa<handshake::LSQOp>(*forkRes.getUsers().begin()))
         continue;
 
-      if (ctrlPathSet.contains(forkRes)) {
-        // Path goes to other group allocation to the same LSQ
-        Channel channel(forkRes, true);
-        if (channel.props->maxOpaque.value_or(1) > 0) {
-          channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
-        } else {
-          OpOperand &oprd = channel.getOperand();
-          ctrlDefOp->emitWarning()
-              << "Fork result " << forkRes.getResultNumber() << " ("
-              << getUniqueName(oprd)
-              << ") is on path to other LSQ group allocation and should "
-                 "have its data/valid paths cut, "
-              << ERR_CONFLICT;
-        }
+      // Path goes to other group allocation to the same LSQ
+      Channel channel(forkRes, true);
+      if (channel.props->maxOpaque.value_or(1) > 0) {
+        channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
       } else {
-        // Path does not go to the same LSQ
-        Channel channel(forkRes, true);
-        if (channel.props->maxTrans.value_or(1) > 0) {
-          channel.props->minTrans = std::max(channel.props->minTrans, 1U);
-        } else {
-          OpOperand &oprd = channel.getOperand();
-          ctrlDefOp->emitWarning()
-              << "Fork result " << forkRes.getResultNumber() << " ("
-              << getUniqueName(oprd)
-              << ") is *not* on path to other LSQ group allocation and "
-                 "should have its ready path cut, "
-              << ERR_CONFLICT;
-        }
+        OpOperand &oprd = channel.getOperand();
+        ctrlDefOp->emitWarning()
+            << "Fork result " << forkRes.getResultNumber() << " ("
+            << getUniqueName(oprd)
+            << ") is on path to other LSQ group allocation and should "
+               "have its data/valid paths cut, "
+            << ERR_CONFLICT;
       }
     }
   }

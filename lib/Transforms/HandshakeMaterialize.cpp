@@ -20,6 +20,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <iterator>
 
 using namespace mlir;
@@ -145,7 +146,7 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
       // fork, so the result can be eager
       SmallVector<Value> ctrlResults = lsqOp.getControlPaths(forkOp);
       assert(!ctrlResults.empty() && "at least one control path must exist");
-      if (ctrlResults.size() > 1)
+      if (!ctrlResults.empty())
         lazyChannels[forkOp].insert(ctrlResults.begin(), ctrlResults.end());
     }
   }
