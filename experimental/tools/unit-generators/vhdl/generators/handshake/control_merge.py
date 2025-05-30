@@ -1,4 +1,8 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat_and_handshake, generate_slice_and_handshake
+from generators.support.signal_manager.utils.types import ExtraSignals
 from generators.handshake.tehb import generate_tehb
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.fork import generate_fork
@@ -168,19 +172,34 @@ end architecture;
     return dependencies + entity + architecture
 
 
+# TODO: Update CMerge's type constraints and remove this function
+def _generate_index_extra_signal_assignments(index_name: str, index_extra_signals: ExtraSignals) -> str:
+    """
+    Generate VHDL assignments for extra signals on the index port (cmerge).
+
+    Example:
+      - index_tag0 <= "0";
+    """
+
+    # TODO: Extra signals on the index port are not tested
+    index_extra_signals_list = []
+    for signal_name in index_extra_signals:
+        index_extra_signals_list.append(
+            f"  {index_name}_{signal_name} <= {get_default_extra_signal_value(signal_name)};")
+    return "\n  ".join(index_extra_signals_list)
+
+
 def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitwidth, extra_signals):
-    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-        extra_signals)
-    return generate_signal_manager(name, {
-        "type": "bbmerge",
-        "in_ports": [{
+    # Generate signal manager entity
+    entity = generate_entity(
+        name,
+        [{
             "name": "ins",
             "bitwidth": data_bitwidth,
-            "2d": True,
             "size": size,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "index",
             "bitwidth": index_bitwidth,
             # TODO: Extra signals for index port are not tested
@@ -189,8 +208,59 @@ def _generate_control_merge_signal_manager(name, size, index_bitwidth, data_bitw
             "name": "outs",
             "bitwidth": data_bitwidth,
             "extra_signals": extra_signals
-        }],
-        "index_name": "index",
-        "index_dir": "out",
-        "extra_signals": extra_signals
-    }, lambda name: _generate_control_merge(name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth))
+        }])
+
+    # Layout info for how extra signals are packed into one std_logic_vector
+    concat_layout = ConcatLayout(extra_signals)
+    extra_signals_bitwidth = concat_layout.total_bitwidth
+
+    inner_name = f"{name}_inner"
+    inner = _generate_control_merge(
+        inner_name, size, index_bitwidth, extra_signals_bitwidth + data_bitwidth)
+
+    assignments = []
+
+    # Concatenate ins data and extra signals to create ins_inner
+    assignments.extend(generate_concat_and_handshake(
+        "ins", data_bitwidth, "ins_inner", concat_layout, size))
+
+    # Slice outs_inner data to create outs data and extra signals
+    assignments.extend(generate_slice_and_handshake(
+        "outs_inner", "outs", data_bitwidth, concat_layout))
+
+    # Assign index extra signals (TODO: Remove this)
+    index_extra_signal_assignments = _generate_index_extra_signal_assignments(
+        "index", extra_signals)
+
+    architecture = f"""
+-- Architecture of signal manager (cmerge)
+architecture arch of {name} is
+  signal ins_inner : data_array({size} - 1 downto 0)({data_bitwidth} + {extra_signals_bitwidth} - 1 downto 0);
+  signal ins_inner_valid, ins_inner_ready : std_logic_vector({size} - 1 downto 0);
+  signal outs_inner : std_logic_vector({data_bitwidth} + {extra_signals_bitwidth} - 1 downto 0);
+  signal outs_inner_valid, outs_inner_ready : std_logic;
+begin
+  -- Concat/slice data and extra signals
+  {"\n  ".join(assignments)}
+
+  -- Assign index extra signals
+  {index_extra_signal_assignments}
+
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins_inner,
+      ins_valid => ins_inner_valid,
+      ins_ready => ins_inner_ready,
+      outs => outs_inner,
+      outs_valid => outs_inner_valid,
+      outs_ready => outs_inner_ready,
+      index => index,
+      index_valid => index_valid,
+      index_ready => index_ready
+    );
+end architecture;
+"""
+
+    return inner + entity + architecture

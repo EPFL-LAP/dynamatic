@@ -1,6 +1,8 @@
 from generators.handshake.cond_br import generate_cond_br
 from generators.handshake.merge import generate_merge
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
+from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.utils import data
 
 
@@ -144,26 +146,62 @@ end architecture;
 
 
 def _generate_spec_commit_signal_manager(name, bitwidth, extra_signals):
+    # Concat signals except spec
+
     extra_signals_without_spec = extra_signals.copy()
     extra_signals_without_spec.pop("spec")
 
-    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-        extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
-            "name": "ins",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals
-        }, {
-            "name": "ctrl",
-            "bitwidth": 1
-        }],
-        "out_ports": [{
-            "name": "outs",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals_without_spec,
-        }],
-        "extra_signals": extra_signals_without_spec,
-        "ignore_ports": ["ctrl"]
-    }, lambda name: _generate_spec_commit(name, bitwidth + extra_signals_bitwidth - 1))
+    concat_layout = ConcatLayout(extra_signals_without_spec)
+    extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
+
+    inner_name = f"{name}_inner"
+    inner = _generate_spec_commit(
+        inner_name, bitwidth + extra_signals_without_spec_bitwidth)
+
+    entity = generate_entity(name, [{
+        "name": "ins",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "ctrl",
+        "bitwidth": 1,
+        "extra_signals": {}
+    }], [{
+        "name": "outs",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals_without_spec
+    }])
+
+    assignments = []
+
+    # Concat ins data and extra signals (except spec) to create ins_concat
+    assignments.extend(generate_concat(
+        "ins", bitwidth, "ins_concat", concat_layout))
+
+    # Slice outs_concat to create outs data and extra signals (except spec)
+    assignments.extend(generate_slice(
+        "outs_concat", "outs", bitwidth, concat_layout))
+
+    architecture = f"""
+-- Architecture of spec_commit signal manager
+architecture arch of {name} is
+  signal ins_concat, outs_concat : std_logic_vector({bitwidth + extra_signals_without_spec_bitwidth} - 1 downto 0);
+begin
+  {"\n  ".join(assignments)}
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      ins => ins_concat,
+      ins_valid => ins_valid,
+      ins_ready => ins_ready,
+      outs => outs_concat,
+      outs_valid => outs_valid,
+      outs_ready => outs_ready,
+      -- Forward spec signal
+      ins_spec => ins_spec
+    );
+end architecture;
+"""
+
+    return inner + entity + architecture

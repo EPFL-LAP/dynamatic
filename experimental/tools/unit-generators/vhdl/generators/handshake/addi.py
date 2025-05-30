@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
@@ -66,9 +66,9 @@ end architecture;
 
 
 def _generate_addi_signal_manager(name, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [{
             "name": "lhs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -77,10 +77,10 @@ def _generate_addi_signal_manager(name, bitwidth, extra_signals):
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "result",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_addi(name, bitwidth))
+        extra_signals,
+        lambda name: _generate_addi(name, bitwidth))

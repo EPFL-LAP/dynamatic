@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 
 
 def generate_constant(name, params):
@@ -47,17 +47,17 @@ end architecture;
 
 
 def _generate_constant_signal_manager(name, value, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [{
             "name": "ctrl",
             "bitwidth": 0,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_constant(name, value, bitwidth))
+        extra_signals,
+        lambda name: _generate_constant(name, value, bitwidth))

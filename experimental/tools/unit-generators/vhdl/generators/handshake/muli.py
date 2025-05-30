@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
@@ -161,10 +161,9 @@ end architecture;
 
 
 def _generate_muli_signal_manager(name, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "buffered",
-        "latency": _get_latency(),
-        "in_ports": [{
+    return generate_buffered_signal_manager(
+        name,
+        [{
             "name": "lhs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -173,10 +172,11 @@ def _generate_muli_signal_manager(name, bitwidth, extra_signals):
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "result",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_muli(name, bitwidth))
+        extra_signals,
+        lambda name: _generate_muli(name, bitwidth),
+        _get_latency())
