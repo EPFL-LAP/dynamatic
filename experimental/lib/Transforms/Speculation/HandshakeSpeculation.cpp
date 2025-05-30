@@ -159,6 +159,8 @@ static bool forkTreeEquals(Value a, Value b) {
   return findForkTreeTop(a) == findForkTreeTop(b);
 }
 
+/// Finds an existing branch op that uses the given condition and data.
+/// Works for both SpeculatingBranchOp and ConditionalBranchOp.
 template <typename BranchOpType>
 static std::optional<BranchOpType> findExistingBranch(Value condition,
                                                       Value data) {
