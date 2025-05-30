@@ -196,37 +196,43 @@ end entity;
 
 -- Architecture of signal manager (concat)
 architecture arch of merge_0 is
-  -- Concatenated data and extra signals
-  signal ins_inner : data_array(1 downto 0)(40 downto 0);
-  signal outs_inner : std_logic_vector(40 downto 0);
+  signal ins_concat : data_array(1 downto 0)(40 downto 0);
+  signal ins_concat_valid : std_logic_vector(1 downto 0);
+  signal ins_concat_ready : std_logic_vector(1 downto 0);
+  signal outs_concat : std_logic_vector(40 downto 0);
+  signal outs_concat_valid : std_logic;
+  signal outs_concat_ready : std_logic;
 begin
-  -- Concatenate data and extra signals
-  ins_inner(0)(32 - 1 downto 0) <= ins(0);
-  ins_inner(0)(32 downto 32) <= ins_0_spec;
-  ins_inner(0)(40 downto 33) <= ins_0_tag0;
-  ins_inner(1)(32 - 1 downto 0) <= ins(1);
-  ins_inner(1)(32 downto 32) <= ins_1_spec;
-  ins_inner(1)(40 downto 33) <= ins_1_tag0;
-  outs <= outs_inner(32 - 1 downto 0);
-  outs_spec <= outs_inner(32 downto 32);
-  outs_tag0 <= outs_inner(40 downto 33);
+  -- Concate/slice data and extra signals
+  ins_concat(0)(32 - 1 downto 0) <= ins(0);
+  ins_concat(0)(32 downto 32) <= ins_0_spec;
+  ins_concat(0)(40 downto 33) <= ins_0_tag0;
+  ins_concat(1)(32 - 1 downto 0) <= ins(1);
+  ins_concat(1)(32 downto 32) <= ins_1_spec;
+  ins_concat(1)(40 downto 33) <= ins_1_tag0;
+  ins_concat_valid <= ins_valid;
+  ins_ready <= ins_concat_ready;
+  outs <= outs_concat(32 - 1 downto 0);
+  outs_spec <= outs_concat(32 downto 32);
+  outs_tag0 <= outs_concat(40 downto 33);
+  outs_valid <= outs_concat_valid;
+  outs_concat_ready <= outs_ready;
 
-  -- Note: Inner merge is generated with concatenated bitwidth
   inner : entity work.merge_0_inner(arch)
     port map(
       clk => clk,
       rst => rst,
-      ins => ins_inner,
-      ins_valid => ins_valid,
-      ins_ready => ins_ready,
-      outs => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
+      ins => ins_concat,
+      ins_valid => ins_concat_valid,
+      ins_ready => ins_concat_ready,
+      outs => outs_concat,
+      outs_valid => outs_concat_valid,
+      outs_ready => outs_concat_ready
     );
 end architecture;
 ```
 
-## `load` (custom signal manager)
+## `select` (custom signal manager)
 
 ```vhdl
 library ieee;
@@ -260,22 +266,33 @@ end entity;
 
 -- Architecture of selector signal manager
 architecture arch of select_0 is
+  signal trueValue_inner : std_logic_vector(32 downto 0);
+  signal trueValue_inner_valid : std_logic;
+  signal trueValue_inner_ready : std_logic;
+  signal falseValue_inner : std_logic_vector(32 downto 0);
+  signal falseValue_inner_valid : std_logic;
+  signal falseValue_inner_ready : std_logic;
+  signal result_inner_concat : std_logic_vector(32 downto 0);
+  signal result_inner_concat_valid : std_logic;
+  signal result_inner_concat_ready : std_logic;
   signal result_inner : std_logic_vector(31 downto 0);
   signal result_inner_valid : std_logic;
   signal result_inner_ready : std_logic;
   signal result_inner_spec : std_logic_vector(0 downto 0);
-  -- Concatenated data and extra signals
-  signal trueValue_inner : std_logic_vector(32 downto 0);
-  signal falseValue_inner : std_logic_vector(32 downto 0);
-  signal result_inner_concat : std_logic_vector(32 downto 0);
 begin
   -- Concatenate extra signals
   trueValue_inner(32 - 1 downto 0) <= trueValue;
   trueValue_inner(32 downto 32) <= trueValue_spec;
+  trueValue_inner_valid <= trueValue_valid;
+  trueValue_ready <= trueValue_inner_ready;
   falseValue_inner(32 - 1 downto 0) <= falseValue;
   falseValue_inner(32 downto 32) <= falseValue_spec;
+  falseValue_inner_valid <= falseValue_valid;
+  falseValue_ready <= falseValue_inner_ready;
   result_inner <= result_inner_concat(32 - 1 downto 0);
   result_inner_spec <= result_inner_concat(32 downto 32);
+  result_inner_valid <= result_inner_concat_valid;
+  result_inner_concat_ready <= result_inner_ready;
 
   -- Forwarding logic
   result_spec <= condition_spec or result_inner_spec;
@@ -292,14 +309,14 @@ begin
       condition_valid => condition_valid,
       condition_ready => condition_ready,
       trueValue => trueValue_inner,
-      trueValue_valid => trueValue_valid,
-      trueValue_ready => trueValue_ready,
+      trueValue_valid => trueValue_inner_valid,
+      trueValue_ready => trueValue_inner_ready,
       falseValue => falseValue_inner,
-      falseValue_valid => falseValue_valid,
-      falseValue_ready => falseValue_ready,
+      falseValue_valid => falseValue_inner_valid,
+      falseValue_ready => falseValue_inner_ready,
       result => result_inner_concat,
-      result_ready => result_inner_ready,
-      result_valid => result_inner_valid
+      result_ready => result_inner_concat_ready,
+      result_valid => result_inner_concat_valid
     );
 end architecture;
 ```
@@ -319,7 +336,7 @@ use ieee.numeric_std.all;
 use work.types.all;
 
 -- Entity of signal manager
-entity spec_commit_0 is
+entity spec_commit0 is
   port(
     clk : in std_logic;
     rst : in std_logic;
@@ -339,31 +356,40 @@ entity spec_commit_0 is
 end entity;
 
 -- Architecture of signal manager (spec_units)
-architecture arch of spec_commit_0 is
-  -- Concatenated data and extra signals
-  signal ins_inner : std_logic_vector(39 downto 0);
-  signal outs_inner : std_logic_vector(39 downto 0);
+architecture arch of spec_commit0 is
+  signal ins_concat : std_logic_vector(39 downto 0);
+  signal ins_concat_valid : std_logic;
+  signal ins_concat_ready : std_logic;
+  signal ins_concat_spec : std_logic_vector(0 downto 0);
+  signal outs_concat : std_logic_vector(39 downto 0);
+  signal outs_concat_valid : std_logic;
+  signal outs_concat_ready : std_logic;
+  signal outs_concat_spec : std_logic_vector(0 downto 0);
 begin
-  -- Concatenate data and extra signals
-  -- Note: Only tag0 is concatenated
-  ins_inner(32 - 1 downto 0) <= ins;
-  ins_inner(39 downto 32) <= ins_tag0;
-  outs <= outs_inner(32 - 1 downto 0);
-  outs_tag0 <= outs_inner(39 downto 32);
+  -- Concat/slice data and extra signals
+  ins_concat(32 - 1 downto 0) <= ins;
+  ins_concat(39 downto 32) <= ins_tag0;
+  ins_concat_valid <= ins_valid;
+  ins_ready <= ins_concat_ready;
+  ins_concat_spec <= ins_spec;
+  outs <= outs_concat(32 - 1 downto 0);
+  outs_tag0 <= outs_concat(39 downto 32);
+  outs_valid <= outs_concat_valid;
+  outs_concat_ready <= outs_ready;
+  outs_spec <= outs_concat_spec;
 
-  inner : entity work.spec_commit_0_inner(arch)
+  inner : entity work.spec_commit0_inner(arch)
     port map(
       clk => clk,
       rst => rst,
-      ins => ins_inner,
-      ins_valid => ins_valid,
-      ins_ready => ins_ready,
-      -- Note: `spec` is forwarded.
-      ins_spec => ins_spec,
-      outs => outs_inner,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready,
-      -- Note: `index` is not concatenated and directly forwarded to external signal.
+      ins => ins_concat,
+      ins_valid => ins_concat_valid,
+      ins_ready => ins_concat_ready,
+      ins_spec => ins_concat_spec,
+      outs => outs_concat,
+      outs_valid => outs_concat_valid,
+      outs_ready => outs_concat_ready,
+      outs_spec => outs_concat_spec,
       ctrl => ctrl,
       ctrl_valid => ctrl_valid,
       ctrl_ready => ctrl_ready
