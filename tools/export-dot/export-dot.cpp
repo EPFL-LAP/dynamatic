@@ -22,7 +22,6 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "handshake.h.inc"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -165,7 +164,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
               return "buffer" + numSlotsStr;
             if (auto bufferTypeAttr =
                     dyn_cast<StringAttr>(optBufferType->getValue())) {
-              std::string bufferTypeStr = bufferTypeAttr.getValue().str();
+              llvm::StringRef bufferTypeStr = bufferTypeAttr.getValue();
               if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DV) {
                 return "DV" + numSlotsStr;
               } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_R) {
