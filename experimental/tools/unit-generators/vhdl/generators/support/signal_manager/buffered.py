@@ -117,6 +117,7 @@ def generate_buffered_signal_manager(
     for signal_name in extra_signals:
         forwarding_assignments.extend(generate_signal_wise_forwarding(
             in_channel_names, ["forwarded"], signal_name))
+
     # Declare extra signals of `forwarded` channel
     # Example: signal forwarded_spec : std_logic_vector(0 downto 0);
     forwarding_decls.extend(

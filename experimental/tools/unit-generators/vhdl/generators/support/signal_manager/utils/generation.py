@@ -15,6 +15,9 @@ def generate_concat(in_channel_name: str, in_data_bitwidth: int, out_channel_nam
       array_size (int): Size of the array if the channel is an array. Defaults to 0.
     Returns:
       assignments (list[str]): List of VHDL assignments for the concatenation.
+      - Example: When `in_channel_name` is `ins` and `in_data_bitwidth` is 32:
+        ins_concat(32 - 1 downto 0) <= ins;
+        ins_concat(32 downto 32) <= ins_spec;
     """
 
     assignments = []
@@ -57,6 +60,9 @@ def generate_slice(in_channel_name: str, out_channel_name: str, out_data_bitwidt
       array_size (int): Size of the array if the channel is an array. Defaults to 0.
     Returns:
       assignments (list[str]): List of VHDL assignments for the slicing.
+      - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
+        outs <= outs_concat(32 - 1 downto 0);
+        outs_spec <= outs_concat(32 downto 32);
     """
 
     assignments = []
@@ -99,6 +105,11 @@ def generate_concat_and_handshake(in_channel_name: str, in_data_bitwidth: int, o
       array_size (int): Size of the array if the channel is an array. Defaults to 0.
     Returns:
       assignments (list[str]): List of VHDL assignments for the concatenation and handshake forwarding.
+      - Example: When `in_channel_name` is `ins` and `out_channel_name` is `ins_concat`:
+        ins_concat(32 - 1 downto 0) <= ins;
+        ins_concat(32 downto 32) <= ins_spec;
+        ins_concat_valid <= ins_valid;
+        ins_ready <= ins_concat_ready;
     """
 
     assignments = []
@@ -126,6 +137,11 @@ def generate_slice_and_handshake(in_channel_name: str, out_channel_name: str, ou
       array_size (int): Size of the array if the channel is an array. Defaults to 0.
     Returns:
       assignments (list[str]): List of VHDL assignments for the slicing and handshake forwarding.
+      - Example: When `in_channel_name` is `outs_concat` and `out_channel_name` is `outs`:
+        outs <= outs_concat(32 - 1 downto 0);
+        outs_spec <= outs_concat(32 downto 32);
+        outs_valid <= outs_concat_valid;
+        outs_concat_ready <= outs_ready;
     """
 
     assignments = []
@@ -153,6 +169,12 @@ def generate_mapping(internal_channel_name: str, channel: Channel) -> list[str]:
       channel (Channel): Channel to generate mapping for.
     Returns:
       mapping (list[str]): List of VHDL mapping strings for the channel.
+      - Example: When `internal_channel_name` is `ins_inner` and `channel` is named `ins`,
+        carrying `spec` extra signal:
+        ins => ins_inner,
+        ins_valid => ins_inner_valid,
+        ins_ready => ins_inner_ready,
+        ins_spec => ins_inner_spec
     """
 
     mapping: list[str] = []
@@ -180,6 +202,10 @@ def generate_default_mappings(channels: list[Channel]) -> str:
     Generate VHDL mappings for the inner entity (port map (...)), using a list of
     channels where each channel maps to a channel of the same name without extra
     signals.
+    - Example:
+      ins => ins,
+      ins_valid => ins_valid,
+      ins_ready => ins_ready
     """
 
     mappings = []
@@ -225,6 +251,10 @@ def generate_signal_wise_forwarding(in_channel_names: list[str], out_channel_nam
       extra_signal_bitwidth (int): Bitwidth of the extra signal.
     Returns:
       assignments (list[str]): List of VHDL assignments for the extra signal forwarding.
+      - Example: When `in_channel_names` is `["lhs", "rhs"]` and
+       `out_channel_names` is `["trueResult", "falseResult"]`:
+       trueResult_spec <= lhs_spec or rhs_spec;
+       falseResult_spec <= lhs_spec or rhs_spec;
     """
 
     assignments = []

@@ -16,6 +16,9 @@ def create_internal_array_decl(name: str, bitwidth: int, size: int) -> str:
 def create_internal_extra_signals_decl(channel_name: str, extra_signals: ExtraSignals) -> list[str]:
     """
     Generate VHDL declarations for extra signals in a channel.
+    Example: When `extra_signals` is: {"spec": 1, "tag0": 8}
+      signal my_channel_spec : std_logic_vector(0 downto 0);
+      signal my_channel_tag0 : std_logic_vector(7 downto 0);
     """
 
     return [
@@ -32,6 +35,12 @@ def create_internal_channel_decl(channel: Channel) -> list[str]:
       channel (Channel): Channel to generate declarations for.
     Returns:
       decls (list[str]): List of VHDL declarations for the channel.
+      - Example:
+        signal my_channel : std_logic_vector(31 downto 0);
+        signal my_channel_valid : std_logic;
+        signal my_channel_ready : std_logic;
+        signal my_channel_spec : std_logic_vector(0 downto 0);
+        signal my_channel_tag0 : std_logic_vector(7 downto 0);
     """
 
     decls = []

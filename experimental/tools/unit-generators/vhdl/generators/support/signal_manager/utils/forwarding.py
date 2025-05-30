@@ -15,6 +15,8 @@ def generate_forwarding_expression_for_signal(signal_name: str, in_extra_signal_
     If the list is empty, a default value is returned.
     Currently, only the "spec" signal is supported,
     which is forwarded using a logical OR.
+
+    Example: "0", lhs_spec or rhs_spec
     """
 
     if not in_extra_signal_names:
