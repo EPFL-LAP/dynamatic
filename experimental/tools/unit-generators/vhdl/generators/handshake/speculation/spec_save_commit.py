@@ -316,20 +316,20 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
         extra_signals)
     return generate_spec_units_signal_manager(
-      name,
-      [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }, {
-          "name": "ctrl",
-          "bitwidth": 3
-      }],
-      [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      extra_signals_without_spec,
-      ["ctrl"],
-      lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+        name,
+        [{
+            "name": "ins",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }, {
+            "name": "ctrl",
+            "bitwidth": 3
+        }],
+        [{
+            "name": "outs",
+            "bitwidth": bitwidth,
+            "extra_signals": extra_signals
+        }],
+        extra_signals_without_spec,
+        ["ctrl"],
+        lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

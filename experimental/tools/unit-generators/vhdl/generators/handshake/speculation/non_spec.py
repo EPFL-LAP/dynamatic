@@ -61,7 +61,8 @@ def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
     extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
 
     inner_name = f"{name}_inner"
-    inner = _generate_non_spec(inner_name, extra_signals_without_spec_bitwidth)
+    inner = _generate_non_spec(
+        inner_name, bitwidth + extra_signals_without_spec_bitwidth)
 
     entity = generate_entity(name, [{
         "name": "dataIn",

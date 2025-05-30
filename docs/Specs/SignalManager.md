@@ -324,9 +324,9 @@ end architecture;
 
 ### `spec_commit`
 
-The `spec_commit` unit is used for speculation. It uses the `spec_units` signal manager, located in `signal_manager/spec_units.py`.
+The `spec_save_commit` unit is used for speculation. It uses the `spec_units` signal manager, located in `signal_manager/spec_units.py`.
 
-When `spec_commit` handles both `spec: i1` and `tag0: i8`, it concatenates `tag0` to the data while propagating `spec` to the inner unit. Additionally, it doesn't concatenate the control signal, as it doesn't carry any extra signals.
+When `spec_save_commit` handles both `spec: i1` and `tag0: i8`, it concatenates `tag0` to the data while propagating `spec` to the inner unit. Additionally, it doesn't concatenate the control signal, as it doesn't carry any extra signals.
 
 
 ```vhdl
@@ -336,7 +336,7 @@ use ieee.numeric_std.all;
 use work.types.all;
 
 -- Entity of signal manager
-entity spec_commit0 is
+entity spec_save_commit0 is
   port(
     clk : in std_logic;
     rst : in std_logic;
@@ -345,18 +345,19 @@ entity spec_commit0 is
     ins_ready : out std_logic;
     ins_spec : in std_logic_vector(1 - 1 downto 0);
     ins_tag0 : in std_logic_vector(8 - 1 downto 0);
-    ctrl : in std_logic_vector(1 - 1 downto 0);
+    ctrl : in std_logic_vector(3 - 1 downto 0);
     ctrl_valid : in std_logic;
     ctrl_ready : out std_logic;
     outs : out std_logic_vector(32 - 1 downto 0);
     outs_valid : out std_logic;
     outs_ready : in std_logic;
+    outs_spec : out std_logic_vector(1 - 1 downto 0);
     outs_tag0 : out std_logic_vector(8 - 1 downto 0)
   );
 end entity;
 
 -- Architecture of signal manager (spec_units)
-architecture arch of spec_commit0 is
+architecture arch of spec_save_commit0 is
   signal ins_concat : std_logic_vector(39 downto 0);
   signal ins_concat_valid : std_logic;
   signal ins_concat_ready : std_logic;
@@ -378,7 +379,7 @@ begin
   outs_concat_ready <= outs_ready;
   outs_spec <= outs_concat_spec;
 
-  inner : entity work.spec_commit0_inner(arch)
+  inner : entity work.spec_save_commit0_inner(arch)
     port map(
       clk => clk,
       rst => rst,
@@ -396,4 +397,3 @@ begin
     );
 end architecture;
 ```
-
