@@ -103,6 +103,10 @@ public:
   }
   bool isPrimaryOutput() const { return (isOutput || isLatchInput); }
 
+  // Used to merge I/O nodes. I/O is set false and isChannelEdge is set to true
+  // so that the node can be considered as a dataflow graph edge.
+  void convertIOToChannel();
+
   std::string str() const { return name; }
 
   ~Node() {
