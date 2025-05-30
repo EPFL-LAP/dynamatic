@@ -106,6 +106,79 @@ struct BranchTracingItem {
         branchDirection(branchDirection) {}
 };
 
+/// If the value is a result of ForkOp, returns the operand of the ForkOp.
+/// Otherwise, returns the value itself.
+/// If the operand of the ForkOp is also a result of ForkOp, the function
+/// recursively finds the top of the fork tree.
+static Value findForkTreeTop(Value value) {
+  Operation *definingOp = value.getDefiningOp();
+  if (!definingOp)
+    return value;
+
+  if (auto forkOp = dyn_cast<ForkOp>(definingOp))
+    return findForkTreeTop(forkOp.getOperand());
+
+  if (auto lazyForkOp = dyn_cast<LazyForkOp>(definingOp))
+    return findForkTreeTop(lazyForkOp.getOperand());
+
+  // TODO: We might want to handle buffer ops here to ignore buffering
+  // differences, but it's not necessary for the current use case.
+
+  return value;
+}
+
+/// Internal helper for `findUsersInForkTree`.
+/// Find all users of the MLIR values in the *partial* fork tree rooted at the
+/// `value`.
+static void
+findUsersInForkTreeTraversal(llvm::SmallVector<Operation *> &targets,
+                             Value value) {
+  for (Operation *user : value.getUsers()) {
+    targets.push_back(user);
+
+    if (isa<ForkOp>(user) || isa<LazyForkOp>(user)) {
+      for (OpResult result : user->getResults()) {
+        findUsersInForkTreeTraversal(targets, result);
+      }
+    }
+  }
+}
+
+/// Find all users of the MLIR values in the fork tree.
+static llvm::SmallVector<Operation *> findUsersInForkTree(Value value) {
+  Value forkTreeTop = findForkTreeTop(value);
+
+  llvm::SmallVector<Operation *> targets;
+  // Start the traversal from the top of the fork tree
+  findUsersInForkTreeTraversal(targets, forkTreeTop);
+  return targets;
+}
+
+/// Returns if two values are in the same fork tree.
+static bool forkTreeEquals(Value a, Value b) {
+  return findForkTreeTop(a) == findForkTreeTop(b);
+}
+
+/// Finds an existing branch op that uses the given condition and data.
+/// Works for both SpeculatingBranchOp and ConditionalBranchOp.
+template <typename BranchOpType>
+static std::optional<BranchOpType> findExistingBranch(Value condition,
+                                                      Value data) {
+  // Find all users of the condition (ignoring the fork differences)
+  llvm::SmallVector<Operation *> users = findUsersInForkTree(condition);
+  for (Operation *user : users) {
+    if (auto branchOp = dyn_cast<BranchOpType>(user)) {
+      // Check if the data operand is also the same (ignoring the fork
+      // differences)
+      if (forkTreeEquals(branchOp.getDataOperand(), data)) {
+        // Found a branch that matches the condition and data
+        return branchOp;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 // This function traverses the IR and creates a control path by replicating the
 // branches it finds in the way. It stops at commits and connects them to the
 // newly created path with value ctrlSignal
@@ -150,23 +223,33 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
       // level.
 
       auto conditionOperand = branchOp.getConditionOperand();
-      // trueResultType and falseResultType are tentative and will be updated in
-      // the addSpecTag algorithm later.
-      auto branchDiscardNonSpec =
-          builder.create<handshake::SpeculatingBranchOp>(
-              branchOp.getLoc(),
-              /*trueResultType=*/conditionOperand.getType(),
-              /*falseResultType=*/conditionOperand.getType(),
-              /*specTag=*/valueForSpecTag, conditionOperand);
-      inheritBB(specOp, branchDiscardNonSpec);
 
-      // The replicated branch directs the control token based on the path the
-      // speculative token took
-      auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardNonSpec->getLoc(),
-          /*condition=*/branchDiscardNonSpec.getTrueResult(),
-          /*data=*/ctrlSignal);
-      inheritBB(specOp, branchReplicated);
+      std::optional<SpeculatingBranchOp> branchDiscardNonSpec =
+          findExistingBranch<SpeculatingBranchOp>(valueForSpecTag,
+                                                  conditionOperand);
+      if (!branchDiscardNonSpec.has_value()) {
+        // trueResultType and falseResultType are tentative and will be updated
+        // in the addSpecTag algorithm later.
+        branchDiscardNonSpec = builder.create<handshake::SpeculatingBranchOp>(
+            branchOp.getLoc(),
+            /*trueResultType=*/conditionOperand.getType(),
+            /*falseResultType=*/conditionOperand.getType(),
+            /*specTag=*/valueForSpecTag, conditionOperand);
+        inheritBB(specOp, *branchDiscardNonSpec);
+      }
+
+      std::optional<ConditionalBranchOp> branchReplicated =
+          findExistingBranch<ConditionalBranchOp>(
+              branchDiscardNonSpec->getTrueResult(), ctrlSignal);
+      if (!branchReplicated.has_value()) {
+        // The replicated branch directs the control token based on the path the
+        // speculative token took
+        branchReplicated = builder.create<handshake::ConditionalBranchOp>(
+            branchDiscardNonSpec->getLoc(),
+            /*condition=*/branchDiscardNonSpec->getTrueResult(),
+            /*data=*/ctrlSignal);
+        inheritBB(specOp, *branchReplicated);
+      }
 
       // Update ctrlSignal
       ctrlSignal = branchReplicated->getResult(branchDirection);
