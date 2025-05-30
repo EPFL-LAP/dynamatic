@@ -1171,23 +1171,32 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   if (!lookup)
     return callOp->emitError() << "call references unknown function";
   TypeRange resultTypes;
-  // Vectors storing indices of classified arguments
+  // Vectors storing indices of classified arguments for placeholder logic handling
   SmallVector<unsigned> InstanceOpInputIndices;
   SmallVector<unsigned> InstanceOpOutputIndices;
   SmallVector<unsigned> InstanceOpParameterIndices;
-  // Maps output argument index -> list of operations that consume its value
+  SmallVector<Operation*> originalInitCallsToErase;
+  // OutputConnections: Maps output argument index -> list of operations that consume its value
   llvm::DenseMap<unsigned, SmallVector<Operation*>> OutputConnections;
+  // parameterMap: Maps parameter name to its value
+  llvm::DenseMap<StringRef, Attribute> parameterMap;
+  // Store and later erase const that are used to define parameters
+  llvm::SmallVector<arith::ConstantOp, 4> parameterConstantOps;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
+
   if (!calledHandshakeFuncOp) {
     // if this is not the case, the function might have been not traversed yet
     // during the conversion
     auto calledFuncOp = dyn_cast<func::FuncOp>(lookup);
-    if (!calledFuncOp)
+    if (!calledFuncOp) {
       return callOp->emitError() << "call does not reference a function";
+    } 
+ 
     // Classify arguments based on naming convention
-    for(unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i){
+    for (unsigned i = 0; i < calledFuncOp.getNumArguments(); ++i) {
       auto nameAttr = calledFuncOp.getArgAttrOfType<mlir::StringAttr>(i, "handshake.arg_name");
+      assert(nameAttr && !nameAttr.getValue().empty() && "Argument name attribute is missing or empty");
       if (nameAttr.getValue().starts_with("input_")) {
         InstanceOpInputIndices.push_back(i);
       } else if (nameAttr.getValue().starts_with("output_")) {
@@ -1196,20 +1205,98 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         // and store the mapping in OutputConnections
         Value outputArg = callOp.getOperand(i);
         auto &fanouts = OutputConnections[i];
-        for(auto &use : outputArg.getUses()){
+        for (auto &use : outputArg.getUses()) {
           Operation* user = use.getOwner();
-          if(user != callOp){
+          if (user != callOp) {
             fanouts.push_back(user);
           }
         }
       } else if (nameAttr.getValue().starts_with("parameter_")) {
-        InstanceOpParameterIndices.push_back(i);
+          // Extract and Store parameter name and value inside a Dictionary.
+          InstanceOpParameterIndices.push_back(i);
+          StringRef parameterName = nameAttr.getValue().drop_front(strlen("parameter_"));
+          Value operand = callOp.getOperand(i);
+          if (auto constOp = operand.getDefiningOp<arith::ConstantOp>()) {
+            Attribute parameterValue = constOp.getValue();
+            parameterMap[parameterName] = parameterValue;
+            if (!llvm::is_contained(parameterConstantOps, constOp)) {
+              parameterConstantOps.push_back(constOp);
+            }
+          } else {
+            assert(false && "Parameter value is not a constant at call site");
+          }
+    
       } else {
         llvm::errs() << "Argument " << i << " does not follow the naming convention\n";
         assert(false && "Invalid argument naming");
       }
     }
+    assert(!InstanceOpOutputIndices.empty() && "Placeholder functions must atleast have one output_ argument!");
+    // Create Operands for InstanceOp based on collected Inputs
+    // Remember that the control signal is already included in operands so start at size - 1
+    // for every element check if its Index is part of Output/Parameter vector and delete it,
+    // else keep it. 
+    for (int i = adaptor.getOperands().size() - 1; i >= 0 ; --i) {
+      if (llvm::is_contained(InstanceOpOutputIndices, i) || llvm::is_contained(InstanceOpParameterIndices, i)) {
+        operands.erase(operands.begin() + i);
+      }
+    }
+
+    // Rewriting the Function definition by first creating newInputs & newResults
+    auto calledFuncOpType = calledFuncOp.getFunctionType();
+    SmallVector<Type> newInputs;
+    SmallVector<Type> newResults;
+    for (unsigned i = 0; i < calledFuncOpType.getNumInputs(); ++i) {
+      if (llvm::is_contained(InstanceOpInputIndices, i)) {
+        newInputs.push_back(calledFuncOpType.getInput(i));
+      } else if (llvm::is_contained(InstanceOpOutputIndices, i)) {
+        newResults.push_back(calledFuncOpType.getInput(i));
+      }
+    }
+    // Rewrite Function definiton by creating and setting newFuncType
+    auto newFuncType = FunctionType::get(calledFuncOpType.getContext(), newInputs, newResults);
+    calledFuncOp.setType(newFuncType);
+
     resultTypes = calledFuncOp.getFunctionType().getResults();
+
+    // Helper to strip away any UnrealizedConversionCastOps and retrieve
+    // the original defining operation.
+    auto stripCasts = [](Value val) -> Operation* {
+      while (val && isa<UnrealizedConversionCastOp>(val.getDefiningOp())) {
+        val = val.getDefiningOp()->getOperand(0);
+      }
+      return val.getDefiningOp();
+    };
+    // Trace back the source call operations that drive the output arguments
+    // of this instance (e.g. calls to __init feeding a __placeholder).
+    for (unsigned outputArgIdx : InstanceOpOutputIndices) {
+      if (outputArgIdx >= adaptor.getOperands().size()) continue;
+
+      Value operandForOutputSlot = adaptor.getOperands()[outputArgIdx];
+      auto definingOp = stripCasts(operandForOutputSlot);
+      if (!definingOp) continue;
+
+      auto sourceCallOp = dyn_cast<func::CallOp>(definingOp);
+      if (!sourceCallOp) continue;
+      
+      // if sourceCallOp calls __init, track it so we can remove it later
+      // once the placeholder logic is handled
+      SymbolRefAttr sourceCalleeAttr = sourceCallOp.getCalleeAttr();
+      Operation* sourceFuncLookup = mlir::SymbolTable::lookupNearestSymbolFrom(callOp, sourceCalleeAttr);
+      auto sourceFunc = dyn_cast<func::FuncOp>(sourceFuncLookup);
+      if (!sourceFunc || !sourceFunc.getSymName().startswith("__init")) continue;
+
+      if (!llvm::is_contained(originalInitCallsToErase, sourceCallOp)) {
+        originalInitCallsToErase.push_back(sourceCallOp);
+      }
+    }
+    // Erase parameters from callOp
+    llvm::sort(InstanceOpParameterIndices, std::greater<>());
+    for (unsigned id : InstanceOpParameterIndices) {
+      if (id < callOp->getNumOperands()) {
+        callOp->eraseOperand(id);
+      }
+    }
   } else {
     resultTypes = calledHandshakeFuncOp.getFunctionType().getResults();
   }
@@ -1224,11 +1311,61 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   auto instOp = rewriter.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), handshakeResultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
+
+  // attach parameters to the new Instance as attributes
+  for (const auto &param : parameterMap) {
+    instOp->setAttr(param.first, param.second);
+  }
+  // Rewiring: If the called function was not already rewritten to a handshake::FuncOp,
+  // manually rewire users of the original outputs to now use the InstanceOp results.
+  if (!calledHandshakeFuncOp) {
+    auto InstanceResults = instOp.getResults();
+    unsigned ResultId = 0;
+    for (auto OutputId : InstanceOpOutputIndices) {
+      for (Operation *user : OutputConnections[OutputId]) {
+        for (OpOperand &operand : user->getOpOperands()) {
+          // ASSUMPTION: Data dependencies are acyclic, no output from the instance 
+          // is used to (directly or indirectly) compute its own input.
+          // All uses of placeholder values must occur after the instance is inserted.
+          // This avoids SSA violations and preserves correct dataflow semantics.
+          if (operand.get() == callOp.getOperand(OutputId)) {
+            operand.set(InstanceResults[ResultId]);
+          }
+        }
+      }
+      ResultId++;
+    }
+  }
   namer.replaceOp(callOp, instOp);
-  if (callOp->getNumResults() == 0)
+  if (callOp->getNumResults() == 0){
     rewriter.eraseOp(callOp);
-  else
+  } else if (!calledHandshakeFuncOp) {
+    // Placeholder call: previous result was dataflow, so we must replace it
+    // with a dataflow result. We guarantee the first instance result is dataflow
+    // since the placeholder has at least one output.
+    rewriter.replaceOp(callOp, instOp.getResult(0));
+  } else {
     rewriter.replaceOp(callOp, instOp.getResults().drop_back());
+  }
+
+  // in case __init was used to define output variables: go through all __init calls and check if the
+  // current callOp is the only user. If yes then saftley delete the __init call
+  if (!originalInitCallsToErase.empty()) {
+    for (Operation *initCallToErase : originalInitCallsToErase) {
+      // Ensure the operation is still in the IR, valid & only has one result
+      if (initCallToErase->isRegistered() && initCallToErase->getParentRegion()) {
+        assert(initCallToErase->getNumResults() == 1 && "Expected single-result __init call");
+        for (OpResult result : initCallToErase->getResults()) {
+          // If the one user is the current callOp being rewritten, delete __init
+          if (result.hasOneUse() && *result.getUsers().begin() == callOp) {
+            result.dropAllUses();
+            rewriter.eraseOp(initCallToErase);
+          }
+        }
+      }
+    }
+  }
+
   return success();
 }
 
@@ -1385,9 +1522,33 @@ struct CfToHandshakePass
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();
+    
+    target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
+    // If the call is to __init*, consider it legal for now.
+    // This allows the pass to continue so that __placeholder conversion can
+    // later erase these __init* calls.
+    // All other func.CallOp (not calling __init*) remain illegal due to the
+    // addIllegalDialect rule above and must be converted by a pattern.
+    if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
+            SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
+        return calledFn.getSymName().startswith("__init");
+    }
+    // If symbol lookup fails or it's not a func::FuncOp, treat as default (illegal)
+    return false;
+    });
+    target.addDynamicallyLegalOp<func::FuncOp>([](func::FuncOp op) {
+      return op.getSymName().startswith("__init");
+    });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // erase __init
+    for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
+      if (func.getSymName().startswith("__init") && func.use_empty()) {
+        func.erase();
+      }
+    }
   }
 };
 } // namespace
