@@ -153,8 +153,7 @@ LogicalResult TimingDatabase::getLatency(
 
 LogicalResult TimingDatabase::getInternalDelay(Operation *op,
                                                SignalType signalType,
-                                               double &delay,
-                                               double targetPeriod) const {
+                                               double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
     return failure();
