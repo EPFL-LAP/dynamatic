@@ -263,6 +263,10 @@ def BufferOp : Handshake_Op<"buffer", [
     /// and introduces one cycle of latency on all three.
     static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
     
+    /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share a handshake control, 
+    /// so they stall or accept inputs together.
+    static constexpr ::llvm::StringLiteral SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV";
+    
   }];
 
   let assemblyFormat = [{

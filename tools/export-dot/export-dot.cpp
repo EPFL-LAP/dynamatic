@@ -158,21 +158,25 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optBufferType = params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
-            if (!optBufferType) 
+            auto optBufferType =
+                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType)
               return "buffer" + numSlotsStr;
-            if (auto bufferTypeAttr = dyn_cast<StringAttr>(optBufferType->getValue())) {
-              std::string bufferTypeStr = bufferTypeAttr.getValue().str();
-              if (bufferTypeStr == "ONE_SLOT_BREAK_DV") {
+            if (auto bufferTypeAttr =
+                    dyn_cast<StringAttr>(optBufferType->getValue())) {
+              llvm::StringRef bufferTypeStr = bufferTypeAttr.getValue();
+              if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DV) {
                 return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == "ONE_SLOT_BREAK_R") {
+              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_R) {
                 return "R" + numSlotsStr;
-              } else if (bufferTypeStr == "FIFO_BREAK_DV") {
+              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_DV) {
                 return "DV" + numSlotsStr;
-              } else if (bufferTypeStr == "FIFO_BREAK_NONE") {
+              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_NONE) {
                 return "NONE" + numSlotsStr;
-              } else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
+              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DVR) {
                 return "DVR" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::SHIFT_REG_BREAK_DV) {
+                return "SRDV" + numSlotsStr;
               }
             }
             return "buffer" + numSlotsStr;
