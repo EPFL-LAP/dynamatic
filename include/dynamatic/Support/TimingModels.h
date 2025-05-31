@@ -98,10 +98,12 @@ public:
   /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
 
-  /// Determines the value of the metric at the internal operating delay that is
-  /// highest, but still smaller than the target period (meaning we pick the
-  /// slowest implementation that still meets timing).The metric is expected to
-  /// be monotonically increasing when the delay decreases, meaning that the
+  /// Determines and passes back the value of the metric. Based on the provided 
+  ///target period, the chosen value will be the one who's key is the highest
+  /// delay possible (to avoid needless latency or hardware costs); with upper bound 
+  ///the target period (meaning we pick the slowest implementation that still 
+  ///meets timing constraints).
+  ///The metric is expected to be monotonically increasing when the delay decreases; ie the
   /// metric's value at a lower delay is always greater than or equal to the
   /// metric's value at a higher delay. This is not enforced in the code, but
   /// should be kept in mind when using this class, otherwise sub-optimal
