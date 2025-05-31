@@ -50,8 +50,14 @@ static std::string instantiateModuleUnderTest(
     auto argumentName = argument.first;
     auto argumentType = argument.second;
 
-    llvm::TypeSwitch<Type, void>(argumentType)
-        .Case<handshake::ControlType>([&](handshake::ControlType) {
+    llvm::TypeSwitch<Type>(argumentType)
+        .Case<handshake::ChannelType>([&](auto) {
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_DATA_NAME.str());
+          inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                   SEQUENCE_GENERATOR_VALID_NAME.str());
+        })
+        .Case<handshake::ControlType>([&](auto) {
           // TODO: remove this if statement when updating the elastic-miter to
           // the new SMV backend.
           // This is a hack: we use syncOutput as a proxy to
@@ -60,7 +66,8 @@ static std::string instantiateModuleUnderTest(
           // is always true). This hack can be fixed as soon as elastic-miter is
           // updated.
           if (syncOutput) {
-            inputVariables.push_back("TRUE");
+            inputVariables.push_back("seq_generator_" + argumentName + "." +
+                                     SEQUENCE_GENERATOR_VALID_NAME.str());
           } else {
             inputVariables.push_back("seq_generator_" + argumentName + "." +
                                      SEQUENCE_GENERATOR_DATA_NAME.str());
@@ -68,20 +75,15 @@ static std::string instantiateModuleUnderTest(
                                      SEQUENCE_GENERATOR_VALID_NAME.str());
           }
         })
-        .Case<handshake::ChannelType>([&](handshake::ChannelType) {
-          inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                   SEQUENCE_GENERATOR_DATA_NAME.str());
-          inputVariables.push_back("seq_generator_" + argumentName + "." +
-                                   SEQUENCE_GENERATOR_VALID_NAME.str());
-        })
-        // This is the case for data coming from memory (it has no handshake
-        // signals)
         .Case<IntegerType>([&](IntegerType intType) {
+          // This is the case for data coming from memory (it has no handshake
+          // signals)
           if (argumentName != "clk" && argumentName != "rst") {
             inputVariables.push_back("0usd" +
                                      std::to_string(intType.getWidth()) + "_0");
           }
-        });
+        })
+        .Default([](Type) {});
   }
 
   if (syncOutput)
@@ -220,7 +222,7 @@ static std::string createTBJoin(size_t nrOfOutputs) {
 }
 
 static std::optional<std::string> convertMLIRTypeToSMV(Type type) {
-  return llvm::TypeSwitch<Type, std::string>(type)
+  return llvm::TypeSwitch<Type, std::optional<std::string>>(type)
       .Case<handshake::ControlType>(
           [&](handshake::ControlType cType) { return std::nullopt; })
       .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {

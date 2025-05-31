@@ -17,6 +17,7 @@ target_link_libraries(elastic-miter
   DynamaticHandshake
   DynamaticSupport
   DynamaticTransforms
+  DynamaticExperimentalSupport
 
   MLIRIR
   MLIRMemRefTransforms
