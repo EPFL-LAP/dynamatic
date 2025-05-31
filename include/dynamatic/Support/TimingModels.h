@@ -137,8 +137,9 @@ public:
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
-/// Deserializes a JSON value into a BitwidthDepMetric<DelayDepMetric<double>>,
-/// ie containing the custom, struct for combinational delay to latency map.
+/// Deserializes a JSON map into a BitwidthDepMetric<DelayDepMetric<double>> struct.
+/// This is done by first deserialising individual values with a nested fromJSON, to fill a latency
+/// map which will be passed as the data field of the struct.
 bool fromJSON(const llvm::json::Value &value,
               BitwidthDepMetric<DelayDepMetric<double>> &metric,
               llvm::json::Path path);
