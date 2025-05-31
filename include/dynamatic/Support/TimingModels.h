@@ -103,6 +103,9 @@ public:
   /// delay possible (to avoid needless latency or hardware costs); with upper bound 
   ///the target period (meaning we pick the slowest implementation that still 
   ///meets timing constraints).
+  /// Based on known trends, we expect that higher combinational delays corresponds to lower latency 
+  /// - generally because of higher degree of pipelining. Since the only use case of this struct
+  /// for now is this delay:latency case, the logic was implemented as follows :
   ///The metric is expected to be monotonically increasing when the delay decreases; ie the
   /// metric's value at a lower delay is always greater than or equal to the
   /// metric's value at a higher delay. This is not enforced in the code, but
