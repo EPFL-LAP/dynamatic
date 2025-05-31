@@ -36,21 +36,20 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
   for (auto [channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
     bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
+                            GRB_DoubleAttr_X) > 0;
+    bool forceBreakR = chVars.signalVars[SignalType::READY].bufPresent.get(
                            GRB_DoubleAttr_X) > 0;
-    bool forceBreakR =
-        chVars.signalVars[SignalType::READY].bufPresent.get(
-            GRB_DoubleAttr_X) > 0;
 
     PlacementResult result;
     // 1. If breaking DV & R:
     // When numslot = 1, map to ONE_SLOT_BREAK_DVR;
-    // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 2) * 
+    // When numslot > 1, map to ONE_SLOT_BREAK_DV + (numslot - 2) *
     //                            FIFO_BREAK_NONE + ONE_SLOT_BREAK_R.
     //
     // 2. If only breaking DV:
@@ -105,7 +104,8 @@ void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
 
   // Force buffer presence if at least one slot is requested
-  unsigned minSlots = std::max(props.minOpaque + props.minTrans, props.minSlots);
+  unsigned minSlots =
+      std::max(props.minOpaque + props.minTrans, props.minSlots);
   if (minSlots > 0) {
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
     model.addConstr(chVars.bufNumSlots >= minSlots, "custom_minSlots");
@@ -171,7 +171,8 @@ struct Pin {
   SignalType signalType;
 
   /// Simple member-by-member constructor.
-  Pin(Value channel, SignalType signalType) : channel(channel), signalType(signalType) {};
+  Pin(Value channel, SignalType signalType)
+      : channel(channel), signalType(signalType){};
 };
 
 /// Represents a mixed domain constraint between an input pin and an output pin,
@@ -186,7 +187,7 @@ struct MixedDomainConstraint {
 
   /// Simple member-by-member constructor.
   MixedDomainConstraint(Pin input, Pin output, double internalDelay)
-      : input(input), output(output), internalDelay(internalDelay) {};
+      : input(input), output(output), internalDelay(internalDelay){};
 };
 
 } // namespace
@@ -353,11 +354,11 @@ void CFDFCUnionBuffers::setup() {
 
     // Add single-domain path constraints
     addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
-                              readyGroup);
+                                readyGroup);
     addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
-                              readyGroup);
+                                readyGroup);
     addChannelTimingConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup, {});
+                                dataValidGroup, {});
 
     // Elasticity constraints
     addBufferPresenceConstraints(channel);
@@ -469,11 +470,11 @@ void OutOfCycleBuffers::setup() {
 
     // Add single-domain path constraints
     addChannelTimingConstraints(channel, SignalType::DATA, bufModel, {},
-                              readyGroup);
+                                readyGroup);
     addChannelTimingConstraints(channel, SignalType::VALID, bufModel, {},
-                              readyGroup);
+                                readyGroup);
     addChannelTimingConstraints(channel, SignalType::READY, bufModel,
-                              dataValidGroup, {});
+                                dataValidGroup, {});
 
     // Add elasticity constraints
     addBufferPresenceConstraints(channel);
