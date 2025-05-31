@@ -95,7 +95,7 @@ public:
 template <typename M>
 struct DelayDepMetric {
 public:
-  /// Data points for the metric, mapping a frequency with the metric's value
+  /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
 
   /// Determines the value of the metric at the internal operating delay that is
