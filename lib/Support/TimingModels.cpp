@@ -336,13 +336,13 @@ bool dynamatic::fromJSON(const ljson::Value &value,
     //nested fromJSON call, which deserializes individual delay & latency pairs into the 
     //Latencymap
  
-    for (const auto &[doubleKey, doubleValue] : *nestedMap) {
+    for (const auto &[doubleDelay, doubleLatency] : *nestedMap) {
       double key;
-      key = std::stod(doubleKey.str());
+      key = std::stod(doubleDelay.str());
 
       double value;
-      if (!fromJSON(doubleValue, value,
-                    path.field(bitwidthKey).field(doubleKey)))
+      if (!fromJSON(doubleLatency, value,
+                    path.field(bitwidthKey).field(doubleDelay)))
         return false;
 
       LatencyMap[key] = value;
