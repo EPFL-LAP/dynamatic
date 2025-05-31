@@ -66,16 +66,26 @@ protected:
   bool isBlackbox = false;
 
   void loadBlifFile(std::initializer_list<unsigned int> inputs,
-                    std::string to_append = "");
+                    std::string toAppend = "");
 
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
                                BaseSubjectGraph *moduleBeforeSubjectGraph);
 
+  // Function to assign signals to the ChannelSignals struct based on the
+  // rules provided. It processes the nodes in the BLIF file and assigns them
+  // to the appropriate ChannelSignals based on the pattern specified in the
+  // NodeProcessingRule.
   void processNodesWithRules(const std::vector<NodeProcessingRule> &rules);
 
+  // Inserts a subject graph in between two other subject graphs.
+  void insertNewSubjectGraph(BaseSubjectGraph *predecessorGraph,
+                             BaseSubjectGraph *successorGraph);
+
 public:
+  // Default constructor, used for Subject Graph creation without an MLIR
+  // Operation.
   BaseSubjectGraph();
   // Constructor for a SubjectGraph based on an Operation
   BaseSubjectGraph(Operation *op);
@@ -112,9 +122,9 @@ public:
   // Each Subject Graph implements its own connectInputNodes() function.
   // Retrieves the output nodes of its input module, and connects the nodes.
   virtual void connectInputNodes() = 0;
-  // Returns the output nodes associated with a specific channel number (MLIR
-  // Result Number)
-  virtual ChannelSignals &returnOutputNodes(unsigned int resultNumber) = 0;
+
+  // Returns the output nodes associated with a specific MLIR result number.
+  virtual ChannelSignals &returnOutputNodes(unsigned int channelIndex) = 0;
 };
 
 /// Below is class definitions of Subject Graph for supported modules. Each
@@ -127,7 +137,7 @@ private:
   unsigned int dataWidth = 0;
   ChannelSignals lhsNodes;
   ChannelSignals rhsNodes;
-  ChannelSignals outputNodes;
+  ChannelSignals resultNodes;
 
 public:
   ArithSubjectGraph(Operation *op);
@@ -302,8 +312,6 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int) override;
 };
 
-enum class BufferType { OEHB, TEHB };
-
 class BufferSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
@@ -311,45 +319,47 @@ private:
   ChannelSignals outputNodes;
   std::string bufferType;
 
-  static std::string getBufferTypeName(BufferType type) {
-    switch (type) {
-    case BufferType::OEHB:
-      return "oehb";
-    case BufferType::TEHB:
-      return "tehb";
-    }
-  }
-
 public:
   BufferSubjectGraph(Operation *op);
-  BufferSubjectGraph(Operation *op1, Operation *op2,
-                     std::string bufferTypeName);
-  BufferSubjectGraph(BufferSubjectGraph *graph1, Operation *op2,
-                     std::string bufferTypeName);
+  BufferSubjectGraph(unsigned int inputDataWidth, std::string bufferTypeName);
 
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
 
-  // Inserts a pair of OEHB and TEHB buffers between two operations. Used to cut
-  // loopbacks.
-  static void createBuffers(Operation *inputOp, Operation *outputOp) {
-    // Create OEHB buffer using the temporary string
-    BufferSubjectGraph *oehb = new BufferSubjectGraph(
-        inputOp, outputOp, getBufferTypeName(BufferType::OEHB));
+  // Creates a new Buffer SubjectGraph, and inserts it into the middle of 2
+  // other SubjectGraphs, given by the input and output Ops.
+  static void createAndInsertNewBuffer(Operation *inputOp, Operation *outputOp,
+                                       std::string bufferTypeName) {
+    // Get the SubjectGraphs of the operations
+    BaseSubjectGraph *graph1 = moduleMap[inputOp];
+    BaseSubjectGraph *graph2 = moduleMap[outputOp];
 
-    // Create TEHB buffer that connects to OEHB
-    BufferSubjectGraph *tehb = new BufferSubjectGraph(
-        oehb, outputOp, getBufferTypeName(BufferType::TEHB));
+    // Get the result number between inputOp and outputOp, so that we place the
+    // buffer on the correct channel
+    unsigned int resultNum = graph2->inputSubjectGraphToResultNumber[graph1];
+    ChannelSignals &channel = graph1->returnOutputNodes(resultNum);
+
+    // Data width of the channel between the Ops. New buffer should have the
+    // same data width.
+    unsigned int inputDataWidth = channel.dataSignals.size();
+
+    // Create the new buffer.
+    BufferSubjectGraph *breakDvr =
+        new BufferSubjectGraph(inputDataWidth, std::move(bufferTypeName));
+
+    // Insert the new BufferSubjectGraph in between the 2 SubjectGraphs
+    breakDvr->insertNewSubjectGraph(graph1, graph2);
   }
 
-  void insertBuffer(BaseSubjectGraph *graph1, BaseSubjectGraph *graph2);
+  // Initializes the BufferSubjectGraph by loading the BLIF file based on the
+  // buffer type name and data width.
   void initBuffer();
 };
 
 // SubjectGraphGenerator function generates the Subject Graphs for the given
 // FuncOp. Iterates through Ops and calls the appropriate SubjectGraph
 // constructor.
-void SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
+void subjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
 
 } // namespace experimental
 } // namespace dynamatic
