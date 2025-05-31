@@ -346,13 +346,10 @@ public:
   void initBuffer();
 };
 
-// SubjectGraphGenerator class generates the Subject Graphs for the given
+// SubjectGraphGenerator function generates the Subject Graphs for the given
 // FuncOp. Iterates through Ops and calls the appropriate SubjectGraph
 // constructor.
-class SubjectGraphGenerator {
-public:
-  SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
-};
+void SubjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
 
 } // namespace experimental
 } // namespace dynamatic
