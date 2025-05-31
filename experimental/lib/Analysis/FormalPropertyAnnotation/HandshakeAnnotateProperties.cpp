@@ -87,8 +87,8 @@ bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
-  for (auto res1 : op1.getResults())
-    for (auto res2 : op2.getResults()) {
+  for (auto [i, res1] : llvm::enumerate(op1.getResults()))
+    for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
       if (res1 == res2)
         continue;
       if (res1 != res2 && isChannelModifiable(res1) &&
