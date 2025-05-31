@@ -759,8 +759,11 @@ ChannelSignals &BufferSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
-// SubjectGraphGenerator implementation
-SubjectGraphGenerator::SubjectGraphGenerator(handshake::FuncOp funcOp,
+// This function iterates over the MLIR operations inside a FuncOp, and it 
+// populates the vector subjectGraphVector with the subject graph of each op.
+// Then, it marks the PIs and POs of the subject graph with the corresponding
+// dataflow unit port that they represent.
+void SubjectGraphGenerator(handshake::FuncOp funcOp,
                                              StringRef blifFiles) {
   baseBlifPath = blifFiles;
   std::vector<BaseSubjectGraph *> subjectGraphs;
