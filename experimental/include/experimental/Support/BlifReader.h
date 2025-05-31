@@ -91,6 +91,37 @@ public:
     regOutputNode->isLatchOutput = true;
   }
 
+  // Replaces an existing fanin with a new one.
+  void replaceFanin(Node *oldFanin, Node *newFanin) {
+    fanins.erase(oldFanin);
+    fanins.insert(newFanin);
+  }
+
+  // Connects two nodes by setting the pointer of current node to the previous
+  // node. This function is used to merge different LogicNetwork objects. Input
+  // node of one LogicNetwork object is connected to the output node of
+  // LogicNetwork object that comes before it.
+  static void connectNodes(Node *currentNode, Node *previousNode) {
+    // Once Input/Output Nodes are connected, they should not be Input/Output in
+    // the BLIF, but just become internal Nodes
+    currentNode->convertIOToChannel();
+    previousNode->convertIOToChannel();
+
+    if (previousNode->isBlackboxOutput) {
+      previousNode->isInput = true;
+    }
+
+    for (auto &fanout : currentNode->fanouts) {
+      previousNode->addFanout(fanout);
+      fanout->replaceFanin(currentNode, previousNode);
+    }
+
+    // Reverse the naming for ready signals
+    if (previousNode->name.find("ready") != std::string::npos) {
+      previousNode->name = currentNode->name;
+    }
+  }
+
   // Configures the node based on the type of I/O node.
   void configureIONode(const std::string &type);
 
