@@ -109,7 +109,7 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       Option<"collisions", "collisions", "std::string", "",
       "Three different cases for memory collsions: none/half/full">,
       Option<"targetCP", "target-period", "double", "4.0",
-      "Target clock period for the buffer placement CFDFC">];
+      "Target clock period for the LSQ pass">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
