@@ -118,7 +118,8 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
   auto targetChannel = targetOp->getResult(prop.getTargetIndex());
 
   builder.setInsertionPointAfter(targetOp);
-  auto loc = ownerChannel.getLoc();
+  Location loc =
+      FusedLoc::get(ctx, {ownerChannel.getLoc(), targetChannel.getLoc()});
 
   auto newOp = builder.create<handshake::ValidMergerOp>(loc, ownerChannel,
                                                         targetChannel);
