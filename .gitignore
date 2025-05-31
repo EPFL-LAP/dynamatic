@@ -53,3 +53,5 @@ metals.sbt
 
 # ElasticMiter puts external files in this directory
 /ext
+# VSCode settings
+.vscode/
