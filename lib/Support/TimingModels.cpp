@@ -127,10 +127,8 @@ LogicalResult TimingDatabase::getLatency(
   if (!model)
     return failure();
 
-  // This section now must handle the fact that all latency values are now
-  // contained inside an instance of DelayDepMetric. We therefore extract this
-  // structure, and use the struct's internal function to obtain the latency
-  // value at the targetPeriod provided.
+  //First, we extract the DelayDepMetric instance for a specific biwdidth.
+  //Then, we use its method (getDelayCeilMetric) to get the latency for the given targetPeriod.
   DelayDepMetric<double> DelayStruct;
 
   if (failed(model->latency.getCeilMetric(op, DelayStruct)))
@@ -328,12 +326,16 @@ bool dynamatic::fromJSON(const ljson::Value &value,
       return false;
     std::map<double, double> LatencyMap;
 
+    //validiity check in case a value encountered would be using the pre-PR475 format.
     const ljson::Object *nestedMap = metricValue.getAsObject();
     if (!nestedMap) {
       path.field(bitwidthKey).report("expected nested map object");
       return false;
     }
 
+    //nested fromJSON call, which deserializes individual delay & latency pairs into the 
+    //Latencymap
+ 
     for (const auto &[doubleKey, doubleValue] : *nestedMap) {
       double key;
       key = std::stod(doubleKey.str());
@@ -345,8 +347,11 @@ bool dynamatic::fromJSON(const ljson::Value &value,
 
       LatencyMap[key] = value;
     }
+    //the above loop filled out the latency map, we it as the data field of the DelayDepMetric structures.
     DelayDepMetric<double> LatencyStruct;
     LatencyStruct.data = LatencyMap;
+
+    //each DelayDepMetric structure is then associated to it's associated bitwidth, completing the map of maps. 
     metric.data[bitwidth] = LatencyStruct;
   }
 
