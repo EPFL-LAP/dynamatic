@@ -315,18 +315,27 @@ bool dynamatic::fromJSON(const ljson::Value &value,
 bool dynamatic::fromJSON(const ljson::Value &value,
                          BitwidthDepMetric<DelayDepMetric<double>> &metric,
                          ljson::Path path) {
+
+  
   const ljson::Object *object = value.getAsObject();
+
+  //standard empty object check
   if (!object) {
     path.report("expected JSON object");
     return false;
   }
+  //Our outer loop is on the bitwidths : each is associated with a <delay:latency> map
+  //in the JSON, and each requires a DelayDepMetric struct to store data. 
   for (const auto &[bitwidthKey, metricValue] : *object) {
     unsigned bitwidth;
+    //we start by obtaining the bitwidth value associated with this key
     if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
       return false;
+
+    // we instantiate inside the loop a LatencyMap for this specific bitwidth. 
     std::map<double, double> LatencyMap;
 
-    //validiity check in case a value encountered would be using the pre-PR475 format.
+    //validity check in case a latency value would be provided without the <delay:latency> map. 
     const ljson::Object *nestedMap = metricValue.getAsObject();
     if (!nestedMap) {
       path.field(bitwidthKey).report("expected nested map object");
@@ -335,7 +344,6 @@ bool dynamatic::fromJSON(const ljson::Value &value,
 
     //nested fromJSON call, which deserializes individual delay & latency pairs into the 
     //Latencymap
- 
     for (const auto &[doubleDelay, doubleLatency] : *nestedMap) {
       double key;
       key = std::stod(doubleDelay.str());
