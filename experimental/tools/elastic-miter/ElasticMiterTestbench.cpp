@@ -80,7 +80,7 @@ static std::string createMiterProperties(const std::string &moduleName,
   return properties.str();
 }
 
-std::string createSmvFormalTestbench(
+std::string createElasticMiterTestBench(
     MLIRContext &context, const ElasticMiterConfig &config,
     const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
     const std::optional<
@@ -118,7 +118,7 @@ LogicalResult createSmvSequenceLengthTestbench(
 
   // Call the function to generate a general testbench. We do not need to
   // include properties nor sequence constraints.
-  std::string wrapper = createSmvFormalTestbench(
+  std::string wrapper = createElasticMiterTestBench(
       context, config, modelSmvName, nrOfTokens, false, std::nullopt, true);
   std::ofstream mainFile(wrapperPath);
   mainFile << wrapper;

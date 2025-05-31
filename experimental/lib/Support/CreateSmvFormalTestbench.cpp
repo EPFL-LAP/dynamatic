@@ -74,9 +74,11 @@ static std::string instantiateModuleUnderTest(
           inputVariables.push_back("seq_generator_" + argumentName + "." +
                                    SEQUENCE_GENERATOR_VALID_NAME.str());
         })
+        // This is the case for data coming from memory (it has no handshake
+        // signals)
         .Case<IntegerType>([&](IntegerType intType) {
           if (argumentName != "clk" && argumentName != "rst") {
-            inputVariables.push_back("0sd" +
+            inputVariables.push_back("0usd" +
                                      std::to_string(intType.getWidth()) + "_0");
           }
         });
@@ -217,10 +219,10 @@ static std::string createTBJoin(size_t nrOfOutputs) {
   return tbJoin.str();
 }
 
-static std::string convertMLIRTypeToSMV(Type type) {
+static std::optional<std::string> convertMLIRTypeToSMV(Type type) {
   return llvm::TypeSwitch<Type, std::string>(type)
       .Case<handshake::ControlType>(
-          [&](handshake::ControlType cType) { return std::string(""); })
+          [&](handshake::ControlType cType) { return std::nullopt; })
       .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
         if (cType.getDataBitWidth() == 1)
           return std::string("boolean");
@@ -236,7 +238,7 @@ static std::string createSupportEntities(
   std::unordered_set<std::string> types;
   for (auto [_, type] : arguments)
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
-      types.insert(convertMLIRTypeToSMV(type));
+      types.insert(*convertMLIRTypeToSMV(type));
   std::ostringstream supportEntities;
 
   for (const auto &smvType : types) {
