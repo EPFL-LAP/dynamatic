@@ -247,7 +247,7 @@ public:
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
   LogicalResult getInternalDelay(Operation *op, SignalType signalType,
-                                 double &delay, double targetPeriod) const;
+                                 double &delay) const;
 
   /// Attempts to get an operation's port delay for a specific signal and port
   /// type. On success, sets the last argument to the requested delay.
