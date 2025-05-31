@@ -248,15 +248,18 @@ module write_data_signals #(
   input      [              ARBITER_SIZE - 1 : 0] sel,
   output     [                DATA_TYPE - 1 : 0] write_data,
   input      [ARBITER_SIZE * DATA_TYPE  - 1 : 0] in_data,
-  output reg [              ARBITER_SIZE - 1 : 0] valid
+  output     [              ARBITER_SIZE - 1 : 0] valid
 );
   integer                      i;
   reg     [DATA_TYPE - 1 : 0] data_out_var = 0;
+  reg     [ARBITER_SIZE - 1: 0] valid_out_var = 0;
 
   always @(*) begin
     data_out_var = {DATA_TYPE{1'b0}};
     for (i = 0; i < ARBITER_SIZE; i = i + 1) begin
-      data_out_var = in_data[i*DATA_TYPE+:DATA_TYPE];
+      if (sel[i]) begin
+        data_out_var = in_data[i*DATA_TYPE+:DATA_TYPE];
+      end
     end
   end
 
@@ -264,11 +267,13 @@ module write_data_signals #(
 
   always @(posedge clk) begin
     if (rst) begin
-      valid <= 0;
+      valid_out_var <= 0;
     end else begin
-      valid <= sel;
+      valid_out_var <= sel;
     end
   end
+
+  assign valid = valid_out_var;
 
 endmodule
 

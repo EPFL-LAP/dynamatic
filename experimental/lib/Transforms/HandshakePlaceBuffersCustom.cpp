@@ -7,8 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Buffer placement pass in Handshake functions, it takes the location (i.e.,
-// the predecessor, and which output channel of it), type (i.e., opaque or
-// transparent), and slots of the buffer that should be placed.
+// the predecessor, and which output channel of it), type, and slots of the 
+// buffer that should be placed.
 //
 // This pass facilitates externally prototyping a custom buffer placement
 // analysis, e.g., in Python. This also makes the results of some research
@@ -27,6 +27,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -67,7 +68,7 @@ struct HandshakePlaceBuffersCustomPass
       llvm::errs() << "No operation named \"" << pred << "\" exists\n";
       return signalPassFailure();
     }
-    assert(outid <= op->getNumResults() &&
+    assert(outid < op->getNumResults() &&
            "The output id exceeds the number of output ports!");
     Value channel = op->getResult(outid);
     // Set the insertion point to be before the original successor of the
@@ -75,16 +76,28 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
     handshake::TimingInfo timing;
-    if (type == "oehb") {
-      timing = handshake::TimingInfo::oehb();
-    } else if (type == "tehb") {
-      timing = handshake::TimingInfo::tehb();
+    StringRef bufferType;
+    if (type == "one_slot_break_dv") {
+      timing = handshake::TimingInfo::break_dv();
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
+    } else if (type == "one_slot_break_r") {
+      timing = handshake::TimingInfo::break_r();
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
+    } else if (type == "fifo_break_dv") {
+      timing = handshake::TimingInfo::break_dv();
+      bufferType = handshake::BufferOp::FIFO_BREAK_DV;
+    } else if (type == "fifo_break_none") {
+      timing = handshake::TimingInfo::break_none();
+      bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
+    } else if (type == "one_slot_break_dvr") {
+      timing = handshake::TimingInfo::break_dvr();
+      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots);
+                                                     timing, slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);

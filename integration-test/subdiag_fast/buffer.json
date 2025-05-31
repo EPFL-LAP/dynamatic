@@ -1,0 +1,23 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 15,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "cmpi1",
+    "outid": 0,
+    "slots": 15,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  },
+  {
+    "pred": "load5",
+    "outid": 1,
+    "slots": 13,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  }
+]

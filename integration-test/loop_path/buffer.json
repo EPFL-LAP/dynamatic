@@ -1,0 +1,37 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "cmpi2",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  },
+  {
+    "pred": "fork3",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  },
+  {
+    "pred": "spec_commit4",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking"
+  },
+  {
+    "pred": "fork11",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit4 (ctrl)"
+  }
+]

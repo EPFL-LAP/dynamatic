@@ -1,6 +1,8 @@
 add_subdirectory(backend)
 add_subdirectory(dynamatic)
+add_subdirectory(dynamatic-mlir-lsp-server)
 add_subdirectory(dynamatic-opt)
 add_subdirectory(export-dot)
+add_subdirectory(export-cfg)
 add_subdirectory(export-rtl)
 add_subdirectory(hls-verifier)

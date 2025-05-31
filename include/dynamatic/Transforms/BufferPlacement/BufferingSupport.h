@@ -37,11 +37,11 @@ struct FuncInfo {
 
   /// Argument-less constructor so that we can use the struct as a value type
   /// for maps.
-  FuncInfo() : funcOp(nullptr) {};
+  FuncInfo() : funcOp(nullptr){};
 
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
-  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp) {};
+  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp){};
 };
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.
@@ -58,7 +58,7 @@ public:
   /// Constructs an instance from the channel whose buffering properties will be
   /// managed by the object.
   inline LazyChannelBufProps(Value val, bool updateOnDestruction = false)
-      : val(val), updateOnDestruction(updateOnDestruction) {};
+      : val(val), updateOnDestruction(updateOnDestruction){};
 
   /// Returns the underlying channel the object was created with.
   inline mlir::Value getChannel() { return val; }
@@ -141,18 +141,13 @@ struct Channel {
   Channel(Value value, Operation *producer, Operation *consumer,
           bool updateProps = false)
       : value(value), producer(producer), consumer(consumer),
-        props(value, updateProps) {};
+        props(value, updateProps){};
 
   /// Constructs a channel from its associated SSA value alone.
   Channel(Value value, bool updateProps = false);
 
   /// Returns a reference to the operation operand corresponding to the channel.
   OpOperand &getOperand() const;
-
-  /// Adds pre-existing buffers that may exist as part of the units the channel
-  /// connects to the channel's buffering properties. These are added to the
-  /// minimum numbers of transparent and opaque slots for the channel.
-  void addInternalBuffers(const TimingDatabase &timingDB);
 
   /// The lazily-loaded channel buffering properties cannot be safely copied, so
   /// neither can the channel.
@@ -169,21 +164,22 @@ struct Channel {
 /// Holds information about what type of buffer should be placed on a specific
 /// channel.
 struct PlacementResult {
-  /// The number of transparent buffer slots that should be placed.
-  unsigned numTrans = 0;
-  /// The number of opaque buffer slots that should be placed.
-  unsigned numOpaque = 0;
-  /// Whether opaque slots should be placed transparent slots for placement
-  /// results that include both.
-  bool opaqueBeforeTrans = true;
+  /// The number of ONE_SLOT_BREAK_DV that should be placed.
+  unsigned numOneSlotDV = 0;
+  /// The number of ONE_SLOT_BREAK_R that should be placed.
+  unsigned numOneSlotR = 0;
+  /// The number of FIFO_BREAK_DV slots that should be placed.
+  unsigned numFifoDV = 0;
+  /// The number of FIFO_BREAK_NONE slots that should be placed.
+  unsigned numFifoNone = 0;
+  /// The number of ONE_SLOT_BREAK_DVR that should be placed.
+  unsigned numOneSlotDVR = 0;
 
-  /// Removes pre-existing buffers that may exist as part of the units the
-  /// channel connects to from the placement results. These are deducted from
-  /// the numbers of transparent and opaque slots stored in the placement
-  /// results. The latter are expected to specify more slots than what is going
-  /// to be deducted.
-  void deductInternalBuffers(const Channel &channel,
-                             const TimingDatabase &timingDB);
+  /// Prefered order:
+  /// {ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE,
+  /// ONE_SLOT_BREAK_R} bufferOrder = true means the order is as above,
+  /// otherwise it is reversed.
+  bool bufferOrder = true;
 };
 
 /// Maps channels to buffer placement decisions.

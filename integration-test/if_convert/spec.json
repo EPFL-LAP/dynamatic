@@ -1,0 +1,8 @@
+{
+  "speculator": {
+    "operation-name": "select0",
+    "operand-idx": 0,
+    "fifo-depth": 7
+  },
+  "save-commits-fifo-depth": 7
+}

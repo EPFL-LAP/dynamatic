@@ -31,6 +31,19 @@ endif ()
 include(FindPackageHandleStandardArgs)
 find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 
+# Build Dynamatic with ccache if the package is present
+set(DYNAMATIC_CCACHE_BUILD OFF CACHE BOOL "Set to ON for a ccache enabled build")
+if(DYNAMATIC_CCACHE_BUILD)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+        message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+        set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    else()
+        message(WARNING "ccache not found, but DYNAMATIC_CCACHE_BUILD is ON")
+    endif()
+endif()
+
 #-------------------------------------------------------------------------------
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
@@ -55,6 +68,7 @@ include(AddLLVM)
 include(AddMLIR)
 include(AddClang)
 include(HandleLLVMOptions)
+include(FetchContent)
 
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
@@ -129,6 +143,50 @@ else()
                    project.")
   add_compile_definitions(DYNAMATIC_GUROBI_NOT_INSTALLED)
 endif()
+
+#-------------------------------------------------------------------------------
+# XLS Integration (experimental)
+#-------------------------------------------------------------------------------
+
+set(DYNAMATIC_XLS_DIR ${DYNAMATIC_SOURCE_DIR}/xls)
+
+if(DYNAMATIC_ENABLE_XLS)
+  # Add 'DYNAMATIC_ENABLE_XLS` macro to prepoc + tablegen for conditioanl
+  # inclusion of XLS features.
+  add_compile_definitions(DYNAMATIC_ENABLE_XLS)
+  set(LLVM_TABLEGEN_FLAGS ${LLVM_TABLEGEN_FLAGS} -DDYNAMATIC_ENABLE_XLS)
+
+  include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/xls/include)
+  include_directories(${DYNAMATIC_BINARY_DIR}/experimental/xls/include)
+  include_directories(${DYNAMATIC_XLS_DIR})
+endif()
+
+
+#-------------------------------------------------------------------------------
+# External binaries
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_LEQ_BINARIES)
+  # Download modified NuSMV binary,
+  # which support to print larger sets of reachable states
+  set(EXT_BIN_DIR "${DYNAMATIC_SOURCE_DIR}/ext")
+  file(DOWNLOAD
+      https://github.com/ETHZ-DYNAMO/NuSMV-2.7.0/releases/download/v1.0.1/NuSMV
+      ${EXT_BIN_DIR}/NuSMV
+  )
+  file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
+
+  # Download dot2smv Python scripts
+  FetchContent_Declare(
+    dot2smv
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
+    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
+  )
+
+  FetchContent_MakeAvailable(dot2smv)
+endif()
+
 
 #-------------------------------------------------------------------------------
 # Directory setup

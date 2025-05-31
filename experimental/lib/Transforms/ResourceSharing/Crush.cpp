@@ -66,8 +66,7 @@ static constexpr unsigned MAX_GROUP_SIZE = 20;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"),
-    FPGA20_LEGACY("fpga20-legacy"), FPL22("fpl22");
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 // A FuncPerfInfo holds the extracted data from buffer placement, for a single
@@ -124,7 +123,7 @@ static void loadFuncPerfInfo(SharingInfo &sharingInfo, MILPVars &vars,
     cfIndices[cfAndOpt.first] = id;
 
   // Extract result: save global CFDFC throuhgputs into sharingInfo
-  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfVars)) {
+  for (auto [id, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
 
     auto [cf, cfVars] = cfdfcWithVars;
     double throughput = cfVars.throughput.get(GRB_DoubleAttr_X);
@@ -170,15 +169,13 @@ class FPGA20BuffersWrapper : public FPGA20Buffers {
 public:
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod, bool legacyPlacement,
-                       Logger &logger, StringRef milpName)
-      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
-                      logger, milpName),
+                       double targetPeriod, Logger &logger, StringRef milpName)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, logger, milpName),
         sharingInfo(sharingInfo){};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                       double targetPeriod, bool legacyPlacement)
-      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement),
+                       double targetPeriod)
+      : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod),
         sharingInfo(sharingInfo){};
 
 private:
@@ -307,11 +304,11 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       env.set(GRB_DoubleParam_TimeLimit, timeout);
     env.start();
 
-    if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY)
+    if (algorithm == FPGA20)
       // Create and solve the MILP
       return checkLoggerAndSolve<buffer::fpga20::FPGA20BuffersWrapper>(
           logger, "placement", placement, sharingInfo, env, funcInfo, timingDB,
-          targetCP, algorithm != FPGA20);
+          targetCP);
     if (algorithm == FPL22) {
       // Create disjoint block unions of all CFDFCs
       SmallVector<CFDFC *, 8> cfdfcs;
