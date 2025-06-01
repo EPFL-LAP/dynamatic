@@ -98,17 +98,13 @@ public:
   /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
 
-  /// Determines and passes back the value of the metric. Based on the provided 
-  ///target period, the chosen value will be the one who's key is the highest
-  /// delay possible (to avoid needless latency or hardware costs); with upper bound 
-  ///the target period (meaning we pick the slowest implementation that still 
-  ///meets timing constraints).
-  /// Based on known trends, we expect that higher combinational delays corresponds to lower latency 
-  /// - generally because of higher degree of pipelining. Since the only use case of this struct
-  /// for now is this delay:latency case, the logic was implemented as follows :
-  ///Computes and returns the metric value corresponding to the highest delay that 
-  ///does not exceed the target period, selecting the slowest implementation that still meets timing constraints.
-
+/// Computes and returns the metric value for the highest delay that does not exceed
+/// the target period—effectively selecting the fastest implementation that still meets
+/// timing constraints.
+/// 
+/// Based on observed trends, higher combinational delays generally correspond to lower latency,
+/// due to deeper pipelining. Since this struct is currently only used for delay-to-latency maps,
+/// this assumption motivates the selection strategy.
   LogicalResult getDelayCeilMetric(double targetPeriod, M &metric) const {
     std::optional<unsigned> opDelayCeil;
     M metricFloor = 0.0;
