@@ -148,6 +148,54 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   auto func = allAlgorithms[algorithm];
   if (failed(((*this).*(func))()))
     return signalPassFailure();
+
+  // run the delay selection logic again, writing it to the IR for processing in
+  // the backend
+  // In order tp avoid interleaving this IR writing with the value extraction,
+  // we keep it seperate. this does mean redudant logic, but the Database
+  // parsing is not a performance bottleneck, so this should be acceptable.
+  // TODO : this should go into a bespoke function
+
+  TimingDatabase timingDB(&getContext());
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    llvm::errs() << "=== TimindDB read failed ===\n";
+  else
+    llvm::errs() << "=== TimindDB read succeeded ===\n";
+
+  modOp.walk([&](mlir::Operation *op) {
+    if (llvm::isa<dynamatic::handshake::ArithOpInterface>(op)) {
+      double delay;
+      if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
+                                                         delay, targetCP))) {
+        llvm::errs() << "written delay value: " << delay << "\n";
+
+        auto ctx = op->getContext();
+        auto paramsAttr =
+            op->getAttrOfType<mlir::DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+
+        // Start from existing or empty param list
+        llvm::SmallVector<mlir::NamedAttribute, 8> newParams;
+        if (paramsAttr)
+          newParams.append(paramsAttr.getValue().begin(),
+                           paramsAttr.getValue().end());
+
+        // Replace or add selected_delay
+        auto delayAttrName = mlir::StringAttr::get(ctx, "selected_delay");
+        auto delayAttrValue = mlir::StringAttr::get(ctx, std::to_string(delay));
+
+        // Remove existing selected_delay if present
+        llvm::erase_if(newParams, [&](const mlir::NamedAttribute &attr) {
+          return attr.getName() == delayAttrName;
+        });
+
+        newParams.push_back(
+            mlir::NamedAttribute(delayAttrName, delayAttrValue));
+
+        op->setAttr(RTL_PARAMETERS_ATTR_NAME,
+                    mlir::DictionaryAttr::get(ctx, newParams));
+      }
+    }
+  });
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -230,9 +278,10 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
         auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
         if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
             dstBB == endBB) {
-          /// NOTE: (lucas-rami) This is probably the start->end control channel
-          /// which goes from the entry block to the exit block. This is fine in
-          /// general so we let this pass without triggering a warning or error
+          /// NOTE: (lucas-rami) This is probably the start->end control
+          /// channel which goes from the entry block to the exit block. This
+          /// is fine in general so we let this pass without triggering a
+          /// warning or error
           continue;
         }
 
@@ -344,8 +393,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    SmallVector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
-  // Store all archs in a set. We use a pointer to each arch as the key type to
-  // allow us to modify their frequencies during CFDFC extractions without
+  // Store all archs in a set. We use a pointer to each arch as the key type
+  // to allow us to modify their frequencies during CFDFC extractions without
   // messing up key hashes
   ArchSet archs;
   // Similarly, store all block IDs in a set.
@@ -447,7 +496,6 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
-
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
@@ -491,9 +539,9 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
-  // The only strategy at this point is to place buffers on the output channels
-  // of all merge-like operations. We still want to respect channel-specific
-  // buffering constraints
+  // The only strategy at this point is to place buffers on the output
+  // channels of all merge-like operations. We still want to respect
+  // channel-specific buffering constraints
 
   // Read the operations' timing models from disk
   TimingDatabase timingDB(&getContext());
@@ -501,14 +549,14 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     return failure();
 
   for (handshake::FuncOp funcOp : getOperation().getOps<handshake::FuncOp>()) {
-    // Map all channels in the function to their specific buffering properties,
-    // adjusting for internal buffers present inside the units
+    // Map all channels in the function to their specific buffering
+    // properties, adjusting for internal buffers present inside the units
     llvm::MapVector<Value, ChannelBufProps> channelProps;
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    // Make sure that the data output channels of all merge-like operations have
-    // at least one opaque and one transparent slot, unless a constraint
+    // Make sure that the data output channels of all merge-like operations
+    // have at least one opaque and one transparent slot, unless a constraint
     // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
@@ -517,7 +565,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
@@ -525,7 +574,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may "
+               "output due to channel-specific buffering constraints. This "
+               "may "
                "yield an invalid buffering.";
       }
     }

@@ -2,11 +2,13 @@
   {
     "name": "handshake.addf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "selected_delay", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
-  },
+  }
+  ,
   {
     "name": "handshake.addi",
     "parameters": [
