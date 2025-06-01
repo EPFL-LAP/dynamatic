@@ -126,21 +126,23 @@ The timing system uses the following core data structures:
 ## Loading Timing Data from JSON
 Before detailing the process, an introduction of the main functions involved is required :
 
-- ```fromJSON((const ljson::Value &jsonValue, T &target, ljson::Path path)``` : this is the primary function used, with a number of overloads for various T object types. These overloads are, in order :  [first called](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L373) on the TimingDatabase, then [on every](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L330) TimingModel inside the Database, then on individual fields(example for BitwidthDepMetric [here](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L373) ); PortModels also have a dedicated [overload](https://github.com/KillianMcCourt/dynamatic/blob/pr1-clean/lib/Support/TimingModels.cpp#L426) .
+- ```fromJSON((const ljson::Value &jsonValue, T &target, ljson::Path path)``` : this is the primary function used, with a number of overloads for various T object types. These overloads are, in order :  [first called](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L373) on the TimingDatabase, then [on every](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L330) TimingModel inside the Database, then on individual fields(example for BitwidthDepMetric [here](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L373) ); PortModels also have a dedicated [overload](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L396) .
 
 - [```deserializenested((ArrayRef<std::string> keys, const ljson::Object *object, T &out, ljson::Path path)```](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L256): this function is called by the TimingModel fromJSON. It calls the ```fromJSON(*value, out, currentPath)```   for the inidividual fields, by iterating across the path provided by the ```TimingModel```-level ```fromJSON```. Therefore, it handles the deserialisation of said fields, by passing back the object deserialized. 
 
 The process follows these steps:
 
-1. **Initialization**: Create empty TimingDatabase
-2. **File Reading**: Parse the entire components.json file
-3. **Data Extraction**: For each operator in the JSON:
-   - Create a TimingModel instance
-   - Extract latency, delay, and port timing data, with appropriate calls to a fromJSON function . 
-   - Handle bitwidth-dependent values appropriately
-   - Insert the completed model into the TimingDatabase
+1. **Initialization**: Create empty TimingDatabase, and call the initialisation readFromJSON on it. This function :
+  1.1 **File Reading**: Loads the entire contents of the components.json into a string, and then parses it as a JSON.
+  1.2. **Begin extraction** We then call fromJSON on the TimingDatabase and the parsed JSON  to begin the deserialisation process.
+2. **Deserialisation**: For each operator in the JSON, the TimingDatabase from JSON will : 
+   2.1 Create a TimingModel instance
+   2.2 Call fromJSON on that TimingModel and the parsed fromJSON.  This fromJSON contains a list of fields it needs to fill.
+     2.2.1 For each field, it will call deserializeNested
+     2.2.1 This calls the appropriate fromJSON and writes result back into the field
+   2.3 Write back the TimingModel into the Database
   
-The JSON parsing handles the nested structure automatically, converting string keys to bitwidths and organizing delay values by signal type. 
+Once deserialisation is done for all operators, the database will contain the full information of the JSON. 
 
 ##  Core Functions of Data Structures
 
