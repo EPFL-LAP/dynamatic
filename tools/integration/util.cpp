@@ -96,14 +96,11 @@ bool runSpecIntegrationTest(const std::string& name) {
   fs::path outDir = cFileDir / "out_spec";
   if (fs::exists(outDir)) {
     fs::remove_all(outDir);
-    std::cout << "[INFO] Deleting directory " << outDir << std::endl;
   }
   fs::create_directories(outDir);
-  std::cout << "[INFO] Creating directory " << outDir << std::endl;
 
   fs::path compOutDir = outDir / "comp";
   fs::create_directories(compOutDir);
-  std::cout << "[INFO] Creating directory " << compOutDir << std::endl;
 
   // Copy cf.mlir
   fs::path cfFileBase = cFileDir / "cf.mlir";
@@ -119,7 +116,6 @@ bool runSpecIntegrationTest(const std::string& name) {
   }
 
   fs::path cfDynTransformed = compOutDir / "cfDynTransformed.mlir";
-  std::cout << "transformed is " << cfDynTransformed << std::endl;
   if (!runSubprocess({DYNAMATIC_OPT_BIN, cfTransformed.string(),
                         "--arith-reduce-strength=max-adder-depth-mul=1", "--push-constants", "--mark-memory-interfaces"},
                       cfDynTransformed)) {
@@ -146,7 +142,7 @@ bool runSpecIntegrationTest(const std::string& name) {
   std::string timingModel = (fs::path(DYNAMATIC_ROOT) / "data" / "components.json").string();
   if (!runSubprocess({DYNAMATIC_OPT_BIN, handshakeTransformed.string(),
                         "--handshake-set-buffering-properties=version=fpga20",
-                        "--handshake-place-buffers=algorithm=on-merges timing-models=" + timingModel},
+                        "\"--handshake-place-buffers=algorithm=on-merges timing-models=" +  timingModel + "\""},
                       handshakeBuffered)) {
       std::cerr << "Failed to place simple buffers\n";
       return false;
