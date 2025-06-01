@@ -161,16 +161,39 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
     llvm::errs() << "=== TimindDB read failed ===\n";
   else
     llvm::errs() << "=== TimindDB read succeeded ===\n";
+
   modOp.walk([&](mlir::Operation *op) {
     if (llvm::isa<dynamatic::handshake::ArithOpInterface>(op)) {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
-                                                         delay, targetCP)))
+                                                         delay, targetCP))) {
         llvm::errs() << "written delay value: " << delay << "\n";
 
-      op->setAttr(
-          "selected_delay",
-          mlir::StringAttr::get(op->getContext(), std::to_string(delay)));
+        auto ctx = op->getContext();
+        auto paramsAttr =
+            op->getAttrOfType<mlir::DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
+
+        // Start from existing or empty param list
+        llvm::SmallVector<mlir::NamedAttribute, 8> newParams;
+        if (paramsAttr)
+          newParams.append(paramsAttr.getValue().begin(),
+                           paramsAttr.getValue().end());
+
+        // Replace or add selected_delay
+        auto delayAttrName = mlir::StringAttr::get(ctx, "selected_delay");
+        auto delayAttrValue = mlir::StringAttr::get(ctx, std::to_string(delay));
+
+        // Remove existing selected_delay if present
+        llvm::erase_if(newParams, [&](const mlir::NamedAttribute &attr) {
+          return attr.getName() == delayAttrName;
+        });
+
+        newParams.push_back(
+            mlir::NamedAttribute(delayAttrName, delayAttrValue));
+
+        op->setAttr(RTL_PARAMETERS_ATTR_NAME,
+                    mlir::DictionaryAttr::get(ctx, newParams));
+      }
     }
   });
 }
