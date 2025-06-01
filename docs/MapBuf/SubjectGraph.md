@@ -5,13 +5,67 @@ While the Handshake dialect in Dynamatic is used to model the Dataflow circuits 
 
 This creates a gap within Dynamatic, the high-level Handshake dialect cannot provide the low-level AIG representation needed for MapBuf. The Subject Graph class implementation fills this gap. While it is not a formal MLIR dialect, it functions conceptually as an AIG Dialect within Dynamatic. The Subject Graph implementation:
 
-1) Creates AIG representations of Dataflow units by integrating BLIF files of the corresponding hardware units 
-2) Constructs the complete Subject Graph of the entire circuit by connecting these individual unit representations
-3) Provides bidirectional mapping between MLIR Operations and Subject Graphs through a static moduleMap, enabling efficient lookups in both directions
-4) Enables buffer insertion at specific points in the circuit
+1) It parses the AIG implementation of each dataflow unit in the dataflow circuit. 
+2) Constructs the complete AIG of the entire dataflow circuit by connecting the AIG of each unit.
+3) Provides bidirectional mapping between dataflow units and the nodes in the AIG through a static moduleMap, enabling efficient lookups in both directions.
+4) Enables buffer insertion at specific points in the dataflow circuit.
+
+
+# Implementation Overview
+
+The code base data structure is **BaseSubjectGraph** which contains the AIG of each dataflow unit separately.
+
+The core data structure that contains the list of the subject graph of all dataflow units is `subjectGraphVector` which is filled in the `BaseSubjectGraph` object generator.
+
+The main function that build the subject graph of the entire AIG is `SubjectGraphGenerator`. The following is its pseudo-code:
+
+```
+DataflowCircuit DC;
+std::vector<BaseSubjectGraph *> subjectGraphs;
+for ( DataFlow unit: DC.get_dataflow_units() ){
+
+  BaseSubjectGraph * unit_sg = BaseSubjectGraph(unit);
+  subjectGraphs.append( unit_sg );
+
+}
+
+for ( BaseSubjectGraph * module: subjectGraphs){
+  module->buildSubjectGraphConnections();
+}
+```
+
+For each dataflow unit in the dataflow circuit, the SubjectGraphGenerator creates the corresponding derived BaseSubjectGraph object. Then, for each one of these, it calls the corresponding buildSubjectGraphConnections function which connects them.
+
 
 # BaseSubjectGraph Class
-BaseSubjectGraph class is an abstract class that provides base functionality for hardware module specific Subject Graph classes. 
+The BaseSubjectGraph class is an abstract base class that provides shared functionality for generating the subject graph of a dataflow unit. Each major type of dataflow unit has its own subclass that extends BaseSubjectGraph. These subclasses implement their own constructors and are responsible for parsing the corresponding BLIF (Berkeley Logic Interchange Format) file to construct the unit's subject graph.
+
+The following pseudocode illustrates the subject graph generation process within the dataflow unit class generator:
+
+```
+dataBitwidth = unit->getDataBitwidth();
+loadBlifFile(dataBitwidth);
+
+processOutOfRuleNodes();
+NodeProcessingRule rules = ... // generated seprately for each dataflow unit type
+processNodesWithRules(rules);
+```
+
+The process begins by retrieving the data bitwidth of the unit, which is used to select and load the appropriate BLIF file via the `loadBlifFile` functionThis file provides the AIG   representation for the specific unit at that bitwidth.
+
+After parsing the BLIF, two functions are used to interpret and process the AIG nodes:
+- `processOutOfRuleNodes`: A subclass-specific function that performs custom processing of AIG nodes, typically identifying matches between primary inputs (PIs) and primary outputs (POs) and the corresponding ports of the dataflow unit.
+- `processNodesWithRules`: A generic function shared across all subclasses, which matches the PIs and POs of the AIG with the corresponding ports of the dataflow units applying the rules describes by `NodeProcessingRule` structure. 
+
+An example of a NodeProcessingRule is `{"lhs", lhsNodes, false, nullptr}`. This rule instructs the system to collect AIG PIs or POs whose names contain the substring `"lhs"` into the set `lhsNodes`, without renaming them (`false` flag) and without applying additional processing (`nullptr` argument).
+
+
+Another key step is handled by the `buildSubjectGraphConnections` function. It iterates over the dataflow unit's input and output ports and stores their corresponding subject graphs in two vectors—one for inputs and one for outputs.
+
+
+Finally, the `connectInputNodes` function connects the different subject graphs together using the previously collected node information and the input/output subject graph vectors. This step completes the construction of the full subject graph.
+
+
 ## Key Variables
 1) Operation *op: The MLIR Operation of the Dataflow unit that the Subject Graph represents
 2) std::string uniqueName: Unique identifier used for node naming in the BLIF file
@@ -32,8 +86,8 @@ BaseSubjectGraph class is an abstract class that provides base functionality for
 # Channel Signals
 A struct that holds the different types of signals that a channel can have. It consists of a vector of Nodes for Data signals, and single Nodes for Valid and Ready signals. The input/output variables of the SubjectGraph classes consist of this struct.
 
-# Derived SubjectGraph Classes
-Each different dataflow unit has its own derived SubjectGraph class, extending BaseSubjectGraph to suit different number of I/O channels and naming conventions. These classes have different variables representing their I/O channels, and also specialized constructor to correctly parse the BLIF file generated from their hardware descriptions, in accordance with the naming convention used for these modules in their hardware descriptions.
+# Derived BaseSubjectGraph Classes
+As mentioned in the BaseSubjectGraph Class section, each different dataflow unit has its own derived SubjectGraph class. In this section, we mention in detail some of them.
 
 ## ArithSubjectGraph
 Represents arithmetic operations in the Handshake dialect, which consists of AddIOp, AndIOp, CmpIOp, OrIOp, ShLIOp, ShRSIOp, ShRUIOp, SubIOp, XOrIOp, MulIOp, DivSIOp, DivUIOp. 
