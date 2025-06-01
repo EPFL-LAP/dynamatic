@@ -18,7 +18,7 @@
 
 using json = nlohmann::json;
 
-int runSubprocess(const std::vector<std::string>& args, const fs::path& outputPath) {
+bool runSubprocess(const std::vector<std::string>& args, const fs::path& outputPath) {
   std::ostringstream command;
   command << args[0];
   for (size_t i = 1; i < args.size(); ++i) {
