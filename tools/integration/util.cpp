@@ -93,7 +93,7 @@ bool runSpecIntegrationTest(const std::string& name) {
   std::cout << "[INFO] Running " << name << std::endl;
 
   fs::path cFileDir = cFilePath.parent_path();
-  fs::path outDir = cFileDir / "out";
+  fs::path outDir = cFileDir / "out_spec";
   if (fs::exists(outDir)) {
     fs::remove_all(outDir);
     std::cout << "[INFO] Deleting directory " << outDir << std::endl;
