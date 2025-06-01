@@ -17,7 +17,7 @@ We classify combinational delays into two categories:
 
 This difference is a key distinction between **pipelined** and **non-pipelined** operations. Consider the following graph :
 
-![image](https://github.com/user-attachments/assets/9f6f8608-7a80-4d91-a92b-bc0cb5dcf3af)
+![image](https://github.com/user-attachments/assets/1b980703-40e6-4331-9932-24d624bbbbb9)
 
 
 In the pipelined case (i.e., when latency > 0), registers are placed along the paths between input and output ports. As a result, these paths no longer have any intra-port delays, since there are no purely combinational routes connecting inputs directly to outputs. However, port2reg delays still exist on these paths — capturing the combinational delays between an input port and the first register stage, and between the last register stage and an output port. In the figure, the inport and outport delays illustrate these port2reg delays.
@@ -133,13 +133,21 @@ Before detailing the process, an introduction of the main functions involved is 
 The process follows these steps:
 
 1. **Initialization**: Create empty TimingDatabase, and call the initialisation readFromJSON on it. This function :
+   
   1.1 **File Reading**: Loads the entire contents of the components.json into a string, and then parses it as a JSON.
+   
   1.2. **Begin extraction** We then call fromJSON on the TimingDatabase and the parsed JSON  to begin the deserialisation process.
-2. **Deserialisation**: For each operator in the JSON, the TimingDatabase from JSON will : 
+  
+2. **Deserialisation**: For each operator in the JSON, the TimingDatabase from JSON will :
+   
    2.1 Create a TimingModel instance
+   
    2.2 Call fromJSON on that TimingModel and the parsed fromJSON.  This fromJSON contains a list of fields it needs to fill.
+   
      2.2.1 For each field, it will call deserializeNested
+   
      2.2.1 This calls the appropriate fromJSON and writes result back into the field
+   
    2.3 Write back the TimingModel into the Database
   
 Once deserialisation is done for all operators, the database will contain the full information of the JSON. 
