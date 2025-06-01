@@ -88,19 +88,22 @@ bool runSpecIntegrationTest(const std::string& name) {
     fs::path(DYNAMATIC_ROOT) / "data" / "rtl-config-vhdl-beta.json";
 
   fs::path cFilePath =
-      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
+    fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
 
   std::cout << "[INFO] Running " << name << std::endl;
 
   fs::path cFileDir = cFilePath.parent_path();
   fs::path outDir = cFileDir / "out";
   if (fs::exists(outDir)) {
-      fs::remove_all(outDir);
+    fs::remove_all(outDir);
+    std::cout << "[INFO] Deleting directory " << outDir << std::endl;
   }
   fs::create_directories(outDir);
+  std::cout << "[INFO] Creating directory " << outDir << std::endl;
 
   fs::path compOutDir = outDir / "comp";
   fs::create_directories(compOutDir);
+  std::cout << "[INFO] Creating directory " << compOutDir << std::endl;
 
   // Copy cf.mlir
   fs::path cfFileBase = cFileDir / "cf.mlir";
@@ -116,6 +119,7 @@ bool runSpecIntegrationTest(const std::string& name) {
   }
 
   fs::path cfDynTransformed = compOutDir / "cfDynTransformed.mlir";
+  std::cout << "transformed is " << cfDynTransformed << std::endl;
   if (!runSubprocess({DYNAMATIC_OPT_BIN, cfTransformed.string(),
                         "--arith-reduce-strength=max-adder-depth-mul=1", "--push-constants", "--mark-memory-interfaces"},
                       cfDynTransformed)) {
