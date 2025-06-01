@@ -132,25 +132,28 @@ Before detailing the process, an introduction of the main functions involved is 
 
 The process follows these steps:
 
-1. **Initialization**: Create empty TimingDatabase, and call the initialisation readFromJSON on it. This function :
-   
-  1.1 **File Reading**: Loads the entire contents of the components.json into a string, and then parses it as a JSON.
-   
-  1.2. **Begin extraction** We then call fromJSON on the TimingDatabase and the parsed JSON  to begin the deserialisation process.
+1. **Initialization**  
+   Create an empty `TimingDatabase`, and call the initialization `readFromJSON` on it. This function:
+
+   1.1 **File Reading**  
+   Loads the entire contents of the `components.json` into a string, and then parses it as a JSON.
+
+   1.2 **Begin Extraction**  
+   We then call `fromJSON` on the `TimingDatabase` and the parsed JSON to begin the deserialization process.
+
+2. **Deserialization**  
+   For each operator in the JSON, the `TimingDatabase fromJSON` will:
+
+   2.1 **Create a `TimingModel`** instance.
+
+   2.2 **Call `fromJSON` on that `TimingModel` and the parsed JSON**. This `fromJSON` contains a list of fields it needs to fill.
+
+   - 2.2.1 For each field, it will call `deserializeNested`.
+   - 2.2.2 This calls the appropriate `fromJSON` and writes the result back into the field.
+
+   2.3 **Write back the `TimingModel` into the database.**
   
-2. **Deserialisation**: For each operator in the JSON, the TimingDatabase from JSON will :
-   
-   2.1 Create a TimingModel instance
-   
-   2.2 Call fromJSON on that TimingModel and the parsed fromJSON.  This fromJSON contains a list of fields it needs to fill.
-   
-     2.2.1 For each field, it will call deserializeNested
-   
-     2.2.1 This calls the appropriate fromJSON and writes result back into the field
-   
-   2.3 Write back the TimingModel into the Database
-  
-Once deserialisation is done for all operators, the database will contain the full information of the JSON. 
+Once deserialisation is done for **all operators**, the database will contain the full information of the JSON. 
 
 ##  Core Functions of Data Structures
 
