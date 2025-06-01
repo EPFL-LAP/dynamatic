@@ -100,13 +100,13 @@ In this section, we present the data structures used to store timing information
 
 The timing system uses the following core data structures:
 
-- **[TimingDatabase](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L174)**: IR-level timing container
+- **[TimingDatabase](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L221)**: IR-level timing container
   - Contains the timing data for the entire IR.
   - Stores multiple `TimingModel` instances (one per operation).
   - Provides accessor methods to retrieve timing information.
   - Gets populated from the JSON file during buffer placement passes.
 
-- **[TimingModel](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L103)**: Per-operation timing data container
+- **[TimingModel](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L151)**: Per-operation timing data container
   - Encapsulates all timing data for a single operation (latencies and delays).
   - Uses `BitwidthDepMetric` structure to represent bitwidth-dependent values (see below).
   - Contains nested `PortModel` structures for port2reg delay information. 
