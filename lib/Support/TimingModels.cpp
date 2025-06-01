@@ -324,43 +324,43 @@ bool dynamatic::fromJSON(const ljson::Value &value,
     path.report("expected JSON object");
     return false;
   }
-  //Our outer loop is on the bitwidths : each is associated with a <delay:latency> map
-  //in the JSON, and each requires a DelayDepMetric struct to store data. 
+  //The outer loop is on the bitwidths: each is associated with a DelayDepMetric map
+  //in the JSON. 
   for (const auto &[bitwidthKey, metricValue] : *object) {
     unsigned bitwidth;
     //we start by obtaining the bitwidth value associated with this key
     if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
       return false;
 
-    // we instantiate inside the loop a LatencyMap for this specific bitwidth. 
-    std::map<double, double> LatencyMap;
+    //We instantiate inside the loop an internalMap for this specific bitwidth. 
+    std::map<double, double> internalMap;
 
-    //validity check in case a latency value would be provided without the <delay:latency> map. 
+    //Validity check to ensure the presence of a map. 
     const ljson::Object *nestedMap = metricValue.getAsObject();
     if (!nestedMap) {
       path.field(bitwidthKey).report("expected nested map object");
       return false;
     }
 
-    //nested fromJSON call, which deserializes individual delay & latency pairs into the 
-    //Latencymap
-    for (const auto &[doubleDelay, doubleLatency] : *nestedMap) {
+    //nested fromJSON call, which deserializes individual delay & value pairs into the 
+    //internalMap
+    for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
       double key;
       key = std::stod(doubleDelay.str());
 
       double value;
-      if (!fromJSON(doubleLatency, value,
+      if (!fromJSON(doubleValue, value,
                     path.field(bitwidthKey).field(doubleDelay)))
         return false;
 
-      LatencyMap[key] = value;
+      internalMap[key] = value;
     }
-    //the above loop filled out the latency map, we it as the data field of the DelayDepMetric structures.
-    DelayDepMetric<double> LatencyStruct;
-    LatencyStruct.data = LatencyMap;
+    //We save the internal map as the data field of the DelayDepMetric.
+    DelayDepMetric<double> DelayDepStruct;
+    DelayDepStruct.data = internalMap;
 
-    //each DelayDepMetric structure is then associated to it's associated bitwidth, completing the map of maps. 
-    metric.data[bitwidth] = LatencyStruct;
+    //Each DelayDepMetric structure is then associated with its bitwidth, completing the 2-level nested map. 
+    metric.data[bitwidth] = DelayDepStruct;
   }
 
   return true;
