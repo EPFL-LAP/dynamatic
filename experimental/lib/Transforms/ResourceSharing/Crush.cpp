@@ -171,12 +171,12 @@ public:
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod, Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
                        double targetPeriod)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -199,12 +199,12 @@ public:
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
                           logger, milpName),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
 
 private:
   SharingInfo &sharingInfo;
@@ -289,7 +289,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
                                    bool dumpLogs)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
                                   firstCFDFC, targetCP, timeout, dumpLogs),
-        sharingInfo(sharingInfo){};
+        sharingInfo(sharingInfo) {};
   SharingInfo &sharingInfo;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -539,7 +539,8 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
 // of all performance critical CFCs.
 void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
                     llvm::MapVector<Operation *, double> &opOccupancy,
-                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo, double targetCP) {
+                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo,
+                    double targetCP) {
 
   double latency;
   for (Operation *target : sharingTargets) {
@@ -550,7 +551,8 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
     for (auto cf : funcPerfInfo.critCfcs) {
       if (funcPerfInfo.cfUnits[cf].find(target) !=
           funcPerfInfo.cfUnits[cf].end()) {
-        if (failed(timingDB.getLatency(target, SignalType::DATA, latency, targetCP )))
+        if (failed(timingDB.getLatency(target, SignalType::DATA, latency,
+                                       targetCP)))
           latency = 0.0;
         // Formula for operation occupancy:
         // Occupancy = Latency / II = Latency * Throughput.
@@ -592,7 +594,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     Operation *sharedOp = *group.begin();
 
     double latency;
-    if (failed(timingDB.getLatency(sharedOp, SignalType::DATA, latency, targetCP)))
+    if (failed(
+            timingDB.getLatency(sharedOp, SignalType::DATA, latency, targetCP)))
       latency = 0.0;
 
     // Maps each original successor and the input operand (Value)
@@ -690,7 +693,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
 LogicalResult CreditBasedSharingPass::sharingInFuncOp(
     handshake::FuncOp *funcOp, FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-    TimingDatabase &timingDB, double targetCP){
+    TimingDatabase &timingDB, double targetCP) {
 
   std::error_code ec;
   SharingLogger sharingLogger(*funcOp, dumpLogs, ec);
@@ -774,7 +777,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   // Apply resource sharing for each function in the module op.
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
-    if (failed(sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB, targetCP))) {
+    if (failed(
+            sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB, targetCP))) {
       signalPassFailure();
     }
   }

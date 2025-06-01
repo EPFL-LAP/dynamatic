@@ -164,7 +164,8 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     // If the component is combinational (i.e., 0 latency) its output fluid
     // retiming equals its input fluid retiming, otherwise it is different
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
+    if (failed(
+            timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
       latency = 0.0;
     if (latency == 0.0)
       unitVars.retOut = unitVars.retIn;
@@ -596,7 +597,8 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)) ||
+    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency,
+                                   targetPeriod)) ||
         latency == 0.0)
       continue;
 

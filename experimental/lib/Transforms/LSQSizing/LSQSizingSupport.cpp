@@ -38,7 +38,8 @@ using namespace dynamatic::experimental::lsqsizing;
 /// 2. If the operation is a buffer operation, the latency is extracted from the
 /// timing attribute
 /// 3. If the operation is neither, then its latency is set to 0
-static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB, double targetCP) {
+static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
+                              double targetCP) {
   double latency = 0;
 
   if (!failed(timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {

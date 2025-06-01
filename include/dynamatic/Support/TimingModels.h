@@ -98,13 +98,14 @@ public:
   /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
 
-/// Computes and returns the metric value for the highest delay that does not exceed
-/// the target period—effectively selecting the fastest implementation that still meets
-/// timing constraints.
-/// 
-/// Based on observed trends, higher combinational delays generally correspond to lower latency,
-/// due to deeper pipelining. Since this struct is currently only used for delay-to-latency maps,
-/// this assumption motivates the selection strategy.
+  /// Computes and returns the metric value for the highest delay that does not
+  /// exceed the target period—effectively selecting the fastest implementation
+  /// that still meets timing constraints.
+  ///
+  /// Based on observed trends, higher combinational delays generally correspond
+  /// to lower latency, due to deeper pipelining. Since this struct is currently
+  /// only used for delay-to-latency maps, this assumption motivates the
+  /// selection strategy.
   LogicalResult getDelayCeilMetric(double targetPeriod, M &metric) const {
     std::optional<unsigned> opDelayCeil;
     M metricFloor = 0.0;
@@ -133,9 +134,10 @@ public:
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
-/// Deserializes a JSON map into a BitwidthDepMetric<DelayDepMetric<double>> struct.
-/// This is done by first deserialising individual values with a nested fromJSON, to fill a latency
-/// map which will be passed as the data field of the struct.
+/// Deserializes a JSON map into a BitwidthDepMetric<DelayDepMetric<double>>
+/// struct. This is done by first deserialising individual values with a nested
+/// fromJSON, to fill a latency map which will be passed as the data field of
+/// the struct.
 bool fromJSON(const llvm::json::Value &value,
               BitwidthDepMetric<DelayDepMetric<double>> &metric,
               llvm::json::Path path);
@@ -157,9 +159,10 @@ public:
     double readyDelay = 0.0;
   };
 
-  ///Operation's latency, depending on its bitwidth and internal combinational delay. 
-  ///This information is saved in a nested two-level map where the keys of the first
-  ///level are bitwidth (BitwidthDepMetric map) and the ones of the second level are delays (DelayDepMetric map).
+  /// Operation's latency, depending on its bitwidth and internal combinational
+  /// delay. This information is saved in a nested two-level map where the keys
+  /// of the first level are bitwidth (BitwidthDepMetric map) and the ones of
+  /// the second level are delays (DelayDepMetric map).
   BitwidthDepMetric<DelayDepMetric<double>> latency;
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;

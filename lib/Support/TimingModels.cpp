@@ -127,8 +127,9 @@ LogicalResult TimingDatabase::getLatency(
   if (!model)
     return failure();
 
-  //First, we extract the DelayDepMetric instance for a specific biwdidth.
-  //Then, we use its method (getDelayCeilMetric) to get the latency for the given targetPeriod.
+  // First, we extract the DelayDepMetric instance for a specific biwdidth.
+  // Then, we use its method (getDelayCeilMetric) to get the latency for the
+  // given targetPeriod.
   DelayDepMetric<double> DelayStruct;
 
   if (failed(model->latency.getCeilMetric(op, DelayStruct)))
@@ -316,34 +317,33 @@ bool dynamatic::fromJSON(const ljson::Value &value,
                          BitwidthDepMetric<DelayDepMetric<double>> &metric,
                          ljson::Path path) {
 
-  
   const ljson::Object *object = value.getAsObject();
 
-  //standard empty object check
+  // standard empty object check
   if (!object) {
     path.report("expected JSON object");
     return false;
   }
-  //The outer loop is on the bitwidths: each is associated with a DelayDepMetric map
-  //in the JSON. 
+  // The outer loop is on the bitwidths: each is associated with a
+  // DelayDepMetric map in the JSON.
   for (const auto &[bitwidthKey, metricValue] : *object) {
     unsigned bitwidth;
-    //we start by obtaining the bitwidth value associated with this key
+    // we start by obtaining the bitwidth value associated with this key
     if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
       return false;
 
-    //We instantiate inside the loop an internalMap for this specific bitwidth. 
+    // We instantiate inside the loop an internalMap for this specific bitwidth.
     std::map<double, double> internalMap;
 
-    //Validity check to ensure the presence of a map. 
+    // Validity check to ensure the presence of a map.
     const ljson::Object *nestedMap = metricValue.getAsObject();
     if (!nestedMap) {
       path.field(bitwidthKey).report("expected nested map object");
       return false;
     }
 
-    //nested fromJSON call, which deserializes individual delay & value pairs into the 
-    //internalMap
+    // nested fromJSON call, which deserializes individual delay & value pairs
+    // into the internalMap
     for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
       double key;
       key = std::stod(doubleDelay.str());
@@ -355,11 +355,12 @@ bool dynamatic::fromJSON(const ljson::Value &value,
 
       internalMap[key] = value;
     }
-    //We save the internal map as the data field of the DelayDepMetric.
+    // We save the internal map as the data field of the DelayDepMetric.
     DelayDepMetric<double> DelayDepStruct;
     DelayDepStruct.data = internalMap;
 
-    //Each DelayDepMetric structure is then associated with its bitwidth, completing the 2-level nested map. 
+    // Each DelayDepMetric structure is then associated with its bitwidth,
+    // completing the 2-level nested map.
     metric.data[bitwidth] = DelayDepStruct;
   }
 
