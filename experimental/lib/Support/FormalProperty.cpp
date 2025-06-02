@@ -77,7 +77,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
                          llvm::json::Path path) {
   std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.mapOptional(TYPE_LIT, typeStr))
+  if (!mapper || !mapper.map(TYPE_LIT, typeStr))
     return nullptr;
 
   auto typeOpt = typeFromStr(typeStr);
@@ -99,10 +99,8 @@ FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
   std::string typeStr, tagStr;
   llvm::json::ObjectMapper mapper(value, path);
 
-  if (!mapper || !mapper.mapOptional(ID_LIT, id) ||
-      !mapper.mapOptional(TYPE_LIT, typeStr) ||
-      !mapper.mapOptional(TAG_LIT, tagStr) ||
-      !mapper.mapOptional(CHECK_LIT, check))
+  if (!mapper || !mapper.map(ID_LIT, id) || !mapper.map(TYPE_LIT, typeStr) ||
+      !mapper.map(TAG_LIT, tagStr) || !mapper.map(CHECK_LIT, check))
     return nullptr;
 
   auto typeOpt = typeFromStr(typeStr);
@@ -169,13 +167,12 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper ||
-      !mapper.mapOptional(OWNER_OP_LIT, prop->ownerChannel.operationName) ||
-      !mapper.mapOptional(USER_OP_LIT, prop->userChannel.operationName) ||
-      !mapper.mapOptional(OWNER_INDEX_LIT, prop->ownerChannel.channelIndex) ||
-      !mapper.mapOptional(USER_INDEX_LIT, prop->userChannel.channelIndex) ||
-      !mapper.mapOptional(OWNER_CHANNEL_LIT, prop->ownerChannel.channelName) ||
-      !mapper.mapOptional(USER_CHANNEL_LIT, prop->userChannel.channelName))
+  if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerChannel.operationName) ||
+      !mapper.map(USER_OP_LIT, prop->userChannel.operationName) ||
+      !mapper.map(OWNER_INDEX_LIT, prop->ownerChannel.channelIndex) ||
+      !mapper.map(USER_INDEX_LIT, prop->userChannel.channelIndex) ||
+      !mapper.map(OWNER_CHANNEL_LIT, prop->ownerChannel.channelName) ||
+      !mapper.map(USER_CHANNEL_LIT, prop->userChannel.channelName))
     return nullptr;
 
   return prop;
@@ -219,13 +216,12 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper ||
-      !mapper.mapOptional(OWNER_OP_LIT, prop->ownerChannel.operationName) ||
-      !mapper.mapOptional(TARGET_OP_LIT, prop->targetChannel.operationName) ||
-      !mapper.mapOptional(OWNER_INDEX_LIT, prop->ownerChannel.channelIndex) ||
-      !mapper.mapOptional(TARGET_INDEX_LIT, prop->targetChannel.channelIndex) ||
-      !mapper.mapOptional(OWNER_CHANNEL_LIT, prop->ownerChannel.channelName) ||
-      !mapper.mapOptional(TARGET_CHANNEL_LIT, prop->targetChannel.channelName))
+  if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerChannel.operationName) ||
+      !mapper.map(TARGET_OP_LIT, prop->targetChannel.operationName) ||
+      !mapper.map(OWNER_INDEX_LIT, prop->ownerChannel.channelIndex) ||
+      !mapper.map(TARGET_INDEX_LIT, prop->targetChannel.channelIndex) ||
+      !mapper.map(OWNER_CHANNEL_LIT, prop->ownerChannel.channelName) ||
+      !mapper.map(TARGET_CHANNEL_LIT, prop->targetChannel.channelName))
     return nullptr;
 
   return prop;

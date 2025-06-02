@@ -1211,13 +1211,11 @@ LogicalResult SMVWriter::createInternalSignals(WriteModData &data) const {
 }
 
 LogicalResult SMVWriter::createProperties(WriteModData &data) const {
-  for (const auto &[i, property] :
-       llvm::enumerate(propertyInfo.table.getProperties())) {
+  for (const auto &property : propertyInfo.table.getProperties()) {
 
     FormalProperty::TAG propertyTag = property->getTag();
 
-    if (AbsenceOfBackpressure *p =
-            llvm::dyn_cast<AbsenceOfBackpressure>(property.get())) {
+    if (auto *p = llvm::dyn_cast<AbsenceOfBackpressure>(property.get())) {
       std::string validSignal =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string readySignal =
@@ -1225,8 +1223,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal + " -> " + readySignal,
                                      propertyTag};
-    } else if (ValidEquivalence *p =
-                   llvm::dyn_cast<ValidEquivalence>(property.get())) {
+    } else if (auto *p = llvm::dyn_cast<ValidEquivalence>(property.get())) {
       std::string validSignal1 =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string validSignal2 =
@@ -1235,6 +1232,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
     } else {
+      llvm::errs() << "Formal property Type not known\n";
       return failure();
     }
   }

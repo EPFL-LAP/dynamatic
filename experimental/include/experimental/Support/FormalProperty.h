@@ -15,6 +15,7 @@
 #include "llvm/Support/JSON.h"
 #include <fstream>
 #include <memory>
+#include <optional>
 
 namespace dynamatic {
 
@@ -50,7 +51,7 @@ public:
 
   FormalProperty() = default;
   FormalProperty(unsigned long id, TAG tag, TYPE type)
-      : id(id), tag(tag), type(type), check("unchecked") {}
+      : id(id), tag(tag), type(type), check(std::nullopt) {}
   virtual ~FormalProperty() = default;
 
   static bool classof(const FormalProperty *fp) { return true; }
@@ -59,7 +60,7 @@ protected:
   unsigned long id;
   TAG tag;
   TYPE type;
-  std::string check;
+  std::optional<bool> check;
 
   llvm::json::Value parseBaseAndExtractInfo(const llvm::json::Value &value,
                                             llvm::json::Path path);
