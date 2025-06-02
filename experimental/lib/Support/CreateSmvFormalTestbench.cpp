@@ -171,16 +171,17 @@ std::string SMV_INPUT_INF(const std::string &type) {
 }
 
 static std::string
-createSequenceGenerator(const std::string &type, size_t nrOfTokens,
+createSequenceGenerator(const std::optional<std::string> &type,
+                        size_t nrOfTokens,
                         bool generateExactNrOfTokens = false) {
-  if (type == "") {
+  if (type == std::nullopt) {
     if (nrOfTokens == 0)
       return SMV_CTRL_INPUT_INF;
     if (generateExactNrOfTokens)
       return SMV_CTRL_INPUT_EXACT;
     return SMV_CTRL_INPUT;
   }
-  if (type == "boolean") {
+  if (*type == "boolean") {
     if (nrOfTokens == 0)
       return SMV_BOOL_INPUT_INF;
     if (generateExactNrOfTokens)
@@ -189,10 +190,10 @@ createSequenceGenerator(const std::string &type, size_t nrOfTokens,
   }
   {
     if (nrOfTokens == 0)
-      return SMV_INPUT_INF(type);
+      return SMV_INPUT_INF(*type);
     if (generateExactNrOfTokens)
-      return SMV_INPUT_EXACT(type);
-    return SMV_INPUT(type);
+      return SMV_INPUT_EXACT(*type);
+    return SMV_INPUT(*type);
   }
 }
 
@@ -237,10 +238,10 @@ static std::string createSupportEntities(
     const SmallVector<std::pair<std::string, Type>> &results, size_t nrOfTokens,
     bool generateExactNrOfTokens = false, bool syncOutput = false) {
 
-  std::unordered_set<std::string> types;
-  for (auto [_, type] : arguments)
+  std::unordered_set<std::optional<std::string>> types;
+  for (const auto &[_, type] : arguments)
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
-      types.insert(*convertMLIRTypeToSMV(type));
+      types.insert(convertMLIRTypeToSMV(type));
   std::ostringstream supportEntities;
 
   for (const auto &smvType : types) {
