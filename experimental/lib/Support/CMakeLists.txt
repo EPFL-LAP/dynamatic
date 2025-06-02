@@ -1,6 +1,7 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
   CutlessMapping.cpp
+  SubjectGraph.cpp
   CDGAnalysis.cpp
   CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
