@@ -257,13 +257,14 @@ LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   llvm::json::Path::Root jsonRoot(filepath);
   llvm::json::Path jsonPath(jsonRoot);
 
+  // Retrieve formal properties (see
+  // https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/FormalProperties.md)
   llvm::json::Array *jsonComponents = value->getAsArray();
   if (!jsonComponents) {
     jsonPath.report(json::ERR_EXPECTED_ARRAY);
     jsonRoot.printErrorContext(*value, llvm::errs());
     return failure();
   }
-
   for (auto [idx, jsonComponent] : llvm::enumerate(*jsonComponents)) {
     std::unique_ptr<FormalProperty> &property = properties.emplace_back();
     if (!fromJSON(jsonComponent, property, jsonPath.index(idx))) {

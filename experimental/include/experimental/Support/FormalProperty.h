@@ -36,10 +36,15 @@ public:
   static std::optional<TAG> tagFromStr(const std::string &s);
   static std::string tagToStr(TAG t);
 
+  // Serializes the formal property into JSON format
   llvm::json::Value toJSON() const;
-
+  // Serializes the extra info to JSON fomrat. For the base class this is empty.
+  // Derived class are supposed to overrde this with their method to serialize
+  // extra info
   inline virtual llvm::json::Value extraInfoToJSON() const { return nullptr; };
 
+  // Deserializes a formal property from JSON. The return type can be casted to
+  // the derived classes to access the extra info
   std::unique_ptr<FormalProperty> static fromJSON(
       const llvm::json::Value &value, llvm::json::Path path);
 
@@ -82,7 +87,10 @@ public:
   std::string getOwnerChannel() { return ownerChannel.channelName; }
   std::string getUserChannel() { return userChannel.channelName; }
 
+  // Overriding the serilization of extra info with the new fields added for
+  // absence of backpressure
   llvm::json::Value extraInfoToJSON() const override;
+  // Deserializes absence of backpressure form JSON
   static std::unique_ptr<AbsenceOfBackpressure>
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
@@ -114,7 +122,10 @@ public:
   std::string getOwnerChannel() { return ownerChannel.channelName; }
   std::string getTargetChannel() { return targetChannel.channelName; }
 
+  // Overriding the serilization of extra info with the new fields added for
+  // absence of backpressure
   llvm::json::Value extraInfoToJSON() const override;
+  // Deserializes absence of backpressure form JSON
   static std::unique_ptr<ValidEquivalence>
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 

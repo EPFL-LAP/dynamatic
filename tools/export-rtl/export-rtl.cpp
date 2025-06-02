@@ -135,7 +135,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -156,13 +156,9 @@ struct FormalPropertyInfo {
   FormalPropertyTable &table;
   /// Output directory (without trailing separators).
   StringRef outputPath;
-  /// Path for the json ObjectMapper
-  llvm::json::Path::Root jsonRoot;
-  llvm::json::Path jsonPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath), jsonRoot(outputPath),
-        jsonPath(jsonRoot){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -324,7 +320,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -1220,8 +1216,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
     FormalProperty::TAG propertyTag = property->getTag();
 
-    if (llvm::isa<AbsenceOfBackpressure>(property.get())) {
-      auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
+    if (AbsenceOfBackpressure *p =
+            llvm::dyn_cast<AbsenceOfBackpressure>(property.get())) {
       std::string validSignal =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string readySignal =
@@ -1229,8 +1225,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal + " -> " + readySignal,
                                      propertyTag};
-    } else if (llvm::isa<ValidEquivalence>(property.get())) {
-      auto *p = llvm::cast<ValidEquivalence>(property.get());
+    } else if (ValidEquivalence *p =
+                   llvm::dyn_cast<ValidEquivalence>(property.get())) {
       std::string validSignal1 =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string validSignal2 =
