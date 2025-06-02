@@ -2,11 +2,11 @@
 
 In this document, we describe how to use placeholder functions for multi-output MLIR operations and how they are handled inside of CfToHandshake's `ConvertCalls::matchAndRewrite`.
 
-![graphExample](image-2.png)
+![simpleExample](MLIROpInstantiationCLevel/simpleExample.svg)
 
 In Dynamatic placeholder functions named in the format `__name_component` can be used to instantiate specific units at the C level. At the MLIR level, these functions are initially represented as an empty `func:callOp`, which takes the function's arguments as inputs of the corresponding MLIR op and produces its return value as output of the MLIR op. The `callOp` remains unchanged until the transformation pass from cf to handshake, where it is turned into a `handshake:InstanceOp`. These instances then continue through the processing flow. Current Flow in Dynamatic:
 
-![Current Flow in Dynamatic](image.png)
+![Current Flow](MLIROpInstantiationCLevel/CurrentFlow.png)
 
 By intercepting the CfToHandshake lowering process, we can use the `callOp`'s operands to create a `handshake:InstanceOp` that produces multiple results each corresponding to an `output_` argument passed to the placeholder function. These results are then rewired to replace the `output_` variables.
 
@@ -122,7 +122,7 @@ To avoid this, we do not erase the parameter constants manually. Any unused cons
 
 ### Inside `matchAndRewrite`:
 
-![matchAndRewriteFlow](matchAndRewrite_flow_reworked_background.svg)
+![matchAndRewriteFlow](MLIROpInstantiationCLevel/matchAndRewriteFlow.svg)
 
 - Functions are first **differentiated** from normal function calls. Non-placeholder calls are lowered using the standard logic (dashed arrows).
 
