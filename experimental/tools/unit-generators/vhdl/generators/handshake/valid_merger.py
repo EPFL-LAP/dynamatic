@@ -51,7 +51,7 @@ begin
   rhs_outs <= rhs_ins;
   lhs_outs_valid <= lhs_ins_valid;
   rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_ins_ready;
+  lhs_ins_ready <= lhs_outs_ready;
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
@@ -94,7 +94,7 @@ begin
   lhs_outs <= lhs_ins;
   lhs_outs_valid <= lhs_ins_valid;
   rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_ins_ready;
+  lhs_ins_ready <= lhs_outs_ready;
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
@@ -137,7 +137,7 @@ begin
   rhs_outs <= rhs_ins;
   lhs_outs_valid <= lhs_ins_valid;
   rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_ins_ready;
+  lhs_ins_ready <= lhs_outs_ready;
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
@@ -176,7 +176,7 @@ architecture arch of {name} is
 begin
   lhs_outs_valid <= lhs_ins_valid;
   rhs_outs_valid <= lhs_ins_valid; -- merge happens here
-  lhs_ins_ready <= lhs_ins_ready;
+  lhs_ins_ready <= lhs_outs_ready;
   rhs_ins_ready <= rhs_outs_ready;
 end architecture;
 """
