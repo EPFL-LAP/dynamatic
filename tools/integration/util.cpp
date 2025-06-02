@@ -173,8 +173,8 @@ bool runSpecIntegrationTest(const std::string& name) {
 
       std::vector<std::string> bufferArgs = {DYNAMATIC_OPT_BIN, handshakeSpeculation.string()};
       for (const auto& buffer : buffers) {
-          bufferArgs.push_back("--handshake-placebuffers-custom=pred=" + buffer["pred"].get<std::string>() +
-                                " outid=" + buffer["outid"].get<std::string>() +
+        bufferArgs.push_back("--handshake-placebuffers-custom=pred=" + buffer["pred"].get<std::string>() +
+                                " outid=" + std::to_string(buffer["outid"].get<int>()) +
                                 " slots=" + std::to_string(buffer["slots"].get<int>()) +
                                 " type=" + buffer["type"].get<std::string>());
       }
