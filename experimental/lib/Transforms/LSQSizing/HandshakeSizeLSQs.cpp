@@ -54,7 +54,9 @@ struct HandshakeSizeLSQsPass
     : public dynamatic::experimental::lsqsizing::impl::HandshakeSizeLSQsBase<
           HandshakeSizeLSQsPass> {
 
-  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions) {
+  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions,
+                        double targetCP) {
+    this->targetCP = targetCP;
     this->timingModels = timingModels.str();
     this->collisions = collisions.str();
   }
@@ -74,7 +76,7 @@ private:
   std::optional<LSQSizingResult>
   sizeLSQsForCFDFC(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
                    TimingDatabase timingDB, unsigned initialII,
-                   std::string collisions);
+                   std::string collisions, double targetCP);
 
   /// Finds the Start Node in a CFDFC
   /// The start node, is the node with the longest non-cyclic path to any other
@@ -193,8 +195,9 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       if (IIs.find(entry.first) == IIs.end())
         continue;
 
-      std::optional<LSQSizingResult> result = sizeLSQsForCFDFC(
-          funcOp, entry.second, timingDB, IIs.at(entry.first), collisions);
+      std::optional<LSQSizingResult> result =
+          sizeLSQsForCFDFC(funcOp, entry.second, timingDB, IIs.at(entry.first),
+                           collisions, targetCP);
 
       if (result) {
         for (auto &entry : result.value()) {
@@ -230,9 +233,10 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
 
 std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
     handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-    TimingDatabase timingDB, unsigned initialII, std::string collisions) {
+    TimingDatabase timingDB, unsigned initialII, std::string collisions,
+    double targetCP) {
 
-  CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII);
+  CFDFCGraph graph(funcOp, cfdfcBBs, timingDB, initialII, targetCP);
 
   // We only want LSQ loads and stores (not MC loads and stores), therefore we
   // need to check if they are connected to an LSQ
@@ -527,8 +531,7 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
 
         handshake::TimingInfo info = timing.getInfo();
 
-        if (info == TimingInfo::break_r() ||
-            info == TimingInfo::break_none()) {
+        if (info == TimingInfo::break_r() || info == TimingInfo::break_none()) {
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
             // -1 because buffer can get the load result 1 cycle earlier
             // Maybe it could also be earlier for a buffer with multiple slots
@@ -675,6 +678,7 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
 
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(
-    StringRef timingModels, StringRef collisions) {
-  return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions);
+    StringRef timingModels, StringRef collisions, double targetCP) {
+  return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions,
+                                                 targetCP);
 }
