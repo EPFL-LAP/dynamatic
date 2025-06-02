@@ -179,13 +179,13 @@ bool runSpecIntegrationTest(const std::string& name) {
                                 " type=" + buffer["type"].get<std::string>() + "\"");
       }
 
-      handshakeExport = compOutDir / "handshakeExport.mlir";
+      handshakeExport = compOutDir / "handshake_export.mlir";
       if (!runSubprocess(bufferArgs, handshakeExport)) {
           std::cerr << "Failed to export Handshake\n";
           return false;
       }
   } else {
-      handshakeExport = compOutDir / "handshakeExport.mlir";
+      handshakeExport = compOutDir / "handshake_export.mlir";
       fs::copy_file(handshakeCanonicalized, handshakeExport, fs::copy_options::overwrite_existing);
   }
 
