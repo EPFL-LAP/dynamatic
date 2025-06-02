@@ -199,6 +199,8 @@ void OutOfOrderExecutionPass::runDynamaticPass() {
     if (failed(readOutOfOrderNodes(funcOp, outOfOrderNodes)))
       signalPassFailure();
 
+    // TODO:Check if the node requested to be out of order is in a loop-carried dependency, force its aligner to be controlled 
+
     // Step 2: Apply the out-of-order execution methodology to each out-of-order
     // node
     if (!outOfOrderNodes.empty()) {
