@@ -18,6 +18,7 @@ target_link_libraries(dynamatic-opt
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
+  DynamaticFormalPropertyAnnotation
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake
@@ -28,6 +29,7 @@ target_link_libraries(dynamatic-opt
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms
+  DynamaticExperimentalAnalysis
 
   MLIRIR
   MLIRAffineTransforms
