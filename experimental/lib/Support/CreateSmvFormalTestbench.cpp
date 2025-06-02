@@ -191,18 +191,18 @@ static std::string createTBJoin(size_t nrOfOutputs) {
     insValids.push_back("ins_" + std::to_string(i) + "_valid");
 
   tbJoin << "MODULE tb_join (";
-  tbJoin << join(insValids, ", ");
+  tbJoin << llvm::join(insValids, ", ");
   tbJoin << ", outs_ready)\n";
 
   tbJoin << "  DEFINE\n  outs_valid := ";
-  tbJoin << join(insValids, " & ");
+  tbJoin << llvm::join(insValids, " & ");
   tbJoin << ";\n";
 
   for (size_t i = 0; i < nrOfOutputs; i++) {
     tbJoin << "  ins_" << i << "_ready := ";
     std::vector<std::string> tmp = insValids;
     tmp.erase(tmp.begin() + i);
-    tbJoin << join(tmp, " & ");
+    tbJoin << llvm::join(tmp, " & ");
     tbJoin << " & outs_ready;\n";
   }
   tbJoin << "\n\n";
@@ -247,7 +247,7 @@ static std::string createSupportEntities(
     supportEntities << createTBJoin(nrOutChannels);
   } else
     supportEntities << "MODULE sink_main (ins_valid)\n"
-                       "  DEFINE ready0 := TRUE;\n\n";
+                       "  DEFINE ins_ready := TRUE;\n\n";
 
   return supportEntities.str();
 }
@@ -336,7 +336,7 @@ instantiateJoin(const std::string &moduleName,
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
       outputValids.push_back(moduleName + "." + resultName + "_valid");
   }
-  str << join(outputValids, ", ") << ", global_ready);\n";
+  str << llvm::join(outputValids, ", ") << ", global_ready);\n";
 
   return str.str();
 }
