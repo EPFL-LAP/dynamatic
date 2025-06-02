@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -385,13 +386,17 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
-  } else if (modName == "handshake.mem_controller") {
+  } else if (modName == "handshake.mem_controller" ||
+             modName == "handshake.lsq") {
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     // Warning: Ports differ from instance to instance.
     // Therefore, mod.getNumOutputs() is also variable.
     serializedParams["ADDR_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
+    llvm::errs() << modName << serializedParams["DATA_BITWIDTH"]
+                 << serializedParams["ADDR_BITWIDTH"] << "\n"
+                 << modType << "\n\n\n";
   } else if (modName == "mem_to_bram") {
     serializedParams["ADDR_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
@@ -401,7 +406,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              modName == "handshake.mulf" || modName == "handshake.subf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
-  } else if (modName == "handshake.source" || modName == "mem_controller") {
+  } else if (modName == "handshake.source") {
     // Skip
   }
 }
