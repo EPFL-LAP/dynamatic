@@ -74,52 +74,78 @@ Variables passed as arguments to placeholder functions must follow these rules:
 
   Note that `__init1()` follows the same style as placeholder functions (i.e., prefixed with `__` and left undefined), but is treated as a special case by the compiler. Each `__init*` function must return the correct type to match its associated output (e.g., `output_b` is an `int`, so `__init1()` must return `int`). If another output like `output_c` has type `float`, you must define a new `__init2()` that returns `float`.
   ```c
-  void __placeholder(int input_a, float output_b, int output_c);
-  int __init1(); // used for int outputs
-  float __init2(); // used for float outputs
+  void __placeholder(int input_a, int output_b, floaf output_c);
+  int __init1(); // used for int output a
+  float __init2(); // used for float output c
+  ```
+
+  If there is another output also of type `int`, you must define a new function, `__init3()`. For instance:
+
+  ```c
+  void __placeholder(int input_a, int output_b, float output_c, int output_d);
+  int __init1(); // used for int output a
+  float __init2(); // used for float output c
+  int __init2(); // use for int output d
   ```
 
   All `__init*()` functions must have unique names, but any name is valid as long as it starts with `"__init"`.
 
 - **At Least One Output Required:**  
-  This is important since it's expected that the call return value is replaced by a dataflow result (even when not used). Therefore, at least one output is needed to replace the call return value.
+  This is important since it's expected that the return value of the MLIR op CallOp is replaced by a data result of InstanceOp. Therefore, InstanceOp should have at least one output.
 
-- **Inputs and Unused Outputs Must Not Be Initialized with `__init*()`:**  
-  These functions are exclusively used for undefined **outputs** that are passed to placeholder functions. Inputs should be defined as usual and treated by the compiler in the standard way. If Outputs are initialized with `__init*()` but are not consumed by a placeholder, the produced IR will be invalid.
+- **Inputs Must Not Be Initialized with `__init*()`:**  
+  These functions are exclusively used for **outputs** that are passed to placeholder functions. Inputs should be defined as usual and treated by the compiler in the standard way. If outputs variable are initialized with `__init*()` but are not an argument of the placeholder function, the produced IR will be invalid.
 
 - **Parameters Must Be Constant:**  
-  Parameter arguments must be assigned constant values (e.g., `int bitw = 31;`). This is necessary because parameters are converted into attributes on the `handshake.instance`. If a parameter is not a constant, an assertion will fail during the conversion process.
-
+  Parameter arguments must be assigned constant values (e.g., `int bitw = 31;`). This is necessary because parameters are converted into attributes on the `handshake.instance`. If a parameter is not a constant, an assertion will fail during the conversion process. The following is a correct example:
+  
+  ```c
+    //function definition using naming convention
+    int __placeholder(int input_a, int output_b, int parameter_bitw);
+    int __init();
+  
+    int main(){
+      ....
+      //arbitrary names for variables
+      int x;
+      int y = __init();
+      int z = 31;
+      __placeholder(x, y, z);
+      ....
+    }
+  ```
+  In this case, the variable `z` has a constant value.
+  
 ---
 
 ## 3. Important Assumptions
 
 - **Correct usage of `__init*()`:**
-  `__init*()` functions should only initialize output arguments that are later passed to placeholder functions. If a variable defined by __init*() is not used by any placeholder, neither the variable nor its function definition is removed, leaving an invalid IR.
+  `__init*()` functions should only initialize output arguments of the placeholder functions. If a variable defined by __init*() is not used by any placeholder, neither the variable nor its function definition is removed, leaving an invalid IR.
 
 - **At Least One Output:**  
   Placeholder functions must include at least one `output_` argument.
 
 - **Acyclic Data Dependencies:**  
-  There must be **no cyclic data dependencies** involving the outputs of placeholder functions. This is due to limitations in the current rewiring logic. Cycles (e.g., output values used to compute their own input) could lead to invalid SSA or deadlock in handshake IR.
+  There must be **no cyclic data dependencies** involving the outputs of placeholder functions used as inputs of the same placeholder function. This is due to limitations in the current rewiring logic. Cycles (e.g., output values used to compute their own input) could lead to invalid SSA or deadlock in the handshake IR.
 
 - **SSA domination:** 
-  Each argument passed to the placeholder must be defined before its first use (i.e. it must dominate the call).
+  Each argument passed to the placeholder must be defined before its first use (i.e., it must dominate the call).
 
 
 ---
 
 ## 4. Additional Notes
 
-- Constants used to define parameters (e.g., `bitw = 31`) are not removed by the conversion pass. Instead, the **users** of those constants (i.e., placeholder call arguments) are removed. If the constants end up unused, they will be automatically cleaned up during standard SSA optimization passes.
+- Constants used to define parameters (e.g., `bitw = 31`) are not removed by the conversion pass. Instead, the **users** of those constants (i.e., placeholder call arguments) are removed. If the constants end up unused, they will be automatically cleaned up during the handshake canonicalization pass.
 
-- For placeholder functions, the call's return value is always replaced by the first result of the newly created `handshake.instance`. We assume that placeholder functions always declare at least one output, which ensures that the first result is of a dataflow type. This is necessary to maintain consistency with the pre-transformation call, which also returned a dataflow value.
+- For placeholder functions, the call's return value is always replaced by the first result of the newly created `handshake.instance`. We assume that placeholder functions always contain at least one output argument, which ensures that the first result is of a dataflow type. This is necessary to maintain consistency with the pre-transformation call, which also returned a dataflow value.
 
 ### Why Parameter Constants Are Not Deleted Manually:
 
 During the conversion, parameter values are extracted from `arith.constant` operations and embedded directly as attributes on the `handshake.instance`. These constants originate from the **pre-transformation graph** (i.e., before the function is rewritten).
 
-Attempting to delete them inside of `matchAndRewrite` fails because MLIR's conversion framework already has **replaced or removed** them. For example, you might hit errors like: "operation was already replaced".
+Attempting to delete them inside of `matchAndRewrite` fails because MLIR's conversion framework has already **replaced or removed** them with handshake constantOp. For example, you might hit errors like: "operation was already replaced".
 
 To avoid this, we do not erase the parameter constants manually. Any unused constants are cleaned up automatically by later passes, and importantly, they **do not appear in the final `handshake_export` IR**.
 
