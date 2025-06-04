@@ -17,16 +17,20 @@ The rest of this document goes into details of this procedure.
 
 ---
 
-## 1. Overview of Multi-Output Placeholder Functions
+## 1. Overview of Placeholder Functions
 
-Multi-output functions can be declared at the C/C++ source level by using a double underscore `__` prefix and naming their arguments using specific conventions: `input_`, `output_`, and `parameter_`. These functions act as placeholders and should not have a definition, which ensures they are treated as external functions during lowering.
+Placeholder functions can be declared at the C/C++ source level by using a double underscore `__` prefix. These functions act as placeholders and should not have a definition, which ensures they are treated as external functions during lowering.
+
+Argument variables are rewired inside of CfToHandshake based on their naming. In particular, arguments with the prefixes `input_`, `output_`, and `parameter_` correspond to the inputs, outputs, and parameters of the InstanceOp. 
+
 
 Example:
 ```c
 void __new_component(int input_a, int output_b, int output_c, int parameter_bitw);
 ```
-
-Argument variables are rewired inside of CfToHandshake based on their naming. After lowering, the placeholder functions outputs correspond to its arguments at the C level.
+```MLIR
+%output_c = __new_component %input_a, %output_b, {bitw = %paramter_bitw}
+```
 
 ---
 
@@ -35,7 +39,7 @@ Argument variables are rewired inside of CfToHandshake based on their naming. Af
 Variables passed as arguments to placeholder functions must follow these rules:
 
 - **Naming Convention:**  
-  Inside the placeholder function definition all arguments must have names that begin with `input_`, `output_`, or `parameter_`. When defining the variables that will be passed into the placeholder function, any name can be chosen. For example:
+  Inside the placeholder function definition, all arguments must have names that begin with `input_`, `output_`, or `parameter_`. If there is any argument that does not follow any of these conventions, the code will throw an error. When defining the variables that will be passed into the placeholder function, any name can be chosen. For example:
     ```c
   //function definition using naming convention
   int __placeholder(int input_a, int output_b);
@@ -44,15 +48,17 @@ Variables passed as arguments to placeholder functions must follow these rules:
   int main(){
     ....
     //arbitrary names for variables
-    int x = 1;
+    int x;
     int y = __init();
     __placeholder(x, y);
     ....
   }
   ```
 
+  The MLIR operation `__placeholder` would receive as input x and as output y.
+
 - **Undefined Output Arguments:**  
-  Output arguments that do not have a definition in the source code must be initialized using special `__init*()` functions. For example:
+  Output arguments must be initialized using special `__init*()` functions. For example:
 
   ```c
   void __placeholder(int input_a, int output_b);
