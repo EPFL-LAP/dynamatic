@@ -172,11 +172,11 @@ To avoid this, we do not erase the parameter constants manually. Any unused cons
 
 - **Mappings are built**:
   - For each output argument, the index is stored together with a list of users that consume that output inside a dictionary (`OutputConnections:` indices → list of users). This dictionary will later be used for rewiring. 
-  - similarly for each parameter we store its name and value in a dictionary (``parameterMap:`` names → constant values), for attribute conversion.
+  - Similarly, for each parameter, we store its name and value in a dictionary (``parameterMap``: names → constant values), for attribute conversion.
 
-- The placeholder function’s **signature is rewritten** to match the actual inputs and outputs post-conversion. This ensures the IR is valid and passes MLIR verification. If the function definition doesnt correctly reflect the new instance format, MLIR verifaction fails and emits an error.
+- The placeholder function’s **signature is rewritten** to match the actual inputs and outputs post-conversion. This ensures the IR is valid and passes MLIR verification. If the function definition doesn't correctly reflect the new instance format, MLIR verification fails and emits an error.
 
-- The ``resultTypes`` are extracted from the rewritten function signature. After that they are cast into `HandshakeResultTypes`. The ``Operands`` list is cleaned up by removing outputs and parameters, it consists of only inputs.
+- The ``resultTypes`` are extracted from the rewritten function signature. After that, they are cast into `HandshakeResultTypes`. The ``Operands`` list is cleaned up by removing outputs and parameters. Then, it consists of only inputs.
 
 - A **`handshake.instance` is created** using the `HandshakeResultTypes` and cleaned ``Operands`` list.
 
