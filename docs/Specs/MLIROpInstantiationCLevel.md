@@ -74,18 +74,9 @@ Variables passed as arguments to placeholder functions must follow these rules:
 
   Note that `__init1()` follows the same style as placeholder functions (i.e., prefixed with `__` and left undefined), but is treated as a special case by the compiler. Each `__init*` function must return the correct type to match its associated output (e.g., `output_b` is an `int`, so `__init1()` must return `int`). If another output like `output_c` has type `float`, you must define a new `__init2()` that returns `float`.
   ```c
-  void __placeholder(int input_a, int output_b, floaf output_c);
-  int __init1(); // used for int output a
-  float __init2(); // used for float output c
-  ```
-
-  If there is another output also of type `int`, you must define a new function, `__init3()`. For instance:
-
-  ```c
-  void __placeholder(int input_a, int output_b, float output_c, int output_d);
-  int __init1(); // used for int output a
-  float __init2(); // used for float output c
-  int __init2(); // use for int output d
+  void __placeholder(int input_a, int output_b, float output_c);
+  int __init1(); // used for int outputs
+  float __init2(); // used for float outputs
   ```
 
   All `__init*()` functions must have unique names, but any name is valid as long as it starts with `"__init"`.
@@ -212,7 +203,7 @@ This assumption is important because rewiring outputs from an `InstanceOp` direc
 
 ## 8. Example
 
-Consider the Example below, where we use a placeholder function that produces two outputs that then are used for simple operations:
+Consider the Example below, where we use a placeholder function that produces two outputs that are then used for simple operations:
 
 #### Example Code
 ```c
@@ -231,7 +222,7 @@ int hw_inst() {
   return result;
 }
 ```
-Next take a look at the pre- and post-transformation IR. We see that the calls to `@__init*()` disappear, the instance now correctly reflects the expected behaviour, and all outputs have been rewired. Additionally the parameter becomes an attribute to the newly created instance.
+Next, take a look at the pre- and post-transformation IR. We see that the calls to `@__init*()` disappear, the instance now correctly reflects the expected behaviour, and all outputs have been rewired. Additionally, the parameter becomes an attribute of the newly created instance.
 
 #### Pre-Transformation IR
 ```mlir
@@ -250,7 +241,7 @@ module {
   func.func private @__placeholder(i32 {handshake.arg_name = "input_a"}, i32 {handshake.arg_name = "output_b"}, i32 {handshake.arg_name = "output_c"}, i32 {handshake.arg_name = "parameter_BITWIDTH"})
 }
 ```
-Notice that ``%0`` and ``%1`` are the output variables. They are initialized using _``_init1()``, passed to the ``__placeholder() call``, and later used in the computation.
+Notice that ``%0`` and ``%1`` are the output variables. They are initialized using ``__init1()``, passed to the ``__placeholder()`` call, and later used in the computation.
 
 #### Post-Transformation IR
 ```mlir
@@ -268,7 +259,7 @@ module {
   handshake.func private @__placeholder(!handshake.channel<i32>, !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["input_a", "start"], resNames = ["out0", "out1", "end"]}
 }
 ```
-The ``@__placeholder instance`` now produces three results: two data outputs (``%4#0``, ``%4#1``) and one control signal. The computation that previously used ``%0`` and ``%1`` has been rewired to use these instance results. All ``__init1() ``calls and its function signature have been removed from the IR.
+The ``@__placeholder instance`` now produces three results: two data outputs (``%4#0``, ``%4#1``) and one control signal. The computation that previously used ``%0`` and ``%1`` has been rewired to use these instance results. All ``__init1() ``calls and their function signature have been removed from the IR.
 
 > Note: The constant value used for the parameter (``BITWIDTH = 31``) remains in the IR for now but will be eliminated during the final export pass, as it is embedded into the instance as an attribute.
 
