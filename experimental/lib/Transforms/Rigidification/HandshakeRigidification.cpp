@@ -69,7 +69,7 @@ void HandshakeRigidificationPass::runDynamaticPass() {
 
   for (const auto &property : table.getProperties()) {
     if (property->getTag() == FormalProperty::TAG::OPT &&
-        property->getCheck() == "True") {
+        property->getCheck() != std::nullopt && *property->getCheck()) {
       if (isa<AbsenceOfBackpressure>(property)) {
         auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
         if (failed(insertRigidifier(*p, ctx)))

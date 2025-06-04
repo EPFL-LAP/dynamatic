@@ -156,13 +156,9 @@ struct FormalPropertyInfo {
   FormalPropertyTable &table;
   /// Output directory (without trailing separators).
   StringRef outputPath;
-  /// Path for the json ObjectMapper
-  llvm::json::Path::Root jsonRoot;
-  llvm::json::Path jsonPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath), jsonRoot(outputPath),
-        jsonPath(jsonRoot) {};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -1219,8 +1215,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
     FormalProperty::TAG propertyTag = property->getTag();
 
-    if (llvm::isa<AbsenceOfBackpressure>(property.get())) {
-      auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
+    if (auto *p = llvm::dyn_cast<AbsenceOfBackpressure>(property.get())) {
       std::string validSignal =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string readySignal =
@@ -1228,8 +1223,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal + " -> " + readySignal,
                                      propertyTag};
-    } else if (llvm::isa<ValidEquivalence>(property.get())) {
-      auto *p = llvm::cast<ValidEquivalence>(property.get());
+    } else if (auto *p = llvm::dyn_cast<ValidEquivalence>(property.get())) {
       std::string validSignal1 =
           p->getOwner() + "." + p->getOwnerChannel() + "_valid";
       std::string validSignal2 =
@@ -1238,6 +1232,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
     } else {
+      llvm::errs() << "Formal property Type not known\n";
       return failure();
     }
   }
