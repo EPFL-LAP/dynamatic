@@ -85,7 +85,7 @@ Variables passed as arguments to placeholder functions must follow these rules:
   This is important since it's expected that the return value of the MLIR op CallOp is replaced by a data result of InstanceOp. Therefore, InstanceOp should have at least one output.
 
 - **Inputs Must Not Be Initialized with `__init*()`:**  
-  These functions are exclusively used for **outputs** that are passed to placeholder functions. Inputs should be defined as usual and treated by the compiler in the standard way. If outputs variable are initialized with `__init*()` but are not an argument of the placeholder function, the produced IR will be invalid.
+  These functions are exclusively used for **outputs** that are passed to placeholder functions. Inputs should be defined as usual and treated by the compiler in the standard way. If outputs variable are initialized with `__init*()` but are not an argument of the placeholder function, the produced IR will be invalid. Therefore, initialization via `__init*()` is permitted only for variables that are passed as output arguments to the placeholder, any other use is disallowed and triggers an assertion when exiting the pass.
 
 - **Parameters Must Be Constant:**  
   Parameter arguments must be assigned constant values (e.g., `int bitw = 31;`). This is necessary because parameters are converted into attributes on the `handshake.instance`. If a parameter is not a constant, an assertion will fail during the conversion process. The following is a correct example:
@@ -112,7 +112,7 @@ Variables passed as arguments to placeholder functions must follow these rules:
 ## 3. Important Assumptions
 
 - **Correct usage of `__init*()`:**
-  `__init*()` functions should only initialize output arguments of the placeholder functions. If a variable defined by __init*() is not used by any placeholder, neither the variable nor its function definition is removed, leaving an invalid IR.
+  `__init*()` functions should only initialize output arguments of the placeholder functions. If a variable defined by __init*() is not used by any placeholder, neither the variable nor its function definition is removed. This would leave an invalid IR, which is why we have an assertion in place that verifies this is not the case.
 
 - **At Least One Output:**  
   Placeholder functions must include at least one `output_` argument.
@@ -181,7 +181,7 @@ To avoid this, we do not erase the parameter constants manually. Any unused cons
 
 - Any `__init*()` calls used to initialize output variables are **removed during the `matchAndRewrite` conversion step**, once their results have been replaced by the corresponding `handshake.instance` outputs.
 
-- After the full conversion is complete, if a `__init*()` **function definition** has no remaining users, it is deleted as part of a **post-pass cleanup** step. 
+- After the full conversion is complete, if a `__init*()` **function definition** has no remaining users, it is deleted as part of a **post-pass cleanup** step. If a `__init*()` **function definition** still has users an assertion will be triggered.
 
 ### Important Note:
 In case a variable was initialized using `__init*()` but wasn't passed to placeholder function, that `call @ __init*()` will still be present in the IR and therefore will not allow for the deletion of `__init*()`'s function definition. This will cause an **invalid IR.** Hence why we assume correct usage of `__init*()` in [3. Important-Assumptions](#3-important-assumptions).
