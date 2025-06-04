@@ -1,14 +1,19 @@
-# [CfToHandshake] Multi-Output MLIR Operations
+# Instantiation of MLIR Operations at C-Level
 
-In this document, we describe how to use placeholder functions for multi-output MLIR operations and how they are handled inside of CfToHandshake's `ConvertCalls::matchAndRewrite`.
+This document explains how to use placeholder functions in C to instantiate an MLIR operation within the Handshake dialect.
 
-![simpleExample](figs/MLIROpInstantiationCLevel/simpleExample.svg)
-
-In Dynamatic placeholder functions named in the format `__name_component` can be used to instantiate specific units at the C level. At the MLIR level, these functions are initially represented as an empty `func:callOp`, which takes the function's arguments as inputs of the corresponding MLIR op and produces its return value as output of the MLIR op. The `callOp` remains unchanged until the transformation pass from cf to handshake, where it is turned into a `handshake:InstanceOp`. These instances then continue through the processing flow. Current Flow in Dynamatic:
+The following figure shows the current flow:
 
 ![Current Flow](figs/MLIROpInstantiationCLevel/CurrentFlow.png)
 
-By intercepting the CfToHandshake lowering process, we can use the `callOp`'s operands to create a `handshake:InstanceOp` that produces multiple results each corresponding to an `output_` argument passed to the placeholder function. These results are then rewired to replace the `output_` variables.
+A placeholder function named in the format `__name_component` can be used to instantiate a specific MLIR operation at the C level. At the MLIR level, these functions are initially represented as an empty `func:callOp`. The `callOp` remains unchanged until the transformation pass from cf to handshake, where it is turned into a `handshake:InstanceOp`. These instances then continue through the processing flow.
+
+
+The key step for this feature is the CfToHandshake lowering process. Dynamatic uses the `callOp`'s operands to determine inputs, outputs, and parameters of the `handshake:InstanceOp`. The following figure gives a quick overview of this process:
+
+![simpleExample](figs/MLIROpInstantiationCLevel/simpleExample.svg)
+
+The rest of this document goes into details of this procedure.
 
 ---
 
