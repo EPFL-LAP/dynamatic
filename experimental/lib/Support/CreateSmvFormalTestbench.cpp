@@ -14,6 +14,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -94,26 +95,37 @@ static std::string instantiateModuleUnderTest(
                        llvm::join(inputVariables, ", "))
       .str();
 }
-std::string getPrefixTypeName(const std::string &smvType) {
-  size_t start = smvType.find('[');
-  size_t end = smvType.find(']');
 
-  if (start != std::string::npos && end != std::string::npos &&
-      end > start + 1) {
-    std::string numberStr = smvType.substr(start + 1, end - start - 1);
-    return "s" + numberStr;
-  }
-  return "";
+std::optional<std::string> getPrefixTypeName(const Type &type) {
+  return llvm::TypeSwitch<Type, std::optional<std::string>>(type)
+      .Case<handshake::ControlType>(
+          [&](handshake::ControlType cType) { return std::nullopt; })
+      .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
+        if (cType.getDataBitWidth() == 1)
+          return std::string("bool");
+        return "s" + std::to_string(cType.getDataBitWidth());
+      });
+}
+
+static std::optional<std::string> convertMLIRTypeToSMV(const Type &type) {
+  return llvm::TypeSwitch<Type, std::optional<std::string>>(type)
+      .Case<handshake::ControlType>(
+          [&](handshake::ControlType cType) { return std::nullopt; })
+      .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
+        if (cType.getDataBitWidth() == 1)
+          return std::string("boolean");
+        return "signed word [" + std::to_string(cType.getDataBitWidth()) + "]";
+      });
 }
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // actual number of generated tokens is non-determinstically set between 0
 // and (inclusive) max_tokens.
-std::string smvInput(const std::string &type) {
-  return "MODULE " + getPrefixTypeName(type) +
+std::string smvInput(const Type &type) {
+  return "MODULE " + *getPrefixTypeName(type) +
          "_input(nReady0, max_tokens)\n"
          "  VAR outs : " +
-         type +
+         *convertMLIRTypeToSMV(type) +
          ";\n"
          "  VAR counter : 0..31;\n"
          "  FROZENVAR exact_tokens : 0..max_tokens;\n"
@@ -129,11 +141,11 @@ std::string smvInput(const std::string &type) {
 
 // SMV module for a sequence generator with a finite number of tokens. The
 // number of generated tokens is exact_tokens.
-std::string smvInputExact(const std::string &type) {
-  return "MODULE " + getPrefixTypeName(type) +
+std::string smvInputExact(const Type &type) {
+  return "MODULE " + *getPrefixTypeName(type) +
          "_input_exact(nReady0, exact_tokens)\n"
          "  VAR outs : " +
-         type +
+         *convertMLIRTypeToSMV(type) +
          ";\n"
          "  VAR counter : 0..31;\n"
          "  ASSIGN\n"
@@ -147,41 +159,43 @@ std::string smvInputExact(const std::string &type) {
 }
 
 // SMV module for a sequence generator with an infinite number of tokens
-std::string smvInputInf(const std::string &type) {
-  return "MODULE " + getPrefixTypeName(type) +
+std::string smvInputInf(const Type &type) {
+  return "MODULE " + *getPrefixTypeName(type) +
          "_input_inf(nReady0)\n"
          "  VAR outs : " +
-         type +
+         *convertMLIRTypeToSMV(type) +
          ";\n"
          "    -- make sure outs is persistent\n"
          "    DEFINE outs_valid := TRUE;\n\n";
 }
 
 static std::string
-createSequenceGenerator(const std::optional<std::string> &type,
-                        size_t nrOfTokens,
+createSequenceGenerator(const Type &type, size_t nrOfTokens,
                         bool generateExactNrOfTokens = false) {
-  if (type == std::nullopt) {
-    if (nrOfTokens == 0)
-      return SMV_CTRL_INPUT_INF;
-    if (generateExactNrOfTokens)
-      return SMV_CTRL_INPUT_EXACT;
-    return SMV_CTRL_INPUT;
-  }
-  if (*type == "boolean") {
-    if (nrOfTokens == 0)
-      return SMV_BOOL_INPUT_INF;
-    if (generateExactNrOfTokens)
-      return SMV_BOOL_INPUT_EXACT;
-    return SMV_BOOL_INPUT;
-  }
-  {
-    if (nrOfTokens == 0)
-      return smvInputInf(*type);
-    if (generateExactNrOfTokens)
-      return smvInputExact(*type);
-    return smvInput(*type);
-  }
+  return llvm::TypeSwitch<Type, std::string>(type)
+      .Case<handshake::ControlType>([&](auto) {
+        if (nrOfTokens == 0)
+          return SMV_CTRL_INPUT_INF;
+        if (generateExactNrOfTokens)
+          return SMV_CTRL_INPUT_EXACT;
+        return SMV_CTRL_INPUT;
+      })
+      .Case<handshake::ChannelType>([&](handshake::ChannelType type) {
+        if (type.getDataBitWidth() == 1) {
+          if (nrOfTokens == 0)
+            return SMV_BOOL_INPUT_INF;
+          if (generateExactNrOfTokens)
+            return SMV_BOOL_INPUT_EXACT;
+          return SMV_BOOL_INPUT;
+        }
+        {
+          if (nrOfTokens == 0)
+            return smvInputInf(type);
+          if (generateExactNrOfTokens)
+            return smvInputExact(type);
+          return smvInput(type);
+        }
+      });
 }
 
 static std::string createTBJoin(size_t nrOfOutputs) {
@@ -209,30 +223,19 @@ static std::string createTBJoin(size_t nrOfOutputs) {
   return tbJoin.str();
 }
 
-static std::optional<std::string> convertMLIRTypeToSMV(Type type) {
-  return llvm::TypeSwitch<Type, std::optional<std::string>>(type)
-      .Case<handshake::ControlType>(
-          [&](handshake::ControlType cType) { return std::nullopt; })
-      .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
-        if (cType.getDataBitWidth() == 1)
-          return std::string("boolean");
-        return "signed word [" + std::to_string(cType.getDataBitWidth()) + "]";
-      });
-}
-
 static std::string createSupportEntities(
     const SmallVector<std::pair<std::string, Type>> &arguments,
     const SmallVector<std::pair<std::string, Type>> &results, size_t nrOfTokens,
     bool generateExactNrOfTokens = false, bool syncOutput = false) {
 
-  std::unordered_set<std::optional<std::string>> types;
+  llvm::DenseSet<Type> types;
   for (const auto &[_, type] : arguments)
     if (type.isa<handshake::ControlType, handshake::ChannelType>())
-      types.insert(convertMLIRTypeToSMV(type));
+      types.insert(type);
   std::ostringstream supportEntities;
 
-  for (const auto &smvType : types) {
-    supportEntities << createSequenceGenerator(smvType, nrOfTokens,
+  for (const auto &type : types) {
+    supportEntities << createSequenceGenerator(type, nrOfTokens,
                                                generateExactNrOfTokens)
                     << "\n\n";
   }
@@ -247,7 +250,7 @@ static std::string createSupportEntities(
     supportEntities << createTBJoin(nrOutChannels);
   } else
     supportEntities << "MODULE sink_main (ins_valid)\n"
-                       "  DEFINE ins_ready := TRUE;\n\n";
+                       "  DEFINE ins_ready   := TRUE;\n\n";
 
   return supportEntities.str();
 }
