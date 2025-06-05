@@ -97,8 +97,15 @@ std::string createElasticMiterTestBench(
     arguments.push_back(newArg);
   }
 
-  wrapper << createSmvFormalTestbench(arguments, config.results, modelSmvName,
-                                      nrOfTokens, generateExactNrOfTokens);
+  const SmvTestbenchConfig smvConfig = {.arguments = arguments,
+                                        .results = config.results,
+                                        .modelSmvName = modelSmvName,
+                                        .nrOfTokens = nrOfTokens,
+                                        .generateExactNrOfTokens =
+                                            generateExactNrOfTokens,
+                                        .syncOutput = false};
+
+  wrapper << createSmvFormalTestbench(smvConfig);
   if (includeProperties) {
     wrapper << createMiterProperties(modelSmvName, config);
 

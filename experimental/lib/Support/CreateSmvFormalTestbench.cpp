@@ -12,7 +12,6 @@
 #include "experimental/Support/CreateSmvFormalTestbench.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Types.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -344,38 +343,31 @@ instantiateJoin(const std::string &moduleName,
   return str.str();
 }
 
-std::string createSmvFormalTestbench(
-    const SmallVector<std::pair<std::string, Type>> &arguments,
-    const SmallVector<std::pair<std::string, Type>> &results,
-    const std::string &modelSmvName, size_t nrOfTokens,
-    bool generateExactNrOfTokens, bool syncOutput) {
-
+std::string createSmvFormalTestbench(const SmvTestbenchConfig &config) {
   std::ostringstream wrapper;
-  wrapper << "#include \"" + modelSmvName + ".smv\"\n\n";
+  wrapper << "#include \"" + config.modelSmvName + ".smv\"\n\n";
 
-  wrapper << createSupportEntities(arguments, results, nrOfTokens,
-                                   generateExactNrOfTokens, syncOutput);
+  wrapper << createSupportEntities(
+      config.arguments, config.results, config.nrOfTokens,
+      config.generateExactNrOfTokens, config.syncOutput);
 
   wrapper << "MODULE main\n\n";
 
-  wrapper << instantiateSequenceGenerators(modelSmvName, arguments, nrOfTokens,
-                                           generateExactNrOfTokens);
+  wrapper << instantiateSequenceGenerators(config.modelSmvName,
+                                           config.arguments, config.nrOfTokens,
+                                           config.generateExactNrOfTokens);
 
-  wrapper << instantiateModuleUnderTest(modelSmvName, arguments, results,
-                                        syncOutput)
+  wrapper << instantiateModuleUnderTest(config.modelSmvName, config.arguments,
+                                        config.results, config.syncOutput)
           << "\n";
 
-  if (syncOutput) {
+  if (config.syncOutput) {
 
-    wrapper << "  VAR global_ready : boolean;\n"
-               "  ASSIGN\n"
-               "  init(global_ready) := TRUE;\n"
-               "  next(global_ready) := join_global.outs_valid ? FALSE : "
-               "global_ready;\n\n";
+    wrapper << "  DEFINE global_ready := TRUE;\n";
 
-    wrapper << instantiateJoin(modelSmvName, results) << "\n";
+    wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
   } else {
-    wrapper << instantiateSinks(modelSmvName, results) << "\n";
+    wrapper << instantiateSinks(config.modelSmvName, config.results) << "\n";
   }
 
   return wrapper.str();
