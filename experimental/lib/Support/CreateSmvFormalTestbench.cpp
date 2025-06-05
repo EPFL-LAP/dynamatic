@@ -24,10 +24,10 @@ using namespace mlir;
 
 namespace dynamatic::experimental {
 
-// Create the call to the module
-// The resulting string will look like:
-// VAR <moduleName> : <moduleName> (seq_generator_A.outs,
-// seq_generator_A.outs_valid, ..., sink_F.ins_ready, ...)
+/// Create the call to the module
+/// The resulting string will look like:
+/// VAR <moduleName> : <moduleName> (seq_generator_A.outs,
+/// seq_generator_A.outs_valid, ..., sink_F.ins_ready, ...)
 static std::string instantiateModuleUnderTest(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
@@ -122,9 +122,9 @@ static std::optional<std::string> convertMLIRTypeToSMV(const Type &type) {
       });
 }
 
-// SMV module for a sequence generator with a finite number of tokens. The
-// actual number of generated tokens is non-determinstically set between 0
-// and (inclusive) max_tokens.
+/// SMV module for a sequence generator with a finite number of tokens. The
+/// actual number of generated tokens is non-determinstically set between 0
+/// and (inclusive) max_tokens.
 std::string smvInput(const Type &type) {
   return llvm::formatv(R"DELIM(
 MODULE {0}_input(nReady0, max_tokens)"
@@ -144,8 +144,8 @@ MODULE {0}_input(nReady0, max_tokens)"
                        *getPrefixTypeName(type), *convertMLIRTypeToSMV(type));
 }
 
-// SMV module for a sequence generator with a finite number of tokens. The
-// number of generated tokens is exact_tokens.
+/// SMV module for a sequence generator with a finite number of tokens. The
+/// number of generated tokens is exact_tokens.
 std::string smvInputExact(const Type &type) {
   return llvm::formatv(R"DELIM(
 MODULE {0}_input_exact(nReady0, exact_tokens)"
@@ -164,7 +164,7 @@ MODULE {0}_input_exact(nReady0, exact_tokens)"
                        *getPrefixTypeName(type), *convertMLIRTypeToSMV(type));
 }
 
-// SMV module for a sequence generator with an infinite number of tokens
+/// SMV module for a sequence generator with an infinite number of tokens
 std::string smvInputInf(const Type &type) {
   return llvm::formatv(R"DELIM(
 MODULE {0}_input_inf(nReady0)"
@@ -263,7 +263,16 @@ static std::string createSupportEntities(
   return supportEntities.str();
 }
 
-// Create the sequence generator at the inputs of the module
+/// Create the sequence generator at the inputs of the module
+/// We support three different kinds of sequence generators:
+/// 1. Infinite sequence generator: Will create an infinite number of
+/// tokens.
+/// 2. Standard finite generator: Will create 0 to the maximal number of
+/// tokens. The exact number of tokens is non-deterministic.
+/// 3. Exact finite generator: Will create the exact number of tokens (if
+/// it receives enough ready inputs).
+/// When nrOfTokens is set to 0, the infinite sequence generator is created
+/// and the value of generateExactNrOfTokens is ignored.
 static std::string instantiateSequenceGenerators(
     const std::string &moduleName,
     const SmallVector<std::pair<std::string, Type>> &arguments,
@@ -284,15 +293,6 @@ static std::string instantiateSequenceGenerators(
               return "s" + std::to_string(cType.getDataBitWidth());
             });
 
-    // We support three different kinds of sequence generators:
-    // 1. Infinite sequence generator: Will create an infinite number of
-    // tokens.
-    // 2. Standard finite generator: Will create 0 to the maximal number of
-    // tokens. The exact number of tokens is non-deterministic.
-    // 3. Exact finite generator: Will create the exact number of tokens (if
-    // it receives enough ready inputs).
-    // When nrOfTokens is set to 0, the infinite sequence generator is created
-    // and the value of generateExactNrOfTokens is ignored.
     if (nrOfTokens == 0) {
       // Example: VAR seq_generator_D : bool_input_inf(model.D_ready);
       sequenceGenerators
@@ -321,7 +321,7 @@ static std::string instantiateSequenceGenerators(
   return sequenceGenerators.str();
 }
 
-// Create the sinks at the outputs of the module
+/// Create the sinks at the outputs of the module
 static std::string
 instantiateSinks(const std::string &moduleName,
                  const SmallVector<std::pair<std::string, Type>> &results) {
@@ -336,7 +336,7 @@ instantiateSinks(const std::string &moduleName,
   return sinks.str();
 }
 
-// Create the join at the outputs of the module
+/// Create the join at the outputs of the module
 static std::string
 instantiateJoin(const std::string &moduleName,
                 const SmallVector<std::pair<std::string, Type>> &results) {
