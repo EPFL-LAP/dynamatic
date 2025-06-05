@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 
 
 def generate_source(name, params):
@@ -40,13 +40,13 @@ end architecture;
 
 
 def _generate_source_signal_manager(name, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [],
-        "out_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [],
+        [{
             "name": "outs",
             "bitwidth": 0,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_source(name))
+        extra_signals,
+        lambda name: _generate_source(name))
