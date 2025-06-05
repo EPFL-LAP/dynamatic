@@ -113,11 +113,11 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
 }
 
 def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
-  let summary = "Simplifies handshake logic by making a channel rigid";
+  let summary = "Simplifies handshake logic";
   let description = [{
     The pass uses the insights gathered from model checking stored in the property database
     to rigidify some channels and remove the redundant logic associated with them. To do so
-    we place a rigidifier Op that sets the valid signal to 1 and leave the ready signal open.
+    we place RigidifierOps and ValidMergerOps, that manipulate valid and ready signals.
   }];
   let constructor = "dynamatic::experimental::rigidification::createRigidification()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
