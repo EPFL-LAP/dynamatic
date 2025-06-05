@@ -1486,7 +1486,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 }
 
 def RigidifierOp : Handshake_Op<"rigidifier",[
-SameOperandsAndResultType
+  SameOperandsAndResultType
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1505,9 +1505,9 @@ SameOperandsAndResultType
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
-AllTypesMatch<["lhsIn", "lhs"]>,
-AllTypesMatch<["rhsIn", "rhs"]>,
-DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  AllTypesMatch<["lhsIn", "lhs"]>,
+  AllTypesMatch<["rhsIn", "rhs"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = [{
     Merges the valid signals of two channels.

@@ -646,8 +646,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::OrIOp, handshake::ShLIOp, handshake::ShRSIOp,
             handshake::ShRUIOp, handshake::SubFOp, handshake::SubIOp,
             handshake::XOrIOp, handshake::SIToFPOp, handshake::FPToSIOp,
-            handshake::AbsFOp, handshake::RigidifierOp,
-            handshake::ValidMergerOp>([&](auto) {
+            handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -682,6 +681,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
+      .Case<handshake::RigidifierOp, handshake::ValidMergerOp>([&](auto) {
+        // No parameters needed for these operations
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";

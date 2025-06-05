@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -69,8 +70,8 @@ private:
 } // namespace
 
 bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
-  // channels connected to input, output, memory controllers, and LSQ can't be
-  // modified
+  // channels produced/consumed by input, output, memory controllers, and LSQ
+  // can't be modified
   if (isa<handshake::EndOp, handshake::MemoryControllerOp, handshake::LSQOp>(
           res.getOwner()))
     return false;
@@ -78,10 +79,11 @@ bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
   if (res.getUsers().empty())
     return false;
 
-  if (isa<handshake::EndOp, handshake::MemoryControllerOp, handshake::LSQOp>(
-          *res.getUsers().begin()))
-    return false;
-  return true;
+  return std::all_of(
+      res.getUsers().begin(), res.getUsers().end(), [](auto *user) {
+        return !isa<handshake::EndOp, handshake::MemoryControllerOp,
+                    handshake::LSQOp>(*user);
+      });
 }
 
 LogicalResult
@@ -91,7 +93,8 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
       // equivalence is symmetrical so it needs to be checked only once for
       // each pair of signals
-      if (i < j && isChannelModifiable(res1) && isChannelModifiable(res2)) {
+      if ((getUniqueName(&op1).str() != getUniqueName(&op2).str() || i < j) &&
+          isChannelModifiable(res1) && isChannelModifiable(res2)) {
         ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
         propertyTable.push_back(p.toJSON());

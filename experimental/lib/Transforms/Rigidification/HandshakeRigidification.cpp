@@ -56,13 +56,12 @@ struct HandshakeRigidificationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult insertRigidifier(AbsenceOfBackpressure prop, MLIRContext *ctx);
-  LogicalResult insertValidMerger(ValidEquivalence prop, MLIRContext *ctx);
+  LogicalResult insertRigidifier(AbsenceOfBackpressure prop);
+  LogicalResult insertValidMerger(ValidEquivalence prop);
 };
 } // namespace
 
 void HandshakeRigidificationPass::runDynamaticPass() {
-  MLIRContext *ctx = &getContext();
   FormalPropertyTable table;
   if (failed(table.addPropertiesFromJSON(jsonPath)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
@@ -71,14 +70,12 @@ void HandshakeRigidificationPass::runDynamaticPass() {
     if (property->getTag() == FormalProperty::TAG::OPT &&
         property->getCheck() != std::nullopt && *property->getCheck()) {
 
-      if (isa<AbsenceOfBackpressure>(property)) {
-        auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
-        if (failed(insertRigidifier(*p, ctx)))
+      if (auto *p = dyn_cast<AbsenceOfBackpressure>(property.get())) {
+        if (failed(insertRigidifier(*p)))
           return signalPassFailure();
 
-      } else if (isa<ValidEquivalence>(property)) {
-        auto *p = llvm::cast<ValidEquivalence>(property.get());
-        if (failed(insertValidMerger(*p, ctx)))
+      } else if (auto *p = dyn_cast<ValidEquivalence>(property.get())) {
+        if (failed(insertValidMerger(*p)))
           return signalPassFailure();
       }
     }
@@ -86,8 +83,8 @@ void HandshakeRigidificationPass::runDynamaticPass() {
 }
 
 LogicalResult
-HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop,
-                                              MLIRContext *ctx) {
+HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop) {
+  MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
@@ -97,19 +94,14 @@ HandshakeRigidificationPass::insertRigidifier(AbsenceOfBackpressure prop,
   auto loc = channel.getLoc();
 
   auto newOp = builder.create<handshake::RigidifierOp>(loc, channel);
-  Value rigidificationRes = newOp.getResult();
+  channel.replaceAllUsesExcept(newOp.getResult(), newOp);
 
-  for (auto &use : llvm::make_early_inc_range(channel.getUses())) {
-    if (use.getOwner() != newOp) {
-      use.set(rigidificationRes);
-    }
-  }
   return success();
 }
 
 LogicalResult
-HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
-                                               MLIRContext *ctx) {
+HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop) {
+  MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
@@ -123,19 +115,9 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
 
   auto newOp = builder.create<handshake::ValidMergerOp>(loc, ownerChannel,
                                                         targetChannel);
-  auto mergerRes0 = newOp.getResult(0);
-  auto mergerRes1 = newOp.getResult(1);
 
-  for (auto &use : llvm::make_early_inc_range(ownerChannel.getUses())) {
-    if (use.getOwner() != newOp) {
-      use.set(mergerRes0);
-    }
-  }
-  for (auto &use : llvm::make_early_inc_range(targetChannel.getUses())) {
-    if (use.getOwner() != newOp) {
-      use.set(mergerRes1);
-    }
-  }
+  ownerChannel.replaceAllUsesExcept(newOp.getLhs(), newOp);
+  targetChannel.replaceAllUsesExcept(newOp.getRhs(), newOp);
   return success();
 }
 
