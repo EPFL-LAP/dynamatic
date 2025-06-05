@@ -89,10 +89,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     Operation &op1, Operation &op2) {
   for (auto [i, res1] : llvm::enumerate(op1.getResults()))
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
-      if (res1 == res2)
-        continue;
-      if (res1 != res2 && isChannelModifiable(res1) &&
-          isChannelModifiable(res2)) {
+      if (i < j && isChannelModifiable(res1) && isChannelModifiable(res2)) {
 
         ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
@@ -106,15 +103,11 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalence(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    for (auto [i, op_i] : llvm::enumerate(funcOp.getOps())) {
-      for (auto [j, op_j] : llvm::enumerate(funcOp.getOps())) {
-        // equivalence is symmetrical so it needs to be checked only once for
-        // each pair of signals (therefore operations)
-        if (i <= j && getLogicBB(&op_i) == getLogicBB(&op_i)) {
-          if (failed(annotateValidEquivalenceBetweenOps(op_i, op_j))) {
-            return failure();
-          }
-        }
+    for (auto &op : funcOp.getOps()) {
+      // equivalence is symmetrical so it needs to be checked only once for
+      // each pair of signals (therefore operations)
+      if (failed(annotateValidEquivalenceBetweenOps(op, op))) {
+        return failure();
       }
     }
   }
