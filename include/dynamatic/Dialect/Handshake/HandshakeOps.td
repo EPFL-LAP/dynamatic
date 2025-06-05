@@ -1515,7 +1515,7 @@ DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
   let description = [{
     Merges the valid signal of two channels by propagating only one input
     valid signal to both output valid signals. In this way the valid generation
-    of the second input signal can be simplified;
+    of the second input signal can be simplified.
   }];
 
   let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);

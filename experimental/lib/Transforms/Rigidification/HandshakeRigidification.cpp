@@ -70,10 +70,12 @@ void HandshakeRigidificationPass::runDynamaticPass() {
   for (const auto &property : table.getProperties()) {
     if (property->getTag() == FormalProperty::TAG::OPT &&
         property->getCheck() != std::nullopt && *property->getCheck()) {
+
       if (isa<AbsenceOfBackpressure>(property)) {
         auto *p = llvm::cast<AbsenceOfBackpressure>(property.get());
         if (failed(insertRigidifier(*p, ctx)))
           return signalPassFailure();
+
       } else if (isa<ValidEquivalence>(property)) {
         auto *p = llvm::cast<ValidEquivalence>(property.get());
         if (failed(insertValidMerger(*p, ctx)))
@@ -109,8 +111,6 @@ LogicalResult
 HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop,
                                                MLIRContext *ctx) {
   OpBuilder builder(ctx);
-
-  // TYPE MATCHING
 
   Operation *ownerOp = getAnalysis<NameAnalysis>().getOp(prop.getOwner());
   Operation *targetOp = getAnalysis<NameAnalysis>().getOp(prop.getTarget());
