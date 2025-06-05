@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
 
@@ -115,18 +115,18 @@ end architecture;
 
 
 def _generate_fptosi_signal_manager(name, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "buffered",
-        "latency": 5,
-        "in_ports": [{
+    return generate_buffered_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_fptosi(name, bitwidth))
+        extra_signals,
+        lambda name: _generate_fptosi(name, bitwidth),
+        5)
