@@ -980,6 +980,7 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   if (failed(createInternalSignals(data)))
     return failure();
 
+  os << "`timescale 1ns / 1ps\n\n";
   os << "module " << modOp.getSymName() << "(\n";
 
   os.indent();
