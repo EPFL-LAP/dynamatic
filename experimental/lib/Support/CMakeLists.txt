@@ -1,6 +1,7 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
   CutlessMapping.cpp
+  SubjectGraph.cpp
   CDGAnalysis.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
@@ -18,6 +19,8 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+  DynamaticAnalysis
+
 )
 
 add_subdirectory(BooleanLogic)
