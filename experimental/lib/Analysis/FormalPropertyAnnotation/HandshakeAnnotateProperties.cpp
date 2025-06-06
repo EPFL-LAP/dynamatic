@@ -92,8 +92,8 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
   for (auto [i, res1] : llvm::enumerate(op1.getResults()))
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
       // equivalence is symmetrical so it needs to be checked only once for
-      // each pair of signals
-      if ((getUniqueName(&op1).str() != getUniqueName(&op2).str() || i < j) &&
+      // each pair of signals when the Ops are the same
+      if ((&op1 != &op2 || i < j) &&
           isChannelModifiable(res1) && isChannelModifiable(res2)) {
         ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
