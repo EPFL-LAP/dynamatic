@@ -24,6 +24,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/OperationSupport.h"
@@ -42,7 +43,8 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
-static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22");
+static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"), 
+    CostAware("costaware");
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 namespace {
@@ -120,6 +122,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
@@ -485,6 +488,11 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
         logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
   }
+  if (algorithm == CostAware) {
+    // Create and solve the MILP
+    return checkLoggerAndSolve<costaware::CostAwareBuffers>(
+        logger, "placement", placement, env, info, timingDB, targetCP);
+  }
 
   llvm_unreachable("unknown algorithm");
 }
@@ -572,6 +580,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     };
 
     if (placeRes.bufferOrder) {
+      placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
       for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
         placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
       }
@@ -599,6 +608,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
       for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
         placeBuffer(TimingInfo::break_dvr(), BufferOp::ONE_SLOT_BREAK_DVR, 1);
       }
+      placeBuffer(TimingInfo::break_dv(), BufferOp::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
     }
   }
 }

@@ -173,6 +173,8 @@ static std::string getPrettyNodeLabel(Operation *op) {
                 return "NONE" + numSlotsStr;
               } else if (bufferTypeStr == "ONE_SLOT_BREAK_DVR") {
                 return "DVR" + numSlotsStr;
+              } else if (bufferTypeStr == "SHIFT_REG_BREAK_DV") {
+                return "SRDV" + numSlotsStr;
               }
             }
             return "buffer" + numSlotsStr;

@@ -144,21 +144,21 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
-  for (handshake::LoadOp loadOp : funcOp.getOps<handshake::LoadOp>()) {
-    auto memOp = findMemInterface(loadOp.getAddressResult());
-    if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
-      continue;
+  // for (handshake::LoadOp loadOp : funcOp.getOps<handshake::LoadOp>()) {
+  //   auto memOp = findMemInterface(loadOp.getAddressResult());
+  //   if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+  //     continue;
 
-    for (Value operand : loadOp->getOperands()) {
-      Channel channel(operand, true);
-      Operation *defOp = operand.getDefiningOp();
+  //   for (Value operand : loadOp->getOperands()) {
+  //     Channel channel(operand, true);
+  //     Operation *defOp = operand.getDefiningOp();
 
-      if (defOp &&
-          !isa<handshake::MemoryOpInterface, handshake::ConstantOp>(defOp)) {
-        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
-      }
-    }
-  }
+  //     if (defOp &&
+  //         !isa<handshake::MemoryOpInterface, handshake::ConstantOp>(defOp)) {
+  //       channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+  //     }
+  //   }
+  // }
 
   // See docs/Specs/Buffering.md
   // Memrefs are not real edges in the graph and are therefore unbufferizable
