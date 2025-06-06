@@ -1487,6 +1487,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def RigidifierOp : Handshake_Op<"rigidifier",[
   SameOperandsAndResultType
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1502,6 +1503,19 @@ def RigidifierOp : Handshake_Op<"rigidifier",[
   let assemblyFormat = [{
     $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
   }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return "ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return "outs";
+    }
+  }];
+
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
