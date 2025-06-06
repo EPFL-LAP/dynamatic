@@ -17,6 +17,9 @@ module shift_reg_break_dv_dataless #(
   reg  [NUM_SLOTS-1:0] valid_reg;
   wire             regEn;
 
+  // See 'docs/Specs/Buffering/Buffering.md'
+  // All the slots share a single handshake control and thus 
+  // accept or stall inputs together.
   always @(posedge clk) begin
     if (rst) begin
       valid_reg <= {NUM_SLOTS{1'b0}};

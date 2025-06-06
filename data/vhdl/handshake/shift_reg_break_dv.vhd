@@ -41,13 +41,17 @@ begin
       outs_ready => outs_ready
     );
 
-  -- If not valid, the data in this slot is obsolete
-  -- Hence, no need to reset
-  -- If reset is necessary, then add the following lines:
+  -- If valid is reset, the data in this slot becomes obsolete.
+  -- Hence, there is no need to reset the data as well.
+  -- If reset is required, then add the following lines:
   -- if (rst = '1') then
   --   for i in 0 to NUM_SLOTS - 1 loop
   --     Memory(i) <= (others => '0');
   --   end loop;
+
+  -- See 'docs/Specs/Buffering/Buffering.md'
+  -- All the slots share a single handshake control and thus 
+  -- accept or stall inputs together.
   process (clk) is
   begin
     if (rising_edge(clk)) then

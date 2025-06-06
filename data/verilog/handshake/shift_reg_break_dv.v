@@ -32,6 +32,9 @@ module shift_reg_break_dv #(
     .outs_ready (outs_ready )
   );
   
+  // See 'docs/Specs/Buffering/Buffering.md'
+  // All the slots share a single handshake control and thus 
+  // accept or stall inputs together.
   integer i;
   always @(posedge clk) begin
     if (regEn) begin

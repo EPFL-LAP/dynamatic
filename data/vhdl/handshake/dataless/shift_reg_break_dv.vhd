@@ -24,7 +24,9 @@ architecture arch of shift_reg_break_dv_dataless is
   signal valid_reg  : REG_VALID;
 
 begin
-
+  -- See 'docs/Specs/Buffering/Buffering.md'
+  -- All the slots share a single handshake control and thus 
+  -- accept or stall inputs together.
   process(clk) is
   begin
     if (rising_edge(clk)) then
