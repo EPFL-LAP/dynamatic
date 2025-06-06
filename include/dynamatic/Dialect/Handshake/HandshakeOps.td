@@ -1525,6 +1525,18 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_ins" : "rhs_ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_outs" : "rhs_outs";
+    }
+  }];
+
 }
 
 
