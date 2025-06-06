@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 
 
 def generate_trunci(name, params):
@@ -48,17 +48,17 @@ end architecture;
 
 
 def _generate_trunci_signal_manager(name, input_bitwidth, output_bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": input_bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": output_bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_trunci(name, input_bitwidth, output_bitwidth))
+        extra_signals,
+        lambda name: _generate_trunci(name, input_bitwidth, output_bitwidth))

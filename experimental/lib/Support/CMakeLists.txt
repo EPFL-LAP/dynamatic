@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   CutlessMapping.cpp
   SubjectGraph.cpp
   CDGAnalysis.cpp
+  CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
   HandshakeSimulator.cpp
   FtdImplementation.cpp
@@ -19,6 +20,8 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+  DynamaticAnalysis
+
 )
 
 add_subdirectory(BooleanLogic)
