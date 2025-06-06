@@ -15,6 +15,7 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
+USE_RIGIDIFICATION=$9
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -194,6 +195,67 @@ fi
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+
+# Rigidification
+if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
+  # Annotate properties
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
+  --handshake-annotate-properties > /dev/null
+
+  # handshake level -> hw level
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  > "$F_HW"
+  exit_on_fail "Failed to lower to HW" "Lowered to HW"
+
+  # generate SMV
+  ./bin/export-rtl "$F_HW" integration-test/fir/out/hdl/ data/rtl-config-smv.json --hdl smv --property-database formal_properties.json
+
+  # create the testbench
+  build/bin/smv-check-opt -i $MODEL_DIR --name $KERNEL_NAME -o $MODEL_DIR --mlir $MLIR_DIR/hw.mlir
+
+  # use the modelcheker
+  echo "set verbose_level 0;
+  set pp_list cpp;
+  set counter_examples 0;
+  set dynamic_reorder 1;
+  set on_failure_script_quits;
+  set reorder_method sift;
+  set enable_sexp2bdd_caching 0;
+  set bdd_static_order_heuristics basic;
+  set cone_of_influence;
+  set use_coi_size_sorting 1;
+  read_model -i $MODEL_DIR/main.smv;
+  flatten_hierarchy;
+  encode_variables;
+  build_flat_model;
+  build_model -f;
+  check_invar -s forward;
+  check_ctlspec;
+  show_property -o $FORMAL_DIR/property.rpt;
+  time;
+  quit" > $FORMAL_DIR/prove.cmd
+
+
+  file=$MODEL_DIR/$KERNEL_NAME.smv
+  total=$(( $(awk '/-- properties/ {found=1; next} found' "$file" | wc -l) + 26))
+  bar_length=30
+  i=0
+
+  echo "[INFO] Running nuXmv"
+  nuXmv -source $FORMAL_DIR/prove.cmd #| while IFS= read -r line; do
+  #     ((i++))
+  #     percent=$(( i * 100 / total ))
+  #     filled=$(( i * bar_length / total ))
+  #     bar=$(printf "%-${filled}s" "#" | tr ' ' '#')
+  #     max_line_length=$(( $(tput cols) - bar_length - 20 ))
+  #     display_line="${line:0:max_line_length}"
+  #     printf "\r\033[K[%-${bar_length}s] %3d%% %s" "$bar" "$percent" "$display_line"
+  # done
+
+  # parse the results
+  printf "\n[INFO] Saving formal verification results\n"
+  python experimental/tools/smv-check-opt/parse_results.py $MLIR_DIR/formal_properties.json $FORMAL_DIR/property.rpt
+fi
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
