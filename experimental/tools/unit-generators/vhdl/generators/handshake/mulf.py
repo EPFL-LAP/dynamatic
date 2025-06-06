@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_buffered_signal_manager
 from generators.handshake.join import generate_join
 from generators.support.delay_buffer import generate_delay_buffer
 from generators.handshake.oehb import generate_oehb
@@ -249,10 +249,9 @@ end architecture;
 
 def _generate_mulf_signal_manager(name, is_double, extra_signals):
     bitwidth = 64 if is_double else 32
-    return generate_signal_manager(name, {
-        "type": "buffered",
-        "latency": _get_latency(is_double),
-        "in_ports": [{
+    return generate_buffered_signal_manager(
+        name,
+        [{
             "name": "lhs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -261,10 +260,11 @@ def _generate_mulf_signal_manager(name, is_double, extra_signals):
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "result",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_mulf(name, is_double))
+        extra_signals,
+        lambda name: _generate_mulf(name, is_double),
+        _get_latency(is_double))

@@ -111,10 +111,13 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   return getModel(op->getName());
 }
 
-LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
-                                         double &latency) const {
-  // Our current timing model doesn't have latency information for valid and
-  // ready signals, assume it is 0.
+LogicalResult TimingDatabase::getLatency(
+    Operation *op, SignalType signalType, double &latency,
+    double targetPeriod) const // Our current timing model doesn't have latency
+                               // information for valid and
+// ready signals, assume it is 0
+{
+
   if (signalType != SignalType::DATA) {
     latency = 0.0;
     return success();
@@ -124,13 +127,20 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   if (!model)
     return failure();
 
-  if (failed(model->latency.getCeilMetric(op, latency)))
+  // First, we extract the DelayDepMetric instance for a specific biwdidth.
+  // Then, we use its method (getDelayCeilMetric) to get the latency for the
+  // given targetPeriod.
+  DelayDepMetric<double> DelayStruct;
+
+  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+    return failure();
+  if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
     return failure();
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
   // currenty unable to account for this. It's obviosuly very bad to
-  // special-case this here so we should find a waay to properly express this
+  // special-case this here so we should find a way to properly express this
   // information in our models.
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
     auto memOp = findMemInterface(loadOp.getAddressResult());
@@ -140,7 +150,8 @@ LogicalResult TimingDatabase::getLatency(Operation *op, SignalType signalType,
   return success();
 }
 
-LogicalResult TimingDatabase::getInternalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getInternalDelay(Operation *op,
+                                               SignalType signalType,
                                                double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
@@ -180,7 +191,8 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
   }
 }
 
-LogicalResult TimingDatabase::getTotalDelay(Operation *op, SignalType signalType,
+LogicalResult TimingDatabase::getTotalDelay(Operation *op,
+                                            SignalType signalType,
                                             double &delay) const {
   const TimingModel *model = getModel(op);
   if (!model)
@@ -298,6 +310,60 @@ bool dynamatic::fromJSON(const ljson::Value &value,
     }
     metric.data[bitwidth] = dataValue;
   }
+  return true;
+}
+
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         BitwidthDepMetric<DelayDepMetric<double>> &metric,
+                         ljson::Path path) {
+
+  const ljson::Object *object = value.getAsObject();
+
+  // standard empty object check
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
+  // The outer loop is on the bitwidths: each is associated with a
+  // DelayDepMetric map in the JSON.
+  for (const auto &[bitwidthKey, metricValue] : *object) {
+    unsigned bitwidth;
+    // we start by obtaining the bitwidth value associated with this key
+    if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
+      return false;
+
+    // We instantiate inside the loop an internalMap for this specific bitwidth.
+    std::map<double, double> internalMap;
+
+    // Validity check to ensure the presence of a map.
+    const ljson::Object *nestedMap = metricValue.getAsObject();
+    if (!nestedMap) {
+      path.field(bitwidthKey).report("expected nested map object");
+      return false;
+    }
+
+    // nested fromJSON call, which deserializes individual delay & value pairs
+    // into the internalMap
+    for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
+      double key;
+      key = std::stod(doubleDelay.str());
+
+      double value;
+      if (!fromJSON(doubleValue, value,
+                    path.field(bitwidthKey).field(doubleDelay)))
+        return false;
+
+      internalMap[key] = value;
+    }
+    // We save the internal map as the data field of the DelayDepMetric.
+    DelayDepMetric<double> DelayDepStruct;
+    DelayDepStruct.data = internalMap;
+
+    // Each DelayDepMetric structure is then associated with its bitwidth,
+    // completing the 2-level nested map.
+    metric.data[bitwidth] = DelayDepStruct;
+  }
+
   return true;
 }
 

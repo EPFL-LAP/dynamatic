@@ -144,6 +144,8 @@ def generate_code(name, mod_type, parameters):
             return xori.generate_xori(name, parameters)
         case "memory_controller":
             return memory_controller.generate_memory_controller(name, parameters)
+        case "ndwire":
+            return ndwire.generate_ndwire(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 

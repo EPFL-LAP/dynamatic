@@ -21,13 +21,13 @@
 namespace dynamatic {
 namespace experimental {
 namespace lsqsizing {
-
 #define GEN_PASS_DECL_HANDSHAKESIZELSQS
 #define GEN_PASS_DEF_HANDSHAKESIZELSQS
 #include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSizeLSQs(StringRef timingModels = "", StringRef collisions = "");
+createHandshakeSizeLSQs(StringRef timingModels = "", StringRef collisions = "",
+                        double targetCP = 10.0);
 
 } // namespace lsqsizing
 } // namespace experimental

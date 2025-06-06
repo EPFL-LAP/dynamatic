@@ -80,12 +80,12 @@ Dynamatic also contains integration tests that assess the whole flow by going fr
 
 # Contributing 
 
-Dynamatic welcomes contributions from the open-source community and from students as part of academic projects. We generally follow the LLVM and MLIR community practices, and currently use [GitHub issues and pull requests](#github-issues--pull-requests) to handle bug reports/design proposals and code contributions, respectively. Here are some high-level guidelines (inspired from CIRCT's guidelines):
-- Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../.clang-format)). There are good plugins for common editors like [VSCode](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) that can be set up to format each file on save, or you can run it manually. This makes code easier to read and understand, and more uniform throuhgout the codebase.
-- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases they help in identifying code-smells. 
+Dynamatic welcomes contributions from the open-source community and from students as part of academic projects. We generally follow the LLVM and MLIR community practices, and currently use [GitHub issues and pull requests](#github-issues--pull-requests) to handle bug reports/design proposals and code contributions, respectively. Here are some high-level guidelines (inspired by CIRCT's guidelines):
+- Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../.clang-format)). There are good plugins for common editors like VSCode ([cpptool](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) or [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)) that can be set up to format each file on save, or you can run them manually. This makes code easier to read and understand, and more uniform throughout the codebase.
+- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases, they help in identifying code-smells. 
 - Please follow the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html).
 - Please practice [*incremental development*](https://llvm.org/docs/DeveloperPolicy.html#incremental-development), preferring to send a small series of incremental patches rather than large patches. There are other policies in the LLVM Developer Policy document that are worth skimming.
-- Please create an issue if you run into a a bug or problem with Dynamatic.
+- Please create an issue if you run into a bug or problem with Dynamatic.
 - Please create a PR to get a code review. For reviewers, it is good to look at the primary author of the code you are touching to make sure they are at least CC'd on the PR.
 
 ## Relevant Documentation

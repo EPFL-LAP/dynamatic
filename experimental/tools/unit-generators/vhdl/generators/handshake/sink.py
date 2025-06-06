@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.support.utils import data
 
 
@@ -42,13 +42,13 @@ end architecture;
 
 
 def _generate_sink_signal_manager(name, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_sink(name, bitwidth))
+        [],
+        extra_signals,
+        lambda name: _generate_sink(name, bitwidth))

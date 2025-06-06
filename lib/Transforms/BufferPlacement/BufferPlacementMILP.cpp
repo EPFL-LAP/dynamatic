@@ -164,7 +164,8 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     // If the component is combinational (i.e., 0 latency) its output fluid
     // retiming equals its input fluid retiming, otherwise it is different
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency)))
+    if (failed(
+            timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
       latency = 0.0;
     if (latency == 0.0)
       unitVars.retOut = unitVars.retIn;
@@ -245,7 +246,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                    ChannelFilter filter) {
   // Add path constraints for units
   double latency;
-  if (failed(timingDB.getLatency(unit, signalType, latency)))
+  if (failed(timingDB.getLatency(unit, signalType, latency, targetPeriod)))
     latency = 0.0;
 
   if (latency == 0.0) {
@@ -489,8 +490,8 @@ void BufferPlacementMILP::
     // Assuming that we minimize the number of buffer slots, bubble occupancy
     // always takes the minimum feasible value. Therefore, the combined
     // constraints are equivalent to:
-    // -  token occupancy + CFDFC's throughput <= numSlots, if readyBuf holds;
-    // -  token occupancy <= numSlots, if not. (Already enforced by the earlier
+    // If dataBuf holds, then token occupancy + CFDFC's throughput <= numSlots;
+    // otherwise, token occupancy <= numSlots. (Already enforced by the earlier
     // constraint named "throughput_channel")
     // The following constraint encodes the case where readyBuf holds, and is
     // trivially satisfied when readyBuf does not hold (since the earlier
@@ -574,15 +575,19 @@ void BufferPlacementMILP::
                      shiftRegExtraBubblesName);
 
     // Combine the following into a unified constraint:
-    // 1. If readyBuf is used, bubble occupancy >= CFDFC's throughput;
+    // 1. If readyBuf is used, bubble occupancy limits the CFDFC's throughput,
+    //    i.e., bubble occupancy >= CFDFC's throughput;
     //    otherwise, bubble occupancy >= 0.
     // 2. Token occupancy + bubble occupancy <= slot number.
     // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used.
-    // Assuming that we minimize the number of buffer slots, bubble occupancy
-    // always takes the minimum feasible value. Therefore, constraint 1 becomes:
+    // Since there is no others reason to have more bubbles, the optimal
+    // (minimum value) of the bubble due to readyBuf is the same as CFDFC's
+    // throughput. Therefore, constraint 1 becomes:
     // 1. If readyBuf is used, bubble occupancy = CFDFC's throughput;
     //    otherwise, bubble occupancy = 0.
-    // We model bubble occupancy as 'readyBuf * throughput'.
+    // As a result, we model bubble occupancy as 'readyBuf * throughput'. This
+    // term can be linearized, but it is not necessary because this is a
+    // quadratic constaint.
     model.addQConstr(chTokenOccupancy + readyBuf * throughput +
                              shiftReg * shiftRegExtraBubbles <=
                          bufNumSlots,
@@ -594,7 +599,8 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency)) ||
+    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency,
+                                   targetPeriod)) ||
         latency == 0.0)
       continue;
 

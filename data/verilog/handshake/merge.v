@@ -27,7 +27,7 @@ module merge # (
     tmp_data_out = ins[0 +: DATA_TYPE];
 
     cnt = 1;
-    for (i = 0; i < INPUTS; i = i + 1) begin
+    for (i = 0; i < SIZE; i = i + 1) begin
       if (cnt == 1 && ins_valid[i]) begin
         tmp_data_out = ins[i * DATA_TYPE +: DATA_TYPE];
         tmp_valid_out = 1;
