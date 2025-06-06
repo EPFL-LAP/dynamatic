@@ -52,6 +52,7 @@ Each buffer type corresponds to a specific RTL backend HDL module with different
 | `FIFO_BREAK_NONE`      | TFIFO              | Data: 0, Valid: 0, Ready: 0 | Bypass: D, V, R           |
 | `SHIFT_REG_BREAK_DV`   | N/A                | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
 
+> Different from `ONE_SLOT_BREAK_DV`, the slots in `SHIFT_REG_BREAK_DV` share a single handshake control and thus accept or stall inputs together.
 > All six buffer types can be used together in a channel to handle various needs. For the first three types, multiple modules can be chained to provide more slots. The last three types allow multiple slots within their module parameters, so they need not be chained in a channel.
 > An assertion is placed in the BufferOp builder to ensure that if the buffer type is `ONE_SLOT`, then `NUM_SLOTS` == 1.
 

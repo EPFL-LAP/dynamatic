@@ -792,6 +792,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << result.numFifoDV << " FifoDV slot(s)\n";
     os << result.numFifoNone << " FifoNone slot(s)\n";
     os << result.numOneSlotDVR << " OneSlotDVR slot(s)\n";
+    os << result.numShiftRegDV << " ShiftRegDV slot(s)\n";
     os.unindent();
     os << "\n";
   }
