@@ -135,7 +135,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -158,7 +158,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -320,7 +320,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -1337,7 +1337,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
   os << ")\n\n";
 
-  os << "\n// input and output\n";
+  os << "\n-- input and output\n";
   data.writeSignalAssignments([](const llvm::Twine &dst, const llvm::Twine &src,
                                  raw_indented_ostream &os) {
     os << "DEFINE " << dst << " := " << src << ";\n";
@@ -1346,7 +1346,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << "\n\n";
 
   writeModuleInstantiations(data);
-  os << "\n// properties\n";
+  os << "\n-- properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)

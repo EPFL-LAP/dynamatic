@@ -94,7 +94,7 @@ static std::string instantiateModuleUnderTest(
             llvm::formatv("sink_{0}.{1}", resultName, SINK_READY_NAME.str()));
     }
 
-  return llvm::formatv("VAR {0} : {1} ({2});\n", moduleName, moduleName,
+  return llvm::formatv("  VAR {0} : {1} ({2});\n", moduleName, moduleName,
                        llvm::join(inputVariables, ", "))
       .str();
 }
@@ -297,21 +297,21 @@ static std::string instantiateSequenceGenerators(
       // Example: VAR seq_generator_D : bool_input_inf(model.D_ready);
       sequenceGenerators
           << llvm::formatv(
-                 "VAR seq_generator_{0} : {1}_input_inf({2}.{0}_ready);\n",
+                 "  VAR seq_generator_{0} : {1}_input_inf({2}.{0}_ready);\n",
                  argumentName, typePrefixName, moduleName)
                  .str();
 
     } else if (generateExactNrOfTokens) {
       // Example: VAR seq_generator_D : bool_input_exact(model.D_ready, 1);
       sequenceGenerators << llvm::formatv(
-                                "VAR seq_generator_{0} : "
+                                "  VAR seq_generator_{0} : "
                                 "{1}_input_exact({2}.{0}_ready, {3});\n",
                                 argumentName, typePrefixName, moduleName,
                                 nrOfTokens)
                                 .str();
     } else {
       // Example: VAR seq_generator_D : bool_input(model.D_ready, 1);
-      sequenceGenerators << llvm::formatv("VAR seq_generator_{0} : "
+      sequenceGenerators << llvm::formatv("  VAR seq_generator_{0} : "
                                           "{1}_input({2}.{0}_ready, {3});\n",
                                           argumentName, typePrefixName,
                                           moduleName, nrOfTokens)
@@ -366,17 +366,17 @@ std::string createSmvFormalTestbench(const SmvTestbenchConfig &config) {
 
   wrapper << instantiateSequenceGenerators(config.modelSmvName,
                                            config.arguments, config.nrOfTokens,
-                                           config.generateExactNrOfTokens);
+                                           config.generateExactNrOfTokens)
+          << "\n";
 
   wrapper << instantiateModuleUnderTest(config.modelSmvName, config.arguments,
                                         config.results, config.syncOutput)
           << "\n";
 
   if (config.syncOutput) {
-
+    wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
     wrapper << "  DEFINE global_ready := TRUE;\n";
 
-    wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
   } else {
     wrapper << instantiateSinks(config.modelSmvName, config.results) << "\n";
   }
