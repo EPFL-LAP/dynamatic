@@ -117,7 +117,7 @@ static std::optional<std::string> convertMLIRTypeToSMV(const Type &type) {
       .Case<handshake::ChannelType>([&](handshake::ChannelType cType) {
         if (cType.getDataBitWidth() == 1)
           return std::string("boolean");
-        return llvm::formatv("signed word [{0}]", cType.getDataBitWidth())
+        return llvm::formatv("unsigned word [{0}]", cType.getDataBitWidth())
             .str();
       });
 }
@@ -127,7 +127,7 @@ static std::optional<std::string> convertMLIRTypeToSMV(const Type &type) {
 /// and (inclusive) max_tokens.
 std::string smvInput(const Type &type) {
   return llvm::formatv(R"DELIM(
-MODULE {0}_input(nReady0, max_tokens)"
+MODULE {0}_input(nReady0, max_tokens)
   VAR outs : {1};
   VAR counter : 0..31;
   FROZENVAR exact_tokens : 0..max_tokens;
@@ -148,7 +148,7 @@ MODULE {0}_input(nReady0, max_tokens)"
 /// number of generated tokens is exact_tokens.
 std::string smvInputExact(const Type &type) {
   return llvm::formatv(R"DELIM(
-MODULE {0}_input_exact(nReady0, exact_tokens)"
+MODULE {0}_input_exact(nReady0, exact_tokens)
   VAR outs : {1};
   VAR counter : 0..31;
   ASSIGN
@@ -167,7 +167,7 @@ MODULE {0}_input_exact(nReady0, exact_tokens)"
 /// SMV module for a sequence generator with an infinite number of tokens
 std::string smvInputInf(const Type &type) {
   return llvm::formatv(R"DELIM(
-MODULE {0}_input_inf(nReady0)"
+MODULE {0}_input_inf(nReady0)
   VAR outs : {1};
 
   -- make sure outs is persistent

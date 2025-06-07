@@ -147,7 +147,7 @@ def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_typ
         num_stores)] + [f"stAddr_{n}_valid" for n in range(num_stores)]
     store_data_ports = [f"stData_{n}" for n in range(
         num_stores)] + [f"stData_{n}_valid" for n in range(num_stores)]
-    mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + load_address_ports +
+    mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + control_ports +
                             store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
     mc_loadless_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports +
                                      store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
