@@ -247,8 +247,8 @@
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t fptosi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.rigidifier",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t rigidifier -p bitwidth=$BITWIDTH"
+    "name": "handshake.ready_remover",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ready_remover -p bitwidth=$BITWIDTH"
   },
   {
     "name": "handshake.valid_merger",

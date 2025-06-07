@@ -1,5 +1,5 @@
 
-def generate_rigidifier(name, params):
+def generate_ready_remover(name, params):
     bitwidth = params["bitwidth"]
 
     if bitwidth > 0:

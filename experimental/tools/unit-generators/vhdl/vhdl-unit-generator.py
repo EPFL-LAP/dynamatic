@@ -37,7 +37,7 @@ import generators.handshake.shli as shli
 import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
-import generators.handshake.rigidifier as rigidifier
+import generators.handshake.ready_remover as ready_remover
 import generators.handshake.valid_merger as valid_merger
 
 
@@ -113,8 +113,8 @@ def generate_code(name, mod_type, parameters):
             return sitofp.generate_sitofp(name, parameters)
         case "fptosi":
             return fptosi.generate_fptosi(name, parameters)
-        case "rigidifier":
-            return rigidifier.generate_rigidifier(name, parameters)
+        case "ready_remover":
+            return ready_remover.generate_ready_remover(name, parameters)
         case "valid_merger":
             return valid_merger.generate_valid_merger(name, parameters)
         case _:

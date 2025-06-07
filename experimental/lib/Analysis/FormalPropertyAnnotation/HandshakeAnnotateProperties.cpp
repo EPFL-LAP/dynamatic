@@ -76,9 +76,6 @@ bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
           res.getOwner()))
     return false;
 
-  if (res.getUsers().empty())
-    return false;
-
   return std::all_of(
       res.getUsers().begin(), res.getUsers().end(), [](auto *user) {
         return !isa<handshake::EndOp, handshake::MemoryControllerOp,
@@ -92,9 +89,9 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
   for (auto [i, res1] : llvm::enumerate(op1.getResults()))
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
       // equivalence is symmetrical so it needs to be checked only once for
-      // each pair of signals
-      if ((getUniqueName(&op1).str() != getUniqueName(&op2).str() || i < j) &&
-          isChannelModifiable(res1) && isChannelModifiable(res2)) {
+      // each pair of signals when the Ops are the same
+      if ((&op1 != &op2 || i < j) && isChannelModifiable(res1) &&
+          isChannelModifiable(res2)) {
         ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
         propertyTable.push_back(p.toJSON());
@@ -119,7 +116,7 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalence(ModuleOp modOp) {
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    for (Operation &op : llvm::make_early_inc_range(funcOp.getOps())) {
+    for (Operation &op : funcOp.getOps()) {
       for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
         if (isChannelModifiable(res)) {
 
