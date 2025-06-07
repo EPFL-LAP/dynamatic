@@ -15,6 +15,7 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
+USE_RIGIDIFICATION=$9
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -195,13 +196,98 @@ fi
   > "$F_HANDSHAKE_EXPORT"
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
+# Rigidification
+if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
+  FORMAL_DIR="$OUTPUT_DIR/formal"
+  MODEL_DIR="$FORMAL_DIR/model"
+
+  F_FORMAL_HW="$FORMAL_DIR/tmp_hw.mlir"
+  F_FORMAL_PROP="$FORMAL_DIR/formal_properties.json"
+  F_NUXMV_PROP="$FORMAL_DIR/property.rpt"
+  F_NUXMV_CMD="$FORMAL_DIR/prove.cmd"
+  F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/rigidified.mlir"
+
+
+  rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
+
+
+  # Annotate properties
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
+  --handshake-annotate-properties=json-path=$F_FORMAL_PROP > /dev/null
+
+  # handshake level -> hw level
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  > "$F_FORMAL_HW"
+
+  # generate SMV
+  ./bin/export-rtl "$F_FORMAL_HW" $MODEL_DIR data/rtl-config-smv.json --hdl smv --property-database $F_FORMAL_PROP
+
+  # create the testbench
+  build/bin/rigidification-testbench -i $MODEL_DIR --name $KERNEL_NAME -o $MODEL_DIR --mlir $F_FORMAL_HW
+
+  # use the modelcheker
+  echo "set verbose_level 0;
+  set pp_list cpp;
+  set counter_examples 0;
+  set dynamic_reorder 1;
+  set on_failure_script_quits;
+  set reorder_method sift;
+  set enable_sexp2bdd_caching 0;
+  set bdd_static_order_heuristics basic;
+  set cone_of_influence;
+  set use_coi_size_sorting 1;
+  read_model -i $MODEL_DIR/main.smv;
+  flatten_hierarchy;
+  encode_variables;
+  build_flat_model;
+  build_model -f;
+  check_invar -s forward;
+  check_ctlspec;
+  show_property -o $F_NUXMV_PROP;
+  time;
+  quit" > $F_NUXMV_CMD
+
+
+  file=$MODEL_DIR/$KERNEL_NAME.smv
+  total=$(( $(awk '/-- properties/ {found=1; next} found' "$file" | wc -l) + 27))
+  bar_length=30
+  i=0
+
+  echo "[INFO] Running nuXmv"
+  nuXmv -source $F_NUXMV_CMD | while IFS= read -r line; do
+      ((i++))
+      percent=$(( i * 100 / total ))
+      filled=$(( i * bar_length / total ))
+      bar=$(printf "%-${filled}s" "#" | tr ' ' '#')
+      max_line_length=$(( $(tput cols) - bar_length - 20 ))
+      display_line="${line:0:max_line_length}"
+      printf "\r\033[K[%-${bar_length}s] %3d%% %s" "$bar" "$percent" "$display_line"
+  done
+
+  # parse the results
+  printf "\n[INFO] Saving formal verification results\n"
+  python experimental/tools/rigidification/parse_nuxmv_results.py $F_FORMAL_PROP $F_NUXMV_PROP
+
+  # apply rigidification
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
+  --handshake-rigidification=json-path=$F_FORMAL_PROP > $F_HANDSHAKE_RIGIDIFIED
+  exit_on_fail "Failed to rigidify" "Rigidification completed"
+
+fi
+
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
-  > "$F_HW"
-exit_on_fail "Failed to lower to HW" "Lowered to HW"
+if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+    > "$F_HW"
+  exit_on_fail "Failed to lower to HW" "Lowered to HW"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+    > "$F_HW"
+  exit_on_fail "Failed to lower to HW" "Lowered to HW"
+fi
 
 echo_info "Compilation succeeded"

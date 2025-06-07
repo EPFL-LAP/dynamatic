@@ -26,7 +26,10 @@ class SmvScalarType:
         Constructor for SmvScalarType.
         """
         self.bitwidth = bitwidth
-        self.smv_type = f"unsigned word [{bitwidth}]"
+        if bitwidth == 1:
+            self.smv_type = "boolean"
+        else:
+            self.smv_type = f"unsigned word [{bitwidth}]"
 
     def format_constant(self, value) -> str:
         """

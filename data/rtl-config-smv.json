@@ -286,7 +286,7 @@
   },
   {
     "name": "mem_to_bram",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generator": "touch $OUTPUT_DIR/$MODULE_NAME.smv",
     "hdl": "smv"
   },
   {
