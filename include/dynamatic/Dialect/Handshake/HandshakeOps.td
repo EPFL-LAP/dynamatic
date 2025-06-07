@@ -1486,7 +1486,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 }
 
 def RigidifierOp : Handshake_Op<"rigidifier",[
-  SameOperandsAndResultType
+  SameOperandsAndResultType,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = [{
@@ -1505,14 +1505,12 @@ def RigidifierOp : Handshake_Op<"rigidifier",[
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
-    return "ins";
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      return "ins";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
-    return "outs";
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      return "outs";
     }
   }];
 
