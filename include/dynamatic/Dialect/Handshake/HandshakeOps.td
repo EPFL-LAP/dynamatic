@@ -1485,7 +1485,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasVerifier = 1;
 }
 
-def RigidifierOp : Handshake_Op<"rigidifier",[
+def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {

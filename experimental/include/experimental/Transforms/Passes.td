@@ -117,7 +117,7 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
   let description = [{
     The pass uses the insights gathered from model checking stored in the property database
     to rigidify some channels and remove the redundant logic associated with them. To do so
-    we place RigidifierOps and ValidMergerOps, that manipulate valid and ready signals.
+    we place ReadyRemoverOps and ValidMergerOps, that manipulate valid and ready signals.
   }];
   let constructor = "dynamatic::experimental::rigidification::createRigidification()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
