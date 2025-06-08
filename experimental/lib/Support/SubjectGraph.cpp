@@ -921,3 +921,42 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
     module->buildSubjectGraphConnections();
   }
 }
+
+// After creating the individual Subject Graphs, this functions is called to
+// connect the Subject Graphs by connecting the input and output nodes of the
+// adjacent modules. This generates the merged Subject Graph, which is the
+// overall Subject Graph of the entire circuit.
+LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
+  // Connect inputs and outputs of subject graphs to each other
+  for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
+    module->connectInputNodes();
+  }
+
+  // Create a new LogicNetwork object that will hold the BLIF representation of
+  // the connected AIG
+  experimental::LogicNetwork *mergedBlif = new experimental::LogicNetwork();
+
+  for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
+    experimental::LogicNetwork *blifModule = module->blifData;
+
+    // Add nodes to the new BLIF
+    for (auto &node : blifModule->getNodesInTopologicalOrder()) {
+      mergedBlif->addNode(node);
+    }
+
+    // Add latches to the new BLIF
+    for (auto &latch : blifModule->getLatches()) {
+      mergedBlif->addLatch(latch.first->name, latch.second->name);
+    }
+  }
+
+  // Set name as "merged"
+  mergedBlif->moduleName = "merged";
+
+  // Sort the nodes of the newly created Merged LogicNetwork in topological
+  // order
+  mergedBlif->generateTopologicalOrder();
+
+  // Return the resulting LogicNetwork object 
+  return mergedBlif;
+}

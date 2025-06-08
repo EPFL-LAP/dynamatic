@@ -20,13 +20,9 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "mlir/Support/LLVM.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ErrorHandling.h"
 
 #include <boost/functional/hash/extensions.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 using namespace mlir;
@@ -360,6 +356,8 @@ public:
 // FuncOp. Iterates through Ops and calls the appropriate SubjectGraph
 // constructor.
 void subjectGraphGenerator(handshake::FuncOp funcOp, StringRef blifFiles);
+
+LogicNetwork *connectSubjectGraphs();
 
 } // namespace experimental
 } // namespace dynamatic

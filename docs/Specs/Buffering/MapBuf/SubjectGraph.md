@@ -32,10 +32,29 @@ for ( DataFlow unit: DC.get_dataflow_units() ){
 for ( BaseSubjectGraph * module: subjectGraphs){
   module->buildSubjectGraphConnections();
 }
+
 ```
 
-For each dataflow unit in the dataflow circuit, the SubjectGraphGenerator creates the corresponding derived BaseSubjectGraph object. Then, for each one of these, it calls the corresponding buildSubjectGraphConnections function which connects them.
+For each dataflow unit in the dataflow circuit, the SubjectGraphGenerator creates the corresponding derived BaseSubjectGraph object. Then, for each one of these, it calls the corresponding buildSubjectGraphConnections function, which populates the inputSubjectGraphs and outputSubjectGraphs vectors of each Subject Graph. 
 
+At this stage, Nodes of the neighboring Subject Graphs are not connected. The connection is built by the function connectSubjectGraphs(). The following is its pseudo-code:
+
+```
+for ( BaseSubjectGraph * module: subjectGraphs){
+  module->connectInputNodes();
+}
+
+LogicNetwork* mergedBlif = new LogicNetwork();
+
+for ( BaseSubjectGraph * module: subjectGraphs){
+  mergedBlif->addNodes(module->getNodes());
+}
+
+return mergedBlif;
+
+```
+
+For each Subject Graph, the connectInputNodes() function is called, which merges the input and output nodes of the neighboring graphs. Then, a new LogicNetwork object is created, and the Nodes of the individual SubjectGraphs are added as Nodes to the new mergedBlif LogicNetwork object. Since each node stores its own connection information, adding all the nodes into one LogicNetwork is enough to build a connected network for the entire circuit. The connected LogicNetwork is then returned from the function. Doing the connection of graphs as a separate step from creating the individual Subject Graphs allows more flexibility. This way, Subject Graphs can be inserted/removed from the circuit structure easily before moving on to the connection step.
 
 # BaseSubjectGraph Class
 The BaseSubjectGraph class is an abstract base class that provides shared functionality for generating the subject graph of a dataflow unit. Each major type of dataflow unit has its own subclass that extends BaseSubjectGraph. These subclasses implement their own constructors and are responsible for parsing the corresponding BLIF (Berkeley Logic Interchange Format) file to construct the unit's subject graph.
