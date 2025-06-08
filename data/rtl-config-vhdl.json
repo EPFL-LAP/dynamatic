@@ -6,7 +6,7 @@
             { "name": "SELECTED_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
-    "arch-name": "arch_$DATA_TYPE_$SELECTED_DELAY",
+    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
