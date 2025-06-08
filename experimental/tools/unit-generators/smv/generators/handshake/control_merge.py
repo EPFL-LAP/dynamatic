@@ -1,8 +1,6 @@
-from generators.support.merge_notehb import (
-    generate_merge_notehb,
-)
 from generators.support.tehb import generate_tehb
 from generators.handshake.fork import generate_fork
+from generators.handshake.merge import generate_merge
 from generators.support.utils import *
 
 
@@ -22,7 +20,7 @@ def _generate_control_merge_dataless(name, size, index_type):
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, index_ready)
   VAR
   inner_tehb : {name}__tehb(index_in, inner_merge.outs_valid, inner_fork.ins_ready);
-  inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, inner_tehb.ins_ready);
+  inner_merge : {name}__merge_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, inner_tehb.ins_ready);
   inner_fork : {name}__fork_dataless(inner_tehb.outs_valid, outs_ready, index_ready);
 
   DEFINE
@@ -38,7 +36,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
   index_valid := inner_fork.outs_1_valid;
   index := inner_tehb.outs;
 
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
+{generate_merge(f"{name}__merge_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
 {generate_tehb(f"{name}__tehb", {ATTR_BITWIDTH: index_type.bitwidth})}
 {generate_fork(f"{name}__fork_dataless", {ATTR_SIZE: 2, ATTR_BITWIDTH: 0})}
 """
