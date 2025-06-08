@@ -924,8 +924,8 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
 
 // After creating the individual Subject Graphs, this functions is called to
 // connect the Subject Graphs by connecting the input and output nodes of the
-// adjacent modules. This generates the merged Subject Graph, which is the
-// overall Subject Graph of the entire circuit.
+// connected modules in the circuit. This generates the merged Subject Graph, 
+// which is the overall Subject Graph of the entire circuit.
 LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // Connect inputs and outputs of subject graphs to each other
   for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
@@ -936,6 +936,7 @@ LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // the connected AIG
   experimental::LogicNetwork *mergedBlif = new experimental::LogicNetwork();
 
+  // Iterating over the vector containing the subject graphs of each module
   for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
     experimental::LogicNetwork *blifModule = module->blifData;
 
