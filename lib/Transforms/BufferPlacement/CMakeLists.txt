@@ -6,6 +6,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   FPL22Buffers.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
+  MAPBUFBuffers.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

@@ -258,7 +258,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'mapbuf'.">,
     Option<"frequencies", "frequencies", "std::string", "",
     "Path to CSV-formatted file containing estimated transition frequencies "
     "between basic blocks in the kernel.">,
@@ -274,7 +274,10 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"blifFiles", "blif-files", "std::string", "",
+    "Path to AND-Inverter Graphs of dataflow components in Berkeley "
+    "Logic Interchange Format (BLIF).">];
 }
 
 //===----------------------------------------------------------------------===//
