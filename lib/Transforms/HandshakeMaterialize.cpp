@@ -178,20 +178,27 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
       // If some of the control fork's result go outside the memory control
       // network, create an eager fork fed by the lazy fork's last result
       unsigned numEagerResults = forkOp->getNumResults() - lazyResults.size();
-      handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
-          forkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
-      inheritBB(forkOp, eagerForkOp);
 
-      // Replace the control fork's outputs that do not belong to the memory
-      // control network with the eager fork's results
-      ValueRange eagerResults = eagerForkOp.getResult();
-      auto eagerForkResIt = eagerResults.begin();
-      for (OpResult res : forkOp.getResults()) {
-        if (!lazyResults.contains(res))
-          res.replaceAllUsesWith(*(eagerForkResIt++));
+      if (numEagerResults == 1) {
+        for (OpResult res : forkOp.getResults())
+          if (!lazyResults.contains(res))
+            res.replaceAllUsesWith(lazyForkOp->getResults().back());
+      } else {
+        handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
+            forkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
+        inheritBB(forkOp, eagerForkOp);
+
+        // Replace the control fork's outputs that do not belong to the memory
+        // control network with the eager fork's results
+        ValueRange eagerResults = eagerForkOp.getResult();
+        auto eagerForkResIt = eagerResults.begin();
+        for (OpResult res : forkOp.getResults()) {
+          if (!lazyResults.contains(res))
+            res.replaceAllUsesWith(*(eagerForkResIt++));
+        }
+        assert(eagerForkResIt == eagerResults.end() &&
+               "did not exhaust iterator");
       }
-      assert(eagerForkResIt == eagerResults.end() &&
-             "did not exhaust iterator");
     }
 
     // Erase the original fork whose results are now unused
