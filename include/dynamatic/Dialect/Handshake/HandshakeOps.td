@@ -1342,7 +1342,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   }];
 }
 
-def SpecV2SuppressControlOp : Handshake_Op<"spec_v2_suppress_control", [
+def SpecV2CommitControlOp : Handshake_Op<"spec_v2_suppress_control", [
   IsIntSizedChannel<1, "actualCondition">,
   AllTypesMatch<["actualCondition", "generatedCondition", "ctrl"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
