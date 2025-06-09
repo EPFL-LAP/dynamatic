@@ -358,7 +358,7 @@ struct CreditBasedSharingPass
 
   LogicalResult sharingInFuncOp(handshake::FuncOp *funcOp,
                                 FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-                                TimingDatabase &timingDB);
+                                TimingDatabase &timingDB, double targetCP);
 
   LogicalResult sharingWrapperInsertion(
       handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
@@ -539,7 +539,8 @@ void sortGroups(SharingGroups &sharingGroups, FuncPerfInfo &info) {
 // of all performance critical CFCs.
 void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
                     llvm::MapVector<Operation *, double> &opOccupancy,
-                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo) {
+                    TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo,
+                    double targetCP) {
 
   double latency;
   for (Operation *target : sharingTargets) {
@@ -550,7 +551,8 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
     for (auto cf : funcPerfInfo.critCfcs) {
       if (funcPerfInfo.cfUnits[cf].find(target) !=
           funcPerfInfo.cfUnits[cf].end()) {
-        if (failed(timingDB.getLatency(target, SignalType::DATA, latency)))
+        if (failed(timingDB.getLatency(target, SignalType::DATA, latency,
+                                       targetCP)))
           latency = 0.0;
         // Formula for operation occupancy:
         // Occupancy = Latency / II = Latency * Throughput.
@@ -592,7 +594,8 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     Operation *sharedOp = *group.begin();
 
     double latency;
-    if (failed(timingDB.getLatency(sharedOp, SignalType::DATA, latency)))
+    if (failed(
+            timingDB.getLatency(sharedOp, SignalType::DATA, latency, targetCP)))
       latency = 0.0;
 
     // Maps each original successor and the input operand (Value)
@@ -690,7 +693,7 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
 
 LogicalResult CreditBasedSharingPass::sharingInFuncOp(
     handshake::FuncOp *funcOp, FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
-    TimingDatabase &timingDB) {
+    TimingDatabase &timingDB, double targetCP) {
 
   std::error_code ec;
   SharingLogger sharingLogger(*funcOp, dumpLogs, ec);
@@ -708,7 +711,7 @@ LogicalResult CreditBasedSharingPass::sharingInFuncOp(
   // opOccupancy: maps each operation to the maximum occupancy it has to
   // achieve.
   llvm::MapVector<Operation *, double> opOccupancy;
-  getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo);
+  getOpOccupancy(sharingTargets, opOccupancy, timingDB, funcPerfInfo, targetCP);
 
   // Initialize the sharing groups:
   SharingGroups sharingGroups;
@@ -774,7 +777,8 @@ void CreditBasedSharingPass::runDynamaticPass() {
 
   // Apply resource sharing for each function in the module op.
   for (auto &[funcOp, funcPerfInfo] : sharingInfo) {
-    if (failed(sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB))) {
+    if (failed(
+            sharingInFuncOp(funcOp, funcPerfInfo, namer, timingDB, targetCP))) {
       signalPassFailure();
     }
   }

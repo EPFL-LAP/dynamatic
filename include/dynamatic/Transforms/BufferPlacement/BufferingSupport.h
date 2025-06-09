@@ -37,11 +37,11 @@ struct FuncInfo {
 
   /// Argument-less constructor so that we can use the struct as a value type
   /// for maps.
-  FuncInfo() : funcOp(nullptr) {};
+  FuncInfo() : funcOp(nullptr){};
 
   /// Constructs an instance from the function it refers to. Other struct
   /// members start empty.
-  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp) {};
+  FuncInfo(handshake::FuncOp funcOp) : funcOp(funcOp){};
 };
 
 /// Acts as a "smart and lazy getter" around a channel's buffering properties.
@@ -58,7 +58,7 @@ public:
   /// Constructs an instance from the channel whose buffering properties will be
   /// managed by the object.
   inline LazyChannelBufProps(Value val, bool updateOnDestruction = false)
-      : val(val), updateOnDestruction(updateOnDestruction) {};
+      : val(val), updateOnDestruction(updateOnDestruction){};
 
   /// Returns the underlying channel the object was created with.
   inline mlir::Value getChannel() { return val; }
@@ -141,7 +141,7 @@ struct Channel {
   Channel(Value value, Operation *producer, Operation *consumer,
           bool updateProps = false)
       : value(value), producer(producer), consumer(consumer),
-        props(value, updateProps) {};
+        props(value, updateProps){};
 
   /// Constructs a channel from its associated SSA value alone.
   Channel(Value value, bool updateProps = false);
@@ -168,16 +168,17 @@ struct PlacementResult {
   unsigned numOneSlotDV = 0;
   /// The number of ONE_SLOT_BREAK_R that should be placed.
   unsigned numOneSlotR = 0;
-  /// The number of FIFO_BREAK_DV slots that should be placed. 
+  /// The number of FIFO_BREAK_DV slots that should be placed.
   unsigned numFifoDV = 0;
   /// The number of FIFO_BREAK_NONE slots that should be placed.
   unsigned numFifoNone = 0;
   /// The number of ONE_SLOT_BREAK_DVR that should be placed.
   unsigned numOneSlotDVR = 0;
 
-  /// Prefered order: 
-  /// {ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_R}
-  /// bufferOrder = true means the order is as above, otherwise it is reversed.
+  /// Prefered order:
+  /// {ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV, FIFO_BREAK_DV, FIFO_BREAK_NONE,
+  /// ONE_SLOT_BREAK_R} bufferOrder = true means the order is as above,
+  /// otherwise it is reversed.
   bool bufferOrder = true;
 };
 
