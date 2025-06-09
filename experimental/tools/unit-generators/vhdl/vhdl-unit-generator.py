@@ -22,10 +22,6 @@ import generators.handshake.mux as mux
 import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
-import generators.handshake.spec_commit as spec_commit
-import generators.handshake.spec_save_commit as spec_save_commit
-import generators.handshake.speculating_branch as speculating_branch
-import generators.handshake.speculator as speculator
 import generators.handshake.store as store
 import generators.handshake.subf as subf
 import generators.handshake.subi as subi

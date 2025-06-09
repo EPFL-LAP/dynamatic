@@ -47,8 +47,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-const std::string EXTRA_SIGNAL_SPEC = "spec";
-
 static ParseResult parseHandshakeType(OpAsmParser &parser, Type &type) {
   return parser.parseCustomTypeWithFallback(type, [&](Type &ty) -> ParseResult {
     if ((ty = handshake::detail::jointHandshakeTypeParser(parser)))
@@ -435,17 +433,18 @@ LogicalResult BufferOp::verify() {
 
   auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
   if (!bufferTypeAttr)
-    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
 
   auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
   if (!numSlotsAttr)
-    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
 
   StringRef bufferType = bufferTypeAttr.getValue();
   unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
 
-  if ((bufferType == ONE_SLOT_BREAK_DV ||
-       bufferType == ONE_SLOT_BREAK_R ||
+  if ((bufferType == ONE_SLOT_BREAK_DV || bufferType == ONE_SLOT_BREAK_R ||
        bufferType == ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
@@ -606,6 +605,7 @@ LogicalResult ConstantOp::inferReturnTypes(
   // - extra signals matching the input control type
   inferredReturnTypes.push_back(handshake::ChannelType::get(
       attr.getType(), controlType.getExtraSignals()));
+
   return success();
 }
 

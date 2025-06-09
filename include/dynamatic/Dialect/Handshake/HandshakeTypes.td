@@ -82,8 +82,8 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
 
   let builders = [
     TypeBuilderWithInferredContext<(ins
-      "::mlir::Type":$dataType,
-      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras),
+      "::mlir::Type":$dataType, 
+      CArg<"::mlir::ArrayRef<::dynamatic::handshake::ExtraSignal>", "{}">:$extras), 
       [{
         if (::mlir::isa<::mlir::IndexType>(dataType)) {
           // Convert IndexType's to equivalent signless integers automatically
@@ -106,13 +106,7 @@ def ChannelType : Handshake_Type<"Channel", "channel", [
     ChannelType withDataType(Type newDataType) {
       return ChannelType::get(newDataType, getExtraSignals());
     }
-
-    /// Returns a channel type with identical data type but a potentially
-    /// different extra signals.
-    ChannelType withExtraSignal(::mlir::ArrayRef<ExtraSignal> newExtraSignals) {
-      return ChannelType::get(getDataType(), newExtraSignals);
-    }
-
+    
     /// Determines whether a type is supported as the data type or as the type
     /// of an extra signal.
     static bool isSupportedSignalType(::mlir::Type type) {

@@ -47,21 +47,6 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
-    InterfaceMethod<[{
-        Returns whether the operation has at least one operand with the "spec" tag.
-      }],
-      "bool", "hasSpecInput", (ins),
-      /*methodBody=*/"", /*defaultImplementation=*/[{
-        auto operands = $_op->getOperands();
-        for (auto operand : operands) {
-          auto extraSignalsType = mlir::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>(operand.getType());
-          if (extraSignalsType.hasExtraSignal("spec"))
-            return true;
-        }
-
-        return false;
-      }]
-    >,
   ];
 }
 

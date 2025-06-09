@@ -556,6 +556,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
                      .getNumExtraSignals() == 0 &&
              "unexpected extra signals");
     }
+
     // Since none of the operands have extra signals, the result type matches
     // the first operand.
     iMerge.op = rewriter.create<handshake::MuxOp>(
