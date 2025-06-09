@@ -154,8 +154,9 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
   OpBuilder builder(funcOp->getContext());
   for (auto &[forkOp, lazyResults] : lazyChannels) {
     unsigned numLazyForkOutputs = lazyResults.size();
-    bool hasEagerResults = numLazyForkOutputs < forkOp->getNumResults();
-    if (hasEagerResults) {
+    bool hasValueWithoutLazyConstr =
+        numLazyForkOutputs < forkOp->getNumResults();
+    if (hasValueWithoutLazyConstr) {
       // To minimize damage to performance, as many outputs of the control fork
       // as possible should remain "eager". We achieve this by creating an eager
       // fork after the lazy fork that handles token duplication outside the
@@ -174,13 +175,13 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
     for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
       from.replaceAllUsesWith(to);
 
-    if (hasEagerResults) {
+    if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control
       // network, create an eager fork fed by the lazy fork's last result
-      unsigned numChannelsWithoutLazyConstraint =
+      unsigned numValuesWithoutLazyConstr =
           forkOp->getNumResults() - lazyResults.size();
 
-      if (numChannelsWithoutLazyConstraint == 1) {
+      if (numValuesWithoutLazyConstr == 1) {
         // If there is only one eager output channel, we just use the lazy
         // fork's last result to drive that one
         for (OpResult res : forkOp.getResults())
@@ -189,7 +190,7 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
       } else {
         handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
             forkOp->getLoc(), lazyForkOp->getResults().back(),
-            numChannelsWithoutLazyConstraint);
+            numValuesWithoutLazyConstr);
         inheritBB(forkOp, eagerForkOp);
 
         // Replace the control fork's outputs that do not belong to the memory
