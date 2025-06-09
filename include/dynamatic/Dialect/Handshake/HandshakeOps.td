@@ -219,7 +219,7 @@ def BufferOp : Handshake_Op<"buffer", [
 ]> {
   let summary = "buffer operation";
   let description = [{
-    Represents an arbitrary buffer whose properties (e.g., latencies, number of
+    Represents an arbitrary buffer whose properties (e.g., type, latency, and number of
     slots) are dictated by HW parameters. 
   }];
   
@@ -228,17 +228,53 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let builders = [OpBuilder<
     (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-         "std::optional<unsigned>":$numSlots)>
+         "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
   ];
-
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING";
+                                           TIMING_ATTR_NAME = "TIMING",
+                                           BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
+    
+    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
+    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer),
+    /// it introduces one cycle of latency on the D and V paths.
+    /// It does not break the R signal path and adds no latency on R.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV";
+    
+    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path.
+    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer),
+    /// it introduces one cycle of latency on the R path.
+    /// It does not break the D and V signal path and adds no latency on D and V.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R";
+    
+    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO),
+    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths.
+    /// Its only purpose is to hold tokens.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_NONE = "FIFO_BREAK_NONE";
+    
+    /// FIFO_BREAK_DV: This buffer breaks the D and V paths.
+    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers,
+    /// its structure cannot be split. It introduces one cycle of latency on the
+    /// D and V paths regardless of the number of slots and has no latency on R.
+    /// It was previously called an 'elastic_fifo_inner'.
+    static constexpr ::llvm::StringLiteral FIFO_BREAK_DV = "FIFO_BREAK_DV";
+    
+    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal
+    /// paths and introduces one cycle of latency on all of them.
+    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
+    
+    /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
+    /// handshake control signals, causing them to accept or stall inputs
+    /// simultaneously.
+    static constexpr ::llvm::StringLiteral SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV";
+    
   }];
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
+
+  let hasVerifier = 1;
 }
 
 def InitOp : Handshake_Op<"init", [
@@ -364,10 +400,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "selectOperand"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"selectOperand">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -405,10 +438,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadicExcept<"spec", "dataOperands", ["result", "index"]>,
-  // Constraints on spec tag
-  HasSpecTagIfPresentIn<"dataOperands", "result">,
-  LacksSpecTag<"index">,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
@@ -571,6 +601,28 @@ def JoinOp : Handshake_Op<"join", [
 
   let arguments = (ins Variadic<ControlType>:$data);
   let results = (outs ControlType:$result);
+  let assemblyFormat = "$data attr-dict `:` type($result)";
+}
+
+// TODO: Split the input into two parts and explicitly mark the forwarded input,
+// once the backend supports variadic channels with zero or one item correctly.
+def BlockerOp : Handshake_Op<"blocker", [
+  SameOperandsAndResultType
+]> {
+  let summary = "blocker operation";
+  let description = [{
+    A data synchronizer. Blocks handshakes until all inputs are valid, 
+    then forwards the first input.
+
+    Example:
+
+    ```mlir
+    %0 = blocker %a, %b, %c : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins Variadic<ChannelType>:$data);
+  let results = (outs ChannelType:$result);
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
@@ -976,7 +1028,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     ```
   }];
 
-  let arguments = (ins ChannelType:$dataIn, ControlType:$trigger);
+  let arguments = (ins ChannelType:$dataIn,
+                       ControlType:$trigger,
+                       UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$saveCtrl, ChannelType:$commitCtrl, 
                       ChannelType:$SCSaveCtrl,
@@ -990,8 +1044,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   }];
 
   // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger), [{
+  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$dataIn, "Value":$trigger, "unsigned":$fifoDepth), [{
     $_state.addOperands({dataIn, trigger});
+    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
     ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
     ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
@@ -1141,7 +1196,9 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     %dataOut = spec_save_commit[%ctrl] %dataIn : i11
     ```
   }];
-  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
+  let arguments = (ins HandshakeType:$dataIn,
+                       ChannelType:$ctrl,
+                       UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
@@ -1208,172 +1265,37 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   }];
 }
 
-
-//===----------------------------------------------------------------------===//
-// Speculation V2
-//===----------------------------------------------------------------------===//
-
-def SpeculatorV2Op : Handshake_Op<"speculator_v2", [
-  IsIntSizedChannel<1, "condition">,
-  HasValidSpecTag<"condition">,
-  IsSimpleHandshake<"trigger">,
-  IsSimpleHandshake<"ctrlOut">,
-  IsSimpleHandshake<"muxCtrl">,
-  IsIntSizedChannel<2, "muxCtrl">,
-  IsSimpleHandshake<"commitCtrl">,
-  IsIntSizedChannel<1, "commitCtrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-]> {
-  let summary = "Central control unit of the speculative circuit.";
-  let description = [{
-    The speculator produces speculative tokens when real data has
-    not yet arrived. The speculator is also responsible for deciding
-    the correctness of its speculation.
-
-    It needs to send control tokens to save units and commit units
-    ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while
-    $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCIsMisspec is needed
-    in the replicated branches to discard the latter signal.
-
-    Example:
-
-    ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
-      = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
-        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
-    ```
-  }];
-
-  let arguments = (ins ChannelType:$condition, ControlType:$trigger);
-  let results = (outs ControlType:$ctrlOut,
-                      ChannelType:$muxCtrl,
-                      ChannelType:$commitCtrl);
-
-  let assemblyFormat = [{
-    `[` $trigger `]` $condition attr-dict `:` type($trigger) `,` type($condition) `,`
-    type($ctrlOut) `,` type($muxCtrl) `,` type($commitCtrl)
-  }];
-
-  // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Value":$condition, "Value":$trigger), [{
-    $_state.addOperands({condition, trigger});
-
-    ControlType ctrlOutType = ControlType::get($_builder.getContext(), {});
-    ChannelType muxCtrlType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(2), {});
-    ChannelType commitCtrlType = ChannelType::get($_builder.getContext(), $_builder.getIntegerType(1), {});
-
-    $_state.addTypes({ctrlOutType, muxCtrlType, commitCtrlType});
-  }]>];
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "condition" : "trigger";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
-      switch (idx) {
-      case 0:
-        return "ctrlOut";
-      case 1:
-        return "muxCtrl";
-      default:
-        return "commitCtrl";
-      }
-    }
-  }];
-}
-
-def SpecCommitV2Op : Handshake_Op<"spec_commit_v2", [
+def NonSpecOp : Handshake_Op<"non_spec", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  HasValidSpecTag<"dataIn">,
-  LacksSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">,
-  IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-]> {
-  let summary = "Stall speculative data tokens until they are resolved.";
-  let description = [{
-    Commit units are used to mark the end of the speculation region.
-    Commit units are used to stall speculative tokens until they receive
-    the decision from the speculator. In case the speculation is correct,
-    the speculative tokens are converted into non-speculative tokens and
-    passed on to the rest of the circuit.
-    Otherwise, the speculative tokens are discarded.
-
-    Any non-speculative token can pass through the commit units
-    without any stall.
-
-    Example:
-
-    ```mlir
-    %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.channel<i32>, !handshake.channel<i1>
-    ```
-  }];
-
-  let arguments = (ins HandshakeType:$dataIn, ChannelType:$ctrl);
-  let results = (outs HandshakeType:$dataOut);
-
-  let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
-  }];
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
-      return idx == 0 ? "dataIn" : "ctrl";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
-      return "dataOut";
-    }
-  }];
-}
-
-def SpecMuxV2Op : Handshake_Op<"spec_mux_v2", [
-  AllDataTypesMatch<["nonspecIn", "specIn", "dataOut"]>,
-  AllExtraSignalsMatchExcept<"spec", ["nonspecIn", "specIn", "dataOut"]>,
-  HasValidSpecTag<"specIn">,
-  LacksSpecTag<"nonspecIn">,
+  LacksSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"muxCtrl">,
-  IsIntSizedChannel<2, "muxCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let summary = "";
+  let summary = "Adds a non-speculative spec bit.";
   let description = [{
+    The non-spec operation has an input channel without a spec bit and an output
+    channel with a spec bit. Tokens on the output channel are marked as non-spec.
+    It's typically used before a MuxOp or CMergeOp to satisfy their type
+    requirements and to indicate the beginning of a speculative region.
+
     Example:
 
     ```mlir
+    %dataOut = non_spec %dataIn : !handshake.channel<i32> to !handshake.channel<i32, [spec: i1]>
     ```
   }];
 
-  let arguments = (ins ChannelType:$muxCtrl,
-                       HandshakeType:$nonspecIn, // TODO: Variadic
-                       HandshakeType:$specIn); // TODO: Variadic
+  let arguments = (ins HandshakeType:$dataIn);
   let results = (outs HandshakeType:$dataOut);
-
   let assemblyFormat = [{
-    `[` $nonspecIn `,` $specIn `]` $muxCtrl attr-dict `:` type($nonspecIn) `,`
-    type($specIn) `,` type($muxCtrl) `,` type($dataOut)
+    $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
-      switch (idx) {
-      case 0:
-        return "muxCtrl";
-      case 1:
-        return "nonspecIn";
-      default:
-        return "specIn";
-      }
+      return "dataIn";
     }
 
     std::string $cppClass::getResultName(unsigned idx) {

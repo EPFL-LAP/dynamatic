@@ -1,8 +1,8 @@
 def generate_source(name, params):
-  return f"""
+    return f"""
 MODULE {name}(outs_ready)
 
-  // output
+  -- output
   DEFINE
   outs_valid  := TRUE;
 """

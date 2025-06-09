@@ -154,8 +154,8 @@ Attribute MemDependenceAttr::parse(AsmParser &odsParser, Type odsType) {
 // TimingInfo(Attr)
 //===----------------------------------------------------------------------===//
 
-std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
-  switch (type) {
+std::optional<unsigned> TimingInfo::getLatency(SignalType signalType) {
+  switch (signalType) {
   case SignalType::DATA:
     return dataLatency;
   case SignalType::VALID:
@@ -165,8 +165,8 @@ std::optional<unsigned> TimingInfo::getLatency(SignalType type) {
   }
 }
 
-TimingInfo &TimingInfo::setLatency(SignalType type, unsigned latency) {
-  switch (type) {
+TimingInfo &TimingInfo::setLatency(SignalType signalType, unsigned latency) {
+  switch (signalType) {
   case SignalType::DATA:
     dataLatency = latency;
     break;
@@ -214,15 +214,32 @@ mlir::ParseResult TimingInfo::parseKey(mlir::AsmParser &odsParser,
   return success();
 }
 
-TimingInfo TimingInfo::oehb() {
+TimingInfo TimingInfo::break_dv() {
   return TimingInfo()
       .setLatency(SignalType::DATA, 1)
       .setLatency(SignalType::VALID, 1)
       .setLatency(SignalType::READY, 0);
 }
 
-TimingInfo TimingInfo::tehb() {
-  return TimingInfo().setLatency(SignalType::READY, 1);
+TimingInfo TimingInfo::break_r() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 1);
+}
+
+TimingInfo TimingInfo::break_none() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 0)
+      .setLatency(SignalType::VALID, 0)
+      .setLatency(SignalType::READY, 0);
+}
+
+TimingInfo TimingInfo::break_dvr() {
+  return TimingInfo()
+      .setLatency(SignalType::DATA, 1)
+      .setLatency(SignalType::VALID, 1)
+      .setLatency(SignalType::READY, 1);
 }
 
 bool dynamatic::handshake::operator==(const TimingInfo &lhs,
@@ -241,9 +258,9 @@ void TimingAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << " {";
 
   TimingInfo info = getInfo();
-  auto printIfPresent = [&](StringRef name, SignalType type,
+  auto printIfPresent = [&](StringRef name, SignalType signalType,
                             bool &firstData) -> void {
-    std::optional<unsigned> latency = info.getLatency(type);
+    std::optional<unsigned> latency = info.getLatency(signalType);
     if (!latency)
       return;
     if (!firstData)
@@ -294,9 +311,10 @@ ChannelBufProps::ChannelBufProps(unsigned minTrans,
                                  std::optional<unsigned> maxTrans,
                                  unsigned minOpaque,
                                  std::optional<unsigned> maxOpaque,
+                                 unsigned minSlots,
                                  double inDelay, double outDelay, double delay)
     : minTrans(minTrans), maxTrans(maxTrans), minOpaque(minOpaque),
-      maxOpaque(maxOpaque), inDelay(inDelay), outDelay(outDelay),
+      maxOpaque(maxOpaque), minSlots(minSlots), inDelay(inDelay), outDelay(outDelay),
       delay(delay) {};
 
 bool ChannelBufProps::isSatisfiable() const {
@@ -311,8 +329,8 @@ bool ChannelBufProps::isBufferizable() const {
 
 bool ChannelBufProps::operator==(const ChannelBufProps &rhs) const {
   return (this->minTrans == rhs.minTrans) && (this->maxTrans == rhs.maxTrans) &&
-         (this->minOpaque == rhs.minOpaque) &&
-         (this->maxOpaque == rhs.maxOpaque) && (this->inDelay == rhs.inDelay) &&
+         (this->minOpaque == rhs.minOpaque) && (this->maxOpaque == rhs.maxOpaque) &&
+         (this->minSlots == rhs.minSlots) && (this->inDelay == rhs.inDelay) &&
          (this->outDelay == rhs.outDelay) && (this->delay == rhs.delay);
 }
 
@@ -355,6 +373,10 @@ Attribute ChannelBufPropsAttr::parse(AsmParser &odsParser, Type odsType) {
       odsParser.parseComma() || parseMaxSlots(odsParser, props.maxOpaque))
     return nullptr;
 
+  // Parse minimum number of slots
+  if (odsParser.parseComma() || odsParser.parseInteger(props.minSlots))
+    return nullptr;
+
   // Parse the delays
   if (odsParser.parseComma() || odsParser.parseFloat(props.inDelay) ||
       odsParser.parseComma() || odsParser.parseFloat(props.outDelay) ||
@@ -367,6 +389,7 @@ Attribute ChannelBufPropsAttr::parse(AsmParser &odsParser, Type odsType) {
 void ChannelBufPropsAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << "[" << getMinTrans() << "," << getMaxStr(getMaxTrans()) << ", ["
              << getMinOpaque() << "," << getMaxStr(getMaxOpaque()) << ", "
+             << getMinSlots() << ", "
              << getInDelay().getValueAsDouble() << ", "
              << getOutDelay().getValueAsDouble() << ", "
              << getDelay().getValueAsDouble();

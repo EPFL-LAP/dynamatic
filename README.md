@@ -2,13 +2,13 @@
 
 Dynamatic is an academic, open-source high-level synthesis compiler that produces synchronous dynamically-scheduled circuits from C/C++ code. Dynamatic generates synthesizable RTL which currently targets Xilinx FPGAs and delivers significant performance improvements compared to state-of-the-art commercial HLS tools in specific situations (e.g., applications with irregular memory accesses or control-dominated code). The fully automated compilation flow of Dynamatic is based on MLIR. It is customizable and extensible to target different hardware platforms and easy to use with commercial tools such as Vivado (Xilinx) and Modelsim (Mentor Graphics).
 
-We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/GettingStarted.md#contributing) and/or join our [Zulip community server](https://dynamatic.zulipchat.com/join/kb5xdsftwz2gr76rlxqa6vz5/).
+We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/GettingStarted.md#contributing).
 
 ## Setting up Dynamatic
 
 There are currently two ways to setup and use Dynamatic locally.
 
-1. **Build from source (recommended)**. We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [simple build instructions](#building-from-source) below, which should work out-of-the-box for any apt-based or pacman-based Linux distribution. Different distributions may require cosmetic changes to the dependencies you have to install before running Dynamatic.
+1. **Build from source (recommended)**. We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [simple build instructions](#building-from-source) below, which should work out-of-the-box. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distribuions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 2. **Use the provided virtual machine**. We provide an [Ubuntu-based virtual machine](docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. This machine was originally set-up for the [*Dynamatic Reloaded* tutorial given at the FPGA'24 conference](https://www.isfpga.org/workshops-tutorials/#t7) in Monterey, California. You can use it to simply follow the tutorial (available in the [repository's documentation](docs/Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
 
@@ -24,20 +24,20 @@ The following instructions can be used to setup Dynamatic from source. If you in
 
 1. **Install dependencies required by the project.**
 
-    Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with `.dot` files, Boost's regex library, and standard command-line tools like `git`.
+    Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), `cmake` and `ninja` for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with `.dot` files, and standard command-line tools like `git`.
   
     On `apt`-based Linux distributions:
 
     ```sh
     apt-get update
-    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz libboost-regex-dev git curl gzip libreadline-dev
+    apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev
     ```
 
     On `pacman`-based Linux distributions:
 
     ```sh
     pacman -Syu
-    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz boost git curl gzip readline
+    pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz git curl gzip readline
     ```
 
     `clang`, `lld`, and `ccache` are not stictly required but significantly speed up (re)builds. If you do not wish to install them, in step 3 call the build script with the `--disable-build-opt` flag to prevent their usage.

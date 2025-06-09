@@ -24,7 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Constraints.h"
-#include "CreateSmvFormalTestbench.h"
+#include "ElasticMiterTestbench.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
 #include "SmvUtils.h"
@@ -201,10 +201,12 @@ static FailureOr<bool> checkEquivalence(
   std::filesystem::path wrapperPath = miterDir / "main.smv";
 
   // Create wrapper (main) for the elastic-miter
-  auto fail = dynamatic::experimental::createSmvFormalTestbench(
-      wrapperPath, config, smvModelName, nrOfTokens, true, constraints);
-  if (failed(fail))
-    return failure();
+
+  std::string testbench = dynamatic::experimental::createElasticMiterTestBench(
+      context, config, smvModelName, nrOfTokens, true, constraints);
+  std::ofstream mainFile(wrapperPath);
+  mainFile << testbench;
+  mainFile.close();
 
   // Put the output of the CTLSPEC check into results.txt. Later we
   // read from that file to check whether all the properties pass.

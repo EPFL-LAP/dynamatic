@@ -1,0 +1,37 @@
+[
+  {
+    "pred": "speculating_branch0",
+    "outid": 0,
+    "slots": 5,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "trunci1",
+    "outid": 0,
+    "slots": 6,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit4 (data)"
+  },
+  {
+    "pred": "spec_save_commit3",
+    "outid": 0,
+    "slots": 6,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit3 (data)"
+  },
+  {
+    "pred": "fork1",
+    "outid": 3,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To achieve better II"
+  },
+  {
+    "pred": "extsi2",
+    "outid": 0,
+    "slots": 4,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit1 (data)"
+  }
+]

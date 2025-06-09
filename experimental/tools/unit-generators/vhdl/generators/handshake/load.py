@@ -1,29 +1,30 @@
-from generators.support.signal_manager import generate_entity, generate_concat_signal_decls, generate_concat_logic
-from generators.support.utils import ExtraSignalMapping
+from generators.support.signal_manager.utils.entity import generate_entity
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.handshake.tehb import generate_tehb
-from generators.handshake.tfifo import generate_tfifo
+from generators.handshake.ofifo import generate_ofifo
 
 
 def generate_load(name, params):
-  addr_bitwidth = params["addr_bitwidth"]
-  data_bitwidth = params["data_bitwidth"]
-  extra_signals = params.get("extra_signals", None)
+    addr_bitwidth = params["addr_bitwidth"]
+    data_bitwidth = params["data_bitwidth"]
+    extra_signals = params.get("extra_signals", None)
 
-  if extra_signals:
-    return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
-  else:
-    return _generate_load(name, data_bitwidth, addr_bitwidth)
+    if extra_signals:
+        return _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals)
+    else:
+        return _generate_load(name, data_bitwidth, addr_bitwidth)
 
 
 def _generate_load(name, data_bitwidth, addr_bitwidth):
-  addr_tehb_name = f"{name}_addr_tehb"
-  data_tehb_name = f"{name}_data_tehb"
+    addr_tehb_name = f"{name}_addr_tehb"
+    data_tehb_name = f"{name}_data_tehb"
 
-  dependencies = \
-      generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
-      generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
+    dependencies = \
+        generate_tehb(addr_tehb_name, {"bitwidth": addr_bitwidth}) + \
+        generate_tehb(data_tehb_name, {"bitwidth": data_bitwidth})
 
-  entity = f"""
+    entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -52,7 +53,7 @@ entity {name} is
 end entity;
 """
 
-  architecture = f"""
+    architecture = f"""
 -- Architecture of load
 architecture arch of {name} is
 begin
@@ -86,80 +87,78 @@ begin
 end architecture;
 """
 
-  return dependencies + entity + architecture
+    return dependencies + entity + architecture
 
 
 def _generate_load_signal_manager(name, data_bitwidth, addr_bitwidth, extra_signals):
-  # Construct extra signal mapping to concatenate extra signals
-  extra_signal_mapping = ExtraSignalMapping(extra_signals)
-  extra_signals_total_bitwidth = extra_signal_mapping.total_bitwidth
+    # Concatenate extra signals and store them in a dedicated FIFO
 
-  inner_name = f"{name}_inner"
-  inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
+    # Get concatenation details for extra signals
+    concat_layout = ConcatLayout(extra_signals)
+    extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
-  # Generate tfifo to store extra signals for in-flight memory requests
-  tfifo_name = f"{name}_tfifo"
-  tfifo = generate_tfifo(tfifo_name, {
-      "bitwidth": extra_signals_total_bitwidth,
-      "num_slots": 32  # todo
-  })
+    inner_name = f"{name}_inner"
+    inner = _generate_load(inner_name, data_bitwidth, addr_bitwidth)
 
-  entity = generate_entity(name, [{
-      "name": "addrIn",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": extra_signals
-  }, {
-      "name": "dataFromMem",
-      "bitwidth": data_bitwidth,
-      "extra_signals": {}
-  }], [{
-      "name": "addrOut",
-      "bitwidth": addr_bitwidth,
-      "extra_signals": {}
-  }, {
-      "name": "dataOut",
-      "bitwidth": data_bitwidth,
-      "extra_signals": extra_signals
-  }])
+    # Generate ofifo to store extra signals for in-flight memory requests
+    ofifo_name = f"{name}_ofifo"
+    ofifo = generate_ofifo(ofifo_name, {
+        "bitwidth": extra_signals_total_bitwidth,
+        "num_slots": 1  # Assume LoadOp is connected to a memory controller
+    })
 
-  # Only extra signals (not data) are concatenated, so set inner port bitwidth to 0.
-  addrIn_inner_port = {
-      "name": "addrIn",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
-  }
-  dataOut_inner_port = {
-      "name": "dataOut",
-      "bitwidth": 0,
-      "extra_signals": extra_signals
-  }
-  concat_signal_decls = generate_concat_signal_decls(
-      [addrIn_inner_port, dataOut_inner_port], extra_signals_total_bitwidth)
-  concat_signal_logic = generate_concat_logic(
-      [addrIn_inner_port], [dataOut_inner_port], extra_signal_mapping)
+    entity = generate_entity(name, [{
+        "name": "addrIn",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "dataFromMem",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }], [{
+        "name": "addrOut",
+        "bitwidth": addr_bitwidth,
+        "extra_signals": {}
+    }, {
+        "name": "dataOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": extra_signals
+    }])
 
-  architecture = f"""
+    assignments = []
+
+    # Concatenate addrIn extra signals to create signals_pre_buffer
+    assignments.extend(generate_concat(
+        "addrIn", 0, "signals_pre_buffer", concat_layout))
+
+    # Slice signals_post_buffer to create dataOut data and extra signals
+    assignments.extend(generate_slice(
+        "signals_post_buffer", "dataOut", 0, concat_layout))
+
+    architecture = f"""
 -- Architecture of load signal manager
 architecture arch of {name} is
-  signal addrIn_ready_inner : std_logic;
-  signal tfifo_ready : std_logic;
-{concat_signal_decls}
+  signal signals_pre_buffer, signals_post_buffer : std_logic_vector({concat_layout.total_bitwidth} - 1 downto 0);
   signal transfer_in, transfer_out : std_logic;
 begin
-  addrIn_ready <= addrIn_ready_inner and tfifo_ready;
-  transfer_in <= addrIn_valid and addrIn_ready_inner;
+  -- Transfer signal assignments
+  transfer_in <= addrIn_valid and addrIn_ready;
   transfer_out <= dataOut_valid and dataOut_ready;
 
-{concat_signal_logic}
+  -- Concat/slice extra signals
+  {"\n  ".join(assignments)}
 
-  tfifo : entity work.{tfifo_name}(arch)
+  -- Buffer to store extra signals for in-flight memory requests
+  -- LoadOp is assumed to be connected to a memory controller
+  -- Use ofifo with latency 1 (MC latency)
+  ofifo : entity work.{ofifo_name}(arch)
     port map(
       clk => clk,
       rst => rst,
-      ins => addrIn_inner,
+      ins => signals_pre_buffer,
       ins_valid => transfer_in,
-      ins_ready => tfifo_ready,
-      outs => dataOut_inner,
+      ins_ready => open,
+      outs => signals_post_buffer,
       outs_valid => open,
       outs_ready => transfer_out
     );
@@ -170,7 +169,7 @@ begin
       rst => rst,
       addrIn => addrIn,
       addrIn_valid => addrIn_valid,
-      addrIn_ready => addrIn_ready_inner,
+      addrIn_ready => addrIn_ready,
       addrOut => addrOut,
       addrOut_valid => addrOut_valid,
       addrOut_ready => addrOut_ready,
@@ -184,4 +183,4 @@ begin
 end architecture;
 """
 
-  return inner + tfifo + entity + architecture
+    return inner + ofifo + entity + architecture

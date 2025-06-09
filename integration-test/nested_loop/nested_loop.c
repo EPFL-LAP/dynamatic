@@ -3,7 +3,7 @@
 #include "stdlib.h"
 
 void nested_loop(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
-  for(int j = 0; j < 2; j++){
+  for (int j = 0; j < 2; j++) {
     int i = 0;
     int bound = 1000;
     int sum = 0;

@@ -158,15 +158,26 @@ static std::string getPrettyNodeLabel(Operation *op) {
                   numSlotsStr = " [" + std::to_string(numSlots.getUInt()) + "]";
               }
             }
-            auto optTiming = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-            if (!optTiming)
+            auto optBufferType =
+                params.getNamed(BufferOp::BUFFER_TYPE_ATTR_NAME);
+            if (!optBufferType)
               return "buffer" + numSlotsStr;
-            if (auto timing = dyn_cast<TimingAttr>(optTiming->getValue())) {
-              TimingInfo info = timing.getInfo();
-              if (info == TimingInfo::oehb())
-                return "oehb" + numSlotsStr;
-              if (info == TimingInfo::tehb())
-                return "tehb" + numSlotsStr;
+            if (auto bufferTypeAttr =
+                    dyn_cast<StringAttr>(optBufferType->getValue())) {
+              llvm::StringRef bufferTypeStr = bufferTypeAttr.getValue();
+              if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DV) {
+                return "DV" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_R) {
+                return "R" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_DV) {
+                return "DV" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::FIFO_BREAK_NONE) {
+                return "NONE" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::ONE_SLOT_BREAK_DVR) {
+                return "DVR" + numSlotsStr;
+              } else if (bufferTypeStr == BufferOp::SHIFT_REG_BREAK_DV) {
+                return "SRDV" + numSlotsStr;
+              }
             }
             return "buffer" + numSlotsStr;
           })
@@ -270,7 +281,8 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BufferOp>([&](auto) { return "lightgreen"; })
+      .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
+      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })
@@ -283,7 +295,8 @@ static StringRef getNodeColor(Operation *op) {
           [&](auto) { return "tan2"; })
       .Case<handshake::SpeculatorOp, handshake::SpecCommitOp,
             handshake::SpecSaveOp, handshake::SpecSaveCommitOp,
-            handshake::SpeculatingBranchOp>([&](auto) { return "salmon"; })
+            handshake::SpeculatingBranchOp, handshake::NonSpecOp>(
+          [&](auto) { return "salmon"; })
       .Default([&](auto) { return "moccasin"; });
 }
 

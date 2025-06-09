@@ -1,24 +1,8 @@
 {
   "speculator": {
     "operation-name": "select0",
-    "operand-idx": 0
+    "operand-idx": 0,
+    "fifo-depth": 7
   },
-  "buffers": [
-    {
-      "operation-name": "muli0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "select0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "trunci0",
-      "operand-idx": 0
-    },
-    {
-      "operation-name": "trunci1",
-      "operand-idx": 0
-    }
-  ]
+  "save-commits-fifo-depth": 7
 }

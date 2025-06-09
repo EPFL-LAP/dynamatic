@@ -1,7 +1,7 @@
 [
   {
     "name": "handshake.br",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t br -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t br -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -10,12 +10,12 @@
     {"name": "NUM_SLOTS", "type": "unsigned"},
     {"name": "TIMING", "type": "timing"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p slots=$NUM_SLOTS port_types=$PORT_TYPES timing=\"$TIMING\"",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH transparent=$TRANSPARENT timing=\"$TIMING\"",
     "hdl": "smv"
   },
   {
     "name": "handshake.cond_br",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cond_br -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cond_br -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -23,7 +23,7 @@
    "parameters": [
     {"name": "VALUE", "type": "string"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t constant -p value=0b$VALUE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t constant -p value=0b$VALUE bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -31,7 +31,7 @@
    "parameters": [
     {"name": "SIZE", "type": "unsigned"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t control_merge -p size=$SIZE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t control_merge -p size=$SIZE data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -39,7 +39,7 @@
    "parameters": [
       {"name": "SIZE", "type": "unsigned"}
    ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fork -p size=$SIZE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fork -p size=$SIZE bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -55,12 +55,12 @@
    "parameters": [
       {"name": "SIZE", "type": "unsigned"}
    ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t lazy_fork -p size=$SIZE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t lazy_fork -p size=$SIZE bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.load",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t load -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t load -p data_bitwidth=$DATA_BITWIDTH addr_bitwidth=$ADDR_BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -68,7 +68,7 @@
    "parameters": [
       {"name": "SIZE", "type": "unsigned"}
    ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t merge -p size=$SIZE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t merge -p size=$SIZE bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -76,17 +76,17 @@
    "parameters": [
     {"name": "SIZE", "type": "unsigned"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mux -p size=$SIZE port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mux -p size=$SIZE data_bitwidth=$DATA_BITWIDTH index_bitwidth=$INDEX_BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.select",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t select -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t select -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.sink",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sink -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sink -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -96,12 +96,22 @@
   },
   {
     "name": "handshake.store",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t store -p port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t store -p data_bitwidth=$DATA_BITWIDTH addr_bitwidth=$ADDR_BITWIDTH",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.mem_controller",
+    "parameters": [
+      { "name": "NUM_CONTROLS", "type": "unsigned"},
+      { "name": "NUM_LOADS", "type": "unsigned"},
+      { "name": "NUM_STORES", "type": "unsigned"}
+    ],  
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t memory_controller -p num_controls=$NUM_CONTROLS num_loads=$NUM_LOADS num_stores=$NUM_STORES data_bitwidth=$DATA_BITWIDTH addr_bitwidth=$ADDR_BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.absf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t absf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t absf --abstract-data -p latency=0 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
@@ -109,22 +119,22 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=12 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=12 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.addf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=9 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addf --abstract-data -p latency=9 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.addi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addi --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t addi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.andi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t andi --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t andi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -132,7 +142,7 @@
    "parameters": [
     {"name": "PREDICATE", "type": "string"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpi --abstract-data -p latency=0 predicate='\"$PREDICATE\"' port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpi --abstract-data -p latency=0 predicate='\"$PREDICATE\"' bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -140,7 +150,7 @@
     "parameters": [
       {"name": "PREDICATE", "type": "string"}
     ],  
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpf --abstract-data -p latency=0 predicate='\"$PREDICATE\"' port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t cmpf --abstract-data -p latency=0 predicate='\"$PREDICATE\"' is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
@@ -148,97 +158,97 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=36 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=36 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.divf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=29 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divf --abstract-data -p latency=29 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.divsi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divsi --abstract-data -p latency=35 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divsi --abstract-data -p latency=35 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.divui",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divui --abstract-data -p latency=35 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t divui --abstract-data -p latency=35 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.extf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extf --abstract-data -p latency=0",
     "hdl": "smv"
   },
   {
     "name": "handshake.extsi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extsi --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extsi --abstract-data -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.extui",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extui --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extui --abstract-data -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.fptosi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fptosi --abstract-data -p latency=5 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t fptosi --abstract-data -p latency=5 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.maximumf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t maximumf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t maximumf --abstract-data -p latency=0 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.minimumf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t minimumf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t minimumf --abstract-data -p latency=0 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.mulf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mulf --abstract-data -p latency=4 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t mulf --abstract-data -p latency=4 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.muli",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t muli --abstract-data -p latency=4 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t muli --abstract-data -p latency=4 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.negf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t negf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t negf --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.not",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t not --abstract-data -p latency=0 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.ori",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ori --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ori --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.shli",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shli --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shli --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.shrsi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shrsi --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shrsi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.shrui",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shrui --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t shrui --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.sitofp",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=5 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sitofp --abstract-data -p latency=5 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -246,32 +256,42 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
     ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=12 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=12 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.subf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=9 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subf --abstract-data -p latency=9 is_double=$IS_DOUBLE",
     "hdl": "smv"
   },
   {
     "name": "handshake.subi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subi --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t subi --abstract-data -p latency=0 bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.truncf",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t truncf --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t truncf --abstract-data -p latency=0",
     "hdl": "smv"
   },
   {
     "name": "handshake.trunci",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t trunci --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t trunci --abstract-data -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
     "name": "handshake.xori",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t xori --abstract-data -p latency=0 port_types=$PORT_TYPES",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t xori --abstract-data -p latency=0 bitwidth=$BITWIDTH",
+    "hdl": "smv"
+  },
+  {
+    "name": "mem_to_bram",
+    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.lsq",
+    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
     "hdl": "smv"
   }
 ]

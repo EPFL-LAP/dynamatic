@@ -199,7 +199,7 @@ namespace {
 
 void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                      Value operand, const TimingInfo &timing,
-                     std::optional<unsigned> numSlots) {
+                     std::optional<unsigned> numSlots, StringRef bufferType) {
   odsState.addOperands(operand);
   odsState.addTypes(operand.getType());
 
@@ -214,6 +214,9 @@ void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         IntegerAttr::get(IntegerType::get(ctx, 32, IntegerType::Unsigned),
                          *numSlots));
   }
+
+  attributes.emplace_back(StringAttr::get(ctx, BUFFER_TYPE_ATTR_NAME),
+                          StringAttr::get(ctx, bufferType));
 
   odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
                         DictionaryAttr::get(ctx, attributes));
@@ -421,6 +424,33 @@ LogicalResult FuncOp::verify() {
     return failure();
   if (failed(verifyPortNameAttr("resNames", getNumResults())))
     return failure();
+
+  return success();
+}
+
+LogicalResult BufferOp::verify() {
+  auto parametersAttr = (*this)->getAttrOfType<DictionaryAttr>("hw.parameters");
+  if (!parametersAttr)
+    return success();
+
+  auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
+  if (!bufferTypeAttr)
+    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+
+  auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
+  if (!numSlotsAttr)
+    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+
+  StringRef bufferType = bufferTypeAttr.getValue();
+  unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
+
+  if ((bufferType == ONE_SLOT_BREAK_DV ||
+       bufferType == ONE_SLOT_BREAK_R ||
+       bufferType == ONE_SLOT_BREAK_DVR) &&
+      numSlots != 1) {
+    return emitOpError("buffer type '")
+           << bufferType << "' requires NUM_SLOTS = 1, but got " << numSlots;
+  }
 
   return success();
 }

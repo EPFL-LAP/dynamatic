@@ -1,0 +1,58 @@
+[
+  {
+    "pred": "speculating_branch1",
+    "outid": 0,
+    "slots": 5,
+    "type": "fifo_break_none",
+    "comment": "To avoid deadlock"
+  },
+  {
+    "pred": "fork18",
+    "outid": 0,
+    "slots": 4,
+    "type": "fifo_break_none",
+    "comment": "To absorb the initial latency (sc ctrl)"
+  },
+  {
+    "pred": "fork14",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit8 (ctrl)"
+  },
+  {
+    "pred": "spec_commit9",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking"
+  },
+  {
+    "pred": "spec_commit8",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "Buffer non-spec token to prevent II=2 locking"
+  },
+  {
+    "pred": "extsi3",
+    "outid": 0,
+    "slots": 4,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit1 (data)"
+  },
+  {
+    "pred": "addi0",
+    "outid": 0,
+    "slots": 4,
+    "type": "fifo_break_none",
+    "comment": "To absorb latency for spec_commit9 (data)"
+  },
+  {
+    "pred": "cmpi0",
+    "outid": 0,
+    "slots": 2,
+    "type": "fifo_break_none",
+    "comment": "To prevent II=2 locking"
+  }
+]

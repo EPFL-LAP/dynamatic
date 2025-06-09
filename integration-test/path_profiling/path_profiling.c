@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "path_profiling.h"
+#include "dynamatic/Integration.h"
 #include <stdlib.h>
 
 void path_profiling(out_int_t a[LOOP_BOUND], out_int_t b[LOOP_BOUND],

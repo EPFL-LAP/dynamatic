@@ -16,6 +16,17 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+  let summary = "Combine common steering logic between different handshake operations.";
+  let description = [{
+      Eliminates redundant steering units that have the same inputs but
+      different outputs by combining them into single units feeding multiple 
+      outputs. This is a simplification which comes immediately after the FTD 
+      logic.
+  }];
+  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
+}
+
 def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
   let summary = "Place Speculation operations";
   let description = [{
@@ -42,17 +53,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
            "specified in the JSON-formatted file.">];
 }
 
-def SpecAnnotatePaths : DynamaticPass<"spec-annotate-paths"> {
-  let summary = "Adds an attribute to mark operations in speculative regions";
-  let description = [{
-    The operations within speculative regions need to be marked for
-    VHDL exporting purposes. The pass adds the attribute "speculative" to
-    operations that are found within the speculative region, which is defined from
-    save units and the speculator, to commit units.
-  }];
-  let constructor = "dynamatic::experimental::speculation::createSpecAnnotatePaths()";
-}
-
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of
@@ -63,7 +63,7 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
   	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
   	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
-  	Option<"type", "type", "std::string", "", "type of buffer, can be either oehb or tehb">
+  	Option<"type", "type", "std::string", "", "type of buffer">
   ];
 }
 
@@ -115,7 +115,9 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Path to JSON-formatted file containing timing models for dataflow "
       "components.">,
       Option<"collisions", "collisions", "std::string", "",
-      "Three different cases for memory collsions: none/half/full">];
+      "Three different cases for memory collsions: none/half/full">,
+      Option<"targetCP", "target-period", "double", "4.0",
+      "Target clock period for the LSQ pass">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

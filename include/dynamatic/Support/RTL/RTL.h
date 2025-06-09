@@ -29,7 +29,7 @@
 namespace dynamatic {
 
 /// Hardware description languages.
-enum class HDL { VHDL, VERILOG };
+enum class HDL { VHDL, VERILOG, SMV };
 
 /// Returns the file extension (without a leading '.') for files of the HDL.
 StringRef getHDLExtension(HDL hdl);
@@ -294,6 +294,16 @@ public:
   /// (generation_params in the future)
   void registerParameters(hw::HWModuleExternOp &modOp);
 
+  void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                 llvm::StringRef modName,
+                                 hw::ModuleType &modType);
+  void registerTransparentParameter(hw::HWModuleExternOp &modOp,
+                                    llvm::StringRef modName,
+                                    hw::ModuleType &modType);
+  void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                     llvm::StringRef modName,
+                                     hw::ModuleType &modType);
+
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
   /// output directory while generated components are produced by the
@@ -400,8 +410,8 @@ public:
   /// non-signal-specific version of that method suffixed by a string
   /// identifying the signal type (e.g., "_valid" for valid signals). Default
   /// suffixes may be overriden on a per-component basis.
-  std::pair<std::string, bool> getRTLPortName(StringRef mlirPortName,
-                                              SignalType type, HDL hdl) const;
+  std::pair<std::string, bool>
+  getRTLPortName(StringRef mlirPortName, SignalType signalType, HDL hdl) const;
 
   RTLComponent(RTLComponent &&) noexcept = default;
   RTLComponent &operator=(RTLComponent &&) noexcept = default;

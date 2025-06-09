@@ -132,12 +132,45 @@ static void dumpArg(const T (&arrayArg)[Size1][Size2][Size3][Size4][Size5],
 //===----------------------------------------------------------------------===//
 
 #ifdef PRINT_PROFILING_INFO
+#include "stdint.h"
+#include <cassert>
 #include <iostream>
+#include <sstream>
+#include <string>
+
+// Dummy template for generating a compile-time error when the branch is
+// initiantiated.
+template <typename T>
+inline constexpr bool always_false = false;
+
+template <typename T>
+std::string formatElement(const T &element) {
+  std::ostringstream oss;
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double> ||
+                std::is_same_v<T, int> || std::is_same_v<T, unsigned>) {
+    // We can use the default handler for printing float, double, and int.
+    oss << element;
+  } else if constexpr (std::is_same_v<T, int8_t> ||
+                       std::is_same_v<T, uint8_t> ||
+                       std::is_same_v<T, int16_t> ||
+                       std::is_same_v<T, uint16_t>) {
+    // C++ can correctly print the value of int, float, double, etc..  However,
+    // int8_t might be interpreted and printed as a char, so we need to convert
+    // it to an int before printing it to stdout.
+    oss << static_cast<int>(element);
+  } else if constexpr (std::is_same_v<T, char>) {
+    // A char can be directly printed as a integer (i.e., its ASCII code)
+    oss << int(element);
+  } else {
+    static_assert(always_false<T>, "Unsupported type!");
+  }
+  return oss.str();
+}
 
 /// Writes the argument's directly to the stream.
 template <typename T>
 static void scalarPrinter(const T &arg, OS &os) {
-  os << arg << std::endl;
+  os << formatElement(arg) << std::endl;
 }
 
 /// Writes the array's content in row-major-order as a comma-separated list of
@@ -149,8 +182,8 @@ static void arrayPrinter(const T *arrayPtr, size_t size, OS &os) {
     return;
   }
   for (size_t idx = 0; idx < size - 1; ++idx)
-    os << arrayPtr[idx] << ",";
-  os << arrayPtr[size - 1] << std::endl;
+    os << formatElement(arrayPtr[idx]) << ",";
+  os << formatElement(arrayPtr[size - 1]) << std::endl;
 }
 
 /// After dumping the contents of all kernel arguments to stdout, calls the
@@ -187,6 +220,8 @@ static Res callKernel(Res (*kernel)(void)) {
 /// values of all function arguments to dedicated folders on disk before and
 /// after kernel execution. Also logs the kernel's return value, if it has one.
 #ifdef HLS_VERIFICATION
+#include "stdint.h"
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -209,11 +244,38 @@ static std::string _outPrefix_;
 
 // NOLINTEND(readability-identifier-naming)
 
-/// Specialization of the scalar printer for float.
+/// Specialization of the scalar printer for char.
+template <>
+void scalarPrinter<char>(const char &arg, OS &os) {
+  // Print the char as a 2-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << (static_cast<int>(arg)) << std::endl;
+}
+
+/// Specialization of the scalar printer for int8_t.
+template <>
+void scalarPrinter<int8_t>(const int8_t &arg, OS &os) {
+  // Since int8_t only has 8 bits, it is sufficient to print it as a 2-digits
+  // hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
+}
+
+/// Specialization of the scalar printer for uint8_t.
+template <>
+void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
+  // Since uint8_t only has 8 bits, it is sufficient to print it as a 2-digits
+  // hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(2)
+     << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
+}
+
 template <>
 void scalarPrinter<float>(const float &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
-     << *((const unsigned int *)(&arg)) << std::endl;
+  uint32_t bits;
+  std::memcpy(&bits, &arg, sizeof(bits));
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << bits
+     << std::endl;
 }
 
 /// Specialization of the scalar printer for double.
