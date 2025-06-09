@@ -538,6 +538,43 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 }
 
+def SuppressOp : Handshake_Op<"suppress", [
+  AllTypesMatch<["data", "result"]>,
+  AllExtraSignalsMatch<["data", "result", "ctrl"]>,
+  IsIntSizedChannel<1, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "suppress operation";
+  let description = [{
+    The suppress operation acts as one-side conditional branch.
+
+    Example:
+
+    ```mlir
+    suppress %data, %ctrl : !handshake.channel<i32>, !handshake.channel<i1>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$data, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $data `[` $ctrl `]` attr-dict `:` custom<HandshakeType>(type($result)) type($ctrl)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return idx == 0 ? "data" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "result";
+    }
+  }];
+}
+
 def SinkOp : Handshake_Op<"sink"> {
   let summary = "sink operation";
   let description = [{
@@ -1301,6 +1338,41 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
+    }
+  }];
+}
+
+def SpecV2SuppressControlOp : Handshake_Op<"spec_v2_suppress_control", [
+  IsIntSizedChannel<1, "actualCondition">,
+  AllTypesMatch<["actualCondition", "generatedCondition", "ctrl"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Generates suppression signals.";
+  let description = [{
+    Used in speculation v2.
+
+    Example:
+
+    ```mlir
+    %suppressedCtrl = spec_v2_suppress_control %ctrl : !handshake.channel<i1>
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$actualCondition, ChannelType:$generatedCondition);
+  let results = (outs ChannelType:$ctrl);
+  let assemblyFormat = [{
+    $actualCondition $generatedCondition attr-dict `:` type($actualCondition)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "actualCondition" : "generatedCondition";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "ctrl";
     }
   }];
 }
