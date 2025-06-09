@@ -7,7 +7,7 @@ A friendly tour of how groups (Basic Blocks) are allocated into the LSQ.
 ## 1. Overview and Purpose
 In a dynamically scheduled dataflow circuit, there is no traditional program counter or sequential instruction fetch. The **Group Allocator** provides a mechanism to handle this. It is based on the concept of a "group," which is a sequence of memory accesses (loads and stores) within a single basic block whose internal dependency order is known at compile time.  
 
-Instead of allocating one memory operation at a time, the Group Allocator receives a single signal to "activate" a group. In response, it allocates all loads and stores belonging to that group into the Load Queue (LDQ) and Store Queue (STQ) at once. This block-level allocation is a key point for high throughput in the dataflow circuit.  
+Instead of allocating one memory operation at a time, the Group Allocator receives a single signal that triggers the allocation of a group. In response, it allocates all loads and stores belonging to that group into the Load Queue (LDQ) and Store Queue (STQ) at once. This block-level allocation is a key point for high throughput in the dataflow circuit.  
 
 The allocator's logic is designed around internal Read-Only Memories (ROMs) that store the pre-compiled properties of each group, such as its size, port assignments, and internal ordering.
 

@@ -25,7 +25,7 @@ The Queue-to-Port Dispatcher has the following core responsibilities:
 
 
 
-![Queue-to-Port Dispatcher](./figs/queue_to_port.png)
+![Queue-to-Port Dispatcher](./figs/queue_to_port_v2.png)
 
 
 

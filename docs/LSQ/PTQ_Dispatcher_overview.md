@@ -1,6 +1,6 @@
 # Port-to-Queue Dispatcher
 
-A friendly tour of how addresses and data enter the Load-Store Queue
+A friendly tour of how addresses and data enter the Load-Store Queue.
 
 
 
@@ -24,7 +24,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 4. **Write**: After arbitration, it writes the selected payload into the correct LSQ entry.
 
 
-![Port-to-Queue Dispatcher](./figs/queue_to_port_v2.png)
+![Port-to-Queue Dispatcher](./figs/port_to_queue_v2.png)
 
 
 ## 3. Dataflow Walkthrough

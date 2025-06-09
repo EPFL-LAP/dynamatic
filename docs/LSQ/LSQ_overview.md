@@ -3,7 +3,7 @@
 ## 1. Overview and Purpose
 The Load-Store Queue (LSQ) is the central memory system in a dynamically scheduled circuit. Its primary purpose is to enable high-performance memory access by allowing independent load and store operations to execute out-of-order, while strictly enforcing true data dependencies to ensure program correctness.
 
-In many applications, memory access patterns are irregular and cannot be determined at compile time. A simple, statically-ordered memory system would be inefficient, stalling frequently. The LSQ solves this by acting as a buffer. It tracks all memory operations, dynamically checks for hazards at runtime, and dispatches operations to memory when it is safe to execute.
+In many applications, memory access patterns are irregular and cannot be determined at compile time. A simple, statically-ordered memory system would be conservative, stalling frequently. The LSQ-based system presented here solves this. It tracks all memory operations, dynamically checks for hazards at runtime, and dispatches operations to memory when it is safe to execute.
 
 This module is the top-level component that instantiates and connects the Group Allocator, all Dispatchers, and the core queue and dependency-checking logic into a single, cohesive, and configurable system.
 
