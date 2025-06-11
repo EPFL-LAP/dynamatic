@@ -44,4 +44,3 @@ def unregister_registry(key: str) -> None:
     Remove a generator from the registry.
     """
     _generators.pop(key, None)
-
