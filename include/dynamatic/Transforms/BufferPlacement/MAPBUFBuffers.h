@@ -38,14 +38,14 @@ using pathMap = std::unordered_map<
     std::vector<experimental::Node *>,
     boost::hash<std::pair<experimental::Node *, experimental::Node *>>>;
 
-/// Holds the state and logic for MapBuf smart buffer placement. 
+/// Holds the state and logic for MapBuf smart buffer placement.
 class MAPBUFBuffers : public BufferPlacementMILP {
 public:
   /// Setups the entire MILP that buffers the input dataflow circuit for the
   /// target clock period, after which (absent errors) it is ready for
-  /// optimization. If a channel's buffering properties are provably unsatisfiable,
-  /// the MILP will not be marked ready for optimization, ensuring that further
-  /// calls to `optimize` fail.
+  /// optimization. If a channel's buffering properties are provably
+  /// unsatisfiable, the MILP will not be marked ready for optimization,
+  /// ensuring that further calls to `optimize` fail.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod, StringRef blifFiles);
 
@@ -61,7 +61,7 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  // Experimental average lutDelay value 
+  // Experimental average lutDelay value
   float lutDelay = 0.55;
   // Big constant value used in MILP constraints
   int bigConstant = 100;
@@ -73,8 +73,9 @@ private:
   StringRef blifFiles;
 
   // Adds Blackbox Constraints for the Data Signals of blackbox ADDI, SUBI and
-  // CMPI modules. These delays are retrieved from Vivado Timing Reports. Ready
-  // and Valid signals are not blackboxed.
+  // CMPI modules or any other component that is not directly implemented as an
+  // LUT. These delays are retrieved from Vivado Timing Reports. Ready and Valid
+  // signals are not blackboxed.
   void addBlackboxConstraints(Value channel);
 
   /// Adds channel-specific buffering constraints that were parsed from IR
@@ -98,18 +99,19 @@ private:
   // back edge, then a buffer is inserted.
   void addCutLoopbackBuffers();
 
-  // Converts the Cyclic Graph into an Acyclic Graph by determining the Minimum
-  // Feedback Arc Set (MFAS). A graph can only be acyclic if a topological
-  // ordering can be found. An additional MILP is used here, which enforces a
-  // topological ordering. Since our graph is cyclic, a topological ordering
-  // cannot be found without removing some edges. The MILP formulated here
-  // minimizes the number of edges that needs to be removed in order to make the
-  // graph acyclic. Then, buffers are inserted on the edges that needs to be
-  // removed to make the graph acyclic.
+  // This is an alternative method to addCutLoopbackBuffers() function to create
+  // an acyclic graph. This function converts the cyclic dataflow graph into an
+  // acyclic graph by determining the Minimum Feedback Arc Set (MFAS). A graph
+  // can only be acyclic if a topological ordering can be found. An additional
+  // MILP is used here, which enforces a topological ordering. Since our graph
+  // is cyclic, a topological ordering cannot be found without removing some
+  // edges. The MILP formulated here minimizes the number of edges that needs to
+  // be removed in order to make the graph acyclic. Then, buffers are inserted
+  // on the edges that needs to be removed to make the graph acyclic.
   void findMinimumFeedbackArcSet();
 
   // Add clock period constraints for subject graph edges. For subject graph
-  // edges, only a single timing variable is requires, as opposed to data flow
+  // edges, only a single timing variable is required, as opposed to data flow
   // graph edges where two timing variables are required. Also adds constraints
   // for primary inputs and constants.
   void addClockPeriodConstraintsNodes();
@@ -124,7 +126,7 @@ private:
   // leaves of the cut and adds delay propagation constraints for each leaf.
   // Also adds cut selection conflict constraints.
   void
-  addDelayPropagationConstraints(experimental::Node *root,
+  addDelayAndCutConflictConstraints(experimental::Node *root,
                                  std::vector<experimental::Cut> &cutVector);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting

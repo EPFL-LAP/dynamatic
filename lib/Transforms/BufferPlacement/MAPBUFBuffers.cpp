@@ -135,9 +135,9 @@ const std::map<unsigned int, double> ADD_SUB_DELAYS = {
 const std::map<unsigned int, double> COMPARATOR_DELAYS = {
     {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
 
-// This function searches for the closest matching bitwidth in the provided 
+// This function searches for the closest matching bitwidth in the provided
 // delay table and returns the associated delay value. If an exact match is
-// not found, it attempts to find the next higher bitwidth. For example, 
+// not found, it attempts to find the next higher bitwidth. For example,
 // for bitwidth of 18, the delay value of 32 will be returned.
 double getDelay(const std::map<unsigned int, double> &delayTable,
                 unsigned int bitwidth) {
@@ -174,7 +174,7 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 
-    // Skip mapping to blackboxes for operations with bitwidth <= 4.
+    // Components are blackboxed only if their bitwitdh is more than 5
     unsigned int bitwidth =
         handshake::getHandshakeTypeBitWidth(inputChannel.getType());
     if (bitwidth <= 4) {
@@ -195,8 +195,10 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
         inputChannelVars.signalVars[SignalType::DATA].path.tOut;
 
     double delay = getDelay(delays, bitwidth);
-      model.addConstr(inputPathOut + delay == outputPathIn,
-                      constName + std::to_string(bitwidth));
+    // Delay propagation constraint for blackbox nodes. Delay propagates through
+    // input edges to output edges, increasing by delay variable.
+    model.addConstr(inputPathOut + delay == outputPathIn,
+                    constName + std::to_string(bitwidth));
   }
   model.update();
 }
@@ -269,15 +271,18 @@ void MAPBUFBuffers::addCutSelectionConstraints(
     cutSelectionSum += cutSelection;
   }
   model.update();
+  // Cut Selection Constraint. Only a single cut of a node can be selected.
+  // This affects delay propagation, as delay will propagate through the chosen
+  // cut.
   model.addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
 // Check if the path from leaf to root has already been computed, if so then
 // return it. If not, return the shortest path by running BFS.
-std::vector<experimental::Node *>
-getOrCreateLeafToRootPath(experimental::Node *key, experimental::Node *leaf,
-                          pathMap &leafToRootPaths,
-                          experimental::LogicNetwork *blif) {
+std::vector<experimental::Node *> getPath(experimental::Node *key,
+                                          experimental::Node *leaf,
+                                          pathMap &leafToRootPaths,
+                                          experimental::LogicNetwork *blif) {
   // Check if this leaf/key pair is already computed
   auto leafKeyPair = std::make_pair(leaf, key);
   if (leafToRootPaths.find(leafKeyPair) != leafToRootPaths.end()) {
@@ -304,12 +309,14 @@ void MAPBUFBuffers::addCutSelectionConflicts(experimental::Node *root,
                                              GRBVar &cutSelectionVar) {
   // Get the path from the leaf to the root
   std::vector<experimental::Node *> path;
-  path = getOrCreateLeafToRootPath(root, leaf, leafToRootPaths, blifData);
+  path = getPath(root, leaf, leafToRootPaths, blifData);
+  // Loop over edges in the path from the leaf to the root.
   for (auto &nodePath : path) {
-    // Loop over edges in the path from the leaf to the root. Add cut
-    // selection conflict constraints for channels that are on the
-    // path.
     if (nodePath->gurobiVars->bufferVar.has_value()) {
+      // Add the Cut Selection Conflict Constraints. An LUT cannot cover an edge
+      // if it is cut by a buffer, as LUTs cannot cover multiple sequential
+      // stages. This constraint ensures an edge is either covered by a LUT, or
+      // a buffer is inserted on the edge.
       model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
                                cutSelectionVar,
                       "cut_selection_conflict");
@@ -318,11 +325,11 @@ void MAPBUFBuffers::addCutSelectionConflicts(experimental::Node *root,
 }
 
 // This function constructs the Gurobi variable name of the channel (which was
-// set in the addChannelVars() function) based on the node name and variable type
-// given.
+// set in the addChannelVars() function) based on the node name and variable
+// type given.
 std::ostringstream retrieveChannelName(const experimental::Node &node,
                                        const std::string &variableType) {
-  
+
   std::string nodeName = node.str();
   if (!node.isChannelEdge) {
     return std::ostringstream{nodeName};
@@ -359,7 +366,7 @@ std::ostringstream retrieveChannelName(const experimental::Node &node,
   } else {
     // For data signals, remove after [, so it removes bit index
     const auto lastBracket = nodeName.find_last_of('[');
-    const auto nodeNameBeforeBracket= nodeName.substr(0, lastBracket);
+    const auto nodeNameBeforeBracket = nodeName.substr(0, lastBracket);
     varNameStream << ("data" + variableTypeName) << nodeNameBeforeBracket;
   }
   return varNameStream;
@@ -420,10 +427,13 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
   GRBModel modelFeedback = GRBModel(envFeedback);
 
   int numOps = 0;
+
+  // Maps operations to GRBVars that holds the topological order index of MLIR
+  // Operations
   DenseMap<Operation *, GRBVar> opToGRB;
 
   funcInfo.funcOp.walk([&](Operation *op) {
-    // create a Gurobi variable for each operation, which will hold the order of
+    // Create a Gurobi variable for each operation, which will hold the order of
     // the Operation in the topological ordering
     ++numOps;
     StringRef uniqueName = getUniqueName(op);
@@ -447,6 +457,11 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
           (getUniqueName(op) + "_" + getUniqueName(user)).str());
       edgeToOps[std::make_pair(op, user)] = edge;
       model.update();
+      // This constraint enforces topological order, by forcing successor
+      // operations to have a bigger larger index in the topological order than
+      // their predecessors. It such an order cannot be satisfied with the given
+      // set of nodes, "edge" variable is set to 1, which means the edge needs
+      // to be cut to have an acyclic graph.
       modelFeedback.addConstr(userOpVar - currentOpVar + bigConstant * edge >=
                                   1,
                               "operation_order");
@@ -468,11 +483,11 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
   // Solve the model
   modelFeedback.optimize();
 
-  // Loop over Gurobi Variables to see which Channels are chosen
-  // to be cut with buffers
+  // Loop over Gurobi Variables (edgeVar) to see which Channels are chosen
+  // to be cut with buffers.
   for (const auto &entry : edgeToOps) {
-    auto edgeVar = entry.second;
     auto ops = entry.first;
+    auto edgeVar = entry.second;
     auto *inputOp = ops.first;
     auto *outputOp = ops.second;
     if (edgeVar.get(GRB_DoubleAttr_X) > 0) {
@@ -482,7 +497,7 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
             !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
           if (channel.getDefiningOp() == inputOp) {
             handshake::ChannelBufProps &resProps = channelProps[channel];
-            // If the channel is chosen to be cut by MFAS, add buffer placement 
+            // If the channel is chosen to be cut by MFAS, add buffer placement
             // constraints to the original MAPBUF Buffer placement Gurobi Model
             // as well
             if (resProps.maxTrans.value_or(1) >= 1) {
@@ -527,7 +542,7 @@ void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
     // it was already created in addChannelVars(). Here, we retrieve those
     // Gurobi variables by doing a search on the Gurobi variables. If found,
     // we assign these Gurobi Variables to the nodeVarIn, nodeVarOut and
-    // nodeBufVar, which are member variables of Node Class. 
+    // nodeBufVar, which are member variables of Node Class.
     if (node->isChannelEdge) {
       std::optional<GRBVar> pathInVar =
           retrieveAndSearchGRBVar(*node, "pathIn");
@@ -570,12 +585,16 @@ void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
   GRBVar &t1 = signalVars.path.tIn;
   GRBVar &t2 = signalVars.path.tOut;
 
+  // Enforces clock period as upper bound of all timing variables
   model.addConstr(t1 <= targetPeriod, "pathIn_period");
   model.addConstr(t2 <= targetPeriod, "pathOut_period");
+  // Delay propagates from edge input to edge output if no buffer is inserted
+  // (bufVarSignal = 0), otherwise (bufVarSignal = 1), it becomes a redundant
+  // constraint since t2 is non-negative
   model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
 }
 
-void MAPBUFBuffers::addDelayPropagationConstraints(
+void MAPBUFBuffers::addDelayAndCutConflictConstraints(
     experimental::Node *root, std::vector<experimental::Cut> &cutVector) {
   // Using cuts map to loop over subject graph edges, and adds delay
   // propagation constraints to the nodes that have cuts
@@ -603,15 +622,17 @@ void MAPBUFBuffers::addDelayPropagationConstraints(
     };
 
     auto &leaves = cut.getLeaves();
+
+    // Trivial cut. Delay is propagated from the fanins of the root
+    if ((leaves.size() == 1) && (*leaves.begin() == root)) {
+      for (auto &fanIn : fanIns) {
+        addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
+      }
+      continue;
+    }
+
     // Loop over leaves of the cut
     for (auto *leaf : leaves) {
-      if ((leaves.size() == 1) && (leaf == root)) {
-        // Trivial cut. Delay is propagated from the fanins of the root
-        for (auto &fanIn : fanIns) {
-          addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
-        }
-        continue;
-      }
       addDelayPropagationConstraint(leaf, "delay_propagation");
       // Add cut selection conflict constraints for the root
       addCutSelectionConflicts(root, leaf, cutSelectionVar);
