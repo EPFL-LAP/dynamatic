@@ -1,5 +1,6 @@
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
 def generate_tfifo(name, params):
@@ -144,17 +145,17 @@ end architecture;
 
 def _generate_tfifo_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_concat_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_tfifo(name, size, bitwidth + extra_signals_bitwidth))
+        extra_signals,
+        lambda name: _generate_tfifo(name, size, bitwidth + extra_signals_bitwidth))

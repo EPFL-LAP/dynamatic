@@ -1,4 +1,7 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth, _get_default_extra_signal_value
+from generators.support.signal_manager.utils.forwarding import get_default_extra_signal_value
+from generators.support.signal_manager.utils.concat import ConcatLayout
+from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
+from generators.support.signal_manager.utils.entity import generate_entity
 from generators.support.utils import data
 
 
@@ -41,7 +44,7 @@ begin
   {data("dataOut <= dataIn;", bitwidth)}
   dataOut_valid <= dataIn_valid;
   dataIn_ready <= dataOut_ready;
-  dataOut_spec <= {_get_default_extra_signal_value("spec")};
+  dataOut_spec <= {get_default_extra_signal_value("spec")};
 end architecture;
 """
 
@@ -49,22 +52,58 @@ end architecture;
 
 
 def _generate_non_spec_signal_manager(name, bitwidth, extra_signals):
+    # Concat signals except spec
+
     extra_signals_without_spec = extra_signals.copy()
     extra_signals_without_spec.pop("spec")
 
-    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-        extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
-            "name": "dataIn",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals
-        }],
-        "out_ports": [{
-            "name": "dataOut",
-            "bitwidth": bitwidth,
-            "extra_signals": extra_signals_without_spec,
-        }],
+    concat_layout = ConcatLayout(extra_signals_without_spec)
+    extra_signals_without_spec_bitwidth = concat_layout.total_bitwidth
+
+    inner_name = f"{name}_inner"
+    inner = _generate_non_spec(
+        inner_name, bitwidth + extra_signals_without_spec_bitwidth)
+
+    entity = generate_entity(name, [{
+        "name": "dataIn",
+        "bitwidth": bitwidth,
         "extra_signals": extra_signals_without_spec
-    }, lambda name: _generate_non_spec(name, bitwidth + extra_signals_bitwidth - 1))
+    }], [{
+        "name": "dataOut",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }])
+
+    assignments = []
+
+    # Concat dataIn data and extra signals (except spec) to create dataIn_concat
+    assignments.extend(generate_concat(
+        "dataIn", bitwidth, "dataIn_concat", concat_layout))
+
+    # Slice dataOut_concat to create dataOut data and extra signals (except spec)
+    assignments.extend(generate_slice(
+        "dataOut_concat", "dataOut", bitwidth, concat_layout))
+
+    architecture = f"""
+-- Architecture of non_spec signal manager
+architecture arch of {name} is
+  signal dataIn_concat, dataOut_concat : std_logic_vector({bitwidth + extra_signals_without_spec_bitwidth} - 1 downto 0);
+begin
+  {"\n  ".join(assignments)}
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      dataIn => dataIn_concat,
+      dataIn_valid => dataIn_valid,
+      dataIn_ready => dataIn_ready,
+      dataOut => dataOut_concat,
+      dataOut_valid => dataOut_valid,
+      dataOut_ready => dataOut_ready,
+      -- Forward spec signal
+      dataOut_spec => dataOut_spec
+    );
+end architecture;
+"""
+
+    return inner + entity + architecture

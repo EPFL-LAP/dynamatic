@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_spec_units_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.support.utils import data
 
 
@@ -314,9 +315,9 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
 
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
         extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_spec_units_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
@@ -324,11 +325,11 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
             "name": "ctrl",
             "bitwidth": 3
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals_without_spec,
-        "ignore_ports": ["ctrl"]
-    }, lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
+        extra_signals_without_spec,
+        ["ctrl"],
+        lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -921,3 +922,4 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
     module->buildSubjectGraphConnections();
   }
 }
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

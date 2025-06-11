@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
@@ -65,19 +65,18 @@ end architecture;
 
 
 def _generate_blocker_signal_manager(name, size, bitwidth, extra_signals):
-    return generate_signal_manager(name, {
-        "type": "normal",
-        "in_ports": [{
+    return generate_default_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals,
-            "2d": True,
             "size": size
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name:  _generate_blocker(name, size, bitwidth))
+        extra_signals,
+        lambda name:  _generate_blocker(name, size, bitwidth))
