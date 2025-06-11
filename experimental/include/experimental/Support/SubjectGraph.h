@@ -11,6 +11,7 @@
 //
 //===-----------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #ifndef EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
 #define EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
 
@@ -363,3 +364,4 @@ LogicNetwork *connectSubjectGraphs();
 } // namespace dynamatic
 
 #endif // EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
