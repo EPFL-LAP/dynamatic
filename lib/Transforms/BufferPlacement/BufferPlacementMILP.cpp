@@ -254,6 +254,8 @@ void BufferPlacementMILP::addUnitPathConstraints(Operation *unit,
     if (failed(timingDB.getTotalDelay(unit, type, delay)))
       delay = 0.0;
 
+    //The delay of the unit must be positive.
+    delay = std::max(delay,0.001);
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
     forEachIOPair(unit, [&](Value in, Value out) {
@@ -380,13 +382,6 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
-    // No throughput constraints on channels going to stores
-    /// TODO: this is from legacy implementation, we should understand why we
-    /// really do this and figure out if it makes sense (@lucas-rami: I don't
-    /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
-
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
@@ -422,12 +417,23 @@ void BufferPlacementMILP::addChannelThroughputConstraints(CFDFC &cfdfc) {
     // the channel thoughput by 1
     model.addConstr(cfVars.throughput - chThroughput + dataBuf <= 1,
                     "throughput_cfdfc");
-    // If there is an opaque buffer, the summed channel and CFDFC throughputs
-    // cannot exceed the number of buffer slots. If there is not, the combined
-    // throughput can exceed the number of slots by 1
-    model.addConstr(chThroughput + cfVars.throughput + dataBuf - bufNumSlots <=
-                        1,
-                    "throughput_combined");
+    // Assuming that we minimize the number of buffer slots, bubble occupancy
+    // always takes the minimum feasible value. Therefore, the combined
+    // constraints are equivalent to:
+    // If dataBuf holds, then token occupancy + CFDFC's throughput <= numSlots;
+    // otherwise, token occupancy <= numSlots. (Already enforced by the earlier
+    // constraint named "throughput_channel")
+    // The following constraint encodes the case where readyBuf holds, and is
+    // trivially satisfied when readyBuf does not hold (since the earlier
+    // constraint already enforces it):
+    if(chVars.signalVars.count(SignalType::READY)){
+      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+      model.addConstr(chThroughput + cfVars.throughput + readyBuf - bufNumSlots <= 1,
+                    "throughput_ready");
+    }
+    // Note: Additional buffers may be needed to prevent combinational cycles
+    // if the model does not select all three signals (or only selects DATA).
+    // See extractResult() in FPGA20Buffers.cpp for an example.
   }
 }
 
@@ -439,15 +445,15 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
         latency == 0.0)
       continue;
 
-    // Retrieve the MILP variables corresponding to the unit's fluid retiming
-    UnitVars &unitVars = cfVars.unitVars[unit];
-    GRBVar &retIn = unitVars.retIn;
-    GRBVar &retOut = unitVars.retOut;
-
-    // The fluid retiming of tokens across the non-combinational unit must
-    // be the same as its latency multiplied by the CFDFC's throughput
-    model.addConstr(cfVars.throughput * latency == retOut - retIn,
-                    "through_unitRetiming");
+      // For each unit with non-zero data latency, add a constraint enforcing
+      // (CFDFC throughput * latency) <= channel throughput, as described in the FPGA 20 paper.
+    for (Value channel: cfdfc.channels) {
+      Operation *dstOp = *channel.getUsers().begin();
+      if (dstOp != unit)
+        continue;
+      GRBVar &chThroughput = cfVars.channelThroughputs[channel];
+      model.addConstr(cfVars.throughput * latency <= chThroughput, "UnitThroughput_pipelined");
+    }
   }
 }
 

@@ -209,6 +209,10 @@ Block *getBlockFromOp(Operation *op, BlockIndexing blockIndexing) {
       blockIndexing.getBlockFromIndex(opBBNum);
   if (blockOptional)
     return blockOptional.value();
+  else {
+    llvm::errs() << "Error: Block not found for operation: " << *op << "\n";
+    return nullptr;
+  }
 }
 
 
@@ -374,14 +378,7 @@ getNDelayedValues(Value initialVal, Value constVal, Operation *BBOp, unsigned N,
   if (N == 0)
     effective_N = 1;
   for (unsigned i = 0; i < effective_N; i++) {
-    /// ManualBuff
-    handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-        BBOp->getLoc(), prevResult, handshake::TimingInfo::tehb(), 1);
-    inheritBB(BBOp, bufferOp);
-
-    llvm::errs() << "N delay \n" << bufferOp << "\n";
-
-    values = {bufferOp.getResult(), constVal};
+    values = {prevResult, constVal};
     handshake::MergeOp mergeOp =
         rewriter.create<handshake::MergeOp>(BBOp->getLoc(), values);
     inheritBB(BBOp, mergeOp);
@@ -530,13 +527,22 @@ SmallVector<Value> insertBranches(SmallVector<Value> mainValues,
   SmallVector<Value> results;
   for (auto [mainValue, cond] : llvm::zip(mainValues, conds)) {
     /// ManualBuff
-    handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-        BBOp->getLoc(), cond, handshake::TimingInfo::tehb(), 5);
-    inheritBB(BBOp, bufferOp);
-
-    handshake::ConditionalBranchOp conditionalBranchOp =
+    bool manualBuff_insertBranches = true;// Best execution time with manual buffer present
+    handshake::BufferOp bufferOp;
+    handshake::ConditionalBranchOp conditionalBranchOp;
+    if (manualBuff_insertBranches) {
+      bufferOp = rewriter.create<handshake::BufferOp>(
+        BBOp->getLoc(), cond, handshake::TimingInfo::tehb(),5);
+      inheritBB(BBOp, bufferOp);
+      conditionalBranchOp =
         rewriter.create<handshake::ConditionalBranchOp>(
-            BBOp->getLoc(), bufferOp.getResult(), mainValue);
+            BBOp->getLoc(), bufferOp.getResult(),mainValue);
+    }
+    else{
+      conditionalBranchOp =
+        rewriter.create<handshake::ConditionalBranchOp>(
+            BBOp->getLoc(), cond, mainValue);
+    }
     inheritBB(BBOp, conditionalBranchOp);
     results.push_back(conditionalBranchOp.getResult(1));
   }
@@ -624,15 +630,25 @@ SmallVector<Value> createSkipConditionForPair(
       predecessorOpPointer->getLoc(), diffTokens);
   inheritBB(predecessorOpPointer, mergeOp);
   /// ManualBuff (Init)
-  handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
+  bool manualBuff_skip_cond = true; // Best execution time with manual buffer present
+  handshake::BufferOp bufferOp;
+  handshake::ConditionalBranchOp conditionalBranchOp;
+  if (manualBuff_skip_cond){
+    bufferOp = rewriter.create<handshake::BufferOp>(
       predecessorOpPointer->getLoc(), mergeOp.getResult(),
       handshake::TimingInfo::tehb(), N);
-  inheritBB(predecessorOpPointer, bufferOp);
-
-  handshake::ConditionalBranchOp conditionalBranchOp =
+    inheritBB(predecessorOpPointer, bufferOp);
+    conditionalBranchOp =
       rewriter.create<handshake::ConditionalBranchOp>(
           successorOpPointer->getLoc(), ftdValues.getSupp(),
           bufferOp.getResult());
+  }
+  else{
+    conditionalBranchOp =
+      rewriter.create<handshake::ConditionalBranchOp>(
+          successorOpPointer->getLoc(), ftdValues.getSupp(),
+          mergeOp.getResult());
+  }
   inheritBB(successorOpPointer, conditionalBranchOp);
   // Not sure which one (0 or 1)
   handshake::UnbundleOp unbundleOp = rewriter.create<handshake::UnbundleOp>(
@@ -673,15 +689,9 @@ SmallVector<Value> createSkipConditionForPair(
 
   SmallVector<Value> skipConditions;
   for (Value delayedAddress : delayedAddressesAfterSuppress) {
-    /// ManualBuff (Comparator)
-    handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-        predecessorOpPointer->getLoc(), delayedAddress,
-        handshake::TimingInfo::tehb(), 1);
-    inheritBB(predecessorOpPointer, bufferOp);
-    llvm::errs() << "comp \n" << bufferOp << "\n";
     handshake::CmpIOp cmpIOp = rewriter.create<handshake::CmpIOp>(
         predecessorOpPointer->getLoc(), CmpIPredicate::ne, gatedSuccessorOpaddr,
-        bufferOp.getResult());
+        delayedAddress);
     inheritBB(predecessorOpPointer, cmpIOp);
     skipConditions.push_back(cmpIOp.getResult());
   }
@@ -731,13 +741,6 @@ SkipConditionForPair createSkipConditionsForAllPairs(
         SmallVector<Value> delayedAddresses = std::get<0>(bothDelayedAddresses);
         SmallVector<Value> extraDelayedAddresses =
             std::get<1>(bothDelayedAddresses);
-
-        /// ManualBuff (store)
-        handshake::BufferOp bufferOp = rewriter.create<handshake::BufferOp>(
-            predecessorOpPointer->getLoc(), predecessorOpAddr,
-            ::TimingInfo::tehb(), 20);
-        inheritBB(predecessorOpPointer, bufferOp);
-        predecessorOpPointer->setOperand(0, bufferOp.getResult());
 
         for (MemDependenceAttr dependency : deps.getDependencies()) {
           if (!dependency.getIsActive().getValue())
