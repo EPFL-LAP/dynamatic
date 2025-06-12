@@ -126,6 +126,29 @@ public:
     metric = metricFloor;
     return success();
   }
+
+  // Similarly to getDelayCeilMetric, uses Ceil logic to find the highest delay
+  // that does not exceed the target period. Howver, it returns this delay,
+  // instead of returning the metric value at that delay. Used for setting the
+  // delay in the IR.
+  LogicalResult getDelayCeilValue(double targetPeriod, double &delay) const {
+    std::optional<double> opDelayCeil;
+
+    // Find highest delay that's <= targetPeriod
+    for (const auto &[opDelay, val] : data) {
+      if (opDelay <= targetPeriod) {
+        if (!opDelayCeil.has_value() || *opDelayCeil < opDelay) {
+          opDelayCeil = opDelay;
+        }
+      }
+    }
+
+    if (!opDelayCeil.has_value())
+      return failure();
+
+    delay = *opDelayCeil;
+    return success();
+  }
 };
 
 /// Deserializes a JSON value into a BitwidthDepMetric<double>. See
@@ -243,6 +266,11 @@ public:
   /// to return the real latency for those signal types too.
   LogicalResult getLatency(Operation *op, SignalType signalType,
                            double &latency, double targetPeriod) const;
+
+  LogicalResult getInternalCombinationalDelay(Operation *op,
+                                              SignalType signalType,
+                                              double &delay,
+                                              double targetPeriod) const;
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
