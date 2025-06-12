@@ -452,7 +452,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
       if (dstOp != unit)
         continue;
       GRBVar &chThroughput = cfVars.channelThroughputs[channel];
-      model.addConstr(cfVars.throughput * latency <= chThroughput, "pipelined_unit_const");
+      model.addConstr(cfVars.throughput * latency <= chThroughput, "UnitThroughput_pipelined");
     }
   }
 }
