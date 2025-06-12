@@ -923,9 +923,9 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
   }
 }
 
-// After creating the individual Subject Graphs, this functions is called to
+// After creating the individual Subject Graphs, this function is called to
 // connect the Subject Graphs by connecting the input and output nodes of the
-// connected modules in the circuit. This generates the merged Subject Graph, 
+// connected modules in the circuit. This generates the merged Subject Graph,
 // which is the overall Subject Graph of the entire circuit.
 LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // Connect inputs and outputs of subject graphs to each other
@@ -959,7 +959,7 @@ LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // order
   mergedBlif->generateTopologicalOrder();
 
-  // Return the resulting LogicNetwork object 
+  // Return the resulting LogicNetwork object
   return mergedBlif;
 }
 
