@@ -21,7 +21,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRTransforms
   MLIRSCFDialect
   DynamaticAnalysis
-
+  DynamaticExperimentalSupportBooleanLogic
 )
 
 add_subdirectory(BooleanLogic)
