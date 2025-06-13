@@ -91,6 +91,7 @@ struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
   std::string polygeistPath;
+  std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
@@ -225,6 +226,19 @@ public:
       : Command("set-polygeist-path",
                 "Sets the path to Polygeist installation directory", state) {
     addPositionalArg({"path", "path to Polygeist installation directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetFPUnitsGenerator : public Command {
+public:
+  SetFPUnitsGenerator(FrontendState &state)
+      : Command("set-fp-units-generator",
+                "Sets the floating-point units generator to use", state) {
+    addPositionalArg({"generator",
+                      "floating-point units generator, values are 'flopoco' "
+                      "(default option) or 'vivado'"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -535,6 +549,17 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  StringRef generator = args.positionals.front();
+  if (generator == "flopoco" || generator == "vivado") {
+    state.fpUnitsGenerator = generator.str();
+    return CommandResult::SUCCESS;
+  }
+  llvm::outs() << ERR << "Unknown floating-point units generator '" << generator
+               << "', possible options are 'flopoco' and 'vivado'.\n";
+  return CommandResult::FAIL;
+}
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
@@ -588,8 +613,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath,
-                 sharing);
+                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 state.fpUnitsGenerator);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -616,7 +641,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl);
+                 state.getKernelName(), hdl, state.fpUnitsGenerator);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -711,6 +736,7 @@ int main(int argc, char **argv) {
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
   commands.add<SetPolygeistPath>(state);
+  commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);
