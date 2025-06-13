@@ -65,13 +65,19 @@ private:
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
                                                    Operation &op2);
-  bool isChannelModifiable(OpResult res);
+  bool isChannelToBeChecked(OpResult res);
 };
 } // namespace
 
-bool HandshakeAnnotatePropertiesPass::isChannelModifiable(OpResult res) {
-  // channels produced/consumed by input, output, memory controllers, and LSQ
-  // can't be modified
+bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
+  // The channel connected to EndOp, MemoryControllerOp, and LSQOp don't appear
+  // in the properties database for the following reasons:
+  // - EndOp: the operation doesn't exist in the output model; the property
+  //   creation is still possible but requires to get the names of the model's
+  //   I/O signals (not implemented yet)
+  // - MemeoryControllerOp and LSQOp: only load and stores can be connected to
+  //   these Ops, therefore we cannot rigidify their channels with the
+  //   ReadyRemoverOp and ValidMergerOp
   if (isa<handshake::EndOp, handshake::MemoryControllerOp, handshake::LSQOp>(
           res.getOwner()))
     return false;
@@ -90,8 +96,8 @@ HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
     for (auto [j, res2] : llvm::enumerate(op2.getResults())) {
       // equivalence is symmetrical so it needs to be checked only once for
       // each pair of signals when the Ops are the same
-      if ((&op1 != &op2 || i < j) && isChannelModifiable(res1) &&
-          isChannelModifiable(res2)) {
+      if ((&op1 != &op2 || i < j) && isChannelToBeChecked(res1) &&
+          isChannelToBeChecked(res2)) {
         ValidEquivalence p(uid, FormalProperty::TAG::OPT, res1, res2);
 
         propertyTable.push_back(p.toJSON());
@@ -118,7 +124,7 @@ HandshakeAnnotatePropertiesPass::annotateAbsenceOfBackpressure(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       for (auto [resIndex, res] : llvm::enumerate(op.getResults()))
-        if (isChannelModifiable(res)) {
+        if (isChannelToBeChecked(res)) {
 
           AbsenceOfBackpressure p(uid, FormalProperty::TAG::OPT, res);
 
