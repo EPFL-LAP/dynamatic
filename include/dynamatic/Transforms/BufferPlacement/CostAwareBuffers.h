@@ -10,9 +10,9 @@
 // https://dl.acm.org/doi/full/10.1145/3477053
 //
 // This mainly declares the `CostAwareBuffers` class, which inherits the
-// abstract `BufferPlacementMILP` class to setup and solve a real MILP from 
-// which buffering decisions can be made. Every public member declared in 
-// this file is under the `dynamatic::buffer::costaware` namespace, as to not 
+// abstract `BufferPlacementMILP` class to setup and solve a real MILP from
+// which buffering decisions can be made. Every public member declared in
+// this file is under the `dynamatic::buffer::costaware` namespace, as to not
 // create name conflicts for common structs with other implementors of
 // `BufferPlacementMILP`.
 //
@@ -35,12 +35,11 @@ namespace costaware {
 
 class CostAwareBuffers : public BufferPlacementMILP {
 public:
-
   /// Setups the entire MILP that buffers the input dataflow circuit for the
   /// target clock period, after which (absent errors) it is ready for
-  /// optimization. If a channel's buffering properties are provably unsatisfiable,
-  /// the MILP will not be marked ready for optimization, ensuring that further
-  /// calls to `optimize` fail.
+  /// optimization. If a channel's buffering properties are provably
+  /// unsatisfiable, the MILP will not be marked ready for optimization,
+  /// ensuring that further calls to `optimize` fail.
   CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod);
 
@@ -56,7 +55,7 @@ private:
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
-  
+
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.

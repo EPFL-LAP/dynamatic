@@ -28,17 +28,17 @@ using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::costaware;
 
 CostAwareBuffers::CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod)
+                                   const TimingDatabase &timingDB,
+                                   double targetPeriod)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
 CostAwareBuffers::CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod, Logger &logger,
-                            StringRef milpName)
+                                   const TimingDatabase &timingDB,
+                                   double targetPeriod, Logger &logger,
+                                   StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                           milpName) {
   if (!unsatisfiable)
@@ -54,17 +54,20 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
         channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
-    
+
     unsigned dataLatency = static_cast<unsigned>(
         channelVars.dataLatency.get(GRB_DoubleAttr_X) + 0.5);
     unsigned readyLatency = static_cast<unsigned>(
-        channelVars.signalVars[SignalType::READY].bufPresent.get(GRB_DoubleAttr_X) + 0.5);
+        channelVars.signalVars[SignalType::READY].bufPresent.get(
+            GRB_DoubleAttr_X) +
+        0.5);
     bool useShiftReg = channelVars.shiftReg.get(GRB_DoubleAttr_X) > 0.5;
-    
+
     bool hasOneThroughputCFDFC = false;
     for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
       if (cfdfc->channels.contains(channel)) {
-        double throughput = vars.cfdfcVars[cfdfc].throughput.get(GRB_DoubleAttr_X);
+        double throughput =
+            vars.cfdfcVars[cfdfc].throughput.get(GRB_DoubleAttr_X);
         if (throughput > 0.7) {
           hasOneThroughputCFDFC = true;
           break;
@@ -92,7 +95,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
         }
       } else {
         hasOneThroughputCFDFC = true;
-        if (hasOneThroughputCFDFC){
+        if (hasOneThroughputCFDFC) {
           if (dataLatency == 1) {
             result.numOneSlotDV = 1;
             result.numOneSlotR = 1;
@@ -142,16 +145,15 @@ void CostAwareBuffers::addCustomChannelConstraints(Value channel) {
   if (props.minOpaque > 0) {
     // Force the MILP to place a minimum number of opaque slots
     model.addConstr(dataLatency >= props.minOpaque, "custom_forceOpaque");
-  } 
+  }
   if (props.minTrans > 0) {
     // Force the MILP to place a minimum number of transparent slots
     model.addConstr(chVars.bufNumSlots >= props.minTrans + dataLatency,
                     "custom_minTrans");
-  } 
+  }
   if (props.minSlots > 0) {
     // Force the MILP to place a minimum number of slots
-    model.addConstr(chVars.bufNumSlots >= props.minSlots,
-                    "custom_minSlots");
+    model.addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
   }
   if (props.minOpaque + props.minTrans + props.minSlots > 0)
     model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
