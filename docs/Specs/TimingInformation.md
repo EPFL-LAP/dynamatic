@@ -142,17 +142,17 @@ The process follows these steps:
    We then call `fromJSON` on the `TimingDatabase` and the parsed JSON to begin the deserialization process.
 
 2. **Deserialization**  
-   The [`TimingDatabase`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L439) `fromJSON` overload iterates over e the JSON object, where each key represents an operation name and the values are the timing information. For every found operation, it will :
+   The [`TimingDatabase`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L439) `fromJSON` overload iterates over the JSON object, where each key represents an operation name and the values are the timing information. For every found operation, it will :
 
    2.1 **Create a `TimingModel`** instance.
 
-   2.2 **Call `fromJSON` on that `TimingModel` and the parsed JSON**. This `fromJSON` contains a list of timing characteristics it will fill. For each it uses predefined string arrays as nested key paths, for example :`Data delays: {"delay", "data"}`.
+   2.2 **Call `fromJSON` on that `TimingModel` and the parsed JSON**. This `fromJSON` contains a list of timing characteristics that are to be filled. For each it uses predefined string arrays as nested key paths, for example :`Data delays: {"delay", "data"}`.
 
-   - 2.2.1 For each field and it's nested key path, it will call [`deserializeNested`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L268). This function validates that each step in the path exists and is the correct type (object vs value) exists.  
+   - 2.2.1 **For each field and it's nested key path**, it will call [`deserializeNested`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L268). This function validates that each step in the path exists and is the correct type (object vs value) exists.  
    - 
-   - 2.2.2 This calls the appropriate `fromJSON` and writes the result back into the field. For example,for [`BitwidthDepMetric<double>`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L295), which parses bitwidth keys(as unsigned integers) and their associated timing values, writing results back into the `TimingModel`which made the request.
+   - 2.2.2 This in turn **calls the appropriate `fromJSON` and writes the result back into the field**. For example,for [`BitwidthDepMetric<double>`](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L295), the fromJSON parses integer bitwidth keys and their associated timing values, writing results back into the `TimingModel`which made the request.
 
-   2.3 **Write back the `TimingModel` into the database.**
+   2.3 Once every key listed in 2.2 has been handled, we **Write back the `TimingModel` into the database.**
   
 Once deserialisation is done for **all operators**, the database will contain the full information of the JSON. 
 
