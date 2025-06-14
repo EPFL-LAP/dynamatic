@@ -277,7 +277,16 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
-    "Logic Interchange Format (BLIF).">];
+    "Logic Interchange Format (BLIF).">,
+    Option<"lutDelay", "lut-delay", "double", "0.55",
+    "Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.">,
+    Option<"lutSize", "lut-size", "int", "6",
+    "Maximum LUT input size of the target FPGA.">,
+    Option<"acyclicType", "acyclic-type", "bool", "false",
+    "Method for creating acyclic graphs from cyclic dataflow graph. Required by "
+    "MapBuf to generate AIGs. If false, Cut Loopbacks method is used to cut backedges "
+    "of the graph. If true, Minimum Feedback Arc Set (MFAS) method is used, which cuts the "
+    "minimum number of edges to create an acyclic graph. MFAS method requires Gurobi.">];
 }
 
 //===----------------------------------------------------------------------===//

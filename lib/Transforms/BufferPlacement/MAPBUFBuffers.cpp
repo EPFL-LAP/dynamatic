@@ -43,9 +43,11 @@ using namespace dynamatic::buffer::mapbuf;
 
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, StringRef blifFiles)
+                             double targetPeriod, StringRef blifFiles,
+                             double lutDelay, int lutSize, bool acyclicType)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
-      blifFiles(blifFiles) {
+      blifFiles(blifFiles), lutDelay(lutDelay), lutSize(lutSize),
+      acyclicType(acyclicType) {
   if (!unsatisfiable)
     setup();
 }
@@ -53,10 +55,12 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
 MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
+                             double lutDelay, int lutSize, bool acyclicType,
                              Logger &logger, StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                           milpName),
-      blifFiles(blifFiles) {
+      blifFiles(blifFiles), lutDelay(lutDelay), lutSize(lutSize),
+      acyclicType(acyclicType) {
   if (!unsatisfiable)
     setup();
 }
@@ -663,9 +667,6 @@ void MAPBUFBuffers::setup() {
   // Generates Subject Graphs
   experimental::subjectGraphGenerator(funcInfo.funcOp, blifFiles);
 
-  // Boolean to choose between different acyclic graph convertion methods
-  bool acyclicType = true;
-
   if (!acyclicType) {
     addCutLoopbackBuffers();
   } else {
@@ -674,7 +675,6 @@ void MAPBUFBuffers::setup() {
 
   blifData = experimental::connectSubjectGraphs();
 
-  int lutSize = 6;
   auto cuts = experimental::generateCuts(blifData, lutSize);
 
   addClockPeriodConstraintsNodes();

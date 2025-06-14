@@ -492,7 +492,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
         logger, "placement", placement, env, info, timingDB, targetCP,
-        blifFiles);
+        blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");

@@ -47,13 +47,15 @@ public:
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, StringRef blifFiles);
+                double targetPeriod, StringRef blifFiles, double lutDelay,
+                int lutSize, bool acyclicType);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, StringRef blifFiles, Logger &logger,
+                double targetPeriod, StringRef blifFiles, double lutDelay,
+                int lutSize, bool acyclicType, Logger &logger,
                 StringRef milpName = "placement");
 
 protected:
@@ -61,8 +63,14 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  // Experimental average lutDelay value
-  float lutDelay = 0.55;
+  // Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.
+  double lutDelay;
+  // Maximum LUT input size of the target FPGA.
+  int lutSize;
+  // Method for creating acyclic graphs from cyclic dataflow graph. If false,
+  // addCutLoopbackBuffers() method is used. If true,
+  // findMinimumFeedbackArcSet() method is used.
+  bool acyclicType;
   // Big constant value used in MILP constraints
   int bigConstant = 100;
   // LogicNetwork of the circuit
@@ -127,7 +135,7 @@ private:
   // Also adds cut selection conflict constraints.
   void
   addDelayAndCutConflictConstraints(experimental::Node *root,
-                                 std::vector<experimental::Cut> &cutVector);
+                                    std::vector<experimental::Cut> &cutVector);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
