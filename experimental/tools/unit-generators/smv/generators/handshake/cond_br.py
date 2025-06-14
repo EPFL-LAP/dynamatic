@@ -35,7 +35,7 @@ def _generate_cond_br(name, data_type):
     return f"""
 MODULE {name}(condition, condition_valid, data, data_valid, trueOut_ready, falseOut_ready)
   VAR
-  inner_br : {name}__cond_br_dataless(data_valid, condition, condition_valid, trueOut_ready, falseOut_ready);
+  inner_br : {name}__cond_br_dataless(condition, condition_valid, data_valid, trueOut_ready, falseOut_ready);
 
   -- output
   DEFINE
