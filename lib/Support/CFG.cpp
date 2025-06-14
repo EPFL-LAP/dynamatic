@@ -667,7 +667,8 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
           return GIIDStatus::SUCCEED;
 
         // The select's true value or false value must depend on the predecessor
-        ValueRange values{selectOp.getTrueValue(), selectOp.getFalseValue()};
+        llvm::SmallVector<Value> values{selectOp.getTrueValue(),
+                                        selectOp.getFalseValue()};
         return foldGIIDStatusAnd(recurse, values);
       })
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
