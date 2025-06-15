@@ -220,8 +220,7 @@ handshake.func @makeLSQForkLazyNeedLazyAndEager(%memref: memref<64xi32>, %start:
 // CHECK:           %[[VAL_14:.*]], %[[VAL_15:.*]] = cond_br %[[VAL_11]], %[[VAL_4]]#1 {handshake.bb = 1 : ui32} : <i1>, <>
 // CHECK:           sink %[[VAL_13]] : <i32>
 // CHECK:           %[[VAL_6]]:3 = lazy_fork [3] %[[VAL_14]] {handshake.bb = 2 : ui32} : <>
-// CHECK:           %[[VAL_16:.*]] = fork [1] %[[VAL_6]]#2 {handshake.bb = 2 : ui32} : <>
-// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_16]] {handshake.bb = 2 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_6]]#2 {handshake.bb = 2 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_7]], %[[VAL_18:.*]] = load{{\[}}%[[VAL_17]]] %[[VAL_2]]#1 {handshake.bb = 2 : ui32} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           sink %[[VAL_18]] : <i32>
 // CHECK:           %[[VAL_8]]:3 = fork [3] %[[VAL_15]] {handshake.bb = 3 : ui32} : <>

@@ -291,9 +291,11 @@ static bool isOperandInCycle(Value val, Value res,
   // Recursively explore data operands of merge-like operations to find cycles
   if (auto mergeLikeOp = dyn_cast<handshake::MergeLikeOpInterface>(defOp))
     return recurseMergeLike(mergeLikeOp.getDataOperands());
-  if (auto selectOp = dyn_cast<handshake::SelectOp>(defOp))
-    return recurseMergeLike(
-        ValueRange{selectOp.getTrueValue(), selectOp.getFalseValue()});
+  if (auto selectOp = dyn_cast<handshake::SelectOp>(defOp)) {
+    llvm::SmallVector<Value> vals = {selectOp.getTrueValue(),
+                                     selectOp.getFalseValue()};
+    return recurseMergeLike(vals);
+  }
 
   return false;
 }

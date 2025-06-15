@@ -153,20 +153,21 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
   // Promote eager fork results to lazy where necessary
   OpBuilder builder(funcOp->getContext());
   for (auto &[forkOp, lazyResults] : lazyChannels) {
-    unsigned numLazyResults = lazyResults.size();
-    bool createEagerFork = numLazyResults < forkOp->getNumResults();
-    if (createEagerFork) {
+    unsigned numLazyForkOutputs = lazyResults.size();
+    bool hasValueWithoutLazyConstr =
+        numLazyForkOutputs < forkOp->getNumResults();
+    if (hasValueWithoutLazyConstr) {
       // To minimize damage to performance, as many outputs of the control fork
       // as possible should remain "eager". We achieve this by creating an eager
       // fork after the lazy fork that handles token duplication outside the
       // memory control network. The lazy fork needs an extra output to feed the
       // eager fork
-      ++numLazyResults;
+      ++numLazyForkOutputs;
     }
 
     builder.setInsertionPoint(forkOp);
     handshake::LazyForkOp lazyForkOp = builder.create<handshake::LazyForkOp>(
-        forkOp->getLoc(), forkOp.getOperand(), numLazyResults);
+        forkOp->getLoc(), forkOp.getOperand(), numLazyForkOutputs);
     inheritBB(forkOp, lazyForkOp);
 
     // Replace the original fork's outputs that are part of the memory control
@@ -174,24 +175,35 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
     for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
       from.replaceAllUsesWith(to);
 
-    if (createEagerFork) {
+    if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control
       // network, create an eager fork fed by the lazy fork's last result
-      unsigned numEagerResults = forkOp->getNumResults() - lazyResults.size();
-      handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
-          forkOp->getLoc(), lazyForkOp->getResults().back(), numEagerResults);
-      inheritBB(forkOp, eagerForkOp);
+      unsigned numValuesWithoutLazyConstr =
+          forkOp->getNumResults() - lazyResults.size();
 
-      // Replace the control fork's outputs that do not belong to the memory
-      // control network with the eager fork's results
-      ValueRange eagerResults = eagerForkOp.getResult();
-      auto eagerForkResIt = eagerResults.begin();
-      for (OpResult res : forkOp.getResults()) {
-        if (!lazyResults.contains(res))
-          res.replaceAllUsesWith(*(eagerForkResIt++));
+      if (numValuesWithoutLazyConstr == 1) {
+        // If there is only one eager output channel, we just use the lazy
+        // fork's last result to drive that one
+        for (OpResult res : forkOp.getResults())
+          if (!lazyResults.contains(res))
+            res.replaceAllUsesWith(lazyForkOp->getResults().back());
+      } else {
+        handshake::ForkOp eagerForkOp = builder.create<handshake::ForkOp>(
+            forkOp->getLoc(), lazyForkOp->getResults().back(),
+            numValuesWithoutLazyConstr);
+        inheritBB(forkOp, eagerForkOp);
+
+        // Replace the control fork's outputs that do not belong to the memory
+        // control network with the eager fork's results
+        ValueRange eagerResults = eagerForkOp.getResult();
+        auto eagerForkResIt = eagerResults.begin();
+        for (OpResult res : forkOp.getResults()) {
+          if (!lazyResults.contains(res))
+            res.replaceAllUsesWith(*(eagerForkResIt++));
+        }
+        assert(eagerForkResIt == eagerResults.end() &&
+               "did not exhaust iterator");
       }
-      assert(eagerForkResIt == eagerResults.end() &&
-             "did not exhaust iterator");
     }
 
     // Erase the original fork whose results are now unused

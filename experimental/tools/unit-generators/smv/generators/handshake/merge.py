@@ -1,7 +1,3 @@
-from generators.support.merge_notehb import (
-    generate_merge_notehb,
-)
-from generators.support.tehb import generate_tehb
 from generators.support.utils import *
 
 
@@ -18,17 +14,16 @@ def generate_merge(name, params):
 def _generate_merge_dataless(name, size):
     return f"""
 MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
-  VAR
-  inner_tehb : {name}__tehb_dataless(inner_merge.outs_valid, outs_ready);
-  inner_merge : {name}__merge_notehb_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, inner_tehb.ins_ready);
+  DEFINE
+  one_valid := {' | '.join([f'ins_{i}_valid' for i in range(size)])};
+  in_ins_0_ready := ins_0_valid ? outs_ready : FALSE;
+  {"\n  ".join([f"in_ins_{n + 1}_ready := (ins_{n + 1}_valid & !({' | '.join([f'in_ins_{i}_ready' for i in range(n + 1)])})) ? outs_ready : FALSE;" for n in range(size - 1)])}
+
 
   -- output
   DEFINE
-  {"\n  ".join([f"ins_{n}_ready := inner_merge.ins_{n}_ready;" for n in range(size)])}
-  outs_valid := inner_tehb.outs_valid;
-
-{generate_merge_notehb(f"{name}__merge_notehb_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
-{generate_tehb(f"{name}__tehb_dataless", {ATTR_BITWIDTH: 0})}
+  {"\n  ".join([f"ins_{n}_ready := in_ins_{n}_ready;" for n in range(size)])}
+  outs_valid := one_valid;
 """
 
 
@@ -36,15 +31,19 @@ def _generate_merge(name, size, data_type):
     return f"""
 MODULE {name}({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready)
   VAR
-  inner_tehb : {name}__tehb(inner_merge.outs, inner_merge.outs_valid, outs_ready);
-  inner_merge : {name}__merge_notehb({", ".join([f"ins_{n}" for n in range(size)])}, {", ".join([f"ins_{n}_valid" for n in range(size)])}, inner_tehb.ins_ready);
+  inner_merge : {name}__merge_dataless({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready);
+
+  DEFINE
+  data := case
+    {"\n    ".join([f"ins_{n}_valid : ins_{n};" for n in range(size)])}
+    TRUE : {data_type.format_constant(0)};
+  esac;
 
   -- output
   DEFINE
   {"\n  ".join([f"ins_{n}_ready := inner_merge.ins_{n}_ready;" for n in range(size)])}
-  outs := inner_tehb.outs;
-  outs_valid := inner_tehb.outs_valid;
+  outs_valid := inner_merge.outs_valid;
+  outs := data;
 
-{generate_merge_notehb(f"{name}__merge_notehb", {ATTR_SIZE: size, ATTR_BITWIDTH: data_type.bitwidth})}
-{generate_tehb(f"{name}__tehb", {ATTR_BITWIDTH: data_type.bitwidth})}
+{_generate_merge_dataless(f"{name}__merge_dataless", size)}
 """

@@ -106,12 +106,14 @@ xls::AfterAllOp createAfterAll(OpBuilder builder, ValueRange ts) {
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, Value t1, Value t2) {
-  return createAfterAll(builder, ValueRange{t1, t2});
+  llvm::SmallVector<Value> vals = {t1, t2};
+  return createAfterAll(builder, vals);
 }
 
 xls::AfterAllOp createAfterAll(OpBuilder builder, Value t1, Value t2,
                                Value t3) {
-  return createAfterAll(builder, ValueRange{t1, t2, t3});
+  llvm::SmallVector<Value> vals = {t1, t2, t3};
+  return createAfterAll(builder, vals);
 }
 
 } // namespace
@@ -352,9 +354,9 @@ void SelectProc::build(OpBuilder builder) const {
                        .getResult();
 
   // Select the result:
-  auto selOp = b.create<xls::SelOp>(
-      typeVal, rxSel.getResult(),
-      ValueRange{rxFalseVal.getResult(), rxTrueVal.getResult()});
+  llvm::SmallVector<Value> operands = {rxFalseVal.getResult(),
+                                       rxTrueVal.getResult()};
+  auto selOp = b.create<xls::SelOp>(typeVal, rxSel.getResult(), operands);
 
   // Send the result:
   b.create<xls::SSendOp>(tokResult, selOp.getResult(), nextArgs[3]);
@@ -1215,8 +1217,10 @@ LogicalResult ConvertToXlsSpawn<T>::matchAndRewrite(
     auto outChanTy = xls::SchanType::get(ctx, innerType,
                                          /*is_input=*/false);
 
+    llvm::SmallVector<Type> returnType = {outChanTy, inChanTy};
+
     xls::SchanOp ch = rewriter.create<xls::SchanOp>( // TODO BROKEN BUILD
-        op.getLoc(), TypeRange{outChanTy, inChanTy}, "ssa", innerType,
+        op.getLoc(), returnType, "ssa", innerType,
         xls::FifoConfigAttr::get(ctx, /*fifo_depth=*/0,
                                  /*bypass=*/true,
                                  /*register_push_outputs=*/false,
