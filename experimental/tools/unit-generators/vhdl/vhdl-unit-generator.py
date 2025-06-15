@@ -37,6 +37,8 @@ import generators.handshake.shli as shli
 import generators.handshake.blocker as blocker
 import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
+import generators.handshake.ready_remover as ready_remover
+import generators.handshake.valid_merger as valid_merger
 
 
 def generate_code(name, mod_type, parameters):
@@ -111,6 +113,10 @@ def generate_code(name, mod_type, parameters):
             return sitofp.generate_sitofp(name, parameters)
         case "fptosi":
             return fptosi.generate_fptosi(name, parameters)
+        case "ready_remover":
+            return ready_remover.generate_ready_remover(name, parameters)
+        case "valid_merger":
+            return valid_merger.generate_valid_merger(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
@@ -124,7 +130,8 @@ def parse_parameters(param_list):
                 param_dict[key.strip()] = ast.literal_eval(value.strip())
         return param_dict
     except ValueError:
-        raise ValueError("Invalid parameter format. Use key=value key=value,...\n")
+        raise ValueError(
+            "Invalid parameter format. Use key=value key=value,...\n")
 
 
 def main():
