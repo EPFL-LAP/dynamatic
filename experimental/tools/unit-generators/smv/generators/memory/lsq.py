@@ -20,6 +20,7 @@ def generate_lsq(name, params):
     load_groups = config["numLoads"]
     store_groups = config["numStores"]
 
+    # the "master" config field determines if the LSQ is connected to a memory controller (slave LSQ) or not (master LSQ)
     if config["master"]:
         return _generate_lsq_master(
             name,
@@ -48,8 +49,8 @@ def generate_lsq(name, params):
 
 def group_index(index, group_list):
     partial_sum = 0
-    for i, num_el in enumerate(group_list):
-        partial_sum += num_el
+    for i, num_elements_in_group in enumerate(group_list):
+        partial_sum += num_elements_in_group
         if index < partial_sum:
             return i
 
@@ -100,9 +101,9 @@ MODULE {name} ({lsq_in_ports})
   ctrlEnd_ready := inner_mc_control.ctrlEnd_ready;
   memEnd_valid := inner_mc_control.memEnd_valid;
 
-  {generate_mc_control(f"{name}__mc_control")}
-  {_generate_nd_load_port(f"{name}__nd_load_port", capacity, addr_type, data_type)}
-  {_generate_nd_store_port(f"{name}__nd_store_port", capacity, addr_type, data_type)}
+{generate_mc_control(f"{name}__mc_control")}
+{_generate_nd_load_port(f"{name}__nd_load_port", capacity, addr_type, data_type)}
+{_generate_nd_store_port(f"{name}__nd_store_port", capacity, addr_type, data_type)}
 """
 
 
@@ -144,8 +145,8 @@ MODULE {name} ({lsq_in_ports})
   ldAddrToMC_valid := in_loadEn;
   ldDataFromMC_ready := TRUE;
 
-  {_generate_nd_load_port(f"{name}__nd_load_port", capacity, addr_type, data_type)}
-  {_generate_nd_store_port(f"{name}__nd_store_port", capacity, addr_type, data_type)}
+{_generate_nd_load_port(f"{name}__nd_load_port", capacity, addr_type, data_type)}
+{_generate_nd_store_port(f"{name}__nd_store_port", capacity, addr_type, data_type)}
 """
 
 
@@ -153,7 +154,8 @@ def _generate_lsq_logic(
     name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity
 ):
     return f"""
-  -- Non-deterministic ports
+  -- Non-deterministic ports: they non-deterministically model all possible latencies, to account
+  -- for memeory stalls and memeory dependencies
   VAR
   {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(ctrl_{group_index(n, load_groups)}_valid, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
   {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(ctrl_{group_index(n, store_groups)}_valid, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
