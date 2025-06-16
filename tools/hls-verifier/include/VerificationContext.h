@@ -32,8 +32,9 @@ static const std::string HLS_VERIFY_DIR = "HLS_VERIFY";
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp)
-      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName) {}
+                      handshake::FuncOp *funcOp, bool vivadoFPU)
+      : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
+        vivadoFPU(vivadoFPU) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -45,6 +46,11 @@ struct VerificationContext {
 
   // The name of the top-level handshake function
   std::string kernelName;
+
+  // Whether to use Vivado FPU for floating-point operations
+  bool vivadoFPU;
+
+  bool useVivadoFPU() const { return vivadoFPU; }
 
   std::string getVhdlTestbenchPath() const {
     return getHdlSrcDir() + SEP + "tb_" + kernelName + ".vhd";
