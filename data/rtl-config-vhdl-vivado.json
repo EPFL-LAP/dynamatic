@@ -4,7 +4,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/addf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -35,7 +35,7 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/vivado/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
     "dependencies": ["join", "flopoco_ip_cores"]
   },
   {
@@ -58,7 +58,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/divf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/divf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -114,7 +114,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/mulf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/mulf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -177,7 +177,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/subf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/subf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
