@@ -263,7 +263,9 @@ public:
                "The buffer placement algorithm to use, values are "
                "'on-merges' (default option: minimum buffering for "
                "correctness), 'fpga20' (throughput-driven buffering), or "
-               "'fpl22' (throughput- and timing-driven buffering)"});
+               "'fpl22' (throughput- and timing-driven buffering), or "
+               "'mapbuf' (simultaneous technology mapping and buffer "
+               "placement)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
   }
 
@@ -570,14 +572,16 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22") {
+        it->second == "fpl22" || it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
           << "Unknown buffer placement algorithm " << it->second
           << "! Possible options are 'on-merges' (minimum buffering for "
-             "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
-             "(throughput- and timing-driven buffering).";
+             "correctness), 'fpga20' (throughput-driven buffering), 'fpl22' "
+             "(throughput- and timing-driven buffering), or 'mapbuf' "
+             "(simultaneous technology mapping and buffer "
+             "placement).";
       return CommandResult::FAIL;
     }
   }
