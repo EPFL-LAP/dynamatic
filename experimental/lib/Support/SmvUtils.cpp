@@ -14,7 +14,7 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "SmvUtils.h"
+#include "experimental/Support/SmvUtils.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -57,9 +57,46 @@ LogicalResult createCMDfile(const std::filesystem::path &cmdPath,
   return success();
 }
 
+// Runs a shell command
+int execute(const std::string &command) {
+
+  std::istringstream cmdStream(command);
+  std::vector<StringRef> stringRefVec;
+
+  // Parse the command token by token
+  std::string word;
+  std::vector<std::string> argsVector;
+  while (cmdStream >> word) {
+    argsVector.push_back(word);
+  }
+
+  // Convert the argsVector from std::vector<std::string> to ArrayRef<StringRef>
+  stringRefVec.reserve(argsVector.size()); // Preallocate the vector
+  for (const auto &arg : argsVector) {
+    stringRefVec.emplace_back(arg);
+  }
+  ArrayRef<StringRef> argsArrayRef(stringRefVec);
+
+  std::string errMsg;
+  bool executionFailed;
+  // Find the program in the PATH
+  auto programName = llvm::sys::findProgramByName(argsArrayRef[0]);
+  std::error_code ec = programName.getError();
+  if (ec) {
+    llvm::errs() << "Could not find program with name: " << argsArrayRef[0]
+                 << "\n";
+    return -1;
+  }
+
+  int exitCode = sys::ExecuteAndWait(*programName, argsArrayRef, std::nullopt,
+                                     {}, 0, 0, &errMsg, &executionFailed);
+
+  return exitCode;
+}
+
 // Runs a shell command and redirects the stdout to the provided file.
-static int executeWithRedirect(const std::string &command,
-                               const std::filesystem::path &stdoutFile) {
+int executeWithRedirect(const std::string &command,
+                        const std::filesystem::path &stdoutFile) {
 
   std::istringstream cmdStream(command);
   std::vector<StringRef> stringRefVec;

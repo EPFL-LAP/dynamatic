@@ -27,7 +27,7 @@
 #include "ElasticMiterTestbench.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
-#include "SmvUtils.h"
+#include "experimental/Support/SmvUtils.h"
 
 namespace cl = llvm::cl;
 using namespace mlir;
