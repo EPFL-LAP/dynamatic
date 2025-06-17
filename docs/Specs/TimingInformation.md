@@ -11,7 +11,7 @@ Each operator in a hardware circuit is characterized by two fundamental timing p
 
 We classify combinational delays into two categories:
 
-- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator.
+- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator. 
 
 - **Port2Reg delays**: Combinational delays either from an input port to the first register stage, or from the last register stage to an output port. These capture the logic surrounding the sequential boundaries of an operator.
 
@@ -38,6 +38,7 @@ The combinational delays can connect ports of the same or different types. The o
 
 **Note** : The current code does not seem to use the information related to inport and outport delays. Furthermore all the port delays are 0 for all listed components. We assume this is the intended behaviour for now. We welcome a change to this documentation if the code structure changes. 
 
+**Internal combinational delay** : The longest combinational path delay within a single operator — i.e., the time it takes for signals to propagate through the most complex logic path inside that operator without being interrupted by clocked elements. While the above focuses on delays relevant to relative placement and timing of operators, the operating frequency of the entire circuit is ultimately limited by the operating frequency of the slowest operator, which is defined as the inverse of this internal delay.
 
 
 ## Where Timing Data is Stored
@@ -48,7 +49,9 @@ All timing information lives in the [components JSON file](https://github.com/EP
 {
   "handshake.addi": {
     "latency": {
-      "64": 0.0
+      "64":{
+        "2.3": 8,
+        "4.2": 4
     },
     "delay": {
       "data": {
@@ -74,7 +77,7 @@ All timing information lives in the [components JSON file](https://github.com/EP
 ```
 
 The JSON object encodes the following timing information:
-- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth.
+- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth. For every bitwidth, a map lists all existing implementations, providing their internal combinational delay as key and the latency as value.
 - `delays`: A dictionary describing intra-port delays — i.e., combinational delays between input and output ports with no intervening registers (in nanoseconds).
 - `inport`: A dictionary specifying port2reg delays from an input port to the first register stage (in nanoseconds).
 - `outport`: A dictionary specifying port2reg delays from the last register stage to an output port (in nanoseconds).
@@ -118,9 +121,13 @@ The timing system uses the following core data structures:
   - This structure contains three fields : data, valid and ready delays. The first one is represented using the `BitwidthDepMetric` structure.
 
 - **[BitwidthDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
-  - Maps bitwidths to timing values (e.g., for latency 32-bit → 9 cycles)
+  - Maps bitwidths to timing values (e.g., for latency 32-bit → 3ns delay) - these values can be complex structures, like maps.
   - Supports queries like `getCeilMetric(bitwidth)` to return the timing value for the closest equal or greater supported bitwidth.
 
+
+- **[DelayDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
+  - Maps delays to timing values (e.g., for delay 3.5ns → 9 cycles)
+  - Supports queries like `getDelayMetric(targetCP)` to return the timing value for the highest listed delay that remains smaller than the targetCP.
 
 
 ## Loading Timing Data from JSON
