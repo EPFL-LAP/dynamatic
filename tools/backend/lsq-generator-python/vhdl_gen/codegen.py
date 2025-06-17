@@ -48,5 +48,3 @@ def codeGen(path_rtl, configs):
     # Change the name of the following module to lsq_core
     lsq_core = lsq.LSQ(name, '', configs)
     lsq_core.generate(gen_container, path_rtl)
-
-
