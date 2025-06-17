@@ -6,14 +6,14 @@ from vhdl_gen.operators import *
 class PortToQueueDispatcher:
     def __init__(
             self,
-            name: str, 
+            name: str,
             suffix: str,
 
-            numPorts:           int,
-            numEntries:         int,
-            bitsW:              int,
-            portAddrW:          int
-        ):
+        numPorts:           int,
+        numEntries:         int,
+        bitsW:              int,
+        portAddrW:          int
+    ):
 
         self.name = name
         self.module_name = name + suffix
@@ -23,8 +23,6 @@ class PortToQueueDispatcher:
         self.bitsW = bitsW
         self.portAddrW = portAddrW
 
-        
-    
     def generate(self, path_rtl) -> None:
         """
         Port-to-Queue (Port-to-Entry) Dispatcher
@@ -93,15 +91,18 @@ class PortToQueueDispatcher:
         arch = ''
 
         # IOs
-        port_bits_i = LogicVecArray(ctx, 'port_bits', 'i', self.numPorts, self.bitsW)
+        port_bits_i = LogicVecArray(
+            ctx, 'port_bits', 'i', self.numPorts, self.bitsW)
         port_valid_i = LogicArray(ctx, 'port_valid', 'i', self.numPorts)
         port_ready_o = LogicArray(ctx, 'port_ready', 'o', self.numPorts)
         entry_valid_i = LogicArray(ctx, 'entry_valid', 'i', self.numEntries)
-        entry_bits_valid_i = LogicArray(ctx, 'entry_bits_valid', 'i', self.numEntries)
+        entry_bits_valid_i = LogicArray(
+            ctx, 'entry_bits_valid', 'i', self.numEntries)
         if (self.numPorts != 1):
             entry_port_idx_i = LogicVecArray(
                 ctx, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
-        entry_bits_o = LogicVecArray(ctx, 'entry_bits', 'o', self.numEntries, self.bitsW)
+        entry_bits_o = LogicVecArray(
+            ctx, 'entry_bits', 'o', self.numEntries, self.bitsW)
         entry_wen_o = LogicArray(ctx, 'entry_wen', 'o', self.numEntries)
         queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', self.numEntries)
 
@@ -116,21 +117,22 @@ class PortToQueueDispatcher:
 
         # Mux for the data/addr
         for i in range(0, self.numEntries):
-            arch += Mux1H(ctx, entry_bits_o[i], port_bits_i, entry_port_valid[i])
+            arch += Mux1H(ctx, entry_bits_o[i],
+                          port_bits_i, entry_port_valid[i])
 
         # Entries that request data/address from a any port
         entry_request_valid = LogicArray(
             ctx, 'entry_request_valid', 'w', self.numEntries)
         for i in range(0, self.numEntries):
             arch += Op(ctx, entry_request_valid[i], entry_valid_i[i],
-                    'and', 'not', entry_bits_valid_i[i])
+                       'and', 'not', entry_bits_valid_i[i])
 
         # Entry-port pairs that the entry request the data/address from the port
         entry_port_request = LogicVecArray(
             ctx, 'entry_port_request', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             arch += Op(ctx, entry_port_request[i], entry_port_valid[i],
-                    'when', entry_request_valid[i], 'else', 0)
+                       'when', entry_request_valid[i], 'else', 0)
 
         # Reduce the matrix for each entry to get the ready signal:
         # If one or more entries is requesting data/address from a certain port, ready is set high.
@@ -151,7 +153,7 @@ class PortToQueueDispatcher:
         entry_port_hs = LogicVecArray(
             ctx, 'entry_port_hs', 'w', self.numEntries, self.numPorts)
         arch += CyclicPriorityMasking(ctx, entry_port_hs,
-                                    entry_port_and, queue_head_oh_i)
+                                      entry_port_and, queue_head_oh_i)
 
         # Reduce for each entry(row), which generates write enable signal for entries
         for i in range(0, self.numEntries):
@@ -172,22 +174,19 @@ class PortToQueueDispatcher:
             file.write('begin\n' + arch + '\n')
             file.write('end architecture;\n')
 
-
-
-
     def instantiate(
-            self,
-            ctx:                VHDLContext,
-            port_bits_i:        LogicVecArray,
-            port_valid_i:       LogicArray,
-            port_ready_o:       LogicArray,
-            entry_valid_i:      LogicArray,
-            entry_bits_valid_i: LogicArray,
-            entry_port_idx_i:   LogicVecArray,
-            entry_bits_o:       LogicVecArray,
-            entry_wen_o:        LogicArray,
-            queue_head_oh_i:    LogicVec
-        ) -> str:
+        self,
+        ctx:                VHDLContext,
+        port_bits_i:        LogicVecArray,
+        port_valid_i:       LogicArray,
+        port_ready_o:       LogicArray,
+        entry_valid_i:      LogicArray,
+        entry_bits_valid_i: LogicArray,
+        entry_port_idx_i:   LogicVecArray,
+        entry_bits_o:       LogicVecArray,
+        entry_wen_o:        LogicArray,
+        queue_head_oh_i:    LogicVec
+    ) -> str:
         """
         Port-to-Queue Dispatcher Instantiation
 
@@ -310,14 +309,14 @@ class PortToQueueDispatcher:
 class QueueToPortDispatcher:
     def __init__(
             self,
-            name: str, 
+            name: str,
             suffix: str,
 
-            numPorts:           int,
-            numEntries:         int,
-            bitsW:              int,
-            portAddrW:          int
-        ):
+        numPorts:           int,
+        numEntries:         int,
+        bitsW:              int,
+        portAddrW:          int
+    ):
 
         self.name = name
         self.module_name = name + suffix
@@ -327,8 +326,6 @@ class QueueToPortDispatcher:
         self.bitsW = bitsW
         self.portAddrW = portAddrW
 
-        
-    
     def generate(self, path_rtl) -> None:
         """
         Queue-to-Port (Entry-to-Port) Dispatcher
@@ -394,16 +391,19 @@ class QueueToPortDispatcher:
 
         # IOs
         if (self.bitsW != 0):
-            port_bits_o = LogicVecArray(ctx, 'port_bits', 'o', self.numPorts, self.bitsW)
+            port_bits_o = LogicVecArray(
+                ctx, 'port_bits', 'o', self.numPorts, self.bitsW)
         port_valid_o = LogicArray(ctx, 'port_valid', 'o', self.numPorts)
         port_ready_i = LogicArray(ctx, 'port_ready', 'i', self.numPorts)
         entry_valid_i = LogicArray(ctx, 'entry_valid', 'i', self.numEntries)
-        entry_bits_valid_i = LogicArray(ctx, 'entry_bits_valid', 'i', self.numEntries)
+        entry_bits_valid_i = LogicArray(
+            ctx, 'entry_bits_valid', 'i', self.numEntries)
         if (self.numPorts != 1):
             entry_port_idx_i = LogicVecArray(
                 ctx, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
         if (self.bitsW != 0):
-            entry_bits_i = LogicVecArray(ctx, 'entry_bits', 'i', self.numEntries, self.bitsW)
+            entry_bits_i = LogicVecArray(
+                ctx, 'entry_bits', 'i', self.numEntries, self.bitsW)
         entry_reset_o = LogicArray(ctx, 'entry_reset', 'o', self.numEntries)
         queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', self.numEntries)
 
@@ -421,7 +421,7 @@ class QueueToPortDispatcher:
             ctx, 'entry_port_request', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             arch += Op(ctx, entry_port_request[i], entry_port_valid[i],
-                    'when', entry_valid_i[i], 'else', 0)
+                       'when', entry_valid_i[i], 'else', 0)
 
         # For each port, the oldest entry send bits this cycle. The priority masking per port(column)
         # generates entry-port pairs that will tranfer data/address this cycle.
@@ -429,19 +429,19 @@ class QueueToPortDispatcher:
         entry_port_request_prio = LogicVecArray(
             ctx, 'entry_port_request_prio', 'w', self.numEntries, self.numPorts)
         arch += CyclicPriorityMasking(ctx, entry_port_request_prio,
-                                    entry_port_request, queue_head_oh_i)
+                                      entry_port_request, queue_head_oh_i)
 
         if (self.bitsW != 0):
             for j in range(0, self.numPorts):
                 arch += Mux1H(ctx, port_bits_o[j],
-                            entry_bits_i, entry_port_request_prio, j)
+                              entry_bits_i, entry_port_request_prio, j)
 
         # Mask the matrix with dataValid
         entry_port_request_valid = LogicVecArray(
             ctx, 'entry_port_request_valid', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             arch += Op(ctx, entry_port_request_valid[i], entry_port_request_prio[i],
-                    'when', entry_bits_valid_i[i], 'else', 0)
+                       'when', entry_bits_valid_i[i], 'else', 0)
 
         # Reduce the matrix for each port to get the valid signal:
         # If an entry is providing data/address from a certain port, valid is set high.
@@ -475,23 +475,20 @@ class QueueToPortDispatcher:
             file.write(ctx.signalInitString)
             file.write('begin\n' + arch + '\n')
             file.write('end architecture;\n')
-            
-
-
 
     def instantiate(
-            self,
-            ctx:                VHDLContext,
-            port_bits_o:        LogicVecArray,
-            port_valid_o:       LogicArray,
-            port_ready_i:       LogicArray,
-            entry_valid_i:      LogicArray,
-            entry_bits_valid_i: LogicArray,
-            entry_port_idx_i:   LogicVecArray,
-            entry_bits_i:       LogicVecArray,
-            entry_reset_o:      LogicArray,
-            queue_head_oh_i:    LogicVec
-        ) -> str:
+        self,
+        ctx:                VHDLContext,
+        port_bits_o:        LogicVecArray,
+        port_valid_o:       LogicArray,
+        port_ready_i:       LogicArray,
+        entry_valid_i:      LogicArray,
+        entry_bits_valid_i: LogicArray,
+        entry_port_idx_i:   LogicVecArray,
+        entry_bits_i:       LogicVecArray,
+        entry_reset_o:      LogicArray,
+        queue_head_oh_i:    LogicVec
+    ) -> str:
         """
         Queue-to-Port Dispatcher Instantiation
 
@@ -610,4 +607,3 @@ class QueueToPortDispatcher:
         arch += ctx.get_current_indent() + f');\n'
         ctx.tabLevel -= 1
         return arch
-
