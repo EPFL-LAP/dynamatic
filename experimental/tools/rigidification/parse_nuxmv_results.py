@@ -31,7 +31,7 @@ def parse_nuxmv(json_file, nuxmv_file):
         for line in nuXmv_lines:
             if re.search(id_pattern, line):
                 status_match = re.search(result_pattern, line)
-                # if a match is found update the object only if needed (the new value is different from the old one)
+                # if a match is found, update the object only if needed (the new value is different from the old one)
                 if status_match and obj["check"] != to_bool(status_match.group(1)):
                     obj["check"] = to_bool(status_match.group(1))
                     updated = True
