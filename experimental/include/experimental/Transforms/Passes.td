@@ -112,4 +112,16 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Target clock period for the LSQ pass">];
 }
 
+def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
+  let summary = "Simplifies handshake logic";
+  let description = [{
+    The pass uses the insights gathered from model checking stored in the property database
+    to rigidify some channels and remove the redundant logic associated with them. To do so
+    we place ReadyRemoverOps and ValidMergerOps, that manipulate valid and ready signals.
+  }];
+  let constructor = "dynamatic::experimental::rigidification::createRigidification()";
+  let options = [ Option<"jsonPath", "json-path", "std::string", "",
+    "Path to JSON-formatted file where the properties' information is stored.">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
