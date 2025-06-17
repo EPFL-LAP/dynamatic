@@ -18,15 +18,20 @@ def parse_nuxmv(json_file, nuxmv_file):
     with open(nuxmv_file, 'r') as f:
         nuXmv_lines = f.readlines()
 
-    check_pattern = r"\b(True|False|Unchecked)\b"
+    result_pattern = r"\b(True|False|Unchecked)\b"
 
     updated = False
     for obj in json_data:
         obj_id = obj.get("id")
-        pattern = fr"p{obj_id}\]"
+        # a line in the NuXmv report looks like this:
+        #   [Invar          False          N/A    fir.p75]
+        #
+        # We therefore extract the id with the following pattern
+        id_pattern = fr"p{obj_id}\]"
         for line in nuXmv_lines:
-            if re.search(pattern, line):
-                status_match = re.search(check_pattern, line)
+            if re.search(id_pattern, line):
+                status_match = re.search(result_pattern, line)
+                # if a match is found update the object only if needed (the new value is different from the old one)
                 if status_match and obj["check"] != to_bool(status_match.group(1)):
                     obj["check"] = to_bool(status_match.group(1))
                     updated = True
