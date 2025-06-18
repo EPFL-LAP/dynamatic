@@ -63,53 +63,11 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
         0.5);
     bool useShiftReg = channelVars.shiftReg.get(GRB_DoubleAttr_X) > 0.5;
 
-    bool hasOneThroughputCFDFC = false;
-    for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-      if (cfdfc->channels.contains(channel)) {
-        double throughput =
-            vars.cfdfcVars[cfdfc].throughput.get(GRB_DoubleAttr_X);
-        if (throughput > 0.7) {
-          hasOneThroughputCFDFC = true;
-          break;
-        }
-      }
-    }
-
     PlacementResult result;
-    if (useShiftReg) {
-      result.numShiftRegDV = dataLatency;
-      result.numOneSlotR = readyLatency;
-      result.numFifoNone = numSlotsToPlace - dataLatency - readyLatency;
-      if (dataLatency == 1) {
-        result.numShiftRegDV = 0;
-        result.numOneSlotDV = 1;
-      }
-    } else {
-      if (dataLatency + readyLatency <= numSlotsToPlace) {
-        if (dataLatency == 0) {
-          result.numFifoNone = numSlotsToPlace;
-        } else {
-          result.numOneSlotDV = dataLatency;
-          result.numOneSlotR = 1;
-          result.numFifoNone = numSlotsToPlace - dataLatency - readyLatency;
-        }
-      } else {
-        hasOneThroughputCFDFC = true;
-        if (hasOneThroughputCFDFC) {
-          if (dataLatency == 1) {
-            result.numOneSlotDV = 1;
-            result.numOneSlotR = 1;
-          } else {
-            result.numOneSlotDV = dataLatency - 1;
-            result.numOneSlotR = 1;
-          }
-        } else {
-          result.numOneSlotDV = numSlotsToPlace - readyLatency;
-          result.numOneSlotDVR = dataLatency + readyLatency - numSlotsToPlace;
-          result.numOneSlotR = numSlotsToPlace - dataLatency;
-        }
-      }
-    }
+    result.numOneSlotDV = useShiftReg ? 0 : dataLatency;
+    result.numShiftRegDV = useShiftReg ? dataLatency : 0;
+    result.numOneSlotR = readyLatency;
+    result.numFifoNone = numSlotsToPlace - dataLatency - readyLatency;
 
     placement[channel] = result;
   }
