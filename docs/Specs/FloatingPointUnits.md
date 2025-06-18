@@ -1,6 +1,6 @@
 # Floating Point Units
 
-This document explains the integration of floating-point units in Dynamatic. Dynamatic relies on external frameworks dedicated to generating efficient floating-point units. The current version of Dynamatic supports floating-point units from two generators:
+This document explains the integration of floating-point units in Dynamatic. Dynamatic relies on external frameworks to generate efficient floating-point units. The current version of Dynamatic supports floating-point units from two generators:
 
 - [FloPoCo](https://flopoco.org/)
 - [Vivado](https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vivado.html)
