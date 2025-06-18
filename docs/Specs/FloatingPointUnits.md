@@ -26,7 +26,10 @@ The default units generator is FloPoCo.
 
 #### IPs integration
 
-Since Vivado generates floating point units based on its own IPs, the user has to download the vivado IPs separately. Please refer to [this link](https://adaptivesupport.amd.com/s/question/0D52E00007G0iKDSAZ/simulating-on-modelsim-with-vivado?language=en_US) for more information. 
+Make sure you have **compatible versions** of Vivado and ModelSim. The following link contains a list of compatible versions:
+https://www.xilinx.com/support/answers/68324.html
+
+Since Vivado generates floating point units based on its own IPs, the user has to download the vivado IPs separately. In order to generate them, in Vivado, select Tools -> Compile simulation libraries -> ModelSim simulator, and set the path to where your ModelSim is.  Please refer to [this link](https://adaptivesupport.amd.com/s/question/0D52E00007G0iKDSAZ/simulating-on-modelsim-with-vivado?language=en_US) for more information. 
 
 
 Once the user has downloaded the Vivado IPs, the user has to update the path of these libraries for modelsim simulation by updating the path `/opt/modelsim_lib/` in this [modelsim.ini](https://github.com/EPFL-LAP/dynamatic/blob/main/tools/hls-verifier/resources/modelsim.ini).
@@ -37,7 +40,7 @@ Additionally, the user has to provide the path to the Vivado installation folder
 
 `set-vivado-path vivado_path`
 
-The default value for the vivado path is `/usr/pack/vivado-2019.1.1-bt/Vivado/2019.1/`. This information is essentially to correctly integrate necessary simulation files of Vivado.
+The default value for the vivado path is `/tools/Xilinx/Vivado/2019.1/`. This information is essentially to correctly integrate necessary simulation files of Vivado.
 
 
 ### RTL and timing information structure
