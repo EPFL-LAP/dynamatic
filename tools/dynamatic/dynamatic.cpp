@@ -91,7 +91,7 @@ struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
   std::string polygeistPath;
-  std::string vivadoPath = "/usr/pack/vivado-2019.1.1-bt/Vivado/2019.1/";
+  std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
