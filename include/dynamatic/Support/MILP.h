@@ -55,11 +55,11 @@ public:
   /// MILP model and its solution at `writeTo`_model.lp and
   /// `writeTo`_solution.json, respectively.
   MILP(GRBEnv &env, const llvm::Twine &writeTo = "")
-      : model(GRBModel(env)), writeTo(writeTo.str()){
-        model.set(GRB_IntParam::GRB_IntParam_Seed, 0);
-        model.set(GRB_IntParam_LogToConsole, 0);
-        model.set(GRB_IntParam_OutputFlag, 1);
-      };
+      : model(GRBModel(env)), writeTo(writeTo.str()) {
+    model.set(GRB_IntParam::GRB_IntParam_Seed, 0);
+    model.set(GRB_IntParam_LogToConsole, 0);
+    model.set(GRB_IntParam_OutputFlag, 1);
+  };
 
   /// Optimizes the MILP. If a logger was provided at object creation, the MILP
   /// model and its solution are stored in plain text in its associated
@@ -122,9 +122,7 @@ public:
   }
 
   /// Marks the MILP as initial state.
-  void resetMILPState() {
-    state = State::FAILED_TO_SETUP;
-  }
+  void resetMILPState() { state = State::FAILED_TO_SETUP; }
 
   /// Determines whether the MILP is in a valid state to be optimized. If this
   /// returns true, `MILP::optimize` can be called to solve the MILP.
