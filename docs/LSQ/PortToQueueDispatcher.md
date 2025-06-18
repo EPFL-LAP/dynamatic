@@ -6,13 +6,13 @@ How addresses and data enter from multiple access ports to the LSQ's internal lo
 ## 1. Overview and Purpose  
 
 
-![Port-to-Queue Dispatcher Top-Level](./figs/LSQ_Top-level_dispatcher.png)
+![Port-to-Queue Dispatcher Top-Level](./figs/LSQ_Top-level_ptq_dispatcher.png)
 
 The Port-to-Queue Dispatcher is a submodule within the Load-Store Queue (LSQ) responsible for routing incoming memory requests (addresses or data) from the dataflow circuit's access ports to the correct queue entries of the load queue and the store queue. All incoming requests are directed into either the load queue or the store queue. These queues are essential for tracking every memory request until its completion. It ensures each load queue or store queue entry gets the correct address or data from the appropriate port.  
 
 We need a total of three **Port-to-Queue Dispatchers**—one each for the load address, store address, and store data. Why? To load, you must first supply the address where the data is stored. Likewise, a store operation needs both the value to write and the address to write it at.  
 
-In the LSQ architecture, memory operations from the main program arrive at dedicated access ports. Because multiple ports can try to send data simultaneously, a mechanism is needed to arbitrate these requests and write them into the LSQ.
+In the LSQ architecture, memory operations from the dataflow circuit arrive at dedicated access ports. Because multiple ports can try to send data simultaneously, a mechanism is needed to arbitrate these requests and write them into the load queue and the store queue.
 
 ## 2. Port-to-Queue Dispatcher Internal Blocks
 
@@ -23,13 +23,13 @@ In the LSQ architecture, memory operations from the main program arrive at dedic
 | -------------------- |  --------------- |
 | `port_bits_i[p]`        | _“Here is my 8-bit payload.”_ (address or data)  |
 | `port_valid_i[p]`       | _“…and I really mean it.”_  High when the payload is ready.   |
-| `port_ready_o[p]`       | Dispatcher replies: _“Sure, send it!”_  Goes high if the LSQ can take the request this cycle.  |
-| `entry_valid_i[e]`      | Is LSQ entry **_e_** logically allocated?   |
+| `port_ready_o[p]`       | Dispatcher replies: _“Sure, send it!”_  Goes high if the queue can take the request this cycle.  |
+| `entry_valid_i[e]`      | Is queue entry **_e_** logically allocated?   |
 | `entry_bits_valid_i[e]` | Has the addr/data slot already been filled? |
 | `entry_port_idx_i[e]`   | Indicates to which port the entry is assigned|
-| `entry_bits_o[e]`       | The data actually written into LSQ entry **_e_**. Think of it as the ink flowing into row **_e_** on the whiteboard.|
+| `entry_bits_o[e]`       | The data actually written into the queue entry **_e_**. Think of it as the ink flowing into row **_e_** on the whiteboard.|
 | `entry_wen_o[e]`        | A short pulse that says _“commit the write into entry **_e_** now.”_ |
-| `queue_head_oh_i[e]`    | One-hot vector indicating the head entry in LSQ |
+| `queue_head_oh_i[e]`    | One-hot vector indicating the head entry in the queue |
 
 
 The Port-to-Queue Dispatcher has the following responsibilities:
@@ -58,9 +58,9 @@ This block manages the `valid/ready` handshake protocol with the external access
     - **Processing**: It determines if any waiting entry is requesting data from a specific port. If so, it asserts the `ready` signal for that port, indicating it is prepared to accept the payload. Furthermore, it filters all waiting requests against the incoming `port_valid_i` signals to determine the final set of active requests that are passed to the `Arbitration Logic`.
 
 5. **Arbitration Logic**  
-The core decision making block of the dispatcher. When multiple valid requests are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones.
+The core decision making block of the dispatcher. When multiple valid requests are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones for each port.
     - **Input**: The set of all currently valid and ready requests (informed by `Handshake Logic`), and `queue_head_oh_i` to determine priority.
-    - **Processing**: It uses a Cyclic Priority Masking algorithm. This ensures that among all candidates, the one corresponding to the oldest entry in the queue is granted for the current clock cycle.
+    - **Processing**: It uses a Cyclic Priority Masking algorithm. This ensures that among all candidates for each port, the one corresponding to the oldest entry in the queue is granted for the current clock cycle.
     - **Output**: `entry_wen_o` signal, which acts as the enable for the queue entry. This signal finally makes the queue's `entry_bits_valid` signal high.
 
 
@@ -72,7 +72,7 @@ The core decision making block of the dispatcher. When multiple valid requests a
 
 ### Example of Store Address Port-to-Queue Dispatcher (3 Store Ports, 4 Store Queue Entries)
 
-1. **Matching: Identifying which LSQ slots are empty**  
+1. **Matching: Identifying which queue slots are empty**  
 The first job of this block is to determine which entries in the store queue are waiting for a store address.  
 Based on the example diagram:  
     - **Entry 1** is darkened to indicate that it has not been allocated by the Group Allocator. Its `Store Queue Valid` signal (equivalent to `entry_valid_i`) is `0`.  
@@ -122,13 +122,39 @@ Based on the example diagram:
         
 
 5. **Arbitration Logic: Selecting the oldest active entry**  
-This block is responsible for selecting the oldest active request and generating the write enable signal for such request.  
+This block is responsible for selecting the oldest active request for each port and generating the write enable signal for such requests.  
 Based on the example diagram:
     - The `Handshake Logic` has identified two active requests: one for `Entry 0` from `Port 1` and another for `Entry 3` from `Port 2`.
-    - Priority is determined by the `queue_head_oh_i` signal, which points to the oldest entry in the queue. In this case, the head pointer is at `Entry 2`. This establishes a priority order of `2 -> 3 -> 0 -> 1`. 
-    - The `CyclicPriorityMasking` algorithm compares the active requests (for `Entry 0` and `Entry 3`) against this priority sequence. Because `Entry 3` appears before `Entry 0` in the priority order, `Entry 3` is selected as the oldest of the arbitration.
-    - As a result, the `entry_wen_o` signal is asserted only for `Entry 3`, while the signals for all other entries remain de-asserted.
+    - The CyclicPriorityMasking algorithm operates independently on each port's request list.
+        - For `Port 1`, the only active request is from `Entry 0` (`1000`, 1st column of `entry_port_and`). With no other competitors for this port, `Entry 0` is selected as the winner for `Port 1`.
+        - For `Port 2`, the only active request is from `Entry 3` (`0001`, 0th column of `entry_port_and`). Similarly, it is selected as the winner for `Port 2`.
+    
+    As a result, the `entry_wen_o` signal is asserted for both `Entry 0` and `Entry 3`, allowing two writes to proceed in parallel in the same clock cycle.
 
+    To illustrate this process, let's assume the `entry_port_and` matrix, which represents all "live" requests, is as follows:
 
+                 P2 P1 P0
+        E0:    [ 0, 1, 0 ]
+        E1:    [ 1, 0, 0 ]
+        E2:    [ 0, 0, 0 ]
+        E3:    [ 1, 0, 0 ]
 
+    * **Priority Determination**: The `queue_head_oh_i` signal indicates that the head of the queue is at **Entry 2**. This establishes a priority order of **`2 -> 3 -> 0 -> 1`** for all arbitrations in this cycle.
+
+    The `CyclicPriorityMasking` algorithm is then applied independently to each port's column of requests:
+
+    * **For Port 2** (leftmost column `[0, 1, 0, 1]`): The active requests are from **Entry 1** and **Entry 3**. According to the priority order (`...3 -> 0 -> 1`), Entry 3 is older (has higher priority) than Entry 1. Therefore, **Entry 3** wins the arbitration for Port 2.
+
+    * **For Port 1** (middle column `[1, 0, 0, 0]`): The only active request is from **Entry 0**. With no other competitors for this port, **Entry 0** is automatically selected as the winner for Port 1.
+
+    * **For Port 0** (rightmost column `[0, 0, 0, 0]`): There are no active requests, so there is no winner.
+
+    After the priority masking is complete, the resulting `entry_port_hs` matrix, which indicates the winners, becomes:
+
+                 P2 P1 P0
+        E0:    [ 0, 1, 0 ]  // Winner for Port 1
+        E1:    [ 0, 0, 0 ]
+        E2:    [ 0, 0, 0 ]
+        E3:    [ 1, 0, 0 ]  // Winner for Port 2
+    
 
