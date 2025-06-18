@@ -6,8 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Cost-aware smart buffer placement, as presented in
-// https://dl.acm.org/doi/full/10.1145/3477053
+// Cost-aware smart buffer placement.
 //
 // This mainly declares the `CostAwareBuffers` class, which inherits the
 // abstract `BufferPlacementMILP` class to setup and solve a real MILP from
