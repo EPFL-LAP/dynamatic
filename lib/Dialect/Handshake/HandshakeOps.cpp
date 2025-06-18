@@ -433,17 +433,18 @@ LogicalResult BufferOp::verify() {
 
   auto bufferTypeAttr = parametersAttr.getAs<StringAttr>("BUFFER_TYPE");
   if (!bufferTypeAttr)
-    return emitOpError("missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'BUFFER_TYPE' in 'hw.parameters'");
 
   auto numSlotsAttr = parametersAttr.getAs<IntegerAttr>("NUM_SLOTS");
   if (!numSlotsAttr)
-    return emitOpError("missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
+    return emitOpError(
+        "missing required attribute 'NUM_SLOTS' in 'hw.parameters'");
 
   StringRef bufferType = bufferTypeAttr.getValue();
   unsigned numSlots = numSlotsAttr.getValue().getZExtValue();
 
-  if ((bufferType == ONE_SLOT_BREAK_DV ||
-       bufferType == ONE_SLOT_BREAK_R ||
+  if ((bufferType == ONE_SLOT_BREAK_DV || bufferType == ONE_SLOT_BREAK_R ||
        bufferType == ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
