@@ -24,7 +24,7 @@ DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
 DYNAMATIC_EXPORT_CFG_BIN="$DYNAMATIC_DIR/bin/export-cfg"
 
-DYNAMATIC_EXPERIMENTAL_RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidification.sh"
+RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidification.sh"
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"

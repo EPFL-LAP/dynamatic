@@ -58,13 +58,12 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Generates a testbench for formal verification."
-      "It instantiates the module under test and provides valid"
-      "inputs to it."
-      "Usage Example:\n"
-      "testbench-generator -i integration-tests/fir/out/hdl/ --name fir"
-      "-o integration-tests/fir/out/hdl/"
-      "--mlir intregation-tests/fir/out/comp/hw.mlir/n");
+      R"DELIM(Generates a testbench for formal verification. It
+instantiates the module under test and provides valid inputs to it.
+
+Usage Example:
+testbench-generator -i integration-tests/fir/out/hdl/ --name fir -o
+integration-tests/fir/out/hdl/ --mlir intregation-tests/fir/out/comp/hw.mlir/n)DELIM");
 
   // Register the supported dynamatic dialects and create a context
   DialectRegistry registry;
@@ -74,11 +73,10 @@ int main(int argc, char **argv) {
   std::string kernelName = kernelNameArg.getValue();
   std::filesystem::path mlirPath = mlirPathArg.getValue();
   std::filesystem::path modelPath = modelPathArg.getValue();
-  std::filesystem::path outputDir = outputDirArg.getValue();
   std::filesystem::path wrapperPath = modelPath / "main.smv";
 
   // Create the outputDir if it doesn't exist
-  std::filesystem::create_directories(outputDir);
+  std::filesystem::create_directories(modelPath);
 
   OwningOpRef<ModuleOp> moduleRef =
       parseSourceFile<ModuleOp>(mlirPath.string(), &context);
