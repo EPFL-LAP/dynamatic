@@ -73,11 +73,11 @@ MODULE {name}({mc_in_ports})
   -- stAddr_*_ready: ready signal for the store address ports. This signal 
   -- is derived from the arbiter s decision (the store port is ready 
   -- only if the store port is selected by the arbiter).
-  {"\n  ".join([f"stAddr_{n}_ready := TRUE;" for n in range(num_stores)])}
+  {"\n  ".join([f"stAddr_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_stores)])}
 
   -- stData_*_ready: ready signal for the store data ports. This signal
   -- is activated the same way as stAddr_*_ready.
-  {"\n  ".join([f"stData_{n}_ready := TRUE;" for n in range(num_stores)])}
+  {"\n  ".join([f"stData_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_stores)])}
 
   loadEn := FALSE; -- in a loadless memory controller there are no loads
   loadAddr := {addr_type.format_constant(0)};
