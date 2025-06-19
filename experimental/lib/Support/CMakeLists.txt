@@ -9,7 +9,6 @@ add_dynamatic_library(DynamaticExperimentalSupport
   FtdImplementation.cpp
   FtdSupport.cpp
   FormalProperty.cpp
-  SmvUtils.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR

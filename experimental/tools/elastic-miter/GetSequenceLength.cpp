@@ -22,7 +22,7 @@
 #include "ElasticMiterTestbench.h"
 #include "FabricGeneration.h"
 #include "GetSequenceLength.h"
-#include "experimental/Support/SmvUtils.h"
+#include "SmvUtils.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;

@@ -7,6 +7,7 @@ add_llvm_tool(elastic-miter
   GetSequenceLength.cpp
   FabricGeneration.cpp
   ElasticMiterTestbench.cpp
+  SmvUtils.cpp
   Constraints.cpp
 )
 

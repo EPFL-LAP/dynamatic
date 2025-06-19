@@ -2,12 +2,12 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_llvm_tool(rigidification
-  rigidification.cpp
+add_llvm_tool(rigidification-testbench
+  rigidification-testbench.cpp
 )
 
-llvm_update_compile_flags(rigidification)
-target_link_libraries(rigidification
+llvm_update_compile_flags(rigidification-testbench)
+target_link_libraries(rigidification-testbench
   PRIVATE
   DynamaticHandshake
   DynamaticExperimentalSupport
