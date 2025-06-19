@@ -17,7 +17,7 @@ def generate_fork(name, params):
 def _generate_fork_dataless(name, size):
     return f"""
 MODULE {name}(ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)])})
-  {"\n    ".join([f"VAR inner_reg_block_{n} : {name}__eager_fork_register_block(ins_valid, outs_{n}_ready, backpressure);" for n in range(size)])}
+  {"\n  ".join([f"VAR inner_reg_block_{n} : {name}__eager_fork_register_block(ins_valid, outs_{n}_ready, backpressure);" for n in range(size)])}
 
   DEFINE
   any_block_stop := {" | ".join([f"inner_reg_block_{n}.block_stop" for n in range(size)])};
@@ -38,7 +38,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)
   VAR
   inner_fork : {name}__fork_dataless(ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)])});
 
-  //output
+  -- outputs
   DEFINE
   ins_ready := inner_fork.ins_ready;
   {"\n  ".join([f"outs_{n} := ins;" for n in range(size)])}
