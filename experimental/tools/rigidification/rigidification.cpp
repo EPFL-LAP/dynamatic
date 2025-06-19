@@ -1,4 +1,4 @@
-//===----------- rigidification.cpp -------------------*-C++ -*-===//
+//===----------- rigidification-testbench.cpp -------------------*-C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the rigidification pass
+// This file generates a testbench for formal verification.
 //
 //===----------------------------------------------------------------------===//
 
@@ -104,15 +104,13 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Rigidification pass."
-      "It applies verificaton-based optimization to the input MLIR file:\n"
-      "   - Annotates Absence of Backpressure and Valid Equivalence\n"
-      "   - Generates a formal model of the circuit\n"
-      "   - Checks the model with NuXmv\n"
-      "   - Applies rigidification based on the results of model checking\n\n"
-
+      "Generates a testbench for formal verification."
+      "It instantiates the module under test and provides valid"
+      "inputs to it."
       "Usage Example:\n"
-      "rigidification --mlir hw.mlir -w formal --name fir");
+      "testbench-generator -i integration-tests/fir/out/hdl/ --name fir"
+      "-o integration-tests/fir/out/hdl/"
+      "--mlir intregation-tests/fir/out/comp/hw.mlir/n");
 
   std::string kernelName = kernelNameArg.getValue();
   std::filesystem::path mlirPath = mlirPathArg.getValue();
