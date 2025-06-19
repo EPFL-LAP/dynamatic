@@ -22,12 +22,12 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-    --handshake-annotate-properties=json-path=$F_FORMAL_PROP \
-    > /dev/null
+  --handshake-annotate-properties=json-path=$F_FORMAL_PROP \
+  > /dev/null
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
-    > "$F_FORMAL_HW"
+  > "$F_FORMAL_HW"
 
 # generate SMV
 "$DYNAMATIC_EXPORT_RTL_BIN" "$F_FORMAL_HW" $MODEL_DIR data/rtl-config-smv.json --hdl smv --property-database $F_FORMAL_PROP
@@ -70,13 +70,13 @@ i=0
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
 nuXmv -source $F_NUXMV_CMD | while IFS= read -r line; do
-    ((i++))
-    percent=$(( i * 100 / total ))
-    filled=$(( i * bar_length / total ))
-    bar=$(printf "%-${filled}s" "#" | tr ' ' '#') >&2
-    max_line_length=$(( $(tput cols) - bar_length - 20 ))
-    display_line="${line:0:max_line_length}"
-    printf "\r\033[K[%-${bar_length}s] %3d%% %s" "$bar" "$percent" "$display_line" >&2
+  ((i++))
+  percent=$(( i * 100 / total ))
+  filled=$(( i * bar_length / total ))
+  bar=$(printf "%-${filled}s" "#" | tr ' ' '#') >&2
+  max_line_length=$(( $(tput cols) - bar_length - 20 ))
+  display_line="${line:0:max_line_length}"
+  printf "\r\033[K[%-${bar_length}s] %3d%% %s" "$bar" "$percent" "$display_line" >&2
 done
 
 # parse the results

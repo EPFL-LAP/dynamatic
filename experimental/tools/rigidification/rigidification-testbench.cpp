@@ -39,15 +39,12 @@ static cl::OptionCategory generalCategory("Testbench options");
 
 static cl::opt<std::string>
     modelPathArg("i", cl::Prefix, cl::Required,
-                 cl::desc("Path to the SMV model to check"),
-                 cl::cat(generalCategory));
+                 cl::desc("Path to the SMV model to check"));
 static cl::opt<std::string> mlirPathArg("mlir", cl::Prefix, cl::Required,
-                                        cl::desc("Path to the MLIR file"),
-                                        cl::cat(generalCategory));
+                                        cl::desc("Path to the MLIR file"));
 
 static cl::opt<std::string> kernelNameArg("name", cl::Prefix, cl::Required,
-                                          cl::desc("Kernel name"),
-                                          cl::cat(generalCategory));
+                                          cl::desc("Kernel name"));
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
