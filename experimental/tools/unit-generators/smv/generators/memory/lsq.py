@@ -88,7 +88,7 @@ MODULE {name} ({lsq_in_ports})
   init(all_requests_done) := FALSE;
   next(all_requests_done) := {{FALSE, TRUE}};
 
-  {_generate_lsq_logic(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
+  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
 
   storeData := {data_type.format_constant(0)};
   storeAddr := {addr_type.format_constant(0)};
@@ -135,7 +135,7 @@ def _generate_lsq_slave(
 MODULE {name} ({lsq_in_ports})
 
   DEFINE loadData := ldDataFromMC;
-  {_generate_lsq_logic(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
+  {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
 
   stDataToMC := {data_type.format_constant(0)};
   stDataToMC_valid := in_storeEn;
@@ -150,7 +150,7 @@ MODULE {name} ({lsq_in_ports})
 """
 
 
-def _generate_lsq_logic(
+def _generate_lsq_core(
     name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity
 ):
     return f"""
@@ -189,6 +189,7 @@ def _generate_lsq_logic(
 
 
 def _generate_nd_load_port(name, capacity, addr_type, data_type):
+    # generates a non-deterministic load port, that simulates any stall that can happen from a read operation (memory stall or memory dependency)
     return f"""
 MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid & ctrl_valid, inner_capacity.ins_ready);
@@ -210,6 +211,7 @@ MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
 
 
 def _generate_nd_store_port(name, capacity, addr_type, data_type):
+    # generates a non-deterministic store port, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
     return f"""
 MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid & ctrl_valid, inner_addr_capacity.ins_ready);
