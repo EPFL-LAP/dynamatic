@@ -570,7 +570,7 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 
   // Check whether there is a bin directory in the Vivado path
   // There should be no bin since we are looking for the top-level directory
-  if (fs::exists(vivadoPath + sep + "bin")) {
+  if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
     llvm::outs() << ERR
                  << "The path to Vivado should not contain a 'bin' directory, "
                     "please specify the top-level Vivado directory.\n";
