@@ -91,6 +91,8 @@ struct FrontendState {
   std::string cwd;
   std::string dynamaticPath;
   std::string polygeistPath;
+  std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
+  std::string fpUnitsGenerator = "flopoco";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
@@ -225,6 +227,30 @@ public:
       : Command("set-polygeist-path",
                 "Sets the path to Polygeist installation directory", state) {
     addPositionalArg({"path", "path to Polygeist installation directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetVivadoPath : public Command {
+public:
+  SetVivadoPath(FrontendState &state)
+      : Command("set-vivado-path",
+                "Sets the path to Vivado installation directory", state) {
+    addPositionalArg({"path", "path to Vivado installation directory"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetFPUnitsGenerator : public Command {
+public:
+  SetFPUnitsGenerator(FrontendState &state)
+      : Command("set-fp-units-generator",
+                "Sets the floating-point units generator to use", state) {
+    addPositionalArg({"generator",
+                      "floating-point units generator, values are 'flopoco' "
+                      "(default option) or 'vivado'"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -535,6 +561,37 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
   return CommandResult::SUCCESS;
 }
 
+CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  // Remove the separator at the end of the path if there is one
+  StringRef sep = sys::path::get_separator();
+  std::string vivadoPath = args.positionals.front().str();
+  if (StringRef(vivadoPath).ends_with(sep))
+    vivadoPath = vivadoPath.substr(0, vivadoPath.size() - 1);
+
+  // Check whether there is a bin directory in the Vivado path
+  // There should be no bin since we are looking for the top-level directory
+  if (vivadoPath.compare(vivadoPath.size() - 4, 4, "/bin") == 0) {
+    llvm::outs() << ERR
+                 << "The path to Vivado should not contain a 'bin' directory, "
+                    "please specify the top-level Vivado directory.\n";
+    return CommandResult::FAIL;
+  }
+
+  state.vivadoPath = state.makeAbsolutePath(vivadoPath);
+  return CommandResult::SUCCESS;
+}
+
+CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  StringRef generator = args.positionals.front();
+  if (generator == "flopoco" || generator == "vivado") {
+    state.fpUnitsGenerator = generator.str();
+    return CommandResult::SUCCESS;
+  }
+  llvm::outs() << ERR << "Unknown floating-point units generator '" << generator
+               << "', possible options are 'flopoco' and 'vivado'.\n";
+  return CommandResult::FAIL;
+}
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
@@ -588,8 +645,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), state.polygeistPath,
-                 sharing);
+                 floatToString(state.targetCP, 3), state.polygeistPath, sharing,
+                 state.fpUnitsGenerator);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -616,7 +673,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl);
+                 state.getKernelName(), hdl, state.fpUnitsGenerator);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
@@ -626,7 +683,8 @@ CommandResult Simulate::execute(CommandArguments &args) {
 
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName());
+                 state.getOutputDir(), state.getKernelName(), state.vivadoPath,
+                 state.fpUnitsGenerator == "vivado" ? "true" : "false");
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
@@ -711,6 +769,8 @@ int main(int argc, char **argv) {
   FrontendCommands commands;
   commands.add<SetDynamaticPath>(state);
   commands.add<SetPolygeistPath>(state);
+  commands.add<SetVivadoPath>(state);
+  commands.add<SetFPUnitsGenerator>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);
