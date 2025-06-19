@@ -2,9 +2,11 @@
   {
     "name": "handshake.addf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECTED_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
+    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -56,9 +58,11 @@
   {
     "name": "handshake.divf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECTED_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/divf.vhd",
+    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -112,9 +116,11 @@
   {
     "name": "handshake.mulf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "SELECTED_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/mulf.vhd",
+    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
