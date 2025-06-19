@@ -22,12 +22,12 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
-    --handshake-annotate-properties=json-path=$F_FORMAL_PROP \ 
+    --handshake-annotate-properties=json-path=$F_FORMAL_PROP \
     > /dev/null
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
-> "$F_FORMAL_HW"
+    > "$F_FORMAL_HW"
 
 # generate SMV
 "$DYNAMATIC_EXPORT_RTL_BIN" "$F_FORMAL_HW" $MODEL_DIR data/rtl-config-smv.json --hdl smv --property-database $F_FORMAL_PROP

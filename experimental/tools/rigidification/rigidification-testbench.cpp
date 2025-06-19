@@ -49,10 +49,6 @@ static cl::opt<std::string> kernelNameArg("name", cl::Prefix, cl::Required,
                                           cl::desc("Kernel name"),
                                           cl::cat(generalCategory));
 
-static cl::opt<std::string> outputDirArg("o", cl::Prefix, cl::Required,
-                                         cl::desc("Specify output directory"),
-                                         cl::cat(generalCategory));
-
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
