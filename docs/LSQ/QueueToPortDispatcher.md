@@ -20,6 +20,7 @@ The primary instance of this module is the **Load Data Port Dispatcher**, which 
 
 ![Queue-to-Port Dispatcher High-Level](./figs/QTP_high_level.png)
 
+### Interface Signals
 | Signal Name          |  Description     |
 | -------------------- | --------------- |
 | `port_bits_o[p]`        | The result data (e.g. loaded from memory) sent to the access port |

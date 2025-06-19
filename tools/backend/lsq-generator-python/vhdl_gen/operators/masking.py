@@ -44,7 +44,7 @@ def CyclicPriorityMasking(ctx: VHDLContext, dout, din, base, reverse=False) -> s
                  010
            base = 001
            reverse = False
-        
+
            priority masking -> (0th col) [0010] with base = 1 -> 0010
            priority masking -> (1st col) [1001] with base = 1 -> 0001
            priority masking -> (2nd col) [0000] with base = 1 -> 0000
