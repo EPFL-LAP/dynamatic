@@ -194,8 +194,9 @@ WireReference::fromSignal(StringRef signalName,
     return WireReference{portIt->second, SignalType::DATA, dataIdx};
   }
 
-  auto checkSingleWire = [&](StringRef suffix,
-                             SignalType signalType) -> std::optional<WireReference> {
+  auto checkSingleWire =
+      [&](StringRef suffix,
+          SignalType signalType) -> std::optional<WireReference> {
     if (!signalName.ends_with(suffix))
       return std::nullopt;
 
@@ -296,7 +297,7 @@ int main(int argc, char **argv) {
   if (!modOp)
     return 1;
 
-  std::string level = "duv/" + kernelName + "_wrapped/";
+  std::string level = "tb/duv_inst/";
   std::string logFile = std::filesystem::temp_directory_path().string() +
                         sys::path::get_separator().str() + "dynamatic_" +
                         kernelName + ".log";
