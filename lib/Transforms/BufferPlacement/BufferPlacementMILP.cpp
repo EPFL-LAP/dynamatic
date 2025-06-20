@@ -265,8 +265,10 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
         return;
 
       // Flip channels on ready path which goes upstream
-      if (signalType == SignalType::READY)
+      if (signalType == SignalType::READY) {
         std::swap(in, out);
+        delay = 0.001;
+      }
 
       GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
       GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
