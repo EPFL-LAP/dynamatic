@@ -16,6 +16,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: sync-submodules
+        run: |
+          git submodule update --recursive .
+          git submodule sync --recursive .
+          echo "polygeist/llvm-project url: " $(git -C ./polygeist/llvm-project remote get-url origin)
+
       - name: check-format-cpp
         run: |
           git fetch origin main --no-recurse-submodules
