@@ -5,19 +5,61 @@ from vhdl_gen.operators import *
 
 class PortToQueueDispatcher:
     def __init__(
-            self,
-            name: str,
-            suffix: str,
-
-        numPorts:           int,
-        numEntries:         int,
-        bitsW:              int,
-        portAddrW:          int
+        self,
+        name: str,
+        suffix: str,
+        numPorts: int,
+        numEntries: int,
+        bitsW: int,
+        portAddrW: int
     ):
+        """
+        Port-to-Queue (Port-to-Entry) Dispatcher
+
+        Models a dispatcher that routes signals from multiple ports to queue entries.
+
+        This class encapsulates the logic for generating a VHDL module that takes
+        arguments from a specific access port and passes them to a corresponding
+        queue entry. 
+
+        This generates three main parts in the LSQ module:
+            1. Load Address Port Dispatcher
+            2. Store Address Port Dispatcher
+            3. Store Data Port Dispatcher
+
+        Initilization Parameters:
+            name       : Base name of the dispatcher.
+            suffix     : Suffix appended to the entity name.
+                - lda: Load Address Port Dispatcher
+                - sta: Store Address Port Dispatcher
+                - std: Store Data Port Dispatcher
+            numPorts   : Number of access ports.
+            numEntries : Number of queue entries.
+            bitsW      : Width of each data/address bus.
+            portAddrW  : Width of the port index bus.
+
+        Instance Variable:
+            self.module_name = name + suffix : Entity and architecture identifier
+
+        Example (Load Address Port Dispatcher):
+            ptq_dispatcher_lda = PortToQueueDispatcher(
+                                    "config_0_core",
+                                    "_lda", 
+                                    configs.numLdPorts, 
+                                    configs.numLdqEntries, 
+                                    configs.addrW, 
+                                    configs.ldpAddrW
+                                )
+
+            # You can later generate VHDL entity and architecture by
+            #     ptq_dispatcher_lda.generate(...)
+            # You can later instantiate VHDL entity by
+            #     ptq_dispatcher_lda.instantiate(...)
+
+        """
 
         self.name = name
         self.module_name = name + suffix
-
         self.numPorts = numPorts
         self.numEntries = numEntries
         self.bitsW = bitsW
@@ -25,45 +67,19 @@ class PortToQueueDispatcher:
 
     def generate(self, path_rtl) -> None:
         """
-        Port-to-Queue (Port-to-Entry) Dispatcher
-
         Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
-        that passes arguments from a specific access port to a corresponding LSQ entry.
-
-        This generates three main parts in LSQ:
-            1. Load Address Port Dispatcher
-            2. Store Address Port Dispatcher
-            3. Store Data Port Dispatcher
+        that passes arguments from a specific access port to a corresponding queue entry.
 
         Parameters:
-            ctx         : VHDLContext for code generation state.
             path_rtl    : Output directory for VHDL files.
-            name        : Base name of the dispatcher.
-            suffix      : Suffix appended to the entity name.
-                - lda: Load Address Port Dispatcher
-                - sta: Store Address Port Dispatcher
-                - std: Store Data Port Dispatcher
-            numPorts    : Number of access ports.
-            numEntries  : Number of queue entries.
-            bitsW       : Width of each data/address bus.
-            portAddrW   : Width of the port index bus.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
-            to the .vhd file at <path_rtl>/<name>_core.vhd.
-            Entity and architecture use the identifier: <name><suffix>
+            to the .vhd file at <path_rtl>/<self.name>.vhd.
+            Entity and architecture use the identifier: <self.module_name>
 
         Example (Load Address Port Dispatcher):
-            PortToQueueDispatcher(
-                ctx,
-                path_rtl="rtl",
-                name="config_0",
-                suffix="_core_lda",
-                numPorts=configs.numLdPorts,
-                numEntries=configs.numLdqEntries,
-                bitsW=configs.addrW,
-                portAddrW=configs.ldpAddrW
-            )
+            ptq_dispatcher_lda.generate(path_rtl="rtl")
 
             produces in rtl/config_0_core.vhd:
 
@@ -82,6 +98,10 @@ class PortToQueueDispatcher:
             end architecture;
         """
 
+        # ctx: VHDLContext for code generation state.
+        # When we generate VHDL entity and architecture, we can use this context as a local variable.
+        # We only need to get the context as a parameter when we instantiate the module.
+        # It saves all information we need when we generate VHDL entity and architecture code.
         ctx = VHDLContext()
 
         ctx.tabLevel = 1
@@ -192,16 +212,13 @@ class PortToQueueDispatcher:
 
         Creates the VHDL port mapping for the Port-to-Queue dispatcher entity.
         Connects the top-level signals (reset, clock, port and entry signals)
-        to the internal dispatcher instance named <name>_dispatcher.
+        to the internal dispatcher instance named <self.module_name>_dispatcher.
 
         Parameters:
             ctx                  : VHDLContext for code generation state.
-            name                 : Base name of the dispatcher entity.
-            numPorts             : Number of access ports.
-            numEntries           : Number of queue entries.
             port_bits_i          : Input data or address bits from each port
             port_valid_i         : Valid signal for each input port (Valid data/address)
-            port_ready_o         : Ready signal indicating LSQ is ready to receive data/address
+            port_ready_o         : Ready signal indicating the queue is ready to receive data/address
             entry_valid_i        : Valid bit for a queue entry
             entry_bits_valid_i   : Valid bit for the contents of a queue entry
             entry_port_idx_i     : Indicates to which port the entry is assigned
@@ -212,15 +229,9 @@ class PortToQueueDispatcher:
         Returns:
             VHDL instantiation string for inclusion in the architecture body.
 
-        Example:
-            # Base architecture: 'config_0_core'
-            # suffix for Load Address Dispatcher instantiation: '_lda'
-
-            arch += PortToQueueDispatcherInst(
+        Example (Load Address Port Dispatcher):
+            arch += ptq_dispatcher_lda.instantiate(
                 ctx,
-                name                = 'config_0_core' + '_lda',
-                numPorts            = configs.numLdPorts,
-                numEntries          = configs.numLdqEntries,
                 port_bits_i         = ldp_addr_i,
                 port_valid_i        = ldp_addr_valid_i,
                 port_ready_o        = ldp_addr_ready_o,
@@ -308,15 +319,53 @@ class PortToQueueDispatcher:
 
 class QueueToPortDispatcher:
     def __init__(
-            self,
-            name: str,
-            suffix: str,
-
-        numPorts:           int,
-        numEntries:         int,
-        bitsW:              int,
-        portAddrW:          int
+        self,
+        name: str,
+        suffix: str,
+        numPorts: int,
+        numEntries: int,
+        bitsW: int,
+        portAddrW: int
     ):
+        """
+        Queue-to-Port (Entry-to-Port) Dispatcher
+
+        Models a dispatcher that routes signals from queue entries to access ports.
+
+        This class encapsulates the logic for generating a VHDL module that takes
+        data from queue entries and routes it to the correct outgoing port based on
+        priority. 
+
+        This generates one main part in the LSQ module:
+            1. Load Data Port Dispatcher
+            2. (Optionally) Store Backward Port Dispatcher
+
+        Initialization Parameters:
+            name        : Base name of the dispatcher.
+            suffix      : Suffix appended to the entity name.
+            numPorts    : Number of access ports.
+            numEntries  : Number of queue entries.
+            bitsW       : Width of each data bus.
+            portAddrW   : Width of the port index bus.
+
+        Instance Variable:
+            self.module_name = name + suffix : Entity and architecture identifier
+
+        Example (Load Data Port Dispatcher):
+            qtp_dispatcher_ldd = QueueToPortDispatcher(
+                                    name="config_0_core",
+                                    suffix="_ldd",
+                                    numPorts=configs.numLdPorts,
+                                    numEntries=configs.numLdqEntries,
+                                    bitsW=configs.addrW,
+                                    portAddrW=configs.ldpAddrW
+                                )
+
+            # You can later generate VHDL entity and architecture by
+            #     qtp_dispatcher_ldd.generate(...)
+            # You can later instantiate VHDL entity by
+            #     qtp_dispatcher_ldd.instantiate(...)
+        """
 
         self.name = name
         self.module_name = name + suffix
@@ -333,36 +382,16 @@ class QueueToPortDispatcher:
         Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
         that routes data from queue entries to their access ports.
 
-        This generates one main part in LSQ:
-            1. Load Data Port Dispatcher
-            2. (Optionally) Store Backward Port Dispatcher
-
         Parameters:
-            ctx         : VHDLContext for code generation state.
             path_rtl    : Output directory for VHDL files.
-            name        : Base name of the dispatcher.
-            suffix      : Suffix appended to the entity name.
-            numPorts    : Number of access ports.
-            numEntries  : Number of queue entries.
-            bitsW       : Width of each data bus.
-            portAddrW   : Width of the port index bus.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
-            to the .vhd file at <path_rtl>/<name>_core.vhd.
-            Entity and architecture use the identifier: <name><suffix>
+            to the .vhd file at <path_rtl>/<self.name>_core.vhd.
+            Entity and architecture use the identifier: <self.module_name>
 
         Example (Load Data Port Dispatcher):
-            QueueToPortDispatcher(
-                ctx,
-                path_rtl="rtl",
-                name="config_0",
-                suffix="_core_ldd",
-                numPorts=configs.numLdPorts,
-                numEntries=configs.numLdqEntries,
-                bitsW=configs.addrW,
-                portAddrW=configs.ldpAddrW
-            )
+            qtp_dispatcher_ldd.generate(path_rtl="rtl")
 
             produces in rtl/config_0_core.vhd:
 
@@ -381,6 +410,11 @@ class QueueToPortDispatcher:
             end architecture;
 
         """
+
+        # ctx: VHDLContext for code generation state.
+        # When we generate VHDL entity and architecture, we can use this context as a local variable.
+        # We only need to get the context as a parameter when we instantiate the module.
+        # It saves all information we need when we generate VHDL entity and architecture code.
         ctx = VHDLContext()
 
         ctx.tabLevel = 1
@@ -494,20 +528,17 @@ class QueueToPortDispatcher:
 
         Creates the VHDL port mapping for the Queue-to-Port dispatcher entity.
         Connects the top-level signals (reset, clock, entry and port signals)
-        to the internal dispatcher instance named <name>_dispatcher.
+        to the internal dispatcher instance named <self.module_name>_dispatcher.
 
         Parameters:
             ctx                  : VHDLContext for code generation state.
-            name                 : Base name of the dispatcher entity.
-            numPorts             : Number of access ports.
-            numEntries           : Number of queue entries.
-            port_bits_o          : Output data bits from each LSQ entry
+            port_bits_o          : Output data bits from each queue entry
             port_valid_o         : Valid signal for each input port (Valid data)
-            port_ready_i         : Ready signal indicating LSQ is ready to send data
+            port_ready_i         : Ready signal indicating the queue is ready to send data
             entry_valid_i        : Valid bit for a queue entry
             entry_bits_valid_i   : Valid bit for the contents of a queue entry
             entry_port_idx_i     : Indicates to which port the entry is assigned
-            entry_bits_i         : Input data bits which is written in the LSQ entry
+            entry_bits_i         : Input data bits which is written in the queue entry
             entry_reset_o        : Array of reset outputs for entries.
             queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
 
@@ -519,11 +550,8 @@ class QueueToPortDispatcher:
             # Base architecture: 'config_0_core'
             # suffix for Load Data Dispatcher instantiation: '_ldd'
 
-            arch += QueueToPortDispatcherInst(
+            arch += qtp_dispatcher_ldd.instantiate(
                 ctx,
-                name                = 'config_0' + '_ldd',
-                numPorts            = configs.numLdPorts,
-                numEntries          = configs.numLdqEntries,
                 port_bits_o         = ldp_data_o,
                 port_valid_o        = ldp_data_valid_o,
                 port_ready_i        = ldp_data_ready_i,

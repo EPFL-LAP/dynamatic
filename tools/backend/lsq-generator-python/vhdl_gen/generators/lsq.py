@@ -3,7 +3,7 @@ from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 from vhdl_gen.configs import Configs
 
-import vhdl_gen.generators.lsq_module_container as lsq_module_container
+import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 class LSQ:
@@ -13,22 +13,49 @@ class LSQ:
         suffix: str,
         configs: Configs
     ):
-
-        self.name = name
-        # suffix = '' (self.module_name == name)
-        self.module_name = name + suffix
-
-        self.configs = configs
-
-    def generate(self, gen_container, path_rtl) -> None:
         """
         LSQ
 
+        Models the top-level Load-Store Queue (LSQ) module.
+
+        This class integrates all necessary sub-components to form a complete LSQ.
+        It is responsible for generating the top-level VHDL entity that wires
+        together the Group Allocator, various Port/Queue Dispatchers, and the core
+        queue logic with dependency checking.
+
+        Parameters:
+            name    : Base name of the LSQ. "<name saved in configs>_core"
+            suffix  : Suffix appended to the name to form the VHDL entity name.
+                      Since LSQ is the top module, you do not need to add any suffix.
+            configs : configuration generated from JSON
+
+
+        Instance Variable:
+            self.module_name = name + suffix : Entity and architecture identifier
+
+
+        Example:
+            lsq_core = LSQ("config_0_core", '', configs)
+
+            # You can later generate VHDL entity and architecture by
+            #     lsq_core.generate(...)
+
+            # Instantiation of the LSQ module does not use this class.
+            # It considers more conditions, and it is done in lsq-generator.py.
+
+        """
+
+        self.name = name
+        self.module_name = name + suffix
+        self.configs = configs
+
+    def generate(self, lsq_submodules, path_rtl) -> None:
+        """
         Generates the VHDL 'entity' and 'architecture' sections for an LSQ.
 
-        This function appends the following to the file '<path_rtl>/<name>.vhd:
-            1. 'entity <name>' declaration
-            2. 'architecture arch of <name>' implementation
+        This function appends the following to the file '<path_rtl>/<self.name>.vhd:
+            1. 'entity <self.module_name>' declaration
+            2. 'architecture arch of <self.module_name>' implementation
 
         The generated code also instantitates:
             - Group Allocator
@@ -41,21 +68,19 @@ class LSQ:
                 - (Optionally) Store Backward Port Dispatcher
 
         Parameters:
-            ctx         : VHDLContext for code generation state.
-            path_rtl    : Output directory for VHDL files.
-            name        : Base name of the LSQ.
-            configs     : configuration generated from JSON
+            lsq_submodules  : A collection of objects representing submodules whose VHDL entity 
+                              definitions are already generated. This parameter is used to 
+                              generate their port map instantiations.
+            path_rtl        : Output directory for VHDL files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
-            to the .vhd file at <path_rtl>/<name>.vhd.
-            Entity and architecture use the identifier: <name>
+            to the .vhd file at <path_rtl>/<self.name>.vhd.
+            Entity and architecture use the identifier: <self.module_name>
 
         Example:
-            LSQ(ctx, path_rtl, 'config_0' + '_core', configs)
+            lsq_core.generate(lsq_submodules, path_rtl)
 
-
-        *Instantiation of LSQ is in lsq-generator.py.
         """
 
         ctx = VHDLContext()
@@ -483,7 +508,7 @@ class LSQ:
         ######   Entity Instantiation   ######
 
         # Group Allocator
-        arch += gen_container.group_allocator.instantiate(
+        arch += lsq_submodules.group_allocator.instantiate(
             ctx,
             group_init_valid_i, group_init_ready_o,
             ldq_tail, ldq_head, ldq_empty,
@@ -494,27 +519,27 @@ class LSQ:
         )
 
         # Load Address Port Dispatcher
-        arch += gen_container.ptq_dispatcher_lda.instantiate(
+        arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
             ctx,
             ldp_addr_i, ldp_addr_valid_i, ldp_addr_ready_o,
             ldq_valid, ldq_addr_valid, ldq_port_idx, ldq_addr, ldq_addr_wen, ldq_head_oh
         )
 
         # Load Data Port Dispatcher
-        arch += gen_container.qtp_dispatcher_ldd.instantiate(
+        arch += lsq_submodules.qtp_dispatcher_ldd.instantiate(
             ctx,
             ldp_data_o, ldp_data_valid_o, ldp_data_ready_i,
             ldq_valid, ldq_data_valid, ldq_port_idx, ldq_data, ldq_reset, ldq_head_oh
         )
         # Store Address Port Dispatcher
-        arch += gen_container.ptq_dispatcher_sta.instantiate(
+        arch += lsq_submodules.ptq_dispatcher_sta.instantiate(
             ctx,
             stp_addr_i, stp_addr_valid_i, stp_addr_ready_o,
             stq_valid, stq_addr_valid, stq_port_idx, stq_addr, stq_addr_wen, stq_head_oh
         )
 
         # Store Data Port Dispatcher
-        arch += gen_container.ptq_dispatcher_std.instantiate(
+        arch += lsq_submodules.ptq_dispatcher_std.instantiate(
             ctx,
             stp_data_i, stp_data_valid_i, stp_data_ready_o,
             stq_valid, stq_data_valid, stq_port_idx, stq_data, stq_data_wen, stq_head_oh
@@ -522,7 +547,7 @@ class LSQ:
 
         # Store Backward Port Dispatcher
         if self.configs.stResp:
-            arch += gen_container.qtp_dispatcher_stb.instantiate(
+            arch += lsq_submodules.qtp_dispatcher_stb.instantiate(
                 ctx,
                 None, stp_exec_valid_o, stp_exec_ready_i,
                 stq_valid, stq_exec, stq_port_idx, None, stq_reset, stq_head_oh
@@ -1555,5 +1580,7 @@ class LSQ:
             file.write(ctx.regInitString + 'end architecture;\n')
 
     def instantiate(self, **kwargs) -> str:
-
+        """
+        *Instantiation of LSQ is in lsq-generator.py.
+        """
         pass

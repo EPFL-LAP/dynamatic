@@ -12,6 +12,35 @@ class GroupAllocator:
         suffix: str,
         configs: Configs
     ):
+        """
+        Group Allocator
+
+        Models a group allocator for a Load-Store Queue (LSQ) system.
+
+        This class encapsulates the logic for generating a VHDL module that allocates
+        space for groups of memory operations (loads and stores) in the load queue and 
+        the store queue.
+
+        Parameters:
+            name    : Base name of the group allocator.
+            suffix  : Suffix appended to the entity name.
+            configs : configuration generated from JSON
+
+        Instance Variable:
+            self.module_name = name + suffix : Entity and architecture identifier
+
+        Example:
+            ga = GroupAllocator(
+                    name="config_0_core", 
+                    suffix="_ga", 
+                    configs=configs
+                )
+
+            # You can later generate VHDL entity and architecture by
+            #     ga.generate(...)
+            # You can later instantiate VHDL entity by
+            #     ga.instantiate(...)
+        """
 
         self.name = name
         self.configs = configs
@@ -19,24 +48,18 @@ class GroupAllocator:
 
     def generate(self, path_rtl) -> None:
         """
-        Group Allocator
-
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 
         Parameters:
-            ctx         : VHDLContext for code generation state.
             path_rtl    : Output directory for VHDL files.
-            name        : Base name of the group allocator.
-            suffix      : Suffix appended to the entity name.
-            configs     : configuration generated from JSON
 
         Output:
             Appends the 'entity' and 'architecture' definitions
-            to the .vhd file at <path_rtl>/<name>_core.vhd.
-            Entity and architecture use the identifier: <name><suffix>
+            to the .vhd file at <path_rtl>/<self.name>.vhd.
+            Entity and architecture use the identifier: <self.module_name>
 
         Example (Group Allocator):
-            GroupAllocator(ctx, path_rtl, 'config_0', '_core_ga', configs)
+            ga.generate(path_rtl)
 
             produces in rtl/config_0_core.vhd:
 
@@ -55,6 +78,11 @@ class GroupAllocator:
             end architecture;
 
         """
+
+        # ctx: VHDLContext for code generation state.
+        # When we generate VHDL entity and architecture, we can use this context as a local variable.
+        # We only need to get the context as a parameter when we instantiate the module.
+        # It saves all information we need when we generate VHDL entity and architecture code.
         ctx = VHDLContext()
 
         ctx.tabLevel = 1
@@ -253,8 +281,6 @@ class GroupAllocator:
 
         Parameters:
             ctx                  : VHDLContext for code generation state.
-            name                 : Base name of the group allocator entity.
-            configs              : configuration generated from JSON
             group_init_valid_i   : Group Allocator handshake valid signal
             group_init_ready_o   : Group Allocator handshake ready signal
             ldq_tail_i           : Load queue tail
@@ -275,13 +301,8 @@ class GroupAllocator:
             VHDL instantiation string for inclusion in the architecture body.
 
         Example:
-            # Base architecture: 'config_0_core'
-            # suffix for GroupAllocator instantiation: '_ga'
-
-            arch += GroupAllocatorInst(
+            arch += ga.instantiate(
                 ctx,
-                name               = 'config_0_core' + '_ga',
-                configs            = configs,
                 group_init_valid_i = group_init_valid_i,
                 group_init_ready_o = group_init_ready_o,
                 ldq_tail_i         = ldq_tail,
