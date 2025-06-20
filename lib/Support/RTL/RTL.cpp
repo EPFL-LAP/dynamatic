@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -303,6 +304,7 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.sink" || modName == "handshake.subi" ||
       modName == "handshake.shli" || modName == "handshake.blocker" ||
       modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
+      modName == "handshake.ready_remover" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
@@ -352,9 +354,6 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     // Therefore, mod.getNumOutputs() is also variable.
     serializedParams["ADDR_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(modType.getNumOutputs() - 2));
-    llvm::errs() << modName << serializedParams["DATA_BITWIDTH"]
-                 << serializedParams["ADDR_BITWIDTH"] << "\n"
-                 << modType << "\n\n\n";
   } else if (modName == "mem_to_bram") {
     serializedParams["ADDR_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
@@ -367,7 +366,12 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              modName == "handshake.minimumf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
-  } else if (modName == "handshake.source") {
+  } else if (modName == "handshake.valid_merger") {
+    serializedParams["LEFT_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["RIGHT_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (modName == "handshake.source" || modName == "mem_controller") {
     // Skip
   }
 }
@@ -599,7 +603,8 @@ SmallVector<const RTLParameter *> RTLComponent::getGenericParameters() const {
   bool componentIsGeneric = isGeneric();
   for (const RTLParameter &param : parameters) {
     if (componentIsGeneric) {
-      // Component generic, need explicit notice to NOT use parameter as generic
+      // Component generic, need explicit notice to NOT use parameter as
+      // generic
       if (!param.useAsGeneric.value_or(true))
         continue;
     } else {
@@ -648,13 +653,13 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
     }
 
     // Check whether we can match the MLIR port name to the RTl port name
-    // template; we must identify whether any part of the MLIR port name matches
-    // the wildcard, then replace the potential wildcard in the remapped port
-    // name with that part of the MLIR port name
+    // template; we must identify whether any part of the MLIR port name
+    // matches the wildcard, then replace the potential wildcard in the
+    // remapped port name with that part of the MLIR port name
     StringRef refRTlPortName(rtlPortName);
 
-    // Characters before the wildcard must match between the MLIR port name and
-    // RTL source port name
+    // Characters before the wildcard must match between the MLIR port name
+    // and RTL source port name
     if (mlirPortName.size() < wildcardIdx ||
         mlirPortName.take_front(wildcardIdx) !=
             refRTlPortName.take_front(wildcardIdx))
@@ -663,8 +668,8 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
     StringRef wildcardMatch;
     size_t afterWildcardSize = rtlPortName.size() - wildcardIdx - 1;
     if (afterWildcardSize > 0) {
-      // Characters after the wildcard must match between the MLIR port name and
-      // source RTL port name
+      // Characters after the wildcard must match between the MLIR port name
+      // and source RTL port name
       if (mlirPortName.size() < afterWildcardSize ||
           mlirPortName.take_back(afterWildcardSize) !=
               refRTlPortName.take_back(afterWildcardSize))
@@ -682,8 +687,8 @@ std::string RTLComponent::portRemap(StringRef mlirPortName) const {
     return mappedRTLPortName;
   }
 
-  // When no source port name in the map matched the MLIR port name, just return
-  // it unmodified
+  // When no source port name in the map matched the MLIR port name, just
+  // return it unmodified
   return mlirPortName.str();
 }
 
@@ -753,8 +758,8 @@ bool RTLComponent::checkValidAndSetDefaults(llvm::json::Path path) {
         filename = filename.substr(0, idx);
       moduleName = filename;
     } else {
-      // Component is generated, by default the name is the one provided during
-      // generation
+      // Component is generated, by default the name is the one provided
+      // during generation
       moduleName = "$" + RTLParameter::MODULE_NAME.str();
     }
   }

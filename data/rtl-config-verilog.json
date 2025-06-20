@@ -446,6 +446,51 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "SHIFT_REG_BREAK_DV", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/dataless/shift_reg_break_dv.v",
+    "module-name": "shift_reg_break_dv_dataless",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "SHIFT_REG_BREAK_DV", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/shift_reg_break_dv.v",
+    "module-name": "shift_reg_break_dv",
+    "dependencies": ["shift_reg_break_dv_dataless"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.ndwire",
     "parameters": [
       {

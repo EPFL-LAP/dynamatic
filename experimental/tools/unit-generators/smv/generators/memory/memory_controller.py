@@ -57,7 +57,7 @@ MODULE {name}({mc_in_ports})
   stores_done := storeEn ? {ctrl_type.format_constant(1)} : {ctrl_type.format_constant(0)};
   all_requests_done := (remainingStores = {ctrl_type.format_constant(0)}) & {" & ".join([f"(ctrl_{n}_valid = FALSE)" for n in range(num_controls)])};
 
-  // output
+  -- outputs
   DEFINE
   memStart_ready := inner_mc_control.memStart_ready;
   memEnd_valid := inner_mc_control.memEnd_valid;
@@ -111,7 +111,7 @@ MODULE {name}({mc_in_ports})
   inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
   inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, TRUE);
 
-  // output
+  -- outputs
   DEFINE
   memStart_ready := inner_mc_control.memStart_ready;
   memEnd_valid := inner_mc_control.memEnd_valid;
@@ -148,7 +148,7 @@ def _generate_mem_controller(name, num_loads, num_stores, num_controls, data_typ
         num_stores)] + [f"stAddr_{n}_valid" for n in range(num_stores)]
     store_data_ports = [f"stData_{n}" for n in range(
         num_stores)] + [f"stData_{n}_valid" for n in range(num_stores)]
-    mc_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports + load_address_ports +
+    mc_in_ports = ", ".join(["loadData", "memStart_valid"] + load_address_ports + control_ports +
                             store_address_ports + store_data_ports + ["ctrlEnd_valid"] + load_data_ports + ["memEnd_ready"])
     mc_loadless_in_ports = ", ".join(["loadData", "memStart_valid"] + control_ports +
                                      store_address_ports + store_data_ports + ["ctrlEnd_valid"] + ["memEnd_ready"])
@@ -166,7 +166,7 @@ MODULE {name}({mc_in_ports})
   inner_mc_loadless : {name}__mc_loadless({mc_loadless_in_ports});
   inner_arbiter : {name}__read_memory_arbiter({arbiter_args});
 
-  // outputs
+  -- outputs
   DEFINE
   memStart_ready := inner_mc_loadless.memStart_ready;
   memEnd_valid := inner_mc_loadless.memEnd_valid;
@@ -223,7 +223,7 @@ MODULE {name}({arbiter_in_ports})
 
   ASSIGN
   {"\n  ".join([f"init(valid_{n}_in) := FALSE;" for n in range(num_stores)])}
-  {"\n  ".join([f"next(valid_{n}_in) :=  priority_gen.priority_{n};" for n in range(num_stores)])}
+  {"\n  ".join([f"next(valid_{n}_in) := priority_gen.priority_{n};" for n in range(num_stores)])}
 
 
   DEFINE
@@ -236,7 +236,7 @@ MODULE {name}({arbiter_in_ports})
     TRUE: {data_type.format_constant(0)};
   esac;
 
-  // output
+  -- output
   DEFINE
   {"\n  ".join([f"ready_{n} := priority_gen.priority_{n} & nReady_{n};" for n in range(num_stores)])}
   {"\n  ".join([f"valid_{n} := valid_{n}_in;" for n in range(num_stores)])}
@@ -279,7 +279,7 @@ MODULE {name}({arbiter_in_ports})
   {"\n  ".join([f"init(out_reg_{n}) := {data_type.format_constant(0)};" for n in range(num_loads)])}
   {"\n  ".join([f"next(out_reg_{n}) := sel_prev{n} ? data_from_memory : out_reg_{n};" for n in range(num_loads)])}
 
-  // output
+  -- output
   DEFINE
   {"\n  ".join([f"ready_{n} := priority_gen.priority_{n} & nReady_{n};" for n in range(num_loads)])}
   {"\n  ".join([f"valid_{n} := valid_{n}_in;" for n in range(num_loads)])}
@@ -306,7 +306,7 @@ MODULE {name}({", ".join([f"req_{n}, data_ready_{n}" for n in range(size)])})
   prior_0 := que_el_{0};
   {"\n  ".join([f"prior_{n + 1} := que_el_{n} | prior_{n};\n  que_el_{n + 1} := req_{n + 1} & data_ready_{n + 1} & !prior_{n + 1};" for n in range(size - 1)])}
 
-  // output
+  -- output
   DEFINE
   {"\n  ".join([f"priority_{n} := que_el_{n};" for n in range(size)])}
 
