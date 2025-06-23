@@ -64,6 +64,10 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
     bool useShiftReg = channelVars.shiftReg.get(GRB_DoubleAttr_X) > 0.5;
 
     PlacementResult result;
+    // See 'docs/Specs/Buffering/Buffering.md'.
+    // This algorithm does not use `FIFO_BREAK_DV`, representing it with
+    // `ONE_SLOT_BREAK_DV` and `FIFO_BREAK_NONE` for better area efficiency
+    // in most cases.
     result.numOneSlotDV = useShiftReg ? 0 : dataLatency;
     result.numShiftRegDV = useShiftReg ? dataLatency : 0;
     result.numOneSlotR = readyLatency;
