@@ -212,7 +212,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         
 
 6. **Arbitration Logic: Selecting the oldest active entry**  
-    ![PTQ_Handshake](./figs/PTQ_Masking.png)  
+    ![PTQ_Handshake](./figs/PTQ_masking.png)  
     This block is responsible for selecting the oldest active memory request for each port and generating the write enable signal for such requests.  
     Based on the example diagram:
     - The `Handshake Logic` has identified two active requests: one for `Entry 0` from `Port 1` and another for `Entry 3` from `Port 2`.
