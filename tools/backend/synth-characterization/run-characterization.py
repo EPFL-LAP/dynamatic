@@ -10,14 +10,25 @@ skipping_units = [
     "handshake.ready_remover",
     "handshake.valid_merger"]
 
+def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool):
+    """
+    Run characterization for a single unit using the specified synthesis tool.
+    
+    Args:
+        unit_name (str): Name of the unit to characterize.
+        list_params (list): List of parameters for the unit.
+        hdl_out_dir (str): Directory where HDL files are stored.
+        synth_tool (str): Synthesis tool to use for characterization (e.g., 'vivado').
+    """
+    # Generate all the combination of parameters
+    pass
 
-def get_hdl_files(unit_name, list_params, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list):
+def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list):
     """
     Generate or copy the HDL files for the given unit.
     
     Args:
         unit_name (str): Name of the unit.
-        list_params (list): List of parameters for the unit.
         generic (str): Generic information for the unit.
         generator (str): Generator information for the unit.
         dependencies (list): List of dependencies for the unit.
@@ -44,9 +55,16 @@ def get_hdl_files(unit_name, list_params, generic, generator, dependencies, hdl_
         # If generic is provided, copy the RTL file to the output directory
         rtl_file = generic
         os.system(f"cp {rtl_file} {hdl_out_dir}")
-    else generator:
-
-
+    else:
+        assert generator, "Unit must have either a generic RTL file or a generator."
+        cmd = generator.replace("$DYNAMATIC", dynamatic_dir).replace("$OUTPUT_DIR", hdl_out_dir).replace("$MODULE_NAME", unit_name).replace("$PREDICATE", "ne")
+        # If a generator is provided, run the generator command
+        print(f"Running generator command: {cmd}")
+        os.system(cmd)        
+        # Assert that the RTL file was generated
+        rtl_file_vhdl = f"{hdl_out_dir}/{unit_name}.vhd"  # Assuming
+        rtl_file_verilog = f"{hdl_out_dir}/{unit_name}.v"
+        assert os.path.exists(rtl_file_vhdl) or os.path.exists(rtl_file_verilog), f"RTL file for unit {unit_name} was not generated or copied successfully."
 
 def extract_rtl_info(unit_info):
     """
@@ -127,25 +145,11 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
         os.system(f"rm -rf {hdl_dir}/*")
         # Copy the RTL files or generate them if necessary
         print(f"Processing unit: {unit_name}")
-        get_hdl_files(unit_name, list_params, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
-        
-
-    # Placeholder for characterization logic
-    # This is where you would integrate with your synthesis tool
-    results = {}
-    for unit in dataflow_units:
-        # Simulate some characterization results
-        results[unit] = {
-            "latency": 10,  # Example latency value
-            "area": 100,    # Example area value
-            "power": 5      # Example power value
-        }
+        get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
+        # After generating the HDL files, we can proceed with characterization
+        results = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool)
 
     # Save the results to the output JSON file
-    with open(json_output, 'w') as f:
-        json.dump(results, f, indent=4)
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run characterization of dataflow units")
