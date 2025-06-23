@@ -265,7 +265,13 @@ The ``@__placeholder instance`` now produces three results: two data outputs (``
 
 ---
 
-## 9. Related References
+## 9. Testing
+
+A FileCheck test is available to validate the correctness of the transformation. It can be found in `test/Transforms/handshake-hw-inst.mlir` and it verifies the correct creation of multi-output handshake::InstanceOps, rewiring of outputs, and conversion of parameters into attributes.
+
+---
+
+## 10. Related References
 
 This implementation and design were informed by discussions and iterations captured in the following GitHub entries:
 
