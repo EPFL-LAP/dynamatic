@@ -26,6 +26,10 @@ F_TIMING_PR="$SYNTH_DIR/timing_post_pr.rpt"
 
 # Shortcuts
 HDL_DIR="$OUTPUT_DIR/hdl"
+TCL_DIR="$OUTPUT_DIR/tcl"
+
+# Resources directory
+RESOURCE_DIR="$DYNAMATIC_DIR/tools/backend/synth-resources"
 
 # ============================================================================ #
 # Synthesis flow
@@ -53,11 +57,22 @@ if ls "$HDL_DIR"/*.v 1> /dev/null 2>&1; then
   READ_VERILOG="read_verilog [glob $SYNTH_DIR/hdl/*.v]"
 fi
 
+# Copy resources to synthesis directory
+mkdir -p "$TCL_DIR"
+cp -r "$RESOURCE_DIR"/* "$TCL_DIR"
+READ_TCL=""
+if ls "$TCL_DIR"/*.tcl 1> /dev/null 2>&1; then
+  for f in "$TCL_DIR"/*.tcl; do
+    READ_TCL="$READ_TCL\nsource $f"
+  done
+fi
+
 # Generate synthesis script
 echo -e \
 "set_param general.maxThreads 8
 $READ_VHDL
 $READ_VERILOG
+$READ_TCL
 read_xdc "$F_PERIOD"
 synth_design -top $KERNEL_NAME -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context
 report_utilization > $F_UTILIZATION_SYN
@@ -81,5 +96,5 @@ set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 echo_info "Created synthesis scripts"
 echo_info "Launching Vivado synthesis"
 cd "$SYNTH_DIR"
-vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
+vivado-2019.1.1-bt vivado -mode tcl -source "$F_SCRIPT" > "$F_REPORT"
 exit_on_fail "Logic synthesis failed" "Logic synthesis succeeded"
