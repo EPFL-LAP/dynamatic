@@ -12,7 +12,7 @@ The Port-to-Queue Dispatcher is a submodule within the Load-Store Queue (LSQ) re
 
 We need a total of three **Port-to-Queue Dispatchers**—one each for the load address, store address, and store data. Why? To load, you must first supply the address where the data is stored. Likewise, a store operation needs both the value to write and the address to write it at.  
 
-In the LSQ architecture, memory operations from the dataflow circuit arrive at dedicated access ports. Because multiple ports can try to send data simultaneously, a mechanism is needed to arbitrate these requests and write them into the load queue and the store queue.
+In the LSQ architecture, memory operations arrive via dedicated access ports. The system can process simultaneous payload writes to the LSQ from multiple ports in parallel. An arbitration mechanism is required, however, to handle cases where multiple queue entries compete for access to the same single port. 
 
 ## 2. Port-to-Queue Dispatcher Internal Blocks
 
@@ -182,11 +182,11 @@ The Port-to-Queue Dispatcher has the following responsibilities:
     ![Entry-Port Assignment Assignment Logic](./figs/Ready_Port_Selector.png)  
     Based on the example diagram:
     - `entry_request_valid`:
-        - `Entry 0`: `1` (Valid)    -> `111`
-        - `Entry 1`: `0` (Invalid)  -> `000`
-        - `Entry 2`: `0` (Invalid)  -> `000`
-        - `Entry 2`: `1` (Valid)    -> `111`
-    - The `entry_request_valid`:
+        - `Entry 0`: `1` (Entry 0 is waiting)    -> `111`
+        - `Entry 1`: `0` (Entry 1 is not waiting)  -> `000`
+        - `Entry 2`: `0` (Entry 2 is not waiting)  -> `000`
+        - `Entry 3`: `1` (Entry 3 is waiting)    -> `111`
+    - `entry_port_valid`:
         - `Entry 0`: `010` (Port 1)
         - `Entry 1`: `000` (Port 0)
         - `Entry 2`: `010` (Port 1)
@@ -195,9 +195,9 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `Entry 0`: `111` AND `010` = `010`
         - `Entry 1`: `000` AND `000` = `000`
         - `Entry 2`: `000` AND `010` = `000`
-        - `Entry 3`: `111` AND `100` = `010`
+        - `Entry 3`: `111` AND `100` = `100`
         
-        > `entry_port_request`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
+        > `entry_port_request`: It now only contains one-hot vectors for entries that are both allocated and waiting for a payload.
 
 
 5. **Handshake Logic: Managing port readiness and masking the port assigned with invalid ports**
