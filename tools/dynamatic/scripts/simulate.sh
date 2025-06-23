@@ -11,6 +11,8 @@ DYNAMATIC_DIR=$1
 SRC_DIR=$2
 OUTPUT_DIR=$3
 KERNEL_NAME=$4
+VIVADO_PATH=$5
+VIVADO_FPU=$6
 
 # Generated directories/files
 SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
@@ -49,6 +51,11 @@ cp "$DYNAMATIC_DIR/include/dynamatic/Integration.h" "$DYN_INCLUDE_DIR"
 cp "$HDL_DIR/"*.vhd "$COSIM_HDL_SRC_DIR" 2> /dev/null
 cp "$HDL_DIR/"*.v "$COSIM_HDL_SRC_DIR" 2> /dev/null
 
+if [ "$VIVADO_FPU" = "true" ]; then
+  # Copy the glbl.v file if Vivado is used for FPU support
+  cp "$VIVADO_PATH/data/verilog/src/glbl.v" "$COSIM_HDL_SRC_DIR/glbl.v" 
+fi
+
 # Copy sources to dedicated folder
 cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 
 # Suppress the error if the header file does not exist (it is optional).
@@ -75,9 +82,18 @@ exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen."
 # Simulate and verify design
 echo_info "Launching Modelsim simulation"
 cd "$HLS_VERIFY_DIR"
-"$HLS_VERIFIER_BIN" \
+if [ "$VIVADO_FPU" = "false" ]; then
+  "$HLS_VERIFIER_BIN" \
   --sim-path="$SIM_DIR" \
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   > "../report.txt" 2>&1
+else
+  "$HLS_VERIFIER_BIN" \
+  --sim-path="$SIM_DIR" \
+  --kernel-name="$KERNEL_NAME" \
+  --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
+  --vivado-fpu \
+  > "../report.txt" 2>&1
+fi
 exit_on_fail "Simulation failed" "Simulation succeeded"

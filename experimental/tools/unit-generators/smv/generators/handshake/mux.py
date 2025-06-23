@@ -45,7 +45,7 @@ MODULE {name}(index, index_valid, {", ".join([f"ins_{n}" for n in range(size)])}
   -- output
   DEFINE
   {"\n  ".join([f"ins_{n}_ready := inner_mux.ins_{n}_ready;" for n in range(size)])}
-  index_ready := !inner_mux.index_ready;
+  index_ready := inner_mux.index_ready;
   outs_valid := inner_mux.outs_valid;
   outs := inner_outs;
 

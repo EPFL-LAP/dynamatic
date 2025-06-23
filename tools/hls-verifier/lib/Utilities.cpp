@@ -68,6 +68,9 @@ bool FloatCompare::compare(const string &token1, const string &token2) const {
   float f1 = hexStringToFloat(token1);
   float f2 = hexStringToFloat(token2);
 
+  if (isinf(f1) && isinf(f2))
+    return true;
+
   if (isnan(f1) && isnan(f2))
     return true;
 
@@ -96,6 +99,9 @@ bool DoubleCompare::compare(const string &token1, const string &token2) const {
 
   double d1 = hexStringToDouble(token1);
   double d2 = hexStringToDouble(token2);
+
+  if (isinf(d1) && isinf(d2))
+    return true;
 
   if (isnan(d1) && isnan(d2))
     return true;
