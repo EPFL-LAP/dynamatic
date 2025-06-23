@@ -63,7 +63,7 @@ These signals are used for communication between the dispatcher logic and the qu
 The Port-to-Queue Dispatcher has the following responsibilities:
 
 1. **Matching**  
-    ![Matching](./figs/Matching.png)  
+    ![Matching](./figs/PTQ_matching_description.png)  
     The Matching block is responsible for identifying which queue entries are actively waiting to receive an address or data payload.
     - **Input**:  
         - `entry_valid_i`: Indicates if the entry is allocated by the group allocator.
@@ -73,7 +73,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_request_valid`: A array of bits indicating the queue entry is ready to receive address or data.
 
 2. **Port Index Decoder**  
-    ![Port_Index_Decoder](./figs/Port_Index_Decoder.png)  
+    ![Port_Index_Decoder](./figs/PTQ_Port_Index_Decoder_description.png)  
     When the group allocator allocates a queue entry, it also assigns the queue entry to a specific port, storing this port assignment as an integer. The Port Index Decoder decodes the port assignment for each queue entry from an integer representation to a one-hot representation.
     - **Input**:   
         - `entry_port_idx_i`: Queue entry-port assignment information
@@ -83,7 +83,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_port_valid`: A one-hot vector for each entry that directly corresponds to the port it is assigned to.
 
 3. **Payload Mux**  
-    ![Mux1H](./figs/Mux1H.png)  
+    ![Mux1H](./figs/PTQ_Payload_Mux_description.png)  
     This block routes the address or data payload from the appropriate input port to the correct queue entries. 
     - **Input**:  
          - `port_bits_i`: An array containing the address or data payload from all access ports.
@@ -93,7 +93,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_bits_o`: The selected payload of each queue entry.
 
 4. **Entry-Port Assignment Masking Logic**  
-    ![Entry-Port Assignment Assignment Logic](./figs/Ready_Port_Selector.png)  
+    ![Entry-Port Assignment Assignment Logic](./figs/PTQ_entry_port_assignment_masking_description.png)  
     Each entry is waiting for the payload from a certain port. This block masks out the port assignments for each queue entry if it is not ready to receive the payload. It propagates these entry-port assignment information only for entries that are available to receive the payload.
     
     - **Input**:  
@@ -106,7 +106,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 5. **Handshake Logic**  
-    ![PTQ_Handshake](./figs/PTQ_Handshake.png)  
+    ![PTQ_Handshake](./figs/PTQ_Handshake_description.png)  
     This block manages the `valid/ready` handshake protocol with the external access ports. It generates the outgoing `port_ready_o` signals and produces the final entry-port assignments that have completed a successful handshake (i.e. the internal request is ready and the external port is valid).
 
     - **Input**:  
@@ -120,7 +120,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_port_and`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
 
 6. **Arbitration Logic**  
-    ![PTQ_Handshake](./figs/PTQ_Masking.png)  
+    ![PTQ_Handshake](./figs/PTQ_Arbitration_description.png)  
     The core decision making block of the dispatcher. When multiple handshaked entry-port assignments are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones for each port.
     - **Input**:  
         - `entry_port_and`: The set of all currently valid and ready entry-port assignments.
@@ -201,8 +201,9 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 5. **Handshake Logic: Managing port readiness and masking the port assigned with invalid ports**
-This block is responsible for the `valid/ready` handshake protocol with the `Access Ports`. It performs two functions: providing back-pressure to the ports and identifying all currently active memory requests for the arbiter.  
-Based on the example diagram:
+    ![PTQ_Handshake](./figs/PTQ_Handshake.png)  
+    This block is responsible for the `valid/ready` handshake protocol with the `Access Ports`. It performs two functions: providing back-pressure to the ports and identifying all currently active memory requests for the arbiter.  
+    Based on the example diagram:
     - **Back-pressure control**: First, the block determines which ports are `ready`.
         - From the `Entry-Port Assignment Masking Logic` block, we know that `Entry 0` and `Entry 3` are waiting for an address from `Port 1` and `Port 2` respectively.
         - Therefore, it asserts `port_ready_o` to `1` for both `Port 1` and `Port 2`.
@@ -211,8 +212,9 @@ Based on the example diagram:
         
 
 6. **Arbitration Logic: Selecting the oldest active entry**  
-This block is responsible for selecting the oldest active memory request for each port and generating the write enable signal for such requests.  
-Based on the example diagram:
+    ![PTQ_Handshake](./figs/PTQ_Masking.png)  
+    This block is responsible for selecting the oldest active memory request for each port and generating the write enable signal for such requests.  
+    Based on the example diagram:
     - The `Handshake Logic` has identified two active requests: one for `Entry 0` from `Port 1` and another for `Entry 3` from `Port 2`.
     - The CyclicPriorityMasking algorithm operates independently on each port's request list.
         - For `Port 1`, the only active request is from `Entry 0` (`1000`, 1st column of `entry_port_and`). With no other competitors for this port, `Entry 0` is selected as the winner for `Port 1`.
