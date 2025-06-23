@@ -6,7 +6,7 @@ How addresses and data enter from multiple access ports to the LSQ's internal lo
 ## 1. Overview and Purpose  
 
 
-![Port-to-Queue Dispatcher Top-Level](./figs/LSQ_Top-level_ptq_dispatcher.png)
+![Port-to-Queue Dispatcher Top-Level](./figs/ptq/LSQ_Top-level_ptq_dispatcher.png)
 
 The Port-to-Queue Dispatcher is a submodule within the Load-Store Queue (LSQ) responsible for routing incoming memory requests (addresses or data) from the dataflow circuit's access ports to the correct queue entries of the load queue and the store queue. All incoming requests are directed into either the load queue or the store queue. These queues are essential for tracking every memory request until its completion. It ensures each load queue or store queue entry gets the correct address or data from the appropriate port.  
 
@@ -16,7 +16,7 @@ In the LSQ architecture, memory operations arrive via dedicated access ports. Th
 
 ## 2. Port-to-Queue Dispatcher Internal Blocks
 
-![Port-to-Queue Dispatcher High-Level](./figs/PTQ_high_level.png)
+![Port-to-Queue Dispatcher High-Level](./figs/ptq/PTQ_high_level.png)
 
 Let's assume the following generic parameters for dimensionality:
 * `N_PORTS`: The total number of ports.
@@ -26,7 +26,7 @@ Let's assume the following generic parameters for dimensionality:
 
 ### Port Interface Signals
 
-![Port Interface](./figs/PTQ_Port_Interface.png)
+![Port Interface](./figs/ptq/PTQ_Port_Interface.png)
 
 These signals are used for communication between the external modules and the dispatcher's ports.
 
@@ -44,7 +44,7 @@ These signals are used for communication between the external modules and the di
 
 These signals are used for communication between the dispatcher logic and the queue's memory entries.
 
-![Queue Interface](./figs/PTQ_Queue_Interface.png)
+![Queue Interface](./figs/ptq/PTQ_Queue_Interface.png)
 
 | Signal Name | Direction | Dimensionality | Description |
 | :--- | :--- | :--- | :--- |
@@ -63,7 +63,7 @@ These signals are used for communication between the dispatcher logic and the qu
 The Port-to-Queue Dispatcher has the following responsibilities:
 
 1. **Matching**  
-    ![Matching](./figs/PTQ_matching_description.png)  
+    ![Matching](./figs/ptq/PTQ_matching_description.png)  
     The Matching block is responsible for identifying which queue entries are actively waiting to receive an address or data payload.
     - **Input**:  
         - `entry_valid_i`: Indicates if the entry is allocated by the group allocator.
@@ -73,7 +73,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_request_valid`: A array of bits indicating the queue entry is ready to receive address or data.
 
 2. **Port Index Decoder**  
-    ![Port_Index_Decoder](./figs/PTQ_Port_Index_Decoder_description.png)  
+    ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder_description.png)  
     When the group allocator allocates a queue entry, it also assigns the queue entry to a specific port, storing this port assignment as an integer. The Port Index Decoder decodes the port assignment for each queue entry from an integer representation to a one-hot representation.
     - **Input**:   
         - `entry_port_idx_i`: Queue entry-port assignment information
@@ -83,7 +83,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_port_valid`: A one-hot vector for each entry that directly corresponds to the port it is assigned to.
 
 3. **Payload Mux**  
-    ![Mux1H](./figs/PTQ_Payload_Mux_description.png)  
+    ![Mux1H](./figs/ptq/PTQ_Payload_Mux_description.png)  
     This block routes the address or data payload from the appropriate input port to the correct queue entries. 
     - **Input**:  
          - `port_bits_i`: An array containing the address or data payload from all access ports.
@@ -93,7 +93,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_bits_o`: The selected payload of each queue entry.
 
 4. **Entry-Port Assignment Masking Logic**  
-    ![Entry-Port Assignment Assignment Logic](./figs/PTQ_entry_port_assignment_masking_description.png)  
+    ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_entry_port_assignment_masking_description.png)  
     Each entry is waiting for the payload from a certain port. This block masks out the port assignments for each queue entry if it is not ready to receive the payload. It propagates these entry-port assignment information only for entries that are available to receive the payload.
     
     - **Input**:  
@@ -106,7 +106,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 5. **Handshake Logic**  
-    ![PTQ_Handshake](./figs/PTQ_Handshake_description.png)  
+    ![PTQ_Handshake](./figs/ptq/PTQ_Handshake_description.png)  
     This block manages the `valid/ready` handshake protocol with the external access ports. It generates the outgoing `port_ready_o` signals and produces the final entry-port assignments that have completed a successful handshake (i.e. the internal request is ready and the external port is valid).
 
     - **Input**:  
@@ -120,7 +120,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `entry_port_and`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
 
 6. **Arbitration Logic**  
-    ![PTQ_Handshake](./figs/PTQ_Arbitration_description.png)  
+    ![PTQ_Handshake](./figs/ptq/PTQ_Arbitration_description.png)  
     The core decision making block of the dispatcher. When multiple handshaked entry-port assignments are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones for each port.
     - **Input**:  
         - `entry_port_and`: The set of all currently valid and ready entry-port assignments.
@@ -133,12 +133,12 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 ## 3. Dataflow Walkthrough
 
-![Store Address Port-to-Queue Dispatcher](./figs/PTQ_store_address.png)
+![Store Address Port-to-Queue Dispatcher](./figs/ptq/PTQ_store_address.png)
 
 ### Example of Store Address Port-to-Queue Dispatcher (3 Store Ports, 4 Store Queue Entries)
 
 1. **Matching: Identifying which queue slots are empty**  
-    ![Matching](./figs/Matching.png)  
+    ![Matching](./figs/ptq/PTQ_Matching.png)  
     The first job of this block is to determine which entries in the store queue are waiting for a store address.  
     Based on the example diagram:  
     - **Entry 1** is darkened to indicate that it has not been allocated by the Group Allocator. Its `Store Queue Valid` signal (equivalent to `entry_valid_i`) is `0`.  
@@ -148,7 +148,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
     This logic is captured by the expression `entry_request_valid = entry_valid_i AND (NOT entry_bits_valid_i)`, which creates a list of entries that need attention from the dispatcher.
 
 2. **Port Index Decoder: Queue entries port assignment in one-hot format**
-    ![Port_Index_Decoder](./figs/Port_Index_Decoder.png)  
+    ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder.png)  
     This block's circuit is to decode the binary port index assigned to each queue entry into a one-hot format.  
     Based on the example diagram:  
     - The `Store Queue` shows that `Entry 0` is assigned to `Port 1` , `Entry 1` to `Port 0`, `Entry 2` to `Port 1` and `Entry 3` to `Port 2`. 
@@ -162,7 +162,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
     The output of this block, an array of one-hot vectors, is a crucial input for the `Payload Mux`, where it acts as the select signal to choose the data from the correct port.    
 
 3. **Payload Mux: Routing the correct address**  
-    ![PTQ_Payload_MUX](./figs/PTQ_Payload_MUX.png)  
+    ![PTQ_Payload_MUX](./figs/ptq/PTQ_Payload_MUX.png)  
     Based on the example diagram:
     - The `Access Ports` table shows the current address payloads being presented by each port:
         - `Port 0`: `01101111`
@@ -179,7 +179,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 4. **Entry-Port Assignment Masking Logic**  
-    ![Entry-Port Assignment Assignment Logic](./figs/Ready_Port_Selector.png)  
+    ![Entry-Port Assignment Assignment Logic](./figs/ptq/Ready_Port_Selector.png)  
     Based on the example diagram:
     - `entry_request_valid`:
         - `Entry 0`: `1` (Entry 0 is waiting)    -> `111`
@@ -201,7 +201,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 5. **Handshake Logic: Managing port readiness and masking the port assigned with invalid ports**
-    ![PTQ_Handshake](./figs/PTQ_Handshake.png)  
+    ![PTQ_Handshake](./figs/ptq/PTQ_Handshake.png)  
     This block is responsible for the `valid/ready` handshake protocol with the `Access Ports`. It performs two functions: providing back-pressure to the ports and identifying all currently active memory requests for the arbiter.  
     Based on the example diagram:
     - **Back-pressure control**: First, the block determines which ports are `ready`.
@@ -212,7 +212,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         
 
 6. **Arbitration Logic: Selecting the oldest active entry**  
-    ![PTQ_masking](./figs/PTQ_masking.png)  
+    ![PTQ_masking](./figs/ptq/PTQ_masking.png)  
     This block is responsible for selecting the oldest active memory request for each port and generating the write enable signal for such requests.  
     Based on the example diagram:
     - The `Handshake Logic` has identified two active requests: one for `Entry 0` from `Port 1` and another for `Entry 3` from `Port 2`.
