@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of subf is
 
-  component array_RAM_fsub_32bkb is
+  component subf_vitisHls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 10;
@@ -81,7 +81,7 @@ begin
       outs(0)    => oehb_dataOut
     );
 
-  array_RAM_fsub_32ns_32ns_32_10_full_dsp_1_U1 : component array_RAM_fsub_32bkb
+  array_RAM_fsub_32ns_32ns_32_10_full_dsp_1_U1 : component subf_vitisHls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -151,7 +151,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY array_RAM_ap_fsub_8_full_dsp_32 IS
+ENTITY subf_vitisHls_singlePrecision_lat8 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -162,11 +162,11 @@ ENTITY array_RAM_ap_fsub_8_full_dsp_32 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END array_RAM_ap_fsub_8_full_dsp_32;
+END subf_vitisHls_singlePrecision_lat8;
 
-ARCHITECTURE array_RAM_ap_fsub_8_full_dsp_32_arch OF array_RAM_ap_fsub_8_full_dsp_32 IS
+ARCHITECTURE subf_vitisHls_singlePrecision_lat8_arch OF subf_vitisHls_singlePrecision_lat8 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF array_RAM_ap_fsub_8_full_dsp_32_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF subf_vitisHls_singlePrecision_lat8_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -396,7 +396,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END array_RAM_ap_fsub_8_full_dsp_32_arch;
+END subf_vitisHls_singlePrecision_lat8_arch;
 
 
 -- ==============================================================
@@ -406,7 +406,7 @@ END array_RAM_ap_fsub_8_full_dsp_32_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity array_RAM_fsub_32bkb is
+entity subf_vitisHls_wrapper is
     generic (
         ID         : integer := 1;
         NUM_STAGE  : integer := 10;
@@ -424,9 +424,9 @@ entity array_RAM_fsub_32bkb is
     );
 end entity;
 
-architecture arch of array_RAM_fsub_32bkb is
+architecture arch of subf_vitisHls_wrapper is
     --------------------- Component ---------------------
-    component array_RAM_ap_fsub_8_full_dsp_32 is
+    component subf_vitisHls_singlePrecision_lat8 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -454,7 +454,7 @@ architecture arch of array_RAM_fsub_32bkb is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    array_RAM_ap_fsub_8_full_dsp_32_u : entity work.array_RAM_ap_fsub_8_full_dsp_32
+    subf_vitisHls_singlePrecision_lat8_u : entity work.subf_vitisHls_singlePrecision_lat8
     port map (
         aclk                 => aclk,
         aclken               => aclken,
