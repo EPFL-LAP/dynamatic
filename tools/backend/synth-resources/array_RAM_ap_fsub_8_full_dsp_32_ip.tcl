@@ -1,9 +1,3 @@
-# BEGIN Vivado Commands 
-set vivado_ver [version -short]
-set fpo_ver 7.1
-if {[regexp -nocase {2015\.1.*} $vivado_ver match]} {
-    set fpo_ver 7.0
-}
 create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name array_RAM_ap_fsub_8_full_dsp_32
 # BEGIN Vivado Commands 
 # BEGIN Vivado Parameters
