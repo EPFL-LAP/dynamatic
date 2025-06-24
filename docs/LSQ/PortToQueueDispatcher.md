@@ -179,7 +179,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 
 4. **Entry-Port Assignment Masking Logic**  
-    ![Entry-Port Assignment Assignment Logic](./figs/ptq/Ready_Port_Selector.png)  
+    ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_Entry_Port_Assignment_Masking.png)  
     Based on the example diagram:
     - `entry_request_valid`:
         - `Entry 0`: `1` (Entry 0 is waiting)    -> `111`
