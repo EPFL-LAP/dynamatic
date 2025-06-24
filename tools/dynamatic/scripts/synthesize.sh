@@ -26,7 +26,6 @@ F_TIMING_PR="$SYNTH_DIR/timing_post_pr.rpt"
 
 # Shortcuts
 HDL_DIR="$OUTPUT_DIR/hdl"
-TCL_DIR="$OUTPUT_DIR/tcl"
 
 # Resources directory
 RESOURCE_DIR="$DYNAMATIC_DIR/tools/backend/synth-resources"
@@ -57,12 +56,10 @@ if ls "$HDL_DIR"/*.v 1> /dev/null 2>&1; then
   READ_VERILOG="read_verilog [glob $SYNTH_DIR/hdl/*.v]"
 fi
 
-# Copy resources to synthesis directory
-mkdir -p "$TCL_DIR"
-cp -r "$RESOURCE_DIR"/* "$TCL_DIR"
+# Source tcl resources
 READ_TCL=""
-if ls "$TCL_DIR"/*.tcl 1> /dev/null 2>&1; then
-  for f in "$TCL_DIR"/*.tcl; do
+if ls "$RESOURCE_DIR"/*.tcl 1> /dev/null 2>&1; then
+  for f in "$RESOURCE_DIR"/*.tcl; do
     READ_TCL="$READ_TCL\nsource $f"
   done
 fi
