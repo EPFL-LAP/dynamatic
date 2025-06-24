@@ -64,9 +64,18 @@ if ls "$RESOURCE_DIR"/*.tcl 1> /dev/null 2>&1; then
   done
 fi
 
+# Set vivado commands for vivado IPs for floating point operations
+VIVADO_CMDS="set vivado_ver [version -short]
+set fpo_ver 7.1
+if {[regexp -nocase {2015\.1.*} $vivado_ver match]} {
+    set fpo_ver 7.0
+}
+"
+
 # Generate synthesis script
 echo -e \
 "set_param general.maxThreads 8
+$VIVADO_CMDS
 $READ_VHDL
 $READ_VERILOG
 $READ_TCL
