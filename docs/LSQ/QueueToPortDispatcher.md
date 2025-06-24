@@ -18,7 +18,7 @@ The primary instance of this module is the **Load Data Port Dispatcher**, which 
 ## 2. Queue-to-Port Dispatcher Internal Blocks
 
 
-![Queue-to-Port Dispatcher High-Level](./figs/QTP_high_level.png)
+![Queue-to-Port Dispatcher High-Level](./figs/qtp/QTP_high_level.png)
 
 ### Interface Signals
 | Signal Name          |  Description     |
