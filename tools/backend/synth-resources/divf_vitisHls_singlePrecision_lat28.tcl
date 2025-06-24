@@ -1,4 +1,4 @@
-create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name array_RAM_ap_fdiv_28_no_dsp_32
+create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name divf_vitisHls_singlePrecision_lat28
 # BEGIN Vivado Commands 
 # BEGIN Vivado Parameters
 set_property -dict [list CONFIG.a_precision_type Single \
@@ -18,7 +18,7 @@ set_property -dict [list CONFIG.a_precision_type Single \
                           CONFIG.c_rate 1 \
                           CONFIG.c_result_exponent_width 8 \
                           CONFIG.c_result_fraction_width 24 \
-                          CONFIG.component_name array_RAM_ap_fdiv_28_no_dsp_32 \
+                          CONFIG.component_name divf_vitisHls_singlePrecision_lat28 \
                           CONFIG.flow_control NonBlocking \
                           CONFIG.has_a_tlast false \
                           CONFIG.has_a_tuser false \
@@ -33,7 +33,7 @@ set_property -dict [list CONFIG.a_precision_type Single \
                           CONFIG.operation_tuser_width 1 \
                           CONFIG.operation_type Divide \
                           CONFIG.result_precision_type Single \
-                          CONFIG.result_tlast_behv Null] -objects [get_ips array_RAM_ap_fdiv_28_no_dsp_32] -quiet
+                          CONFIG.result_tlast_behv Null] -objects [get_ips divf_vitisHls_singlePrecision_lat28] -quiet
 # END Vivado Parameters
-set_property generate_synth_checkpoint false [get_files array_RAM_ap_fdiv_28_no_dsp_32.xci]
-generate_target {synthesis simulation} [get_files array_RAM_ap_fdiv_28_no_dsp_32.xci]
+set_property generate_synth_checkpoint false [get_files divf_vitisHls_singlePrecision_lat28.xci]
+generate_target {synthesis simulation} [get_files divf_vitisHls_singlePrecision_lat28.xci]
