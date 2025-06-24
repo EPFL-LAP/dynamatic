@@ -78,7 +78,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
     - **Input**:   
         - `entry_port_idx_i`: Queue entry-port assignment information
     - **Processing**:  
-        - It performs a binary-to-one-hot conversion on the port index associated with each entry. For example, if there are 3 ports, a binary index of `01` would be converted to a one-hot vector of `010`.
+        - It performs a integer-to-one-hot conversion on the port index associated with each entry. For example, if there are 3 ports, an integer index of `1 (01 in binary)` would be converted to a one-hot vector of `010`.
     - **Output**:  
         - `entry_port_valid`: A one-hot vector for each entry that directly corresponds to the port it is assigned to.
 
@@ -149,10 +149,10 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 
 2. **Port Index Decoder: Queue entries port assignment in one-hot format**
     ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder.png)  
-    This block's circuit is to decode the binary port index assigned to each queue entry into a one-hot format.  
+    This block's circuit is to decode an integer index assigned to each queue entry into a one-hot format.  
     Based on the example diagram:  
     - The `Store Queue` shows that `Entry 0` is assigned to `Port 1` , `Entry 1` to `Port 0`, `Entry 2` to `Port 1` and `Entry 3` to `Port 2`. 
-    - The `Port Index Decoder` takes these binary indices (`00`, `01`, `10`) as input.
+    - The `Port Index Decoder` takes these integer indices (`0`, `1`, `2`) as input which are (`00`, `01`, `02` in binary respectively).
     - It processes them and generates a corresponding one-hot vector for each entry. Since there are three access ports, the vector are three bits wide:
         - `Entry 0 (Port 1)`: `010`
         - `Entry 1 (Port 0)`: `000`
