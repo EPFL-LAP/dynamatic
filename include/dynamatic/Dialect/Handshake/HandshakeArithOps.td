@@ -27,7 +27,7 @@ class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
     SameOperandsAndResultType,
     DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
   ]> {
-  let arguments = (ins ChannelType:$lhs, ChannelType:$rhs, OptionalAttr<StrAttr>:$selected_delay);
+  let arguments = (ins ChannelType:$lhs, ChannelType:$rhs, OptionalAttr<StrAttr>:$internal_delay);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($result)";
@@ -64,7 +64,7 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
                                          IsFloatChannel<"operand">,
                                          IsFloatChannel<"result">]
 > {
-  let arguments = (ins ChannelType:$operand, OptionalAttr<StrAttr>:$selected_delay);
+  let arguments = (ins ChannelType:$operand, OptionalAttr<StrAttr>:$internal_delay);
   let results = (outs ChannelType:$result);
 
   let assemblyFormat = "$operand attr-dict `:` type($result)";

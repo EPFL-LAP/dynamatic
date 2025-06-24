@@ -166,12 +166,10 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
                                                          delay, targetCP))) {
-        llvm::errs() << "written delay value: " << delay << "\n";
 
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
-        llvm::errs() << "written delay string: " << delayStr << "\n";
-        op->setAttr("selected_delay",
+        op->setAttr("internal_delay",
                     mlir::StringAttr::get(op->getContext(), delayStr));
       }
     }

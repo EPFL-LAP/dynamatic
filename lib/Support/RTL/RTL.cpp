@@ -337,13 +337,12 @@ void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
 void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
                                               llvm::StringRef modName,
                                               hw::ModuleType &modType) {
-  // Look for SELECTED_DELAY in hw.parameters
+  // Look for INTERNAL_DELAY in hw.parameters
   if (auto paramsAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters")) {
-    if (auto selectedDelay = paramsAttr.get("SELECTED_DELAY")) {
+    if (auto selectedDelay = paramsAttr.get("INTERNAL_DELAY")) {
       if (auto stringAttr = selectedDelay.dyn_cast<StringAttr>()) {
         std::string delayStr = stringAttr.getValue().str();
-        serializedParams["SELECTED_DELAY"] = delayStr;
-        llvm::errs() << "SELECTED_DELAY READ: " << delayStr << "\n";
+        serializedParams["INTERNAL_DELAY"] = delayStr;
         return;
       }
     }
@@ -351,13 +350,11 @@ void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
 
   // Fallback: also check for direct attribute (in case some modules have it
   // there)
-  if (auto selectedDelay = modOp->getAttrOfType<StringAttr>("selected_delay")) {
+  if (auto selectedDelay = modOp->getAttrOfType<StringAttr>("internal_delay")) {
     std::string delayStr = selectedDelay.getValue().str();
-    serializedParams["SELECTED_DELAY"] = delayStr;
-    llvm::errs() << "SELECTED_DELAY READ: " << delayStr << "\n";
+    serializedParams["INTERNAL_DELAY"] = delayStr;
   } else {
-    serializedParams["SELECTED_DELAY"] = "0.0";
-    llvm::errs() << "SELECTED_DELAY DEFAULTED: 0.0\n";
+    serializedParams["INTERNAL_DELAY"] = "0.0";
   }
 }
 

@@ -171,14 +171,6 @@ LogicalResult TimingDatabase::getInternalCombinationalDelay(
   if (failed(DelayStruct.getDelayCeilValue(targetPeriod, delay)))
     return failure();
 
-  llvm::errs() << "=== Debug: writes to IR ===\n";
-  llvm::errs() << "Operation: " << op->getName().getStringRef() << "\n";
-  llvm::errs() << "Final delay value: " << delay << "\n";
-  llvm::errs() << "================================\n\n";
-  llvm::errs() << "=== Debug: writes to IR  ===\n";
-  llvm::errs() << "Final delay value: " << delay << "\n";
-  llvm::errs() << "================================\n\n";
-
   return success();
 }
 

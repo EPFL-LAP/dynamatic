@@ -5,7 +5,7 @@ float loop_add(in_int_t a[N]) {
   float x = 2.0f;
   for (unsigned i = 0; i < N; ++i) {
     if (a[i] == 0)
-      x = x * 1.25f;
+      x = x * 1.256f;
   }
   return x;
 }

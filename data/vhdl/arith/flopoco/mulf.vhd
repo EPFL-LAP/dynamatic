@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 entity mulf is
   generic (
     DATA_TYPE : integer;
-    SELECTED_DELAY : integer
+    INTERNAL_DELAY : integer
   );
   port (
     -- inputs

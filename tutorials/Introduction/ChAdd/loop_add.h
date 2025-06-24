@@ -1,7 +1,7 @@
 #ifndef LOOP_ADD_H
 #define LOOP_ADD_H
 
-#define N 8
+#define N 4
 
 typedef int in_int_t;
 

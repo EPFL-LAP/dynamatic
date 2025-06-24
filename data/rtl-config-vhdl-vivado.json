@@ -3,11 +3,11 @@
     "name": "handshake.addf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-            { "name": "SELECTED_DELAY", "type": "string" }
+            { "name": "INTERNAL_DELAY", "type": "string" }
     ],
 <<<<<<< HEAD:data/rtl-config-vhdl.json
     "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
-    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
+    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
 =======
     "generic": "$DYNAMATIC/data/vhdl/arith/vivado/addf.vhd",
 >>>>>>> main:data/rtl-config-vhdl-vivado.json
@@ -63,11 +63,11 @@
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "SELECTED_DELAY", "type": "string" }
+      { "name": "INTERNAL_DELAY", "type": "string" }
     ],
 <<<<<<< HEAD:data/rtl-config-vhdl.json
     "generic": "$DYNAMATIC/data/vhdl/arith/divf.vhd",
-    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
+    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
 =======
     "generic": "$DYNAMATIC/data/vhdl/arith/vivado/divf.vhd",
 >>>>>>> main:data/rtl-config-vhdl-vivado.json
@@ -125,11 +125,11 @@
     "name": "handshake.mulf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "SELECTED_DELAY", "type": "string" }
+      { "name": "INTERNAL_DELAY", "type": "string" }
     ],
 <<<<<<< HEAD:data/rtl-config-vhdl.json
     "generic": "$DYNAMATIC/data/vhdl/arith/mulf.vhd",
-    "arch-name" : "arch_$DATA_TYPE_$SELECTED_DELAY",
+    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
 =======
     "generic": "$DYNAMATIC/data/vhdl/arith/vivado/mulf.vhd",
 >>>>>>> main:data/rtl-config-vhdl-vivado.json
