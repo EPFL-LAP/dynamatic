@@ -287,6 +287,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     write_sdc_constraints(sdc_file, 4.0)  # Set a default period of 4 ns
     # Create a top file for each combination of parameters and the corresponding tcl file
     list_tcls = []
+    map_rpt2params = {}
     id = 0
     for combination in param_combinations:
         top_file = f"{hdl_out_dir}/{top_entity_name}_top_{id}.vhd" 
@@ -305,10 +306,16 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
             os.remove(rpt_timing)
         write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports)
         id += 1
+        # Map the report file to the parameters used
+        map_rpt2params[rpt_timing] = {}
+        for param_name, param_value in zip(param_names, combination):
+            map_rpt2params[rpt_timing][param_name] = param_value
 
     # Run the synthesis tool for each tcl file
     log_file = f"{log_dir}/synth_{unit_name}_log.txt"
     run_synthesis(list_tcls, synth_tool, log_file)    
+
+    return map_rpt2params
 
 def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list):
     """
@@ -424,6 +431,113 @@ def get_dependency_list(dataflow_units):
             continue
     return dependency_list
 
+def extract_data_from_report(rpt_file):
+    """
+    Extract data from the report file.
+    
+    Args:
+        rpt_file (str): Path to the report file.
+        
+    Returns:
+        tuple: A tuple containing dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay.
+    """
+    # Initialize variables
+    dataDelay = -1
+    validDelay = -1
+    readyDelay = -1
+    VRDelay = -1
+    CVDelay = -1
+    CRDelay = -1
+    VCDelay = -1
+    VDDelay = -1
+    
+    # Read the report file and extract the required data
+    with open(rpt_file, 'r') as f:
+        for line in f:
+            # Extract connection type
+            if "Command      :" in line:
+                match = re.search(r'report_timing\s+-from\s+\[get_ports\s+(\w+)\]\s+-to\s+\[get_ports\s+(\w+)\]', line)
+                assert match, f"Could not find connection type in line: {line}"
+                from_port = match.group(1)
+                to_port = match.group(2)
+            # Extract delay of the data path
+            if "Data Path Delay:" in line:
+                match = re.search(r'Data Path Delay:\s+([\d.]+)ns', line)
+                assert match, f"Could not find data path delay in line: {line}"
+                delay = float(match.group(1))
+                connection_found = False
+                # Determine the connection type based on the ports names
+                if "lhs" == from_port or "rhs" == from_port:
+                    if "result" == to_port:
+                        connection_found = True
+                        dataDelay = max(dataDelay, delay)
+                elif "lhs_valid" == from_port or "rhs_valid" == from_port:
+                    if "result_valid" == to_port:
+                        connection_found = True
+                        validDelay = max(validDelay, delay)
+                    elif "result" == to_port:
+                        connection_found = True
+                        VDDelay = max(VDDelay, delay)
+                    elif "result_ready" == to_port:
+                        connection_found = True
+                        VRDelay = max(VRDelay, delay)
+                elif "lhs_ready" == from_port or "rhs_ready" == from_port:
+                    if "result_ready" == to_port:
+                        connection_found = True
+                        readyDelay = max(readyDelay, delay)
+                assert connection_found, f"Could not determine connection type for ports {from_port} and {to_port} in line: {line}"
+
+    return dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay
+                
+            
+
+def extract_data(map_unit2rpts, json_output):
+    """
+    Extract the data from the map_unit2rpts dictionary and save it to a JSON file.
+    IMPORTANT: For now we assume that only DATA_TYPE is the only parameter that can be used to characterize the unit.
+    
+    Args:
+        map_unit2rpts (dict): Dictionary containing unit names as keys and their reports as values.
+        json_output (str): Path to the output JSON file.
+    """
+    # Create the output data structure
+    output_data = {}
+    for unit_name, map_rpt2params in map_unit2rpts.items():
+        dataDict = {}
+        validDict = {"1": 0.0}
+        readyDict = {"1": 0.0}
+        VRDelayFinal = 0.0
+        CVDelayFinal = 0.0
+        CRDelayFinal = 0.0
+        VCDelayFinal = 0.0
+        VDDelayFinal = 0.0
+        # Extract the data from the reports
+        for rpt_file, params in map_rpt2params.items():
+            # Extract data2data, valid2valid, ready2ready, VR, CV, CR, VC and VD
+            dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay = extract_data_from_report(rpt_file)
+            dataDict[str(params["DATA_TYPE"])] = dataDelay
+            validDict["1"] = max(validDict["1"], validDelay)
+            readyDict["1"] = max(readyDict["1"], readyDelay)
+            VRDelayFinal = max(VRDelayFinal, VRDelay)
+            CVDelayFinal = max(CVDelayFinal, CVDelay)
+            CRDelayFinal = max(CRDelayFinal, CRDelay)
+            VCDelayFinal = max(VCDelayFinal, VCDelay)
+            VDDelayFinal = max(VDDelayFinal, VDDelay)
+
+        output_data[unit_name] = {"delay":{"data": dataDict,
+                                       "valid": validDict,
+                                       "ready": readyDict,
+                                       "VR": VRDelayFinal,
+                                       "CV": CVDelayFinal,
+                                       "CR": CRDelayFinal,
+                                       "VC": VCDelayFinal,
+                                       "VD": VDDelayFinal}}
+
+
+    # Save the output data to the JSON file
+    with open(json_output, 'w') as f:
+        json.dump(output_data, f, indent=4)
+
 def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
     """
     Run characterization of dataflow units based on the provided JSON input.
@@ -461,6 +575,8 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
 
     dependency_list = get_dependency_list(dataflow_units)
 
+    map_unit2rpts = {}
+
     for unit_info in dataflow_units:
         # Extract the unit name and its RTL information
         unit_name, list_params, generic, generator, dependencies = extract_rtl_info(unit_info)
@@ -489,8 +605,12 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
         print(f"Processing unit: {unit_name}")
         top_def_file = get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
         # After generating the HDL files, we can proceed with characterization
-        results = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)
+        map_rpt2params = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)
+        # Store the results in the map_unit2rpts dictionary
+        map_unit2rpts[unit_name] = map_rpt2params
+    
     # Save the results to the output JSON file
+    extract_data(map_unit2rpts, json_output)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run characterization of dataflow units")
