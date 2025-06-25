@@ -456,7 +456,7 @@ def extract_data_from_report(rpt_file):
         for line in f:
             # Extract connection type
             if "Command      :" in line:
-                match = re.search(r'report_timing\s+-from\s+\[get_ports\s+(\w+)\]\s+-to\s+\[get_ports\s+(\w+)\]', line)
+                match = re.search(r'report_timing\s+-from\s+\[get_ports\s+{?([\w\[\]]+)}?\]\s+-to\s+\[get_ports\s+{?([\w\[\]]+)}?\]', line)
                 assert match, f"Could not find connection type in line: {line}"
                 from_port = match.group(1)
                 to_port = match.group(2)
@@ -467,25 +467,55 @@ def extract_data_from_report(rpt_file):
                 delay = float(match.group(1))
                 connection_found = False
                 # Determine the connection type based on the ports names
-                if "lhs" == from_port or "rhs" == from_port:
-                    if "result" == to_port:
-                        connection_found = True
-                        dataDelay = max(dataDelay, delay)
-                elif "lhs_valid" == from_port or "rhs_valid" == from_port:
-                    if "result_valid" == to_port:
-                        connection_found = True
-                        validDelay = max(validDelay, delay)
-                    elif "result" == to_port:
-                        connection_found = True
-                        VDDelay = max(VDDelay, delay)
-                    elif "result_ready" == to_port:
-                        connection_found = True
-                        VRDelay = max(VRDelay, delay)
-                elif "lhs_ready" == from_port or "rhs_ready" == from_port:
-                    if "result_ready" == to_port:
-                        connection_found = True
-                        readyDelay = max(readyDelay, delay)
-                assert connection_found, f"Could not determine connection type for ports {from_port} and {to_port} in line: {line}"
+                validSignalFrom = "_valid" in from_port
+                validSignalTo = "_valid" in to_port
+                readySignalFrom = "_ready" in from_port
+                readySignalTo = "_ready" in to_port
+                conditionFrom = ("condition" in from_port or "index" in from_port)and not validSignalFrom and not readySignalFrom
+                conditionTo = ("condition" in to_port or "index" in to_port) and not validSignalTo and not readySignalTo
+                dataFrom = False
+                dataTo = False
+                if not validSignalFrom and not readySignalFrom and not conditionFrom:
+                    assert "lhs" in from_port or "rhs" in from_port or "trueValue" in from_port or "falseValue" in from_port or "ins" in from_port or "data" in from_port or "addrIn" in from_port, f"Unexpected port `{from_port}` without valid or ready signal."
+                    dataFrom = True
+                if not validSignalTo and not readySignalTo and not conditionTo:
+                    assert "result" in to_port or "outs" in to_port or "trueOut" in to_port or "falseOut" in to_port or "addrOut" in to_port or "dataOut" in to_port, f"Unexpected port `{to_port}` without valid or ready signal."
+                    dataTo = True
+
+                if (dataFrom and dataTo) or (conditionFrom and dataTo):
+                    # Data to data connection
+                    connection_found = True
+                    dataDelay = max(dataDelay, delay)
+                elif validSignalFrom and validSignalTo:
+                    # Valid to valid connection
+                    connection_found = True
+                    validDelay = max(validDelay, delay)
+                elif validSignalFrom and dataTo:
+                    # Valid to data connection (VD)
+                    connection_found = True
+                    VDDelay = max(VDDelay, delay)
+                elif validSignalFrom and readySignalTo:
+                    # Valid to ready connection (VR)
+                    connection_found = True
+                    VRDelay = max(VRDelay, delay)
+                elif validSignalFrom and conditionTo:
+                    # Valid to condition connection (CV)
+                    connection_found = True
+                    VCDelay = max(VCDelay, delay)
+                elif readySignalFrom and readySignalTo:
+                    # Ready to ready connection
+                    connection_found = True
+                    readyDelay = max(readyDelay, delay)
+                elif conditionFrom and validSignalTo:
+                    # Condition to valid connection (CV)
+                    connection_found = True
+                    CVDelay = max(CVDelay, delay)
+                elif conditionFrom and readySignalTo:
+                    # Condition to ready connection (CR)
+                    connection_found = True
+                    CRDelay = max(CRDelay, delay)
+
+                assert connection_found, f"Could not determine connection type for ports `{from_port}` and `{to_port}`"
 
     return dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay
                 
@@ -511,8 +541,14 @@ def extract_data(map_unit2rpts, json_output):
         CRDelayFinal = 0.0
         VCDelayFinal = 0.0
         VDDelayFinal = 0.0
+        traversedOnce = False
         # Extract the data from the reports
         for rpt_file, params in map_rpt2params.items():
+            # Check if the report file exists
+            if not os.path.exists(rpt_file):
+                print("\033[93m" + f"[WARNING] Report file for unit {unit_name} parameters {params} does not exist({rpt_file}). Skipping." + "\033[0m")
+                continue
+            traversedOnce = True
             # Extract data2data, valid2valid, ready2ready, VR, CV, CR, VC and VD
             dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay = extract_data_from_report(rpt_file)
             dataDict[str(params["DATA_TYPE"])] = dataDelay
@@ -523,6 +559,10 @@ def extract_data(map_unit2rpts, json_output):
             CRDelayFinal = max(CRDelayFinal, CRDelay)
             VCDelayFinal = max(VCDelayFinal, VCDelay)
             VDDelayFinal = max(VDDelayFinal, VDDelay)
+
+        if traversedOnce == False:
+            print("\033[91m" + f"[ERROR] No reports found for unit {unit_name}." + "\033[0m")
+            continue
 
         output_data[unit_name] = {"delay":{"data": dataDict,
                                        "valid": validDict,
