@@ -33,7 +33,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)
   VAR
   inner_lazy_fork : {name}__lazy_fork_dataless(ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)])});
 
-  //output
+  -- output
   DEFINE
   ins_ready := inner_lazy_fork.ins_ready;
   {"\n  ".join([f"outs_{n}_valid := inner_lazy_fork.outs_{n}_valid;" for n in range(size)])}

@@ -46,6 +46,8 @@ architecture arch of ENTITY_NAME is
 
   signal join_valid   : std_logic;
   signal result_tmp   : std_logic;
+  signal buff_valid, oehb_valid, oehb_ready : std_logic;
+  signal oehb_dataOut, oehb_datain          : std_logic;
   constant string_opcode : string := "COMPARATOR";
   signal alu_opcode : std_logic_vector(4 downto 0);
 
@@ -88,7 +90,7 @@ begin
       -- inputs
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
-      outs_ready   => result_ready,
+      outs_ready   => oehb_ready,
       -- outputs
       outs_valid   => join_valid,
       ins_ready(0) => lhs_ready,
@@ -107,7 +109,7 @@ begin
       reset   => rst,
       din0    => lhs,
       din1    => rhs,
-      ce      => result_ready,
+      ce      => oehb_ready,
       opcode  => alu_opcode,
       dout(0) => result_tmp
     );
@@ -117,8 +119,20 @@ begin
       clk,
       rst,
       join_valid,
-      result_ready,
-      result_valid
+      oehb_ready,
+      buff_valid
+    );
+
+  oehb : entity work.oehb(arch) generic map(1)
+    port map(
+      clk        => clk,
+      rst        => rst,
+      ins_valid  => buff_valid,
+      outs_ready => result_ready,
+      outs_valid => result_valid,
+      ins_ready  => oehb_ready,
+      ins(0)     => oehb_datain,
+      outs(0)    => oehb_dataOut
     );
 
   result(0) <= result_tmp;
