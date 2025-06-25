@@ -15,15 +15,15 @@ def _generate_cond_br_dataless(name):
     return f"""
 MODULE {name}(condition, condition_valid, data_valid, trueOut_ready, falseOut_ready)
   VAR
-  inner_join : {name}__join(data_valid, condition_valid, branch_ready);
+  inner_join : {name}__join(condition_valid, data_valid, branch_ready);
 
   DEFINE
   branch_ready := (falseOut_ready & !condition) | (trueOut_ready & condition);
 
   -- output
   DEFINE
-  data_ready := inner_join.ins_0_ready;
-  condition_ready := inner_join.ins_1_ready;
+  condition_ready := inner_join.ins_0_ready;
+  data_ready := inner_join.ins_1_ready;
   trueOut_valid := condition & inner_join.outs_valid;
   falseOut_valid := !condition & inner_join.outs_valid;
 

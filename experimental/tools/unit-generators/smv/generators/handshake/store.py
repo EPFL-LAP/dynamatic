@@ -12,7 +12,7 @@ def _generate_store(name, data_type, addr_type):
     return f"""
 MODULE {name}(addrIn, addrIn_valid, dataIn, dataIn_valid, addrOut_ready, dataToMem_ready)
 
-  //output
+  -- outputs
   DEFINE
   dataIn_ready := dataToMem_ready;
   addrIn_ready := addrOut_ready;

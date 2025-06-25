@@ -279,6 +279,7 @@ class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral BUFFER_ALGORITHM = "buffer-algorithm";
   static constexpr llvm::StringLiteral SHARING = "sharing";
+  static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -291,6 +292,7 @@ public:
                "correctness), 'fpga20' (throughput-driven buffering), or "
                "'fpl22' (throughput- and timing-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
+    addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -640,13 +642,14 @@ CommandResult Compile::execute(CommandArguments &args) {
   }
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
+  std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   state.polygeistPath = state.polygeistPath.empty()
                             ? state.dynamaticPath + getSeparator() + "polygeist"
                             : state.polygeistPath;
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), state.polygeistPath, sharing,
-                 state.fpUnitsGenerator);
+                 state.fpUnitsGenerator, rigidification);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
