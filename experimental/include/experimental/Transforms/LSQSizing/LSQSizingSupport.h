@@ -55,7 +55,7 @@ public:
   /// Constructor for the graph, which takes a Vector of BBs, which make up a
   /// single CFDFC
   CFDFCGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-             TimingDatabase timingDB, unsigned II);
+             TimingDatabase timingDB, unsigned II, double targetCP);
 
   /// Adds the edges between the start node and the start node candidates, with
   /// their respective shifting in the start time These edges are necessary to

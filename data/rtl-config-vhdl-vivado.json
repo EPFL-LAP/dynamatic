@@ -4,7 +4,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/addf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/addf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -35,7 +35,7 @@
         "generic": true
       }
     ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
+    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/vivado/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
     "dependencies": ["join", "flopoco_ip_cores"]
   },
   {
@@ -58,7 +58,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/divf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/divf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -114,7 +114,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/mulf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/mulf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -177,7 +177,7 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/subf.vhd",
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/subf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -450,6 +450,49 @@
     "generic": "$DYNAMATIC/data/vhdl/handshake/one_slot_break_dvr.vhd",
     "module-name": "one_slot_break_dvr",
     "dependencies": ["one_slot_break_dvr_dataless"]
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "SHIFT_REG_BREAK_DV", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/shift_reg_break_dv.vhd",
+    "module-name": "shift_reg_break_dv_dataless"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "SHIFT_REG_BREAK_DV", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      {
+        "name": "TIMING",
+        "type": "timing",
+        "data-lat-eq": 1,
+        "valid-lat-eq": 1,
+        "ready-lat-eq": 0,
+        "generic": false
+      }
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/handshake/shift_reg_break_dv.vhd",
+    "module-name": "shift_reg_break_dv",
+    "dependencies": ["shift_reg_break_dv_dataless"]
   },
   {
     "name": "handshake.ndwire",
@@ -784,6 +827,14 @@
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/not.vhd",
     "module-name": "logic_not"
+  },
+  {
+    "name": "handshake.ready_remover",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ready_remover -p bitwidth=$BITWIDTH"
+  },
+  {
+    "name": "handshake.valid_merger",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t valid_merger -p left_bitwidth=$LEFT_BITWIDTH right_bitwidth=$RIGHT_BITWIDTH"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/delay_buffer.vhd"

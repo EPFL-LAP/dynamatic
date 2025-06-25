@@ -11,10 +11,10 @@ module {
     sink %t_1 {handshake.bb = 1 : ui32, handshake.name = "supp_sink_1"} : <i32>
     %loop_out_1 = buffer %f_1 {handshake.bb = 1 : ui32, handshake.name = "comb_buf_1", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
     %m_forked:2 = fork [2] %m {handshake.bb = 1 : ui32, handshake.name = "fork_m"} : <i1>
-    %m_init = init %m_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_m", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %m_init = init %m_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_m", hw.parameters = {INITIAL_TOKEN = 0 : i1, BUFFER_TYPE = "ONE_SLOT_BREAK_DV"}} : <i1>
     %m_not = not %m_forked#1 {handshake.bb = 1 : ui32, handshake.name = "not_m"} : <i1>
     %n_forked:2 = fork [2] %n {handshake.bb = 1 : ui32, handshake.name = "fork_n"} : <i1>
-    %n_init = init %n_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_n", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %n_init = init %n_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_n", hw.parameters = {INITIAL_TOKEN = 0 : i1, BUFFER_TYPE = "ONE_SLOT_BREAK_DV"}} : <i1>
     %n_not = not %n_forked#1 {handshake.bb = 1 : ui32, handshake.name = "not_n"} : <i1>
     end {handshake.bb = 1 : ui32, handshake.name = "end0"} %mux1_forked#0 : <i32>
   }

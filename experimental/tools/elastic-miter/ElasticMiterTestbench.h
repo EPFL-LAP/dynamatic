@@ -37,7 +37,7 @@ namespace dynamatic::experimental {
 // exact: determines if the sequence generator create exactly "nrOfTokens"
 //   tokens, or can non-determinstically create fewer tokens.
 
-std::string createSmvFormalTestbench(
+std::string createElasticMiterTestBench(
     MLIRContext &context, const ElasticMiterConfig &config,
     const std::string &modelSmvName, size_t nrOfTokens, bool includeProperties,
     const std::optional<
@@ -45,7 +45,6 @@ std::string createSmvFormalTestbench(
         &sequenceConstraints,
     bool generateExactNrOfTokens = false);
 
-// TODO
 LogicalResult createSmvSequenceLengthTestbench(
     MLIRContext &context, const std::filesystem::path &wrapperPath,
     const ElasticMiterConfig &config, const std::string &modelSmvName,

@@ -10,7 +10,7 @@ module {
     %loop_out_0 = buffer %f_0 {handshake.bb = 1 : ui32, handshake.name = "comb_buf_0", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
 
     %ctrl_forked_0:2 = fork [2] %c_forked#0 {handshake.bb = 1 : ui32, handshake.name = "fork_ctrl_0"} : <i1>
-    %ctrl_init_0 = init %ctrl_forked_0#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl_0", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %ctrl_init_0 = init %ctrl_forked_0#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl_0", hw.parameters = {INITIAL_TOKEN = 0 : i1, BUFFER_TYPE = "ONE_SLOT_BREAK_DV"}} : <i1>
     %ctrl_not_0 = not %ctrl_forked_0#1 {handshake.bb = 1 : ui32, handshake.name = "not_ctrl_0"} : <i1>
 
 
@@ -21,7 +21,7 @@ module {
     %loop_out_1 = buffer %f_1 {handshake.bb = 1 : ui32, handshake.name = "comb_buf_1", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
 
     %ctrl_forked_1:2 = fork [2] %c_forked#1 {handshake.bb = 1 : ui32, handshake.name = "fork_ctrl_1"} : <i1>
-    %ctrl_init_1 = init %ctrl_forked_1#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl_1", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %ctrl_init_1 = init %ctrl_forked_1#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl_1", hw.parameters = {INITIAL_TOKEN = 0 : i1, BUFFER_TYPE = "ONE_SLOT_BREAK_DV"}} : <i1>
     %ctrl_not_1 = not %ctrl_forked_1#1 {handshake.bb = 1 : ui32, handshake.name = "not_ctrl_1"} : <i1>
 
     end {handshake.bb = 1 : ui32, handshake.name = "end0"} %data_forked_0#0, %data_forked_1#0 : <i32>, <i32>

@@ -183,7 +183,7 @@
   },
   {
     "name": "handshake.extsi",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extsi --abstract-data -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t extsi -p latency=0 input_bitwidth=$INPUT_BITWIDTH output_bitwidth=$OUTPUT_BITWIDTH",
     "hdl": "smv"
   },
   {
@@ -286,7 +286,7 @@
   },
   {
     "name": "mem_to_bram",
-    "generic": "$DYNAMATIC/data/vhdl/support/mem_to_bram.vhd",
+    "generator": "touch $OUTPUT_DIR/$MODULE_NAME.smv",
     "hdl": "smv"
   },
   {

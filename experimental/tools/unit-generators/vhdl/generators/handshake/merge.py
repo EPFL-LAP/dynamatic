@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
@@ -147,19 +148,18 @@ end architecture;
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
     # Haven't tested this function yet
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_concat_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals,
-            "2d": True,
             "size": size
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
+        extra_signals,
+        lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))

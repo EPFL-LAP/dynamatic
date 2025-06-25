@@ -235,33 +235,38 @@ def BufferOp : Handshake_Op<"buffer", [
                                            TIMING_ATTR_NAME = "TIMING",
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
     
-    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths. 
-    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer), 
-    /// it introduces one cycle of latency on the D and V paths. 
+    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
+    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer),
+    /// it introduces one cycle of latency on the D and V paths.
     /// It does not break the R signal path and adds no latency on R.
     static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV";
     
-    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path. 
-    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer), 
-    /// it introduces one cycle of latency on the R path. 
+    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path.
+    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer),
+    /// it introduces one cycle of latency on the R path.
     /// It does not break the D and V signal path and adds no latency on D and V.
     static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R";
     
-    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO), 
-    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths. 
+    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO),
+    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths.
     /// Its only purpose is to hold tokens.
     static constexpr ::llvm::StringLiteral FIFO_BREAK_NONE = "FIFO_BREAK_NONE";
     
-    /// FIFO_BREAK_DV: This buffer breaks the D and V paths. 
-    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers, 
-    /// its structure cannot be split. It introduces one cycle of latency on the D and V paths 
-    /// regardless of the number of slots and has no latency on R. 
+    /// FIFO_BREAK_DV: This buffer breaks the D and V paths.
+    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers,
+    /// its structure cannot be split. It introduces one cycle of latency on the
+    /// D and V paths regardless of the number of slots and has no latency on R.
     /// It was previously called an 'elastic_fifo_inner'.
     static constexpr ::llvm::StringLiteral FIFO_BREAK_DV = "FIFO_BREAK_DV";
     
-    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal paths 
-    /// and introduces one cycle of latency on all three.
+    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal
+    /// paths and introduces one cycle of latency on all of them.
     static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
+    
+    /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
+    /// handshake control signals, causing them to accept or stall inputs
+    /// simultaneously.
+    static constexpr ::llvm::StringLiteral SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV";
     
   }];
 
@@ -1484,5 +1489,72 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
+
+def ReadyRemoverOp : Handshake_Op<"ready_remover",[
+  SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = [{
+    Rigidifies a channel to simplify the handshake logic.
+  }];
+  let description = [{
+    Rigidifies a channel by setting the output valid signal to 1 and input ready
+    signal to a open. This allows the simplification of redundant handshake logic.
+  }];
+
+  let arguments = (ins HandshakeType:$channelIn);
+  let results = (outs HandshakeType:$channelOut);
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      return "ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      return "outs";
+    }
+  }];
+
+}
+
+def ValidMergerOp : Handshake_Op<"valid_merger",[
+  AllTypesMatch<["lhsIn", "lhs"]>,
+  AllTypesMatch<["rhsIn", "rhs"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = [{
+    Merges the valid signals of two channels.
+  }];
+  let description = [{
+    Merges the valid signal of two channels by propagating only one input
+    valid signal to both output valid signals. In this way the valid generation
+    of the second input signal can be simplified.
+  }];
+
+  let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
+  let results = (outs HandshakeType:$lhs, HandshakeType:$rhs);
+
+  let assemblyFormat = [{
+    $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_ins" : "rhs_ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_outs" : "rhs_outs";
+    }
+  }];
+
+}
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

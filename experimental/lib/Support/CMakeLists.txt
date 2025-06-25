@@ -1,5 +1,7 @@
 add_dynamatic_library(DynamaticExperimentalSupport
   BlifReader.cpp
+  CutlessMapping.cpp
+  SubjectGraph.cpp
   CDGAnalysis.cpp
   CreateSmvFormalTestbench.cpp
   StdProfiler.cpp
@@ -18,6 +20,8 @@ add_dynamatic_library(DynamaticExperimentalSupport
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
+  DynamaticAnalysis
+  DynamaticExperimentalSupportBooleanLogic
 )
 
 add_subdirectory(BooleanLogic)

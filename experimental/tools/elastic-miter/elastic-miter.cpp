@@ -202,7 +202,7 @@ static FailureOr<bool> checkEquivalence(
 
   // Create wrapper (main) for the elastic-miter
 
-  std::string testbench = dynamatic::experimental::createSmvFormalTestbench(
+  std::string testbench = dynamatic::experimental::createElasticMiterTestBench(
       context, config, smvModelName, nrOfTokens, true, constraints);
   std::ofstream mainFile(wrapperPath);
   mainFile << testbench;

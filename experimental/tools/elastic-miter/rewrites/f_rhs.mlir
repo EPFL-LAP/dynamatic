@@ -11,7 +11,7 @@ module {
     %loop_out = buffer %f {handshake.bb = 1 : ui32, handshake.name = "comb_buf", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i32>
 
     %ctrl_forked:2 = fork [2] %ctrl {handshake.bb = 1 : ui32, handshake.name = "fork_ctrl"} : <i1>
-    %ctrl_init = init %ctrl_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl", hw.parameters = {INITIAL_TOKEN = 0 : i1, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %ctrl_init = init %ctrl_forked#0 {handshake.bb = 1 : ui32, handshake.name = "init_buffer_ctrl", hw.parameters = {INITIAL_TOKEN = 0 : i1, BUFFER_TYPE = "ONE_SLOT_BREAK_DV"}} : <i1>
     %ctrl_not = not %ctrl_forked#1 {handshake.bb = 1 : ui32, handshake.name = "not_ctrl"} : <i1>
     end {handshake.bb = 1 : ui32, handshake.name = "end0"} %data_forked#0 : <i32>
   }

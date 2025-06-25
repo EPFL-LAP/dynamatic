@@ -6,4 +6,4 @@ Since the variables `x0` and `x1` depend on values from previous iterations, the
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 16               | 6                 |
 | II                   | 14               | 5                 |
-| Cycles (Test Bench)  | 705 (End: 704)   | 275 (End: 270)    |
+| Cycles (Test Bench)  | 705 (End: 704)   | 270 (End: 265)    |
