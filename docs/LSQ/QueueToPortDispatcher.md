@@ -51,7 +51,7 @@ These signals handle the interaction between the dispatcher logic and the intern
 | :--- | :--- | :--- | :--- |
 | **Inputs** | | | |
 | `entry_valid_i`      | Input     | `N_ENTRIES` of `std_logic`                       | Is queue entry `e` logically allocated?                                           |
-| `entry_bits_valid_i` | Input     | `N_ENTRIES` of `std_logic`                       | Has the data slot for entry `e` already been filled?                          |
+| `entry_bits_valid_i` | Input     | `N_ENTRIES` of `std_logic`                       | Is the result data in entry `e` valid and ready to be sent?                          |
 | `entry_port_idx_i`   | Input     | `N_ENTRIES` of `std_logic_vector(PORT_IDX_WIDTH-1:0)` | Indicates to which port each entry is assigned.                                   |
 | `entry_bits_i`       | Input     | `N_ENTRIES` of `std_logic_vector(PAYLOAD_WIDTH-1:0)`  | The array of data stored in the queue entries.                            |
 | `queue_head_oh_i`    | Input     | `std_logic_vector(N_ENTRIES-1:0)`                |  One-hot vector indicating the head entry in the queue.                  |
@@ -111,10 +111,10 @@ The Queue-to-Port Dispatcher has the following core responsibilities:
 
 5. **Handshake Logic**  
 ![Handshake Description](./figs/qtp/QTP_Handshake_Logic_description.png)
-    This block manages the `valid/ready` handshake with the external access ports. It confirms that the winning entry's data from the cyclic priority masking is valid and that the receiving port is ready, then generates the a signal indicating that it is handshaked.
+    This block manages the `valid/ready` handshake with the external access ports. It confirms that the winning entry's data from the cyclic priority masking is valid and that the receiving port is ready, then generates a signal indicating that it is handshaked.
     - **Input**:  
         - `port_ready_i`: The array of ready signals from the external access ports. `port_ready_i[p]` is high when port `p` can accept data.
-        - `entry_bits_valid_i`: The array indicating if the data slot of each queue entry `e` is filled. 
+        - `entry_bits_valid_i`: The array indicating if the data slot of each queue entry `e` is valid and ready to be sent. 
         - `entry_port_request_prio`: The arbitrated selection matrix from the **Find Oldest Valid Entry** block, indicating at most the single winning entry for each port.
     - **Processing**:  
         - **Check Winner's Data Validity**: First, the block verifies if the data in the winning entry is actually ready. It masks the `entry_port_request_prio` matrix with the `entry_bits_valid_i`. If the winning entry for a port doesn't have valid data, it is nullified for this cycle. The result is `entry_port_request_valid`.
@@ -218,7 +218,7 @@ Based on the example diagram:
 ![Handshake Logic](./figs/qtp/QTP_Handshake_Logic.png)  
 This block manages the final stage of the dispatch handshake. It first generates the `port_valid_o` signals by checking if the winners from arbitration have valid data to send. It then confirms which of these can complete a successful handshake.  
 Based on the example diagram:  
-    - First, the logic checks the `entry_bits_valid_i` vector, which is `[0, 1, 1, 0]`. This indicates that among the queue entries, only `Entry 1` and `Entry 2` are the only entries which is allocated by the Group Allocator.
+    - First, the logic checks the `entry_bits_valid_i` vector, which is `[0, 1, 1, 0]`. This indicates that among the winning queue entries, data is valid and ready to be sent from `Entry 1` and `Entry 2`.
     - For the `Port 0` winner (`Entry 2`), its `entry_bits_valid_i` is `1`. The logic asserts `port_valid_o[0]` to `1`.
     - For the `Port 2` winner (`Entry 1`), its `entry_bits_valid_i` is `1`. The logic asserts `port_valid_o[2]` to `1`.
     - Next, the logic checks incoming `port_ready_i` signals from the access ports, which are `[0, 1, 1]`. This means that `Port 1` and `Port 2` are ready, but `Port 0` is not. A final handshake is successful only if the dispatcher has valid data to send `AND` the port is ready to receive. The `entry_port_hs` matrix shows this final result:
