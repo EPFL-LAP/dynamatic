@@ -5,6 +5,9 @@ import os
 from itertools import product
 import re
 from typing import List, Tuple
+from multiprocessing import Pool
+
+NUM_CORES = 10 # Number of cores to use for parallel synthesis (if applicable)
 
 skipping_units = [
     "handshake.constant",
@@ -21,17 +24,35 @@ skipping_units = [
     "handshake.fork",
     "handshake.lazy_fork",
     "handshake.sink",
-    "handshake.mem_controller"]
+    "handshake.mem_controller",
+    "handshake.addf",
+    "handshake.cmpf",
+    "handshake.divf",
+    "handshake.subf",
+    "handshake.mulf",
+    "handshake.extf",
+    "handshake.maximumf",
+    "handshake.minimumf",
+    "handshake.divsi",
+    "handshake.divui",
+    "handshake.negf",
+    "handshake.br",
+    "handshake.source",
+    "handshake.store",
+    "handshake.join",
+    "handshake.not",
+    "mem_to_bram"]
 
 parameters_ranges = { 
     "DATA_TYPE": [1, 2, 4, 8, 16, 32, 64],
     "SIZE": [2],
     "SELECT_TYPE": [2],
     "INDEX_TYPE": [2],
-    "ADDR_TYPE": [64]
+    "ADDR_TYPE": [64],
+    "PREDICATE": ["ne"]
     }
 
-def extract_generics_ports(vhdl_code):
+def extract_generics_ports(vhdl_code, entity_name):
     """
     Extract generics and ports from a VHDL entity block.
     Args:
@@ -46,13 +67,27 @@ def extract_generics_ports(vhdl_code):
     vhdl_code = re.sub(r'--.*', '', vhdl_code)
 
     # Match the entity block
-    entity_match = re.search(r'entity\s+\w+\s+is(.*?)end\s+entity', vhdl_code, re.DOTALL | re.IGNORECASE)
+    entity_match = re.search(r'entity\s+(\w+)\s+is(.*?)end\s+entity', vhdl_code, re.DOTALL | re.IGNORECASE)
     if not entity_match:
         raise ValueError("Could not find VHDL entity block.")
 
-    match = re.search(r'\bentity\s+(\w+)\s+is', vhdl_code, re.IGNORECASE)
-    entity_name = match.group(1) if match else "unknown_entity"
-    entity_block = entity_match.group(1)
+    # If there are multiple entities, we remove the one that does not match the entity_name
+    is_right_entity = entity_match.group(1) in entity_name
+    while not is_right_entity and entity_match:
+        entity_to_remove = entity_match.group(1)
+        # Remove the first entity block that does not match the entity_name
+        first_entity = re.search(fr'entity\s+{entity_to_remove}\s+is(.*?)end\s+architecture', vhdl_code, re.DOTALL | re.IGNORECASE)
+        assert first_entity, f"Could not find VHDL entity block for {entity_to_remove} despite being in the code."
+        vhdl_code = vhdl_code.replace(first_entity.group(0), "")
+        entity_match = re.search(r'entity\s+(\w+)\s+is(.*?)end\s+entity', vhdl_code, re.DOTALL | re.IGNORECASE)
+        entity_extracted = entity_match.group(1)
+        # Check if the entity name matches the one we are looking for # Selector is a special case since its handshake name is handshake.select
+        is_right_entity = entity_extracted in entity_name if entity_extracted != "selector" else True
+
+    assert entity_match, f"Entity {entity_name} not found in the VHDL code."
+
+    entity_name = entity_match.group(1) if entity_match else "unknown_entity"
+    entity_block = entity_match.group(2)
 
     # Extract generics and ports
     generics_match = re.search(r'generic\s*\((.*?)\)\s*;', entity_block, re.DOTALL | re.IGNORECASE)
@@ -72,48 +107,48 @@ def extract_generics_ports(vhdl_code):
     return entity_name, generics, ports
 
 
-def extract_template_top(top_def_file, param_names):
+def extract_template_top(entity_name, generics, ports, param_names):
     """
     Extract the template for the top file from the given top definition file.
     
     Args:
-        top_def_file (str): Path to the top definition file.
+        entity_name (str): Name of the top entity.
+        generics (List[str]): List of generics extracted from the top definition file.
+        ports (List[str]): List of ports extracted from the top definition file.
+        param_names (List[str]): List of parameter names to be used in the template.
         
     Returns:
         str: The template for the top file.
     """
-    print(f"Extracting template top from {top_def_file}")
-    with open(top_def_file, 'r') as f:
-        vhdl_code = f.read()
-    
-    entity_name, generics, ports = extract_generics_ports(vhdl_code)
     for _generic in generics:
         generic = _generic.split(":")[0].strip()  # Get the generic name before the colon
         assert generic in param_names, f"Generic `{generic}` not found in parameter names."
 
-    # Create constants for each generic
-    constants = ""
-    for param in param_names:
-        constants += f"constant {param}_const : integer := {param}_const_value;\n"
-    # Create wires to connect the ports
-    wires = ""
-    for port in ports:
-        port_name = port.replace("in", "").replace("out", "").strip()
-        port_name = f"signal {port_name}"
+    # Create ports for the top file
+    tb_ports = []
+    for _port in ports:
+        port = _port
         for param in param_names:
-            port_name = port_name.replace(f"{param}", f"{param}_const")
-        wires += f"{port_name};\n"
+            port = port.replace(f"{param}", f"{param}_const_value")
+        tb_ports.append(port)
+    # Create the template for the top file
     template_top = "library ieee;\n" \
                      "use ieee.std_logic_1164.all;\n" \
                         "use ieee.numeric_std.all;\n" \
                         "use ieee.math_real.all;\n" \
-                        "use work.types.all;\n\n" \
-                        f"{constants}" \
-                        f"{wires}" \
+                        "use work.types.all;\n" \
+                        f"entity tb is\n" \
+                        f"port (\n" \
+                        f"{';\n'.join(tb_ports)}\n" \
+                        ");\n" \
+                        f"end entity;\n" \
+                        "architecture tb_arch of tb is\n" \
+                        f"begin\n" \
                         f"dut: entity work.{entity_name}\n" \
                         "generic map (\n"
     for param in param_names:
-        template_top += f"    {param} => {param}_const,\n"
+        if param != "PREDICATE":
+            template_top += f"    {param} => {param}_const_value,\n"
     template_top = template_top.rstrip(",\n") + "\n" \
                      ")\n" \
                         "port map (\n"
@@ -121,12 +156,100 @@ def extract_template_top(top_def_file, param_names):
         port_name = port.split(":")[0].strip()  # Get the port name before the colon
         template_top += f"    {port_name} => {port_name},\n"
     template_top = template_top.rstrip(",\n") + "\n" \
-                     ");\n"
-    return template_top
+                     ");\n" \
+                        "end architecture;\n"
 
+    return template_top, entity_name
 
+def run_tcl_file(args):
+    synth_tool, tcl_file, log_file = args
+    os.system(f"{synth_tool} -mode batch -source {tcl_file} > {log_file}")
 
-def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file):
+def run_synthesis(tcl_files, synth_tool, log_file):
+    """
+    Run synthesis for the given TCL files using the specified synthesis tool in parallel (if NUM_CORES > 1).
+    Args:
+        tcl_files (list): List of TCL files to run synthesis on.
+        synth_tool (str): Synthesis tool to use (e.g., 'vivado').
+    """
+    # Run synthesis in parallel using Vivado
+    if NUM_CORES > 1:
+        args_list = [(synth_tool, tcl_file, f"{log_file}{i}") for i, tcl_file in enumerate(tcl_files)]
+        with Pool(processes=NUM_CORES) as pool:
+            pool.map(run_tcl_file, args_list)
+    else:
+        for tcl_file in tcl_files:
+            os.system(f"{synth_tool} -mode batch -source {tcl_file} > {log_file}{tcl_files.index(tcl_file)}")
+
+def add_2d_ports(ports, direction):
+    """
+    Add 2D data_array ports to the list of ports based on the direction.
+
+    Args:
+        ports (list): List of ports to process.
+        direction (str): Direction of the ports ('in' or 'out').
+    Returns:
+        list: List of 2D data_array ports.
+    """
+
+    result = []
+    for port in ports:
+        if direction in port and "data_array" in port:
+            match = re.search(r'data_array\((\w+)\s*-\s*1\s*downto\s*0\)', port)
+            assert match, f"Could not find data_array port {port}."
+            size_name = match.group(1)
+            # Get corresponding size # Assuming only one value in parameters allowed
+            size_value = parameters_ranges[size_name][0]
+            for i in range(size_value):
+                result.append(f"{port.split(':')[0].strip()}[{i}]")
+    return result
+
+def write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports):
+    """
+    Write the TCL file for synthesis based on the top file and HDL files.
+    
+    Args:
+        top_file (str): Path to the top file.
+        top_entity_name (str): Name of the top entity.
+        hdl_files (list): List of HDL files needed for synthesis.
+        tcl_file (str): Path to the output TCL file.
+    """
+    ins = [port.split(":")[0].strip() for port in ports if "in" in port and not "data_array" in port]
+    # Add 2d data_array ports to ins
+    ins.extend(add_2d_ports(ports, "in"))
+    outs = [port.split(":")[0].strip() for port in ports if "out" in port and not "data_array" in port]
+    # Add 2d data_array ports to outs
+    outs.extend(add_2d_ports(ports, "out"))
+    with open(tcl_file, 'w') as f:
+        f.write(f"read_vhdl -vhdl2008 {top_file}\n")
+        for hdl_file in hdl_files:
+            f.write(f"read_vhdl -vhdl2008 {hdl_file}\n")
+        f.write(f"read_xdc {sdc_file}\n")
+        f.write("synth_design -top tb -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context\n")
+        f.write("opt_design\n")
+        f.write("place_design\n")
+        f.write("phys_opt_design\n")
+        f.write("route_design\n")
+        f.write("phys_opt_design\n")
+        for iport in ins:
+            if "clk" in iport or "clock" in iport or "rst" in iport or "reset" in iport:
+                continue  # Skip clock and reset ports
+            for oport in outs:
+                f.write(f"report_timing -from [get_ports {iport}] -to [get_ports {oport}] >> {rpt_timing}\n")
+
+def write_sdc_constraints(sdc_file, period_ns):
+    """
+    Write the SDC constraints file with the specified period.
+    
+    Args:
+        sdc_file (str): Path to the SDC file.
+        period_ns (float): Period in nanoseconds.
+    """
+    with open(sdc_file, 'w') as f:
+        f.write(f"create_clock -name clk -period {period_ns} -waveform {{0.000 {period_ns/2}}} [get_ports clk]\n")
+        f.write("set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]\n")
+
+def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir):
     """
     Run characterization for a single unit using the specified synthesis tool.
     
@@ -135,7 +258,13 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         list_params (list): List of parameters for the unit.
         hdl_out_dir (str): Directory where HDL files are stored.
         synth_tool (str): Synthesis tool to use for characterization (e.g., 'vivado').
+        top_def_file (str): Path to the top definition file.
+        tcl_dir (str): Directory where TCL files will be stored.
+        rpt_dir (str): Directory where reports will be stored.
+        log_dir (str): Directory where logs will be stored.
     """
+    # Get list of hdl files needed for the unit already present in the hdl_out_dir
+    hdl_files = [f"{hdl_out_dir}/{file}" for file in os.listdir(hdl_out_dir) if os.path.isfile(os.path.join(hdl_out_dir, file))]
     # Generate top files for all the combination of parameters
     params_charact = {}
     for param in list_params:
@@ -146,20 +275,40 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     # Compute all combinations of parameters
     param_combinations = list(product(*params_charact.values()))
     param_names = list(params_charact.keys())
+    # Extract generics and ports from the top definition file
+    print(f"Extracting generics and ports from {top_def_file}")
+    with open(top_def_file, 'r') as f:
+        vhdl_code = f.read()
+    top_entity_name, generics, ports = extract_generics_ports(vhdl_code, unit_name)
     # Extract the template for the top file
-    template_top = extract_template_top(top_def_file, param_names)
-    # Create a top file for each combination of parameters
+    template_top, top_entity_name = extract_template_top(top_entity_name, generics, ports, param_names)
+    # Create sdc constraints file
+    sdc_file = f"{tcl_dir}/period.sdc"
+    write_sdc_constraints(sdc_file, 4.0)  # Set a default period of 4 ns
+    # Create a top file for each combination of parameters and the corresponding tcl file
+    list_tcls = []
     id = 0
     for combination in param_combinations:
-        top = f"{hdl_out_dir}/{unit_name}_top_{id}.vhd" 
+        top_file = f"{hdl_out_dir}/{top_entity_name}_top_{id}.vhd" 
         template_top_combined = template_top
         for param_name, param_value in zip(param_names, combination):
             # Replace the constant value in the template
             template_top_combined = template_top_combined.replace(f"{param_name}_const_value", str(param_value))
-        with open(top, 'w') as f:
+        with open(top_file, 'w') as f:
             f.write(template_top_combined)
+        # Write the tcl file for synthesis
+        tcl_file = f"{tcl_dir}/synth_{top_entity_name}_top_{id}.tcl"
+        list_tcls.append(tcl_file)
+        rpt_timing = f"{rpt_dir}/rpt_timing_{top_entity_name}_top_{id}.txt"
+        # Remove previous rpt_timing file if it exists
+        if os.path.exists(rpt_timing):
+            os.remove(rpt_timing)
+        write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports)
         id += 1
-        assert False, "Implementation not complete yet."
+
+    # Run the synthesis tool for each tcl file
+    log_file = f"{log_dir}/synth_{unit_name}_log.txt"
+    run_synthesis(list_tcls, synth_tool, log_file)    
 
 def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list):
     """
@@ -184,10 +333,26 @@ def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dyna
         dependency_info = dependency_list[dependency_unit]
         dependency_rtl = dependency_info["RTL"]
         dependency_rtl = dependency_rtl.replace("$DYNAMATIC", dynamatic_dir)
-        os.system(f"cp {dependency_rtl} {hdl_out_dir}")
+        if "_dataless" in dependency_unit:
+            # If the dependency is a dataless unit, we copy it with a different name
+            rtl_filename = dependency_rtl.split("/")[-1].replace(".vhd", "_dataless.vhd")
+            os.system(f"cp {dependency_rtl} {hdl_out_dir}/{rtl_filename}")
+        else:
+            os.system(f"cp {dependency_rtl} {hdl_out_dir}")
         # Add the dependencies of this dependency to the remaining dependencies
         if "dependencies" in dependency_info:
             remaining_dependencies.extend(dependency_info["dependencies"])
+
+    extra_dependencies = ["types", "logic", "oehb", "oehb_dataless", "br_dataless"]
+    # Add extra dependencies that are not in the dependency list
+    for extra_dependency in extra_dependencies:
+        extra_rtl = dependency_list[extra_dependency]["RTL"]
+        extra_rtl = extra_rtl.replace("$DYNAMATIC", dynamatic_dir)
+        rtl_filename = extra_rtl.split("/")[-1]
+        if "_dataless" in extra_dependency:
+            os.system(f"cp {extra_rtl} {hdl_out_dir}/{rtl_filename.replace('.vhd', '_dataless.vhd')}")
+        else:
+            os.system(f"cp {extra_rtl} {hdl_out_dir}")    
 
     # Check if the unit has RTL file
     if generic:
@@ -197,13 +362,14 @@ def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dyna
         os.system(f"cp {rtl_file} {hdl_out_dir}")
     else:
         assert generator, "Unit must have either a generic RTL file or a generator."
-        cmd = generator.replace("$DYNAMATIC", dynamatic_dir).replace("$OUTPUT_DIR", hdl_out_dir).replace("$MODULE_NAME", unit_name).replace("$PREDICATE", "ne")
+        simplified_unit_name = unit_name.split(".")[-1]  # Get the last part of the unit name
+        cmd = generator.replace("$DYNAMATIC", dynamatic_dir).replace("$OUTPUT_DIR", hdl_out_dir).replace("$MODULE_NAME", simplified_unit_name).replace("$PREDICATE", "ne")
         # If a generator is provided, run the generator command
         print(f"Running generator command: {cmd}")
         os.system(cmd)        
         # Assert that the RTL file was generated
-        rtl_file_vhdl = f"{hdl_out_dir}/{unit_name}.vhd"  # Assuming
-        rtl_file_verilog = f"{hdl_out_dir}/{unit_name}.v"
+        rtl_file_vhdl = f"{hdl_out_dir}/{simplified_unit_name}.vhd"  # Assuming
+        rtl_file_verilog = f"{hdl_out_dir}/{simplified_unit_name}.v"
         assert os.path.exists(rtl_file_vhdl) or os.path.exists(rtl_file_verilog), f"RTL file for unit {unit_name} was not generated or copied successfully."
         rtl_file = rtl_file_vhdl if os.path.exists(rtl_file_vhdl) else rtl_file_verilog
     
@@ -220,10 +386,10 @@ def extract_rtl_info(unit_info):
         tuple: A tuple containing the unit name, list of parameters, generic, generator, and dependencies.
     """
     unit_name = unit_info.get("name")
-    list_params = unit_info["parameters"]
+    list_params = unit_info.get("parameters", [])
     generic = unit_info.get("generic", None)
     generator = unit_info.get("generator", None)
-    dependencies = unit_info.get("dependencies")
+    dependencies = unit_info.get("dependencies", [])
 
     return unit_name, list_params, generic, generator, dependencies
 
@@ -280,12 +446,27 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
     hdl_dir = f"{tmp_dir}/hdl"
     if not os.path.exists(hdl_dir):
         os.makedirs(hdl_dir)
+    # Generate tcl directory
+    tcl_dir = f"{tmp_dir}/tcl"
+    if not os.path.exists(tcl_dir):
+        os.makedirs(tcl_dir)
+    # Generate report directory
+    rpt_dir = f"{tmp_dir}/reports"
+    if not os.path.exists(rpt_dir):
+        os.makedirs(rpt_dir)
+    # Generate logs directory
+    log_dir = f"{tmp_dir}/logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     dependency_list = get_dependency_list(dataflow_units)
 
     for unit_info in dataflow_units:
         # Extract the unit name and its RTL information
         unit_name, list_params, generic, generator, dependencies = extract_rtl_info(unit_info)
+        if unit_name == None:
+            print("Skipping unit with no name.")
+            continue
         if unit_name in skipping_units:
             print(f"Skipping unit {unit_name} as it is in the skipping list.")
             continue
@@ -301,14 +482,14 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
                     break
             if skip_unit:
                 continue
-        # Clean previous RTL files
+        # Clean previous RTL files and tcl files
         os.system(f"rm -rf {hdl_dir}/*")
+        os.system(f"rm -rf {tcl_dir}/*")
         # Copy the RTL files or generate them if necessary
         print(f"Processing unit: {unit_name}")
-        top_def = get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
+        top_def_file = get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
         # After generating the HDL files, we can proceed with characterization
-        results = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def)
-
+        results = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)
     # Save the results to the output JSON file
 
 if __name__ == "__main__":
