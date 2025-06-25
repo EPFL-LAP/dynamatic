@@ -576,7 +576,7 @@ def extract_data(map_unit2rpts, json_output):
 
     # Save the output data to the JSON file
     with open(json_output, 'w') as f:
-        json.dump(output_data, f, indent=4)
+        json.dump(output_data, f, indent=2)
 
 def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
     """
