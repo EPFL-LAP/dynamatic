@@ -1,6 +1,10 @@
 # Dataflow Unit Characterization Script Documentation
 
-This document describes the structure and functionality of the Dataflow Unit Characterization script, which automates the process of characterizing hardware dataflow units. It details the conceptual approach, data handling, and implementation, following the style and clarity of the provided timing documentation.
+This document describes the structure and functionality of the [Dataflow Unit Characterization script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/run-characterization.py), which automates the process of characterizing hardware dataflow units. It details the conceptual approach, data handling, and implementation, following the style and clarity of the provided timing documentation.
+
+The information computed with the characterization script are used as timing information. More details are present in [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md).
+
+**NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the timing information structure. When generating new dataflow units, try to follow the same structure as other dataflow units (in the JSON file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
 
 ## Overview
 

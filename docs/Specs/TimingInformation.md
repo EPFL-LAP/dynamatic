@@ -88,6 +88,8 @@ The delays dictionary is structured as follows:
 
 The inport and outport dictionaries follow the same structure as the delays dictionary, capturing combinational delays between ports and registers instead of port-to-port paths.
 
+The delay information can be computed using a [characterization script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/run-characterization.py). More information about the script are present in [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingCharacterization.md).
+
 ## How Timing Information is Used
 
 Timing data is primarily used during **buffer placement**, which inserts buffers in the dataflow circuit. While basic buffer placement (i.e., `on-merges`) ignores timing, the advanced MILP algorithms (fpga20 and flp22) rely heavily on this information to optimize circuit performance and area.
