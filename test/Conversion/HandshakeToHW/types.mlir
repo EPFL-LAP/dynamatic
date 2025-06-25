@@ -21,7 +21,7 @@ handshake.func @dontChangeTypes(%arg : !handshake.channel<i32>, %start: !handsha
 // CHECK:           %[[VAL_4:.*]] = hw.instance "addf0" @handshake_addf_0(lhs: %[[VAL_0]]: !handshake.channel<i32, [extra: i32]>, rhs: %[[VAL_1]]: !handshake.channel<i32, [extra: i32]>, clk: %[[VAL_2]]: i1, rst: %[[VAL_3]]: i1) -> (result: !handshake.channel<i32, [extra: i32]>)
 // CHECK:           hw.output %[[VAL_4]] : !handshake.channel<i32, [extra: i32]>
 // CHECK:         }
-// CHECK:         hw.module.extern @handshake_addf_0(in %[[VAL_6:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_7:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_8:.*]] : i1, in %[[VAL_9:.*]] : i1, out result : !handshake.channel<i32, [extra: i32]>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32, [extra: ui32]>}}
+// CHECK:         hw.module.extern @handshake_addf_0(in %[[VAL_6:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_7:.*]] : !handshake.channel<i32, [extra: i32]>, in %[[VAL_8:.*]] : i1, in %[[VAL_9:.*]] : i1, out result : !handshake.channel<i32, [extra: i32]>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32, [extra: ui32]>, INTERNAL_DELAY = "0.0"}}
 handshake.func @lowerNonIntTypes(%arg0 : !handshake.channel<f32, [extra: ui32]>, %arg1 : !handshake.channel<f32, [extra: ui32]>) -> !handshake.channel<f32, [extra: ui32]> {
   %res = addf %arg0, %arg1 : <f32, [extra: ui32]>
   end %res : <f32, [extra: ui32]>
