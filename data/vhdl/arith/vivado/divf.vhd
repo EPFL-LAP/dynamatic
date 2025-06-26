@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of divf is
 
-  component divf_vitisHls_wrapper is
+  component divf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 30;
@@ -82,7 +82,7 @@ begin
       outs(0)   => oehb_dataOut
     );
 
-  divf_vitisHls_wrapper_U1 : component divf_vitisHls_wrapper
+  divf_vitis_hls_wrapper_U1 : component divf_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -152,7 +152,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY divf_vitisHls_singlePrecision_lat28 IS
+ENTITY divf_vitis_hls_single_precision_lat_28 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -163,11 +163,11 @@ ENTITY divf_vitisHls_singlePrecision_lat28 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END divf_vitisHls_singlePrecision_lat28;
+END divf_vitis_hls_single_precision_lat_28;
 
-ARCHITECTURE divf_vitisHls_singlePrecision_lat28_arch OF divf_vitisHls_singlePrecision_lat28 IS
+ARCHITECTURE divf_vitis_hls_single_precision_lat_28_arch OF divf_vitis_hls_single_precision_lat_28 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF divf_vitisHls_singlePrecision_lat28_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF divf_vitis_hls_single_precision_lat_28_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -397,7 +397,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END divf_vitisHls_singlePrecision_lat28_arch;
+END divf_vitis_hls_single_precision_lat_28_arch;
 
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.1 (64-bit)
@@ -406,7 +406,7 @@ END divf_vitisHls_singlePrecision_lat28_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity divf_vitisHls_wrapper is
+entity divf_vitis_hls_wrapper is
     generic (
         ID         : integer := 1;
         NUM_STAGE  : integer := 30;
@@ -424,9 +424,9 @@ entity divf_vitisHls_wrapper is
     );
 end entity;
 
-architecture arch of divf_vitisHls_wrapper is
+architecture arch of divf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component divf_vitisHls_singlePrecision_lat28 is
+    component divf_vitis_hls_single_precision_lat_28 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -454,7 +454,7 @@ architecture arch of divf_vitisHls_wrapper is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    divf_vitisHls_singlePrecision_lat28_u : component divf_vitisHls_singlePrecision_lat28
+    divf_vitis_hls_single_precision_lat_28_u : component divf_vitis_hls_single_precision_lat_28
     port map (
         aclk                 => aclk,
         aclken               => aclken,

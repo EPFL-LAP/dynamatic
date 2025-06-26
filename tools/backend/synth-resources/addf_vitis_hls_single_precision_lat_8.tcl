@@ -1,9 +1,9 @@
-create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name subf_vitisHls_singlePrecision_lat8
+create_ip -name floating_point -version $fpo_ver -vendor xilinx.com -library ip -module_name addf_vitis_hls_single_precision_lat_8
 # BEGIN Vivado Commands 
 # BEGIN Vivado Parameters
 set_property -dict [list CONFIG.a_precision_type Single \
                           CONFIG.a_tuser_width 1 \
-                          CONFIG.add_sub_value Subtract \
+                          CONFIG.add_sub_value Add \
                           CONFIG.b_tuser_width 1 \
                           CONFIG.c_a_exponent_width 8 \
                           CONFIG.c_a_fraction_width 24 \
@@ -18,7 +18,7 @@ set_property -dict [list CONFIG.a_precision_type Single \
                           CONFIG.c_rate 1 \
                           CONFIG.c_result_exponent_width 8 \
                           CONFIG.c_result_fraction_width 24 \
-                          CONFIG.component_name subf_vitisHls_singlePrecision_lat8 \
+                          CONFIG.component_name addf_vitis_hls_single_precision_lat_8 \
                           CONFIG.flow_control NonBlocking \
                           CONFIG.has_a_tlast false \
                           CONFIG.has_a_tuser false \
@@ -33,7 +33,7 @@ set_property -dict [list CONFIG.a_precision_type Single \
                           CONFIG.operation_tuser_width 1 \
                           CONFIG.operation_type Add_Subtract \
                           CONFIG.result_precision_type Single \
-                          CONFIG.result_tlast_behv Null] -objects [get_ips subf_vitisHls_singlePrecision_lat8] -quiet
+                          CONFIG.result_tlast_behv Null] -objects [get_ips addf_vitis_hls_single_precision_lat_8] -quiet
 # END Vivado Parameters
-set_property generate_synth_checkpoint false [get_files subf_vitisHls_singlePrecision_lat8.xci]
-generate_target {synthesis simulation} [get_files subf_vitisHls_singlePrecision_lat8.xci]
+set_property generate_synth_checkpoint false [get_files addf_vitis_hls_single_precision_lat_8.xci]
+generate_target {synthesis simulation} [get_files addf_vitis_hls_single_precision_lat_8.xci]

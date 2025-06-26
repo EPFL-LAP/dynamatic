@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of addf is
 
-  component addf_vitisHls_wrapper is
+  component addf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 10;
@@ -82,7 +82,7 @@ begin
       outs(0)    => oehb_dataOut
     );
 
-  addf_vitisHls_U1 : component addf_vitisHls_wrapper
+  addf_vitis_hls_U1 : component addf_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -102,7 +102,7 @@ end architecture;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity addf_vitisHls_wrapper is
+entity addf_vitis_hls_wrapper is
     generic (
         ID         : integer := 1;
         NUM_STAGE  : integer := 10;
@@ -120,9 +120,9 @@ entity addf_vitisHls_wrapper is
     );
 end entity;
 
-architecture arch of addf_vitisHls_wrapper is
+architecture arch of addf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component addf_vitisHls_singlePrecision_lat8 is
+    component addf_vitis_hls_single_precision_lat_8 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -150,7 +150,7 @@ architecture arch of addf_vitisHls_wrapper is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    addf_vitisHls_singlePrecision_lat8_u : component addf_vitisHls_singlePrecision_lat8
+    addf_vitis_hls_single_precision_lat_8_u : component addf_vitis_hls_single_precision_lat_8
     port map (
         aclk                 => aclk,
         aclken               => aclken,
@@ -256,7 +256,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY addf_vitisHls_singlePrecision_lat8 IS
+ENTITY addf_vitis_hls_single_precision_lat_8 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -267,11 +267,11 @@ ENTITY addf_vitisHls_singlePrecision_lat8 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END addf_vitisHls_singlePrecision_lat8;
+END addf_vitis_hls_single_precision_lat_8;
 
-ARCHITECTURE addf_vitisHls_singlePrecision_lat8_arch OF addf_vitisHls_singlePrecision_lat8 IS
+ARCHITECTURE addf_vitis_hls_single_precision_lat_8_arch OF addf_vitis_hls_single_precision_lat_8 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF addf_vitisHls_singlePrecision_lat8_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF addf_vitis_hls_single_precision_lat_8_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -501,4 +501,4 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END addf_vitisHls_singlePrecision_lat8_arch;
+END addf_vitis_hls_single_precision_lat_8_arch;

@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of mulf is
 
-  component mulf_vitisHls_wrapper is
+  component mulf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 6;
@@ -81,7 +81,7 @@ begin
       outs(0)    => oehb_dataOut
     );
 
-  array_RAM_fmul_32ns_32ns_32_6_max_dsp_1_U1 : component mulf_vitisHls_wrapper
+  array_RAM_fmul_32ns_32ns_32_6_max_dsp_1_U1 : component mulf_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -151,7 +151,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY mulf_vitisHls_singlePrecision_lat4 IS
+ENTITY mulf_vitis_hls_single_precision_lat_4 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -162,11 +162,11 @@ ENTITY mulf_vitisHls_singlePrecision_lat4 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END mulf_vitisHls_singlePrecision_lat4;
+END mulf_vitis_hls_single_precision_lat_4;
 
-ARCHITECTURE mulf_vitisHls_singlePrecision_lat4_arch OF mulf_vitisHls_singlePrecision_lat4 IS
+ARCHITECTURE mulf_vitis_hls_single_precision_lat_4_arch OF mulf_vitis_hls_single_precision_lat_4 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF mulf_vitisHls_singlePrecision_lat4_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF mulf_vitis_hls_single_precision_lat_4_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -396,7 +396,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END mulf_vitisHls_singlePrecision_lat4_arch;
+END mulf_vitis_hls_single_precision_lat_4_arch;
 
 
 -- ==============================================================
@@ -406,7 +406,7 @@ END mulf_vitisHls_singlePrecision_lat4_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity mulf_vitisHls_wrapper is
+entity mulf_vitis_hls_wrapper is
     generic (
         ID         : integer := 2;
         NUM_STAGE  : integer := 6;
@@ -424,9 +424,9 @@ entity mulf_vitisHls_wrapper is
     );
 end entity;
 
-architecture arch of mulf_vitisHls_wrapper is
+architecture arch of mulf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component mulf_vitisHls_singlePrecision_lat4 is
+    component mulf_vitis_hls_single_precision_lat_4 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -454,7 +454,7 @@ architecture arch of mulf_vitisHls_wrapper is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    mulf_vitisHls_singlePrecision_lat4_u : entity work.mulf_vitisHls_singlePrecision_lat4
+    mulf_vitis_hls_single_precision_lat_4_u : entity work.mulf_vitis_hls_single_precision_lat_4
     port map (
         aclk                 => aclk,
         aclken               => aclken,
