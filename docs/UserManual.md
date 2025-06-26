@@ -6,7 +6,7 @@ This document serves as a high level overview of various features of Dynamatic. 
 
 - [Basic Usage](#basic-usage)
 
-- [Floating Point IPs]()
+- [Floating Point IPs](#floating-point-ips)
 
 - [Buffer Placement Strategies](#buffer-placement-strategies)
 
@@ -40,6 +40,10 @@ Running the same set of commands over and over again can get tedious, so Dynamat
 ```
 $ bin/dynamatic --run=<path-to-script>
 ```
+
+## Floating Point IPs
+
+For implementing floating point operations, Dynamatic uses open-source [FloPoCo](flopoco.org) components. It is possible to use proprietary Xilinx FP units from Vivado. For instructions on how to achieve this, see [this guide](Specs/FloatingPointUnits.md).
 
 ## Buffer Placement Strategies
 
