@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of ENTITY_NAME is
 
-  component array_RAM_fcmp_32cud is
+  component cmpf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 2;
@@ -97,7 +97,7 @@ begin
       ins_ready(1) => rhs_ready
     );
 
-  array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component array_RAM_fcmp_32cud
+  array_RAM_fcmp_32ns_32ns_1_2_1_u1 : component cmpf_vitis_hls_wrapper
     generic map(
       ID         => 1,
       NUM_STAGE  => 2,
@@ -197,7 +197,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY array_RAM_ap_fcmp_0_no_dsp_32 IS
+ENTITY cmpf_vitis_hls_single_precision_lat_0 IS
   PORT (
     s_axis_a_tvalid : IN STD_LOGIC;
     s_axis_a_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -208,11 +208,11 @@ ENTITY array_RAM_ap_fcmp_0_no_dsp_32 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(7 DOWNTO 0)
   );
-END array_RAM_ap_fcmp_0_no_dsp_32;
+END cmpf_vitis_hls_single_precision_lat_0;
 
-ARCHITECTURE array_RAM_ap_fcmp_0_no_dsp_32_arch OF array_RAM_ap_fcmp_0_no_dsp_32 IS
+ARCHITECTURE cmpf_vitis_hls_single_precision_lat_0_arch OF cmpf_vitis_hls_single_precision_lat_0 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF array_RAM_ap_fcmp_0_no_dsp_32_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF cmpf_vitis_hls_single_precision_lat_0_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -441,7 +441,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END array_RAM_ap_fcmp_0_no_dsp_32_arch;
+END cmpf_vitis_hls_single_precision_lat_0_arch;
 
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.2.1 (64-bit)
@@ -450,7 +450,7 @@ END array_RAM_ap_fcmp_0_no_dsp_32_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity array_RAM_fcmp_32cud is
+entity cmpf_vitis_hls_wrapper is
     generic (
         ID         : integer := 2;
         NUM_STAGE  : integer := 2;
@@ -469,9 +469,9 @@ entity array_RAM_fcmp_32cud is
     );
 end entity;
 
-architecture arch of array_RAM_fcmp_32cud is
+architecture arch of cmpf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component array_RAM_ap_fcmp_0_no_dsp_32 is
+    component cmpf_vitis_hls_single_precision_lat_0 is
         port (
             s_axis_a_tvalid         : in  std_logic;
             s_axis_a_tdata          : in  std_logic_vector(31 downto 0);
@@ -517,7 +517,7 @@ architecture arch of array_RAM_fcmp_32cud is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    array_RAM_ap_fcmp_0_no_dsp_32_u : entity work.array_RAM_ap_fcmp_0_no_dsp_32
+    cmpf_vitis_hls_single_precision_lat_0_u : entity work.cmpf_vitis_hls_single_precision_lat_0
     port map (
         s_axis_a_tvalid         => a_tvalid,
         s_axis_a_tdata          => a_tdata,
