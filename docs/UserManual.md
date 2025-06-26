@@ -1,4 +1,47 @@
-## Performance Optimization via Automatic Buffer Placement
+# Dynamatic User Manual
+
+This document serves as a high level overview of various features of Dynamatic. It is mainly intended for new students and users who are aiming to understand the key ideas behind Dynamatic without going too deeply into technical details. 
+
+## Table of Contents
+
+- [Basic Usage](#basic-usage)
+
+- [Floating Point IPs]()
+
+- [Buffer Placement Strategies](#buffer-placement-strategies)
+
+- [Load-Store Queues]()
+
+- [Custom Compilation Flows]()
+
+## Basic Usage
+
+The simplest way to use Dynamatic is using the `dynamatic` binary. After completing the build process, just run
+```
+$ bin/dynamatic
+```
+from the root directory of the cloned Dynamatic repository.
+
+From here, you are offered a shell with a variety of commands that you can see a list of by typing `help`. You will usually run the following sequence of commands:
+
+0. `set-dynamatic-path <path>`: Used to set the path of the root directory of Dynamatic, so that it can locate various scripts it needs to function. This is not necessary if you run Dynamatic from the root directory.
+
+1. `set-src <source-path>`: Sets the path of the `.c` file of the kernel that you want to compile. For example, you can try `set-src integration-test/fir/fir.c`.
+
+2. `compile`: Compiles the `.c` file given in the previous step. For more information about the options for buffer placement, see [below](#buffer-placement-strategies).
+
+3. `write-hdl`: Writes the resulting circuit into a HDL file. You can choose between VHDL and Verilog using `--hdl VHDL|Verilog`.
+
+4. `simulate`: Runs a ModelSim simulation of the circuit. 
+
+The result of the simulation, as well as intermediate results, can be found in a folder named `out` located in the same path as the `.c` file that was used.
+
+Running the same set of commands over and over again can get tedious, so Dynamatic has basic scripting support. You can write the sequence of commands to be executed into a file and then run them all at once using
+```
+$ bin/dynamatic --run=<path-to-script>
+```
+
+## Buffer Placement Strategies
 
 Dynamatic automatically inserts buffers to eliminate performance bottleneck and
 to achieve a particular clock frequency. This feature is **essential** to
