@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -245,40 +246,6 @@ MapVector<StringRef, StringRef> RTLMatch::getGenericParameterValues() const {
   return values;
 }
 
-/// Serializes the module's "port_types", which includes the types of all ports
-/// (operands and results) of the original operation. This is passed to the RTL
-/// generator to help it generate the correct port types. e.g., '{"lhs":
-/// "!handshake.channel<i32, [spec: i1]>",
-// "rhs": "!handshake.channel<i32, [spec: i1]>",
-// "result": "!handshake.channel<i1, [spec: i1]>"}'
-static std::string serializePortTypes(hw::ModuleType &mod) {
-  // Prepare a string stream to serialize the port types
-  std::string portTypesValue;
-  llvm::raw_string_ostream portTypes(portTypesValue);
-
-  // Wrap in single quotes for easier passing as a generator argument.
-  portTypes << "'{"; // Start of the JSON object
-
-  bool first = true;
-  for (const hw::ModulePort &port : mod.getPorts()) {
-    // Skip the clock and reset ports
-    if (port.name == "clk" || port.name == "rst")
-      continue;
-
-    if (!first)
-      portTypes << ", ";
-    first = false;
-
-    portTypes << "\"" << port.name.str() << "\": \"";
-    // TODO: Escape "" in the port type (if needed)
-    port.type.print(portTypes);
-    portTypes << "\"";
-  }
-  portTypes << "}'"; // End of the JSON object
-
-  return portTypes.str();
-}
-
 static std::string serializeExtraSignalsInner(const Type &type) {
   assert(type.isa<handshake::ExtraSignalsTypeInterface>() &&
          "type should be ChannelType or ControlType");
@@ -320,17 +287,10 @@ void RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-  registerPortTypesParameter(modOp, modName, modType);
   registerBitwidthParameter(modOp, modName, modType);
   registerTransparentParameter(modOp, modName, modType);
   registerExtraSignalParameters(modOp, modName, modType);
   registerSelectedDelayParameter(modOp, modName, modType);
-}
-
-void RTLMatch::registerPortTypesParameter(hw::HWModuleExternOp &modOp,
-                                          llvm::StringRef modName,
-                                          hw::ModuleType &modType) {
-  serializedParams["PORT_TYPES"] = serializePortTypes(modType);
 }
 
 void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
