@@ -98,7 +98,8 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
+      };
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -383,7 +384,10 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(4));
   } else if (modName == "handshake.addf" || modName == "handshake.cmpf" ||
-             modName == "handshake.mulf" || modName == "handshake.subf") {
+             modName == "handshake.mulf" || modName == "handshake.subf" ||
+             modName == "handshake.divf" || modName == "handshake.negf" ||
+             modName == "handshake.maximumf" ||
+             modName == "handshake.minimumf") {
     int bitwidth = handshake::getHandshakeTypeBitWidth(modType.getInputType(0));
     serializedParams["IS_DOUBLE"] = bitwidth == 64 ? "True" : "False";
   } else if (modName == "handshake.valid_merger") {
