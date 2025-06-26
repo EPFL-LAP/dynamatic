@@ -21,6 +21,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
 #include <unordered_map>
 
@@ -123,9 +124,9 @@ public:
       if (data.empty())
         return failure();
 
-      llvm::errs()
+      llvm::dbgs()
           << "CRITICAL WARNING: an operator has no known implementation "
-          << "capable of running at the requested operating frequency. "
+          << "capable of running at the requested oper  ating frequency. "
           << "Closest match selected. Consider increasing target clock period "
           << "or adding an appropriate implementation.\n";
 
@@ -154,7 +155,7 @@ public:
       if (data.empty())
         return failure();
 
-      llvm::errs()
+      llvm::dbgs()
           << "CRITICAL WARNING: an operator has no known implementation "
           << "capable of running at the requested operating frequency. "
           << "Closest match selected. Consider increasing target clock period "
