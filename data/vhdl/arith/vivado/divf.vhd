@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of divf is
 
-  component array_RAM_fdiv_32ns_32ns_32_30_1 is
+  component divf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 30;
@@ -82,7 +82,7 @@ begin
       outs(0)   => oehb_dataOut
     );
 
-  array_RAM_fdiv_32ns_32ns_32_30_1_U1 : component array_RAM_fdiv_32ns_32ns_32_30_1
+  divf_vitis_hls_wrapper_U1 : component divf_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -152,7 +152,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY array_RAM_ap_fdiv_28_no_dsp_32 IS
+ENTITY divf_vitis_hls_single_precision_lat_28 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -163,11 +163,11 @@ ENTITY array_RAM_ap_fdiv_28_no_dsp_32 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END array_RAM_ap_fdiv_28_no_dsp_32;
+END divf_vitis_hls_single_precision_lat_28;
 
-ARCHITECTURE array_RAM_ap_fdiv_28_no_dsp_32_arch OF array_RAM_ap_fdiv_28_no_dsp_32 IS
+ARCHITECTURE divf_vitis_hls_single_precision_lat_28_arch OF divf_vitis_hls_single_precision_lat_28 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF array_RAM_ap_fdiv_28_no_dsp_32_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF divf_vitis_hls_single_precision_lat_28_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -397,7 +397,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END array_RAM_ap_fdiv_28_no_dsp_32_arch;
+END divf_vitis_hls_single_precision_lat_28_arch;
 
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.1 (64-bit)
@@ -406,7 +406,7 @@ END array_RAM_ap_fdiv_28_no_dsp_32_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity array_RAM_fdiv_32ns_32ns_32_30_1 is
+entity divf_vitis_hls_wrapper is
     generic (
         ID         : integer := 1;
         NUM_STAGE  : integer := 30;
@@ -424,9 +424,9 @@ entity array_RAM_fdiv_32ns_32ns_32_30_1 is
     );
 end entity;
 
-architecture arch of array_RAM_fdiv_32ns_32ns_32_30_1 is
+architecture arch of divf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component array_RAM_ap_fdiv_28_no_dsp_32 is
+    component divf_vitis_hls_single_precision_lat_28 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -454,7 +454,7 @@ architecture arch of array_RAM_fdiv_32ns_32ns_32_30_1 is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    array_RAM_ap_fdiv_28_no_dsp_32_u : component array_RAM_ap_fdiv_28_no_dsp_32
+    divf_vitis_hls_single_precision_lat_28_u : component divf_vitis_hls_single_precision_lat_28
     port map (
         aclk                 => aclk,
         aclken               => aclken,

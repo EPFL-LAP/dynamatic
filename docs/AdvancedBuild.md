@@ -59,6 +59,9 @@ cd dynamatic/polygeist/llvm-project
 git fetch --unshallow
 ```
 
+Note that we rely on a fork of [polygeist](https://github.com/EPFL-LAP/Polygeist), which in turn uses a fork of [llvm](https://github.com/EPFL-LAP/llvm-project).
+These are very similar to upstream polygeist and the version of LLVM used by polygeist, with a few upstream LLVM patches back-ported to ensure they build correctly on modern versions of GCC (v15+).
+
 ## Building
 
 This section provides some insights into our custom build script, [build.sh](../build.sh), located in the repository's top-level folder. The script recognizes a number of flags and arguments that allow you to customize the build process to your needs. The `--help` flag makes the script print the entire list of available flags/arguments and exit.
