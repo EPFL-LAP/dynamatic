@@ -530,8 +530,8 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     if (failed(mapChannelsToProperties(funcOp, timingDB, channelProps)))
       return failure();
 
-    // Make sure that the data output channels of all merge-like operations
-    // have at least one opaque and one transparent slot, unless a constraint
+    // Make sure that the data output channels of all merge-like operations have
+    // at least one opaque and one transparent slot, unless a constraint
     // explicitly prevents us from putting a buffer there
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
@@ -540,7 +540,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may"
+               "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
@@ -548,7 +548,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
-               "output due to channel-specific buffering constraints. This may"
+               "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
       }
     }
