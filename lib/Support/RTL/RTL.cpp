@@ -98,7 +98,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {};
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)){};
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
