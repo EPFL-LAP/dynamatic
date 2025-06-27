@@ -210,6 +210,21 @@ The main function of BitwidthDepMetric is the following:
 
 1. **[LogicalResult getCeilMetric(unsigned bitwidth, M &metric)]()**: queries the metric with the smallest key among the ones with a key bigger than `bitwidth` and saves the metric in the variable `metric`.
 
+### DelayDepMetric
+
+The functions of BitwidthDepMetric is the following:
+
+1. **LogicalResult getDelayCeilMetric(double targetPeriod, M &metric)**: finds the highest delay that does not exceed the targetPeriod and returns the corresponding metric value. This selects the fastest implementation that still meets timing constraints. If no suitable delay is found, falls back to the lowest available delay with a critical warning.
+
+2. **LogicalResult getDelayCeilValue(double targetPeriod, double &delay)**: similar to getDelayCeilMetric but returns the delay value itself rather than the associated metric. Finds the highest delay that is less than or equal to targetPeriod, or falls back to the minimum delay if no suitable option exists.
+
+
+# Timing Information in the IRs
+
+Timing information is generally leveraged immediately upon being obtained, for instance latency is obtained for the MILP solver during the buffer placement stage. However, internal delay must be made available in the backend to select the correct implementation to instantiate, but depends on targetCP which isn't known in the backend. 
+
+Therefore, only internal delay is added as an attribute to the IR at the end of the buffer placement stage, and is represented in the hardware IR. The value given is chosen using getDelayCeilValue, ensuring the choice passed into the IR is the same one that was made at any other point with getDelayCeilMetric. 
+
 
 # Timing Information in FloPoCo units
 
