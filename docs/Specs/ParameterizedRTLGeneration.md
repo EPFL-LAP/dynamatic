@@ -27,7 +27,7 @@ This is not order-specific: all types of arguments can be specified in any order
 
 ## Why do we store it like this?
 
-Operation-specific attributes give us enough flexibility to store all information that is needed, generate convienient named getter functions, and allow easy constraints and verifications of the parameter values.
+Operation-specific attributes give us enough flexibility to store all information that is needed, generate convenient named getter functions, and allow easy constraints and verifications of the parameter values.
 
 When used properly, they ensure that all operations have a valid set of RTL parameters, and that all required parameters are in fact present.
 
