@@ -27,7 +27,7 @@ This is not order-specific: all types of arguments can be specified in any order
 
 ## Why do we store it like this?
 
-Operation-specific attributes give us enough flexibility to store all information that is needed, generate convenient named getter functions, and allow easy constraints and verifications of the parameter values.
+Operation-specific attributes give us enough flexibility to store all information that is needed, generate convenient named getter functions, and allow easy constraints and verification of the parameter values.
 
 When used properly, they ensure that all operations have a valid set of RTL parameters, and that all required parameters are in fact present.
 
@@ -46,7 +46,7 @@ let arguments = (ins HandshakeType:$dataIn,
 
 The first two arguments are type-constraints, while the 3rd is an attribute constraint.
 
-This results in following C++ to create a save-commit operation:
+This results in the following C++ to create a save-commit operation:
 ```c++
 SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
     dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
@@ -73,10 +73,10 @@ let arguments = (ins Variadic<ChannelType> : $dataOperands,
   ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
 ```
 
-This declares 4 attributes for the SharingWrapperOp: an array of integer credits, which defaults to empty, and 3 integers with different minimum values. This shows one of the strengths of operation-specific attributes- the ability to declaritively specific default values and constraints.
+This declares 4 attributes for the SharingWrapperOp: an array of integer credits, which defaults to empty, and 3 integers with different minimum values. This shows one of the strengths of operation-specific attributes- the ability to declaratively  specific default values and constraints.
 
 
-The c++ to add a SharingWrapperOp then looks like so:
+The c++ to add a SharingWrapperOp then looks like this:
 ```c++
 // Determining the number of credits of each operation that share the
 // unit based on the maximum achievable occupancy in critical CFCs.
@@ -102,7 +102,7 @@ handshake::SharingWrapperOp wrapperOp =
         (unsigned)round(latency));
 ```
 
-and allows the helpful getter functions for each of its attributes.
+and also generates helpful getter functions for each of its attributes.
 
 #### Example to Avoid
 
@@ -113,12 +113,12 @@ As of time of writing, the buffer operation stores its RTL parameter attributes 
 
 Since this dictionary is not verified, a BufferOp may not even have the attributes present at all when the operation is passed to the backend.
 
-Its arguments looks like so:
+Its arguments do not contain any attribute information:
 ```tablegen
 let arguments = (ins HandshakeType:$operand);
 ```
 
-And it defines additional hardcoded strings to use as dictionary keys using:
+But it defines additional hardcoded strings to use as dictionary keys using:
 
 ```tablegen
 let extraClassDeclaration = [{
@@ -206,7 +206,7 @@ auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
                                                   timing, slots, bufferType);
 ```
 
-This builder enforces the presence of buffer type at construction, but does not prevent later code from removing this attribute from the hw.parameters dictionary (in the above c++ accessesed through RTL_PARAMETERS_ATTR_NAME).
+This builder enforces the presence of buffer type at construction, but does not prevent later code from removing this attribute from the hw.parameters dictionary (in the above c++ accessed through RTL_PARAMETERS_ATTR_NAME).
 
 There are also no named getters generated, and therefore these attributes must be accessed very awkwardly through the dictionary attribute:
 
@@ -230,7 +230,7 @@ Currently, uniqueness is identified using a dictionary attribute called "hw.para
 When an operation uses dedicated attributes, it must still eventually pass its data into hw.parameters. This is done (currently) in 
 
 
-https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511-L568
+https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511-L521
 
 which contains a case-statement for each operation, to allow each operation to add its own operation-specific attributes.
 
