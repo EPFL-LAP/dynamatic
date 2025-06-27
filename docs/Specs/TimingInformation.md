@@ -209,3 +209,17 @@ The LogicalResult or boolean types of these functions represent the successful o
 The main function of BitwidthDepMetric is the following:
 
 1. **[LogicalResult getCeilMetric(unsigned bitwidth, M &metric)]()**: queries the metric with the smallest key among the ones with a key bigger than `bitwidth` and saves the metric in the variable `metric`.
+
+
+# Timing Information in FloPoCo units
+
+Empirical tests done using vivado (see unit profiler, put a link here once on the remote) have shown that FloPoCo unit's pratical internal delay is consistently greater that the target delay. Therefore, all flopoco units are identified by the triplet **{operator name, bitwidth, measured internal delay}.**
+
+## The arch-suffix system (working title)
+
+The legacy Dynamatic backend supports the existence of multiple implementations of a given operator, by allowing an "arch-name" to be specified. This system is leveraged by having each floating point wrapper file (addf.vhd, mulf.vhd, etc.) contain a seperate arch for each FloPoCo implementation, identified by a bitwidth-delay pair, added as a suffix to "arch" to form a unique name. 
+
+Therefore, the desired version of the operator is used, based on the timing information passed through the hardware IR's INTERNAL_DELAY field. 
+
+**Important remark**: For now, there is no mechanism in-Dynamatic ensuring consistency between the components.json file and the units listed. In pratice, both are generated from a shared post-profiling csv file, which works, but is vulnerable to accidental changes in one file. In the current state, such a mismatch would cause an "entity not found" error at the simulation stage, resulting in premature termination.  
+
