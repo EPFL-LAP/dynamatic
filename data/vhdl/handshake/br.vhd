@@ -6,7 +6,8 @@ entity br is
     DATA_TYPE : integer
   );
   port (
-    clk, rst : in std_logic;
+    clk : in  std_logic;
+    rst : in std_logic;
     -- input channel
     ins       : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     ins_valid : in  std_logic;

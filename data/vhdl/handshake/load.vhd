@@ -8,7 +8,8 @@ entity load is
     ADDR_TYPE : integer
   );
   port (
-    clk, rst : in std_logic;
+    clk : in  std_logic;
+    rst : in std_logic;
     -- address from circuit channel
     addrIn       : in  std_logic_vector(ADDR_TYPE - 1 downto 0);
     addrIn_valid : in  std_logic;

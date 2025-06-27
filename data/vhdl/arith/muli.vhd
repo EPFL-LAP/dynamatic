@@ -53,7 +53,8 @@ entity muli is
   );
   port (
     -- inputs
-    clk, rst     : in std_logic;
+    clk     : in std_logic;
+    rst     : in std_logic;
     lhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
     lhs_valid    : in std_logic;
     rhs          : in std_logic_vector(DATA_TYPE - 1 downto 0);
