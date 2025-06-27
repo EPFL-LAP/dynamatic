@@ -25,7 +25,7 @@ MODULE {name}(ins_valid, outs_ready)
 
   FAIRNESS state = RUNNING;
 
-  // output
+  -- output
   DEFINE  
   outs_valid :=  ins_valid & (state = RUNNING);
   ins_ready  :=  outs_ready & (state = RUNNING);
@@ -37,7 +37,7 @@ def _generate_ndwire(name, data_type):
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR inner_ndwire : {name}__ndwire_dataless(ins_valid, outs_ready);
 
-  // output
+  -- output
   DEFINE
   outs := ins;
   outs_valid :=  inner_ndwire.outs_valid;

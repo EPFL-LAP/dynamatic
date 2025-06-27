@@ -86,7 +86,7 @@ MODULE {name} ({lsq_in_ports})
   VAR all_requests_done : boolean;
   ASSIGN
   init(all_requests_done) := FALSE;
-  next(all_requests_done) := {{FALSE, TRUE}};
+  next(all_requests_done) := all_requests_done ? TRUE : {{FALSE, TRUE}};
 
   {_generate_lsq_core(name, num_load_ports, num_store_ports, num_bbs, load_groups, store_groups, capacity)}
 
@@ -157,27 +157,19 @@ def _generate_lsq_core(
   -- Non-deterministic ports: they non-deterministically model all possible latencies, to account
   -- for memeory stalls and memeory dependencies
   VAR
-  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(ctrl_{group_index(n, load_groups)}_valid, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
-  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(ctrl_{group_index(n, store_groups)}_valid, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
+  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(TRUE, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
+  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(TRUE, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
 
 
   -- Checks if at least one load/store port executed an access
   DEFINE
   in_loadEn := {" | ".join([f"inner_load_port_{n}.ldData_valid" for n in range(num_load_ports)])};
   in_storeEn := {" | ".join([f"inner_store_port_{n}.memData_valid" for n in range(num_store_ports)])};
-
-
-  -- Non-deterministic signals
-  VAR
-  {"\n  ".join([f"nd_ctrl_{n} : boolean;" for n in range(num_bbs)])}
-
-  ASSIGN
-  {"\n  ".join([f"init(nd_ctrl_{n}) := {{FALSE, TRUE}};" for n in range(num_bbs)])}
-  {"\n  ".join([f"next(nd_ctrl_{n}) := {{FALSE, TRUE}};" for n in range(num_bbs)])}
   
   -- output
   DEFINE
-  {"\n  ".join([f"ctrl_{n}_ready := nd_ctrl_{n};" for n in range(num_bbs)])}
+  -- for faster model checking we ignore the ctrl signal and set it to constant TRUEs
+  {"\n  ".join([f"ctrl_{n}_ready := TRUE;" for n in range(num_bbs)])}
 
   {"\n  ".join([f"ldAddr_{n}_ready := inner_load_port_{n}.ldAddr_ready;" for n in range(num_load_ports)])}
   {"\n  ".join([f"ldData_{n} := inner_load_port_{n}.ldData;" for n in range(num_load_ports)])}
@@ -193,7 +185,7 @@ def _generate_nd_load_port(name, capacity, addr_type, data_type):
     return f"""
 MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid & ctrl_valid, inner_capacity.ins_ready);
-  VAR inner_capacity : {name}__ofifo(inner_input_ndw.outs, inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
+  VAR inner_capacity : {name}__ofifo(inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
   VAR inner_output_ndw : {name}__out_ndwire(data_from_mem, inner_capacity.outs_valid, ldData_ready);
 
   -- ctrl_valid tells the port when it can start running
@@ -205,7 +197,7 @@ MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   ldData_valid := inner_output_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__in_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_ofifo(f"{name}__ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: addr_type.bitwidth})}
+  {generate_ofifo(f"{name}__ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__out_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
 
@@ -215,9 +207,9 @@ def _generate_nd_store_port(name, capacity, addr_type, data_type):
     return f"""
 MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid & ctrl_valid, inner_addr_capacity.ins_ready);
-  VAR inner_addr_capacity : {name}__addr_ofifo(inner_addr_ndw.outs, inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
+  VAR inner_addr_capacity : {name}__addr_ofifo(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
   VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid & ctrl_valid, inner_data_capacity.ins_ready);
-  VAR inner_data_capacity : {name}__data_ofifo(inner_data_ndw.outs, inner_data_ndw.outs_valid, inner_join.ins_1_ready);
+  VAR inner_data_capacity : {name}__data_ofifo(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
   VAR inner_join : {name}__join(inner_addr_capacity.outs_valid, inner_data_capacity.outs_valid, inner_sink_ndw.ins_valid);
   VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, inner_sink.ins_ready);
   VAR inner_sink : {name}__sink(inner_data_ndw.outs, inner_sink_ndw.outs_valid);
@@ -229,9 +221,9 @@ MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
   memData_valid := inner_sink_ndw.outs_valid;
 
   {generate_ndwire(f"{name}__addr_ndwire", {ATTR_BITWIDTH: addr_type.bitwidth})}
-  {generate_ofifo(f"{name}__addr_ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: addr_type.bitwidth})}
+  {generate_ofifo(f"{name}__addr_ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: 0})}
   {generate_ndwire(f"{name}__data_ndwire", {ATTR_BITWIDTH: data_type.bitwidth})}
-  {generate_ofifo(f"{name}__data_ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: data_type.bitwidth})}
+  {generate_ofifo(f"{name}__data_ofifo", {ATTR_SLOTS: capacity, ATTR_BITWIDTH: 0})}
   {generate_join(f"{name}__join", {"size": 2})}
   {generate_sink(f"{name}__sink", {ATTR_BITWIDTH: data_type.bitwidth})}
 """
