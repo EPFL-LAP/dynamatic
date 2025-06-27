@@ -229,12 +229,13 @@ Currently, uniqueness is identified using a dictionary attribute called "hw.para
 
 When an operation uses dedicated attributes, it must still eventually pass its data into hw.parameters. This is done (currently) in 
 
-https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511C1-L511C58
+
+https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511-L568
 
 which contains a case-statement for each operation, to allow each operation to add its own operation-specific attributes.
 
 The save-commit operation does so like this:
-https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680C1-L682C9
+https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L682
 
 # Passing an Attribute to the Backend
 
