@@ -47,7 +47,15 @@ write-hdl
 simulate
 ```
 
-The result of the simulation, as well as intermediate results, can be found in a folder named `out` located in the same path as the `.c` file that was used. You will also be informed of success or failure directly via the interactive shell output.
+### Reviewing HLS reports
+
+Each command will inform you about its result (success/failure) via interactive shell output. Detailed reports are saved in a folder named `out` in the same path where the `.c` kernel source was located; i.e. if you used `integration-test/fir/fir.c`, then the reports would be in `integration-test/fir/out`.
+
+- `out/comp`: Contains artifacts produced by the compilation. This includes all intermediate MLIR results, as well as the diagram of the dataflow circuit and the control flow graph (in DOT and PNG formats).
+- `out/hdl`: Contains HDL descriptions of all components of the generated dataflow circuit.
+- `out/sim`: Contains subfolders with various simulation artifacts, as well as a text file `report.txt` with the entire simulation log.
+
+### Scripting
 
 Running the same set of commands over and over again can get tedious, so Dynamatic has basic scripting support. You can write the sequence of commands to be executed into a file and then run them all at once using
 ```
