@@ -11,7 +11,7 @@ Each operator in a hardware circuit is characterized by two fundamental timing p
 
 We classify combinational delays into two categories:
 
-- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator.
+- **Intra-port delays**: Combinational delays from an input port to an output port with no intervening registers. These represent purely combinational paths through an operator. 
 
 - **Port2Reg delays**: Combinational delays either from an input port to the first register stage, or from the last register stage to an output port. These capture the logic surrounding the sequential boundaries of an operator.
 
@@ -38,6 +38,7 @@ The combinational delays can connect ports of the same or different types. The o
 
 **Note** : The current code does not seem to use the information related to inport and outport delays. Furthermore all the port delays are 0 for all listed components. We assume this is the intended behaviour for now. We welcome a change to this documentation if the code structure changes. 
 
+**Internal combinational delay** : The longest combinational path delay within a single operator — i.e., the time it takes for signals to propagate through the most complex logic path inside that operator without being interrupted by clocked elements. While the above focuses on delays relevant to relative placement and timing of operators, the operating frequency of the entire circuit is ultimately limited by the operating frequency of the slowest operator, which is defined as the inverse of this internal delay.
 
 
 ## Where Timing Data is Stored
@@ -48,7 +49,9 @@ All timing information lives in the [components JSON file](https://github.com/EP
 {
   "handshake.addi": {
     "latency": {
-      "64": 0.0
+      "64":{
+        "2.3": 8,
+        "4.2": 4
     },
     "delay": {
       "data": {
@@ -74,7 +77,7 @@ All timing information lives in the [components JSON file](https://github.com/EP
 ```
 
 The JSON object encodes the following timing information:
-- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth.
+- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth. For every bitwidth, a map lists all existing implementations, providing their internal combinational delay as key and the latency as value.
 - `delays`: A dictionary describing intra-port delays — i.e., combinational delays between input and output ports with no intervening registers (in nanoseconds).
 - `inport`: A dictionary specifying port2reg delays from an input port to the first register stage (in nanoseconds).
 - `outport`: A dictionary specifying port2reg delays from the last register stage to an output port (in nanoseconds).
@@ -118,9 +121,13 @@ The timing system uses the following core data structures:
   - This structure contains three fields : data, valid and ready delays. The first one is represented using the `BitwidthDepMetric` structure.
 
 - **[BitwidthDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
-  - Maps bitwidths to timing values (e.g., for latency 32-bit → 9 cycles)
+  - Maps bitwidths to timing values (e.g., for latency 32-bit → 3ns delay) - these values can be complex structures, like maps.
   - Supports queries like `getCeilMetric(bitwidth)` to return the timing value for the closest equal or greater supported bitwidth.
 
+
+- **[DelayDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
+  - Maps delays to timing values (e.g., for delay 3.5ns → 9 cycles)
+  - Supports queries like `getDelayMetric(targetCP)` to return the timing value for the highest listed delay that remains smaller than the targetCP.
 
 
 ## Loading Timing Data from JSON
@@ -202,3 +209,101 @@ The LogicalResult or boolean types of these functions represent the successful o
 The main function of BitwidthDepMetric is the following:
 
 1. **[LogicalResult getCeilMetric(unsigned bitwidth, M &metric)]()**: queries the metric with the smallest key among the ones with a key bigger than `bitwidth` and saves the metric in the variable `metric`.
+
+### DelayDepMetric
+
+The functions of BitwidthDepMetric is the following:    %57 = addf %56, %54 {fastmath = #arith.fastmath<none>, handshake.bb = 2 : ui32, handshake.name = "addf0", internal_delay = "3_649333"} : <f32>
+
+1. **LogicalResult [getDelayCeilMetric(double targetPeriod, M &metric)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L109)**: finds the highest delay that does not exceed the targetPeriod and returns the corresponding metric value. This selects the fastest implementation that still meets timing constraints. If no suitable delay is found, falls back to the lowest available delay with a critical warning.
+
+2. **LogicalResult [getDelayCeilValue(double targetPeriod, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L142)**: similar to getDelayCeilMetric but returns the delay value itself rather than the associated metric. Finds the highest delay that is less than or equal to targetPeriod, or falls back to the minimum delay if no suitable option exists.
+
+
+# Timing Information in the IRs
+
+Timing information is generally used immediately upon being obtained, for instance latency is obtained for the MILP solver during the buffer placement stage. However, internal delay must be made available in the backend to select the correct implementation to instantiate, but depends on targetCP which isn't known in the backend. 
+
+Therefore, internal delay is added as an attribute to arithmetic ops in the IR at the end of the buffer placement stage, and is represented in the hardware IR. The value given is chosen using getDelayCeilValue, ensuring the choice passed into the IR is the same one that was made at any other point with getDelayCeilMetric. 
+
+Sample code of the attreibute :
+
+in handhsake IR :
+
+```
+    %57 = addf %56, %54 {fastmath = #arith.fastmath<none>,
+ handshake.bb = 2 : ui32, handshake.name = "addf0",
+internal_delay = "3_649333"} : <f32>
+```
+
+in hardware IR : 
+
+```
+hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : !handshake.channel<i32>,
+ in %clk : i1, in %rst : i1, out result : !handshake.channel<i32>) attributes {hw.name = "handshake.addf",
+ hw.parameters = {DATA_TYPE = !handshake.channel<f32>, INTERNAL_DELAY = "3_649333"}}
+
+```
+
+
+
+
+
+# Timing Information in FloPoCo units - The arch-suffix system (working title)
+
+
+Empirical tests done using vivado (see unit profiler, put a link here once on the remote) have shown that FloPoCo unit's pratical internal delay is consistently greater that the target delay. Therefore, all flopoco units are identified by the triplet **{operator name, bitwidth, measured internal delay}.** 
+
+The legacy Dynamatic backend supports the existence of multiple implementations of a given operator, by allowing an "arch-name" to be specified. This system is leveraged by having each floating point wrapper file (addf.vhd, mulf.vhd, etc.) contain a seperate arch for each FloPoCo implementation, identified by a bitwidth-delay pair, added as a suffix to "arch" to form a unique name. The implemented operator is tracked with the seperation of the wrappers based on the operators. The implementations are contained in a [seperate file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/vhdl/support/flopoco_ip_cores.vhd), and the portion relevant to each operator are also appropriately tagged with the suffix to avoid any cross-usage, which has been observed to cause incorrect calculations unless managed cautiously.
+
+Both the operator specific wrappers and the shared flopoco reference file are generated by the seperate unit module generator (waiting on seeing final location to add links). See its own documentation for further details.
+
+Consider the following example from [addf.vhd](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/data/vhdl/arith/flopoco/addf.vhd), which shows how all architectures are present inside the file, but distinguished by name:
+
+```
+architecture arch_64_5_091333 of addf is
+    
+...
+
+        operator : entity work.FloatingPointAdder_64_5_091333(arch)
+        port map (
+            clk   => clk,
+            ce_1 => oehb_ready,
+            ce_2 => oehb_ready,
+            ce_3 => oehb_ready,
+            ce_4 => oehb_ready,
+            ce_5 => oehb_ready,
+            ce_6 => oehb_ready,
+            ce_7 => oehb_ready,
+            X     => ip_lhs,
+            Y     => ip_rhs,
+            R     => ip_result
+        );
+end architecture;
+
+architecture arch_64_9_068000 of addf is
+
+...
+        operator : entity work.FloatingPointAdder_64_9_068000(arch)
+        port map (
+            clk   => clk,
+            ce_1 => oehb_ready,
+            ce_2 => oehb_ready,
+            X     => ip_lhs,
+            Y     => ip_rhs,
+            R     => ip_result
+        );
+end architecture;
+```
+
+
+
+Therefore, the desired version of the operator is used, based on the timing information passed through the hardware IR's INTERNAL_DELAY field. 
+
+**Caution : Strict usage of the dedicated flopco unit module is required to ensure consistent data. This is for three reasons**:
+
+-For now, there is no mechanism in-Dynamatic ensuring consistency between the components.json file and the units listed. In pratice, both are generated from a shared post-profiling csv file, which works, but is vulnerable to accidental changes in one file. In the current state, such a mismatch would cause an "entity not found" error at the simulation stage, resulting in premature termination.  
+
+-Secondly, there is no in-Dynamatic check to ensure that sub-optimal (ie higher delay and latency that another implementation) implementations aren't listed. These are also removed from components.json by the external executable, but were the component.json to be edited to feature them, the logic would not identify them. This is in keeping with the absence of checks on bitwidth/latency tradeoffs present in the legacy code, and is motivated by the possibility that such a sub-optimal implementation could have other advantages (area, etc.) currently not represented.
+
+-Thirdly, the system relies on {operator name, bitwidth, measured internal delay} being unique. This is guaranteed in pratice in FloPoCo, and enforced in the module with it's removal of non-pareto optimal points. Adding units seperately would bypass this guarantee and lead to unpredictable behaviour.
+
