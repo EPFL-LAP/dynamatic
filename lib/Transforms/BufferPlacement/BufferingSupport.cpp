@@ -112,18 +112,17 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
   // properties into the channel map. Fails and marks the MILP unsatisfiable if
   // any of those combined buffering properties become unsatisfiable.
   auto deriveBufferingProperties = [&](Channel &channel) -> LogicalResult {
-    // Check for satisfiability
-    if (!channel.props->isSatisfiable()) {
+    ChannelBufProps ogProps = *channel.props;
+    if (!ogProps.isSatisfiable()) {
       std::stringstream ss;
       std::string channelName;
-      ss << "Including internal component buffers into buffering "
-            "properties of channel '"
+      ss << "Channel buffering properties of channel '"
          << getUniqueName(*channel.value.getUses().begin())
-         << "' made them unsatisfiable.\nProperties were " << ogProps
-         << "before inclusion and were changed to " << *channel.props
+         << "' are unsatisfiable " << ogProps
          << "Cannot proceed with buffer placement.";
       return channel.consumer->emitError() << ss.str();
     }
+
     channelProps[channel.value] = *channel.props;
     return success();
   };
@@ -132,7 +131,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     // Only register handshake typed values
     if (!isa<handshake::ControlType, handshake::ChannelType>(arg.getType()))
-      break;
+      continue;
 
     Channel channel(arg, funcOp, *arg.getUsers().begin());
     if (failed(deriveBufferingProperties(channel)))
@@ -144,7 +143,7 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       // Only register handshake typed values
       if (!isa<handshake::ControlType, handshake::ChannelType>(res.getType()))
-        break;
+        continue;
 
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))
