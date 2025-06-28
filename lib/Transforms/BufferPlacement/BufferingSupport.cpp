@@ -112,17 +112,6 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
   // properties into the channel map. Fails and marks the MILP unsatisfiable if
   // any of those combined buffering properties become unsatisfiable.
   auto deriveBufferingProperties = [&](Channel &channel) -> LogicalResult {
-    ChannelBufProps ogProps = *channel.props;
-    if (!ogProps.isSatisfiable()) {
-      std::stringstream ss;
-      std::string channelName;
-      ss << "Channel buffering properties of channel '"
-         << getUniqueName(*channel.value.getUses().begin())
-         << "' are unsatisfiable " << ogProps
-         << "Cannot proceed with buffer placement.";
-      return channel.consumer->emitError() << ss.str();
-    }
-
     // Check for satisfiability
     if (!channel.props->isSatisfiable()) {
       std::stringstream ss;

@@ -181,10 +181,7 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
   if (!nameAnalysis.isAnalysisValid())
     return failure();
-  if (!nameAnalysis.areAllOpsNamed()) {
-    if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
-      return failure();
-  }
+
   markAnalysesPreserved<NameAnalysis>();
 
   mlir::ModuleOp modOp = getOperation();
