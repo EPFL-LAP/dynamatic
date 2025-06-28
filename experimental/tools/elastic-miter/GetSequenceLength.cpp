@@ -184,6 +184,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     return failure();
   auto [dstSmv, smvModelName] = failOrSmvPair.value();
 
+  llvm::errs() << dstSmv;
+
   // Create the wrapper with infinite sequence generators
   auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
       context, outputDir / "main_inf.smv", config, smvModelName, 0);
