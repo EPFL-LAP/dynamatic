@@ -212,7 +212,7 @@ The main function of BitwidthDepMetric is the following:
 
 ### DelayDepMetric
 
-The functions of BitwidthDepMetric is the following:
+The functions of BitwidthDepMetric is the following:    %57 = addf %56, %54 {fastmath = #arith.fastmath<none>, handshake.bb = 2 : ui32, handshake.name = "addf0", internal_delay = "3_649333"} : <f32>
 
 1. **LogicalResult [getDelayCeilMetric(double targetPeriod, M &metric)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L109)**: finds the highest delay that does not exceed the targetPeriod and returns the corresponding metric value. This selects the fastest implementation that still meets timing constraints. If no suitable delay is found, falls back to the lowest available delay with a critical warning.
 
@@ -228,12 +228,16 @@ Therefore, internal delay is added as an attribute to arithmetic ops in the IR a
 Sample code of the attreibute :
 
 in handhsake IR :
+
 ```
     %57 = addf %56, %54 {fastmath = #arith.fastmath<none>, handshake.bb = 2 : ui32, handshake.name = "addf0", internal_delay = "3_649333"} : <f32>
 ```
 
 in hardware IR : 
-```  hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : !handshake.channel<i32>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i32>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32>, INTERNAL_DELAY = "3_649333"}}
+
+```
+hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : !handshake.channel<i32>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i32>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32>, INTERNAL_DELAY = "3_649333"}}
+
 ```
 
 
