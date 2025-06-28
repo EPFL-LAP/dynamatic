@@ -10,7 +10,7 @@ This document serves as a high level overview of various features of Dynamatic. 
 
 - [Buffer Placement Strategies](#buffer-placement-strategies)
 
-- [Load-Store Queues]()
+- [Load-Store Queues](#load-store-queues)
 
 - [Custom Compilation Flows]()
 
@@ -43,7 +43,7 @@ $ bin/dynamatic --run=<path-to-script>
 
 ## Floating Point IPs
 
-For implementing floating point operations, Dynamatic uses open-source [FloPoCo](flopoco.org) components. It is possible to use proprietary Xilinx FP units from Vivado. For instructions on how to achieve this, see [this guide](Specs/FloatingPointUnits.md).
+For implementing floating point operations, Dynamatic uses open-source [FloPoCo](https://flopoco.org/) components. It is possible to use proprietary Xilinx FP units from Vivado. For instructions on how to achieve this, see [this guide](Specs/FloatingPointUnits.md).
 
 ## Buffer Placement Strategies
 
@@ -73,4 +73,6 @@ For better performance, two more advanced algorithms are implemented, based on t
 The main idea of the FPGA'20 algorithm is to decompose the dataflow circuit into choice-free dataflow circuits (i.e. parts which don't contain any branches). The performance of these CFDFCs can be modeled using an approach based on timed Petri nets (see [here](https://www.computer.org/csdl/journal/ts/1980/05/01702760/13rRUxASuqJ) and [here](https://dspace.mit.edu/handle/1721.1/13739)). This model is formulated as a mixed-integer linear programming model, with additional constraints which allow the optimization of multiple CFDFCs. Simulation results have shown circut speedups up to 10x for most benchmarks, with some reaching even 33x. For example, the `fir` benchmark with naive buffering runs in 25.8 us, but with this algorithm, it executes in only 4.0 us, which is 6.5x faster. The downside is that the MILP solver can take a long time to complete its task, sometimes even more than an hour, and also clock period targets might not be met.
 
 Similarly, the FPL'22 algorithm uses a MILP-based approach for modeling and optimization. The main difference is that it does not only model the circuit as single dataflow channels carrying tokens, but instead, describes individual edges carrying data, valid and ready signals, while explicitly indicating their interconnections. The dataflow units themselves are modeled with more detail; instead of nodes representing entire dataflow units, they represent distinct combinational delays of every combinational path through the dataflow units. This allows for precise computation of all combinational delays and accurate buffer placement for breaking up long combinational paths. This approach meets the clock period target much more consistently than the previous two approaches. 
+
+## Load-Store Queues
 
