@@ -16,25 +16,38 @@ This document serves as a high level overview of various features of Dynamatic. 
 
 ## Basic Usage
 
-The simplest way to use Dynamatic is using the `dynamatic` binary. After completing the build process, just run
+Dynamatic consists of many components, but the simplest way to use Dynamatic is using the `dynamatic` binary, which abstracts away most of the details by providing a user-friendly interactive shell. After completing the build process, just run
 ```
 $ bin/dynamatic
 ```
 from the root directory of the cloned Dynamatic repository.
 
-From here, you are offered a shell with a variety of commands that you can see a list of by typing `help`. You will usually run the following sequence of commands:
+From here, you are offered a shell with a variety of commands that you can see by typing `help`, or by referring to the list below.
 
-0. `set-dynamatic-path <path>`: Used to set the path of the root directory of Dynamatic, so that it can locate various scripts it needs to function. This is not necessary if you run Dynamatic from the root directory.
+### Dynamatic Shell Commands
+- `help`: Display list of commands.
+- `write-hdl [--hdl <VHDL|Verilog>]`: Convert results from `compile` to a VHDL or Verilog file.
+- `set-vivado-path <path>`: Set the path to the installation directory of Vivado.
+- `simulate`: Simulates the HDL produced by `write-hdl`. **Requires a ModelSim installation!**
+- `set-fp-units-generator <flopoco|vivado>`: Choose which floating point unit generator to use. See [this section](#floating-point-ips) for more information.
+- `set-clock-period <clk>`: Sets the target clock period in nanoseconds.
+- `set-dynamatic-path <path>`: Set the path of the root (top-level) directory of Dynamatic, so that it can locate various scripts it needs to function. This is not necessary if you run Dynamatic from said directory.
+- `set-src <source-path>`: Sets the path of the `.c` file of the kernel that you want to compile. 
+- `synthesize`: Synthesizes the HDL result from `write-hdl` using Vivado. **Requires a Vivado installation!**
+- `compile [...]`: Compiles the source kernel (chosen by `set-src`) into a dataflow circuit. For more options, run `compile --help`. **Does not require Gurobi by default, [but some options do!](#buffer-placement-strategies)**
+- `visualize`: Visualizes the execution of the circuit simulated by `ModelSim`. **Requires Godot Engine and [the visualizer component must be built!](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/AdvancedBuild.md#interactive-dataflow-circuit-visualizer)**
+- `set-polygeist-path <path>`: Sets the path to the Polygeist installation directory.
+- `exit`: Exits the interactive Dynamatic shell.
 
-1. `set-src <source-path>`: Sets the path of the `.c` file of the kernel that you want to compile. For example, you can try `set-src integration-test/fir/fir.c`.
+An example of a usual sequence of commands is given below:
+```
+set-src integration-test/fir/fir.c
+compile
+write-hdl
+simulate
+```
 
-2. `compile`: Compiles the `.c` file given in the previous step. For more information about the options for buffer placement, see [below](#buffer-placement-strategies).
-
-3. `write-hdl`: Writes the resulting circuit into a HDL file. You can choose between VHDL and Verilog using `--hdl VHDL|Verilog`.
-
-4. `simulate`: Runs a ModelSim simulation of the circuit. 
-
-The result of the simulation, as well as intermediate results, can be found in a folder named `out` located in the same path as the `.c` file that was used.
+The result of the simulation, as well as intermediate results, can be found in a folder named `out` located in the same path as the `.c` file that was used. You will also be informed of success or failure directly via the interactive shell output.
 
 Running the same set of commands over and over again can get tedious, so Dynamatic has basic scripting support. You can write the sequence of commands to be executed into a file and then run them all at once using
 ```
