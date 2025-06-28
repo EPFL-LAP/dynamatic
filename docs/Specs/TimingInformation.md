@@ -230,13 +230,17 @@ Sample code of the attreibute :
 in handhsake IR :
 
 ```
-    %57 = addf %56, %54 {fastmath = #arith.fastmath<none>, handshake.bb = 2 : ui32, handshake.name = "addf0", internal_delay = "3_649333"} : <f32>
+    %57 = addf %56, %54 {fastmath = #arith.fastmath<none>,
+ handshake.bb = 2 : ui32, handshake.name = "addf0",
+internal_delay = "3_649333"} : <f32>
 ```
 
 in hardware IR : 
 
 ```
-hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : !handshake.channel<i32>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i32>) attributes {hw.name = "handshake.addf", hw.parameters = {DATA_TYPE = !handshake.channel<f32>, INTERNAL_DELAY = "3_649333"}}
+hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : !handshake.channel<i32>,
+ in %clk : i1, in %rst : i1, out result : !handshake.channel<i32>) attributes {hw.name = "handshake.addf",
+ hw.parameters = {DATA_TYPE = !handshake.channel<f32>, INTERNAL_DELAY = "3_649333"}}
 
 ```
 
