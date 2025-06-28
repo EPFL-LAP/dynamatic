@@ -299,9 +299,11 @@ end architecture;
 
 Therefore, the desired version of the operator is used, based on the timing information passed through the hardware IR's INTERNAL_DELAY field. 
 
-**Caution : Strict usage of the dedicated flopco unit module is required to ensure consistent data. This is for two reasons**:
+**Caution : Strict usage of the dedicated flopco unit module is required to ensure consistent data. This is for three reasons**:
 
 -For now, there is no mechanism in-Dynamatic ensuring consistency between the components.json file and the units listed. In pratice, both are generated from a shared post-profiling csv file, which works, but is vulnerable to accidental changes in one file. In the current state, such a mismatch would cause an "entity not found" error at the simulation stage, resulting in premature termination.  
 
 -Secondly, there is no in-Dynamatic check to ensure that sub-optimal (ie higher delay and latency that another implementation) implementations aren't listed. These are also removed from components.json by the external executable, but were the component.json to be edited to feature them, the logic would not identify them. This is in keeping with the absence of checks on bitwidth/latency tradeoffs present in the legacy code, and is motivated by the possibility that such a sub-optimal implementation could have other advantages (area, etc.) currently not represented.
+
+-Thirdly, the system relies on {operator name, bitwidth, measured internal delay} being unique. This is guaranteed in pratice in FloPoCo, and enforced in the module with it's removal of non-pareto optimal points. Adding units seperately would bypass this guarantee and lead to unpredictable behaviour.
 
