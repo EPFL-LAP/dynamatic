@@ -1,5 +1,5 @@
 def generate_mc_control(name):
-  return f"""
+    return f"""
 MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
   -- the mc_control manages the signals connected to the memory and controls when to
   -- start accessing memory and when no more accesses will be made

@@ -69,15 +69,26 @@ def _generate_lsq_master(
     # the signal order in the interface is different from HandshakeInterfaces.cpp because export-rtl.cpp
     # groups signals with the same name together
     ctrl = [f"ctrl_{n}_valid" for n in range(num_bbs)]
-    load_addr = [f"ldAddr_{n}" for n in range(
-        num_load_ports)] + [f"ldAddr_{n}_valid" for n in range(num_load_ports)]
-    store_addr = [f"stAddr_{n}" for n in range(
-        num_store_ports)] + [f"stAddr_{n}_valid" for n in range(num_store_ports)]
-    store_data = [f"stData_{n}" for n in range(
-        num_store_ports)] + [f"stData_{n}_valid" for n in range(num_store_ports)]
+    load_addr = [f"ldAddr_{n}" for n in range(num_load_ports)] + [
+        f"ldAddr_{n}_valid" for n in range(num_load_ports)
+    ]
+    store_addr = [f"stAddr_{n}" for n in range(num_store_ports)] + [
+        f"stAddr_{n}_valid" for n in range(num_store_ports)
+    ]
+    store_data = [f"stData_{n}" for n in range(num_store_ports)] + [
+        f"stData_{n}_valid" for n in range(num_store_ports)
+    ]
     load_data = [f"ldData_{n}_ready" for n in range(num_load_ports)]
-    lsq_in_ports = ", ".join(["loadData", "memStart_valid"] + ctrl + load_addr +
-                             store_addr + store_data + ["ctrlEnd_valid"] + load_data + ["memEnd_ready"])
+    lsq_in_ports = ", ".join(
+        ["loadData", "memStart_valid"]
+        + ctrl
+        + load_addr
+        + store_addr
+        + store_data
+        + ["ctrlEnd_valid"]
+        + load_data
+        + ["memEnd_ready"]
+    )
 
     return f"""
 MODULE {name} ({lsq_in_ports})
@@ -120,16 +131,27 @@ def _generate_lsq_slave(
 ):
     # the signal order in the interface is different from HandshakeInterfaces.cpp because export-rtl.cpp
     # groups signals with the same name together
+    # Example: ldAddr_0, ldAddr_1, ldAddr_0_valid, ldAddr_1_valid instead of ldAddr_0, ldAddr_0_valid, ldAddr_1, ldAddr_1_valid
     ctrl = [f"ctrl_{n}_valid" for n in range(num_bbs)]
-    load_addr = [f"ldAddr_{n}" for n in range(
-        num_load_ports)] + [f"ldAddr_{n}_valid" for n in range(num_load_ports)]
-    store_addr = [f"stAddr_{n}" for n in range(
-        num_store_ports)] + [f"stAddr_{n}_valid" for n in range(num_store_ports)]
-    store_data = [f"stData_{n}" for n in range(
-        num_store_ports)] + [f"stData_{n}_valid" for n in range(num_store_ports)]
+    load_addr = [f"ldAddr_{n}" for n in range(num_load_ports)] + [
+        f"ldAddr_{n}_valid" for n in range(num_load_ports)
+    ]
+    store_addr = [f"stAddr_{n}" for n in range(num_store_ports)] + [
+        f"stAddr_{n}_valid" for n in range(num_store_ports)
+    ]
+    store_data = [f"stData_{n}" for n in range(num_store_ports)] + [
+        f"stData_{n}_valid" for n in range(num_store_ports)
+    ]
     load_data = [f"ldData_{n}_ready" for n in range(num_load_ports)]
     lsq_in_ports = ", ".join(
-        ctrl + store_addr + store_data + load_addr + ["ldDataFromMC, ldDataFromMC_valid"] + load_data + ["ldAddrToMC_ready, stAddrToMC_ready, stDataToMC_ready"])
+        ctrl
+        + store_addr
+        + store_data
+        + load_addr
+        + ["ldDataFromMC, ldDataFromMC_valid"]
+        + load_data
+        + ["ldAddrToMC_ready, stAddrToMC_ready, stDataToMC_ready"]
+    )
 
     return f"""
 MODULE {name} ({lsq_in_ports})
@@ -157,8 +179,8 @@ def _generate_lsq_core(
   -- Non-deterministic ports: they non-deterministically model all possible latencies, to account
   -- for memeory stalls and memeory dependencies
   VAR
-  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(TRUE, ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
-  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(TRUE, stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
+  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
+  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
 
 
   -- Checks if at least one load/store port executed an access
@@ -183,12 +205,10 @@ def _generate_lsq_core(
 def _generate_nd_load_port(name, capacity, addr_type, data_type):
     # generates a non-deterministic load port, that simulates any stall that can happen from a read operation (memory stall or memory dependency)
     return f"""
-MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
-  VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid & ctrl_valid, inner_capacity.ins_ready);
+MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
+  VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid, inner_capacity.ins_ready);
   VAR inner_capacity : {name}__ofifo(inner_input_ndw.outs_valid, inner_output_ndw.ins_ready);
   VAR inner_output_ndw : {name}__out_ndwire(data_from_mem, inner_capacity.outs_valid, ldData_ready);
-
-  -- ctrl_valid tells the port when it can start running
 
   -- output
   DEFINE
@@ -205,10 +225,10 @@ MODULE {name} (ctrl_valid, ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
 def _generate_nd_store_port(name, capacity, addr_type, data_type):
     # generates a non-deterministic store port, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
     return f"""
-MODULE {name} (ctrl_valid, stAddr, stAddr_valid, stData, stData_valid)
-  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid & ctrl_valid, inner_addr_capacity.ins_ready);
+MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
+  VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_capacity.ins_ready);
   VAR inner_addr_capacity : {name}__addr_ofifo(inner_addr_ndw.outs_valid, inner_join.ins_0_ready);
-  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid & ctrl_valid, inner_data_capacity.ins_ready);
+  VAR inner_data_ndw : {name}__data_ndwire(stData, stData_valid, inner_data_capacity.ins_ready);
   VAR inner_data_capacity : {name}__data_ofifo(inner_data_ndw.outs_valid, inner_join.ins_1_ready);
   VAR inner_join : {name}__join(inner_addr_capacity.outs_valid, inner_data_capacity.outs_valid, inner_sink_ndw.ins_valid);
   VAR inner_sink_ndw : {name}__data_ndwire(inner_data_ndw.outs, inner_join.outs_valid, inner_sink.ins_ready);

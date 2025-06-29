@@ -16,6 +16,7 @@ def generate_elastic_fifo_inner(name, params):
         else:
             return _generate_elastic_fifo_inner(name, slots, data_type)
 
+
 def _generate_transparent_slot_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
@@ -31,6 +32,7 @@ MODULE {name}(ins_valid, outs_ready)
     outs_valid := full | ins_valid;
     ins_ready := (!full) | outs_ready;
 """
+
 
 def _generate_transparent_slot(name, data_type):
     return f"""
@@ -51,6 +53,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
     outs_valid := full | ins_valid;
     ins_ready := (!full) | outs_ready;
 """
+
 
 def _generate_fast_elastic_fifo_inner_dataless(name, slots):
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
@@ -119,6 +122,7 @@ MODULE {name}(ins_valid, outs_ready)
   ins_ready := !full | outs_ready;
   outs_valid := !empty;
 """
+
 
 def _generate_elastic_fifo_inner_fast(name, slots, data_type):
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
