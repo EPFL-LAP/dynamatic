@@ -263,7 +263,7 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   return success();
 }
 
-static constexpr unsigned long long PERIOD_NS = 4, HALF_PERIOD_NS = 2;
+static constexpr unsigned long long PERIOD_NS = 4;
 
 static constexpr StringLiteral ACCEPT("accept"), STALL("stall"),
     TRANSFER("transfer"), IDLE("idle"), UNDEFINED("undefined");
@@ -333,7 +333,7 @@ int main(int argc, char **argv) {
   std::map<size_t, WireReference> wires;
   mlir::DenseSet<Value> toUpdate;
   size_t cycle = 0;
-  unsigned long long period = PERIOD_NS, halfPeriod = HALF_PERIOD_NS;
+  unsigned long long period = PERIOD_NS, halfPeriod = period >> 1;
 
   // Read the LOG file line by line
   std::string event;
@@ -369,10 +369,12 @@ int main(int argc, char **argv) {
       if (tokens[1] != "timestep")
         return success();
 
-      // Example: tokens[2] = "\"1e-15\""
-      // Example: resolutionStr = "1e-15"
+      // Resolution is always specified at the top of the log file.
+
+      // Example: tokens[2] = "\"1e-15\"", resolutionStr = "1e-15"
       llvm::StringRef resolutionStr = tokens[2].substr(1, tokens[2].size() - 2);
 
+      // Example: exponent = -15
       int exponent;
       resolutionStr.split("e").second.getAsInteger(10, exponent);
 
