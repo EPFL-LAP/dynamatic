@@ -1,6 +1,6 @@
 from generators.handshake.cond_br import generate_cond_br
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
 from generators.support.utils import data
+from generators.support.signal_manager.utils.entity import generate_entity
 
 
 def generate_speculating_branch(name, params):
@@ -88,33 +88,54 @@ end architecture;
 
 
 def _generate_speculating_branch_signal_manager(name, data_bitwidth, spec_tag_data_bitwidth, extra_signals):
-    extra_signals_without_spec = extra_signals.copy()
-    extra_signals_without_spec.pop("spec")
+    # Extra signals are discarded except for `spec`
 
-    extra_signals_bitwidth = get_concat_extra_signals_bitwidth(
-        extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
-            "name": "data",
-            "bitwidth": data_bitwidth,
-            "extra_signals": extra_signals
-        }, {
-            "name": "spec_tag_data",
-            "bitwidth": spec_tag_data_bitwidth,
-            "extra_signals": extra_signals
-        }],
-        "out_ports": [{
-            "name": "trueOut",
-            "bitwidth": data_bitwidth,
-            "extra_signals": extra_signals_without_spec
-        }, {
-            "name": "falseOut",
-            "bitwidth": data_bitwidth,
-            "extra_signals": extra_signals_without_spec
-        }],
-        "extra_signals": extra_signals_without_spec
-    }, lambda name: _generate_speculating_branch(
-        name,
-        data_bitwidth + extra_signals_bitwidth - 1,
-        spec_tag_data_bitwidth + extra_signals_bitwidth - 1))
+    inner_name = f"{name}_inner"
+    inner = _generate_speculating_branch(
+        inner_name, data_bitwidth, spec_tag_data_bitwidth)
+
+    entity = generate_entity(name, [{
+        "name": "data",
+        "bitwidth": data_bitwidth,
+        "extra_signals": extra_signals
+    }, {
+        "name": "spec_tag_data",
+        "bitwidth": spec_tag_data_bitwidth,
+        "extra_signals": extra_signals
+    }], [{
+        "name": "trueOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }, {
+        "name": "falseOut",
+        "bitwidth": data_bitwidth,
+        "extra_signals": {}
+    }])
+
+    architecture = f"""
+-- Architecture of speculating_branch signal manager
+architecture arch of {name} is
+begin
+  inner : entity work.{inner_name}(arch)
+    port map(
+      clk => clk,
+      rst => rst,
+      {data("data => data,", data_bitwidth)}
+      data_valid => data_valid,
+      data_ready => data_ready,
+      data_spec => data_spec,
+      {data("spec_tag_data => spec_tag_data,", spec_tag_data_bitwidth)}
+      spec_tag_data_valid => spec_tag_data_valid,
+      spec_tag_data_ready => spec_tag_data_ready,
+      spec_tag_data_spec => spec_tag_data_spec,
+      {data("trueOut => trueOut_inner,", data_bitwidth)}
+      trueOut_valid => trueOut_inner_valid,
+      trueOut_ready => trueOut_inner_ready,
+      {data("falseOut => falseOut_inner,", data_bitwidth)}
+      falseOut_valid => falseOut_inner_valid,
+      falseOut_ready => falseOut_inner_ready
+    );
+end architecture;
+"""
+
+    return inner + entity + architecture
