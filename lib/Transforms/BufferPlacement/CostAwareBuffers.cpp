@@ -65,9 +65,10 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
     // See 'docs/Specs/Buffering/Buffering.md'.
-    // This algorithm does not use `FIFO_BREAK_DV`, representing it with
-    // `ONE_SLOT_BREAK_DV` and `FIFO_BREAK_NONE` for better area efficiency
-    // in most cases.
+    // This algorithm does not use `FIFO_BREAK_DV`; instead, it represents it as
+    // `ONE_SLOT_BREAK_DV` followed by `FIFO_BREAK_NONE`, because the
+    // interpretation is cleaner: `BREAK_DV` modules represent slots with data
+    // latency, while `BREAK_NONE` modules represent zero-latency slots.
     result.numOneSlotDV = useShiftReg ? 0 : dataLatency;
     result.numShiftRegDV = useShiftReg ? dataLatency : 0;
     result.numOneSlotR = readyLatency;
