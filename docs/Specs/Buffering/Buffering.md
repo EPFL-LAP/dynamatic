@@ -140,10 +140,13 @@ But if we always make sure that there is a buffer in between the merge and the f
 
 ### Unbufferizable Channels
 
-- Memory reference arguments are not real edges in the graph and are excluded from buffering.
-- Ports of memory interface operations are also unbufferizable.
+First of all, the buffering algorithm only targets handshake-typed edges (either ChannelType or ControlType). This restriction is enforced by `dynamatic::buffer::mapChannelsToProperties` in `BufferingSupport.cpp`.
 
-These channels are skipped during buffer placement.
+Additionally, the following handshake-typed edges are excluded from buffering:
+- Top-level function arguments: External channels do not require buffering.
+- Channels of operations implementing MemoryOpInterface (MemoryControllerOp, LSQOp): (TODO: Why?)
+
+For these channels, both `maxOpaque` and `maxTrans` are set to 0.
 
 ### Buffering on LSQ Control Paths
 
