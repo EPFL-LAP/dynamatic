@@ -151,6 +151,30 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   auto func = allAlgorithms[algorithm];
   if (failed(((*this).*(func))()))
     return signalPassFailure();
+
+  // run the delay selection logic again, writing it to the IR for processing in
+  // the backend
+  // In order tp avoid interleaving this IR writing with the value extraction,
+  // we keep it seperate. this does mean redudant logic, but the Database
+  // parsing is not a performance bottleneck, so this should be acceptable.
+  // TODO : this should go into a bespoke function
+
+  TimingDatabase timingDB(&getContext());
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    llvm::errs() << "=== TimindDB read failed ===\n";
+  modOp.walk([&](mlir::Operation *op) {
+    if (llvm::isa<dynamatic::handshake::ArithOpInterface>(op)) {
+      double delay;
+      if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
+                                                         delay, targetCP))) {
+
+        std::string delayStr = std::to_string(delay);
+        std::replace(delayStr.begin(), delayStr.end(), '.', '_');
+        op->setAttr("internal_delay",
+                    mlir::StringAttr::get(op->getContext(), delayStr));
+      }
+    }
+  });
 }
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -450,7 +474,6 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
-
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);

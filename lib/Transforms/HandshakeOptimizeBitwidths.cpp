@@ -333,7 +333,8 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
   Value newLhs = modBitWidth(lhs, optWidth, rewriter);
   Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
-  auto newOp = rewriter.create<Op>(op.getLoc(), newLhs, newRhs);
+  auto newOp = rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs,
+                                   newRhs, StringAttr{});
   Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   namer.replaceOp(op, newOp);
   inheritBB(op, newOp);
@@ -1182,7 +1183,8 @@ struct ArithShift : public OpRewritePattern<Op> {
       Value newShifyBy =
           modBitWidth({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift, newShifyBy);
+      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift.getType(),
+                                       newToShift, newShifyBy, StringAttr{});
       ChannelVal newRes = newOp.getResult();
       if (isRightShift)
         // In the case of a right shift, we first truncate the result of the
