@@ -196,14 +196,13 @@ static FailureOr<bool> checkEquivalence(
     llvm::errs() << "Failed to convert miter module to SMV.\n";
     return failure();
   }
-  auto [smvPath, smvModelName] = failOrSmvPair.value();
 
   std::filesystem::path wrapperPath = miterDir / "main.smv";
 
   // Create wrapper (main) for the elastic-miter
 
   std::string testbench = dynamatic::experimental::createElasticMiterTestBench(
-      context, config, smvModelName, nrOfTokens, true, constraints);
+      context, config, config.funcName, nrOfTokens, true, constraints);
   std::ofstream mainFile(wrapperPath);
   mainFile << testbench;
   mainFile.close();

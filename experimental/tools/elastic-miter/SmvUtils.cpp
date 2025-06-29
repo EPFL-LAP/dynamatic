@@ -131,9 +131,8 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 #endif
 }
 
-FailureOr<std::pair<std::filesystem::path, std::string>>
-handshake2smv(const std::filesystem::path &mlirPath,
-              const std::filesystem::path &outputDir) {
+LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
+                            const std::filesystem::path &outputDir) {
 
   std::filesystem::path hwFile = outputDir / "hw.mlir";
 
@@ -147,7 +146,6 @@ handshake2smv(const std::filesystem::path &mlirPath,
   }
 
   // Convert the HW file to SMV
-  std::filesystem::path smvFile = hwFile.parent_path() / "model.smv";
   cmd = "bin/export-rtl " + hwFile.string() + " " + outputDir.string() +
         " ./data/rtl-config-smv.json " + " --dynamatic-path=." + " --hdl=smv";
   ret = executeWithRedirect(cmd, "/dev/null");
@@ -155,8 +153,7 @@ handshake2smv(const std::filesystem::path &mlirPath,
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();
   }
-  std::string moduleName = "model";
 
-  return std::make_pair(smvFile, moduleName);
+  return success();
 }
 } // namespace dynamatic::experimental

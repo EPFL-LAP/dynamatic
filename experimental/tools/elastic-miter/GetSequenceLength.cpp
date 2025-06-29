@@ -182,13 +182,11 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
       dynamatic::experimental::handshake2smv(reachabilityMlirPath, outputDir);
   if (failed(failOrSmvPair))
     return failure();
-  auto [dstSmv, smvModelName] = failOrSmvPair.value();
-
-  llvm::errs() << dstSmv;
+  std::string smvFilename = config.funcName + ".smv";
 
   // Create the wrapper with infinite sequence generators
   auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
-      context, outputDir / "main_inf.smv", config, smvModelName, 0);
+      context, outputDir / "main_inf.smv", config, config.funcName, 0);
   if (failed(fail)) {
     llvm::errs() << "Failed to create infinite reachability wrapper.\n";
     return failure();
@@ -220,7 +218,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
 
     // Create the wrapper with n-token sequence generators
     auto fail = dynamatic::experimental::createSmvSequenceLengthTestbench(
-        context, wrapperPath, config, smvModelName, numberOfTokens);
+        context, wrapperPath, config, config.funcName, numberOfTokens);
     if (failed(fail)) {
       llvm::errs() << "Failed to create " << numberOfTokens
                    << " token reachability wrapper.\n";
@@ -247,7 +245,7 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     // Count the number of differences of reachable states
     auto failOrNrOfDifferences =
         dynamatic::experimental::compareReachableStates(
-            smvModelName, outputDir / "inf_states.txt",
+            config.funcName, outputDir / "inf_states.txt",
             outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
     if (failed(failOrNrOfDifferences)) {
       llvm::errs() << "Failed to compare the number of reachable states with "
