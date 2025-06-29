@@ -50,9 +50,12 @@ using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Tool options");
 
-static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
-                                          cl::desc("<input file>"),
-                                          cl::cat(mainCategory));
+/// Specifies the handshake IR file, which is needed to convert channel names
+/// into indices due to the CSV format. (Why???? The dot graph contains both
+/// names and indices, so this seems like a poor design decision.)
+static cl::opt<std::string> handshakeIRFile(cl::Positional, cl::Required,
+                                            cl::desc("<input file>"),
+                                            cl::cat(mainCategory));
 
 static cl::opt<std::string> level(cl::Positional, cl::Required,
                                   cl::desc("<duv level>"),
@@ -276,10 +279,10 @@ int main(int argc, char **argv) {
       argc, argv,
       "Converts a Modelsim LOG file into a CSV format used by the visualizer.");
 
-  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(handshakeIRFile.c_str());
   if (std::error_code error = fileOrErr.getError()) {
-    llvm::errs() << argv[0] << ": could not open input file '" << inputFilename
-                 << "': " << error.message() << "\n";
+    llvm::errs() << argv[0] << ": could not open input file '"
+                 << handshakeIRFile << "': " << error.message() << "\n";
     return 1;
   }
 
