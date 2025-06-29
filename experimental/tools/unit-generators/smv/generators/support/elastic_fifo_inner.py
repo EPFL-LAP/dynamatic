@@ -7,9 +7,9 @@ def generate_elastic_fifo_inner(name, params):
 
     if slots > 2:
         if data_type.bitwidth == 0:
-            return _generate_fast_elastic_fifo_inner_dataless(name, slots)
+            return _generate_slot_based_elastic_fifo_inner_dataless(name, slots)
         else:
-            return _generate_fast_elastic_fifo_inner(name, slots, data_type)
+            return _generate_slot_based_elastic_fifo_inner(name, slots, data_type)
     else:
         if data_type.bitwidth == 0:
             return _generate_elastic_fifo_inner_dataless(name, slots)
@@ -55,7 +55,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 """
 
 
-def _generate_fast_elastic_fifo_inner_dataless(name, slots):
+def _generate_slot_based_elastic_fifo_inner_dataless(name, slots):
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
@@ -124,7 +124,7 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_elastic_fifo_inner_fast(name, slots, data_type):
+def _generate_slot_based_elastic_fifo_inner(name, slots, data_type):
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
