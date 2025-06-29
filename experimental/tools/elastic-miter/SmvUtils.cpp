@@ -147,7 +147,8 @@ LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
 
   // Convert the HW file to SMV
   cmd = "bin/export-rtl " + hwFile.string() + " " + outputDir.string() +
-        " ./data/rtl-config-smv.json " + " --dynamatic-path=." + " --hdl=smv";
+        " ./data/rtl-config-smv-elasticmiter.json " + " --dynamatic-path=." +
+        " --hdl=smv";
   ret = executeWithRedirect(cmd, "/dev/null");
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
