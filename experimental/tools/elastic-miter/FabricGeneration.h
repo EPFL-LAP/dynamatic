@@ -53,14 +53,15 @@ void setHandshakeAttributes(OpBuilder &builder, Operation *op, int bb,
 LogicalResult prefixOperation(Operation &op, const std::string &prefix);
 
 FailureOr<std::pair<FuncOp, Block *>>
-buildNewFuncWithBlock(OpBuilder builder, const std::string &name,
+buildNewFuncWithBlock(OpBuilder builder, llvm::StringRef name,
                       ArrayRef<Type> inputTypes, ArrayRef<Type> outputTypes,
                       NamedAttribute argNamedAttr, NamedAttribute resNamedAttr);
 
 // Build a elastic-miter template function with the interface of the LHS FuncOp.
 // The result names have EQ_ prefixed.
 FailureOr<std::pair<FuncOp, Block *>>
-buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp);
+buildEmptyMiterFuncOp(OpBuilder builder, FuncOp &lhsFuncOp, FuncOp &rhsFuncOp,
+                      llvm::StringRef funcName);
 
 // Get the first and only non-external FuncOp from the module.
 // Additionally check some properites:

@@ -44,7 +44,7 @@ static std::string createMiterProperties(const std::string &moduleName,
   // INVARSPEC (model.EQ_B_valid -> model.EQ_B_out)
   for (const auto &[resultName, resultType] : config.results) {
     if (resultType.isa<handshake::ChannelType>())
-      properties << llvm::formatv("INVARSPEC ({0}.{1}_valid -> {0}.{1}_out)",
+      properties << llvm::formatv("INVARSPEC ({0}.{1}_valid -> {0}.{1})",
                                   moduleName, resultName)
                         .str();
   }
@@ -53,7 +53,7 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[lhsBuffer, rhsBuffer] : config.inputBuffers) {
-    bufferProperties.push_back(llvm::formatv("({0}.{1}.num = {0}.{2}.num)",
+    bufferProperties.push_back(llvm::formatv("({0}.{1}.data = {0}.{2}.data)",
                                              moduleName, lhsBuffer, rhsBuffer)
                                    .str());
   }
@@ -62,9 +62,9 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits produce the same number of output tokens.
   for (const auto &[lhsBuffer, rhsBuffer] : config.outputBuffers) {
     bufferProperties.push_back(
-        llvm::formatv("({0}.{1}.num = 0)", moduleName, lhsBuffer).str());
+        llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
     bufferProperties.push_back(
-        llvm::formatv("({0}.{1}.num = 0)", moduleName, rhsBuffer).str());
+        llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, rhsBuffer).str());
   }
 
   // Make sure the buffer property will start to hold at one point and from

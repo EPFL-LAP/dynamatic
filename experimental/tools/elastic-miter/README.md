@@ -10,17 +10,7 @@ Ayatallah Elakhras, Jiahui Xu, Martin Erhart, Paolo Ienne, and Lana Josipović. 
 
 By default the tool uses NuSMV for the verification. The official version only supports printing 2^16 state spaces. To circumvent this problem, we provide a modified binary supporting 2^24 states.
 
-Setting the `--enable-leq-binaries` flag when building Dynamatic enables the automatic download of the modified binary:
-
-```
-$ ./build.sh --enable-leq-binaries -f
-```
-
-Don't forget to add the `-f` flag to force CMake to re-run if you've already built Dynamatic.
-
-Currently, the conversion to SMV requires the [dot2smv](https://github.com/Jiahui17/dot2smv) converter (soon to be replaced by a dedicated SMV backend). It is also downloaded when `--enable-leq-binaries` is used.
-
-The binary will be located at `bin/elastic-miter`.
+TODO
 
 ## Usage
 
