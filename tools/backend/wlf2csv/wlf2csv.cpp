@@ -17,7 +17,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -36,11 +35,9 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
@@ -57,8 +54,12 @@ static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
                                           cl::desc("<input file>"),
                                           cl::cat(mainCategory));
 
-static cl::opt<std::string> wlfFile(cl::Positional, cl::Required,
-                                    cl::desc("<path to WLF file>"),
+static cl::opt<std::string> level(cl::Positional, cl::Required,
+                                  cl::desc("<duv level>"),
+                                  cl::cat(mainCategory));
+
+static cl::opt<std::string> logFile(cl::Positional, cl::Required,
+                                    cl::desc("<path to LOG file>"),
                                     cl::init(""), cl::cat(mainCategory));
 
 static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
@@ -273,9 +274,7 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Exports a VHDL design corresponding to an input HW-level IR. "
-      "JSON-formatted RTL configuration files encode the procedure to "
-      "instantiate/generate external HW modules present in the input IR.");
+      "Converts a Modelsim LOG file into a CSV format used by the visualizer.");
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
   if (std::error_code error = fileOrErr.getError()) {
@@ -296,16 +295,6 @@ int main(int argc, char **argv) {
       mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!modOp)
     return 1;
-
-  std::string level = "tb/duv_inst/";
-  std::string logFile = std::filesystem::temp_directory_path().string() +
-                        sys::path::get_separator().str() + "dynamatic_" +
-                        kernelName + ".log";
-  if (int ret = exec("wlf2log -l", level, "-o", logFile, StringRef{wlfFile})) {
-    llvm::errs() << "Failed to convert WLF file @ \"" << wlfFile
-                 << "\" into LOG file\n";
-    return ret;
-  }
 
   // Open the LOG file
   std::ifstream logFileStream(logFile);
