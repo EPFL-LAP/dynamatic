@@ -24,103 +24,122 @@ Let's assume the following generic parameters for dimensionality:
 * `PAYLOAD_WIDTH`: The bit-width of the payload (e.g., 8 bits).
 * `PORT_IDX_WIDTH`: The bit-width required to index a port (e.g., `ceil(log2(N_PORTS))`).
 
+**Signal Naming and Dimensionality**:  
+This module is generated from a higher-level description (e.g., in Python), which results in a specific convention for signal naming in the final VHDL code. It's important to understand this convention when interpreting diagrams and signal tables.
+
+- Generation Pattern: A signal that is conceptually an array in the source code (e.g., `port_bits_i`) is "unrolled" into multiple, distinct signals in the VHDL entity. The generated VHDL signals are indexed with a suffix, such as `port_bits_{p}_i`, where `{p}` is the port index.
+
+- Interpreting Diagrams: If a diagram or conceptual description uses a base name without an index (e.g., `port_bits_i`), it represents a collection of signals. The actual dimension is expanded based on the context:
+
+    - Port-related signals (like `port_bits_i`) are expanded by the number of ports (`N_PORTS`).
+    - Entry-related signals (like `entry_alloc_i`) are expanded by the number of queue entries (`N_ENTRIES`).
+
 ### Port Interface Signals
 
 ![Port Interface](./figs/ptq/PTQ_Port_Interface.png)
 
 These signals are used for communication between the external modules and the dispatcher's ports.
+ `p=[0, N_PORTS-1]`
 
-| Signal Name | Direction | Dimensionality | Description |
-| :--- | :--- | :--- | :--- |
-| **Inputs** | | | |
-| `port_bits_i` | Input | `N_PORTS` of `std_logic_vector(PAYLOAD_WIDTH-1:0)` | Array of payloads (address or data), one for each port. |
-| `port_valid_i` | Input | `N_PORTS` of `std_logic` | Array of valid flags. When `port_valid_i[p]` is high, the payload on `port_bits_i[p]` is valid.|
-| **Outputs** | | | |
-| `port_ready_o` | Output | `N_PORTS` of `std_logic` | Array of ready flags. `port_ready_o[p]` goes high if the queue can accept the payload from port `p` this cycle. |
+| Python Variable Name | VHDL Signal Name | Direction | Dimensionality | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Inputs** | | | | |
+| `port_bits_i` | `port_bits_{p}_i` | Input | `std_logic_vector(PAYLOAD_WIDTH-1:0)` | The payload (address or data) for port `p`.|
+| `port_valid_i` | `port_valid_{p}_i` | Input | `std_logic` | Valid flag for port `p`. When high, it indicates that the payload on `port_bits_{p}_i` is valid. |
+| **Outputs** | | | | |
+| `port_ready_o` | `port_ready_{p}_o` | Output | `std_logic` | Ready flag for port `p`. This signal goes high if the queue can accept the payload from port `p` this cycle. |
 
 
 
 ### Queue Interface Signals
 
 These signals are used for communication between the dispatcher logic and the queue's memory entries.
+ `e=[0, N_ENTRIES-1]`
 
 ![Queue Interface](./figs/ptq/PTQ_Queue_Interface.png)
 
-| Signal Name | Direction | Dimensionality | Description |
-| :--- | :--- | :--- | :--- |
-| **Inputs** | | | |
-| `entry_valid_i` | Input | `N_ENTRIES` of `std_logic` | Is queue entry `e` logically allocated? |
-| `entry_bits_valid_i` | Input | `N_ENTRIES` of `std_logic` | Has the address or the data slot for entry `e` already been filled? |
-| `entry_port_idx_i` | Input | `N_ENTRIES` of `std_logic_vector(PORT_IDX_WIDTH-1:0)`| Indicates to which port each entry is assigned. |
-| `queue_head_oh_i` | Input | `std_logic_vector(N_ENTRIES-1:0)` | One-hot vector indicating the head entry in the queue. |
-| **Outputs** | | | |
-| `entry_bits_o` | Output | `N_ENTRIES` of `std_logic_vector(PAYLOAD_WIDTH-1:0)`| The data to be written into each queue entry. Think of it as the ink flowing into a row on the whiteboard. |
-| `entry_wen_o` | Output | `N_ENTRIES` of `std_logic` | A write-enable signal for each entry. When `entry_wen_o` of entry `e` is high, `entry_bits_valid_i[e]` will become high by the logic outside of the dispatcher. |
+| Python Variable Name | VHDL Signal Name | Direction | Dimensionality | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Inputs** | | | | |
+| `entry_alloc_i` | `entry_valid_{e}_i` | Input | `std_logic` | Is queue entry `e` logically allocated?|
+| `entry_payload_valid_i` | `entry_bits_valid_{e}_i` | Input | `std_logic` | Has the address or the data slot for entry `e` already had valid one? |
+| `entry_port_idx_i` | `entry_port_idx_{e}_i` | Input | `std_logic_vector(PORT_IDX_WIDTH-1:0)`| Indicates to which port entry `e` is assigned. |
+| `queue_head_oh_i` | `queue_head_oh_{e}_i` | Input | `std_logic_vector(N_ENTRIES-1:0)` | One-hot vector indicating the head entry in the queue. |
+| **Outputs** | | | | |
+| `entry_bits_o` | `entry_bits_{e}_o` | Output | `std_logic_vector(PAYLOAD_WIDTH-1:0)`| The payload to be written into queue entry `e`. |
+| `entry_wen_o` | `entry_wen_{e}_o` | Output | `std_logic` | A write-enable signal for entry `e`. When high, `entry_bits_valid_{e}_i` is expected to be asserted by logic outside of this module. This logic exists outside of the dispatcher module. When the write-enable signal is on, this outside logic makes the dispatcher to consider the payload in the queue entry `e` is the valid one. |
 
 
 
 
-The Port-to-Queue Dispatcher has the following responsibilities:
+The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-entry store address dispatcher example):
 
 1. **Matching**  
     ![Matching](./figs/ptq/PTQ_matching_description.png)  
+    ![Matching](./figs/ptq/PTQ_Matching.png)  
     The Matching block is responsible for identifying which queue entries are actively waiting to receive an address or data payload.
     - **Input**:  
-        - `entry_valid_i`: Indicates if the entry is allocated by the group allocator.
-        - `entry_bits_valid_i`: Indicates if the entry's payload slot is already filled. 
-    - **Processing**: For each queue entry, this block performs the check: `entry_valid_i AND (NOT entry_bits_valid_i)`. An entry is considered waiting only if it has been allocated (`entry_valid_i = 1`) but its payload slot is still empty (`entry_bits_valid_i = 0`)
+        - `entry_alloc_i`: Indicates if the entry is allocated by the group allocator.
+        - `entry_payload_valid_i`: Indicates if the entry's payload slot is already valid. 
+    - **Processing**: For each queue entry, this block performs the check: `entry_alloc_i AND (NOT entry_payload_valid_i)`. An entry is considered waiting only if it has been allocated (`entry_alloc_i = 1`) but its payload slot is still empty (`entry_payload_valid_i = 0`)
     - **Output**:  
-        - `entry_request_valid`: A array of bits indicating the queue entry is ready to receive address or data.
+        - `entry_ptq_ready`: `N_ENTRIES` bits indicating the queue entry is ready to receive address or data.
 
 2. **Port Index Decoder**  
     ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder_description.png)  
+    ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder.png)  
     When the group allocator allocates a queue entry, it also assigns the queue entry to a specific port, storing this port assignment as an integer. The Port Index Decoder decodes the port assignment for each queue entry from an integer representation to a one-hot representation.
     - **Input**:   
         - `entry_port_idx_i`: Queue entry-port assignment information
     - **Processing**:  
         - It performs a integer-to-one-hot conversion on the port index associated with each entry. For example, if there are 3 ports, an integer index of `1 (01 in binary)` would be converted to a one-hot vector of `010`.
     - **Output**:  
-        - `entry_port_valid`: A one-hot vector for each entry that directly corresponds to the port it is assigned to.
+        - `entry_port_idx_oh`: A one-hot vector for each entry that directly corresponds to the port it is assigned to.
 
 3. **Payload Mux**  
     ![Mux1H](./figs/ptq/PTQ_Payload_Mux_description.png)  
+    ![PTQ_Payload_MUX](./figs/ptq/PTQ_Payload_MUX.png)  
     This block routes the address or data payload from the appropriate input port to the correct queue entries. 
     - **Input**:  
-         - `port_bits_i`: An array containing the address or data payload from all access ports.
-         - `entry_port_valid`: The one-hot port assignment for each queue entry, used as the select signal.
-    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the corresponding `entry_port_valid` one-hot vector to select one payload from `port_bits_i` array.
+         - `port_bits_i`: `N_PORTS` of the address or data payload from all access ports.
+         - `entry_port_idx_oh`: The one-hot port assignment for each queue entry, used as the select signal.
+    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the corresponding `entry_port_idx_oh` one-hot vector to select one payload from `port_bits_i`.
     - **Output**:  
         - `entry_bits_o`: The selected payload of each queue entry.
 
 4. **Entry-Port Assignment Masking Logic**  
     ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_entry_port_assignment_masking_description.png)  
-    Each entry is waiting for the payload from a certain port. This block masks out the port assignments for each queue entry if it is not ready to receive the payload. It propagates these entry-port assignment information only for entries that are available to receive the payload.
+    ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_Entry_Port_Assignment_Masking.png)   
+
+    Each queue entry which is waiting for data, can only receive data from one port. This converts entry waiting from one-bit signal to a one-hot representation of the port it is waiting for the data from.
     
     - **Input**:  
-         - `entry_port_valid`: A one-hot vector for each entry representing its assigned port.
-         - `entry_request_valid`: A bit array indicating which entries are ready to receive.
-    - **Processing**: Performs a bitwise AND operation between each entry's one-hot port assignment (`entry_port_valid`) and its readiness status (`entry_request_valid`). This masks out assignments for entries that are not ready.
+         - `entry_port_idx_oh`: A one-hot vector for each entry representing its assigned port.
+         - `entry_ptq_ready`: `N_ENTRIES` bits indicating which entries are ready to receive.
+    - **Processing**: Performs a bitwise AND operation between each entry's one-hot port assignment (`entry_port_idx_oh`) and its readiness status (`entry_ptq_ready`). This masks out assignments for entries that are not waiting.
     - **Output**:  
-        - `entry_port_request`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
+        - `entry_waiting_for_port`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
 
 
 
 5. **Handshake Logic**  
     ![PTQ_Handshake](./figs/ptq/PTQ_Handshake_description.png)  
+    ![PTQ_Handshake](./figs/ptq/PTQ_Handshake.png)  
     This block manages the `valid/ready` handshake protocol with the external access ports. It generates the outgoing `port_ready_o` signals and produces the final entry-port assignments that have completed a successful handshake (i.e. the internal request is ready and the external port is valid).
 
     - **Input**:  
-        - `entry_port_request`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
+        - `entry_waiting_for_port`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
         - `port_valid_i`: The incoming port valid signals from each external port.
     - **Processing**:  
         - Ready Generation: It determines if any queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
-        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_port_request` if the corresponding port is not valid.
+        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the corresponding port is not valid.
     - **Output**:
         - `port_ready_o`: The outgoing ready signal to each external port.
         - `entry_port_and`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
 
 6. **Arbitration Logic**  
     ![PTQ_Handshake](./figs/ptq/PTQ_Arbitration_description.png)  
+    ![PTQ_masking](./figs/ptq/PTQ_masking.png)  
     The core decision making block of the dispatcher. When multiple handshaked entry-port assignments are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones for each port.
     - **Input**:  
         - `entry_port_and`: The set of all currently valid and ready entry-port assignments.
@@ -141,13 +160,13 @@ The Port-to-Queue Dispatcher has the following responsibilities:
     ![Matching](./figs/ptq/PTQ_Matching.png)  
     The first job of this block is to determine which entries in the store queue are waiting for a store address.  
     Based on the example diagram:  
-    - **Entry 1** is darkened to indicate that it has not been allocated by the Group Allocator. Its `Store Queue Valid` signal (equivalent to `entry_valid_i`) is `0`.  
-    - **Entries 0, 2, and 3** have been allocated, so their `entry_valid_i` signal are `1`. However, among these, Entry 2 already has a valid address (`Store Queue Addr Valid = 1`).
+    - **Entry 1** is darkened to indicate that it has not been allocated by the Group Allocator. Its `Store Queue Valid` signal (equivalent to `entry_alloc_i`) is `0`.  
+    - **Entries 0, 2, and 3** have been allocated, so their `entry_alloc_i` signal are `1`. However, among these, Entry 2 already has a valid address (`Store Queue Addr Valid = 1`).
     - Therefore, only `Entries 0 and 3` are actively waiting for their store address, as they are allocated but their `Store Queue Addr Valid` bit is still `0`.  
   
-    This logic is captured by the expression `entry_request_valid = entry_valid_i AND (NOT entry_bits_valid_i)`, which creates a list of entries that need attention from the dispatcher.
+    This logic is captured by the expression `entry_ptq_ready = entry_alloc_i AND (NOT entry_payload_valid_i)`, which creates a list of entries that need attention from the dispatcher.
 
-2. **Port Index Decoder: Queue entries port assignment in one-hot format**
+2. **Port Index Decoder: Queue entries port assignment in one-hot format**  
     ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder.png)  
     This block's circuit is to decode an integer index assigned to each queue entry into a one-hot format.  
     Based on the example diagram:  
@@ -159,7 +178,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `Entry 2 (Port 1)`: `010`
         - `Entry 3 (Port 2)`: `100`
 
-    The output of this block, an array of one-hot vectors, is a crucial input for the `Payload Mux`, where it acts as the select signal to choose the data from the correct port.    
+    The output of this block, `N_ENTRIES` of one-hot vectors, is a crucial input for the `Payload Mux`, where it acts as the select signal to choose the data from the correct port.    
 
 3. **Payload Mux: Routing the correct address**  
     ![PTQ_Payload_MUX](./figs/ptq/PTQ_Payload_MUX.png)  
@@ -181,12 +200,12 @@ The Port-to-Queue Dispatcher has the following responsibilities:
 4. **Entry-Port Assignment Masking Logic**  
     ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_Entry_Port_Assignment_Masking.png)  
     Based on the example diagram:
-    - `entry_request_valid`:
+    - `entry_ptq_ready`:
         - `Entry 0`: `1` (Entry 0 is waiting)    -> `111`
         - `Entry 1`: `0` (Entry 1 is not waiting)  -> `000`
         - `Entry 2`: `0` (Entry 2 is not waiting)  -> `000`
         - `Entry 3`: `1` (Entry 3 is waiting)    -> `111`
-    - `entry_port_valid`:
+    - `entry_port_idx_oh`:
         - `Entry 0`: `010` (Port 1)
         - `Entry 1`: `000` (Port 0)
         - `Entry 2`: `010` (Port 1)
@@ -197,7 +216,7 @@ The Port-to-Queue Dispatcher has the following responsibilities:
         - `Entry 2`: `000` AND `010` = `000`
         - `Entry 3`: `111` AND `100` = `100`
         
-        > `entry_port_request`: It now only contains one-hot vectors for entries that are both allocated and waiting for a payload.
+        > `entry_waiting_for_port`: It now only contains one-hot vectors for entries that are both allocated and waiting for a payload.
 
 
 5. **Handshake Logic: Managing port readiness and masking the port assigned with invalid ports**
