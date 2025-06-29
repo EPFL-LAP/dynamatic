@@ -115,9 +115,9 @@ class PortToQueueDispatcher:
             ctx, 'port_bits', 'i', self.numPorts, self.bitsW)
         port_valid_i = LogicArray(ctx, 'port_valid', 'i', self.numPorts)
         port_ready_o = LogicArray(ctx, 'port_ready', 'o', self.numPorts)
-        entry_alloc_i = LogicArray(ctx, 'entry_valid', 'i', self.numEntries)
+        entry_alloc_i = LogicArray(ctx, 'entry_alloc', 'i', self.numEntries)
         entry_payload_valid_i = LogicArray(
-            ctx, 'entry_bits_valid', 'i', self.numEntries)
+            ctx, 'entry_payload_valid', 'i', self.numEntries)
         if (self.numPorts != 1):
             entry_port_idx_i = LogicVecArray(
                 ctx, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
@@ -260,10 +260,10 @@ class PortToQueueDispatcher:
                         port_ready_1_o => ldp_addr_ready_1_o,
                         port_valid_0_i => ldp_addr_valid_0_i,
                         port_valid_1_i => ldp_addr_valid_1_i,
-                        entry_valid_0_i => ldq_valid_0_q,
-                        entry_valid_1_i => ldq_valid_1_q,
-                        entry_bits_valid_0_i => ldq_addr_valid_0_q,
-                        entry_bits_valid_1_i => ldq_addr_valid_1_q,
+                        entry_alloc_0_i => ldq_valid_0_q,
+                        entry_alloc_1_i => ldq_valid_1_q,
+                        entry_payload_valid_0_i => ldq_addr_valid_0_q,
+                        entry_payload_valid_1_i => ldq_addr_valid_1_q,
                         entry_port_idx_0_i => ldq_port_idx_0_q,
                         entry_port_idx_1_i => ldq_port_idx_1_q,
                         entry_bits_0_o => ldq_addr_0_d,
