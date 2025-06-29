@@ -61,13 +61,13 @@ These signals are used for communication between the dispatcher logic and the qu
 | Python Variable Name | VHDL Signal Name | Direction | Dimensionality | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **Inputs** | | | | |
-| `entry_alloc_i` | `entry_valid_{e}_i` | Input | `std_logic` | Is queue entry `e` logically allocated?|
-| `entry_payload_valid_i` | `entry_bits_valid_{e}_i` | Input | `std_logic` | Has the address or the data slot for entry `e` already had valid one? |
+| `entry_alloc_i` | `entry_alloc_{e}_i` | Input | `std_logic` | Is queue entry `e` logically allocated?|
+| `entry_payload_valid_i` | `entry_payload_valid_{e}_i` | Input | `std_logic` | Has the address or the data slot for entry `e` already had valid one? |
 | `entry_port_idx_i` | `entry_port_idx_{e}_i` | Input | `std_logic_vector(PORT_IDX_WIDTH-1:0)`| Indicates to which port entry `e` is assigned. |
 | `queue_head_oh_i` | `queue_head_oh_{e}_i` | Input | `std_logic_vector(N_ENTRIES-1:0)` | One-hot vector indicating the head entry in the queue. |
 | **Outputs** | | | | |
 | `entry_bits_o` | `entry_bits_{e}_o` | Output | `std_logic_vector(PAYLOAD_WIDTH-1:0)`| The payload to be written into queue entry `e`. |
-| `entry_wen_o` | `entry_wen_{e}_o` | Output | `std_logic` | A write-enable signal for entry `e`. When high, `entry_bits_valid_{e}_i` is expected to be asserted by logic outside of this module. This logic exists outside of the dispatcher module. When the write-enable signal is on, this outside logic makes the dispatcher to consider the payload in the queue entry `e` is the valid one. |
+| `entry_wen_o` | `entry_wen_{e}_o` | Output | `std_logic` | A write-enable signal for entry `e`. When high, `entry_payload_valid_{e}_i` is expected to be asserted by logic outside of this module. This logic exists outside of the dispatcher module. When the write-enable signal is on, this outside logic makes the dispatcher to consider the payload in the queue entry `e` is the valid one. |
 
 
 
@@ -145,7 +145,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - `entry_port_and`: The set of all currently valid and ready entry-port assignments.
         - `queue_head_oh_i`: The queue's one-hot head vector.
     - **Processing**: It uses a `CyclicPriorityMasking` algorithm. This ensures that among all candidates for each port, the one corresponding to the oldest entry in the queue is granted for the current clock cycle.
-    - **Output**: `entry_wen_o` signal, which acts as the enable for the queue entry. This signal ultimately causes the queue's `entry_bits_valid` signal to go high via logic outside of the dispatcher.
+    - **Output**: `entry_wen_o` signal, which acts as the enable for the queue entry. This signal ultimately causes the queue's `entry_payload_valid` signal to go high via logic outside of the dispatcher.
 
 
 
