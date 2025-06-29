@@ -8,7 +8,7 @@
 //
 // Cost-aware smart buffer placement.
 //
-// This mainly declares the `CostAwareBuffers` class, which inherits the
+// This file declares the `CostAwareBuffers` class, which inherits the
 // abstract `BufferPlacementMILP` class to setup and solve a real MILP from
 // which buffering decisions can be made. Every public member declared in
 // this file is under the `dynamatic::buffer::costaware` namespace, as to not
