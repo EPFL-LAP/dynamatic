@@ -368,7 +368,10 @@ int main(int argc, char **argv) {
 
       // Example: exponent = -15
       int exponent;
-      resolutionStr.split("e").second.getAsInteger(10, exponent);
+      if (resolutionStr.split("e").second.getAsInteger(10, exponent)) {
+        return error("expected resolution in scientific notation, but got " +
+                     tokens[2]);
+      }
 
       if (exponent > -9) {
         return error(
