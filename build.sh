@@ -415,7 +415,7 @@ create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
-create_symlink ../build/bin/wlf2csv
+create_symlink ../build/bin/log2csv
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
 create_generator_symlink build/bin/rtl-text-generator
