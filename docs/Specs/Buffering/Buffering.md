@@ -55,7 +55,7 @@ Each buffer type corresponds to a specific RTL backend HDL module with different
 Additional notes on modeling and usage of the buffer types listed above:
 
 - **Equivalent combinations**:  
-  Existing algorithms generally do not distinguish between a single `FIFO_BREAK_DV` and the combination of `ONE_SLOT_BREAK_DV` with `FIFO_BREAK_NONE`, even though the two differ in both timing behavior and area cost.  
+  Existing algorithms (FPGA20, FPL22, CostAware) do not distinguish between a single `FIFO_BREAK_DV` and the combination of `ONE_SLOT_BREAK_DV` with `FIFO_BREAK_NONE`, even though the two differ in both timing behavior and area cost.  
   Specifically, the algorithms treat an `n`-slot `FIFO_BREAK_DV` as equivalent to a `1`-slot `ONE_SLOT_BREAK_DV` followed by an `n-1`-slot `FIFO_BREAK_NONE`.
 
 - **Control granularity**:  
