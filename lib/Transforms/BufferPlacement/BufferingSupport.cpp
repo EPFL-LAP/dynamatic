@@ -123,24 +123,16 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
       return channel.consumer->emitError() << ss.str();
     }
 
-    // Check for satisfiability
-    if (!channel.props->isSatisfiable()) {
-      std::stringstream ss;
-      std::string channelName;
-      ss << "Including internal component buffers into buffering "
-            "properties of channel '"
-         << getUniqueName(*channel.value.getUses().begin())
-         << "' made them unsatisfiable.\nProperties were " << ogProps
-         << "before inclusion and were changed to " << *channel.props
-         << "Cannot proceed with buffer placement.";
-      return channel.consumer->emitError() << ss.str();
-    }
     channelProps[channel.value] = *channel.props;
     return success();
   };
 
   // Add channels originating from function arguments to the channel map
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    // Only register handshake typed values
+    if (!isa<handshake::ControlType, handshake::ChannelType>(arg.getType()))
+      continue;
+
     Channel channel(arg, funcOp, *arg.getUsers().begin());
     if (failed(deriveBufferingProperties(channel)))
       return failure();
@@ -149,6 +141,10 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
+      // Only register handshake typed values
+      if (!isa<handshake::ControlType, handshake::ChannelType>(res.getType()))
+        continue;
+
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))
         return failure();

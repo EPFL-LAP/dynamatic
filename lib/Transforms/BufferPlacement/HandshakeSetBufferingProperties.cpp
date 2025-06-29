@@ -21,6 +21,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -161,9 +162,10 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   }
 
   // See docs/Specs/Buffering.md
-  // Memrefs are not real edges in the graph and are therefore unbufferizable
+  // We don't need to place buffers to arguments
   for (BlockArgument arg : funcOp.getArguments())
-    makeUnbufferizable(arg);
+    if (isa<handshake::ControlType, handshake::ChannelType>(arg.getType()))
+      makeUnbufferizable(arg);
 
   // Ports of memory interfaces are unbufferizable
   for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {
