@@ -1,4 +1,4 @@
-//===- wlf2csv.cpp - Converts WLF file to simpler CSV -----------*- C++ -*-===//
+//===- log2csv.cpp - Converts LOG file to CSV for visualizer-----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Transforms a WLF file into a CSV-formatted simplified sequence of channel
-// state changes.
+// Transforms a Modelsim LOG file into a CSV-formatted sequence of channel state
+// changes, utilized by the visualizer.
 //
 //===----------------------------------------------------------------------===//
 

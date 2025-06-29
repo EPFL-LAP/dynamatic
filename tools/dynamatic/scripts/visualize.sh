@@ -42,7 +42,7 @@ wlf2log -l $LEVEL -o "$F_LOG" "$F_WLF"
 exit_on_fail "Failed to convert WLF file into LOG file" "Generated LOG file"
 
 # Convert the log file to a CSV for the visualizer
-"$DYNAMATIC_DIR/bin/wlf2csv" "$COMP_DIR/handshake_export.mlir" \
+"$DYNAMATIC_DIR/bin/log2csv" "$COMP_DIR/handshake_export.mlir" \
   $LEVEL "$F_LOG" $KERNEL_NAME > $F_CSV
 exit_on_fail "Failed to generate channel changes from waveform" "Generated channel changes"
 
