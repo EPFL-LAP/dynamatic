@@ -263,7 +263,7 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   return success();
 }
 
-static constexpr unsigned long long PERIOD = 4000, HALF_PERIOD = PERIOD >> 1;
+static constexpr unsigned long long PERIOD_NS = 4, HALF_PERIOD_NS = 2;
 
 static constexpr StringLiteral ACCEPT("accept"), STALL("stall"),
     TRANSFER("transfer"), IDLE("idle"), UNDEFINED("undefined");
@@ -333,6 +333,7 @@ int main(int argc, char **argv) {
   std::map<size_t, WireReference> wires;
   mlir::DenseSet<Value> toUpdate;
   size_t cycle = 0;
+  unsigned long long period = PERIOD_NS, halfPeriod = HALF_PERIOD_NS;
 
   // Read the LOG file line by line
   std::string event;
@@ -362,6 +363,30 @@ int main(int argc, char **argv) {
       if (failed(callback()))
         exit(1);
       return true;
+    };
+
+    LogCallback setResolution = [&]() {
+      if (tokens[1] != "timestep")
+        return success();
+
+      // Example: tokens[2] = "\"1e-15\""
+      // Example: resolutionStr = "1e-15"
+      llvm::StringRef resolutionStr = tokens[2].substr(1, tokens[2].size() - 2);
+
+      int exponent;
+      resolutionStr.split("e").second.getAsInteger(10, exponent);
+
+      if (exponent > -9) {
+        return error(
+            "Resolution must be at least nanoseconds (10e-9), but got " +
+            tokens[2]);
+      }
+
+      period = PERIOD_NS *
+               static_cast<unsigned long long>(std::pow(10, -9 - exponent));
+      halfPeriod = period >> 1;
+
+      return success();
     };
 
     LogCallback setSignalAssociation = [&]() {
@@ -404,12 +429,12 @@ int main(int argc, char **argv) {
       std::string timeStr = tokens[1].str();
       timeStr.erase(std::remove(timeStr.begin(), timeStr.end(), '.'),
                     timeStr.end());
-      unsigned time;
+      unsigned long long time;
       if (StringRef{timeStr}.getAsInteger(10, time)) {
         return error("expected integer identifier for time, but got " +
                      timeStr);
       }
-      cycle = (time < PERIOD) ? 0 : (time - HALF_PERIOD) / PERIOD + 1;
+      cycle = (time < period) ? 0 : (time - halfPeriod) / period + 1;
       return success();
     };
 
@@ -456,7 +481,8 @@ int main(int argc, char **argv) {
 
     handleLogType("D", 3, setSignalAssociation) ||
         handleLogType("T", 2, newTimestep) ||
-        handleLogType("S", 2, changeWireState);
+        handleLogType("S", 2, changeWireState) ||
+        handleLogType("P", 3, setResolution);
     tokens.clear();
   }
 
