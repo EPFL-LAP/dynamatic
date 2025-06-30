@@ -14,6 +14,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -390,13 +391,17 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
-    // No throughput constraints on channels going to stores
-    /// TODO: this is from legacy implementation, we should understand why we
-    /// really do this and figure out if it makes sense (@lucas-rami: I don't
-    /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
-      continue;
-
+    /// No throughput constraints on channels going to stores which
+    /// are not connected to the LSQ. In the legacy implementation, 
+    /// MCStoreOp and LSQStoreOp were used to distinguish between
+    /// stores that are connected to the LSQ and those that are not.
+    /// In the new implementation, we use the MemInterfaceAttr to determine
+    /// whether the StoreOp is connected to the LSQ or not.
+    if (isa<handshake::StoreOp>(dstOp) && getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()){
+        continue;
+    }
+    
+   
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
