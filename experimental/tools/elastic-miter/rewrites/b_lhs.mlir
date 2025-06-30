@@ -1,5 +1,5 @@
 module {
-  handshake.func @b_lhs(%x: !handshake.channel<i1>, %y: !handshake.channel<i1>, %d: !handshake.control<>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i1>, !handshake.control<>) attributes {argNames = ["Xd", "Yd","Dd", "Cd"], resNames = ["A_out", "B_out"]} {
+  handshake.func @b_lhs(%x: !handshake.channel<i1>, %y: !handshake.channel<i1>, %d: !handshake.control<>, %c: !handshake.channel<i1>, ...) -> (!handshake.channel<i1>, !handshake.control<>) attributes {argNames = ["Xd_in", "Yd_in", "Dd_in", "Cd_in"], resNames = ["A_out", "B_out"]} {
     %a = mux %index [%x, %y] {handshake.bb = 1 : ui32, handshake.name = "mux"}  : <i1>, [<i1>, <i1>] to <i1>
     %c_forked:2 = fork [2] %c {handshake.bb = 1 : ui32, handshake.name = "fork_control"} : <i1>
     %c_not = not %c_forked#0 {handshake.bb = 1 : ui32, handshake.name = "not"} : <i1>
