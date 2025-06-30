@@ -227,7 +227,7 @@ Timing information is generally used immediately upon being obtained, for instan
 
 Therefore, internal delay is added as an attribute to arithmetic ops in the IR at the end of the buffer placement stage, and is represented in the hardware IR. The value given is chosen using getDelayCeilValue, ensuring the choice passed into the IR is the same one that was made at any other point with getDelayCeilMetric. 
 
-Sample code of the attreibute :
+Sample code of the attribute :
 
 in handhsake IR :
 
@@ -253,7 +253,7 @@ hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : 
 # Timing Information in FloPoCo units - The arch-suffix system (working title)
 
 
-Empirical tests done using vivado (see unit profiler, put a link here once on the remote) have shown that FloPoCo unit's pratical internal delay is consistently greater that the target delay. Therefore, all flopoco units are identified by the triplet **{operator name, bitwidth, measured internal delay}.** 
+FloPoCo units are identified by the triplet **{operator name, bitwidth, measured internal delay}** which serves to uniquely identify them.
 
 The legacy Dynamatic backend supports the existence of multiple implementations of a given operator, by allowing an "arch-name" to be specified. This system is leveraged by having each floating point wrapper file (addf.vhd, mulf.vhd, etc.) contain a seperate arch for each FloPoCo implementation, identified by a bitwidth-delay pair, added as a suffix to "arch" to form a unique name. The implemented operator is tracked with the seperation of the wrappers based on the operators. The implementations are contained in a [seperate file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/vhdl/support/flopoco_ip_cores.vhd), and the portion relevant to each operator are also appropriately tagged with the suffix to avoid any cross-usage, which has been observed to cause incorrect calculations unless managed cautiously.
 
