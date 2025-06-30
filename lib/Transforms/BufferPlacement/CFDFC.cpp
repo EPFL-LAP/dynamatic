@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -22,6 +24,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include <fstream>
 
 using namespace mlir;
@@ -32,6 +35,9 @@ using namespace dynamatic::experimental;
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
+
+#include "graphviz/cgraph.h"
+#include "graphviz/gvc.h"
 
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the
@@ -255,6 +261,38 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   // Otherwise the edge must be between different blocks, where the destination
   // can be out of all blocks
   return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
+}
+
+void CFDFC::writeDot(const std::string &fileName) {
+
+  //
+  Agraph_t *gv = agopen(const_cast<char *>("cfdfc"), Agdirected, nullptr);
+
+  for (auto value : channels) {
+    auto *pred = value.getDefiningOp();
+    auto succ = value.getUsers().begin();
+
+    std::string predName =
+        pred->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
+    std::string succName =
+        succ->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
+
+    auto *predNode = agnode(gv, const_cast<char *>(predName.c_str()),
+                            /* create if not exist */ 1);
+    auto *succNode = agnode(gv, const_cast<char *>(succName.c_str()),
+                            /* create if not exist */ 1);
+
+    agedge(gv, predNode, succNode, nullptr, 1);
+  }
+
+  // Write to DOT file
+  FILE *fs = fopen(fileName.c_str(), "w");
+  if (!fs) {
+    llvm::errs() << "Failed to write file\n";
+  }
+
+  agwrite(gv, fs);
+  fclose(fs);
 }
 
 CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {

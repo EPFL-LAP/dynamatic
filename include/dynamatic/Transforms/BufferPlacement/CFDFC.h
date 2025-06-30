@@ -23,6 +23,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -55,6 +56,8 @@ struct CFDFC {
   // block. The distinction is important for the buffer placement MILP, which
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
+
+  void writeDot(const std::string &fileName);
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
