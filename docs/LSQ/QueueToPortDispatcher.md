@@ -153,7 +153,7 @@ The Queue-to-Port Dispatcher has the following core responsibilities (with 3-por
         - Checks each entry (row) of `entry_port_hs` whether it has `1` in a given row `e`. It means that entry `e` sent its data to some port.
         - Performs an OR operation across each row.
     - **Output**: 
-        - `entry_reset_o`: When the queue receives this signal, it de-allocates the corresponding entry, making it available for a new operation.
+        - `entry_reset_o`: When the queue receives this signal, it de-allocates the corresponding entry, making it available for a new operation. However, this de-allocating logic is not in the dispatcher module but outside of it.
 
 
 
