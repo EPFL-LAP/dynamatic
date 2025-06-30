@@ -9,7 +9,7 @@
 // FPL'22 smart buffer placement, as presented in
 // https://ieeexplore.ieee.org/abstract/document/10035122
 //
-// This mainly declares the `FPL22Placement` class, which inherits the abstract
+// This file declares the `FPL22Placement` class, which inherits the abstract
 // `BufferPlacementMILP` class to setup and solve a real MILP from which
 // buffering decisions can be made. Every public member declared in this file is
 // under the `dynamatic::buffer::fpl22` namespace, as to not create name

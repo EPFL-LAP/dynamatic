@@ -25,7 +25,7 @@ end entity;
 
 architecture arch of mulf is
 
-  component array_RAM_fmul_32cud is
+  component mulf_vitis_hls_wrapper is
     generic (
       ID         : integer := 1;
       NUM_STAGE  : integer := 6;
@@ -81,7 +81,7 @@ begin
       outs(0)    => oehb_dataOut
     );
 
-  array_RAM_fmul_32ns_32ns_32_6_max_dsp_1_U1 : component array_RAM_fmul_32cud
+  array_RAM_fmul_32ns_32ns_32_6_max_dsp_1_U1 : component mulf_vitis_hls_wrapper
     port map(
       clk   => clk,
       reset => rst,
@@ -151,7 +151,7 @@ USE ieee.numeric_std.ALL;
 LIBRARY floating_point_v7_1_8;
 USE floating_point_v7_1_8.floating_point_v7_1_8;
 
-ENTITY array_RAM_ap_fmul_4_max_dsp_32 IS
+ENTITY mulf_vitis_hls_single_precision_lat_4 IS
   PORT (
     aclk : IN STD_LOGIC;
     aclken : IN STD_LOGIC;
@@ -162,11 +162,11 @@ ENTITY array_RAM_ap_fmul_4_max_dsp_32 IS
     m_axis_result_tvalid : OUT STD_LOGIC;
     m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
-END array_RAM_ap_fmul_4_max_dsp_32;
+END mulf_vitis_hls_single_precision_lat_4;
 
-ARCHITECTURE array_RAM_ap_fmul_4_max_dsp_32_arch OF array_RAM_ap_fmul_4_max_dsp_32 IS
+ARCHITECTURE mulf_vitis_hls_single_precision_lat_4_arch OF mulf_vitis_hls_single_precision_lat_4 IS
   ATTRIBUTE DowngradeIPIdentifiedWarnings : STRING;
-  ATTRIBUTE DowngradeIPIdentifiedWarnings OF array_RAM_ap_fmul_4_max_dsp_32_arch: ARCHITECTURE IS "yes";
+  ATTRIBUTE DowngradeIPIdentifiedWarnings OF mulf_vitis_hls_single_precision_lat_4_arch: ARCHITECTURE IS "yes";
   COMPONENT floating_point_v7_1_8 IS
     GENERIC (
       C_XDEVICEFAMILY : STRING;
@@ -396,7 +396,7 @@ BEGIN
       m_axis_result_tready => '0',
       m_axis_result_tdata => m_axis_result_tdata
     );
-END array_RAM_ap_fmul_4_max_dsp_32_arch;
+END mulf_vitis_hls_single_precision_lat_4_arch;
 
 
 -- ==============================================================
@@ -406,7 +406,7 @@ END array_RAM_ap_fmul_4_max_dsp_32_arch;
 Library ieee;
 use ieee.std_logic_1164.all;
 
-entity array_RAM_fmul_32cud is
+entity mulf_vitis_hls_wrapper is
     generic (
         ID         : integer := 2;
         NUM_STAGE  : integer := 6;
@@ -424,9 +424,9 @@ entity array_RAM_fmul_32cud is
     );
 end entity;
 
-architecture arch of array_RAM_fmul_32cud is
+architecture arch of mulf_vitis_hls_wrapper is
     --------------------- Component ---------------------
-    component array_RAM_ap_fmul_4_max_dsp_32 is
+    component mulf_vitis_hls_single_precision_lat_4 is
         port (
             aclk                 : in  std_logic;
             aclken               : in  std_logic;
@@ -454,7 +454,7 @@ architecture arch of array_RAM_fmul_32cud is
     signal dout_r    : std_logic_vector(dout_WIDTH-1 downto 0);
 begin
     --------------------- Instantiation -----------------
-    array_RAM_ap_fmul_4_max_dsp_32_u : entity work.array_RAM_ap_fmul_4_max_dsp_32
+    mulf_vitis_hls_single_precision_lat_4_u : entity work.mulf_vitis_hls_single_precision_lat_4
     port map (
         aclk                 => aclk,
         aclken               => aclken,
