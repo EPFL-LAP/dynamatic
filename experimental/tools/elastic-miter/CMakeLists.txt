@@ -28,5 +28,3 @@ target_link_libraries(elastic-miter
   MLIRSupport
   MLIRTransforms
 )
-
-add_subdirectory(cex2csv)

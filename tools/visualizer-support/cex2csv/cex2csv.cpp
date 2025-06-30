@@ -11,14 +11,9 @@
 // experimental/tools/elastic-miter/CMakeLists.txt
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/HW/PortImplementation.h"
+#include "../VisualizerSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -29,7 +24,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -39,7 +33,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
-#include <optional>
 #include <regex>
 #include <string>
 #include <system_error>
@@ -64,148 +57,6 @@ static cl::opt<std::string> resultFile(cl::Positional, cl::Required,
 static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::desc("<kernel name>"), cl::init(""),
                                        cl::cat(mainCategory));
-
-namespace {
-
-enum class WireState { UNDEFINED, LOGIC_0, LOGIC_1 };
-
-struct SignalInfo {
-  std::string signalName;
-  std::string srcComponent;
-  unsigned srcPortID;
-  std::string dstComponent;
-  unsigned dstPortID;
-
-  SignalInfo(Value val, StringRef signalName);
-};
-
-struct ChannelState {
-  Type type;
-
-  WireState valid = WireState::UNDEFINED;
-  WireState ready = WireState::UNDEFINED;
-  std::vector<WireState> data;
-
-  ChannelState(Type type)
-      : type(type), data(std::vector{handshake::getHandshakeTypeBitWidth(type),
-                                     WireState::UNDEFINED}) {}
-
-  std::string decodeData() const {
-    if (data.empty())
-      return "";
-
-    // Build a string from the vector of bits
-    std::string dataString;
-    bool partlyUndef = false;
-    for (WireState bit : llvm::reverse(data)) {
-      switch (bit) {
-      case WireState::UNDEFINED:
-        dataString.push_back('u');
-        partlyUndef = true;
-        break;
-      case WireState::LOGIC_0:
-        dataString.push_back('0');
-        break;
-      case WireState::LOGIC_1:
-        dataString.push_back('1');
-        break;
-      }
-    }
-    if (partlyUndef)
-      return dataString;
-
-    auto channelType = cast<handshake::ChannelType>(type);
-    auto dataType = channelType.getDataType();
-    if (auto intType = dyn_cast<IntegerType>(dataType)) {
-      APInt intVal(data.size(), dataString, 2);
-      if (intType.isSigned())
-        return std::to_string(intVal.getSExtValue());
-      return std::to_string(intVal.getZExtValue());
-    }
-    if (auto floatType = dyn_cast<FloatType>(dataType)) {
-      APFloat floatVal(floatType.getFloatSemantics(), dataString);
-      return std::to_string(floatVal.convertToDouble());
-    }
-    return "undef";
-  }
-};
-} // namespace
-
-SignalInfo::SignalInfo(Value val, StringRef signalName)
-    : signalName(signalName) {
-  // Derive the source component's name and ID
-  if (auto res = dyn_cast<OpResult>(val)) {
-    Operation *producerOp = res.getOwner();
-    srcPortID = res.getResultNumber();
-    srcComponent = getUniqueName(producerOp);
-  } else {
-    auto arg = cast<BlockArgument>(val);
-    auto funcOp = cast<handshake::FuncOp>(arg.getParentBlock()->getParentOp());
-    srcPortID = arg.getArgNumber();
-    srcComponent = funcOp.getArgName(arg.getArgNumber()).str();
-  }
-
-  // Derive the destination component's name and ID
-  OpOperand &oprd = *val.getUses().begin();
-  Operation *consumerOp = oprd.getOwner();
-  if (!isa<MemRefType>(oprd.get().getType()))
-    dstPortID = oprd.getOperandNumber();
-  if (isa<handshake::EndOp>(consumerOp)) {
-    auto funcOp = cast<handshake::FuncOp>(val.getParentBlock()->getParentOp());
-    dstComponent = funcOp.getResName(oprd.getOperandNumber()).str();
-  } else {
-    dstComponent = getUniqueName(consumerOp);
-  }
-}
-
-static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
-                                        llvm::StringMap<Value> &ports) {
-  // Extract the non-external Handshake function from the module
-  handshake::FuncOp funcOp = nullptr;
-  for (auto op : modOp.getOps<handshake::FuncOp>()) {
-    if (op.isExternal())
-      continue;
-    if (funcOp) {
-      return modOp.emitError() << "we currently only support one non-external "
-                                  "handshake function per module";
-    }
-    funcOp = op;
-  }
-  if (!funcOp)
-    return modOp.emitError() << "No Handshake function in input module";
-
-  // Make sure all operations inside the function have names
-  NameAnalysis namer(funcOp);
-  if (!namer.areAllOpsNamed()) {
-    return funcOp.emitError() << "Not all operations in the function have "
-                                 "names, this is a requirement";
-  }
-
-  // First associate names to all function arguments
-  handshake::PortNamer argNameGen(funcOp);
-  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-    ports.insert({argNameGen.getInputName(idx), arg});
-
-  // Then associate names to each operation's results
-  for (Operation &op : funcOp.getOps()) {
-    handshake::PortNamer opNameGen(&op);
-    for (auto [idx, oprd] : llvm::enumerate(op.getOperands())) {
-      std::string signalName =
-          getUniqueName(&op).str() + "_" + opNameGen.getInputName(idx).str();
-      ports.insert({signalName, oprd});
-    }
-    for (auto [idx, res] : llvm::enumerate(op.getResults())) {
-      std::string signalName =
-          getUniqueName(&op).str() + "_" + opNameGen.getOutputName(idx).str();
-      ports.insert({signalName, res});
-    }
-  }
-
-  return success();
-}
-
-static constexpr StringLiteral ACCEPT("accept"), STALL("stall"),
-    TRANSFER("transfer"), IDLE("idle"), UNDEFINED("undefined");
 
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
@@ -240,11 +91,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  llvm::outs() << "cycle, src_component, src_port, dst_component, dst_port, "
-                  "state, data\n";
+  writeCSVHeader(llvm::outs());
 
   llvm::StringMap<Value> signalNameToValue;
-  if (failed(mapSignalsToValues(*modOp, signalNameToValue)))
+  if (failed(mapSignalsToValues(*modOp, signalNameToValue, true)))
     return 1;
 
   mlir::DenseMap<Value, SignalInfo> valueToSignalInfo;
@@ -281,28 +131,10 @@ int main(int argc, char **argv) {
     if (foundCex) {
       StringRef trimmedLine = lineRef.trim();
       if (trimmedLine.starts_with("-> State:")) {
-        for (Value val : toUpdate) {
-          const ChannelState &channelState = state.at(val);
-          WireState valid = channelState.valid;
-          WireState ready = channelState.ready;
-
-          StringRef dataflowState;
-          if (valid != WireState::LOGIC_1 && ready == WireState::LOGIC_1)
-            dataflowState = ACCEPT;
-          else if (valid == WireState::LOGIC_1)
-            dataflowState = ready != WireState::LOGIC_1 ? STALL : TRANSFER;
-          else if (valid == WireState::LOGIC_0 && ready == WireState::LOGIC_0)
-            dataflowState = IDLE;
-          else
-            dataflowState = UNDEFINED;
-
-          const SignalInfo &info = valueToSignalInfo.at(val);
-          llvm::outs() << cycle << ", " << info.srcComponent << ", "
-                       << info.srcPortID << ", " << info.dstComponent << ", "
-                       << info.dstPortID << ", " << dataflowState.str() << ", "
-                       << channelState.decodeData() << "\n";
-        }
+        writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
+                                 valueToSignalInfo);
         toUpdate.clear();
+
         // Update the cycle
         // trimmedLine is: -> State: 2.1 <-
         // Extract the "1"
@@ -394,26 +226,8 @@ int main(int argc, char **argv) {
       }
     }
   }
-  for (Value val : toUpdate) {
-    const ChannelState &channelState = state.at(val);
-    WireState valid = channelState.valid;
-    WireState ready = channelState.ready;
+  writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
+                           valueToSignalInfo);
 
-    StringRef dataflowState;
-    if (valid != WireState::LOGIC_1 && ready == WireState::LOGIC_1)
-      dataflowState = ACCEPT;
-    else if (valid == WireState::LOGIC_1)
-      dataflowState = ready != WireState::LOGIC_1 ? STALL : TRANSFER;
-    else if (valid == WireState::LOGIC_0 && ready == WireState::LOGIC_0)
-      dataflowState = IDLE;
-    else
-      dataflowState = UNDEFINED;
-
-    const SignalInfo &info = valueToSignalInfo.at(val);
-    llvm::outs() << cycle << ", " << info.srcComponent << ", " << info.srcPortID
-                 << ", " << info.dstComponent << ", " << info.dstPortID << ", "
-                 << dataflowState.str() << ", " << channelState.decodeData()
-                 << "\n";
-  }
   return 0;
 }
