@@ -31,7 +31,8 @@ namespace dynamatic::experimental {
 // 3. At a certain point, and from then on, all input buffer pair store the same
 // number of tokens.
 static std::string createMiterProperties(const std::string &moduleName,
-                                         const ElasticMiterConfig &config) {
+                                         const ElasticMiterConfig &config,
+                                         size_t nrOfTokens) {
   std::ostringstream properties;
 
   // Create the property that every output data token will be TRUE. The outputs
@@ -53,14 +54,28 @@ static std::string createMiterProperties(const std::string &moduleName,
   // This means both circuits consume the same number of tokens.
   SmallVector<std::string> bufferProperties;
   for (const auto &[lhsBuffer, rhsBuffer] : config.inputBuffers) {
-    bufferProperties.push_back(llvm::formatv("({0}.{1}.data = {0}.{2}.data)",
-                                             moduleName, lhsBuffer, rhsBuffer)
-                                   .str());
+    if (nrOfTokens > 1) {
+      bufferProperties.push_back(
+          llvm::formatv("({0}.{1}.inner_elastic_fifo.head = "
+                        "{0}.{2}.inner_elastic_fifo.head)",
+                        moduleName, lhsBuffer, rhsBuffer)
+              .str());
+      bufferProperties.push_back(
+          llvm::formatv("({0}.{1}.inner_elastic_fifo.tail = "
+                        "{0}.{2}.inner_elastic_fifo.tail)",
+                        moduleName, lhsBuffer, rhsBuffer)
+              .str());
+    } else {
+      bufferProperties.push_back(llvm::formatv("({0}.{1}.data = {0}.{2}.data)",
+                                               moduleName, lhsBuffer, rhsBuffer)
+                                     .str());
+    }
   }
 
   // Make sure the output buffers will be empty.
   // This means both circuits produce the same number of output tokens.
   for (const auto &[lhsBuffer, rhsBuffer] : config.outputBuffers) {
+    // When outs_valid is false, the buffer is empty.
     bufferProperties.push_back(
         llvm::formatv("(!{0}.{1}.outs_valid)", moduleName, lhsBuffer).str());
     bufferProperties.push_back(
@@ -89,15 +104,7 @@ std::string createElasticMiterTestBench(
     bool generateExactNrOfTokens) {
   std::ostringstream wrapper;
 
-  // replace all arguments' type with boolean
-  SmallVector<std::pair<std::string, Type>> arguments;
-  Type i1Type = IntegerType::get(&context, 1);
-  for (auto [argName, _] : config.arguments) {
-    auto newArg = std::make_pair(argName, ChannelType::get(i1Type, {}));
-    arguments.push_back(newArg);
-  }
-
-  const SmvTestbenchConfig smvConfig = {.arguments = arguments,
+  const SmvTestbenchConfig smvConfig = {.arguments = config.arguments,
                                         .results = config.results,
                                         .modelSmvName = modelSmvName,
                                         .nrOfTokens = nrOfTokens,
@@ -107,7 +114,7 @@ std::string createElasticMiterTestBench(
 
   wrapper << createSmvFormalTestbench(smvConfig);
   if (includeProperties) {
-    wrapper << createMiterProperties(modelSmvName, config);
+    wrapper << createMiterProperties(modelSmvName, config, nrOfTokens);
 
     if (sequenceConstraints) {
       for (const auto &constraint : *sequenceConstraints) {

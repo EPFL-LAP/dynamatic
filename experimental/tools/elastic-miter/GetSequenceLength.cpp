@@ -178,8 +178,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
   }
 
   // Convert the circuit to SMV
-  auto failOrSmvPair =
-      dynamatic::experimental::handshake2smv(reachabilityMlirPath, outputDir);
+  auto failOrSmvPair = dynamatic::experimental::handshake2smv(
+      reachabilityMlirPath, outputDir, true);
   if (failed(failOrSmvPair))
     return failure();
   std::string smvFilename = config.funcName + ".smv";

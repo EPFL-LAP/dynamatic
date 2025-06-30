@@ -132,7 +132,8 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 }
 
 LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
-                            const std::filesystem::path &outputDir) {
+                            const std::filesystem::path &outputDir,
+                            bool generateCircuitPng) {
 
   std::filesystem::path hwFile = outputDir / "hw.mlir";
 
@@ -153,6 +154,28 @@ LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
   if (ret != 0) {
     llvm::errs() << "Failed to convert to SMV\n";
     return failure();
+  }
+
+  // Convert the handshake to dot
+  // Used by the counterexample visualizer
+  std::filesystem::path dotFile = outputDir / "model.dot";
+  cmd = "bin/export-dot " + mlirPath.string() + " --edge-style=spline";
+  ret = executeWithRedirect(cmd, dotFile);
+  if (ret != 0) {
+    llvm::errs() << "Failed to convert to dot\n";
+    return failure();
+  }
+
+  if (generateCircuitPng) {
+    // Optionally, generate a visual representation of the circuit from the
+    // generated dotfile
+    std::filesystem::path pngFile = outputDir / "model.png";
+    cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
+    ret = executeWithRedirect(cmd, "/dev/null");
+    if (ret != 0) {
+      llvm::errs() << "Failed to convert to PNG\n";
+      return failure();
+    }
   }
 
   return success();

@@ -56,7 +56,8 @@ int runSmvCmd(const std::filesystem::path &cmdPath,
 // in outputDir. Either failed() or a pair with the path to the top level SMV
 // file and the name of the generated SMV module, is returned.
 LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
-                            const std::filesystem::path &outputDir);
+                            const std::filesystem::path &outputDir,
+                            bool generateCircuitPng = false);
 
 } // namespace dynamatic::experimental
 #endif
