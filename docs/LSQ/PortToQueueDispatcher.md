@@ -246,3 +246,4 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - For `Port 1`, the active requests are from `Entry 0` and `Entry 2` (`0101`, the middle column of `entry_port_options`). Since the head of the queue is at `Entry 2`, it is the oldest entry. `Entry 0` is masked out by `CyclicPriorityMasking`.
     
     As a result, the `entry_wen_o` signal is asserted for both `Entry 0` and `Entry 3`, allowing two writes to proceed in parallel in the same clock cycle.
+
