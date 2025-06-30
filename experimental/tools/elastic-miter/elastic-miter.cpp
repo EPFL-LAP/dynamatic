@@ -272,7 +272,10 @@ int main(int argc, char **argv) {
   std::filesystem::path rhsPath = rhsFilenameArg.getValue();
   std::filesystem::path outputDir = outputDirArg.getValue();
 
-  // Create the outputDir if it doesn't exist
+  // Clear the outputDir if it exists
+  if (std::filesystem::exists(outputDir)) {
+    std::filesystem::remove_all(outputDir);
+  }
   std::filesystem::create_directories(outputDir);
 
   auto failOrEquivalent = checkEquivalence(context, lhsPath, rhsPath, outputDir,
