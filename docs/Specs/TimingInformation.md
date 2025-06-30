@@ -19,7 +19,8 @@ We classify combinational delays into two categories:
 
 This difference is a key distinction between **pipelined** and **non-pipelined** operations. Consider the following graph :
 
-![image](https://github.com/user-attachments/assets/1b980703-40e6-4331-9932-24d624bbbbb9)
+![image](https://github.com/user-attachments/assets/c6d2961c-f4ba-47ed-a7a0-6201314f9530)
+
 
 
 In the pipelined case (i.e., when latency > 0), registers are placed along the paths between input and output ports. As a result, these paths no longer have any intra-port delays, since there are no purely combinational routes connecting inputs directly to outputs. However, port2reg delays still exist on these paths — capturing the combinational delays between an input port and the first register stage, and between the last register stage and an output port. In the figure, the inport and outport delays illustrate these port2reg delays.
