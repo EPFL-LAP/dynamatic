@@ -144,7 +144,7 @@ First of all, the buffering algorithm only targets handshake-typed edges (either
 
 Additionally, the following handshake-typed edges are excluded from buffering:
 - Top-level function arguments: External channels do not require buffering.
-- Channels of operations implementing MemoryOpInterface (MemoryControllerOp, LSQOp): (TODO: Why?)
+- Channels of operations implementing MemoryOpInterface (MemoryControllerOp, LSQOp): The optimization model is not aware of these channels.
 
 For these channels, both `maxOpaque` and `maxTrans` are set to 0.
 

@@ -167,7 +167,8 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
     if (isa<handshake::ControlType, handshake::ChannelType>(arg.getType()))
       makeUnbufferizable(arg);
 
-  // Ports of memory interfaces are unbufferizable
+  // Ports of operations implementing MemoryOpInterface are ignored by the
+  // buffering algorithm.
   for (auto memOp : funcOp.getOps<handshake::MemoryOpInterface>()) {
     FuncMemoryPorts ports = getMemoryPorts(memOp);
     for (size_t i = 0, e = ports.getNumGroups(); i < e; ++i) {
