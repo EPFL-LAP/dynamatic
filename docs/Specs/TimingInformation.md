@@ -178,7 +178,7 @@ The TimingDatabase provides several core methods:
 
 4.  **[LogicalResult getLatency(Operation *op, SignalType signalType, double &latency)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L114)**: queries the latency of a certain operation `op` for output port of type `signalType` and it saves the latency as unsigned cycle count in the `latency` variable.
 
-5. **[LogicalResult getInternalDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L143)**: queries the internal delay of a certain operation `op` for output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
+5. **[LogicalResult getInternalDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L143)**: queries the reg2reg internal delay of a certain operation `op` for output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
 
 6. **[LogicalResult getPortDelay(Operation *op, SignalType signalType, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/main/lib/Support/TimingModels.cpp#L161)**: queries the port2reg delay of a certain operation `op` for input/output port of type `signalType` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
 
@@ -222,7 +222,7 @@ The functions of BitwidthDepMetric is the following:    %57 = addf %56, %54 {fas
 
 # Timing Information in the IRs
 
-Timing information is generally used immediately upon being obtained, for instance latency is obtained for the MILP solver during the buffer placement stage. However, internal delay must be made available in the backend to select the correct implementation to instantiate, but depends on targetCP which isn't known in the backend. 
+Timing information is generally used immediately upon being obtained, for instance latency is obtained for the MILP solver during the buffer placement stage. However, the reg2eg internal delay must be made available in the backend to select the correct implementation to instantiate, but depends on targetCP which isn't known in the backend. 
 
 Therefore, internal delay is added as an attribute to arithmetic ops in the IR at the end of the buffer placement stage, and is represented in the hardware IR. The value given is chosen using getDelayCeilValue, ensuring the choice passed into the IR is the same one that was made at any other point with getDelayCeilMetric. 
 
