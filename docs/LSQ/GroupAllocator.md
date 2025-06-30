@@ -194,30 +194,30 @@ This block generates the correctly aligned port indices for the newly allocated 
 
 * **Load Port Index (`ldq_port_idx_o`):**
     1.  **ROM Lookup & Padding:** It fetches `gaLdPortIdx[0]`, which is `[0, 1, 2]`. This means that `load0_0` (Group0's 0th load), `load0_1` (Group0's 1st load), and `load0_2` (Group0's 2nd load) use `Port 0`, `Port 1`, and `Port 2` respectively. Since the load queue has 6 entries, this is padded to create the intermediate vector `ldq_port_idx_rom = [0, 1, 2, 0, 0, 0]`.
-    2.  **CyclicLeftShift:** This `[0, 1, 2, 0, 0, 0]` vector is then cyclically shifted left by the `ldq_tail` value, which is `1`. This means the first element (`0`) moves to the end, and all other elements shift left, resulting in **`[0, 0, 1, 2, 0, 0, 0]`**.
-    3. **Final Matrix Output (6x2)**: This result is converted into the final 6x2 matrix (`ldpAddrW=2`), where each number represents a 2-bit port index:
+    2.  **CyclicLeftShift:** This `[0, 1, 2, 0, 0, 0]` vector is then cyclically shifted left by the `ldq_tail` value, which is `1`. This means the first element (`0`) moves to the end, and all other elements shift left, resulting in **`[0, 0, 1, 2, 0, 0]`**.
+    3. **Final Matrix Output (6x4)**: This result is converted into the final 6x4 matrix (`ldpAddrW=4`), where each number represents a 2-bit port index:
 
       ldq_port_idx_o =
       [
-        "00", // Physical Entry 0
-        "00", // Physical Entry 1
-        "01", // Physical Entry 2
-        "10", // Physical Entry 3
-        "00", // Physical Entry 4
-        "00"  // Physical Entry 5
+        "0000", // Physical Entry 0
+        "0000", // Physical Entry 1
+        "0001", // Physical Entry 2
+        "0010", // Physical Entry 3
+        "0000", // Physical Entry 4
+        "0000"  // Physical Entry 5
       ]
 
 * **Store Port Index (`stq_port_idx_o`):**
     1.  **ROM Lookup & Padding:** It fetches `gaStPortIdx[0]`, which is `[0, 1]`. This is padded to the 4-entry store queue length to become `[0, 1, 0, 0]`.
     2.  **Cyclic Left Shift:** This `[0, 1, 0, 0]` vector is shifted left by the `stq_tail` value (`1`), resulting in **`[0, 0, 1, 0]`**.
-    3. **Final Matrix Output (4x2)**: This is converted into the final 4x2 matrix:
+    3. **Final Matrix Output (4x4)**: This is converted into the final 4x4 matrix:
 
       stq_port_idx_o =
       [
-        "00", // Physical Entry 0
-        "00", // Physical Entry 1
-        "01", // Physical Entry 2
-        "00"  // Physical Entry 3
+        "0000", // Physical Entry 0
+        "0000", // Physical Entry 1
+        "0001", // Physical Entry 2
+        "0000"  // Physical Entry 3
       ]
 
 
