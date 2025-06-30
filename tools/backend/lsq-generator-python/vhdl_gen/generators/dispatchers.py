@@ -429,9 +429,9 @@ class QueueToPortDispatcher:
                 ctx, 'port_bits', 'o', self.numPorts, self.bitsW)
         port_valid_o = LogicArray(ctx, 'port_valid', 'o', self.numPorts)
         port_ready_i = LogicArray(ctx, 'port_ready', 'i', self.numPorts)
-        entry_valid_i = LogicArray(ctx, 'entry_valid', 'i', self.numEntries)
-        entry_bits_valid_i = LogicArray(
-            ctx, 'entry_bits_valid', 'i', self.numEntries)
+        entry_alloc_i = LogicArray(ctx, 'entry_alloc', 'i', self.numEntries)
+        entry_payload_valid_i = LogicArray(
+            ctx, 'entry_payload_valid', 'i', self.numEntries)
         if (self.numPorts != 1):
             entry_port_idx_i = LogicVecArray(
                 ctx, 'entry_port_idx', 'i', self.numEntries, self.portAddrW)
@@ -442,45 +442,45 @@ class QueueToPortDispatcher:
         queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', self.numEntries)
 
         # one-hot port index
-        entry_port_valid = LogicVecArray(
-            ctx, 'entry_port_valid', 'w', self.numEntries, self.numPorts)
+        entry_port_idx_oh = LogicVecArray(
+            ctx, 'entry_port_idx_oh', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             if (self.numPorts == 1):
-                arch += Op(ctx, entry_port_valid[i], 1)
+                arch += Op(ctx, entry_port_idx_oh[i], 1)
             else:
-                arch += BitsToOH(ctx, entry_port_valid[i], entry_port_idx_i[i])
+                arch += BitsToOH(ctx, entry_port_idx_oh[i], entry_port_idx_i[i])
 
         # This matrix shows entry-port pairs that the entry is linked with the port
-        entry_port_request = LogicVecArray(
-            ctx, 'entry_port_request', 'w', self.numEntries, self.numPorts)
+        entry_waiting_for_port = LogicVecArray(
+            ctx, 'entry_waiting_for_port', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
-            arch += Op(ctx, entry_port_request[i], entry_port_valid[i],
-                       'when', entry_valid_i[i], 'else', 0)
+            arch += Op(ctx, entry_waiting_for_port[i], entry_port_idx_oh[i],
+                       'when', entry_alloc_i[i], 'else', 0)
 
         # For each port, the oldest entry send bits this cycle. The priority masking per port(column)
         # generates entry-port pairs that will tranfer data/address this cycle.
         # It is also used as one-hot select signal for data Mux.
-        entry_port_request_prio = LogicVecArray(
-            ctx, 'entry_port_request_prio', 'w', self.numEntries, self.numPorts)
-        arch += CyclicPriorityMasking(ctx, entry_port_request_prio,
-                                      entry_port_request, queue_head_oh_i)
+        entry_waiting_for_port_prio = LogicVecArray(
+            ctx, 'entry_waiting_for_port_prio', 'w', self.numEntries, self.numPorts)
+        arch += CyclicPriorityMasking(ctx, entry_waiting_for_port_prio,
+                                      entry_waiting_for_port, queue_head_oh_i)
 
         if (self.bitsW != 0):
             for j in range(0, self.numPorts):
                 arch += Mux1H(ctx, port_bits_o[j],
-                              entry_bits_i, entry_port_request_prio, j)
+                              entry_bits_i, entry_waiting_for_port_prio, j)
 
         # Mask the matrix with dataValid
-        entry_port_request_valid = LogicVecArray(
-            ctx, 'entry_port_request_valid', 'w', self.numEntries, self.numPorts)
+        entry_waiting_for_port_valid = LogicVecArray(
+            ctx, 'entry_waiting_for_port_valid', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
-            arch += Op(ctx, entry_port_request_valid[i], entry_port_request_prio[i],
-                       'when', entry_bits_valid_i[i], 'else', 0)
+            arch += Op(ctx, entry_waiting_for_port_valid[i], entry_waiting_for_port_prio[i],
+                       'when', entry_payload_valid_i[i], 'else', 0)
 
         # Reduce the matrix for each port to get the valid signal:
         # If an entry is providing data/address from a certain port, valid is set high.
         port_valid_vec = LogicVec(ctx, 'port_valid_vec', 'w', self.numPorts)
-        arch += Reduce(ctx, port_valid_vec, entry_port_request_valid, 'or')
+        arch += Reduce(ctx, port_valid_vec, entry_waiting_for_port_valid, 'or')
         arch += VecToArray(ctx, port_valid_o, port_valid_vec)
 
         # AND the request signal with ready, it shows entry-port pairs that are both valid and ready.
@@ -489,7 +489,7 @@ class QueueToPortDispatcher:
         for i in range(0, self.numEntries):
             for j in range(0, self.numPorts):
                 arch += ctx.get_current_indent() + f'{entry_port_hs.getNameWrite(i, j)} <= ' \
-                    f'{entry_port_request_valid.getNameRead(i, j)} and {port_ready_i.getNameRead(j)};\n'
+                    f'{entry_waiting_for_port_valid.getNameRead(i, j)} and {port_ready_i.getNameRead(j)};\n'
 
         # Reduce for each entry(row), which generates reset signal for entries
         for i in range(0, self.numEntries):
@@ -516,8 +516,8 @@ class QueueToPortDispatcher:
         port_bits_o:        LogicVecArray,
         port_valid_o:       LogicArray,
         port_ready_i:       LogicArray,
-        entry_valid_i:      LogicArray,
-        entry_bits_valid_i: LogicArray,
+        entry_alloc_i:      LogicArray,
+        entry_payload_valid_i: LogicArray,
         entry_port_idx_i:   LogicVecArray,
         entry_bits_i:       LogicVecArray,
         entry_reset_o:      LogicArray,
@@ -535,8 +535,8 @@ class QueueToPortDispatcher:
             port_bits_o          : Output data bits from each queue entry
             port_valid_o         : Valid signal for each input port (Valid data)
             port_ready_i         : Ready signal indicating the queue is ready to send data
-            entry_valid_i        : Valid bit for a queue entry
-            entry_bits_valid_i   : Valid bit for the contents of a queue entry
+            entry_alloc_i        : Valid bit for a queue entry
+            entry_payload_valid_i   : Valid bit for the contents of a queue entry
             entry_port_idx_i     : Indicates to which port the entry is assigned
             entry_bits_i         : Input data bits which is written in the queue entry
             entry_reset_o        : Array of reset outputs for entries.
@@ -555,8 +555,8 @@ class QueueToPortDispatcher:
                 port_bits_o         = ldp_data_o,
                 port_valid_o        = ldp_data_valid_o,
                 port_ready_i        = ldp_data_ready_i,
-                entry_valid_i       = ldq_valid,
-                entry_bits_valid_i  = ldq_data_valid,
+                entry_alloc_i       = ldq_valid,
+                entry_payload_valid_i  = ldq_data_valid,
                 entry_port_idx_i    = ldq_port_idx,
                 entry_bits_i        = ldq_data,
                 entry_reset_o       = ldq_reset,
@@ -579,10 +579,10 @@ class QueueToPortDispatcher:
                         port_ready_1_i => ldp_data_ready_1_i,
                         port_valid_0_o => ldp_data_valid_0_o,
                         port_valid_1_o => ldp_data_valid_1_o,
-                        entry_valid_0_i => ldq_valid_0_q,
-                        entry_valid_1_i => ldq_valid_1_q,
-                        entry_bits_valid_0_i => ldq_data_valid_0_q,
-                        entry_bits_valid_1_i => ldq_data_valid_1_q,
+                        entry_alloc_0_i => ldq_valid_0_q,
+                        entry_alloc_1_i => ldq_valid_1_q,
+                        entry_payload_valid_0_i => ldq_data_valid_0_q,
+                        entry_payload_valid_1_i => ldq_data_valid_1_q,
                         entry_port_idx_0_i => ldq_port_idx_0_q,
                         entry_port_idx_1_i => ldq_port_idx_1_q,
                         entry_bits_0_i => ldq_data_0_q,
@@ -614,10 +614,10 @@ class QueueToPortDispatcher:
                 f'port_valid_{i}_o => {port_valid_o.getNameWrite(i)},\n'
         for i in range(0, self.numEntries):
             arch += ctx.get_current_indent() + \
-                f'entry_valid_{i}_i => {entry_valid_i.getNameRead(i)},\n'
+                f'entry_alloc_{i}_i => {entry_alloc_i.getNameRead(i)},\n'
         for i in range(0, self.numEntries):
             arch += ctx.get_current_indent() + \
-                f'entry_bits_valid_{i}_i => {entry_bits_valid_i.getNameRead(i)},\n'
+                f'entry_payload_valid_{i}_i => {entry_payload_valid_i.getNameRead(i)},\n'
         for i in range(0, self.numEntries):
             if (self.numPorts != 1):
                 arch += ctx.get_current_indent() + \
