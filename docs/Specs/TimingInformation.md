@@ -15,6 +15,8 @@ We classify combinational delays into two categories:
 
 - **Port2Reg delays**: Combinational delays either from an input port to the first register stage, or from the last register stage to an output port. These capture the logic surrounding the sequential boundaries of an operator.
 
+- **Reg2Reg delay** : The longest combinational path delay within a single operator — i.e., the time it takes for signals to propagate through the most complex logic path inside that operator without being interrupted by clocked elements. While the above focuses on delays relevant to relative placement and timing of operators, the operating frequency of the entire circuit is ultimately limited by the operating frequency of the slowest operator, which is defined as the inverse of this internal delay.
+
 This difference is a key distinction between **pipelined** and **non-pipelined** operations. Consider the following graph :
 
 ![image](https://github.com/user-attachments/assets/1b980703-40e6-4331-9932-24d624bbbbb9)
@@ -38,7 +40,6 @@ The combinational delays can connect ports of the same or different types. The o
 
 **Note** : The current code does not seem to use the information related to inport and outport delays. Furthermore all the port delays are 0 for all listed components. We assume this is the intended behaviour for now. We welcome a change to this documentation if the code structure changes. 
 
-**Internal combinational delay** : The longest combinational path delay within a single operator — i.e., the time it takes for signals to propagate through the most complex logic path inside that operator without being interrupted by clocked elements. While the above focuses on delays relevant to relative placement and timing of operators, the operating frequency of the entire circuit is ultimately limited by the operating frequency of the slowest operator, which is defined as the inverse of this internal delay.
 
 
 ## Where Timing Data is Stored
@@ -216,7 +217,7 @@ The functions of BitwidthDepMetric is the following:    %57 = addf %56, %54 {fas
 
 1. **LogicalResult [getDelayCeilMetric(double targetPeriod, M &metric)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L109)**: finds the highest delay that does not exceed the targetPeriod and returns the corresponding metric value. This selects the fastest implementation that still meets timing constraints. If no suitable delay is found, falls back to the lowest available delay with a critical warning.
 
-2. **LogicalResult [getDelayCeilValue(double targetPeriod, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L142)**: similar to getDelayCeilMetric but returns the delay value itself rather than the associated metric. Finds the highest delay that is less than or equal to targetPeriod, or falls back to the minimum delay if no suitable option exists.
+2. **LogicalResult [getDelayCeilValue(double targetPeriod, double &delay)](https://github.com/EPFL-LAP/dynamatic/blob/doc_branch_2/include/dynamatic/Support/TimingModels.h#L142)**: similar to getDelayCeilMetric but returns the delay value itself rather than the associated metric. Finds the highest delay that is less than or equal to targetPeriod, or falls back to the minimum delay if no suitable option exists.w
 
 
 # Timing Information in the IRs
