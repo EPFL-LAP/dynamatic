@@ -166,9 +166,9 @@ LogicalResult handshake2smv(const std::filesystem::path &mlirPath,
     return failure();
   }
 
+  // Optionally, generate a visual representation of the circuit from the
+  // generated dotfile
   if (generateCircuitPng) {
-    // Optionally, generate a visual representation of the circuit from the
-    // generated dotfile
     std::filesystem::path pngFile = outputDir / "model.png";
     cmd = "dot -Tpng " + dotFile.string() + " -o " + pngFile.string();
     ret = executeWithRedirect(cmd, "/dev/null");
