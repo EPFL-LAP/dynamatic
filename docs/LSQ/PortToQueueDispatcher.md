@@ -103,7 +103,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
     - **Input**:  
          - `port_bits_i`: `N_PORTS` of the address or data payload from all access ports.
          - `entry_port_idx_oh`: The one-hot port assignment for each queue entry, used as the select signal.
-    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the corresponding `entry_port_idx_oh` one-hot vector to select one payload from `port_bits_i`.
+    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the respective `entry_port_idx_oh` one-hot vector to select one payload from `port_bits_i`.
     - **Output**:  
         - `entry_bits_o`: The selected payload of each queue entry.
 
@@ -131,8 +131,8 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - `entry_waiting_for_port`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
         - `port_valid_i`: The incoming port valid signals from each external port.
     - **Processing**:  
-        - Ready Generation: It determines if any queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
-        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the corresponding port is not valid.
+        - Ready Generation: We determine if any queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
+        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the respective port is not valid.
     - **Output**:
         - `port_ready_o`: The outgoing ready signal to each external port.
         - `entry_port_and`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
