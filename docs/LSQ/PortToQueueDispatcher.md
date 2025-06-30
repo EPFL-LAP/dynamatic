@@ -132,7 +132,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - `port_valid_i`: The incoming port valid signals from each external port.
     - **Processing**:  
         - Ready Generation: We determine if **any** queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
-        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the respective port is not valid.
+        - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the respective port is not valid. It uses `VecToArray` operations to convert `P-bit` vector into `P` 1-bit signals.
     - **Output**:
         - `port_ready_o`: The outgoing ready signal to each external port.
         - `entry_port_options`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
