@@ -113,8 +113,8 @@ MODULE {name} ({lsq_in_ports})
   memEnd_valid := inner_mc_control.memEnd_valid;
 
 {generate_mc_control(f"{name}__mc_control")}
-{_generate_nd_load_port(f"{name}__nd_load_port", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_port(f"{name}__nd_store_port", fifo_depth, addr_type, data_type)}
+{_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
 """
 
 
@@ -169,8 +169,8 @@ MODULE {name} ({lsq_in_ports})
   ldAddrToMC_valid := in_loadEn;
   ldDataFromMC_ready := TRUE;
 
-{_generate_nd_load_port(f"{name}__nd_load_port", fifo_depth, addr_type, data_type)}
-{_generate_nd_store_port(f"{name}__nd_store_port", fifo_depth, addr_type, data_type)}
+{_generate_nd_load_access(f"{name}__nd_load_access", fifo_depth, addr_type, data_type)}
+{_generate_nd_store_access(f"{name}__nd_store_access", fifo_depth, addr_type, data_type)}
 """
 
 
@@ -184,34 +184,33 @@ def _generate_lsq_core(
     fifo_depth,
 ):
     return f"""
-  -- Non-deterministic ports: they non-deterministically model all possible latencies, to account
-  -- for memeory stalls and memeory dependencies
+  -- Non-deterministic access: entity that models all possible latencies that can occur when accessing memory
   VAR
-  {"\n  ".join([f"inner_load_port_{n} : {name}__nd_load_port(ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
-  {"\n  ".join([f"inner_store_port_{n} : {name}__nd_store_port(stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
+  {"\n  ".join([f"inner_load_access_{n} : {name}__nd_load_access(ldAddr_{n}, ldAddr_{n}_valid, ldData_{n}_ready, loadData);" for n in range(num_load_ports)])}
+  {"\n  ".join([f"inner_store_access_{n} : {name}__nd_store_access(stAddr_{n}, stAddr_{n}_valid, stData_{n}, stData_{n}_valid);" for n in range(num_store_ports)])}
 
 
-  -- Checks if at least one load/store port executed an access
+  -- Checks if at least one access has happened
   DEFINE
-  in_loadEn := {" | ".join([f"inner_load_port_{n}.ldData_valid" for n in range(num_load_ports)])};
-  in_storeEn := {" | ".join([f"inner_store_port_{n}.memData_valid" for n in range(num_store_ports)])};
+  in_loadEn := {" | ".join([f"inner_load_access_{n}.ldData_valid" for n in range(num_load_ports)])};
+  in_storeEn := {" | ".join([f"inner_store_access_{n}.memData_valid" for n in range(num_store_ports)])};
   
   -- output
   DEFINE
   -- for faster model checking we ignore the ctrl signal and set it to constant TRUEs
   {"\n  ".join([f"ctrl_{n}_ready := TRUE;" for n in range(num_bbs)])}
 
-  {"\n  ".join([f"ldAddr_{n}_ready := inner_load_port_{n}.ldAddr_ready;" for n in range(num_load_ports)])}
-  {"\n  ".join([f"ldData_{n} := inner_load_port_{n}.ldData;" for n in range(num_load_ports)])}
-  {"\n  ".join([f"ldData_{n}_valid := inner_load_port_{n}.ldData_valid;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldAddr_{n}_ready := inner_load_access_{n}.ldAddr_ready;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldData_{n} := inner_load_access_{n}.ldData;" for n in range(num_load_ports)])}
+  {"\n  ".join([f"ldData_{n}_valid := inner_load_access_{n}.ldData_valid;" for n in range(num_load_ports)])}
 
-  {"\n  ".join([f"stAddr_{n}_ready := inner_store_port_{n}.stAddr_ready;" for n in range(num_store_ports)])}
-  {"\n  ".join([f"stData_{n}_ready := inner_store_port_{n}.stData_ready;" for n in range(num_store_ports)])}
+  {"\n  ".join([f"stAddr_{n}_ready := inner_store_access_{n}.stAddr_ready;" for n in range(num_store_ports)])}
+  {"\n  ".join([f"stData_{n}_ready := inner_store_access_{n}.stData_ready;" for n in range(num_store_ports)])}
 """
 
 
-def _generate_nd_load_port(name, fifo_depth, addr_type, data_type):
-    # generates a non-deterministic load port, that simulates any stall that can happen from a read operation (memory stall or memory dependency)
+def _generate_nd_load_access(name, fifo_depth, addr_type, data_type):
+    # generates a non-deterministic load access, that simulates any stall that can happen from a read operation (memory stall or memory dependency)
     return f"""
 MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
   VAR inner_input_ndw : {name}__in_ndwire(ldAddr, ldAddr_valid, inner_fifo.ins_ready);
@@ -230,8 +229,8 @@ MODULE {name} (ldAddr, ldAddr_valid, ldData_ready, data_from_mem)
 """
 
 
-def _generate_nd_store_port(name, fifo_depth, addr_type, data_type):
-    # generates a non-deterministic store port, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
+def _generate_nd_store_access(name, fifo_depth, addr_type, data_type):
+    # generates a non-deterministic store access, that simulates any stall that can happen from a write operation (memory stall or memory dependency)
     return f"""
 MODULE {name} (stAddr, stAddr_valid, stData, stData_valid)
   VAR inner_addr_ndw : {name}__addr_ndwire(stAddr, stAddr_valid, inner_addr_fifo.ins_ready);

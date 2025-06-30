@@ -17,7 +17,7 @@ def generate_elastic_fifo_inner(name, params):
             return _generate_elastic_fifo_inner(name, slots, data_type)
 
 
-def _generate_transparent_slot_dataless(name):
+def _generate_one_slot_break_none_dataless(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
     VAR 
@@ -34,7 +34,7 @@ MODULE {name}(ins_valid, outs_ready)
 """
 
 
-def _generate_transparent_slot(name, data_type):
+def _generate_one_slot_break_none(name, data_type):
     return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
     VAR 
@@ -56,6 +56,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 
 
 def _generate_slot_based_elastic_fifo_inner_dataless(name, slots):
+    # fifo generated as chain of fully transparent slots for faster model checking
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
     return f"""
@@ -65,7 +66,7 @@ MODULE {name}(ins_valid, outs_ready)
     -- outputs
 		DEFINE outs_valid   := b{slots - 1}.outs_valid;
 		DEFINE ins_ready   := b0.ins_ready;
-{_generate_transparent_slot_dataless(f"{name}_tslot")}
+{_generate_one_slot_break_none_dataless(f"{name}_tslot")}
 """
 
 
@@ -125,6 +126,7 @@ MODULE {name}(ins_valid, outs_ready)
 
 
 def _generate_slot_based_elastic_fifo_inner(name, slots, data_type):
+    # fifo generated as chain of fully transparent slots for faster model checking
     slots_data = ["ins"] + [f"b{i}.outs" for i in range(slots)]
     slots_valid = ["ins_valid"] + [f"b{i}.outs_valid" for i in range(slots - 1)]
     slots_ready = [f"b{i + 1}.ins_ready" for i in range(slots - 1)] + ["outs_ready"]
@@ -136,7 +138,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
 		DEFINE outs   := b{slots - 1}.outs;
 		DEFINE outs_valid   := b{slots - 1}.outs_valid;
 		DEFINE ins_ready   := b0.ins_ready;
-{_generate_transparent_slot(f"{name}_tslot", data_type)}
+{_generate_one_slot_break_none(f"{name}_tslot", data_type)}
 """
 
 
