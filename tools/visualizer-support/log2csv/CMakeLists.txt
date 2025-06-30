@@ -6,6 +6,8 @@ add_llvm_executable(log2csv log2csv.cpp)
 llvm_update_compile_flags(log2csv)
 target_link_libraries(log2csv PRIVATE
   PRIVATE
+  VisualizerSupport
+
   MLIRIR
   MLIRParser
   MLIRArithDialect
