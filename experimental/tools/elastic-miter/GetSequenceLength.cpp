@@ -50,19 +50,19 @@ static std::string stripString(const std::string &string) {
 // output file.
 // Example:
 // State 1:
-//   seq_generator_C.dataOut0 = FALSE
+//   seq_generator_C.outs = FALSE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 2:
-//   seq_generator_C.dataOut0 = TRUE
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 3:
-//   seq_generator_C.dataOut0 = TRUE
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = sleeping
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 4:
-//   seq_generator_C.dataOut0 = FALSE
+//   seq_generator_C.outs = FALSE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = FALSE
 // Here State 1, 2, and 3 are equivalent, since they only differ in variables

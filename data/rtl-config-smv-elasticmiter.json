@@ -298,5 +298,10 @@
     "name": "handshake.ndwire",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t ndwire -p bitwidth=$BITWIDTH",
     "hdl": "smv"
+  },
+  {
+    "name": "handshake.init",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t init",
+    "hdl": "smv"
   }
 ]

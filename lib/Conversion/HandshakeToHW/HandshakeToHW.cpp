@@ -691,6 +691,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::InitOp>([&](auto) {
+        // No parameters needed for these operations
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1812,6 +1815,7 @@ public:
                     ConvertToHWInstance<handshake::ReadyRemoverOp>,
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::InitOp>,
 
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,

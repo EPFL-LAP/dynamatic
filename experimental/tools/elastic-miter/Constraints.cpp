@@ -93,8 +93,8 @@ std::string LoopConstraint::createConstraintString(
   // VAR Cd_false_token_cnt : 0..31;
   // ASSIGN init(Cd_false_token_cnt) := 0;
   // ASSIGN next(Cd_false_token_cnt) := case
-  //   seq_generator_Cd.valid0 & seq_generator_Cd.nReady0 &
-  //   (seq_generator_Cd.dataOut0 = FALSE) & (Cd_false_token_cnt <
+  //   seq_generator_Cd.outs_valid & seq_generator_Cd.nReady0 &
+  //   (seq_generator_Cd.outs = FALSE) & (Cd_false_token_cnt <
   //   seq_generator_Dd.exact_tokens) : (Cd_false_token_cnt + 1); TRUE :
   //   Cd_false_token_cnt;
   // esac;
@@ -104,9 +104,9 @@ std::string LoopConstraint::createConstraintString(
                           << ") := 0;\n"
                           << "ASSIGN next(" << falseCounterTokenCounterVariable
                           << ") := case\n"
-                          << "  " << controlSeqGeneratorName << ".valid0 & "
+                          << "  " << controlSeqGeneratorName << ".outs_valid & "
                           << controlSeqGeneratorName << ".nReady0 & ("
-                          << controlSeqGeneratorName << ".dataOut0 = FALSE) & ("
+                          << controlSeqGeneratorName << ".outs = FALSE) & ("
                           << falseCounterTokenCounterVariable << " < "
                           << dataSeqGeneratorName << ".exact_tokens) : ("
                           << falseCounterTokenCounterVariable << " + 1);\n"
@@ -121,7 +121,7 @@ std::string LoopConstraint::createConstraintString(
   // INVAR (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) =
   // (seq_generator_Cd.exact_tokens - seq_generator_Cd.counter)) &
   // ((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) >= 1) ) ->
-  // seq_generator_Cd.dataOut0 = FALSE;
+  // seq_generator_Cd.outs = FALSE;
   forceFalseTokenInvar << "INVAR (((" << dataSeqGeneratorName
                        << ".exact_tokens - " << falseCounterTokenCounterVariable
                        << ") = (" << controlSeqGeneratorName
@@ -129,7 +129,7 @@ std::string LoopConstraint::createConstraintString(
                        << ".counter)) & ((" << dataSeqGeneratorName
                        << ".exact_tokens - " << falseCounterTokenCounterVariable
                        << ") >= 1) ) -> " << controlSeqGeneratorName
-                       << ".dataOut0 = FALSE;\n";
+                       << ".outs = FALSE;\n";
 
   // Make sure that not to many false tokens are generated. If the last tokens
   // needs to be false, this means we only generate false tokens as long as we
@@ -139,11 +139,11 @@ std::string LoopConstraint::createConstraintString(
   // Example (last True or False): INVAR
   // (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) = 0 ) &
   // ((seq_generator_Cd.exact_tokens - seq_generator_Cd.counter) >= 1)) ->
-  // (seq_generator_Cd.dataOut0 = TRUE);
+  // (seq_generator_Cd.outs = TRUE);
   // Example (last False): INVAR
   // (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) = 1 ) &
   // ((seq_generator_Cd.exact_tokens - seq_generator_Cd.counter) >= 2)) ->
-  // (seq_generator_Cd.dataOut0 = TRUE);
+  // (seq_generator_Cd.outs = TRUE);
   limitFalseTokensInvar << "INVAR (((" << dataSeqGeneratorName
                         << ".exact_tokens - "
                         << falseCounterTokenCounterVariable
@@ -151,7 +151,7 @@ std::string LoopConstraint::createConstraintString(
                         << controlSeqGeneratorName << ".exact_tokens - "
                         << controlSeqGeneratorName
                         << ".counter) >= " << 1 + lastFalse << ")) -> ("
-                        << controlSeqGeneratorName << ".dataOut0 = TRUE);\n";
+                        << controlSeqGeneratorName << ".outs = TRUE);\n";
 
   // Make sure the control sequence generates at least as many tokens as the
   // data sequence. Otherwise it will be impossible to have the same number of

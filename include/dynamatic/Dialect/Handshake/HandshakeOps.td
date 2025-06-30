@@ -278,7 +278,9 @@ def BufferOp : Handshake_Op<"buffer", [
 }
 
 def InitOp : Handshake_Op<"init", [
-  HasClock, SameOperandsAndResultType
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">
 ]> {
   let summary = "init operation";
   let description = [{

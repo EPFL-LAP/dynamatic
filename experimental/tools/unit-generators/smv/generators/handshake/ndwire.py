@@ -1,18 +1,17 @@
-
 from generators.support.utils import *
 
 
 def generate_ndwire(name, params):
-  data_type = SmvScalarType(params[ATTR_BITWIDTH])
+    data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-  if data_type.bitwidth == 0:
-    return _generate_ndwire_dataless(name)
-  else:
-    return _generate_ndwire(name, data_type)
+    if data_type.bitwidth == 0:
+        return _generate_ndwire_dataless(name)
+    else:
+        return _generate_ndwire(name, data_type)
 
 
 def _generate_ndwire_dataless(name):
-  return f"""
+    return f"""
 MODULE {name}(ins_valid, outs_ready)
   VAR state : {{SLEEPING, RUNNING}};
   ASSIGN
@@ -24,14 +23,14 @@ MODULE {name}(ins_valid, outs_ready)
   esac;
   FAIRNESS state = RUNNING;
   // output
-  DEFINE  
+  DEFINE
   outs_valid :=  ins_valid & (state = RUNNING);
   ins_ready  :=  outs_ready & (state = RUNNING);
 """
 
 
-def _generate_ndwire(name, data_type):
-  return f"""
+def _generate_ndwire(name, _):
+    return f"""
 MODULE {name}(ins, ins_valid, outs_ready)
   VAR inner_ndwire : {name}__ndwire_dataless(ins_valid, outs_ready);
   // output
