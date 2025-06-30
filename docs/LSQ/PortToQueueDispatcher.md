@@ -27,11 +27,11 @@ Let's assume the following generic parameters for dimensionality:
 **Signal Naming and Dimensionality**:  
 This module is generated from a higher-level description (e.g., in Python), which results in a specific convention for signal naming in the final VHDL code. It's important to understand this convention when interpreting diagrams and signal tables.
 
-- Generation Pattern: A signal that is conceptually an array in the source code (e.g., `port_bits_i`) is "unrolled" into multiple, distinct signals in the VHDL entity. The generated VHDL signals are indexed with a suffix, such as `port_bits_{p}_i`, where `{p}` is the port index.
+- Generation Pattern: A signal that is conceptually an array in the source code (e.g., `port_payload_i`) is "unrolled" into multiple, distinct signals in the VHDL entity. The generated VHDL signals are indexed with a suffix, such as `port_payload_{p}_i`, where `{p}` is the port index.
 
-- Interpreting Diagrams: If a diagram or conceptual description uses a base name without an index (e.g., `port_bits_i`), it represents a collection of signals. The actual dimension is expanded based on the context:
+- Interpreting Diagrams: If a diagram or conceptual description uses a base name without an index (e.g., `port_payload_i`), it represents a collection of signals. The actual dimension is expanded based on the context:
 
-    - Port-related signals (like `port_bits_i`) are expanded by the number of ports (`N_PORTS`).
+    - Port-related signals (like `port_payload_i`) are expanded by the number of ports (`N_PORTS`).
     - Entry-related signals (like `entry_alloc_i`) are expanded by the number of queue entries (`N_ENTRIES`).
 
 ### Port Interface Signals
@@ -44,8 +44,8 @@ These signals are used for communication between the external modules and the di
 | Python Variable Name | VHDL Signal Name | Direction | Dimensionality | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **Inputs** | | | | |
-| `port_bits_i` | `port_bits_{p}_i` | Input | `std_logic_vector(PAYLOAD_WIDTH-1:0)` | The payload (address or data) for port `p`.|
-| `port_valid_i` | `port_valid_{p}_i` | Input | `std_logic` | Valid flag for port `p`. When high, it indicates that the payload on `port_bits_{p}_i` is valid. |
+| `port_payload_i` | ``port_payload_{p}_i`` | Input | `std_logic_vector(PAYLOAD_WIDTH-1:0)` | The payload (address or data) for port `p`.|
+| `port_valid_i` | `port_valid_{p}_i` | Input | `std_logic` | Valid flag for port `p`. When high, it indicates that the payload on `port_payload_{p}_i` is valid. |
 | **Outputs** | | | | |
 | `port_ready_o` | `port_ready_{p}_o` | Output | `std_logic` | Ready flag for port `p`. This signal goes high if the queue can accept the payload from port `p` this cycle. |
 
@@ -62,11 +62,11 @@ These signals are used for communication between the dispatcher logic and the qu
 | :--- | :--- | :--- | :--- | :--- |
 | **Inputs** | | | | |
 | `entry_alloc_i` | `entry_alloc_{e}_i` | Input | `std_logic` | Is queue entry `e` logically allocated?|
-| `entry_payload_valid_i` | `entry_payload_valid_{e}_i` | Input | `std_logic` | Has the address or the data slot for entry `e` already had valid one? |
+| `entry_payload_valid_i` | `entry_payload_valid_{e}_i` | Input | `std_logic` | Indicates if the entry's payload slot `e` is already valid.  |
 | `entry_port_idx_i` | `entry_port_idx_{e}_i` | Input | `std_logic_vector(PORT_IDX_WIDTH-1:0)`| Indicates to which port entry `e` is assigned. |
 | `queue_head_oh_i` | `queue_head_oh_{e}_i` | Input | `std_logic_vector(N_ENTRIES-1:0)` | One-hot vector indicating the head entry in the queue. |
 | **Outputs** | | | | |
-| `entry_bits_o` | `entry_bits_{e}_o` | Output | `std_logic_vector(PAYLOAD_WIDTH-1:0)`| The payload to be written into queue entry `e`. |
+| `entry_payload_o` | `entry_payload_{e}_o` | Output | `std_logic_vector(PAYLOAD_WIDTH-1:0)`| The payload to be written into queue entry `e`. |
 | `entry_wen_o` | `entry_wen_{e}_o` | Output | `std_logic` | A write-enable signal for entry `e`. When high, `entry_payload_valid_{e}_i` is expected to be asserted by logic outside of this module. This logic exists outside of the dispatcher module. When the write-enable signal is on, this outside logic makes the dispatcher to consider the payload in the queue entry `e` is the valid one. |
 
 
@@ -101,11 +101,11 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
     ![PTQ_Payload_MUX](./figs/ptq/PTQ_Payload_MUX.png)  
     This block routes the address or data payload from the appropriate input port to the correct queue entries. 
     - **Input**:  
-         - `port_bits_i`: `N_PORTS` of the address or data payload from all access ports.
+         - `port_payload_i`: `N_PORTS` of the address or data payload from all access ports.
          - `entry_port_idx_oh`: The one-hot port assignment for each queue entry, used as the select signal.
-    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the respective `entry_port_idx_oh` one-hot vector to select one payload from `port_bits_i`.
+    - **Processing**: For each queue entry, a multiplexer `Mux1H` uses the respective `entry_port_idx_oh` one-hot vector to select one payload from `port_payload_i`.
     - **Output**:  
-        - `entry_bits_o`: The selected payload of each queue entry.
+        - `entry_payload_o`: The selected payload of each queue entry.
 
 4. **Entry-Port Assignment Masking Logic**  
     ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_entry_port_assignment_masking_description.png)  
@@ -131,18 +131,18 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - `entry_waiting_for_port`: A one-hot vector for each entry representing its assigned port, but zero when the queue entry is not ready.
         - `port_valid_i`: The incoming port valid signals from each external port.
     - **Processing**:  
-        - Ready Generation: We determine if any queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
+        - Ready Generation: We determine if **any** queue entry is waiting for data from a specific port. If so, it asserts the `port_ready_o` signal for that port to indicate it can accept data. 
         - Handshake: It then uses the external `port_valid_i` signals to mask out entries in `entry_waiting_for_port` if the respective port is not valid.
     - **Output**:
         - `port_ready_o`: The outgoing ready signal to each external port.
-        - `entry_port_and`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
+        - `entry_port_options`: Represents the set of handshaked entry-port assignments. This signal indicates a successful handshake and is sent to the **Arbitration Logic** to select the oldest one.
 
 6. **Arbitration Logic**  
     ![PTQ_Handshake](./figs/ptq/PTQ_Arbitration_description.png)  
     ![PTQ_masking](./figs/ptq/PTQ_masking.png)  
     The core decision making block of the dispatcher. When multiple handshaked entry-port assignments are ready to be written in the same cycle, it chooses the oldest queue entry among the valid ones for each port.
     - **Input**:  
-        - `entry_port_and`: The set of all currently valid and ready entry-port assignments.
+        - `entry_port_options`: The set of all currently valid and ready entry-port assignments.
         - `queue_head_oh_i`: The queue's one-hot head vector.
     - **Processing**: It uses a `CyclicPriorityMasking` algorithm. This ensures that among all candidates for each port, the one corresponding to the oldest entry in the queue is granted for the current clock cycle.
     - **Output**: `entry_wen_o` signal, which acts as the enable for the queue entry. This signal ultimately causes the queue's `entry_payload_valid` signal to go high via logic outside of the dispatcher.
@@ -159,6 +159,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
 1. **Matching: Identifying which queue slots are empty**  
     ![Matching](./figs/ptq/PTQ_Matching.png)  
     The first job of this block is to determine which entries in the store queue are waiting for a store address.  
+
     Based on the example diagram:  
     - **Entry 1** is darkened to indicate that it has not been allocated by the Group Allocator. Its `Store Queue Valid` signal (equivalent to `entry_alloc_i`) is `0`.  
     - **Entries 0, 2, and 3** have been allocated, so their `entry_alloc_i` signal are `1`. However, among these, Entry 2 already has a valid address (`Store Queue Addr Valid = 1`).
@@ -169,6 +170,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
 2. **Port Index Decoder: Queue entries port assignment in one-hot format**  
     ![Port_Index_Decoder](./figs/ptq/PTQ_Port_Index_Decoder.png)  
     This block's circuit is to decode an integer index assigned to each queue entry into a one-hot format.  
+
     Based on the example diagram:  
     - The `Store Queue` shows that `Entry 0` is assigned to `Port 1` , `Entry 1` to `Port 0`, `Entry 2` to `Port 1` and `Entry 3` to `Port 2`. 
     - The `Port Index Decoder` takes these integer indices (`0`, `1`, `2`) as input which are (`00`, `01`, `02` in binary respectively).
@@ -182,6 +184,7 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
 
 3. **Payload Mux: Routing the correct address**  
     ![PTQ_Payload_MUX](./figs/ptq/PTQ_Payload_MUX.png)  
+
     Based on the example diagram:
     - The `Access Ports` table shows the current address payloads being presented by each port:
         - `Port 0`: `01101111`
@@ -194,11 +197,12 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
         - `Entry 2`: `11111000` (Address from `Port 1`)
         - `Entry 3`: `00100000` (Address from `Port 2`)
     
-    The output of this block, `entry_bits_o` is logically committed to the queue only when the `Arbitration Logic` asserts the `entry_wen_o` signal for that specific entry.
+    The output of this block, `entry_payload_o` is logically committed to the queue only when the `Arbitration Logic` asserts the `entry_wen_o` signal for that specific entry.
 
 
 4. **Entry-Port Assignment Masking Logic**  
-    ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_Entry_Port_Assignment_Masking.png)  
+    ![Entry-Port Assignment Assignment Logic](./figs/ptq/PTQ_Entry_Port_Assignment_Masking.png) 
+
     Based on the example diagram:
     - `entry_ptq_ready`:
         - `Entry 0`: `1` (Entry 0 is waiting)    -> `111`
@@ -221,50 +225,24 @@ The Port-to-Queue Dispatcher has the following responsibilities (with 3-port, 4-
 
 5. **Handshake Logic: Managing port readiness and masking the port assigned with invalid ports**
     ![PTQ_Handshake](./figs/ptq/PTQ_Handshake.png)  
-    This block is responsible for the `valid/ready` handshake protocol with the `Access Ports`. It performs two functions: providing back-pressure to the ports and identifying all currently active memory requests for the arbiter.  
+    This block is responsible for the `valid/ready` handshake protocol with the `Access Ports`. It performs two functions: providing back-pressure to the ports and identifying all currently active memory requests for the arbiter. The value of `entry_waiting_for_port` is different from the previous step for the robustness of the example.  
+
     Based on the example diagram:
     - **Back-pressure control**: First, the block determines which ports are `ready`.
-        - From the `Entry-Port Assignment Masking Logic` block, we know that `Entry 0` and `Entry 3` are waiting for an address from `Port 1` and `Port 2` respectively.
+        - From the `Entry-Port Assignment Masking Logic` block, we know that `Entry 0`, `Entry 2`, and `Entry 3` are waiting for an address from `Port 1` and `Port 2`.
         - Therefore, it asserts `port_ready_o` to `1` for both `Port 1` and `Port 2`.
         - No entry is waiting for `Port 0`, so its ready signal is `0`.
-    - **Active request filtering**: The block checks which ports are handshaked. The `Access Ports` table shows `port_valid_i` is `1` for both `Port 1` and `Port 2`. Since the waiting entries (`Entry 0` and `Entry 3`) correspond to the valid ports (`Port 1` and `Port 2`), both are considered active and are passed to the `Arbitration Logic`.
+    - **Active request filtering**: The block checks which ports are handshaked. The `Access Ports` table shows `port_valid_i` is `1` for all `Port 0`, `Port 1` and `Port 2`. Since the waiting entries from `entry_waiting_for_port` (`Entry 0`, `Entry 2`, and `Entry 3`) correspond to the valid ports (`Port 1` and `Port 2`), both are considered active and are passed to the `Arbitration Logic`.
         
 
 6. **Arbitration Logic: Selecting the oldest active entry**  
     ![PTQ_masking](./figs/ptq/PTQ_masking.png)  
     This block is responsible for selecting the oldest active memory request for each port and generating the write enable signal for such requests.  
+
     Based on the example diagram:
-    - The `Handshake Logic` has identified two active requests: one for `Entry 0` from `Port 1` and another for `Entry 3` from `Port 2`.
+    - The `Handshake Logic` has identified three active requests: one for `Entry 0` from `Port 1`, another for `Entry 2` from `Port 1`, and the other for `Entry 3` from `Port 2`.
     - The CyclicPriorityMasking algorithm operates independently on each port's request list.
-        - For `Port 1`, the only active request is from `Entry 0` (`1000`, 1st column of `entry_port_and`). With no other competitors for this port, `Entry 0` is selected as the winner for `Port 1`.
-        - For `Port 2`, the only active request is from `Entry 3` (`0001`, 0th column of `entry_port_and`). Similarly, it is selected as the winner for `Port 2`.
+        - For `Port 2`, the only active request is from `Entry 3` (`0001`, the left column of `entry_port_options`). With no other competitors for this port, `Entry 3` is selected as the oldest for `Port 2`.
+        - For `Port 1`, the active requests are from `Entry 0` and `Entry 2` (`0101`, the middle column of `entry_port_options`). Since the head of the queue is at `Entry 2`, it is the oldest entry. `Entry 0` is masked out by `CyclicPriorityMasking`.
     
     As a result, the `entry_wen_o` signal is asserted for both `Entry 0` and `Entry 3`, allowing two writes to proceed in parallel in the same clock cycle.
-
-    To illustrate this process, let's assume the `entry_port_and` matrix, which represents all "live" requests, is as follows:
-
-                 P2 P1 P0
-        E0:    [ 0, 1, 0 ]
-        E1:    [ 1, 0, 0 ]
-        E2:    [ 0, 0, 0 ]
-        E3:    [ 1, 0, 0 ]
-
-    * **Priority Determination**: The `queue_head_oh_i` signal indicates that the head of the queue is at **Entry 2**. This establishes a priority order of **`2 -> 3 -> 0 -> 1`** for all arbitrations in this cycle.
-
-    The `CyclicPriorityMasking` algorithm is then applied independently to each port's column of requests:
-
-    * **For Port 2** (leftmost column `[0, 1, 0, 1]`): The active requests are from **Entry 1** and **Entry 3**. According to the priority order (`...3 -> 0 -> 1`), Entry 3 is older (has higher priority) than Entry 1. Therefore, **Entry 3** wins the arbitration for Port 2.
-
-    * **For Port 1** (middle column `[1, 0, 0, 0]`): The only active request is from **Entry 0**. With no other competitors for this port, **Entry 0** is automatically selected as the winner for Port 1.
-
-    * **For Port 0** (rightmost column `[0, 0, 0, 0]`): There are no active requests, so there is no winner.
-
-    After the priority masking is complete, the resulting `entry_port_hs` matrix, which indicates the winners, becomes:
-
-                 P2 P1 P0
-        E0:    [ 0, 1, 0 ]  // Winner for Port 1
-        E1:    [ 0, 0, 0 ]
-        E2:    [ 0, 0, 0 ]
-        E3:    [ 1, 0, 0 ]  // Winner for Port 2
-    
-
