@@ -19,6 +19,7 @@
 #include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "experimental/Transforms/ResourceSharing/Crush.h"
+#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "mlir/Pass/Pass.h"

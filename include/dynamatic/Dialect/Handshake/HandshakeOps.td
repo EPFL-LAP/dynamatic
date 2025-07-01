@@ -1562,4 +1562,71 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   let hasVerifier = 1;
 }
 
+def ReadyRemoverOp : Handshake_Op<"ready_remover",[
+  SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = [{
+    Rigidifies a channel to simplify the handshake logic.
+  }];
+  let description = [{
+    Rigidifies a channel by setting the output valid signal to 1 and input ready
+    signal to a open. This allows the simplification of redundant handshake logic.
+  }];
+
+  let arguments = (ins HandshakeType:$channelIn);
+  let results = (outs HandshakeType:$channelOut);
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      return "ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      return "outs";
+    }
+  }];
+
+}
+
+def ValidMergerOp : Handshake_Op<"valid_merger",[
+  AllTypesMatch<["lhsIn", "lhs"]>,
+  AllTypesMatch<["rhsIn", "rhs"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = [{
+    Merges the valid signals of two channels.
+  }];
+  let description = [{
+    Merges the valid signal of two channels by propagating only one input
+    valid signal to both output valid signals. In this way the valid generation
+    of the second input signal can be simplified.
+  }];
+
+  let arguments = (ins HandshakeType:$lhsIn, HandshakeType:$rhsIn);
+  let results = (outs HandshakeType:$lhs, HandshakeType:$rhs);
+
+  let assemblyFormat = [{
+    $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_ins" : "rhs_ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+    assert(idx < getNumOperands() && "index too high");
+    return (idx == 0) ? "lhs_outs" : "rhs_outs";
+    }
+  }];
+
+}
+
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

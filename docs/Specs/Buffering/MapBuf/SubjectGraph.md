@@ -17,7 +17,7 @@ The code base data structure is **BaseSubjectGraph** which contains the AIG of e
 
 The core data structure that contains the list of the subject graph of all dataflow units is `subjectGraphVector` which is filled in the `BaseSubjectGraph` object generator.
 
-The main function that build the subject graph of the entire AIG is `SubjectGraphGenerator`. The following is its pseudo-code:
+The function that generates the Subject Graphs of dataflow units is `SubjectGraphGenerator`. The following is its pseudo-code:
 
 ```
 DataflowCircuit DC;
@@ -32,10 +32,33 @@ for ( DataFlow unit: DC.get_dataflow_units() ){
 for ( BaseSubjectGraph * module: subjectGraphs){
   module->buildSubjectGraphConnections();
 }
+
 ```
 
-For each dataflow unit in the dataflow circuit, the SubjectGraphGenerator creates the corresponding derived BaseSubjectGraph object. Then, for each one of these, it calls the corresponding buildSubjectGraphConnections function which connects them.
+For each dataflow unit in the dataflow circuit, the SubjectGraphGenerator creates the corresponding derived BaseSubjectGraph object. Then, for each one of these, it calls the corresponding buildSubjectGraphConnections function, which establishes the input/output relations between Subject Graphs.
 
+At this stage, Nodes of the neighbouring Subject Graphs are not connected. The connection is built by the function connectSubjectGraphs(). The following is its pseudo-code:
+
+```
+for ( BaseSubjectGraph * module: subjectGraphs){
+  module->connectInputNodes();
+}
+
+LogicNetwork* mergedBlif = new LogicNetwork();
+
+for ( BaseSubjectGraph * module: subjectGraphs){
+  mergedBlif->addNodes(module->getNodes());
+}
+
+return mergedBlif;
+
+```
+
+The process of constructing a unified circuit graph begins with invoking the connectInputNodes() function for each SubjectGraph. This function establishes connections between adjacent graphs by merging their input and output nodes.
+
+Next, a new LogicNetwork object—referred to as mergedBlif—is instantiated to serve as the container for the complete circuit. All nodes from the individual SubjectGraphs are then added to this new LogicNetwork. Because each node already encapsulates its connection information, simply aggregating them into a single network is sufficient to produce a fully connected representation of the circuit.
+
+Separating the connection logic from the creation of the individual SubjectGraphs offers greater modularity and flexibility. This design makes it easy to insert or remove SubjectGraphs before finalizing the overall network, enabling more dynamic and maintainable circuit assembly.
 
 # BaseSubjectGraph Class
 The BaseSubjectGraph class is an abstract base class that provides shared functionality for generating the subject graph of a dataflow unit. Each major type of dataflow unit has its own subclass that extends BaseSubjectGraph. These subclasses implement their own constructors and are responsible for parsing the corresponding BLIF (Berkeley Logic Interchange Format) file to construct the unit's subject graph.

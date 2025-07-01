@@ -2,10 +2,10 @@ set(LLVM_LINK_COMPONENTS
   Support
 )
 
-add_llvm_executable(wlf2csv wlf2csv.cpp)
-llvm_update_compile_flags(wlf2csv)
-target_link_libraries(wlf2csv PRIVATE
-  PRIVATE   
+add_llvm_executable(log2csv log2csv.cpp)
+llvm_update_compile_flags(log2csv)
+target_link_libraries(log2csv PRIVATE
+  PRIVATE
   MLIRIR
   MLIRParser
   MLIRArithDialect

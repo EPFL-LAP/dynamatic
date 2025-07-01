@@ -65,7 +65,11 @@ void generateModelsimScripts(const VerificationContext &ctx) {
 
   os << "project calculateorder\n";
   os << "project compileall\n";
-  os << "eval vsim tb\n";
+  if (ctx.useVivadoFPU()) {
+    os << "eval vsim tb work.glbl\n";
+  } else {
+    os << "eval vsim tb\n";
+  }
   os << "log -r *\n";
   os << "run -all\n";
   os << "exit\n";
@@ -167,6 +171,11 @@ int main(int argc, char **argv) {
       cl::desc("Name of the handshake MLIR file with the kernel"),
       cl::value_desc("handshake-mlir"), cl::Required);
 
+  cl::opt<bool> vivadoFPU(
+      "vivado-fpu",
+      cl::desc("Use Vivado FPU for floating-point operations (default: false)"),
+      cl::value_desc("vivado-fpu"), cl::init(false));
+
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
 
@@ -202,7 +211,7 @@ int main(int argc, char **argv) {
   handshake::FuncOp funcOp =
       dyn_cast<handshake::FuncOp>(modOp->lookupSymbol(hlsKernelName));
 
-  VerificationContext ctx(simPathName, hlsKernelName, &funcOp);
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);

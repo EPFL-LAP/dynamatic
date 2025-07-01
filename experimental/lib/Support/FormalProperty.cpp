@@ -84,7 +84,6 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   if (!typeOpt)
     return nullptr;
   TYPE type = *typeOpt;
-
   switch (type) {
   case TYPE::AOB:
     return AbsenceOfBackpressure::fromJSON(value, path.field(INFO_LIT));

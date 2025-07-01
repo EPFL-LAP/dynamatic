@@ -150,6 +150,30 @@ LogicalResult TimingDatabase::getLatency(
   return success();
 }
 
+LogicalResult TimingDatabase::getInternalCombinationalDelay(
+    Operation *op, SignalType signalType, double &delay,
+    double targetPeriod) const // Our current timing model doesn't have latency
+                               // information for valid and
+// ready signals, assume it is 0
+{
+  const TimingModel *model = getModel(op);
+  if (!model)
+    return failure();
+
+  // This section now must handle the fact that all latency values are now
+  // contained inside an instance of DelayDepMetric. We therefore extract this
+  // structure, and use its method to obtain the latency value at the
+  // targetPeriod provided.
+  DelayDepMetric<double> DelayStruct;
+
+  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+    return failure();
+  if (failed(DelayStruct.getDelayCeilValue(targetPeriod, delay)))
+    return failure();
+
+  return success();
+}
+
 LogicalResult TimingDatabase::getInternalDelay(Operation *op,
                                                SignalType signalType,
                                                double &delay) const {

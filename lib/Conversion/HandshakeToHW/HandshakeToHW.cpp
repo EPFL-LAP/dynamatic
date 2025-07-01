@@ -649,6 +649,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
+        auto delayAttr = op->getAttrOfType<StringAttr>("internal_delay");
+        if (!delayAttr) {
+          llvm::errs() << "Missing 'internal_delay' attribute in op: "
+                       << op->getName() << "\n";
+          delayAttr = StringAttr::get(op->getContext(), "0.0");
+        }
+        addParam("INTERNAL_DELAY", delayAttr);
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
@@ -681,6 +688,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SpecSaveCommitOp saveCommitOp) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
+      .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
+        // No parameters needed for these operations
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1799,6 +1809,8 @@ public:
                     ConvertToHWInstance<handshake::LoadOp>,
                     ConvertToHWInstance<handshake::StoreOp>,
                     ConvertToHWInstance<handshake::NotOp>,
+                    ConvertToHWInstance<handshake::ReadyRemoverOp>,
+                    ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
 
                     // Arith operations

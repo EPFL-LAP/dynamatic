@@ -1,4 +1,4 @@
-//===- wlf2csv.cpp - Converts WLF file to simpler CSV -----------*- C++ -*-===//
+//===- log2csv.cpp - Converts LOG file to CSV for visualizer-----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Transforms a WLF file into a CSV-formatted simplified sequence of channel
-// state changes.
+// Transforms a Modelsim LOG file into a CSV-formatted sequence of channel state
+// changes, utilized by the visualizer.
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,7 +17,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -36,11 +35,9 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
@@ -53,12 +50,19 @@ using namespace dynamatic;
 
 static cl::OptionCategory mainCategory("Tool options");
 
-static cl::opt<std::string> inputFilename(cl::Positional, cl::Required,
-                                          cl::desc("<input file>"),
-                                          cl::cat(mainCategory));
+/// Specifies the handshake IR file, which is needed to convert channel names
+/// into indices due to the CSV format. (Why???? The dot graph contains both
+/// names and indices, so this seems like a poor design decision.)
+static cl::opt<std::string> handshakeIRFile(cl::Positional, cl::Required,
+                                            cl::desc("<input file>"),
+                                            cl::cat(mainCategory));
 
-static cl::opt<std::string> wlfFile(cl::Positional, cl::Required,
-                                    cl::desc("<path to WLF file>"),
+static cl::opt<std::string> level(cl::Positional, cl::Required,
+                                  cl::desc("<duv level>"),
+                                  cl::cat(mainCategory));
+
+static cl::opt<std::string> logFile(cl::Positional, cl::Required,
+                                    cl::desc("<path to LOG file>"),
                                     cl::init(""), cl::cat(mainCategory));
 
 static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
@@ -194,8 +198,9 @@ WireReference::fromSignal(StringRef signalName,
     return WireReference{portIt->second, SignalType::DATA, dataIdx};
   }
 
-  auto checkSingleWire = [&](StringRef suffix,
-                             SignalType signalType) -> std::optional<WireReference> {
+  auto checkSingleWire =
+      [&](StringRef suffix,
+          SignalType signalType) -> std::optional<WireReference> {
     if (!signalName.ends_with(suffix))
       return std::nullopt;
 
@@ -262,7 +267,7 @@ static LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   return success();
 }
 
-static constexpr unsigned long long PERIOD = 4000, HALF_PERIOD = PERIOD >> 1;
+static constexpr unsigned long long PERIOD_NS = 4;
 
 static constexpr StringLiteral ACCEPT("accept"), STALL("stall"),
     TRANSFER("transfer"), IDLE("idle"), UNDEFINED("undefined");
@@ -272,14 +277,12 @@ int main(int argc, char **argv) {
 
   cl::ParseCommandLineOptions(
       argc, argv,
-      "Exports a VHDL design corresponding to an input HW-level IR. "
-      "JSON-formatted RTL configuration files encode the procedure to "
-      "instantiate/generate external HW modules present in the input IR.");
+      "Converts a Modelsim LOG file into a CSV format used by the visualizer.");
 
-  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFilename.c_str());
+  auto fileOrErr = MemoryBuffer::getFileOrSTDIN(handshakeIRFile.c_str());
   if (std::error_code error = fileOrErr.getError()) {
-    llvm::errs() << argv[0] << ": could not open input file '" << inputFilename
-                 << "': " << error.message() << "\n";
+    llvm::errs() << argv[0] << ": could not open input file '"
+                 << handshakeIRFile << "': " << error.message() << "\n";
     return 1;
   }
 
@@ -295,16 +298,6 @@ int main(int argc, char **argv) {
       mlir::parseSourceFile<ModuleOp>(sourceMgr, &context));
   if (!modOp)
     return 1;
-
-  std::string level = "duv/" + kernelName + "_wrapped/";
-  std::string logFile = std::filesystem::temp_directory_path().string() +
-                        sys::path::get_separator().str() + "dynamatic_" +
-                        kernelName + ".log";
-  if (int ret = exec("wlf2log -l", level, "-o", logFile, StringRef{wlfFile})) {
-    llvm::errs() << "Failed to convert WLF file @ \"" << wlfFile
-                 << "\" into LOG file\n";
-    return ret;
-  }
 
   // Open the LOG file
   std::ifstream logFileStream(logFile);
@@ -332,6 +325,7 @@ int main(int argc, char **argv) {
   std::map<size_t, WireReference> wires;
   mlir::DenseSet<Value> toUpdate;
   size_t cycle = 0;
+  unsigned long long period = PERIOD_NS, halfPeriod = period >> 1;
 
   // Read the LOG file line by line
   std::string event;
@@ -361,6 +355,35 @@ int main(int argc, char **argv) {
       if (failed(callback()))
         exit(1);
       return true;
+    };
+
+    LogCallback setResolution = [&]() {
+      if (tokens[1] != "timestep")
+        return success();
+
+      // Resolution is always specified at the top of the log file.
+
+      // Example: tokens[2] = "\"1e-15\"", resolutionStr = "1e-15"
+      llvm::StringRef resolutionStr = tokens[2].substr(1, tokens[2].size() - 2);
+
+      // Example: exponent = -15
+      int exponent;
+      if (resolutionStr.split("e").second.getAsInteger(10, exponent)) {
+        return error("expected resolution in scientific notation, but got " +
+                     tokens[2]);
+      }
+
+      if (exponent > -9) {
+        return error(
+            "Resolution must be at least nanoseconds (10e-9), but got " +
+            tokens[2]);
+      }
+
+      period = PERIOD_NS *
+               static_cast<unsigned long long>(std::pow(10, -9 - exponent));
+      halfPeriod = period >> 1;
+
+      return success();
     };
 
     LogCallback setSignalAssociation = [&]() {
@@ -403,12 +426,12 @@ int main(int argc, char **argv) {
       std::string timeStr = tokens[1].str();
       timeStr.erase(std::remove(timeStr.begin(), timeStr.end(), '.'),
                     timeStr.end());
-      unsigned time;
+      unsigned long long time;
       if (StringRef{timeStr}.getAsInteger(10, time)) {
         return error("expected integer identifier for time, but got " +
                      timeStr);
       }
-      cycle = (time < PERIOD) ? 0 : (time - HALF_PERIOD) / PERIOD + 1;
+      cycle = (time < period) ? 0 : (time - halfPeriod) / period + 1;
       return success();
     };
 
@@ -455,7 +478,8 @@ int main(int argc, char **argv) {
 
     handleLogType("D", 3, setSignalAssociation) ||
         handleLogType("T", 2, newTimestep) ||
-        handleLogType("S", 2, changeWireState);
+        handleLogType("S", 2, changeWireState) ||
+        handleLogType("P", 3, setResolution);
     tokens.clear();
   }
 

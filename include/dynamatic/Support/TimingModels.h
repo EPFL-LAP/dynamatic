@@ -21,6 +21,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
 #include <unordered_map>
 
@@ -97,7 +98,6 @@ struct DelayDepMetric {
 public:
   /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
-
   /// Computes and returns the metric value for the highest delay that does not
   /// exceed the target period—effectively selecting the fastest implementation
   /// that still meets timing constraints.
@@ -107,9 +107,8 @@ public:
   /// only used for delay-to-latency maps, this assumption motivates the
   /// selection strategy.
   LogicalResult getDelayCeilMetric(double targetPeriod, M &metric) const {
-    std::optional<unsigned> opDelayCeil;
+    std::optional<double> opDelayCeil;
     M metricFloor = 0.0;
-
     // Find highest delay that's <= targetPeriod
     for (const auto &[opDelay, val] : data) {
       if (opDelay <= targetPeriod) {
@@ -120,10 +119,53 @@ public:
       }
     }
 
-    if (!opDelayCeil.has_value())
-      return failure();
+    // If no suitable delay found, fall back to lowest available delay
+    if (!opDelayCeil.has_value()) {
+      if (data.empty())
+        return failure();
+
+      llvm::dbgs()
+          << "CRITICAL WARNING: an operator has no known implementation "
+          << "capable of running at the requested oper  ating frequency. "
+          << "Closest match selected. Consider increasing target clock period "
+          << "or adding an appropriate implementation.\n";
+
+      auto minIt = std::min_element(data.begin(), data.end());
+      opDelayCeil = minIt->first;
+      metricFloor = minIt->second;
+    }
 
     metric = metricFloor;
+    return success();
+  }
+
+  LogicalResult getDelayCeilValue(double targetPeriod, double &delay) const {
+    std::optional<double> opDelayCeil;
+    // Find highest delay that's <= targetPeriod
+    for (const auto &[opDelay, val] : data) {
+      if (opDelay <= targetPeriod) {
+        if (!opDelayCeil.has_value() || *opDelayCeil < opDelay) {
+          opDelayCeil = opDelay;
+        }
+      }
+    }
+
+    // If no suitable delay found, fall back to lowest available delay
+    if (!opDelayCeil.has_value()) {
+      if (data.empty())
+        return failure();
+
+      llvm::dbgs()
+          << "CRITICAL WARNING: an operator has no known implementation "
+          << "capable of running at the requested operating frequency. "
+          << "Closest match selected. Consider increasing target clock period "
+          << "or adding an appropriate implementation.\n";
+
+      auto minIt = std::min_element(data.begin(), data.end());
+      opDelayCeil = minIt->first;
+    }
+
+    delay = *opDelayCeil;
     return success();
   }
 };
@@ -243,6 +285,11 @@ public:
   /// to return the real latency for those signal types too.
   LogicalResult getLatency(Operation *op, SignalType signalType,
                            double &latency, double targetPeriod) const;
+
+  LogicalResult getInternalCombinationalDelay(Operation *op,
+                                              SignalType signalType,
+                                              double &delay,
+                                              double targetPeriod) const;
 
   /// Attempts to get an operation's internal delay for a specific signal type.
   /// On success, sets the last argument to the requested delay.
