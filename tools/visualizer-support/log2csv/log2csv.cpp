@@ -17,7 +17,6 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Parser/Parser.h"
@@ -290,6 +289,7 @@ int main(int argc, char **argv) {
         handleLogType("P", 3, setResolution);
     tokens.clear();
   }
+  csvBuilder.commitChannelStateChanges();
 
   return 0;
 }

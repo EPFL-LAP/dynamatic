@@ -30,8 +30,8 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
-ChannelInfo::ChannelInfo(Value val, StringRef signalName)
-    : channelName(signalName) {
+ChannelInfo::ChannelInfo(Value val, StringRef channelName)
+    : channelName(channelName) {
 
   // Derive the source op's name and result index
   if (auto res = dyn_cast<OpResult>(val)) {
