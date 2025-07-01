@@ -86,3 +86,5 @@ $ OUT_DIR="experimental/tools/elastic-miter/out"
 $ REWRITES="experimental/test/tools/elastic-miter/rewrites"
 $ ./bin/elastic-miter --lhs=$REWRITES/b_lhs.mlir --rhs=$REWRITES/b_rhs.mlir -o $OUT_DIR --seq_length="0+1=3" --seq_length="0=2" --loop_strict=0,1
 ```
+
+**NOTE**: ElasticMiter only works in the dynamatic top-level directory.
