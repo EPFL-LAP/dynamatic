@@ -149,10 +149,15 @@ int main(int argc, char **argv) {
   }
 
   StringRef lineRef;
+  bool initialStateFound = false;
   while (std::getline(resultFileStream, line)) {
     lineRef = line;
     StringRef trimmedLine = lineRef.trim();
     if (trimmedLine.starts_with("-> State:")) {
+      if (!initialStateFound) {
+        initialStateFound = true;
+        continue;
+      }
       // Update the cycle
       csvBuilder.commitChannelStateChanges();
       // Always increment the cycle by 1, even if another counterexample is
