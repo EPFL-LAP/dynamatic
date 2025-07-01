@@ -650,12 +650,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
         auto delayAttr = op->getAttrOfType<StringAttr>("internal_delay");
-        if (!delayAttr) {
+        if (delayAttr) {
+          addString("INTERNAL_DELAY", delayAttr.getValue());
+        } else {
           llvm::errs() << "Missing 'internal_delay' attribute in op: "
                        << op->getName() << "\n";
-          delayAttr = StringAttr::get(op->getContext(), "0.0");
+          addString("INTERNAL_DELAY", "0.0");
         }
-        addParam("INTERNAL_DELAY", delayAttr);
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
