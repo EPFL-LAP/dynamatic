@@ -1,14 +1,10 @@
 # Dataflow Unit Characterization Script Documentation
 
-This document describes the structure and functionality of the [Dataflow Unit Characterization script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/run-characterization.py), which automates the process of characterizing hardware dataflow units. It details the conceptual approach, data handling, and implementation, following the style and clarity of the provided timing documentation.
+This document describes how Dynamatic obtains the timing characteristics of the dataflow units. Please check out [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md) if you are unfamiliar with Dynamatic's timing model. 
 
-The information computed with the characterization script are used as timing information. More details are present in [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md).
+Dynamatic uses a [Python script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/run-characterization.py) to obtain the timing characterization.
 
-**NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the timing information structure. When generating new dataflow units, try to follow the same structure as other dataflow units (in the JSON file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
-
-## Overview
-
-The script automates the extraction of VHDL entity information, testbench generation, synthesis script creation, dependency management, and parallel synthesis execution. Its primary goal is to characterize hardware units by sweeping parameter values and collecting synthesis/timing results.
+**NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the structure of the [timing information file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/components-vivado.json). When generating new dataflow units, try to follow the same structure as other dataflow units (in the timing information file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
 
 ## What is Unit Characterization?
 
@@ -18,6 +14,35 @@ Unit characterization refers to the systematic process of evaluating hardware un
 - **Dependency Resolution**: Ensuring all required VHDL files and dependencies are included for synthesis.
 - **Parallel Synthesis**: Running multiple synthesis jobs concurrently to speed up characterization.
 - **Automated Reporting**: Collecting and organizing timing and resource reports for each configuration.
+
+## How to Use the Script
+
+1. **Prepare VHDL and Dependency Files**
+Ensure all required VHDL files and dependency metadata are available.
+2. **Configure Parameters**
+Update `parameters_ranges` for the units you wish to characterize.
+3. **Run Characterization**
+Call `run_unit_characterization` for each unit, specifying the required directories and tool.
+4. **Analyze Results**
+Timing and synthesis reports are generated for each parameter combination and stored in the designated report directory.
+
+### How to `Run Characterization`  
+
+An example on how to call the script is the following one:
+
+`python run-characterization.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado"`
+
+which would save the output JSON file in `out.json` which contains timing information, it would specify the dynamatic home directory as `/home/dynamatic/` and it would call vivado using the command `vivado-2019 vivado`. An alternative call is the following one:
+
+`python run-characterization.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado" --json-input struct.json`
+
+where the only key difference is the specification of the input JSON (`struct.json`) which contains information related to RTL characteristics of each component. If unspecified, the script will look for the following file `DYNAMATIC_DIR/data/rtl-config-vhdl-vivado.json`.
+
+## Overview
+
+The script automates the extraction of VHDL entity information, testbench generation, synthesis script creation, dependency management, and parallel synthesis execution. Its primary goal is to characterize hardware units by sweeping parameter values and collecting synthesis/timing results.
+
+
 
 
 ## Where Characterization Data is Stored
@@ -113,17 +138,6 @@ The script will automatically:
 - Run synthesis for each configuration in parallel.
 - Collect and store timing/resource reports for later analysis.
 
-
-## How to Use the Script
-
-1. **Prepare VHDL and Dependency Files**
-Ensure all required VHDL files and dependency metadata are available.
-2. **Configure Parameters**
-Update `parameters_ranges` for the units you wish to characterize.
-3. **Run Characterization**
-Call `run_unit_characterization` for each unit, specifying the required directories and tool.
-4. **Analyze Results**
-Timing and synthesis reports are generated for each parameter combination and stored in the designated report directory.
 
 ## Notes
 
