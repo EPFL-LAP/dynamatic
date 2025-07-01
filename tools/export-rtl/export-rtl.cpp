@@ -1337,7 +1337,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
 
   os << ")\n\n";
 
-  os << "\n// input and output\n";
+  os << "\n-- input and output\n";
   data.writeSignalAssignments([](const llvm::Twine &dst, const llvm::Twine &src,
                                  raw_indented_ostream &os) {
     os << "DEFINE " << dst << " := " << src << ";\n";
@@ -1346,7 +1346,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << "\n\n";
 
   writeModuleInstantiations(data);
-  os << "\n// properties\n";
+  os << "\n-- properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (tag == FormalProperty::TAG::OPT)

@@ -16,6 +16,7 @@ TARGET_CP=$6
 POLYGEIST_PATH=$7
 USE_SHARING=$8
 FPUNITS_GEN=$9
+USE_RIGIDIFICATION=${10}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -23,6 +24,8 @@ DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_PROFILER_BIN="$DYNAMATIC_DIR/bin/exp-frequency-profiler"
 DYNAMATIC_EXPORT_DOT_BIN="$DYNAMATIC_DIR/bin/export-dot"
 DYNAMATIC_EXPORT_CFG_BIN="$DYNAMATIC_DIR/bin/export-cfg"
+
+RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidification.sh"
 
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
@@ -38,6 +41,7 @@ F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
+F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -200,9 +204,21 @@ exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_DYN_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
-# handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
-  > "$F_HW"
-exit_on_fail "Failed to lower to HW" "Lowered to HW"
+if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
+  # rigidification
+  bash $RIGIDIFICATION_SH $DYNAMATIC_DIR $OUTPUT_DIR $KERNEL_NAME $F_HANDSHAKE_EXPORT \
+    > "$F_HANDSHAKE_RIGIDIFIED"
+  exit_on_fail "Failed to rigidify" "Rigidification completed"
+
+  # handshake level -> hw level
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+    > "$F_HW"
+  exit_on_fail "Failed to lower to HW" "Lowered to HW"
+else
+  # handshake level -> hw level
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+    > "$F_HW"
+  exit_on_fail "Failed to lower to HW" "Lowered to HW"
+fi
 
 echo_info "Compilation succeeded"
