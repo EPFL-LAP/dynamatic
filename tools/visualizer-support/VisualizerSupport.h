@@ -128,11 +128,10 @@ struct ChannelState {
 };
 
 struct WireReference {
-  static constexpr StringLiteral VALID_SUFFIX = "_valid",
-                                 READY_SUFFIX = "_ready";
-
   Value value;
   SignalType signalType;
+  /// In ModelSim, each bit of the data vector is reported independently.
+  /// idx indicates the index of the bit in the data vector.
   std::optional<size_t> idx;
 };
 

@@ -58,6 +58,42 @@ static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::desc("<kernel name>"), cl::init(""),
                                        cl::cat(mainCategory));
 
+static std::optional<WireReference>
+fromSignal(StringRef opName, StringRef signalName,
+           const llvm::StringMap<Value> &channels) {
+  SignalType signalType;
+  StringRef channelName;
+  if (signalName.ends_with("_valid")) {
+    signalType = SignalType::VALID;
+    channelName = signalName.drop_back(6);
+  } else if (signalName.ends_with("_ready")) {
+    signalType = SignalType::READY;
+    channelName = signalName.drop_back(6);
+  } else {
+    signalType = SignalType::DATA;
+    channelName = signalName;
+  }
+
+  auto valueIt = channels.find(opName.str() + "_" + channelName.str());
+  if (valueIt == channels.end()) {
+    return std::nullopt;
+  }
+
+  return WireReference{valueIt->second, signalType, std::nullopt};
+}
+
+static WireState wireStateFromLog(StringRef logicalValue) {
+  if (logicalValue == "TRUE") {
+    return WireState::Logic1;
+  }
+  if (logicalValue == "FALSE") {
+    return WireState::Logic0;
+  }
+  llvm::errs() << "Warning: expected logical value 'TRUE' or 'FALSE', "
+               << "but got '" << logicalValue << "'\n";
+  return WireState::Undefined;
+}
+
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
 
@@ -164,45 +200,22 @@ int main(int argc, char **argv) {
         StringRef opName = tokens[1];
         StringRef signalName = tokens[2];
 
-        SignalType signalType;
-        StringRef channelName;
-        if (signalName.ends_with("_valid")) {
-          signalType = SignalType::VALID;
-          channelName = signalName.drop_back(6);
-        } else if (signalName.ends_with("_ready")) {
-          signalType = SignalType::READY;
-          channelName = signalName.drop_back(6);
-        } else {
-          signalType = SignalType::DATA;
-          channelName = signalName;
-        }
-
-        auto valueIt =
-            channelNameToValue.find(opName.str() + "_" + channelName.str());
-        if (valueIt == channelNameToValue.end()) {
-          // llvm::errs() << "Warning: could not find signal '" << opName << "."
-          //              << channelName << "' in the Handshake IR file.\n";
+        std::optional<WireReference> wireRef =
+            fromSignal(opName, signalName, channelNameToValue);
+        if (!wireRef) {
           continue;
         }
-        auto channelStateIt = state.find(valueIt->second);
+
+        auto channelStateIt = state.find(wireRef->value);
         if (channelStateIt == state.end()) {
           llvm::errs() << "Warning: could not find channel state for signal '"
-                       << opName << "." << channelName << "'\n";
+                       << opName << "." << signalName << "'\n";
           continue;
         }
-        WireState wireState;
-        if (logicalValue == "TRUE") {
-          wireState = WireState::Logic1;
-        } else if (logicalValue == "FALSE") {
-          wireState = WireState::Logic0;
-        } else {
-          llvm::errs() << "Warning: expected logical value 'TRUE' or 'FALSE', "
-                       << "but got '" << logicalValue << "'\n";
-          wireState = WireState::Undefined;
-        }
 
+        WireState wireState = wireStateFromLog(logicalValue);
         ChannelState &channelState = channelStateIt->second;
-        switch (signalType) {
+        switch (wireRef->signalType) {
         case SignalType::VALID:
           channelState.valid = wireState;
           break;
@@ -215,7 +228,7 @@ int main(int argc, char **argv) {
           break;
         }
 
-        toUpdate.insert(valueIt->second);
+        toUpdate.insert(wireRef->value);
       }
     } else {
       if (lineRef.starts_with("Trace Type:")) {

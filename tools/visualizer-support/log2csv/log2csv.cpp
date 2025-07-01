@@ -62,7 +62,7 @@ static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::cat(mainCategory));
 
 static std::optional<WireReference>
-fromSignal(StringRef signalName, const llvm::StringMap<Value> &ports) {
+fromSignal(StringRef signalName, const llvm::StringMap<Value> &channels) {
   // Check if this is a data signal
   if (signalName.ends_with(")")) {
     // Try to extract the vector's index from the signal name
@@ -78,30 +78,27 @@ fromSignal(StringRef signalName, const llvm::StringMap<Value> &ports) {
 
     // Try to match the port's name to an SSA value
     StringRef portName = signalName.slice(0, idx);
-    auto portIt = ports.find(portName);
-    if (portIt == ports.end())
+    auto portIt = channels.find(portName);
+    if (portIt == channels.end())
       return std::nullopt;
     return WireReference{portIt->second, SignalType::DATA, dataIdx};
   }
 
-  auto checkSingleWire =
-      [&](StringRef suffix,
-          SignalType signalType) -> std::optional<WireReference> {
-    if (!signalName.ends_with(suffix))
-      return std::nullopt;
+  StringRef channelName;
+  SignalType signalType;
+  if (signalName.ends_with("_valid")) {
+    channelName = signalName.drop_back(6);
+    signalType = SignalType::VALID;
+  } else if (signalName.ends_with("_ready")) {
+    channelName = signalName.drop_back(6);
+    signalType = SignalType::READY;
+  }
 
-    // Try to match the port's name to an SSA value
-    StringRef portName = signalName.drop_back(suffix.size());
-    auto portIt = ports.find(portName);
-    if (portIt == ports.end())
-      return std::nullopt;
-    return WireReference{portIt->second, signalType, std::nullopt};
-  };
+  auto channelIt = channels.find(channelName);
+  if (channelIt == channels.end())
+    return std::nullopt;
 
-  if (auto wireOpt =
-          checkSingleWire(WireReference::VALID_SUFFIX, SignalType::VALID))
-    return wireOpt;
-  return checkSingleWire(WireReference::READY_SUFFIX, SignalType::READY);
+  return WireReference{channelIt->second, signalType, std::nullopt};
 }
 
 static WireState wireStateFromLog(StringRef token) {
