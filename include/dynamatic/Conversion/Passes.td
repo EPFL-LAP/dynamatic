@@ -20,11 +20,12 @@ include "dynamatic/Support/Passes.td"
 // AffineToScf
 //===----------------------------------------------------------------------===//
 
-def AffineToScf : DynamaticPass<"lower-affine-to-scf",
-                                [ "mlir::memref::MemRefDialect", 
-                                  "mlir::scf::SCFDialect", 
-                                  "mlir::vector::VectorDialect" ]> {
-  let summary = "Lower affine operations to a mix of SCF and standard operations";
+def AffineToScf : DynamaticPass<"lower-affine-to-scf", [
+  "mlir::memref::MemRefDialect", "mlir::scf::SCFDialect",
+  "mlir::vector::VectorDialect"
+]> {
+  let summary =
+      "Lower affine operations to a mix of SCF and standard operations";
   let description = [{
     Very close analog to the AffineToStandard pass from MLIR that preserves the
     attributes of AffineLoadOp's and AffineStoreOp's during lowering. Keeping
@@ -60,24 +61,35 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
   let summary = "Lowers func and cf dialects to handshake.";
   let description = [{
     Lowers func-level functions whose body have unstructured control flow into
-    their handshake counterparts, which represent dataflow circuits that can
-    ultimately be converted to an RTL design. 
-  }];
-  let constructor = "dynamatic::createCfToHandshake()";
+      their handshake counterparts,
+      which represent dataflow circuits that can ultimately be converted to an
+          RTL design.
+}];
+let constructor = "dynamatic::createCfToHandshake()";
 }
 
 //===----------------------------------------------------------------------===//
 // HandshakeToHW
 //===----------------------------------------------------------------------===//
 
-def HandshakeToHW : DynamaticPass<"lower-handshake-to-hw",
-                                  ["dynamatic::hw::HWDialect"]> {
+def HandshakeToHW
+    : DynamaticPass<"lower-handshake-to-hw", ["dynamatic::hw::HWDialect"]> {
   let summary = "Lowers Handshake to HW.";
   let description = [{
     Lowers Handshake IR into a "netlist-style" representation made up of HW
     instances of external modules interconnected by dataflow channels.
   }];
   let constructor = "dynamatic::createHandshakeToHWPass()";
+}
+  
+//===----------------------------------------------------------------------===//
+// LLVMToControlFlow
+//===----------------------------------------------------------------------===//
+
+def LLVMToControlFlow : DynamaticPass<"convert-llvm-to-cf"> {
+  let summary = "Converts LLVM to ControlFlow dialect";
+  let description = [{ }];
+  let constructor = "dynamatic::createLLVMToControlFlowPass()";
 }
 
 #endif // DYNAMATIC_CONVERSION_PASSES_TD
