@@ -38,21 +38,12 @@ The save-commit operation (the details of what this operation does are not relev
 
 The depth of this FIFO is specified using a required, operation-specific attribute, which is declared in its arguments:
 
-```tablegen
-let arguments = (ins HandshakeType:$dataIn,
-                      ChannelType:$ctrl,
-                      UI32Attr:$fifoDepth);
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1199-L1201 
 
 The first two arguments are constrained by type-constraints, while the 3rd is constrained by an attribute constraint.
 
 This results in the following C++ to create a save-commit operation:
-```c++
-SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
-    dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-    /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal,
-    /*fifoDepth=*/fifoDepth);
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Transforms/Speculation/HandshakeSpeculation.cpp#L384-L387 
 
 It is important to note that since fifoDepth is a required attribute, fifoDepth **must** be passed to the builder in order to create a save-commit operation. The [builder methods](https://mlir.llvm.org/docs/DefiningDialects/Operations/#builder-methods) section of the MLIR Dialect documentation explains well how different C++ builder functions are generated from an operation's tablegen declaration. 
 
@@ -66,36 +57,16 @@ This named getter is generated automatically by declaring the attribute in the t
 
 #### SharingWrapperOp for Crush
 
-```tablegen
-let arguments = (ins Variadic<ChannelType> : $dataOperands,
-  ChannelType : $sharedOpResult,
-  DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$credits,
-  ConfinedAttr<I32Attr, [IntMinValue<2>]>:$numSharedOperations,
-  ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
-  ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1351-L1356
 
 This declares 4 attributes for the `SharingWrapperOp`: an array of integer credits, and 3 integers with different minimum values. This shows one of the strengths of operation-specific attributes- the ability to declaratively specify constrained attributes.
 
 
 The C++ to add a `SharingWrapperOp` then looks like this:
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Transforms/ResourceSharing/Crush.cpp#L634-L655
+
+to better explain the builder, here is a commented version:
 ```c++
-// Determining the number of credits of each operation that share the
-// unit based on the maximum achievable occupancy in critical CFCs.
-llvm::SmallVector<int64_t> credits;
-for (Operation *op : group) {
-  double occupancy = opOccupancy[op];
-  // The number of credits must be an integer. It is incremented by 1 to
-  // hide the latency of returning a credit, and accounts for token
-  // staying in the output buffers due to the effect of sharing.
-  credits.push_back(1 + std::ceil(occupancy));
-}
-
-assert(sharingWrapperOutputTypes.size() ==
-            sharedOp->getNumOperands() + group.size() &&
-        "The sharing wrapper has an incorrect number of output ports.");
-
-builder.setInsertionPoint(*group.begin());
 handshake::SharingWrapperOp wrapperOp =
     builder.create<handshake::SharingWrapperOp>(
         sharedOp->getLoc(), 
@@ -109,7 +80,7 @@ handshake::SharingWrapperOp wrapperOp =
         );
 ```
 
-and also generates helpful getter functions for each of its attributes.
+Helpful getter functions are also generated for each of its attributes.
 
 There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs (as seen in the assertion). In best practice, values like this which can be calculated should not be stored as attributes.
 
@@ -143,14 +114,7 @@ This builder enforces the presence of buffer type at construction, but does not 
 
 There are also no named getters generated, and therefore these attributes must be accessed very awkwardly through the dictionary attribute:
 
-```c++
-// Get the Buffer type and data width from the operation attributes
-auto params =
-    bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-auto bufferTypeNamed =
-    params.getNamed(handshake::BufferOp::BUFFER_TYPE_ATTR_NAME);
-auto bufferTypeAttr = dyn_cast<StringAttr>(bufferTypeNamed->getValue());
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
 
 # RTL Entity Sharing
 
@@ -176,18 +140,7 @@ If the attribute has been added to "hw.parameters" to allow RTL entity sharing, 
 
 In the operation's entry in the JSON, the attribute should also be listed in the operation's parameters list.
 
-```json
-{
-  "name": "handshake.spec_save_commit",
-  "parameters": [
-    {
-      "name": "FIFO_DEPTH",
-      "type": "unsigned"
-    }
-  ],
-  "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_save_commit -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
-}
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/data/rtl-config-vhdl-beta.json#L212-L220
 
 # Future Changes to this Process
 
