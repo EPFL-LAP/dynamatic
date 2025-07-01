@@ -2,13 +2,13 @@
 # Parameterized RTL Generation
 
 
-For some operations, we may wish to **parameterize** the generation of their RTL. This requires storing the parameter value on the the operation itself, as well as passing it to the relevant parts of the code-base to ensure correct generation.
+For some operations, we may wish to **parameterize** the generation of their RTL. This requires storing the parameter value on the operation itself, as well as passing it to the relevant parts of the code-base to ensure correct generation.
 
 # Storing the parameter
 
 ## How to store the parameter
 
-A parameter which affects an operations RTL should be stored as an operation-specific attribute. The [operation definition specification](https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments) (ODS) covers how MLIR uses tablegen files to declaratively define operations, including attributes. 
+A parameter which affects an operation's RTL should be stored as an operation-specific attribute. The [operation definition specification](https://mlir.llvm.org/docs/DefiningDialects/Operations/) (ODS) covers how MLIR uses tablegen files to declaratively define operations, including attributes. 
 The [specific section](https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments) of the ODS relevant to attributes is on operation arguments. Specifically, attributes are operation arguments which are "compile-time known constant values".
 
 Arguments are specified in an operation's tablegen entry like so:
@@ -31,8 +31,8 @@ Operation-specific attributes give us enough flexibility to store all informatio
 
 When used properly, they ensure that all operations have a valid set of RTL parameters, and that all required parameters are in fact present.
 
-#### Good Examples
-##### FIFO-Depth for a Save-Commit
+### Good Examples
+#### FIFO-Depth for a Save-Commit
 
 The save-commit operation (the details of what this operation does are not relevant to this document) has an internal FIFO.
 
@@ -44,7 +44,7 @@ let arguments = (ins HandshakeType:$dataIn,
                       UI32Attr:$fifoDepth);
 ```
 
-The first two arguments are type-constraints, while the 3rd is an attribute constraint.
+The first two arguments are constrained by type-constraints, while the 3rd is constrained by an attribute constraint.
 
 This results in the following C++ to create a save-commit operation:
 ```c++
@@ -54,7 +54,9 @@ SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
     /*fifoDepth=*/fifoDepth);
 ```
 
-and the following getter function to access the attribute's value:
+It is important to note that since fifoDepth is a required attribute, fifoDepth **must** be passed to the builder in order to create a save-commit operation. The [builder methods](https://mlir.llvm.org/docs/DefiningDialects/Operations/#builder-methods) section of the MLIR Dialect documentation explains well how different C++ builder functions are generated from an operation's tablegen declaration. 
+
+The following getter function is also generated, for accessing the attribute's value:
 
 ```c++
 saveCommitOp.getFifoDepth()
@@ -62,7 +64,7 @@ saveCommitOp.getFifoDepth()
 
 This named getter is generated automatically by declaring the attribute in the tablegen file.
 
-##### SharingWrapperOp for Crush
+#### SharingWrapperOp for Crush
 
 ```tablegen
 let arguments = (ins Variadic<ChannelType> : $dataOperands,
@@ -73,10 +75,10 @@ let arguments = (ins Variadic<ChannelType> : $dataOperands,
   ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
 ```
 
-This declares 4 attributes for the SharingWrapperOp: an array of integer credits, which defaults to empty, and 3 integers with different minimum values. This shows one of the strengths of operation-specific attributes- the ability to declaratively  specific default values and constraints.
+This declares 4 attributes for the `SharingWrapperOp`: an array of integer credits, and 3 integers with different minimum values. This shows one of the strengths of operation-specific attributes- the ability to declaratively specify constrained attributes.
 
 
-The c++ to add a SharingWrapperOp then looks like this:
+The C++ to add a `SharingWrapperOp` then looks like this:
 ```c++
 // Determining the number of credits of each operation that share the
 // unit based on the maximum achievable occupancy in critical CFCs.
@@ -96,115 +98,46 @@ assert(sharingWrapperOutputTypes.size() ==
 builder.setInsertionPoint(*group.begin());
 handshake::SharingWrapperOp wrapperOp =
     builder.create<handshake::SharingWrapperOp>(
-        sharedOp->getLoc(), sharingWrapperOutputTypes, dataOperands,
-        sharedOp->getResult(0), llvm::ArrayRef<int64_t>(credits),
-        credits.size(), sharedOp->getNumOperands(),
-        (unsigned)round(latency));
+        sharedOp->getLoc(), 
+        /*aggregate result type arg=*/sharingWrapperOutputTypes, 
+        /*dataOperands=*/dataOperands,
+        /*sharedOpResult=*/sharedOp->getResult(0), 
+        /*credits=*/llvm::ArrayRef<int64_t>(credits),
+        /*numSharedOperations=*/credits.size(), 
+        /*numSharedOperands=*/sharedOp->getNumOperands(),
+        /*latency=*/(unsigned)round(latency)
+        );
 ```
 
 and also generates helpful getter functions for each of its attributes.
 
-#### Example to Avoid
+There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs (as seen in the assertion). In best practice, values like this which can be calculated should not be stored as attributes.
+
+### Example to Avoid
 
 
 
-##### BufferOp
+#### BufferOp
 As of time of writing, the buffer operation stores its RTL parameter attributes in a dictionary called "hw.parameters". 
 
 Since this dictionary is not verified, a BufferOp may not even have the attributes present at all when the operation is passed to the backend.
 
 Its arguments do not contain any attribute information:
-```tablegen
-let arguments = (ins HandshakeType:$operand);
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L226
 
 But it defines additional hardcoded strings to use as dictionary keys using:
-
-```tablegen
-let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING",
-                                           BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
-    
-    /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
-    /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer),
-    /// it introduces one cycle of latency on the D and V paths.
-    /// It does not break the R signal path and adds no latency on R.
-    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV";
-    
-    /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path.
-    /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer),
-    /// it introduces one cycle of latency on the R path.
-    /// It does not break the D and V signal path and adds no latency on D and V.
-    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R";
-    
-    /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO),
-    /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths.
-    /// Its only purpose is to hold tokens.
-    static constexpr ::llvm::StringLiteral FIFO_BREAK_NONE = "FIFO_BREAK_NONE";
-    
-    /// FIFO_BREAK_DV: This buffer breaks the D and V paths.
-    /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers,
-    /// its structure cannot be split. It introduces one cycle of latency on the
-    /// D and V paths regardless of the number of slots and has no latency on R.
-    /// It was previously called an 'elastic_fifo_inner'.
-    static constexpr ::llvm::StringLiteral FIFO_BREAK_DV = "FIFO_BREAK_DV";
-    
-    /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal
-    /// paths and introduces one cycle of latency on all of them.
-    static constexpr ::llvm::StringLiteral ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR";
-    
-    /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
-    /// handshake control signals, causing them to accept or stall inputs
-    /// simultaneously.
-    static constexpr ::llvm::StringLiteral SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV";
-    
-  }];
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L233-L271
 
 To try and replicate some of the behaviour of dedicated attributes, a custom builder is declared in tablegen:
 
-```tablegen
-let builders = [OpBuilder<
-  (ins "Value":$operand, "const ::dynamatic::handshake::TimingInfo &":$timing,
-        "std::optional<unsigned>":$numSlots, "StringRef":$bufferType)>
-];
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L229-L232
 
 and then implemented separately in C++:
-```c++
-void BufferOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                     Value operand, const TimingInfo &timing,
-                     std::optional<unsigned> numSlots, StringRef bufferType) {
-  odsState.addOperands(operand);
-  odsState.addTypes(operand.getType());
-
-  // Create attribute dictionary
-  SmallVector<NamedAttribute> attributes;
-  MLIRContext *ctx = odsState.getContext();
-  attributes.emplace_back(StringAttr::get(ctx, TIMING_ATTR_NAME),
-                          TimingAttr::get(ctx, timing));
-  if (numSlots) {
-    attributes.emplace_back(
-        StringAttr::get(ctx, NUM_SLOTS_ATTR_NAME),
-        IntegerAttr::get(IntegerType::get(ctx, 32, IntegerType::Unsigned),
-                         *numSlots));
-  }
-
-  attributes.emplace_back(StringAttr::get(ctx, BUFFER_TYPE_ATTR_NAME),
-                          StringAttr::get(ctx, bufferType));
-
-  odsState.addAttribute(RTL_PARAMETERS_ATTR_NAME,
-                        DictionaryAttr::get(ctx, attributes));
-}
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/lib/Dialect/Handshake/HandshakeOps.cpp#L198-L221
 
 Due to this custom builder, the C++ to add a new operation looks as if it had used dedicated attributes:
 
-```c++
-auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                  timing, slots, bufferType);
-```
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Transforms/HandshakePlaceBuffersCustom.cpp#L102-L103
 
 This builder enforces the presence of buffer type at construction, but does not prevent later code from removing this attribute from the hw.parameters dictionary (in the above c++ accessed through RTL_PARAMETERS_ATTR_NAME).
 
@@ -232,7 +165,7 @@ When an operation uses dedicated attributes, it must still eventually pass its d
 
 https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511-L521
 
-which contains a case-statement for each operation, to allow each operation to add its own operation-specific attributes.
+which contains a case-statement for each operation, to allow each operation to add its own operation-specific information to hw.parameters.
 
 The save-commit operation does so like this:
 https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L682
