@@ -9,7 +9,7 @@
 // FPGA'20 smart buffer placement, as presented in
 // https://dl.acm.org/doi/full/10.1145/3477053
 //
-// This mainly declares the `FPGA20Placement` class, which inherits the abstract
+// This file declares the `FPGA20Placement` class, which inherits the abstract
 // `BufferPlacementMILP` class to setup and solve a real MILP from which
 // buffering decisions can be made. Every public member declared in this file is
 // under the `dynamatic::buffer::fpga20` namespace, as to not create name
