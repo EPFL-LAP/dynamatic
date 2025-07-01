@@ -107,10 +107,10 @@ fromSignal(StringRef signalName, const llvm::StringMap<Value> &ports) {
 static WireState wireStateFromLog(StringRef token) {
   StringRef state = token.drop_front(2).drop_back(2);
   if (state == "1")
-    return WireState::LOGIC_1;
+    return WireState::Logic1;
   if (state == "0")
-    return WireState::LOGIC_0;
-  return WireState::UNDEFINED;
+    return WireState::Logic0;
+  return WireState::Undefined;
 }
 
 static constexpr unsigned long long PERIOD_NS = 4;
@@ -151,17 +151,15 @@ int main(int argc, char **argv) {
 
   writeCSVHeader(llvm::outs());
 
-  llvm::StringMap<Value> signalNameToValue;
-  if (failed(mapSignalsToValues(*modOp, signalNameToValue)))
+  llvm::StringMap<Value> channelNameToValue;
+  if (failed(mapSignalsToValues(*modOp, channelNameToValue)))
     return 1;
 
-  mlir::DenseMap<Value, SignalInfo> valueToSignalInfo;
+  mlir::DenseMap<Value, ChannelInfo> valueToChannelInfo;
   mlir::DenseMap<Value, ChannelState> state;
-  for (auto &[signalName, val] : signalNameToValue) {
-    if (isa<MemRefType>(val.getType()))
-      continue;
-    valueToSignalInfo.try_emplace(val, val, signalName);
-    state.try_emplace(val, val.getType());
+  for (auto &[signalName, val] : channelNameToValue) {
+    valueToChannelInfo.try_emplace(val, val, signalName);
+    state.insert({val, ChannelState::fromValueType(val.getType())});
   }
 
   std::map<size_t, WireReference> wires;
@@ -235,14 +233,14 @@ int main(int argc, char **argv) {
                      tokens[2]);
       }
       StringRef signalName = StringRef{tokens[1]}.drop_front(level.size());
-      if (auto wire = fromSignal(signalName, signalNameToValue))
+      if (auto wire = fromSignal(signalName, channelNameToValue))
         wires.insert({wireID, *wire});
       return success();
     };
 
     LogCallback newTimestep = [&]() {
       writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                               valueToSignalInfo);
+                               valueToChannelInfo);
       toUpdate.clear();
 
       // Parse the current simulation time and derive the current cycle number

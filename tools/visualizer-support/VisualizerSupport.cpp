@@ -15,7 +15,6 @@
 #include "dynamatic/Dialect/HW/PortImplementation.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OwningOpRef.h"
@@ -25,37 +24,46 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <optional>
 #include <string>
 
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
-SignalInfo::SignalInfo(Value val, StringRef signalName)
-    : signalName(signalName) {
-  // Derive the source component's name and ID
+ChannelInfo::ChannelInfo(Value val, StringRef signalName)
+    : channelName(signalName) {
+
+  // Derive the source op's name and result index
   if (auto res = dyn_cast<OpResult>(val)) {
     Operation *producerOp = res.getOwner();
-    srcPortID = res.getResultNumber();
-    srcComponent = getUniqueName(producerOp);
+    srcChannelIdx = res.getResultNumber();
+    srcOpName = getUniqueName(producerOp);
   } else {
     auto arg = cast<BlockArgument>(val);
     auto funcOp = cast<handshake::FuncOp>(arg.getParentBlock()->getParentOp());
-    srcPortID = arg.getArgNumber();
-    srcComponent = funcOp.getArgName(arg.getArgNumber()).str();
+    srcChannelIdx = arg.getArgNumber();
+    srcOpName = funcOp.getArgName(arg.getArgNumber()).str();
   }
 
-  // Derive the destination component's name and ID
-  OpOperand &oprd = *val.getUses().begin();
+  // Derive the destination op's name and operand index
+  auto oprdIt = val.getUses();
+  if (oprdIt.empty() || std::next(oprdIt.begin()) != oprdIt.end()) {
+    llvm::report_fatal_error(
+        "ChannelInfo can only be constructed from a single use value");
+  }
+
+  OpOperand &oprd = *oprdIt.begin();
   Operation *consumerOp = oprd.getOwner();
-  if (!isa<MemRefType>(oprd.get().getType()))
-    dstPortID = oprd.getOperandNumber();
+  if (isa<MemRefType>(oprd.get().getType())) {
+    dstChannelIdx = 0; // TODO: Why???
+  } else {
+    dstChannelIdx = oprd.getOperandNumber();
+  }
   if (isa<handshake::EndOp>(consumerOp)) {
     auto funcOp = cast<handshake::FuncOp>(val.getParentBlock()->getParentOp());
-    dstComponent = funcOp.getResName(oprd.getOperandNumber()).str();
+    dstOpName = funcOp.getResName(oprd.getOperandNumber()).str();
   } else {
-    dstComponent = getUniqueName(consumerOp);
+    dstOpName = getUniqueName(consumerOp);
   }
 }
 
@@ -85,8 +93,10 @@ LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
 
   // First associate names to all function arguments
   handshake::PortNamer argNameGen(funcOp);
-  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments()))
-    ports.insert({argNameGen.getInputName(idx), arg});
+  for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
+    if (arg.getType().isa<handshake::ControlType, handshake::ChannelType>())
+      ports.insert({argNameGen.getInputName(idx), arg});
+  }
 
   // Then associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
@@ -94,15 +104,20 @@ LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
     if (mapOperands) {
       // Only needed for SMV
       for (auto [idx, oprd] : llvm::enumerate(op.getOperands())) {
-        std::string signalName =
-            getUniqueName(&op).str() + "_" + opNameGen.getInputName(idx).str();
-        ports.insert({signalName, oprd});
+        if (oprd.getType()
+                .isa<handshake::ControlType, handshake::ChannelType>()) {
+          std::string signalName = getUniqueName(&op).str() + "_" +
+                                   opNameGen.getInputName(idx).str();
+          ports.insert({signalName, oprd});
+        }
       }
     }
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
-      std::string signalName =
-          getUniqueName(&op).str() + "_" + opNameGen.getOutputName(idx).str();
-      ports.insert({signalName, res});
+      if (res.getType().isa<handshake::ControlType, handshake::ChannelType>()) {
+        std::string signalName =
+            getUniqueName(&op).str() + "_" + opNameGen.getOutputName(idx).str();
+        ports.insert({signalName, res});
+      }
     }
   }
 
@@ -117,26 +132,26 @@ void writeCSVHeader(llvm::raw_ostream &os) {
 void writeChannelStateChanges(
     llvm::raw_ostream &os, size_t cycle, const mlir::DenseSet<Value> &toUpdate,
     const mlir::DenseMap<Value, ChannelState> &state,
-    const mlir::DenseMap<Value, SignalInfo> &valueToSignalInfo) {
+    const mlir::DenseMap<Value, ChannelInfo> &valueToSignalInfo) {
   for (Value val : toUpdate) {
     const ChannelState &channelState = state.at(val);
     WireState valid = channelState.valid;
     WireState ready = channelState.ready;
 
     StringRef dataflowState;
-    if (valid != WireState::LOGIC_1 && ready == WireState::LOGIC_1)
+    if (valid != WireState::Logic1 && ready == WireState::Logic1)
       dataflowState = ACCEPT;
-    else if (valid == WireState::LOGIC_1)
-      dataflowState = ready != WireState::LOGIC_1 ? STALL : TRANSFER;
-    else if (valid == WireState::LOGIC_0 && ready == WireState::LOGIC_0)
+    else if (valid == WireState::Logic1)
+      dataflowState = ready != WireState::Logic1 ? STALL : TRANSFER;
+    else if (valid == WireState::Logic0 && ready == WireState::Logic0)
       dataflowState = IDLE;
     else
       dataflowState = UNDEFINED;
 
-    const SignalInfo &info = valueToSignalInfo.at(val);
-    llvm::outs() << cycle << ", " << info.srcComponent << ", " << info.srcPortID
-                 << ", " << info.dstComponent << ", " << info.dstPortID << ", "
-                 << dataflowState.str() << ", " << channelState.decodeData()
-                 << "\n";
+    const ChannelInfo &info = valueToSignalInfo.at(val);
+    llvm::outs() << cycle << ", " << info.srcOpName << ", "
+                 << info.srcChannelIdx << ", " << info.dstOpName << ", "
+                 << info.dstChannelIdx << ", " << dataflowState.str() << ", "
+                 << channelState.decodeData() << "\n";
   }
 }

@@ -93,17 +93,15 @@ int main(int argc, char **argv) {
 
   writeCSVHeader(llvm::outs());
 
-  llvm::StringMap<Value> signalNameToValue;
-  if (failed(mapSignalsToValues(*modOp, signalNameToValue, true)))
+  llvm::StringMap<Value> channelNameToValue;
+  if (failed(mapSignalsToValues(*modOp, channelNameToValue, true)))
     return 1;
 
-  mlir::DenseMap<Value, SignalInfo> valueToSignalInfo;
+  mlir::DenseMap<Value, ChannelInfo> valueToChannelInfo;
   mlir::DenseMap<Value, ChannelState> state;
-  for (auto &[signalName, val] : signalNameToValue) {
-    if (isa<MemRefType>(val.getType()))
-      continue;
-    valueToSignalInfo.try_emplace(val, val, signalName);
-    state.try_emplace(val, val.getType());
+  for (auto &[signalName, val] : channelNameToValue) {
+    valueToChannelInfo.try_emplace(val, val, signalName);
+    state.insert({val, ChannelState::fromValueType(val.getType())});
   }
 
   std::string line;
@@ -132,7 +130,7 @@ int main(int argc, char **argv) {
       StringRef trimmedLine = lineRef.trim();
       if (trimmedLine.starts_with("-> State:")) {
         writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                                 valueToSignalInfo);
+                                 valueToChannelInfo);
         toUpdate.clear();
 
         // Update the cycle
@@ -180,8 +178,8 @@ int main(int argc, char **argv) {
         }
 
         auto valueIt =
-            signalNameToValue.find(opName.str() + "_" + channelName.str());
-        if (valueIt == signalNameToValue.end()) {
+            channelNameToValue.find(opName.str() + "_" + channelName.str());
+        if (valueIt == channelNameToValue.end()) {
           // llvm::errs() << "Warning: could not find signal '" << opName << "."
           //              << channelName << "' in the Handshake IR file.\n";
           continue;
@@ -194,13 +192,13 @@ int main(int argc, char **argv) {
         }
         WireState wireState;
         if (logicalValue == "TRUE") {
-          wireState = WireState::LOGIC_1;
+          wireState = WireState::Logic1;
         } else if (logicalValue == "FALSE") {
-          wireState = WireState::LOGIC_0;
+          wireState = WireState::Logic0;
         } else {
           llvm::errs() << "Warning: expected logical value 'TRUE' or 'FALSE', "
                        << "but got '" << logicalValue << "'\n";
-          wireState = WireState::UNDEFINED;
+          wireState = WireState::Undefined;
         }
 
         ChannelState &channelState = channelStateIt->second;
@@ -227,7 +225,7 @@ int main(int argc, char **argv) {
     }
   }
   writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                           valueToSignalInfo);
+                           valueToChannelInfo);
 
   return 0;
 }

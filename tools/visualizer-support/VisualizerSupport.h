@@ -31,66 +31,99 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
-enum class WireState { UNDEFINED, LOGIC_0, LOGIC_1 };
+enum class WireState { Undefined, Logic0, Logic1 };
 
-struct SignalInfo {
-  std::string signalName;
-  std::string srcComponent;
-  unsigned srcPortID;
-  std::string dstComponent;
-  unsigned dstPortID;
+struct ChannelInfo {
+  std::string channelName;
+  std::string srcOpName;
+  unsigned srcChannelIdx;
+  std::string dstOpName;
+  unsigned dstChannelIdx;
 
-  SignalInfo(Value val, StringRef signalName);
+  ChannelInfo(Value val, StringRef channelName);
 };
 
-struct ChannelState {
-  Type type;
+enum class VisualizerChannelType { SignedInt, UnsignedInt, Float, Control };
 
-  WireState valid = WireState::UNDEFINED;
-  WireState ready = WireState::UNDEFINED;
+struct ChannelState {
+  WireState valid = WireState::Undefined;
+  WireState ready = WireState::Undefined;
+
+  VisualizerChannelType type;
+  unsigned bitWidth;
   std::vector<WireState> data;
 
-  ChannelState(Type type)
-      : type(type), data(std::vector{handshake::getHandshakeTypeBitWidth(type),
-                                     WireState::UNDEFINED}) {}
+  ChannelState(VisualizerChannelType type, unsigned bitWidth)
+      : type(type), bitWidth(bitWidth),
+        data(std::vector{bitWidth, WireState::Undefined}) {}
+
+  static ChannelState fromValueType(Type valueType) {
+    if (auto channelType = dyn_cast<handshake::ChannelType>(valueType)) {
+      Type dataType = channelType.getDataType();
+      unsigned bitWidth = dataType.getIntOrFloatBitWidth();
+      if (auto intDataType = dyn_cast<IntegerType>(dataType)) {
+        if (intDataType.isSigned()) {
+          return ChannelState(VisualizerChannelType::SignedInt, bitWidth);
+        }
+        // Treat sign-less integers (e.g., i32) also as unsigned integers
+        return ChannelState(VisualizerChannelType::UnsignedInt, bitWidth);
+      }
+      if (dataType.isa<FloatType>()) {
+        return ChannelState(VisualizerChannelType::Float, bitWidth);
+      }
+      dataType.dump();
+      llvm_unreachable("Unsupported data type for ChannelState");
+    }
+    if (auto controlType = dyn_cast<handshake::ControlType>(valueType)) {
+      return ChannelState(VisualizerChannelType::Control, 1);
+    }
+    valueType.dump();
+    llvm_unreachable("Unsupported value type for ChannelState");
+  }
 
   std::string decodeData() const {
-    if (data.empty())
+    if (type == VisualizerChannelType::Control) {
       return "";
+    }
 
     // Build a string from the vector of bits
     std::string dataString;
-    bool partlyUndef = false;
     for (WireState bit : llvm::reverse(data)) {
       switch (bit) {
-      case WireState::UNDEFINED:
-        dataString.push_back('u');
-        partlyUndef = true;
-        break;
-      case WireState::LOGIC_0:
+      case WireState::Undefined:
+        return "u";
+      case WireState::Logic0:
         dataString.push_back('0');
         break;
-      case WireState::LOGIC_1:
+      case WireState::Logic1:
         dataString.push_back('1');
         break;
       }
     }
-    if (partlyUndef)
-      return dataString;
+    APInt intVal(bitWidth, dataString, 2);
 
-    auto channelType = cast<handshake::ChannelType>(type);
-    auto dataType = channelType.getDataType();
-    if (auto intType = dyn_cast<IntegerType>(dataType)) {
+    if (type == VisualizerChannelType::SignedInt) {
+      return std::to_string(intVal.getSExtValue());
+    }
+    if (type == VisualizerChannelType::UnsignedInt) {
       APInt intVal(data.size(), dataString, 2);
-      if (intType.isSigned())
-        return std::to_string(intVal.getSExtValue());
       return std::to_string(intVal.getZExtValue());
     }
-    if (auto floatType = dyn_cast<FloatType>(dataType)) {
-      APFloat floatVal(floatType.getFloatSemantics(), dataString);
-      return std::to_string(floatVal.convertToDouble());
+    assert(type == VisualizerChannelType::Float &&
+           "Unsupported channel type for data decoding");
+    if (bitWidth == 32) {
+      // Convert to float
+      APFloat floatVal(APFloat::IEEEsingle(), intVal);
+      return std::to_string(floatVal.convertToFloat());
     }
-    return "undef";
+    if (bitWidth == 64) {
+      // Convert to double
+      APFloat doubleVal(APFloat::IEEEdouble(), intVal);
+      return std::to_string(doubleVal.convertToDouble());
+    }
+    llvm::errs() << "Unsupported bit width for float conversion: " << bitWidth
+                 << "\n";
+    llvm_unreachable("Unsupported bit width for float conversion");
   }
 };
 
@@ -114,6 +147,6 @@ void writeCSVHeader(llvm::raw_ostream &os);
 void writeChannelStateChanges(
     llvm::raw_ostream &os, size_t cycle, const mlir::DenseSet<Value> &toUpdate,
     const mlir::DenseMap<Value, ChannelState> &state,
-    const mlir::DenseMap<Value, SignalInfo> &valueToSignalInfo);
+    const mlir::DenseMap<Value, ChannelInfo> &valueToSignalInfo);
 
 #endif // VISUALIZER_SUPPORT_H
