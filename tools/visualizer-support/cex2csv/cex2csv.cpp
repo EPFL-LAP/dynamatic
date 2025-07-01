@@ -58,8 +58,7 @@ static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::cat(mainCategory));
 
 static std::optional<WireReference>
-getWireReference(StringRef opName, StringRef signalName,
-                 const CSVBuilder &builder) {
+getWireReference(StringRef signalName, const CSVBuilder &builder) {
   SignalType signalType;
   StringRef channelName;
   if (signalName.ends_with("_valid")) {
@@ -73,7 +72,7 @@ getWireReference(StringRef opName, StringRef signalName,
     channelName = signalName;
   }
 
-  auto value = builder.getChannel(opName.str() + "_" + channelName.str());
+  auto value = builder.getChannel(channelName);
   if (!value.has_value()) {
     return std::nullopt;
   }
@@ -160,10 +159,8 @@ int main(int argc, char **argv) {
       // found
       // e.g., State 1.1 -> 1.2 -> 2.1 -> 2.2 -> ...
       csvBuilder.updateCycle(csvBuilder.getCycle() + 1);
-      llvm::errs() << "Cycle: " << csvBuilder.getCycle() << "\n";
     } else {
       if (!trimmedLine.starts_with(kernelName + ".")) {
-        llvm::errs() << "Warning: skipping line: " << line << "\n";
         continue;
       }
       StringRef signal = trimmedLine.split('=').first.trim();
@@ -172,17 +169,18 @@ int main(int argc, char **argv) {
       SmallVector<StringRef> tokens;
       signal.split(tokens, '.');
 
-      if (tokens.size() < 3) {
-        llvm::errs() << "Warning: expected at least 3 tokens in signal '"
-                     << signal << "', but got " << tokens.size() << "\n";
+      std::string signalName;
+      if (tokens.size() == 3) {
+        signalName = tokens[1].str() + "_" + tokens[2].str();
+      } else if (tokens.size() == 2) {
+        // External signals (BlockArgument or Value consumed by EndOp)
+        signalName = tokens[1];
+      } else {
         continue;
       }
 
-      StringRef opName = tokens[1];
-      StringRef signalName = tokens[2];
-
       std::optional<WireReference> wireRef =
-          getWireReference(opName, signalName, csvBuilder);
+          getWireReference(signalName, csvBuilder);
       if (!wireRef) {
         continue;
       }
