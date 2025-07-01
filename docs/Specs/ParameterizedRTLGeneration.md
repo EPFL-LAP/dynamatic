@@ -82,7 +82,7 @@ handshake::SharingWrapperOp wrapperOp =
 
 Helpful getter functions are also generated for each of its attributes.
 
-There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs (as seen in the assertion). In best practice, values like this which can be calculated should not be stored as attributes.
+There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs. In best practice, values like this which can be calculated should not be stored as attributes.
 
 ### Example to Avoid
 
