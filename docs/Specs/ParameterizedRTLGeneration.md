@@ -118,14 +118,13 @@ https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496
 
 # RTL Entity Sharing
 
-Operations in the Handshake IR are checked for uniqueness due to the desire for shared RTL entities i.e. if there are two 32-bit floating point multipliers in the circuit, the RTL defining what is a 32-bit floating point multiplier should be present only once. 
+Operations in the Handshake IR are checked for uniqueness due to the desire for shared RTL entities: if there are two 32-bit floating point multipliers in the circuit, the RTL defining what is a 32-bit floating point multiplier should be present only once. 
 
 However, if an operation has a parameter which affects RTL generation, it also affects the "uniqueness" of the operation.
 
-Currently, uniqueness is identified using a dictionary attribute called "hw.parameters". Previous documentation has specified that code anywhere in the compilation flow could instantiate hw.parameters and place data inside of it- this is not good practice, and dedicated attributes should be used instead. In future, data placed inside hw.parameters before the handshake to hardware pass will be ignored, and so code that currently does this should be updated.
+Currently, uniqueness is identified using a dictionary attribute called "hw.parameters". Previous documentation has specified that code anywhere in the compilation flow could instantiate hw.parameters and place data inside of it. However, we no longer consider this is good practice, and dedicated attributes should be used instead. We hope to eventually depreciate support for this, and if so, data placed inside hw.parameters before the handshake to hardware pass would be ignored.
 
 When an operation uses dedicated attributes, it must still eventually pass its data into hw.parameters. This is done (currently) in 
-
 
 https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca61df/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L511-L521
 
@@ -136,7 +135,7 @@ https://github.com/EPFL-LAP/dynamatic/blob/0f29d6f1f8d8277ae003f3eb9b40319a5dca6
 
 # Passing an Attribute to the Backend
 
-If the attribute has been added to "hw.parameters" to allow RTL entity sharing, then the value of that attribute is accessible by its key in the backend JSONs (rtl-config-vhdl.json, rtl-config-verliog.json, etc.)
+If the attribute has been added to "hw.parameters" to support RTL uniqueness evaluation, then the value of that attribute is accessible by its key in the backend JSONs (rtl-config-vhdl.json, rtl-config-verliog.json, etc.)
 
 In the operation's entry in the JSON, the attribute should also be listed in the operation's parameters list.
 
@@ -144,6 +143,6 @@ https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496
 
 # Future Changes to this Process
 
-The case statement in ModuleDiscriminator is an unsustainable solution. Instead, operation interfaces should be used to allow operations to internally specify what RTL parameters they have. 
+The case statement in ModuleDiscriminator is an unsustainable solution. In the future, we intend to use operation interfaces, allowing operations to internally specify what RTL parameters they have. 
 
-This is also important for our single-source-of-truth philosophy, that each tablegen entry should entirely define an MLIR operation.
+This is also important for our single-source-of-truth philosophy, which requires that each tablegen entry should entirely define an MLIR operation. The case statement in ModuleDiscriminator is an example of a distributed operation definition, which violates this principle.
