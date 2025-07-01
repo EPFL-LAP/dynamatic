@@ -146,6 +146,7 @@ struct CSVBuilder {
   void writeCSVHeader() const;
   void commitChannelStateChanges();
   void updateCycle(size_t newCycle);
+  size_t getCycle() const;
   std::optional<ChannelState> getChannelState(Value val) const;
   void updateChannelState(Value val, const ChannelState &newState);
   std::optional<Value> getChannel(StringRef channelName) const;

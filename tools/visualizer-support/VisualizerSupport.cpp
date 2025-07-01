@@ -169,6 +169,8 @@ std::optional<ChannelState> CSVBuilder::getChannelState(Value val) const {
   return it->second;
 }
 
+size_t CSVBuilder::getCycle() const { return cycle; }
+
 void CSVBuilder::updateChannelState(Value val, const ChannelState &newState) {
   auto it = states.find(val);
   if (it == states.end()) {

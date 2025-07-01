@@ -150,79 +150,62 @@ int main(int argc, char **argv) {
         << "Warning: Couldn't detect the NuSMV version from the result file.\n";
   }
 
-  bool foundCex = false;
   StringRef lineRef;
-
   while (std::getline(resultFileStream, line)) {
     lineRef = line;
-    if (foundCex) {
-      StringRef trimmedLine = lineRef.trim();
-      if (trimmedLine.starts_with("-> State:")) {
-        csvBuilder.commitChannelStateChanges();
-
-        // Update the cycle
-        // trimmedLine is: -> State: 2.1 <-
-        // Extract the "1"
-        unsigned cycle;
-        bool failed = trimmedLine.substr(0, trimmedLine.size() - 3)
-                          .split('.')
-                          .second.getAsInteger(10, cycle);
-        if (failed) {
-          llvm::errs() << "Failed to parse cycle from line: " << line << "\n";
-          return 1;
-        }
-        csvBuilder.updateCycle(cycle);
-      } else {
-        if (!trimmedLine.starts_with(kernelName + ".")) {
-          llvm::errs() << "Warning: skipping line: " << line << "\n";
-          continue;
-        }
-        StringRef signal = trimmedLine.split('=').first.trim();
-        StringRef logicalValue = trimmedLine.split('=').second.trim();
-
-        SmallVector<StringRef> tokens;
-        signal.split(tokens, '.');
-
-        if (tokens.size() < 3) {
-          llvm::errs() << "Warning: expected at least 3 tokens in signal '"
-                       << signal << "', but got " << tokens.size() << "\n";
-          continue;
-        }
-
-        StringRef opName = tokens[1];
-        StringRef signalName = tokens[2];
-
-        std::optional<WireReference> wireRef =
-            getWireReference(opName, signalName, csvBuilder);
-        if (!wireRef) {
-          continue;
-        }
-
-        auto channelState = csvBuilder.getChannelState(wireRef->value);
-        assert(channelState.has_value() &&
-               "Expected channel state to be available for the wire reference");
-
-        WireState wireState = getWireState(logicalValue);
-        switch (wireRef->signalType) {
-        case SignalType::VALID:
-          channelState->valid = wireState;
-          break;
-        case SignalType::READY:
-          channelState->ready = wireState;
-          break;
-        case SignalType::DATA:
-          // Assuming 1-bit data
-          channelState->data[0] = wireState;
-          break;
-        }
-
-        csvBuilder.updateChannelState(wireRef->value, *channelState);
-      }
+    StringRef trimmedLine = lineRef.trim();
+    if (trimmedLine.starts_with("-> State:")) {
+      // Update the cycle
+      csvBuilder.commitChannelStateChanges();
+      // Always increment the cycle by 1, even if another counterexample is
+      // found
+      // e.g., State 1.1 -> 1.2 -> 2.1 -> 2.2 -> ...
+      csvBuilder.updateCycle(csvBuilder.getCycle() + 1);
     } else {
-      if (lineRef.starts_with("Trace Type:")) {
-        foundCex = true;
+      if (!trimmedLine.starts_with(kernelName + ".")) {
+        llvm::errs() << "Warning: skipping line: " << line << "\n";
         continue;
       }
+      StringRef signal = trimmedLine.split('=').first.trim();
+      StringRef logicalValue = trimmedLine.split('=').second.trim();
+
+      SmallVector<StringRef> tokens;
+      signal.split(tokens, '.');
+
+      if (tokens.size() < 3) {
+        llvm::errs() << "Warning: expected at least 3 tokens in signal '"
+                     << signal << "', but got " << tokens.size() << "\n";
+        continue;
+      }
+
+      StringRef opName = tokens[1];
+      StringRef signalName = tokens[2];
+
+      std::optional<WireReference> wireRef =
+          getWireReference(opName, signalName, csvBuilder);
+      if (!wireRef) {
+        continue;
+      }
+
+      auto channelState = csvBuilder.getChannelState(wireRef->value);
+      assert(channelState.has_value() &&
+             "Expected channel state to be available for the wire reference");
+
+      WireState wireState = getWireState(logicalValue);
+      switch (wireRef->signalType) {
+      case SignalType::VALID:
+        channelState->valid = wireState;
+        break;
+      case SignalType::READY:
+        channelState->ready = wireState;
+        break;
+      case SignalType::DATA:
+        // Assuming 1-bit data
+        channelState->data[0] = wireState;
+        break;
+      }
+
+      csvBuilder.updateChannelState(wireRef->value, *channelState);
     }
   }
   csvBuilder.commitChannelStateChanges();
