@@ -62,30 +62,29 @@ static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::cat(mainCategory));
 
 static std::optional<WireReference>
-fromSignal(StringRef signalName, const llvm::StringMap<Value> &channels) {
+getWireReference(StringRef signalName, const CSVBuilder &builder) {
+  StringRef channelName;
+  SignalType signalType;
+  std::optional<unsigned> dataIdx;
+
   // Check if this is a data signal
   if (signalName.ends_with(")")) {
     // Try to extract the vector's index from the signal name
-    size_t idx = signalName.rfind("(");
-    if (idx == std::string::npos)
+    size_t lBracketPos = signalName.rfind("(");
+    if (lBracketPos == std::string::npos)
       return std::nullopt;
-    StringRef dataIdxStr = signalName.slice(idx + 1, signalName.size() - 1);
+    StringRef dataIdxStr =
+        signalName.slice(lBracketPos + 1, signalName.size() - 1);
 
     // Try to convert the index to an unsigned
-    unsigned dataIdx;
-    if (dataIdxStr.getAsInteger(10, dataIdx))
+    unsigned dataIdxValue;
+    if (dataIdxStr.getAsInteger(10, dataIdxValue))
       return std::nullopt;
+    dataIdx = dataIdxValue;
 
-    // Try to match the port's name to an SSA value
-    StringRef portName = signalName.slice(0, idx);
-    auto portIt = channels.find(portName);
-    if (portIt == channels.end())
-      return std::nullopt;
-    return WireReference{portIt->second, SignalType::DATA, dataIdx};
+    channelName = signalName.slice(0, lBracketPos);
+    signalType = SignalType::DATA;
   }
-
-  StringRef channelName;
-  SignalType signalType;
   if (signalName.ends_with("_valid")) {
     channelName = signalName.drop_back(6);
     signalType = SignalType::VALID;
@@ -94,14 +93,14 @@ fromSignal(StringRef signalName, const llvm::StringMap<Value> &channels) {
     signalType = SignalType::READY;
   }
 
-  auto channelIt = channels.find(channelName);
-  if (channelIt == channels.end())
+  auto channel = builder.getChannel(channelName);
+  if (!channel)
     return std::nullopt;
 
-  return WireReference{channelIt->second, signalType, std::nullopt};
+  return WireReference{*channel, signalType, dataIdx};
 }
 
-static WireState wireStateFromLog(StringRef token) {
+static WireState getWireState(StringRef token) {
   StringRef state = token.drop_front(2).drop_back(2);
   if (state == "1")
     return WireState::Logic1;
@@ -146,22 +145,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  writeCSVHeader(llvm::outs());
-
-  llvm::StringMap<Value> channelNameToValue;
-  if (failed(mapSignalsToValues(*modOp, channelNameToValue)))
+  CSVBuilder csvBuilder(llvm::outs());
+  if (failed(csvBuilder.initialize(*modOp))) {
+    llvm::errs() << "Failed to initialize CSV builder with the module.\n";
     return 1;
-
-  mlir::DenseMap<Value, ChannelInfo> valueToChannelInfo;
-  mlir::DenseMap<Value, ChannelState> state;
-  for (auto &[signalName, val] : channelNameToValue) {
-    valueToChannelInfo.try_emplace(val, val, signalName);
-    state.insert({val, ChannelState::fromValueType(val.getType())});
   }
 
+  csvBuilder.writeCSVHeader();
+
   std::map<size_t, WireReference> wires;
-  mlir::DenseSet<Value> toUpdate;
-  size_t cycle = 0;
   unsigned long long period = PERIOD_NS, halfPeriod = period >> 1;
 
   // Read the LOG file line by line
@@ -230,15 +222,13 @@ int main(int argc, char **argv) {
                      tokens[2]);
       }
       StringRef signalName = StringRef{tokens[1]}.drop_front(level.size());
-      if (auto wire = fromSignal(signalName, channelNameToValue))
+      if (auto wire = getWireReference(signalName, csvBuilder))
         wires.insert({wireID, *wire});
       return success();
     };
 
     LogCallback newTimestep = [&]() {
-      writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                               valueToChannelInfo);
-      toUpdate.clear();
+      csvBuilder.commitChannelStateChanges();
 
       // Parse the current simulation time and derive the current cycle number
       std::string timeStr = tokens[1].str();
@@ -249,7 +239,8 @@ int main(int argc, char **argv) {
         return error("expected integer identifier for time, but got " +
                      timeStr);
       }
-      cycle = (time < period) ? 0 : (time - halfPeriod) / period + 1;
+      csvBuilder.updateCycle(time < period ? 0
+                                           : (time - halfPeriod) / period + 1);
       return success();
     };
 
@@ -266,31 +257,30 @@ int main(int argc, char **argv) {
         return success();
 
       WireReference &wire = wireIt->second;
-      auto channelStateIt = state.find(wire.value);
-      assert(channelStateIt != state.end());
-      ChannelState &channelState = channelStateIt->second;
-      WireState wireState = wireStateFromLog(tokens[2]);
+      auto channelState = csvBuilder.getChannelState(wire.value);
+      assert(channelState.has_value());
+      WireState wireState = getWireState(tokens[2]);
 
       switch (wire.signalType) {
       case SignalType::VALID:
-        channelState.valid = wireState;
+        channelState->valid = wireState;
         break;
       case SignalType::READY:
-        channelState.ready = wireState;
+        channelState->ready = wireState;
         break;
       case SignalType::DATA:
         if (!wire.idx)
           return error("index undefined for data wire");
-        if (*wire.idx >= channelState.data.size()) {
+        if (*wire.idx >= channelState->data.size()) {
           return error("index out of bounds, expected number between 0 and " +
-                       std::to_string(channelState.data.size()) + ", but got " +
-                       std::to_string(*wire.idx));
+                       std::to_string(channelState->data.size()) +
+                       ", but got " + std::to_string(*wire.idx));
         }
-        channelState.data[*wire.idx] = wireState;
+        channelState->data[*wire.idx] = wireState;
         break;
       }
 
-      toUpdate.insert(wire.value);
+      csvBuilder.updateChannelState(wire.value, *channelState);
       return success();
     };
 

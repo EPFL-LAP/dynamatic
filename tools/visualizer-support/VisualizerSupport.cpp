@@ -67,9 +67,8 @@ ChannelInfo::ChannelInfo(Value val, StringRef signalName)
   }
 }
 
-LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
-                                 llvm::StringMap<Value> &ports,
-                                 bool mapOperands) {
+LogicalResult CSVBuilder::initialize(mlir::ModuleOp modOp,
+                                     bool registerOperands) {
   // Extract the non-external Handshake function from the module
   handshake::FuncOp funcOp = nullptr;
   for (auto op : modOp.getOps<handshake::FuncOp>()) {
@@ -95,20 +94,20 @@ LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
   handshake::PortNamer argNameGen(funcOp);
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     if (arg.getType().isa<handshake::ControlType, handshake::ChannelType>())
-      ports.insert({argNameGen.getInputName(idx), arg});
+      channelNameToValue.insert({argNameGen.getInputName(idx), arg});
   }
 
   // Then associate names to each operation's results
   for (Operation &op : funcOp.getOps()) {
     handshake::PortNamer opNameGen(&op);
-    if (mapOperands) {
+    if (registerOperands) {
       // Only needed for SMV
       for (auto [idx, oprd] : llvm::enumerate(op.getOperands())) {
         if (oprd.getType()
                 .isa<handshake::ControlType, handshake::ChannelType>()) {
           std::string signalName = getUniqueName(&op).str() + "_" +
                                    opNameGen.getInputName(idx).str();
-          ports.insert({signalName, oprd});
+          channelNameToValue.insert({signalName, oprd});
         }
       }
     }
@@ -116,42 +115,73 @@ LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
       if (res.getType().isa<handshake::ControlType, handshake::ChannelType>()) {
         std::string signalName =
             getUniqueName(&op).str() + "_" + opNameGen.getOutputName(idx).str();
-        ports.insert({signalName, res});
+        channelNameToValue.insert({signalName, res});
       }
     }
+  }
+
+  for (auto &[signalName, val] : channelNameToValue) {
+    channelInfos.try_emplace(val, val, signalName);
+    states.insert({val, ChannelState::fromValueType(val.getType())});
   }
 
   return success();
 }
 
-void writeCSVHeader(llvm::raw_ostream &os) {
+void CSVBuilder::writeCSVHeader() const {
   os << "cycle, src_component, src_port, dst_component, dst_port, "
         "state, data\n";
 }
 
-void writeChannelStateChanges(
-    llvm::raw_ostream &os, size_t cycle, const mlir::DenseSet<Value> &toUpdate,
-    const mlir::DenseMap<Value, ChannelState> &state,
-    const mlir::DenseMap<Value, ChannelInfo> &valueToSignalInfo) {
+void CSVBuilder::commitChannelStateChanges() {
+  // Write the channel state changes to the output stream
   for (Value val : toUpdate) {
-    const ChannelState &channelState = state.at(val);
+    const ChannelState &channelState = states.at(val);
     WireState valid = channelState.valid;
     WireState ready = channelState.ready;
 
     StringRef dataflowState;
     if (valid != WireState::Logic1 && ready == WireState::Logic1)
-      dataflowState = ACCEPT;
+      dataflowState = "accept";
     else if (valid == WireState::Logic1)
-      dataflowState = ready != WireState::Logic1 ? STALL : TRANSFER;
+      dataflowState = ready != WireState::Logic1 ? "stall" : "transfer";
     else if (valid == WireState::Logic0 && ready == WireState::Logic0)
-      dataflowState = IDLE;
+      dataflowState = "idle";
     else
-      dataflowState = UNDEFINED;
+      dataflowState = "undefined";
 
-    const ChannelInfo &info = valueToSignalInfo.at(val);
-    llvm::outs() << cycle << ", " << info.srcOpName << ", "
-                 << info.srcChannelIdx << ", " << info.dstOpName << ", "
-                 << info.dstChannelIdx << ", " << dataflowState.str() << ", "
-                 << channelState.decodeData() << "\n";
+    const ChannelInfo &info = channelInfos.at(val);
+    os << cycle << ", " << info.srcOpName << ", " << info.srcChannelIdx << ", "
+       << info.dstOpName << ", " << info.dstChannelIdx << ", "
+       << dataflowState.str() << ", " << channelState.decodeData() << "\n";
   }
+
+  // Clear the toUpdate set for the next cycle
+  toUpdate.clear();
+}
+
+void CSVBuilder::updateCycle(size_t newCycle) { cycle = newCycle; }
+
+std::optional<ChannelState> CSVBuilder::getChannelState(Value val) const {
+  auto it = states.find(val);
+  if (it == states.end())
+    return std::nullopt;
+  return it->second;
+}
+
+void CSVBuilder::updateChannelState(Value val, const ChannelState &newState) {
+  auto it = states.find(val);
+  if (it == states.end()) {
+    states.insert({val, newState});
+  } else {
+    it->second = newState;
+  }
+  toUpdate.insert(val);
+}
+
+std::optional<Value> CSVBuilder::getChannel(StringRef channelName) const {
+  auto it = channelNameToValue.find(channelName);
+  if (it == channelNameToValue.end())
+    return std::nullopt;
+  return it->second;
 }

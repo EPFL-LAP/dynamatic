@@ -24,6 +24,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cstddef>
 #include <optional>
 #include <string>
 
@@ -135,17 +137,26 @@ struct WireReference {
   std::optional<size_t> idx;
 };
 
-LogicalResult mapSignalsToValues(mlir::ModuleOp modOp,
-                                 llvm::StringMap<Value> &ports,
-                                 bool mapOperands = false);
+struct CSVBuilder {
+  CSVBuilder(llvm::raw_ostream &os)
+      : os(os), channelNameToValue({}), toUpdate({}), states({}),
+        channelInfos({}) {}
 
-static constexpr StringLiteral ACCEPT("accept"), STALL("stall"),
-    TRANSFER("transfer"), IDLE("idle"), UNDEFINED("undefined");
+  LogicalResult initialize(mlir::ModuleOp modOp, bool registerOperands = false);
+  void writeCSVHeader() const;
+  void commitChannelStateChanges();
+  void updateCycle(size_t newCycle);
+  std::optional<ChannelState> getChannelState(Value val) const;
+  void updateChannelState(Value val, const ChannelState &newState);
+  std::optional<Value> getChannel(StringRef channelName) const;
 
-void writeCSVHeader(llvm::raw_ostream &os);
-void writeChannelStateChanges(
-    llvm::raw_ostream &os, size_t cycle, const mlir::DenseSet<Value> &toUpdate,
-    const mlir::DenseMap<Value, ChannelState> &state,
-    const mlir::DenseMap<Value, ChannelInfo> &valueToSignalInfo);
+private:
+  llvm::raw_ostream &os;
+  size_t cycle = 0;
+  llvm::StringMap<Value> channelNameToValue;
+  mlir::DenseSet<Value> toUpdate;
+  mlir::DenseMap<Value, ChannelState> states;
+  mlir::DenseMap<Value, ChannelInfo> channelInfos;
+};
 
 #endif // VISUALIZER_SUPPORT_H

@@ -59,8 +59,8 @@ static cl::opt<std::string> kernelName(cl::Positional, cl::Required,
                                        cl::cat(mainCategory));
 
 static std::optional<WireReference>
-fromSignal(StringRef opName, StringRef signalName,
-           const llvm::StringMap<Value> &channels) {
+getWireReference(StringRef opName, StringRef signalName,
+                 const CSVBuilder &builder) {
   SignalType signalType;
   StringRef channelName;
   if (signalName.ends_with("_valid")) {
@@ -74,15 +74,15 @@ fromSignal(StringRef opName, StringRef signalName,
     channelName = signalName;
   }
 
-  auto valueIt = channels.find(opName.str() + "_" + channelName.str());
-  if (valueIt == channels.end()) {
+  auto value = builder.getChannel(channelName);
+  if (!value.has_value()) {
     return std::nullopt;
   }
 
-  return WireReference{valueIt->second, signalType, std::nullopt};
+  return WireReference{*value, signalType, std::nullopt};
 }
 
-static WireState wireStateFromLog(StringRef logicalValue) {
+static WireState getWireState(StringRef logicalValue) {
   if (logicalValue == "TRUE") {
     return WireState::Logic1;
   }
@@ -127,18 +127,13 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  writeCSVHeader(llvm::outs());
-
-  llvm::StringMap<Value> channelNameToValue;
-  if (failed(mapSignalsToValues(*modOp, channelNameToValue, true)))
+  CSVBuilder csvBuilder(llvm::outs());
+  if (failed(csvBuilder.initialize(*modOp, true))) {
+    llvm::errs() << "Failed to initialize CSV builder with the module.\n";
     return 1;
-
-  mlir::DenseMap<Value, ChannelInfo> valueToChannelInfo;
-  mlir::DenseMap<Value, ChannelState> state;
-  for (auto &[signalName, val] : channelNameToValue) {
-    valueToChannelInfo.try_emplace(val, val, signalName);
-    state.insert({val, ChannelState::fromValueType(val.getType())});
   }
+
+  csvBuilder.writeCSVHeader();
 
   std::string line;
 
@@ -157,21 +152,18 @@ int main(int argc, char **argv) {
 
   bool foundCex = false;
   StringRef lineRef;
-  size_t cycle;
-  mlir::DenseSet<Value> toUpdate;
 
   while (std::getline(resultFileStream, line)) {
     lineRef = line;
     if (foundCex) {
       StringRef trimmedLine = lineRef.trim();
       if (trimmedLine.starts_with("-> State:")) {
-        writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                                 valueToChannelInfo);
-        toUpdate.clear();
+        csvBuilder.commitChannelStateChanges();
 
         // Update the cycle
         // trimmedLine is: -> State: 2.1 <-
         // Extract the "1"
+        unsigned cycle;
         bool failed = trimmedLine.substr(0, trimmedLine.size() - 3)
                           .split('.')
                           .second.getAsInteger(10, cycle);
@@ -179,7 +171,7 @@ int main(int argc, char **argv) {
           llvm::errs() << "Failed to parse cycle from line: " << line << "\n";
           return 1;
         }
-        llvm::errs() << "Cycle: " << cycle << "\n";
+        csvBuilder.updateCycle(cycle);
       } else {
         if (!trimmedLine.starts_with(kernelName + ".")) {
           llvm::errs() << "Warning: skipping line: " << line << "\n";
@@ -201,34 +193,30 @@ int main(int argc, char **argv) {
         StringRef signalName = tokens[2];
 
         std::optional<WireReference> wireRef =
-            fromSignal(opName, signalName, channelNameToValue);
+            getWireReference(opName, signalName, csvBuilder);
         if (!wireRef) {
           continue;
         }
 
-        auto channelStateIt = state.find(wireRef->value);
-        if (channelStateIt == state.end()) {
-          llvm::errs() << "Warning: could not find channel state for signal '"
-                       << opName << "." << signalName << "'\n";
-          continue;
-        }
+        auto channelState = csvBuilder.getChannelState(wireRef->value);
+        assert(channelState.has_value() &&
+               "Expected channel state to be available for the wire reference");
 
-        WireState wireState = wireStateFromLog(logicalValue);
-        ChannelState &channelState = channelStateIt->second;
+        WireState wireState = getWireState(logicalValue);
         switch (wireRef->signalType) {
         case SignalType::VALID:
-          channelState.valid = wireState;
+          channelState->valid = wireState;
           break;
         case SignalType::READY:
-          channelState.ready = wireState;
+          channelState->ready = wireState;
           break;
         case SignalType::DATA:
           // Assuming 1-bit data
-          channelState.data[0] = wireState;
+          channelState->data[0] = wireState;
           break;
         }
 
-        toUpdate.insert(wireRef->value);
+        csvBuilder.updateChannelState(wireRef->value, *channelState);
       }
     } else {
       if (lineRef.starts_with("Trace Type:")) {
@@ -237,8 +225,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  writeChannelStateChanges(llvm::outs(), cycle, toUpdate, state,
-                           valueToChannelInfo);
+  csvBuilder.commitChannelStateChanges();
 
   return 0;
 }
