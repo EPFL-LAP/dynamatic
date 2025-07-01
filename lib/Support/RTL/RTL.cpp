@@ -297,22 +297,11 @@ void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
                                               hw::ModuleType &modType) {
   // Look for INTERNAL_DELAY in hw.parameters
   if (auto paramsAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters")) {
-    if (auto selectedDelay = paramsAttr.get("INTERNAL_DELAY")) {
-      if (auto stringAttr = selectedDelay.dyn_cast<StringAttr>()) {
-        std::string delayStr = stringAttr.getValue().str();
-        serializedParams["INTERNAL_DELAY"] = delayStr;
-        return;
-      }
+    if (auto stringAttr = paramsAttr.getAs<StringAttr>("INTERNAL_DELAY")) {
+      std::string delayStr = stringAttr.getValue().str();
+      serializedParams["INTERNAL_DELAY"] = delayStr;
+      return;
     }
-  }
-
-  // Fallback: also check for direct attribute (in case some modules have it
-  // there)
-  if (auto selectedDelay = modOp->getAttrOfType<StringAttr>("internal_delay")) {
-    std::string delayStr = selectedDelay.getValue().str();
-    serializedParams["INTERNAL_DELAY"] = delayStr;
-  } else {
-    serializedParams["INTERNAL_DELAY"] = "0.0";
   }
 }
 
