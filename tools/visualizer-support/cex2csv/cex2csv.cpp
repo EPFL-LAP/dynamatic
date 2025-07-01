@@ -73,7 +73,7 @@ getWireReference(StringRef opName, StringRef signalName,
     channelName = signalName;
   }
 
-  auto value = builder.getChannel(channelName);
+  auto value = builder.getChannel(opName.str() + "_" + channelName.str());
   if (!value.has_value()) {
     return std::nullopt;
   }
@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
       // found
       // e.g., State 1.1 -> 1.2 -> 2.1 -> 2.2 -> ...
       csvBuilder.updateCycle(csvBuilder.getCycle() + 1);
+      llvm::errs() << "Cycle: " << csvBuilder.getCycle() << "\n";
     } else {
       if (!trimmedLine.starts_with(kernelName + ".")) {
         llvm::errs() << "Warning: skipping line: " << line << "\n";
