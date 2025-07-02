@@ -27,10 +27,6 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
      `ArithDialect`.
   }];
 
-  // let extraClassDeclaration = [{
-  //   static constexpr ::llvm::StringLiteral INTERNAL_DELAY_ATTR_NAME = "internal_delay";
-  // }];
-
   let methods = [
     InterfaceMethod<[{
       Sets the internal delay as a StringAttr named "internal_delay".
