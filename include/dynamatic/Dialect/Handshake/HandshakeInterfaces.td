@@ -45,7 +45,7 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
       Operation *op = $_op.getOperation();
       if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
         return attr;
-      return StringAttr::get($_op.getContext(), "0.0");
+      return StringAttr::get(op->getContext(), "0.0");
     }]>
   ];
 }
