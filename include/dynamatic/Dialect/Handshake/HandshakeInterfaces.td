@@ -42,7 +42,7 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
     InterfaceMethod<[{
       Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
     }], "StringAttr", "getInternalDelay", (ins), [{
-      if (auto attr = $_op.getAttrOfType<StringAttr>("internal_delay"))
+      if (auto attr = $_op.template getAttrOfType<StringAttr>("internal_delay"))
         return attr;
       return StringAttr::get($_op.getContext(), "0.0");
     }]>
