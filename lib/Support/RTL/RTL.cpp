@@ -296,7 +296,8 @@ void RTLMatch::registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
                                               llvm::StringRef modName,
                                               hw::ModuleType &modType) {
   // Look for INTERNAL_DELAY in hw.parameters
-  if (auto paramsAttr = modOp->getAttrOfType<DictionaryAttr>("hw.parameters")) {
+  if (auto paramsAttr =
+          modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
     if (auto stringAttr = paramsAttr.getAs<StringAttr>("INTERNAL_DELAY")) {
       std::string delayStr = stringAttr.getValue().str();
       serializedParams["INTERNAL_DELAY"] = delayStr;
