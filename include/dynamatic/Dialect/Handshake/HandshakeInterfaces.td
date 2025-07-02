@@ -27,22 +27,22 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
      `ArithDialect`.
   }];
 
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral INTERNAL_DELAY_ATTR_NAME = "internal_delay";
-  }];
+  // let extraClassDeclaration = [{
+  //   static constexpr ::llvm::StringLiteral INTERNAL_DELAY_ATTR_NAME = "internal_delay";
+  // }];
 
   let methods = [
     InterfaceMethod<[{
       Sets the internal delay as a StringAttr named "internal_delay".
     }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
-      $_op.setAttr(INTERNAL_DELAY_ATTR_NAME,
+      $_op.setAttr("internal_delay",
                    StringAttr::get($_op.getContext(), value));
     }]>,
     
     InterfaceMethod<[{
       Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
     }], "StringAttr", "getInternalDelay", (ins), [{
-      if (auto attr = $_op.getAttrOfType<StringAttr>(INTERNAL_DELAY_ATTR_NAME))
+      if (auto attr = $_op.getAttrOfType<StringAttr>("internal_delay"))
         return attr;
       return StringAttr::get($_op.getContext(), "0.0");
     }]>
