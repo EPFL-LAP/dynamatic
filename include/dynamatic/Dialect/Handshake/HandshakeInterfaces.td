@@ -26,6 +26,22 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
      Handshake operations which semantically correspond to an operation from the
      `ArithDialect`.
   }];
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INTERNAL_DELAY_ATTR_NAME = "internal_delay";
+  }];
+
+  let methods = [
+    InterfaceMethod<"void", "setInternalDelay", (ins "StringRef":$value), [{
+      this->setAttr("INTERNAL_DELAY_ATTR_NAME",
+                    StringAttr::get(this->getContext(), value));
+    }]>,
+    InterfaceMethod<"StringAttr", "getInternalDelay", (ins), [{
+      if (auto attr = this->getAttrOfType<StringAttr>("INTERNAL_DELAY_ATTR_NAME"))
+        return attr;
+      return StringAttr::get(this->getContext(), "0.0");
+    }]>
+  ];
 }
 
 def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
