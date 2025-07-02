@@ -93,6 +93,7 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
   inheritBB(condBrOp, loopContinueSuppressor);
 
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
+  inheritBB(condBrOp, conditionGenerator);
   ConstantOp conditionConstant = builder.create<ConstantOp>(
       specLoc, IntegerAttr::get(conditionType.getDataType(), 1),
       conditionGenerator.getResult());
@@ -108,14 +109,9 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
                                      conditionConstant.getResult()});
   inheritBB(condBrOp, merge);
 
-  BufferOp oehb = builder.create<BufferOp>(specLoc, merge.getResult(),
-                                           TimingInfo::break_dv(), 1,
-                                           BufferOp::ONE_SLOT_BREAK_DV);
-  inheritBB(condBrOp, oehb);
-
-  BufferOp tehb =
-      builder.create<BufferOp>(specLoc, oehb.getResult(), TimingInfo::break_r(),
-                               1, BufferOp::ONE_SLOT_BREAK_R);
+  BufferOp tehb = builder.create<BufferOp>(specLoc, merge.getResult(),
+                                           TimingInfo::break_r(), 1,
+                                           BufferOp::ONE_SLOT_BREAK_R);
   inheritBB(condBrOp, tehb);
 
   generatedConditionBackedge.setValue(tehb.getResult());
@@ -176,7 +172,7 @@ void HandshakeSpeculationV2Pass::replaceBranches(FuncOp &funcOp,
 
     PasserOp exitSuppressor = builder.create<PasserOp>(
         branchOp.getLoc(), branchOp.getDataOperand(), specLoopExit.value());
-    inheritBB(branchOp, loopSuppressor);
+    inheritBB(branchOp, exitSuppressor);
     branchOp.getFalseResult().replaceAllUsesWith(exitSuppressor.getResult());
 
     branchOp->erase();
@@ -255,7 +251,7 @@ void HandshakeSpeculationV2Pass::placeCommitsTraversal(
     builder.setInsertionPoint(currOp);
     PasserOp commitSuppressor = builder.create<PasserOp>(
         confirmSpec.value().getLoc(), currOpOperand.get(), confirmSpec.value());
-    inheritBB(currOp, commitSuppressor);
+    inheritBB(currOpOperand.get().getDefiningOp(), commitSuppressor);
     currOpOperand.get().replaceAllUsesExcept(commitSuppressor.getResult(),
                                              commitSuppressor);
     return;
