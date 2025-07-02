@@ -35,16 +35,16 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
     InterfaceMethod<[{
       Sets the internal delay as a StringAttr named "internal_delay".
     }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
-      this->setAttr(INTERNAL_DELAY_ATTR_NAME,
-                    StringAttr::get(this->getContext(), value));
+      $_op.setAttr(INTERNAL_DELAY_ATTR_NAME,
+                   StringAttr::get($_op.getContext(), value));
     }]>,
     
     InterfaceMethod<[{
       Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
     }], "StringAttr", "getInternalDelay", (ins), [{
-      if (auto attr = this->getAttrOfType<StringAttr>(INTERNAL_DELAY_ATTR_NAME))
+      if (auto attr = $_op.getAttrOfType<StringAttr>(INTERNAL_DELAY_ATTR_NAME))
         return attr;
-      return StringAttr::get(this->getContext(), "0.0");
+      return StringAttr::get($_op.getContext(), "0.0");
     }]>
   ];
 }
