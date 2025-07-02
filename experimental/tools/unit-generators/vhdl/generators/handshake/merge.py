@@ -1,7 +1,5 @@
 from generators.support.signal_manager import generate_concat_signal_manager
 from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
-from generators.handshake.merge_notehb import generate_merge_notehb
-from generators.handshake.tehb import generate_tehb
 
 
 def generate_merge(name, params):
@@ -19,12 +17,6 @@ def generate_merge(name, params):
 
 
 def _generate_merge_dataless(name, size):
-    inner_name = f"{name}_inner"
-    tehb_name = f"{name}_tehb"
-
-    dependencies = generate_merge_notehb(inner_name, {"size": size}) + \
-        generate_tehb(tehb_name, {"bitwidth": 0, "size": 0})
-
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -47,45 +39,33 @@ end entity;
     architecture = f"""
 -- Architecture of merge_dataless
 architecture arch of {name} is
-  signal tehb_pvalid : std_logic;
-  signal tehb_ready  : std_logic;
 begin
-  merge_ins : entity work.{inner_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => ins_valid,
-      outs_ready => tehb_ready,
-      ins_ready  => ins_ready,
-      outs_valid => tehb_pvalid
-    );
+  process (ins_valid, outs_ready)
+    variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector({size} - 1 downto 0);
+  begin
+    tmp_valid_out := '0';
+    tmp_ready_out := (others => '0');
 
-  tehb : entity work.{tehb_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => tehb_pvalid,
-      outs_ready => outs_ready,
-      outs_valid => outs_valid,
-      ins_ready  => tehb_ready
-    );
+    for i in 0 to ({size} - 1) loop
+      if (ins_valid(i) = '1') then
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
+      end if;
+    end loop;
+
+    outs_valid <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
+  end process;
+
 end architecture;
 """
 
-    return dependencies + entity + architecture
+    return entity + architecture
 
 
 def _generate_merge(name, size, bitwidth):
-    inner_name = f"{name}_inner"
-    tehb_name = f"{name}_tehb"
-
-    dependencies = \
-        generate_merge_notehb(inner_name, {
-            "size": size,
-            "bitwidth": bitwidth,
-        }) + \
-        generate_tehb(tehb_name, {"bitwidth": bitwidth})
-
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -111,38 +91,34 @@ end entity;
     architecture = f"""
 -- Architecture of merge
 architecture arch of {name} is
-  signal tehb_data_in : std_logic_vector({bitwidth} - 1 downto 0);
-  signal tehb_pvalid  : std_logic;
-  signal tehb_ready   : std_logic;
 begin
+  process (ins_valid, ins, outs_ready)
+    variable tmp_data_out  : unsigned({bitwidth} - 1 downto 0);
+    variable tmp_valid_out : std_logic;
+    variable tmp_ready_out : std_logic_vector({size} - 1 downto 0);
+  begin
+    tmp_data_out  := unsigned(ins(0));
+    tmp_valid_out := '0';
+    tmp_ready_out := (others => '0');
 
-  merge_ins : entity work.{inner_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins        => ins,
-      ins_valid  => ins_valid,
-      outs_ready => tehb_ready,
-      ins_ready  => ins_ready,
-      outs       => tehb_data_in,
-      outs_valid => tehb_pvalid
-    );
+    for I in 0 to ({size} - 1) loop
+      if (ins_valid(I) = '1') then
+        tmp_data_out  := unsigned(ins(I));
+        tmp_valid_out := '1';
+        tmp_ready_out(i) := outs_ready;
+        exit;
+      end if;
+    end loop;
 
-  tehb : entity work.{tehb_name}(arch)
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => tehb_pvalid,
-      outs_ready => outs_ready,
-      outs_valid => outs_valid,
-      ins_ready  => tehb_ready,
-      ins        => tehb_data_in,
-      outs       => outs
-    );
+    outs <= std_logic_vector(resize(tmp_data_out, {bitwidth}));
+    outs_valid  <= tmp_valid_out;
+    ins_ready <= tmp_ready_out;
+  end process;
+
 end architecture;
 """
 
-    return dependencies + entity + architecture
+    return entity + architecture
 
 
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
