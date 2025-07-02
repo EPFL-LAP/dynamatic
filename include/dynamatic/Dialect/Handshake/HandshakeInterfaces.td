@@ -32,7 +32,7 @@ def ArithOpInterface : OpInterface<"ArithOpInterface"> {
   }];
 
   let methods = [
-    InterfaceMethod<"void", "setInternalDelay", (ins StringRef:$value), [{
+    InterfaceMethod<"void", "setInternalDelay", (ins ::llvm::StringRef:$value), [{
       this->setAttr(INTERNAL_DELAY_ATTR_NAME,
                     StringAttr::get(this->getContext(), value));
     }]>,
