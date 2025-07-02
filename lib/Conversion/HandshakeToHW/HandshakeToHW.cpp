@@ -649,11 +649,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
-        auto arithInterface =
-            llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op);
-        auto delayAttr = arithInterface.getInternalDelay();
-
-        addParam("INTERNAL_DELAY", delayAttr);
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
@@ -694,6 +689,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
+      
+    if (auto arithInterface =
+            llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op)) {
+        auto delayAttr = arithInterface.getInternalDelay();
+        addParam("INTERNAL_DELAY", delayAttr);
+    }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
