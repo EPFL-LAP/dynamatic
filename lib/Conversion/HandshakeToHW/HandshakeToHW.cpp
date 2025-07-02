@@ -650,7 +650,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
         auto arithInterface = 
-          llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op);
+            llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op);
         auto delayAttr = arithInterface.getInternalDelay();
 
         addParam("INTERNAL_DELAY", delayAttr);
