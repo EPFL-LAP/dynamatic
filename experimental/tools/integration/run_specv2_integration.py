@@ -12,7 +12,9 @@ DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
 POLYGEIST_CLANG_BIN = DYNAMATIC_ROOT / "bin" / "cgeist"
+CLANGXX_BIN = DYNAMATIC_ROOT / "bin" / "clang++"
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
+DYNAMATIC_PROFILER_BIN = DYNAMATIC_ROOT / "bin" / "exp-frequency-profiler"
 EXPORT_DOT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-dot"
 EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
 SIMULATE_SH = DYNAMATIC_ROOT / "tools" / \
@@ -226,14 +228,72 @@ def run_test(c_file, id, timeout):
         else:
             return fail(id, "Failed to apply transformations to handshake")
 
-    # Buffer placement (Simple buffer placement)
+    # Speculation
+    handshake_speculation = os.path.join(
+        comp_out_dir, "handshake_speculation.mlir")
+    with open(handshake_speculation, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_OPT_BIN, handshake_transformed,
+            "--handshake-speculation-v2",
+            "--handshake-materialize",
+            "--handshake-canonicalize"
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Added speculative units")
+        else:
+            return fail(id, "Failed to add speculative units")
+
+    # Buffer placement (fpga20)
+    profiler_bin = os.path.join(comp_out_dir, "profile")
+    result = subprocess.run([
+        CLANGXX_BIN, c_file,
+        "-D", "PRINT_PROFILING_INFO",
+        "-I", str(DYNAMATIC_ROOT / "include"),
+        "-Wno-deprecated",
+        "-o", profiler_bin
+    ])
+    if result.returncode == 0:
+        print("Built kernel for profiling")
+    else:
+        return fail(id, "Failed to place simple buffers")
+
+    profiler_inputs = os.path.join(comp_out_dir, "profiler-inputs.txt")
+    with open(profiler_inputs, "w") as f:
+        result = subprocess.run([profiler_bin],
+                                stdout=f,
+                                stderr=sys.stdout
+                                )
+        if result.returncode == 0:
+            print("Ran kernel for profiling")
+        else:
+            return fail(id, "Failed to kernel for profiling")
+
+    frequencies = os.path.join(comp_out_dir, "frequencies.csv")
+    with open(frequencies, "w") as f:
+        result = subprocess.run([
+            DYNAMATIC_PROFILER_BIN, cf_dyn_transformed,
+            "--top-level-function=" + kernel_name,
+            "--input-args-file=" + profiler_inputs,
+        ],
+            stdout=f,
+            stderr=sys.stdout
+        )
+        if result.returncode == 0:
+            print("Profiled cf-level")
+        else:
+            return fail(id, "Failed to profile cf-level")
+
+    # Buffer placement (FPGA20)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
     timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_transformed,
+            DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=on-merges timing-models={timing_model}"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=6.000 timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -260,27 +320,9 @@ def run_test(c_file, id, timeout):
         else:
             return fail(id, "Failed to canonicalize Handshake")
 
-    # Speculation
-    handshake_speculation = os.path.join(
-        comp_out_dir, "handshake_speculation.mlir")
-    with open(handshake_speculation, "w") as f:
-        result = subprocess.run([
-            DYNAMATIC_OPT_BIN, handshake_canonicalized,
-            "--handshake-speculation-v2",
-            "--handshake-materialize",
-            "--handshake-canonicalize"
-        ],
-            stdout=f,
-            stderr=sys.stdout
-        )
-        if result.returncode == 0:
-            print("Added speculative units")
-        else:
-            return fail(id, "Failed to add speculative units")
-
     # buffer_json = os.path.join(c_file_dir, "buffer_v2.json")
     handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
-    shutil.copy(handshake_speculation, handshake_export)
+    shutil.copy(handshake_canonicalized, handshake_export)
     # with open(buffer_json, "r") as f:
     #   buffers = json.load(f)
     #   buffer_pass_args = []
@@ -383,8 +425,8 @@ def main():
     Entry point for the script.
     """
 
-    result = run_test(INTEGRATION_FOLDER / "single_loop" /
-                      "single_loop.c", 0, 10)
+    result = run_test(INTEGRATION_FOLDER / "nested_loop" /
+                      "nested_loop.c", 0, 10)
     if result["status"] == "pass":
         color_print(result["msg"], TermColors.OKGREEN)
     elif result["status"] == "fail":
