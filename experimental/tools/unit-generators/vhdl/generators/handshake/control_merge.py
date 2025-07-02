@@ -31,7 +31,7 @@ def _generate_control_merge_dataless(name, size, index_bitwidth):
     tehb_name = f"{name}_tehb"
     fork_name = f"{name}_fork"
 
-    dependencies = generate_merge(merge_name, {"size": size}) + \
+    dependencies = generate_merge(merge_name, {"size": size, "bitwidth": 0}) + \
         generate_tehb(tehb_name, {"bitwidth": index_bitwidth}) + \
         generate_fork(fork_name, {"size": 2, "bitwidth": 0})
 
