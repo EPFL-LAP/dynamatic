@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
@@ -48,6 +49,8 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+
+#define DEBUG_TYPE "handshake-to-hw"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -653,8 +656,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         if (delayAttr) {
           addString("INTERNAL_DELAY", delayAttr.getValue());
         } else {
-          llvm::errs() << "Missing 'internal_delay' attribute in op: "
-                       << op->getName() << "\n";
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Missing 'internal_delay' attribute in op: "
+                     << op->getName() << "\n");
           addString("INTERNAL_DELAY", "0.0");
         }
       })
