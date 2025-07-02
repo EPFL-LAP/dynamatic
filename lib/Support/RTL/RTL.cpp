@@ -314,14 +314,14 @@ void RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       modName == "handshake.buffer" || modName == "handshake.cmpi" ||
       modName == "handshake.fork" || modName == "handshake.lazy_fork" ||
       modName == "handshake.merge" || modName == "handshake.muli" ||
-      modName == "handshake.sink" || modName == "handshake.subi" ||
-      modName == "handshake.shli" || modName == "handshake.blocker" ||
-      modName == "handshake.sitofp" || modName == "handshake.fptosi" ||
-      modName == "handshake.ready_remover" ||
+      modName == "handshake.not" || modName == "handshake.sink" ||
+      modName == "handshake.subi" || modName == "handshake.shli" ||
+      modName == "handshake.blocker" || modName == "handshake.sitofp" ||
+      modName == "handshake.fptosi" || modName == "handshake.ready_remover" ||
       // the first input has data bitwidth
       modName == "handshake.speculator" || modName == "handshake.spec_commit" ||
       modName == "handshake.spec_save_commit" ||
-      modName == "handshake.non_spec") {
+      modName == "handshake.non_spec" || modName == "handshake.passer") {
     // Default
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(0));
   } else if (modName == "handshake.cond_br" || modName == "handshake.select") {
@@ -423,10 +423,11 @@ void RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       modName == "handshake.cond_br" || modName == "handshake.constant" ||
       modName == "handshake.extsi" || modName == "handshake.fork" ||
       modName == "handshake.merge" || modName == "handshake.mulf" ||
-      modName == "handshake.muli" || modName == "handshake.select" ||
-      modName == "handshake.sink" || modName == "handshake.subf" ||
-      modName == "handshake.extui" || modName == "handshake.shli" ||
-      modName == "handshake.subi" || modName == "handshake.spec_save_commit" ||
+      modName == "handshake.muli" || modName == "handshake.not" ||
+      modName == "handshake.select" || modName == "handshake.sink" ||
+      modName == "handshake.subf" || modName == "handshake.extui" ||
+      modName == "handshake.shli" || modName == "handshake.subi" ||
+      modName == "handshake.spec_save_commit" ||
       modName == "handshake.speculator" || modName == "handshake.trunci" ||
       modName == "handshake.mux" || modName == "handshake.control_merge" ||
       modName == "handshake.blocker" || modName == "handshake.sitofp" ||

@@ -278,7 +278,9 @@ def BufferOp : Handshake_Op<"buffer", [
 }
 
 def InitOp : Handshake_Op<"init", [
-  HasClock, SameOperandsAndResultType
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">
 ]> {
   let summary = "init operation";
   let description = [{
@@ -538,20 +540,20 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 }
 
-def SuppressOp : Handshake_Op<"suppress", [
+def PasserOp : Handshake_Op<"passer", [
   AllTypesMatch<["data", "result"]>,
   AllExtraSignalsMatch<["data", "result", "ctrl"]>,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
-  let summary = "suppress operation";
+  let summary = "passer operation";
   let description = [{
-    The suppress operation acts as one-side conditional branch.
+    The passer operation acts as one-side conditional branch.
 
     Example:
 
     ```mlir
-    suppress %data, %ctrl : !handshake.channel<i32>, !handshake.channel<i1>
+    passer %data, %ctrl : !handshake.channel<i32>, !handshake.channel<i1>
     ```
   }];
 
@@ -1342,9 +1344,9 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   }];
 }
 
-def SpecV2CommitControlOp : Handshake_Op<"spec_v2_suppress_control", [
+def SpecV2ResolverOp : Handshake_Op<"spec_v2_resolver", [
   IsIntSizedChannel<1, "actualCondition">,
-  AllTypesMatch<["actualCondition", "generatedCondition", "ctrl"]>,
+  AllTypesMatch<["actualCondition", "generatedCondition", "confirmSpec"]>,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Generates suppression signals.";
@@ -1354,12 +1356,12 @@ def SpecV2CommitControlOp : Handshake_Op<"spec_v2_suppress_control", [
     Example:
 
     ```mlir
-    %suppressedCtrl = spec_v2_suppress_control %ctrl : !handshake.channel<i1>
+    %confirmSpec = spec_v2_suppress_control %actual, %generated : !handshake.channel<i1>
     ```
   }];
 
   let arguments = (ins ChannelType:$actualCondition, ChannelType:$generatedCondition);
-  let results = (outs ChannelType:$ctrl);
+  let results = (outs ChannelType:$confirmSpec);
   let assemblyFormat = [{
     $actualCondition $generatedCondition attr-dict `:` type($actualCondition)
   }];
@@ -1372,7 +1374,7 @@ def SpecV2CommitControlOp : Handshake_Op<"spec_v2_suppress_control", [
 
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
-      return "ctrl";
+      return "confirmSpec";
     }
   }];
 }

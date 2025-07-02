@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <bitset>
@@ -690,6 +691,15 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             addUnsigned("FIFO_DEPTH", saveCommitOp.getFifoDepth());
           })
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
+        // No parameters needed for these operations
+      })
+      .Case<handshake::InitOp>([&](auto) {
+        // No parameters needed for these operations
+      })
+      .Case<handshake::PasserOp>([&](auto) {
+        // No parameters needed for these operations
+      })
+      .Case<handshake::SpecV2ResolverOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Default([&](auto) {
@@ -1813,6 +1823,9 @@ public:
                     ConvertToHWInstance<handshake::ReadyRemoverOp>,
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
+                    ConvertToHWInstance<handshake::InitOp>,
+                    ConvertToHWInstance<handshake::PasserOp>,
+                    ConvertToHWInstance<handshake::SpecV2ResolverOp>,
 
                     // Arith operations
                     ConvertToHWInstance<handshake::AddFOp>,

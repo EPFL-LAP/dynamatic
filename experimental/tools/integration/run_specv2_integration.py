@@ -17,7 +17,7 @@ EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
 SIMULATE_SH = DYNAMATIC_ROOT / "tools" / \
     "dynamatic" / "scripts" / "simulate.sh"
 
-RTL_CONFIG = DYNAMATIC_ROOT / "data" / "rtl-config-vhdl-spec.json"
+RTL_CONFIG = DYNAMATIC_ROOT / "data" / "rtl-config-vhdl-beta.json"
 
 
 class TermColors:
@@ -160,7 +160,7 @@ def run_test(c_file, id, timeout):
 
     # Buffer placement (Simple buffer placement)
     handshake_buffered = os.path.join(comp_out_dir, "handshake_buffered.mlir")
-    timing_model = DYNAMATIC_ROOT / "data" / "components.json"
+    timing_model = DYNAMATIC_ROOT / "data" / "components-flopoco.json"
     with open(handshake_buffered, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_transformed,
@@ -295,7 +295,7 @@ def run_test(c_file, id, timeout):
     # Simulate
     print("Simulator launching")
     result = subprocess.run([
-        SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name
+        SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name, "", "false"
     ])
 
     if result.returncode == 0:

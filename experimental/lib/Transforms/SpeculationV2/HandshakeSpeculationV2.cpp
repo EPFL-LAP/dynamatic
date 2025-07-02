@@ -42,9 +42,9 @@ struct HandshakeSpeculationV2Pass
           HandshakeSpeculationV2Base<HandshakeSpeculationV2Pass> {
   HandshakeSpeculationV2Pass() {}
 
-  std::optional<Value> loopSuppressCtrl;
-  std::optional<Value> exitSuppressCtrl;
-  std::optional<Value> commitSuppressCtrl;
+  std::optional<Value> specLoopContinue;
+  std::optional<Value> specLoopExit;
+  std::optional<Value> confirmSpec;
 
   void placeSpeculator(FuncOp &funcOp, unsigned specBB);
 
@@ -75,26 +75,21 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
   OpBuilder builder(funcOp->getContext());
   builder.setInsertionPoint(condBrOp);
 
-  Value actualCondition = condBrOp.getConditionOperand();
-  Location specLoc = actualCondition.getLoc();
-  ChannelType conditionType = actualCondition.getType().cast<ChannelType>();
+  Value loopContinue = condBrOp.getConditionOperand();
+  Location specLoc = loopContinue.getLoc();
+  ChannelType conditionType = loopContinue.getType().cast<ChannelType>();
 
   // Append CommitControl
   BackedgeBuilder backedgeBuilder(builder, specLoc);
   Backedge generatedConditionBackedge = backedgeBuilder.get(conditionType);
 
-  SpecV2CommitControlOp specSuppressCtrlOp =
-      builder.create<SpecV2CommitControlOp>(specLoc, actualCondition,
-                                            generatedConditionBackedge);
-  inheritBB(condBrOp, specSuppressCtrlOp);
+  SpecV2ResolverOp specResolverOp = builder.create<SpecV2ResolverOp>(
+      specLoc, loopContinue, generatedConditionBackedge);
+  inheritBB(condBrOp, specResolverOp);
 
-  SuppressOp loopConditionSuppressor = builder.create<SuppressOp>(
-      specLoc, actualCondition, specSuppressCtrlOp.getCtrl());
-  inheritBB(condBrOp, loopConditionSuppressor);
-
-  NotOp notCondition =
-      builder.create<NotOp>(specLoc, loopConditionSuppressor.getResult());
-  inheritBB(condBrOp, notCondition);
+  PasserOp loopContinueSuppressor = builder.create<PasserOp>(
+      specLoc, loopContinue, specResolverOp.getConfirmSpec());
+  inheritBB(condBrOp, loopContinueSuppressor);
 
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
   ConstantOp conditionConstant = builder.create<ConstantOp>(
@@ -104,17 +99,20 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
 
   MergeOp merge = builder.create<MergeOp>(
       specLoc, llvm::ArrayRef<Value>{conditionConstant.getResult(),
-                                     notCondition.getResult()});
+                                     loopContinueSuppressor.getResult()});
   inheritBB(condBrOp, merge);
   generatedConditionBackedge.setValue(merge.getResult());
 
-  OrIOp orCondition = builder.create<OrIOp>(specLoc, actualCondition,
-                                            specSuppressCtrlOp.getCtrl());
-  inheritBB(condBrOp, orCondition);
+  NotOp loopContinueNot = builder.create<NotOp>(specLoc, loopContinue);
+  inheritBB(condBrOp, loopContinueNot);
 
-  loopSuppressCtrl = merge.getResult();
-  exitSuppressCtrl = orCondition.getResult();
-  commitSuppressCtrl = specSuppressCtrlOp.getCtrl();
+  AndIOp andCondition = builder.create<AndIOp>(
+      specLoc, loopContinueNot.getResult(), specResolverOp.getConfirmSpec());
+  inheritBB(condBrOp, andCondition);
+
+  specLoopContinue = merge.getResult();
+  specLoopExit = andCondition.getResult();
+  confirmSpec = specResolverOp.getConfirmSpec();
 }
 
 /// Returns operands to traverse next when placing Commit or SaveCommit.
@@ -151,16 +149,17 @@ void HandshakeSpeculationV2Pass::replaceBranches(FuncOp &funcOp,
        llvm::make_early_inc_range(funcOp.getOps<ConditionalBranchOp>())) {
     if (getLogicBB(branchOp) != specBB)
       continue;
-    branchOp.dump();
 
     // Assume trueResult is backedge
     builder.setInsertionPoint(branchOp);
-    SuppressOp loopSuppressor = builder.create<SuppressOp>(
-        branchOp.getLoc(), branchOp.getDataOperand(), loopSuppressCtrl.value());
+    PasserOp loopSuppressor = builder.create<PasserOp>(
+        branchOp.getLoc(), branchOp.getDataOperand(), specLoopContinue.value());
+    inheritBB(branchOp, loopSuppressor);
     branchOp.getTrueResult().replaceAllUsesWith(loopSuppressor.getResult());
 
-    SuppressOp exitSuppressor = builder.create<SuppressOp>(
-        branchOp.getLoc(), branchOp.getDataOperand(), exitSuppressCtrl.value());
+    PasserOp exitSuppressor = builder.create<PasserOp>(
+        branchOp.getLoc(), branchOp.getDataOperand(), specLoopExit.value());
+    inheritBB(branchOp, loopSuppressor);
     branchOp.getFalseResult().replaceAllUsesWith(exitSuppressor.getResult());
 
     branchOp->erase();
@@ -173,9 +172,9 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
   builder.setInsertionPoint(funcOp.getBodyBlock(),
                             funcOp.getBodyBlock()->begin());
 
-  InitOp initOp = builder.create<InitOp>(loopSuppressCtrl->getLoc(),
-                                         loopSuppressCtrl.value());
-  inheritBB(loopSuppressCtrl.value().getDefiningOp(), initOp);
+  InitOp initOp = builder.create<InitOp>(specLoopContinue->getLoc(),
+                                         specLoopContinue.value());
+  inheritBB(specLoopContinue.value().getDefiningOp(), initOp);
 
   for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
     if (getLogicBB(muxOp) != specBB)
@@ -184,12 +183,11 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
     assert(muxOp.getDataOperands().size() == 2 &&
            "MuxOp in specBB should have two data operands");
 
-    Operation *definingOp = muxOp.getDataOperands()[0].getDefiningOp();
+    Operation *definingOp = muxOp.getDataOperands()[1].getDefiningOp();
     if (!definingOp || getLogicBB(definingOp) != specBB) {
-      // Swap
-      Value entry = muxOp.getDataOperands()[0];
-      muxOp.getDataOperandsMutable()[0].set(muxOp.getDataOperands()[1]);
-      muxOp.getDataOperandsMutable()[1].set(entry);
+      Value entry = muxOp.getDataOperands()[1];
+      muxOp.getDataOperandsMutable()[1].set(muxOp.getDataOperands()[0]);
+      muxOp.getDataOperandsMutable()[0].set(entry);
     }
   }
 
@@ -202,19 +200,19 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
            "ControlMergeOp in specBB should have two data operands");
 
     Value entry, backedge;
-    Operation *definingOp = cmergeOp.getDataOperands()[0].getDefiningOp();
+    Operation *definingOp = cmergeOp.getDataOperands()[1].getDefiningOp();
     if (!definingOp || getLogicBB(definingOp) != specBB) {
-      entry = cmergeOp.getDataOperands()[0];
-      backedge = cmergeOp.getDataOperands()[1];
-    } else {
       entry = cmergeOp.getDataOperands()[1];
       backedge = cmergeOp.getDataOperands()[0];
+    } else {
+      entry = cmergeOp.getDataOperands()[0];
+      backedge = cmergeOp.getDataOperands()[1];
     }
 
     builder.setInsertionPoint(cmergeOp);
     MuxOp muxOp = builder.create<MuxOp>(cmergeOp.getLoc(), backedge.getType(),
                                         initOp.getResult(),
-                                        llvm::ArrayRef{backedge, entry});
+                                        llvm::ArrayRef{entry, backedge});
     inheritBB(cmergeOp, muxOp);
 
     cmergeOp.getResult().replaceAllUsesWith(muxOp.getResult());
@@ -230,7 +228,7 @@ void HandshakeSpeculationV2Pass::placeCommitsTraversal(
   Operation *currOp = currOpOperand.getOwner();
   OpBuilder builder(currOp->getContext());
 
-  if (isa<handshake::SuppressOp>(currOp)) {
+  if (isa<handshake::PasserOp>(currOp)) {
     return;
   }
 
@@ -238,15 +236,15 @@ void HandshakeSpeculationV2Pass::placeCommitsTraversal(
       isa<handshake::MemoryControllerOp>(currOp) ||
       isa<handshake::EndOp>(currOp)) {
     builder.setInsertionPoint(currOp);
-    SuppressOp commitSuppressor = builder.create<SuppressOp>(
-        commitSuppressCtrl.value().getLoc(), currOpOperand.get(),
-        commitSuppressCtrl.value());
+    PasserOp commitSuppressor = builder.create<PasserOp>(
+        confirmSpec.value().getLoc(), currOpOperand.get(), confirmSpec.value());
+    inheritBB(currOp, commitSuppressor);
     currOpOperand.get().replaceAllUsesExcept(commitSuppressor.getResult(),
                                              commitSuppressor);
     return;
   }
 
-  currOp->dump();
+  // currOp->dump();
   assert(getLogicBB(currOp) == specBB &&
          "Operation should be in the speculation BB");
 

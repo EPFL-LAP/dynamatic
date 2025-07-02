@@ -19,6 +19,7 @@ import generators.handshake.merge as merge
 import generators.handshake.mulf as mulf
 import generators.handshake.muli as muli
 import generators.handshake.mux as mux
+import generators.handshake.logical_not as logical_not
 import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
@@ -39,6 +40,9 @@ import generators.handshake.sitofp as sitofp
 import generators.handshake.fptosi as fptosi
 import generators.handshake.ready_remover as ready_remover
 import generators.handshake.valid_merger as valid_merger
+import generators.handshake.init as init
+import generators.handshake.passer as passer
+import generators.handshake.spec_v2.resolver as spec_v2_resolver
 
 
 def generate_code(name, mod_type, parameters):
@@ -77,6 +81,8 @@ def generate_code(name, mod_type, parameters):
             return muli.generate_muli(name, parameters)
         case "mux":
             return mux.generate_mux(name, parameters)
+        case "not":
+            return logical_not.generate_logical_not(name, parameters)
         case "select":
             return select.generate_select(name, parameters)
         case "sink":
@@ -117,6 +123,12 @@ def generate_code(name, mod_type, parameters):
             return ready_remover.generate_ready_remover(name, parameters)
         case "valid_merger":
             return valid_merger.generate_valid_merger(name, parameters)
+        case "init":
+            return init.generate_init(name, parameters)
+        case "passer":
+            return passer.generate_passer(name, parameters)
+        case "spec_v2_resolver":
+            return spec_v2_resolver.generate_spec_v2_resolver(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
