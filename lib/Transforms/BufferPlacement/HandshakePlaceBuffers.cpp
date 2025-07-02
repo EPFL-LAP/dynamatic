@@ -163,7 +163,7 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
-    if (auto arithInterface = 
+      if (auto arithInterface = 
             llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op)) {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
