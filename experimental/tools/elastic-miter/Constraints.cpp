@@ -2,6 +2,8 @@
 #include <regex>
 #include <string>
 
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Constraints.h"
@@ -81,55 +83,34 @@ std::string LoopConstraint::createConstraintString(
   std::string controlSeqGeneratorName = "seq_generator_" + controlSequenceName;
   std::string dataSeqGeneratorName = "seq_generator_" + dataSequenceName;
 
-  std::ostringstream falseTokenCounterString;
-  std::ostringstream forceFalseTokenInvar;
-  std::ostringstream limitFalseTokensInvar;
-  std::ostringstream seqLengthRelationInvar;
-  std::ostringstream emptyDataSequenceInvar;
+  std::string falseTokenCounterString;
+  std::string forceFalseTokenInvar;
+  std::string limitFalseTokensInvar;
+  std::string seqLengthRelationInvar;
+  std::string emptyDataSequenceInvar;
 
   // Create a counter, which counts the total number of false token at the
   // control sequence input.
-  // Example:
-  // VAR Cd_false_token_cnt : 0..31;
-  // ASSIGN init(Cd_false_token_cnt) := 0;
-  // ASSIGN next(Cd_false_token_cnt) := case
-  //   seq_generator_Cd.outs_valid & seq_generator_Cd.nReady0 &
-  //   (seq_generator_Cd.outs = FALSE) & (Cd_false_token_cnt <
-  //   seq_generator_Dd.exact_tokens) : (Cd_false_token_cnt + 1); TRUE :
-  //   Cd_false_token_cnt;
-  // esac;
-  falseTokenCounterString << "VAR " << falseCounterTokenCounterVariable
-                          << " : 0..31;\n"
-                          << "ASSIGN init(" << falseCounterTokenCounterVariable
-                          << ") := 0;\n"
-                          << "ASSIGN next(" << falseCounterTokenCounterVariable
-                          << ") := case\n"
-                          << "  " << controlSeqGeneratorName << ".outs_valid & "
-                          << controlSeqGeneratorName << ".nReady0 & ("
-                          << controlSeqGeneratorName << ".outs = FALSE) & ("
-                          << falseCounterTokenCounterVariable << " < "
-                          << dataSeqGeneratorName << ".exact_tokens) : ("
-                          << falseCounterTokenCounterVariable << " + 1);\n"
-                          << "  TRUE : " << falseCounterTokenCounterVariable
-                          << ";\n"
-                          << "esac;\n";
+  falseTokenCounterString = llvm::formatv(
+      R"DELIM(VAR {0} : 0..31;
+ASSIGN init({0}) := 0;
+ASSIGN next({0}) := case
+  {1}.outs_valid & {1}.nReady0 & ({1}.outs = FALSE) & ({0} < {2}.exact_tokens) : ({0} + 1);
+  TRUE : {0};
+esac;
+)DELIM",
+      falseCounterTokenCounterVariable, controlSeqGeneratorName,
+      dataSeqGeneratorName);
 
   // Make sure enough false tokens are generated. When there are as many false
   // tokens that still need to be generated, as there are total control tokens
   // that can be generated, every token needs to be false.
-  // Example:
-  // INVAR (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) =
-  // (seq_generator_Cd.exact_tokens - seq_generator_Cd.counter)) &
-  // ((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) >= 1) ) ->
-  // seq_generator_Cd.outs = FALSE;
-  forceFalseTokenInvar << "INVAR (((" << dataSeqGeneratorName
-                       << ".exact_tokens - " << falseCounterTokenCounterVariable
-                       << ") = (" << controlSeqGeneratorName
-                       << ".exact_tokens - " << controlSeqGeneratorName
-                       << ".counter)) & ((" << dataSeqGeneratorName
-                       << ".exact_tokens - " << falseCounterTokenCounterVariable
-                       << ") >= 1) ) -> " << controlSeqGeneratorName
-                       << ".outs = FALSE;\n";
+  forceFalseTokenInvar = llvm::formatv(
+      R"DELIM(INVAR ((({0}.exact_tokens - {1}) = ({2}.exact_tokens - {2}.counter)) &
+  (({0}.exact_tokens - {1}) >= 1)) -> {2}.outs = FALSE;
+)DELIM",
+      dataSeqGeneratorName, falseCounterTokenCounterVariable,
+      controlSeqGeneratorName);
 
   // Make sure that not to many false tokens are generated. If the last tokens
   // needs to be false, this means we only generate false tokens as long as we
@@ -144,31 +125,32 @@ std::string LoopConstraint::createConstraintString(
   // (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) = 1 ) &
   // ((seq_generator_Cd.exact_tokens - seq_generator_Cd.counter) >= 2)) ->
   // (seq_generator_Cd.outs = TRUE);
-  limitFalseTokensInvar << "INVAR (((" << dataSeqGeneratorName
-                        << ".exact_tokens - "
-                        << falseCounterTokenCounterVariable
-                        << ") = " << lastFalse << " ) & (("
-                        << controlSeqGeneratorName << ".exact_tokens - "
-                        << controlSeqGeneratorName
-                        << ".counter) >= " << 1 + lastFalse << ")) -> ("
-                        << controlSeqGeneratorName << ".outs = TRUE);\n";
+  limitFalseTokensInvar = llvm::formatv(
+      R"DELIM(INVAR ((({0}.exact_tokens - {1}) = {2}) &
+(({3}.exact_tokens - {3}.counter) >= {4})) ->
+({3}.outs = TRUE);
+)DELIM",
+      dataSeqGeneratorName, falseCounterTokenCounterVariable,
+      (unsigned)lastFalse, controlSeqGeneratorName, 1 + lastFalse);
 
   // Make sure the control sequence generates at least as many tokens as the
   // data sequence. Otherwise it will be impossible to have the same number of
   // control false tokens as total data tokens.
-  seqLengthRelationInvar << "INVAR (" << controlSeqGeneratorName
-                         << ".exact_tokens >= " << dataSeqGeneratorName
-                         << ".exact_tokens);\n";
+  seqLengthRelationInvar = llvm::formatv(
+      R"DELIM(INVAR ({0}.exact_tokens >= {1}.exact_tokens);
+)DELIM",
+      controlSeqGeneratorName, dataSeqGeneratorName);
 
   // When there are no data tokens, there should also be no control tokens.
   // Otherwise the control token cannot be consumed.
-  emptyDataSequenceInvar << "INVAR (" << dataSeqGeneratorName
-                         << ".exact_tokens = 0) -> (" << controlSeqGeneratorName
-                         << ".exact_tokens = 0);\n\n";
+  emptyDataSequenceInvar = llvm::formatv(
+      R"DELIM(INVAR ({0}.exact_tokens = 0) -> ({1}.exact_tokens = 0);
+)DELIM",
+      dataSeqGeneratorName, controlSeqGeneratorName);
 
-  return falseTokenCounterString.str() + forceFalseTokenInvar.str() +
-         limitFalseTokensInvar.str() + seqLengthRelationInvar.str() +
-         emptyDataSequenceInvar.str();
+  return falseTokenCounterString + forceFalseTokenInvar +
+         limitFalseTokensInvar + seqLengthRelationInvar +
+         emptyDataSequenceInvar;
 }
 
 // Create the constraints to limit the number of tokens in the circuit.
@@ -234,22 +216,20 @@ std::string TokenLimitConstraint::createSmvConstraint(
     //   model.rhs_in_ndw_D.nReady0 & rhs_D_active_tokens < D_active_token_limit
     //   : rhs_D_active_tokens + 1; TRUE : rhs_D_active_tokens;
     // esac;
-    tokenLimitConstraint << "VAR " << limiterVarName << " : 0.." << limit
-                         << ";\n"
-                         << "ASSIGN\n"
-                         << "init(" << limiterVarName << ") := 0;\n"
-                         << "next(" << limiterVarName << ") := case\n"
-                         << "  " << inputTokenCondition << " & "
-                         << outputTokenCondition << " : " << limiterVarName
-                         << ";\n"
-                         << "  " << outputTokenCondition << " & "
-                         << limiterVarName << " > 0 : " << limiterVarName
-                         << " - 1;\n"
-                         << "  " << inputTokenCondition << " & "
-                         << limiterVarName << " < " << tokenLimitDef << " : "
-                         << limiterVarName << " + 1;\n"
-                         << "  TRUE : " << limiterVarName << ";\n"
-                         << "esac;\n";
+    std::string activeTokenCounterString =
+        llvm::formatv(R"DELIM(VAR {0} : 0..{1}
+ASSIGN
+init({0}) := 0;
+next({0}) := case
+  {2} & {3} : {0};
+  {3} & {0} > 0 : {0} - 1;
+  {2} & {0} < {4} : {0} + 1;
+  TRUE : {0};
+esac;
+)DELIM",
+                      limiterVarName, limit, inputTokenCondition,
+                      outputTokenCondition, tokenLimitDef);
+    tokenLimitConstraint << activeTokenCounterString;
 
     // Token limiter invar:
     // When we reached the active token limit, the input ND wire is forced to
