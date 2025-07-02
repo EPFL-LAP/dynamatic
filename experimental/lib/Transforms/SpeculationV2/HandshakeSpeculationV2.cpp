@@ -12,6 +12,7 @@
 
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Backedge.h"
@@ -93,15 +94,31 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
 
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
   ConstantOp conditionConstant = builder.create<ConstantOp>(
-      specLoc, IntegerAttr::get(conditionType.getDataType(), 0),
+      specLoc, IntegerAttr::get(conditionType.getDataType(), 1),
       conditionGenerator.getResult());
   inheritBB(condBrOp, conditionConstant);
 
+  BufferOp specLoopContinueTehb = builder.create<BufferOp>(
+      specLoc, loopContinueSuppressor.getResult(), TimingInfo::break_r(), 1,
+      BufferOp::ONE_SLOT_BREAK_R);
+  inheritBB(condBrOp, specLoopContinueTehb);
+
   MergeOp merge = builder.create<MergeOp>(
-      specLoc, llvm::ArrayRef<Value>{conditionConstant.getResult(),
-                                     loopContinueSuppressor.getResult()});
+      specLoc, llvm::ArrayRef<Value>{specLoopContinueTehb.getResult(),
+                                     conditionConstant.getResult()});
   inheritBB(condBrOp, merge);
-  generatedConditionBackedge.setValue(merge.getResult());
+
+  BufferOp oehb = builder.create<BufferOp>(specLoc, merge.getResult(),
+                                           TimingInfo::break_dv(), 1,
+                                           BufferOp::ONE_SLOT_BREAK_DV);
+  inheritBB(condBrOp, oehb);
+
+  BufferOp tehb =
+      builder.create<BufferOp>(specLoc, oehb.getResult(), TimingInfo::break_r(),
+                               1, BufferOp::ONE_SLOT_BREAK_R);
+  inheritBB(condBrOp, tehb);
+
+  generatedConditionBackedge.setValue(tehb.getResult());
 
   NotOp loopContinueNot = builder.create<NotOp>(specLoc, loopContinue);
   inheritBB(condBrOp, loopContinueNot);
@@ -110,7 +127,7 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
       specLoc, loopContinueNot.getResult(), specResolverOp.getConfirmSpec());
   inheritBB(condBrOp, andCondition);
 
-  specLoopContinue = merge.getResult();
+  specLoopContinue = tehb.getResult();
   specLoopExit = andCondition.getResult();
   confirmSpec = specResolverOp.getConfirmSpec();
 }

@@ -11,6 +11,7 @@ from pathlib import Path
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
 INTEGRATION_FOLDER = DYNAMATIC_ROOT / "integration-test"
 
+POLYGEIST_CLANG_BIN = DYNAMATIC_ROOT / "bin" / "cgeist"
 DYNAMATIC_OPT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "dynamatic-opt"
 EXPORT_DOT_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-dot"
 EXPORT_RTL_BIN = DYNAMATIC_ROOT / "build" / "bin" / "export-rtl"
@@ -87,6 +88,73 @@ def run_test(c_file, id, timeout):
     Path(comp_out_dir).mkdir()
 
     # Custom compilation flow
+    # # source -> affine
+    # affine = os.path.join(comp_out_dir, "affine.mlir")
+    # with open(affine, "w") as f:
+    #     result = subprocess.run([
+    #         POLYGEIST_CLANG_BIN, c_file,
+    #         "--function=" + kernel_name,
+    #         "-I", str(DYNAMATIC_ROOT / "polygeist" /
+    #                   "llvm-project" / "clang" / "lib" / "Headers"),
+    #         "-I", str(DYNAMATIC_ROOT / "include"),
+    #         "-S", "-O3", "--memref-fullrank", "--raise-scf-to-affine"
+    #     ],
+    #         stdout=f,
+    #         stderr=sys.stdout
+    #     )
+    #     if result.returncode == 0:
+    #         print("Compiled source to affine")
+    #     else:
+    #         return fail(id, "Failed to compile source to affine")
+
+    # # affine-level -> pre-processing and memory analysis
+    # affine_mem = os.path.join(comp_out_dir, "affine_mem.mlir")
+    # with open(affine_mem, "w") as f:
+    #     result = subprocess.run([
+    #         DYNAMATIC_OPT_BIN, affine,
+    #         "--allow-unregistered-dialect",
+    #         "--remove-polygeist-attributes",
+    #         f"--func-set-arg-names=source={c_file}",
+    #         "--mark-memory-dependencies"
+    #     ],
+    #         stdout=f,
+    #         stderr=sys.stdout
+    #     )
+    #     if result.returncode == 0:
+    #         print("Ran memory analysis")
+    #     else:
+    #         return fail(id, "Failed to run memory analysis")
+
+    # scf = os.path.join(comp_out_dir, "scf.mlir")
+    # with open(scf, "w") as f:
+    #     result = subprocess.run([
+    #         DYNAMATIC_OPT_BIN, affine_mem,
+    #         "--lower-affine-to-scf",
+    #         "--flatten-memref-row-major",
+    #         "--scf-simple-if-to-select",
+    #         "--scf-rotate-for-loops"
+    #     ],
+    #         stdout=f,
+    #         stderr=sys.stdout
+    #     )
+    #     if result.returncode == 0:
+    #         print("Compiled affine to scf")
+    #     else:
+    #         return fail(id, "Failed to compile affine to scf")
+
+    # cf = os.path.join(comp_out_dir, "cf.mlir")
+    # with open(cf, "w") as f:
+    #     result = subprocess.run([
+    #         DYNAMATIC_OPT_BIN, scf,
+    #         "--lower-scf-to-cf"
+    #     ],
+    #         stdout=f,
+    #         stderr=sys.stdout
+    #     )
+    #     if result.returncode == 0:
+    #         print("Compiled scf to cf")
+    #     else:
+    #         return fail(id, "Failed to compile scf to cf")
 
     # Start with copying the .cf file to the out_dir
     cf_file_base = os.path.join(c_file_dir, "cf.mlir")
