@@ -162,7 +162,8 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   }
 
   // See docs/Specs/Buffering.md
-  // We don't need to place buffers to arguments
+  // We don't need to place buffers to arguments (including both memref and
+  // handshake channels).
   for (BlockArgument arg : funcOp.getArguments())
     makeUnbufferizable(arg);
 

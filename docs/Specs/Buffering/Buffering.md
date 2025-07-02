@@ -154,10 +154,8 @@ But if we always make sure that there is a buffer in between the merge and the f
 
 ### Unbufferizable Channels
 
-First of all, the buffering algorithm only targets handshake-typed edges (either ChannelType or ControlType). This restriction is enforced by `dynamatic::buffer::mapChannelsToProperties` in `BufferingSupport.cpp`.
-
-Additionally, the following handshake-typed edges are excluded from buffering:
-- Top-level function arguments: External channels do not require buffering.
+The following edges are excluded from buffering:
+- Top-level function arguments (both memref and handshake channels): External channels do not require buffering.
 - Channels of operations implementing MemoryOpInterface (MemoryControllerOp, LSQOp): The optimization model is not aware of these channels.
 
 For these channels, both `maxOpaque` and `maxTrans` are set to 0.
