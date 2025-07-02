@@ -246,6 +246,9 @@ createReachabilityCircuit(MLIRContext &context,
   // circuit.
   for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
     BlockArgument arg = funcOp.getArgument(i);
+    if (getHandshakeTypeBitWidth(arg.getType()) > 1)
+      return funcOp.emitError("ElasticMiter currently supports only 1-bit or "
+                              "control inputs.");
 
     std::string ndwName = "ndw_in_" + funcOp.getArgName(i).str();
 
@@ -388,6 +391,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     BlockArgument lhsArg = lhsFuncOp.getArgument(i);
     BlockArgument rhsArg = rhsFuncOp.getArgument(i);
     BlockArgument miterArg = newFuncOp.getArgument(i);
+    if (getHandshakeTypeBitWidth(miterArg.getType()) > 1) {
+      return lhsFuncOp.emitError(
+          "ElasticMiter currently supports only 1-bit or "
+          "control inputs.");
+    }
 
     std::string forkName = "in_fork_" + lhsFuncOp.getArgName(i).str();
     std::string lhsBufName = "lhs_in_buf_" + lhsFuncOp.getArgName(i).str();
