@@ -333,8 +333,8 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
   Value newLhs = modBitWidth(lhs, optWidth, rewriter);
   Value newRhs = modBitWidth(rhs, optWidth, rewriter);
   rewriter.setInsertionPoint(op);
-  auto newOp = rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs,
-                                   newRhs);
+  auto newOp =
+      rewriter.create<Op>(op.getLoc(), newLhs.getType(), newLhs, newRhs);
   Value newRes = modBitWidth({newOp.getResult(), extRes}, resWidth, rewriter);
   namer.replaceOp(op, newOp);
   inheritBB(op, newOp);
