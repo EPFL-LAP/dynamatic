@@ -88,8 +88,15 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
       specLoc, loopContinue, generatedConditionBackedge);
   inheritBB(condBrOp, specResolverOp);
 
-  PasserOp loopContinueSuppressor = builder.create<PasserOp>(
-      specLoc, loopContinue, specResolverOp.getConfirmSpec());
+  NotOp loopContinueNot = builder.create<NotOp>(specLoc, loopContinue);
+  inheritBB(condBrOp, loopContinueNot);
+
+  AndIOp andCondition = builder.create<AndIOp>(
+      specLoc, loopContinueNot.getResult(), specResolverOp.getConfirmSpec());
+  inheritBB(condBrOp, andCondition);
+
+  PasserOp loopContinueSuppressor =
+      builder.create<PasserOp>(specLoc, loopContinue, andCondition.getResult());
   inheritBB(condBrOp, loopContinueSuppressor);
 
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
@@ -115,13 +122,6 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
   inheritBB(condBrOp, tehb);
 
   generatedConditionBackedge.setValue(tehb.getResult());
-
-  NotOp loopContinueNot = builder.create<NotOp>(specLoc, loopContinue);
-  inheritBB(condBrOp, loopContinueNot);
-
-  AndIOp andCondition = builder.create<AndIOp>(
-      specLoc, loopContinueNot.getResult(), specResolverOp.getConfirmSpec());
-  inheritBB(condBrOp, andCondition);
 
   specLoopContinue = tehb.getResult();
   specLoopExit = andCondition.getResult();
