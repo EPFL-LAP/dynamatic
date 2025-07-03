@@ -101,20 +101,26 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
 
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
   inheritBB(condBrOp, conditionGenerator);
+  conditionGenerator->setAttr("specv2_ignore_buffer",
+                              builder.getBoolAttr(true));
   ConstantOp conditionConstant = builder.create<ConstantOp>(
       specLoc, IntegerAttr::get(conditionType.getDataType(), 1),
       conditionGenerator.getResult());
   inheritBB(condBrOp, conditionConstant);
+  conditionConstant->setAttr("specv2_ignore_buffer", builder.getBoolAttr(true));
 
   BufferOp specLoopContinueTehb = builder.create<BufferOp>(
       specLoc, loopContinueSuppressor.getResult(), TimingInfo::break_r(), 1,
       BufferOp::ONE_SLOT_BREAK_R);
   inheritBB(condBrOp, specLoopContinueTehb);
+  specLoopContinueTehb->setAttr("specv2_buffer_as_sink",
+                                builder.getBoolAttr(true));
 
   MergeOp merge = builder.create<MergeOp>(
       specLoc, llvm::ArrayRef<Value>{specLoopContinueTehb.getResult(),
                                      conditionConstant.getResult()});
   inheritBB(condBrOp, merge);
+  merge->setAttr("specv2_buffer_as_source", builder.getBoolAttr(true));
 
   BufferOp tehb = builder.create<BufferOp>(specLoc, merge.getResult(),
                                            TimingInfo::break_r(), 1,

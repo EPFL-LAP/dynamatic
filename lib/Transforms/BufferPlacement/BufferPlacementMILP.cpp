@@ -244,6 +244,9 @@ void BufferPlacementMILP::addChannelTimingConstraints(
 void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                    SignalType signalType,
                                                    ChannelFilter filter) {
+  if (unit->hasAttr("specv2_ignore_buffer"))
+    return;
+
   // Add path constraints for units
   double latency;
   if (failed(timingDB.getLatency(unit, signalType, latency, targetPeriod)))
@@ -259,21 +262,25 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
 
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
-    forEachIOPair(unit, [&](Value in, Value out) {
-      // The input/output channels must both be inside the CFDFC union
-      if (!filter(in) || !filter(out))
-        return;
+    if (!unit->hasAttr("specv2_buffer_as_sink") &&
+        !unit->hasAttr("specv2_buffer_as_source")) {
+      forEachIOPair(unit, [&](Value in, Value out) {
+        // The input/output channels must both be inside the CFDFC union
+        if (!filter(in) || !filter(out))
+          return;
 
-      // Flip channels on ready path which goes upstream
-      if (signalType == SignalType::READY)
-        std::swap(in, out);
+        // Flip channels on ready path which goes upstream
+        if (signalType == SignalType::READY)
+          std::swap(in, out);
 
-      GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
-      GRBVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
-      // Arrival time at unit's output port must be greater than arrival
-      // time at unit's input port + the unit's combinational data delay
-      model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
-    });
+        GRBVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
+        GRBVar &tOutPort =
+            vars.channelVars[out].signalVars[signalType].path.tIn;
+        // Arrival time at unit's output port must be greater than arrival
+        // time at unit's input port + the unit's combinational data delay
+        model.addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+      });
+    }
 
     return;
   }
@@ -282,36 +289,40 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
   // and every of the unit's output ports
 
   // Input port constraints
-  for (Value in : unit->getOperands()) {
-    if (!filter(in))
-      continue;
+  if (!unit->hasAttr("specv2_buffer_as_source")) {
+    for (Value in : unit->getOperands()) {
+      if (!filter(in))
+        continue;
 
-    double inPortDelay;
-    if (failed(
-            timingDB.getPortDelay(unit, signalType, PortType::IN, inPortDelay)))
-      inPortDelay = 0.0;
+      double inPortDelay;
+      if (failed(timingDB.getPortDelay(unit, signalType, PortType::IN,
+                                       inPortDelay)))
+        inPortDelay = 0.0;
 
-    TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
-    GRBVar &tInPort = path.tOut;
-    // Arrival time at unit's input port + input port delay must be less
-    // than the target clock period
-    model.addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
+      TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
+      GRBVar &tInPort = path.tOut;
+      // Arrival time at unit's input port + input port delay must be less
+      // than the target clock period
+      model.addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
+    }
   }
 
   // Output port constraints
-  for (OpResult out : unit->getResults()) {
-    if (!filter(out))
-      continue;
+  if (!unit->hasAttr("specv2_buffer_as_sink")) {
+    for (OpResult out : unit->getResults()) {
+      if (!filter(out))
+        continue;
 
-    double outPortDelay;
-    if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT,
-                                     outPortDelay)))
-      outPortDelay = 0.0;
+      double outPortDelay;
+      if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT,
+                                       outPortDelay)))
+        outPortDelay = 0.0;
 
-    TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
-    GRBVar &tOutPort = path.tIn;
-    // Arrival time at unit's output port is equal to the output port delay
-    model.addConstr(tOutPort == outPortDelay, "path_outDelay");
+      TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
+      GRBVar &tOutPort = path.tIn;
+      // Arrival time at unit's output port is equal to the output port delay
+      model.addConstr(tOutPort == outPortDelay, "path_outDelay");
+    }
   }
 }
 

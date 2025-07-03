@@ -164,7 +164,8 @@ static Operation *backtrackToBranch(Operation *op) {
   do {
     if (!op)
       break;
-    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(op))
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::PasserOp>(op))
       return op;
     if (canGoThroughOutsideBlocks(op))
       op = op->getOperand(0).getDefiningOp();
@@ -697,8 +698,8 @@ bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
 bool dynamatic::isChannelOnCycle(mlir::Value channel) {
   llvm::SmallPtrSet<mlir::Value, 32> visited;
 
-  std::function<bool(mlir::Value, bool)> dfs =
-      [&](mlir::Value current, bool isStart) -> bool {
+  std::function<bool(mlir::Value, bool)> dfs = [&](mlir::Value current,
+                                                   bool isStart) -> bool {
     if (!isStart && current == channel)
       return true;
 

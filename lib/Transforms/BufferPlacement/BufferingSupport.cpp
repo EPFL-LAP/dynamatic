@@ -148,6 +148,10 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
 
   // Add channels originating from operations' results to the channel map
   for (Operation &op : funcOp.getOps()) {
+    if (op.hasAttr("specv2_buffer_as_sink") ||
+        op.hasAttr("specv2_ignore_buffer")) {
+      continue;
+    }
     for (auto [idx, res] : llvm::enumerate(op.getResults())) {
       Channel channel(res, &op, *res.getUsers().begin());
       if (failed(deriveBufferingProperties(channel)))

@@ -186,6 +186,9 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
   assert(cycle.size() == archs.size() && "failed to construct cycle");
 
   for (Operation &op : funcOp.getOps()) {
+    if (op.hasAttr("specv2_ignore_buffer"))
+      continue;
+
     // Get operation's basic block
     unsigned srcBB;
     if (auto optBB = getLogicBB(&op); !optBB.has_value())
@@ -199,46 +202,53 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
 
     // Add the unit and valid outgoing channels to the CFDFC
     units.insert(&op);
-    for (OpResult res : op.getResults()) {
-      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
-             "value must have unique user");
+    if (!op.hasAttr("specv2_buffer_as_sink")) {
+      for (OpResult res : op.getResults()) {
+        assert(std::distance(res.getUsers().begin(), res.getUsers().end()) ==
+                   1 &&
+               "value must have unique user");
 
-      // Get the value's unique user and its basic block
-      Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
-        continue;
-      else
-        dstBB = *optBB;
+        // Get the value's unique user and its basic block
+        Operation *user = *res.getUsers().begin();
+        unsigned dstBB;
+        if (std::optional<unsigned> optBB = getLogicBB(user);
+            !optBB.has_value())
+          continue;
+        else
+          dstBB = *optBB;
 
-      if (srcBB != dstBB) {
-        // The channel is in the CFDFC if it belongs belong to a selected arch
-        // between two basic blocks
-        for (size_t i = 0; i < cycle.size(); ++i) {
-          unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
-          if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-            channels.insert(res);
-            if (isCFDFCBackedge(res))
-              backedges.insert(res);
-            break;
+        if (srcBB != dstBB) {
+          // The channel is in the CFDFC if it belongs belong to a selected arch
+          // between two basic blocks
+          for (size_t i = 0; i < cycle.size(); ++i) {
+            unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+            if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
+              channels.insert(res);
+              if (isCFDFCBackedge(res))
+                backedges.insert(res);
+              break;
+            }
           }
+        } else if (cycle.size() == 1) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the CFDFC is just a block looping to itself
+          channels.insert(res);
+          if (isCFDFCBackedge(res))
+            backedges.insert(res);
+        } else if (!isBackedge(res)) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the channel is not a backedge
+          channels.insert(res);
         }
-      } else if (cycle.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
-        channels.insert(res);
-        if (isCFDFCBackedge(res))
-          backedges.insert(res);
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
-        channels.insert(res);
       }
     }
   }
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
+  if (isa<handshake::InitOp>(val.getDefiningOp()))
+    return true;
+
   // A CFDFC backedge is a backedge
   if (!isBackedge(val))
     return false;
@@ -250,7 +260,7 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   // If the edge is between operations in the same block, the source operation
   // must be a conditional branch
   if (srcBB.has_value() && dstBB.has_value() && *srcBB == *dstBB)
-    return isa<handshake::ConditionalBranchOp>(defOp);
+    return isa<handshake::ConditionalBranchOp, handshake::PasserOp>(defOp);
 
   // Otherwise the edge must be between different blocks, where the destination
   // can be out of all blocks
