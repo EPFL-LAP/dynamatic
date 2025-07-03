@@ -690,9 +690,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         unsupported = true;
       });
       
-    if (auto arithInterface =
-            llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op)) {
-        auto delayAttr = arithInterface.getInternalDelay();
+    if (auto internalDelayInterface =
+            llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+        auto delayAttr = internalDelayInterface.getInternalDelay();
         addParam("INTERNAL_DELAY", delayAttr);
     }
 }

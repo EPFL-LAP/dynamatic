@@ -163,15 +163,15 @@ void HandshakePlaceBuffersPass::runDynamaticPass() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
-    if (auto arithInterface =
-            llvm::dyn_cast<dynamatic::handshake::ArithOpInterface>(op)) {
+    if (auto internalDelayInterface =
+            llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
       double delay;
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
                                                          delay, targetCP))) {
 
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
-        arithInterface.setInternalDelay(delayStr);
+        internalDelayInterface.setInternalDelay(delayStr);
       }
     }
   });

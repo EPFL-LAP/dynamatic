@@ -19,7 +19,7 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 include "dynamatic/Dialect/Handshake/HandshakeInterfaces.td"
 
 class Handshake_Arith_Op<string mnemonic, list<Trait> traits = []> :
-  Handshake_Op<mnemonic, traits # [Pure, ArithOpInterface]> {
+  Handshake_Op<mnemonic, traits # [Pure, ArithOpInterface, InternalDelayInterface]> {
 }
 
 class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
