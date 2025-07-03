@@ -6,6 +6,8 @@ def generate_elastic_fifo_inner(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
     if slots > 2:
+        # This model cascades one_slot_break_none and its total reachable states scales linearly withs the size of the FIFO,
+        # instead of scaling quadratically like the head-tail based model.
         if data_type.bitwidth == 0:
             return _generate_slot_based_elastic_fifo_inner_dataless(name, slots)
         else:
@@ -64,8 +66,8 @@ MODULE {name}(ins_valid, outs_ready)
     {"\n    ".join([f"VAR b{n} : {name}_tslot({valid}, {ready});" for n, (valid, ready) in enumerate(zip(slots_valid, slots_ready))])}
 
     -- outputs
-		DEFINE outs_valid   := b{slots - 1}.outs_valid;
-		DEFINE ins_ready   := b0.ins_ready;
+		DEFINE outs_valid := b{slots - 1}.outs_valid;
+		DEFINE ins_ready := b0.ins_ready;
 {_generate_one_slot_break_none_dataless(f"{name}_tslot")}
 """
 
