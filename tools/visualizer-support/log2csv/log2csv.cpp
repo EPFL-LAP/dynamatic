@@ -11,7 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../VisualizerSupport.h"
+#include "HlsVhdlTb.h"
+#include "VisualizerSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -108,8 +109,6 @@ static WireState getWireState(StringRef token) {
   return WireState::Undefined;
 }
 
-static constexpr unsigned long long PERIOD_NS = 4;
-
 int main(int argc, char **argv) {
   InitLLVM y(argc, argv);
 
@@ -153,7 +152,8 @@ int main(int argc, char **argv) {
   csvBuilder.writeCSVHeader();
 
   std::map<size_t, WireReference> wires;
-  unsigned long long period = PERIOD_NS, halfPeriod = period >> 1;
+  unsigned long long period = HALF_CLK_PERIOD_NS << 1;
+  unsigned long long resetPeriod = RESET_PERIOD_NS;
 
   // Read the LOG file line by line
   std::string event;
@@ -207,9 +207,9 @@ int main(int argc, char **argv) {
             tokens[2]);
       }
 
-      period = PERIOD_NS *
-               static_cast<unsigned long long>(std::pow(10, -9 - exponent));
-      halfPeriod = period >> 1;
+      unsigned long long coefficient = std::pow(10, -9 - exponent);
+      period = (HALF_CLK_PERIOD_NS << 1) * coefficient;
+      resetPeriod = RESET_PERIOD_NS * coefficient;
 
       return success();
     };
@@ -227,8 +227,6 @@ int main(int argc, char **argv) {
     };
 
     LogCallback newTimestep = [&]() {
-      csvBuilder.commitChannelStateChanges();
-
       // Parse the current simulation time and derive the current cycle number
       std::string timeStr = tokens[1].str();
       timeStr.erase(std::remove(timeStr.begin(), timeStr.end(), '.'),
@@ -238,8 +236,13 @@ int main(int argc, char **argv) {
         return error("expected integer identifier for time, but got " +
                      timeStr);
       }
-      csvBuilder.updateCycle(time < period ? 0
-                                           : (time - halfPeriod) / period + 1);
+
+      size_t newCycle =
+          time < resetPeriod ? 0 : (time - resetPeriod) / period + 1;
+      if (newCycle != csvBuilder.getCycle()) {
+        csvBuilder.commitChannelStateChanges();
+        csvBuilder.updateCycle(newCycle);
+      }
       return success();
     };
 

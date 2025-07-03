@@ -343,7 +343,10 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
     ChannelToEndConnector c(type, argName);
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
-  declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
+  declareConstant(os, "HALF_CLK_PERIOD", "TIME",
+                  std::to_string(HALF_CLK_PERIOD_NS) + " ns");
+  declareConstant(os, "RESET_PERIOD", "TIME",
+                  std::to_string(RESET_PERIOD_NS) + " ns");
   declareConstant(os, "TRANSACTION_NUM", "INTEGER", to_string(1));
 }
 

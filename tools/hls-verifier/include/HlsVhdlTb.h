@@ -15,6 +15,10 @@
 #include <vector>
 
 using namespace std;
+
+const constexpr unsigned HALF_CLK_PERIOD_NS = 2;
+const constexpr unsigned RESET_PERIOD_NS = 10;
+
 static const string VHDL_LIBRARY_HEADER = R"DELIM(
 library IEEE;
 use ieee.std_logic_1164.all;
@@ -58,7 +62,7 @@ end process;
 gen_reset_proc : process
 begin
   tb_rst <= '1';
-  wait for 10 ns;
+  wait for RESET_PERIOD;
   tb_rst <= '0';
   wait;
 end process;

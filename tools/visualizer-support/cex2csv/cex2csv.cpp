@@ -11,7 +11,7 @@
 // experimental/tools/elastic-miter/CMakeLists.txt
 //===----------------------------------------------------------------------===//
 
-#include "../VisualizerSupport.h"
+#include "VisualizerSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
