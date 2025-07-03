@@ -50,25 +50,9 @@ static std::string instantiateModuleUnderTest(
                             SEQUENCE_GENERATOR_VALID_NAME.str()));
         })
         .Case<handshake::ControlType>([&](auto) {
-          // TODO: remove this if statement when updating the elastic-miter to
-          // the new SMV backend.
-          // This is a hack: we use syncOutput as a proxy to
-          // know if we are using the old dot2smv (in elastic-miter syncOutput
-          // is always false) or the new backend (in rigidification syncOutput
-          // is always true). This hack can be fixed as soon as elastic-miter is
-          // updated.
-          if (syncOutput) {
-            inputVariables.push_back(
-                llvm::formatv("seq_generator_{0}.{1}", argumentName,
-                              SEQUENCE_GENERATOR_VALID_NAME.str()));
-          } else {
-            inputVariables.push_back(
-                llvm::formatv("seq_generator_{0}.{1}", argumentName,
-                              SEQUENCE_GENERATOR_DATA_NAME.str()));
-            inputVariables.push_back(
-                llvm::formatv("seq_generator_{0}.{1}", argumentName,
-                              SEQUENCE_GENERATOR_VALID_NAME.str()));
-          }
+          inputVariables.push_back(
+              llvm::formatv("seq_generator_{0}.{1}", argumentName,
+                            SEQUENCE_GENERATOR_VALID_NAME.str()));
         })
         .Case<IntegerType>([&](IntegerType intType) {
           // This is the case for data coming from memory (it has no handshake

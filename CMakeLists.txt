@@ -176,15 +176,6 @@ if(DYNAMATIC_ENABLE_LEQ_BINARIES)
   )
   file(CHMOD ${EXT_BIN_DIR}/NuSMV PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ)
 
-  # Download dot2smv Python scripts
-  FetchContent_Declare(
-    dot2smv
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    SOURCE_DIR     ${EXT_BIN_DIR}/dot2smv
-    URL https://github.com/Jiahui17/dot2smv/archive/refs/heads/elastic-miter.tar.gz
-  )
-
-  FetchContent_MakeAvailable(dot2smv)
 endif()
 
 
