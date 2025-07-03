@@ -155,6 +155,8 @@ Importantly, each input operation type defines the set of RTL parameters which c
 
 At the Handshake level, the input and output ports of MLIR operations (in MLIR jargon, their operands and results) do not have names. In keeping with the objective of the `HandshakeToHW` conversion pass to lower the IR to a close-to-RTL representation, the pass associates a port name to each input and output port of each HW-level instance and (external) module operation. These port names will end up as-is in the emitted RTL design (unless explicitly modified by the RTL configuration, see JSON options [`io-kind`](#io-kind), [`io-signals`](#io-signals), and [`io-map`](#io-map)). They are derived through a mix of means depending on the specific input MLIR operation type.
 
+[WARNING] The port names and their ordering influences the experimental backend that uses python generators, so if any changes are needed they should be reflected also in the generators. Special attention should be given to the relative order of data and valid signal implemented in the `export-rtl.cpp`.
+
 ### RTL emission
 
 The RTL emitter picks up the IR that comes out of the `HandshakeToHW` conversion pass and turns it into a synthesizable RTL design. Importantly, the emitter takes as additional argument a list of JSON-formatted RTL configuration files which describe the set of parameterized RTL components it can conretize and instantiate; the [next section](#rtl-configuration) covers in details the configuration file's expected syntax, including all of its options.
