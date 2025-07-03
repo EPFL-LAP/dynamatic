@@ -21,35 +21,21 @@ end entity;
 
 -- Architecture of init
 architecture arch of {name} is
-  signal reg : std_logic_vector(0 downto 0);
-  signal full : std_logic;
-  signal enable : std_logic;
+  signal init : std_logic;
 begin
-  enable <= ins_ready and ins_valid and not outs_ready;
-  outs <= reg when full else ins;
-  outs_valid <= ins_valid or full;
-  ins_ready <= not full;
+  outs <= "0" when init else ins;
+  outs_valid <= '1' when init else ins_valid;
+  ins_ready <= '0' when init else outs_ready;
 
-  reg_proc : process (clk)
+  init_proc : process (clk)
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        reg <= (others => '0');
+        init <= '1';
       else
-        if enable then
-          reg <= ins;
+        if outs_ready then
+          init <= '0';
         end if;
-      end if;
-    end if;
-  end process;
-
-  full_proc : process (clk)
-  begin
-    if rising_edge(clk) then
-      if rst = '1' then
-        full <= '1';
-      else
-        full <= outs_valid and not outs_ready;
       end if;
     end if;
   end process;
