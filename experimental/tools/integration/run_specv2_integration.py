@@ -425,8 +425,8 @@ def main():
     Entry point for the script.
     """
 
-    result = run_test(INTEGRATION_FOLDER / "single_loop" /
-                      "single_loop.c", 0, 10)
+    result = run_test(INTEGRATION_FOLDER / "nested_loop" /
+                      "nested_loop.c", 0, 10)
     if result["status"] == "pass":
         color_print(result["msg"], TermColors.OKGREEN)
     elif result["status"] == "fail":

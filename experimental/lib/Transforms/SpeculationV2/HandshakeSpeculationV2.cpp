@@ -292,7 +292,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
   // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
-  unsigned specBB = 1;
+  unsigned specBB = 2;
 
   placeSpeculator(funcOp, specBB);
   replaceBranches(funcOp, specBB);

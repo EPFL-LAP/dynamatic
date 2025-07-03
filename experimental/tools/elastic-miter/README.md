@@ -1,12 +1,20 @@
 # elastic-miter: A tool to compare two MLIR circuits in the Handshake dialect
 
-The tool compares two MLIR circuits in the handshake dialect by constructing an Elastic-Miter circuit, formally verfiying their (non-)equivalence.
+The tool compares two MLIR circuits in the handshake dialect by constructing an ElasticMiter circuit, formally verfiying their (non-)equivalence.
 
 ## Citation
 
 Ayatallah Elakhras, Jiahui Xu, Martin Erhart, Paolo Ienne, and Lana Josipović. 2025. ElasticMiter: Formally Verified Dataflow Circuit Rewrites. In *Proceedings of the 30th ACM International Conference*
 
-## Setup
+## Build
+
+ElasticMiter depends on LLVM and Dynamatic, so it cannot be built independently.
+
+Instead, it is compiled alongside the Dynamatic binaries. Please refer to the top-level `README.md` for build instructions.
+
+Once the build is complete, the ElasticMiter binary can be found at `bin/elastic-miter`.
+
+### Using the Modified NuSMV Binary
 
 By default the tool uses NuSMV for the verification. The official version only supports printing 2^16 state spaces. To circumvent this problem, we provide a modified binary supporting 2^24 states.
 
@@ -17,10 +25,6 @@ $ ./build.sh --enable-leq-binaries -f
 ```
 
 Don't forget to add the `-f` flag to force CMake to re-run if you've already built Dynamatic.
-
-Currently, the conversion to SMV requires the [dot2smv](https://github.com/Jiahui17/dot2smv) converter (soon to be replaced by a dedicated SMV backend). It is also downloaded when `--enable-leq-binaries` is used.
-
-The binary will be located at `bin/elastic-miter`.
 
 ## Usage
 
@@ -72,7 +76,7 @@ Example:
 Example rewrites are available in the `rewrites` folder. You can test all of them using the `prove-rewrites.sh` script:
 
 ```bash
-$ experimental/tools/elastic-miter/prove-rewrites.sh
+$ ./experimental/tools/elastic-miter/prove-rewrites.sh
 ```
 
 Alternatively, you can directly invoke the `elastic-miter` binary as follows:
@@ -82,6 +86,8 @@ $ OUT_DIR="experimental/tools/elastic-miter/out"
 $ REWRITES="experimental/test/tools/elastic-miter/rewrites"
 $ ./bin/elastic-miter --lhs=$REWRITES/b_lhs.mlir --rhs=$REWRITES/b_rhs.mlir -o $OUT_DIR --seq_length="0+1=3" --seq_length="0=2" --loop_strict=0,1
 ```
+
+**NOTE**: ElasticMiter only works in the dynamatic top-level directory.
 
 ## Visualizer
 
