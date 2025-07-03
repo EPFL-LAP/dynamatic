@@ -689,12 +689,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
-      
-    if (auto internalDelayInterface =
-            llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
-        auto delayAttr = internalDelayInterface.getInternalDelay();
-        addParam("INTERNAL_DELAY", delayAttr);
-    }
+
+  if (auto internalDelayInterface =
+          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+    auto delayAttr = internalDelayInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
