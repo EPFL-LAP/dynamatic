@@ -447,7 +447,7 @@ void VisualDataflow::changeStateColor(int64_t state, Color color) {
       DataflowState::STALL, DataflowState::TRANSFER};
 
   // Update the color associated to the state
-  assert(state < 0 || state > 4 && "invalid channel state!");
+  assert(state >= 0 && state <= 4 && "invalid channel state!");
   DataflowState stateEnum = intToState[state];
   stateColors.insert_or_assign(stateEnum, color);
 
