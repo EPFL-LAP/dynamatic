@@ -82,3 +82,17 @@ $ OUT_DIR="experimental/tools/elastic-miter/out"
 $ REWRITES="experimental/test/tools/elastic-miter/rewrites"
 $ ./bin/elastic-miter --lhs=$REWRITES/b_lhs.mlir --rhs=$REWRITES/b_rhs.mlir -o $OUT_DIR --seq_length="0+1=3" --seq_length="0=2" --loop_strict=0,1
 ```
+
+## Visualizer
+
+When the `--cex` option is enabled and the equivalence check fails, counterexamples are included in the log file. These counterexamples can be visualized using Dynamatic's visualizer tool. For example:
+
+```
+$ ./experimental/tools/elastic-miter/visualize.sh elastic_miter_a_lhs_a_rhs experimental/tools/elastic-miter/out/a/miter
+```
+
+**Note**: The visualizer is disabled by default and must be built manually. For instructions, see the [advanced build](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/AdvancedBuild.md#interactive-dataflow-circuit-visualizer) guide.
+
+The script takes two arguments:
+1. The name of the top-level module, which can be found in the `funcOp` of the MLIR file or in the SMV file.
+2. The directory containing the `result.txt` and corresponding MLIR file.
