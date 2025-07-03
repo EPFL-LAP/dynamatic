@@ -122,14 +122,11 @@ void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
   inheritBB(condBrOp, merge);
   merge->setAttr("specv2_buffer_as_source", builder.getBoolAttr(true));
 
-  BufferOp tehb = builder.create<BufferOp>(specLoc, merge.getResult(),
-                                           TimingInfo::break_r(), 1,
-                                           BufferOp::ONE_SLOT_BREAK_R);
-  inheritBB(condBrOp, tehb);
+  // Buffer after a merge is required, which is added in the buffering pass.
 
-  generatedConditionBackedge.setValue(tehb.getResult());
+  generatedConditionBackedge.setValue(merge.getResult());
 
-  specLoopContinue = tehb.getResult();
+  specLoopContinue = merge.getResult();
   specLoopExit = andCondition.getResult();
   confirmSpec = specResolverOp.getConfirmSpec();
 }

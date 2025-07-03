@@ -184,6 +184,12 @@ void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
   // Control paths to LSQs have specific properties
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>())
     setLSQControlConstraints(lsqOp);
+
+  // SpecV2 Constraints
+  for (handshake::InitOp initOp : funcOp.getOps<handshake::InitOp>()) {
+    Channel channel(initOp.getOperand(), true);
+    channel.props->minSlots = std::max(channel.props->minSlots, 2U);
+  }
 }
 
 namespace {
