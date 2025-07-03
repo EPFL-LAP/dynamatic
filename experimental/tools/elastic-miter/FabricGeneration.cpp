@@ -63,7 +63,7 @@ buildNewFuncWithBlock(OpBuilder builder, llvm::StringRef name,
                       NamedAttribute argNamedAttr,
                       NamedAttribute resNamedAttr) {
 
-  ArrayRef<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
+  SmallVector<NamedAttribute> funcAttr({argNamedAttr, resNamedAttr});
 
   FunctionType funcType = builder.getFunctionType(inputTypes, outputTypes);
 
@@ -500,8 +500,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     setHandshakeAttributes(builder, rhsEndBufferOp, BB_OUT, rhsBufName);
 
     if (lhsResult.getType().isa<handshake::ControlType>()) {
-      ValueRange joinInputs = {lhsEndBufferOp.getResult(),
-                               rhsEndBufferOp.getResult()};
+      SmallVector<Value> joinInputs = {lhsEndBufferOp.getResult(),
+                                       rhsEndBufferOp.getResult()};
       JoinOp joinOp =
           builder.create<JoinOp>(builder.getUnknownLoc(), joinInputs);
       setHandshakeAttributes(builder, joinOp, BB_OUT, eqName);

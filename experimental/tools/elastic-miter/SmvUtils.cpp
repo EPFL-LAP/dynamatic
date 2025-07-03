@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
-#include <utility>
 
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -80,7 +79,7 @@ static int executeWithRedirect(const std::string &command,
 
   // Redirect stdout, keep default of stdin and stderr
   std::string stdoutFileString = stdoutFile.string();
-  ArrayRef<std::optional<StringRef>> redirects = {
+  SmallVector<std::optional<StringRef>> redirects = {
       std::nullopt, stdoutFileString, std::nullopt};
 
   std::string errMsg;
