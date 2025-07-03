@@ -116,7 +116,19 @@ There are also no named getters generated, and therefore these attributes must b
 
 https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
 
-# RTL Entity Sharing
+# Non-Operation Specific RTL Parameters
+
+Some parameters may exist across many different operations. 
+
+If we followed the above rules, adding a new attribute to every operation that will use this parameter results in code duplication. 
+
+Instead, we recommend to add the attribute instead to an interface, and to then add that interface to all of the relevant operations.
+
+## How to define interface attributes
+
+
+
+<!-- # RTL Entity Sharing
 
 Operations in the Handshake IR are checked for uniqueness due to the desire for shared RTL entities: if there are two 32-bit floating point multipliers in the circuit, the RTL defining what is a 32-bit floating point multiplier should be present only once. 
 
@@ -145,4 +157,4 @@ https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496
 
 The case statement in ModuleDiscriminator is an unsustainable solution. In the future, we intend to use operation interfaces, allowing operations to internally specify what RTL parameters they have. 
 
-This is also important for our single-source-of-truth philosophy, which requires that each tablegen entry should entirely define an MLIR operation. The case statement in ModuleDiscriminator is an example of a distributed operation definition, which violates this principle.
+This is also important for our single-source-of-truth philosophy, which requires that each tablegen entry should entirely define an MLIR operation. The case statement in ModuleDiscriminator is an example of a distributed operation definition, which violates this principle. -->
