@@ -374,6 +374,24 @@ def NDWireOp : Handshake_Op<"ndwire", [
   }];
 }
 
+def SpecV2NDSpeculatorOp : Handshake_Op<"spec_v2_nd_speculator", [
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+}
+
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> : 
   Handshake_Op<mnemonic, traits # [
     Pure, HasClock, SameOperandsAndResultType
@@ -1420,7 +1438,7 @@ def SpecV2ResolverOp : Handshake_Op<"spec_v2_resolver", [
   let arguments = (ins ChannelType:$actualCondition, ChannelType:$generatedCondition);
   let results = (outs ChannelType:$confirmSpec);
   let assemblyFormat = [{
-    $actualCondition $generatedCondition attr-dict `:` type($actualCondition)
+    $actualCondition `,` $generatedCondition attr-dict `:` type($actualCondition)
   }];
 
   let extraClassDefinition = [{

@@ -20,6 +20,8 @@ import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
 import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
+import generators.handshake.spec_v2.resolver as spec_v2_resolver
+import generators.handshake.spec_v2.nd_speculator as spec_v2_nd_speculator
 import generators.handshake.passer as passer
 
 import generators.arith.absf as absf
@@ -157,6 +159,10 @@ def generate_code(name, mod_type, parameters):
             return spec_v2_repeating_init.generate_spec_v2_repeating_init(name, parameters)
         case "spec_v2_interpolator":
             return spec_v2_interpolator.generate_spec_v2_interpolator(name, parameters)
+        case "spec_v2_resolver":
+            return spec_v2_resolver.generate_spec_v2_resolver(name, parameters)
+        case "spec_v2_nd_speculator":
+            return spec_v2_nd_speculator.generate_spec_v2_nd_speculator(name, parameters)
         case "passer":
             return passer.generate_passer(name, parameters)
         case _:
