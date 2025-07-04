@@ -301,7 +301,7 @@ def InitOp : Handshake_Op<"init", [
   }];
 }
 
-def SpecV2RepeatingInitOp : Handshake_Op<"specv2_repeating_init", [
+def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
   HasClock, SameOperandsAndResultType,
   IsIntSizedChannel<1, "operand">,
   IsIntSizedChannel<1, "result">
@@ -577,7 +577,7 @@ def PasserOp : Handshake_Op<"passer", [
     Example:
 
     ```mlir
-    passer %data, %ctrl : !handshake.channel<i32>, !handshake.channel<i1>
+    passer %data [%ctrl] : !handshake.channel<i32>, !handshake.channel<i1>
     ```
   }];
 
@@ -585,7 +585,7 @@ def PasserOp : Handshake_Op<"passer", [
   let results = (outs HandshakeType:$result);
 
   let assemblyFormat = [{
-    $data `[` $ctrl `]` attr-dict `:` custom<HandshakeType>(type($result)) type($ctrl)
+    $data `[` $ctrl `]` attr-dict `:` custom<HandshakeType>(type($result)) `,` type($ctrl)
   }];
 
   let extraClassDefinition = [{
