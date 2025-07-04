@@ -40,22 +40,8 @@ Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tu
 
 >While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](user-guide-topics/dependencies.md) section for a better understanding of how the tool works.
 
-Finally, Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) to run simulations, thus you need to install it before hand. [Download](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) modelsim, install it (in a directory with no special access permissions) and add it to path for Dynamatic to be able to run it. Add the following lines to the `.bashrc` file in your home directory to add modelsim to path variables
-```
-export MODELSIM_HOME=/path/to/modelsim  # path will look like /../intelFPGA/20.1/modelsim_ase
-export PATH="$MODELSIM_HOME/bin:$PATH"  # (adjust the path accordingly)
-```
-In any terminal, `source` .bashrc file and run the `vsim` command to verify that modelsim was added to path properly and runs.
-```
-source ~/.bashrc
-vsim
-```
-If you encounter any issue related to `libXext` you may need to install a few more libraries to enable the 32 bit architecture which supports packages needed by modelsim:
-```
-sudo dpkg -add-architecture i386
-sudo apt update
-sudo apt install libxext6:i386 libxft2:i386 libxrender1:i386
-```
+Finally, Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) to run simulations, thus you need to install it before hand and add it to your environment variables.  
+
 Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
 **2. Cloning the project and its submodules**  
