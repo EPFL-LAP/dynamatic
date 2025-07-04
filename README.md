@@ -12,12 +12,12 @@ There are currently two ways to setup and use Dynamatic
 We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [Build instructions](#build-instructions) below. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distributions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 **2. Use the Provided Virtual Machine**  
-We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](usage.md)) or as a starting point to use/[modify](advancedusage.md) Dynamatic in general.
+We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](user-guide-topics/usage.md)) or as a starting point to use/[modify](user-guide-topics/advancedusage.md) Dynamatic in general.
 
 
 ### Build Instructions
 The following instructions can be used to setup Dynamatic from source.  
->If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](advanced-build.md) to learn how to customize the build process to your needs.
+>If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](user-guide-topics/advanced-build.md) to learn how to customize the build process to your needs.
 
 **1. Install dependencies required by the project**  
 Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), cmake and ninja for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with .dot files, and standard command-line tools like git.
@@ -53,9 +53,9 @@ sudo apt-get update
 sudo apt-get install sbt
 ```
 
-Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tutorial for guidance on [how to setup the Gurobi solver](advanced-build.md#1-gurobi).
+Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tutorial for guidance on [how to setup the Gurobi solver](user-guide-topics/advanced-build.md#1-gurobi).
 
->While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](dependencies.md) section for a better understanding of how the tool works.
+>While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](user-guide-topics/dependencies.md) section for a better understanding of how the tool works.
 
 Finally, Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) to run simulations, thus you need to install it before hand. [Download](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) modelsim, install it (in a directory with no special access permissions) and add it to path for Dynamatic to be able to run it. Add the following lines to the `.bashrc` file in your home directory to add modelsim to path variables
 ```
@@ -86,7 +86,7 @@ git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
 This creates a `dynamatic` folder in your current working directory.
 
 **3. Build the Project**  
-Run the build script from the directory created by the clone command (check out our [advanced build](advanced-build.md) instructions to see how you can customize the build process and/or build the interactive dataflow visualizer). You may want to check the [build](advanced-build.md#3-building) section of the advanced build page if you want more options for building such as multi-threaded build which is faster.
+Run the build script from the directory created by the clone command (check out our [advanced build](user-guide-topics/advanced-build.md) instructions to see how you can customize the build process and/or build the interactive dataflow visualizer). You may want to check the [build](user-guide-topics/advanced-build.md#3-building) section of the advanced build page if you want more options for building such as multi-threaded build which is faster.
 ```
 cd dynamatic
 chmod +x ./build.sh
@@ -100,7 +100,7 @@ After building the project, or at any time during development, you can run Dynam
 cd build
 ninja check-dynamatic
 ```
-Now, you have the groundwork for [using dynamatic](usage.md) and trying the [Advanced build](advanced-build.md) options.
+Now, you have the groundwork for [using dynamatic](user-guide-topics/usage.md) and trying the [Advanced build](user-guide-topics/advanced-build.md) options.
 For information on usage and features, please check out [the user manual](docs/UserManual.md).
 
 [Go to top of the page](#installing-dynamatic)
