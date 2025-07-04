@@ -37,7 +37,8 @@ use work.types.all;
 -- Entity of mem_controller
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
@@ -153,7 +154,8 @@ use work.types.all;
 -- Entity of mem_controller_storeless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;
@@ -252,7 +254,8 @@ use work.types.all;
 -- Entity of mem_controller_loadless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- start input control
     memStart_valid : in  std_logic;
     memStart_ready : out std_logic;

@@ -19,7 +19,8 @@ use ieee.numeric_std.all;
 -- Entity of merge_notehb_dataless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channels
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
@@ -69,7 +70,8 @@ use work.types.all;
 -- Entity of merge_notehb
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channels
     ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
