@@ -310,7 +310,7 @@ We first represent the implementation as a StringAttr, add verification, and a c
     // Uses hardcoded string to set 'implementation' 
     // since TableGen builders can't reference C++ constants
     OpBuilder<(ins), [{
-      build($_builder, $_state, $_builder.getStringAttr("IMPL1"));
+      build($_builder, $_state, /*implementation=*/"IMPL1");
     }]>
   ];
 ```
@@ -345,10 +345,10 @@ def AddOp : Op<"mydialect.add", [InternalDelayInterface]> {
   let results = (outs);
 
   let builders = [
-    // Uses hardcoded default value for 'implementation' 
+    // Uses hardcoded string to set 'implementation' 
     // since TableGen builders can't reference C++ constants
     OpBuilder<(ins), [{
-      build($_builder, $_state, $_builder.getStringAttr("IMPL1"));
+      build($_builder, $_state, /*implementation=*/"IMPL1");
     }]>
   ];
 
