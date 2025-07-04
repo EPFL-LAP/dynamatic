@@ -1,0 +1,27 @@
+#include "j_rhs.smv"
+
+
+MODULE bool_input_inf(nReady0)
+    VAR outs : boolean;
+    
+    -- make sure outs is persistent
+    ASSIGN
+    next(outs) := case 
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+    DEFINE outs_valid := TRUE;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_In1 : bool_input_inf(j_rhs.In1_ready);
+  VAR seq_generator_In2 : bool_input_inf(j_rhs.In2_ready);
+  VAR seq_generator_Ctrl : bool_input_inf(j_rhs.Ctrl_ready);
+
+  VAR j_rhs : j_rhs (seq_generator_In1.outs, seq_generator_In1.outs_valid, seq_generator_In2.outs, seq_generator_In2.outs_valid, seq_generator_Ctrl.outs, seq_generator_Ctrl.outs_valid, sink_Out1.ins_ready);
+
+  VAR sink_Out1 : sink_main(j_rhs.Out1_valid);
+

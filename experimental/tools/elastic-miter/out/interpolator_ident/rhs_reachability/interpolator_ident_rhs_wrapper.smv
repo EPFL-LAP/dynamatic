@@ -1,0 +1,20 @@
+#include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE interpolator_ident_rhs_wrapper (A_in, A_in_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := interpolator_ident_rhs_wrapped.B_out;
+DEFINE B_out_valid := interpolator_ident_rhs_wrapped.B_out_valid;
+DEFINE interpolator_ident_rhs_wrapped_B_out_ready := B_out_ready;
+DEFINE interpolator_ident_rhs_wrapped_A_in := A_in;
+DEFINE interpolator_ident_rhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := interpolator_ident_rhs_wrapped.A_in_ready;
+
+
+VAR interpolator_ident_rhs_wrapped : interpolator_ident_rhs(interpolator_ident_rhs_wrapped_A_in, interpolator_ident_rhs_wrapped_A_in_valid, interpolator_ident_rhs_wrapped_B_out_ready);
+
+-- properties

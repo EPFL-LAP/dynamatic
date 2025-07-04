@@ -1,0 +1,114 @@
+-- handshake_buffer_0 : buffer(['num_slots=2', 'bitwidth=1', 'transparent=False', "timing='#handshake<timing {D: 1, V: 1, R: 0}>'"])
+
+
+MODULE handshake_buffer_0 (ins, ins_valid, outs_ready)
+  VAR
+  inner_tehb : handshake_buffer_0__tehb(ins, ins_valid, inner_elastic_fifo.ins_ready);
+  inner_elastic_fifo : handshake_buffer_0__elastic_fifo_inner(inner_tehb.outs, inner_tehb.outs_valid, outs_ready);
+
+  -- output
+  DEFINE
+  ins_ready := inner_tehb.ins_ready;
+  outs_valid := inner_elastic_fifo.outs_valid;
+  outs := inner_elastic_fifo.outs;
+
+
+MODULE handshake_buffer_0__tehb(ins, ins_valid, outs_ready)
+  VAR
+  inner_tehb : handshake_buffer_0__tehb__tehb_dataless(ins_valid, outs_ready);
+  data : boolean;
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := ins_ready & ins_valid & !outs_ready ? ins : data;
+
+  -- output
+  DEFINE
+  ins_ready := inner_tehb.ins_ready;
+  outs_valid := inner_tehb.outs_valid;
+  outs := inner_tehb.full ? data : ins;
+
+
+MODULE handshake_buffer_0__tehb__tehb_dataless(ins_valid, outs_ready)
+  VAR
+  full : boolean;
+
+  ASSIGN
+  init(full) := FALSE;
+  next(full) := outs_valid & !outs_ready;
+
+  -- output
+  DEFINE
+  ins_ready := !full;
+  outs_valid := ins_valid | full;
+
+
+
+MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
+  VAR mem_0 : boolean;
+  VAR mem_1 : boolean;
+  VAR
+  full : boolean;
+  empty : boolean;
+  head : 0..1;
+  tail : 0..1;
+
+  DEFINE
+  read_en := outs_ready & !empty;
+  write_en := ins_valid & (!full | outs_ready);
+
+  ASSIGN
+  init(tail) := 0;
+  next(tail) := case
+    write_en & (tail = 0) : 1;
+    write_en & (tail = 1) : 0;
+    TRUE : tail;
+  esac;
+
+  init(head) := 0;
+  next(head) := case
+    read_en & (head = 0) : 1;
+    read_en & (head = 1) : 0;
+    TRUE : head;
+  esac;
+
+  ASSIGN
+  init(mem_0) := FALSE;
+  next(mem_0) := write_en & (tail = 0) ? ins : mem_0;
+  ASSIGN
+  init(mem_1) := FALSE;
+  next(mem_1) := write_en & (tail = 1) ? ins : mem_1;
+
+  init(full) := FALSE;
+  next(full) := case
+    write_en & !read_en : case
+      tail < 1 & head = tail + 1: TRUE;
+      tail = 1 & head = 0 : TRUE;
+      TRUE : full;
+    esac;
+    !write_en & read_en : FALSE;
+    TRUE : full;
+  esac;
+
+  init(empty) := TRUE;
+  next(empty) := case
+    !write_en & read_en : case
+      head < 1 & tail = head + 1: TRUE;
+      head = 1 & tail = 0 : TRUE;
+      TRUE : empty;
+    esac;
+    write_en & !read_en : FALSE;
+    TRUE : empty;
+  esac;
+
+  -- output
+  DEFINE
+  ins_ready := !full | outs_ready;
+  outs_valid := !empty;
+  outs := case
+    head = 0 : mem_0;
+    head = 1 : mem_1;
+    TRUE : mem_0;
+  esac;
+
+

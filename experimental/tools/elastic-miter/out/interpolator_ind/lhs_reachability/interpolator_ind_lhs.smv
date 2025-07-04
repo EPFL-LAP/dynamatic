@@ -1,0 +1,36 @@
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE interpolator_ind_lhs (A_in, A_in_valid, B_in, B_in_valid, Sup_in, Sup_in_valid, Sup_out_ready)
+
+
+-- input and output
+DEFINE Sup_out := ndw_out_Sup_out.outs;
+DEFINE Sup_out_valid := ndw_out_Sup_out.outs_valid;
+DEFINE ndw_out_Sup_out_outs_ready := Sup_out_ready;
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+DEFINE ndw_in_B_in_ins := B_in;
+DEFINE ndw_in_B_in_ins_valid := B_in_valid;
+DEFINE B_in_ready := ndw_in_B_in.ins_ready;
+DEFINE ndw_in_Sup_in_ins := Sup_in;
+DEFINE ndw_in_Sup_in_ins_valid := Sup_in_valid;
+DEFINE Sup_in_ready := ndw_in_Sup_in.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, interpolate.short_ready);
+VAR ndw_in_B_in : handshake_ndwire_0(ndw_in_B_in_ins, ndw_in_B_in_ins_valid, fork.ins_ready);
+VAR ndw_in_Sup_in : handshake_ndwire_0(ndw_in_Sup_in_ins, ndw_in_Sup_in_ins_valid, passer1.data_ready);
+VAR ndw_out_Sup_out : handshake_ndwire_0(passer2.result, passer2.result_valid, ndw_out_Sup_out_outs_ready);
+VAR fork : handshake_fork_0(ndw_in_B_in.outs, ndw_in_B_in.outs_valid, interpolate.long_ready, ri.ins_ready);
+VAR interpolate : handshake_spec_v2_interpolator_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, fork.outs_0, fork.outs_0_valid, passer2.ctrl_ready);
+VAR ri : handshake_spec_v2_repeating_init_0(fork.outs_1, fork.outs_1_valid, passer1.ctrl_ready);
+VAR passer1 : handshake_passer_0(ndw_in_Sup_in.outs, ndw_in_Sup_in.outs_valid, ri.outs, ri.outs_valid, passer2.data_ready);
+VAR passer2 : handshake_passer_0(passer1.result, passer1.result_valid, interpolate.result, interpolate.result_valid, ndw_out_Sup_out.ins_ready);
+
+-- properties

@@ -1,0 +1,29 @@
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+
+
+MODULE j_rhs_wrapper (In1, In1_valid, In2, In2_valid, Ctrl, Ctrl_valid, Out1_ready)
+
+
+-- input and output
+DEFINE Out1 := j_rhs_wrapped.Out1;
+DEFINE Out1_valid := j_rhs_wrapped.Out1_valid;
+DEFINE j_rhs_wrapped_Out1_ready := Out1_ready;
+DEFINE j_rhs_wrapped_In1 := In1;
+DEFINE j_rhs_wrapped_In1_valid := In1_valid;
+DEFINE In1_ready := j_rhs_wrapped.In1_ready;
+DEFINE j_rhs_wrapped_In2 := In2;
+DEFINE j_rhs_wrapped_In2_valid := In2_valid;
+DEFINE In2_ready := j_rhs_wrapped.In2_ready;
+DEFINE j_rhs_wrapped_Ctrl := Ctrl;
+DEFINE j_rhs_wrapped_Ctrl_valid := Ctrl_valid;
+DEFINE Ctrl_ready := j_rhs_wrapped.Ctrl_ready;
+
+
+VAR j_rhs_wrapped : j_rhs(j_rhs_wrapped_In1, j_rhs_wrapped_In1_valid, j_rhs_wrapped_In2, j_rhs_wrapped_In2_valid, j_rhs_wrapped_Ctrl, j_rhs_wrapped_Ctrl_valid, j_rhs_wrapped_Out1_ready);
+
+-- properties

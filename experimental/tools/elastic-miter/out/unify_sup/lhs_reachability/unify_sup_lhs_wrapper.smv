@@ -1,0 +1,26 @@
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE unify_sup_lhs_wrapper (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := unify_sup_lhs_wrapped.B_out;
+DEFINE B_out_valid := unify_sup_lhs_wrapped.B_out_valid;
+DEFINE unify_sup_lhs_wrapped_B_out_ready := B_out_ready;
+DEFINE unify_sup_lhs_wrapped_A_in := A_in;
+DEFINE unify_sup_lhs_wrapped_A_in_valid := A_in_valid;
+DEFINE A_in_ready := unify_sup_lhs_wrapped.A_in_ready;
+DEFINE unify_sup_lhs_wrapped_Cond1 := Cond1;
+DEFINE unify_sup_lhs_wrapped_Cond1_valid := Cond1_valid;
+DEFINE Cond1_ready := unify_sup_lhs_wrapped.Cond1_ready;
+DEFINE unify_sup_lhs_wrapped_Cond2 := Cond2;
+DEFINE unify_sup_lhs_wrapped_Cond2_valid := Cond2_valid;
+DEFINE Cond2_ready := unify_sup_lhs_wrapped.Cond2_ready;
+
+
+VAR unify_sup_lhs_wrapped : unify_sup_lhs(unify_sup_lhs_wrapped_A_in, unify_sup_lhs_wrapped_A_in_valid, unify_sup_lhs_wrapped_Cond1, unify_sup_lhs_wrapped_Cond1_valid, unify_sup_lhs_wrapped_Cond2, unify_sup_lhs_wrapped_Cond2_valid, unify_sup_lhs_wrapped_B_out_ready);
+
+-- properties

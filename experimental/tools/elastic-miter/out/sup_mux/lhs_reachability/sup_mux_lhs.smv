@@ -1,0 +1,35 @@
+#include "handshake_fork_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_mux_lhs (In1, In1_valid, In2, In2_valid, Ctrl, Ctrl_valid, Out1_ready)
+
+
+-- input and output
+DEFINE Out1 := ndw_out_Out1.outs;
+DEFINE Out1_valid := ndw_out_Out1.outs_valid;
+DEFINE ndw_out_Out1_outs_ready := Out1_ready;
+DEFINE ndw_in_In1_ins := In1;
+DEFINE ndw_in_In1_ins_valid := In1_valid;
+DEFINE In1_ready := ndw_in_In1.ins_ready;
+DEFINE ndw_in_In2_ins := In2;
+DEFINE ndw_in_In2_ins_valid := In2_valid;
+DEFINE In2_ready := ndw_in_In2.ins_ready;
+DEFINE ndw_in_Ctrl_ins := Ctrl;
+DEFINE ndw_in_Ctrl_ins_valid := Ctrl_valid;
+DEFINE Ctrl_ready := ndw_in_Ctrl.ins_ready;
+
+
+VAR ndw_in_In1 : handshake_ndwire_0(ndw_in_In1_ins, ndw_in_In1_ins_valid, passer.data_ready);
+VAR ndw_in_In2 : handshake_ndwire_0(ndw_in_In2_ins, ndw_in_In2_ins_valid, data_mux.ins_0_ready);
+VAR ndw_in_Ctrl : handshake_ndwire_0(ndw_in_Ctrl_ins, ndw_in_Ctrl_ins_valid, fork_data_mux.ins_ready);
+VAR ndw_out_Out1 : handshake_ndwire_0(data_mux.outs, data_mux.outs_valid, ndw_out_Out1_outs_ready);
+VAR fork_data_mux : handshake_fork_0(ndw_in_Ctrl.outs, ndw_in_Ctrl.outs_valid, init_buffer_ctrl.ins_ready, passer.ctrl_ready);
+VAR init_buffer_ctrl : handshake_init_0(fork_data_mux.outs_0, fork_data_mux.outs_0_valid, data_mux.index_ready);
+VAR passer : handshake_passer_0(ndw_in_In1.outs, ndw_in_In1.outs_valid, fork_data_mux.outs_1, fork_data_mux.outs_1_valid, data_mux.ins_1_ready);
+VAR data_mux : handshake_mux_0(init_buffer_ctrl.outs, init_buffer_ctrl.outs_valid, ndw_in_In2.outs, passer.result, ndw_in_In2.outs_valid, passer.result_valid, ndw_out_Out1.ins_ready);
+
+-- properties

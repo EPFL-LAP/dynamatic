@@ -1,0 +1,35 @@
+#include "interpolator_ind_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_A_in : bool_input_exact(interpolator_ind_rhs.A_in_ready, 1);
+  VAR seq_generator_B_in : bool_input_exact(interpolator_ind_rhs.B_in_ready, 1);
+  VAR seq_generator_Sup_in : bool_input_exact(interpolator_ind_rhs.Sup_in_ready, 1);
+
+  VAR interpolator_ind_rhs : interpolator_ind_rhs (seq_generator_A_in.outs, seq_generator_A_in.outs_valid, seq_generator_B_in.outs, seq_generator_B_in.outs_valid, seq_generator_Sup_in.outs, seq_generator_Sup_in.outs_valid, sink_Sup_out.ins_ready);
+
+  VAR sink_Sup_out : sink_main(interpolator_ind_rhs.Sup_out_valid);
+

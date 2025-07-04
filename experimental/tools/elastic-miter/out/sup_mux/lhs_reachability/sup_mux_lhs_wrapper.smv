@@ -1,0 +1,28 @@
+#include "handshake_fork_0.smv"
+#include "handshake_init_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_mux_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_mux_lhs_wrapper (In1, In1_valid, In2, In2_valid, Ctrl, Ctrl_valid, Out1_ready)
+
+
+-- input and output
+DEFINE Out1 := sup_mux_lhs_wrapped.Out1;
+DEFINE Out1_valid := sup_mux_lhs_wrapped.Out1_valid;
+DEFINE sup_mux_lhs_wrapped_Out1_ready := Out1_ready;
+DEFINE sup_mux_lhs_wrapped_In1 := In1;
+DEFINE sup_mux_lhs_wrapped_In1_valid := In1_valid;
+DEFINE In1_ready := sup_mux_lhs_wrapped.In1_ready;
+DEFINE sup_mux_lhs_wrapped_In2 := In2;
+DEFINE sup_mux_lhs_wrapped_In2_valid := In2_valid;
+DEFINE In2_ready := sup_mux_lhs_wrapped.In2_ready;
+DEFINE sup_mux_lhs_wrapped_Ctrl := Ctrl;
+DEFINE sup_mux_lhs_wrapped_Ctrl_valid := Ctrl_valid;
+DEFINE Ctrl_ready := sup_mux_lhs_wrapped.Ctrl_ready;
+
+
+VAR sup_mux_lhs_wrapped : sup_mux_lhs(sup_mux_lhs_wrapped_In1, sup_mux_lhs_wrapped_In1_valid, sup_mux_lhs_wrapped_In2, sup_mux_lhs_wrapped_In2_valid, sup_mux_lhs_wrapped_Ctrl, sup_mux_lhs_wrapped_Ctrl_valid, sup_mux_lhs_wrapped_Out1_ready);
+
+-- properties

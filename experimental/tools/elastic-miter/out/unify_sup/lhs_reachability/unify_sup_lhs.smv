@@ -1,0 +1,33 @@
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE unify_sup_lhs (A_in, A_in_valid, Cond1, Cond1_valid, Cond2, Cond2_valid, B_out_ready)
+
+
+-- input and output
+DEFINE B_out := ndw_out_B_out.outs;
+DEFINE B_out_valid := ndw_out_B_out.outs_valid;
+DEFINE ndw_out_B_out_outs_ready := B_out_ready;
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+DEFINE ndw_in_Cond1_ins := Cond1;
+DEFINE ndw_in_Cond1_ins_valid := Cond1_valid;
+DEFINE Cond1_ready := ndw_in_Cond1.ins_ready;
+DEFINE ndw_in_Cond2_ins := Cond2;
+DEFINE ndw_in_Cond2_ins_valid := Cond2_valid;
+DEFINE Cond2_ready := ndw_in_Cond2.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, passer2.data_ready);
+VAR ndw_in_Cond1 : handshake_ndwire_0(ndw_in_Cond1_ins, ndw_in_Cond1_ins_valid, passer1.data_ready);
+VAR ndw_in_Cond2 : handshake_ndwire_0(ndw_in_Cond2_ins, ndw_in_Cond2_ins_valid, fork_cond2.ins_ready);
+VAR ndw_out_B_out : handshake_ndwire_0(passer3.result, passer3.result_valid, ndw_out_B_out_outs_ready);
+VAR fork_cond2 : handshake_fork_0(ndw_in_Cond2.outs, ndw_in_Cond2.outs_valid, passer1.ctrl_ready, passer2.ctrl_ready);
+VAR passer1 : handshake_passer_0(ndw_in_Cond1.outs, ndw_in_Cond1.outs_valid, fork_cond2.outs_0, fork_cond2.outs_0_valid, passer3.ctrl_ready);
+VAR passer2 : handshake_passer_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, fork_cond2.outs_1, fork_cond2.outs_1_valid, passer3.data_ready);
+VAR passer3 : handshake_passer_0(passer2.result, passer2.result_valid, passer1.result, passer1.result_valid, ndw_out_B_out.ins_ready);
+
+-- properties

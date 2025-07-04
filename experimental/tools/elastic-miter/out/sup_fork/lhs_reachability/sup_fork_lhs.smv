@@ -1,0 +1,31 @@
+#include "handshake_passer_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+
+
+MODULE sup_fork_lhs (A_in, A_in_valid, Cond, Cond_valid, B_out_ready, C_out_ready)
+
+
+-- input and output
+DEFINE B_out := ndw_out_B_out.outs;
+DEFINE B_out_valid := ndw_out_B_out.outs_valid;
+DEFINE ndw_out_B_out_outs_ready := B_out_ready;
+DEFINE C_out := ndw_out_C_out.outs;
+DEFINE C_out_valid := ndw_out_C_out.outs_valid;
+DEFINE ndw_out_C_out_outs_ready := C_out_ready;
+DEFINE ndw_in_A_in_ins := A_in;
+DEFINE ndw_in_A_in_ins_valid := A_in_valid;
+DEFINE A_in_ready := ndw_in_A_in.ins_ready;
+DEFINE ndw_in_Cond_ins := Cond;
+DEFINE ndw_in_Cond_ins_valid := Cond_valid;
+DEFINE Cond_ready := ndw_in_Cond.ins_ready;
+
+
+VAR ndw_in_A_in : handshake_ndwire_0(ndw_in_A_in_ins, ndw_in_A_in_ins_valid, passer1.data_ready);
+VAR ndw_in_Cond : handshake_ndwire_0(ndw_in_Cond_ins, ndw_in_Cond_ins_valid, passer1.ctrl_ready);
+VAR ndw_out_B_out : handshake_ndwire_0(fork.outs_0, fork.outs_0_valid, ndw_out_B_out_outs_ready);
+VAR ndw_out_C_out : handshake_ndwire_0(fork.outs_1, fork.outs_1_valid, ndw_out_C_out_outs_ready);
+VAR passer1 : handshake_passer_0(ndw_in_A_in.outs, ndw_in_A_in.outs_valid, ndw_in_Cond.outs, ndw_in_Cond.outs_valid, fork.ins_ready);
+VAR fork : handshake_fork_0(passer1.result, passer1.result_valid, ndw_out_B_out.ins_ready, ndw_out_C_out.ins_ready);
+
+-- properties

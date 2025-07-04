@@ -1,0 +1,37 @@
+Digraph G {
+  splines=spline
+  compound=true
+  "A_in" ["style"="solid", "shape"="diamond", "label"="A_in", "mlir_op"="handshake.func"]
+  "Cond" ["style"="solid", "shape"="diamond", "label"="Cond", "mlir_op"="handshake.func"]
+  "B_out" ["style"="solid", "shape"="diamond", "label"="B_out", "mlir_op"="handshake.func"]
+  "C_out" ["style"="solid", "shape"="diamond", "label"="C_out", "mlir_op"="handshake.func"]
+  "A_in" -> "ndw_in_A_in" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="A_in", "to_idx"="0"]
+  "Cond" -> "ndw_in_Cond" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ins", "arrowtail"="none", "from"="Cond", "to_idx"="0"]
+  "ndw_in_A_in" -> "fork" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_in_Cond" -> "fork_cond" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_B_out" -> "B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="B_out", "arrowtail"="none", "from"="outs", "to_idx"="0"]
+  "ndw_out_C_out" -> "C_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "color"="blue", "to"="C_out", "arrowtail"="none", "from"="outs", "to_idx"="1"]
+  "passer1" -> "ndw_out_B_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  "passer2" -> "ndw_out_C_out" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
+  subgraph cluster0 {
+    graph ["label"="BB 0"]
+    "ndw_in_A_in" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_in_Cond" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster3 {
+    graph ["label"="BB 3"]
+    "ndw_out_B_out" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+    "ndw_out_C_out" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="ndwire", "mlir_op"="handshake.ndwire"]
+  }
+  subgraph cluster1 {
+    graph ["label"="BB 1"]
+    "fork" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "fork_cond" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
+    "passer1" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "passer2" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="passer", "mlir_op"="handshake.passer"]
+    "fork" -> "passer1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="data", "arrowtail"="none", "from"="outs_0", "to_idx"="0"]
+    "fork" -> "passer2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="data", "arrowtail"="none", "from"="outs_1", "to_idx"="0"]
+    "fork_cond" -> "passer1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ctrl", "arrowtail"="none", "from"="outs_0", "to_idx"="1"]
+    "fork_cond" -> "passer2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="1", "to"="ctrl", "arrowtail"="none", "from"="outs_1", "to_idx"="1"]
+  }
+}
