@@ -59,6 +59,72 @@ parameters_ranges = {
     "PREDICATE": ["ne"]
     }
 
+class VhdlInterfaceInfo:
+    """
+    Class to hold VHDL interface information.
+    This class is used to store the generics and ports of a VHDL entity.
+    """
+    def __init__(self, generics: List[str], ports: List[str]):
+        self.generics = generics
+        self.ports = ports
+        self.ins, self.outs = self.extract_ins_outs()
+
+    def __repr__(self):
+        return f"VhdlInterfaceInfo(generics={self.generics}, ports={self.ports})"
+
+    def extract_ins_outs(self) -> Tuple[List[str], List[str]]:
+        """
+        Extract input and output ports from the VHDL interface.
+        
+        Returns:
+            Tuple[List[str], List[str]]: A tuple containing two lists:
+                - List of input ports
+                - List of output ports
+        """
+        ins = [port.split(":")[0].strip() for port in self.ports if "in" in port and not "data_array" in port]
+        # Add 2d data_array ports to ins
+        ins.extend(add_2d_ports(self.ports, "in"))
+        outs = [port.split(":")[0].strip() for port in self.ports if "out" in port and not "data_array" in port]
+        # Add 2d data_array ports to outs
+        outs.extend(add_2d_ports(self.ports, "out"))
+        return ins, outs
+    
+    def get_input_ports(self) -> List[str]:
+        """
+        Get the input ports of the VHDL interface.
+        
+        Returns:
+            List[str]: List of input ports.
+        """
+        return self.ins
+    
+    def get_output_ports(self) -> List[str]:
+        """
+        Get the output ports of the VHDL interface.
+        
+        Returns:
+            List[str]: List of output ports.
+        """
+        return self.outs
+    
+    def get_list_ports(self) -> List[str]:
+        """
+        Get the list of all ports (input and output) of the VHDL interface.
+        
+        Returns:
+            List[str]: List of all ports.
+        """
+        return self.ports
+
+    def get_list_generics(self) -> List[str]:
+        """
+        Get the list of generics of the VHDL interface.
+        
+        Returns:
+            List[str]: List of generics.
+        """
+        return self.generics
+
 def extract_generics_ports(vhdl_code, entity_name):
     """
     Extract generics and ports from a VHDL entity block.
@@ -111,22 +177,23 @@ def extract_generics_ports(vhdl_code, entity_name):
     generics = split_definitions(generics_raw)
     ports    = split_definitions(ports_raw)
 
-    return entity_name, generics, ports
+    return entity_name, VhdlInterfaceInfo(generics, ports)
 
 
-def extract_template_top(entity_name, generics, ports, param_names):
+def extract_template_top(entity_name, vhdl_interface_info, param_names):
     """
     Extract the template for the top file from the given top definition file.
     
     Args:
         entity_name (str): Name of the top entity.
-        generics (List[str]): List of generics extracted from the top definition file.
-        ports (List[str]): List of ports extracted from the top definition file.
+        vhdl_interface_info (VhdlInterfaceInfo): VHDL interface information containing generics and ports.
         param_names (List[str]): List of parameter names to be used in the template.
         
     Returns:
         str: The template for the top file.
     """
+    generics = vhdl_interface_info.get_list_generics()
+    ports = vhdl_interface_info.get_list_ports()
     for _generic in generics:
         generic = _generic.split(":")[0].strip()  # Get the generic name before the colon
         assert generic in param_names, f"Generic `{generic}` not found in parameter names."
@@ -209,7 +276,7 @@ def add_2d_ports(ports, direction):
                 result.append(f"{port.split(':')[0].strip()}[{i}]")
     return result
 
-def write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports):
+def write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, vhdl_interface_info):
     """
     Write the TCL file for synthesis based on the top file and HDL files.
     
@@ -218,13 +285,12 @@ def write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timi
         top_entity_name (str): Name of the top entity.
         hdl_files (list): List of HDL files needed for synthesis.
         tcl_file (str): Path to the output TCL file.
+        sdc_file (str): Path to the SDC file for constraints.
+        rpt_timing (str): Path to the output timing report file.
+        vhdl_interface_info (VhdlInterfaceInfo): VHDL interface information containing generics and ports.
     """
-    ins = [port.split(":")[0].strip() for port in ports if "in" in port and not "data_array" in port]
-    # Add 2d data_array ports to ins
-    ins.extend(add_2d_ports(ports, "in"))
-    outs = [port.split(":")[0].strip() for port in ports if "out" in port and not "data_array" in port]
-    # Add 2d data_array ports to outs
-    outs.extend(add_2d_ports(ports, "out"))
+    input_ports = vhdl_interface_info.get_input_ports()
+    output_ports = vhdl_interface_info.get_output_ports()
     with open(tcl_file, 'w') as f:
         f.write(f"read_vhdl -vhdl2008 {top_file}\n")
         for hdl_file in hdl_files:
@@ -236,10 +302,10 @@ def write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timi
         f.write("phys_opt_design\n")
         f.write("route_design\n")
         f.write("phys_opt_design\n")
-        for iport in ins:
+        for iport in input_ports:
             if "clk" in iport or "clock" in iport or "rst" in iport or "reset" in iport:
                 continue  # Skip clock and reset ports
-            for oport in outs:
+            for oport in output_ports:
                 f.write(f"report_timing -from [get_ports {iport}] -to [get_ports {oport}] >> {rpt_timing}\n")
 
 def write_sdc_constraints(sdc_file, period_ns):
@@ -284,9 +350,9 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     print(f"Extracting generics and ports from {top_def_file}")
     with open(top_def_file, 'r') as f:
         vhdl_code = f.read()
-    top_entity_name, generics, ports = extract_generics_ports(vhdl_code, unit_name)
+    top_entity_name, vhdl_interface_info = extract_generics_ports(vhdl_code, unit_name)
     # Extract the template for the top file
-    template_top, top_entity_name = extract_template_top(top_entity_name, generics, ports, param_names)
+    template_top, top_entity_name = extract_template_top(top_entity_name, vhdl_interface_info, param_names)
     # Create sdc constraints file
     sdc_file = f"{tcl_dir}/period.sdc"
     write_sdc_constraints(sdc_file, 4.0)  # Set a default period of 4 ns
@@ -309,7 +375,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         # Remove previous rpt_timing file if it exists
         if os.path.exists(rpt_timing):
             os.remove(rpt_timing)
-        write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports)
+        write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, vhdl_interface_info)
         id += 1
         # Map the report file to the parameters used
         map_rpt2params[rpt_timing] = {}
