@@ -1,4 +1,4 @@
-[Home](README.md) <span>&ensp;</span> [Usage](user-guide-topics/usage.md)<span>&ensp;</span> [Modification](user-guide-topics/advancedusage.md)<span>&ensp;</span> [Advanced-Build](user-guide-topics/advanced-build.md) <span>&ensp;</span>[Examples](user-guide-topics/examples.md) <span>&ensp;</span>[Dependencies](user-guide-topics/dependencies.md) <span>&ensp;</span>[Development](user-guide-topics/work-in-progress.md)
+[Home](README.md) <span>&ensp;</span> [Usage](docs/UserGuideTopics/Usage.md)<span>&ensp;</span> [Modification](docs/UserGuideTopics/AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](docs/UserGuideTopics/AdvancedBuild.md) <span>&ensp;</span>[Examples](docs/UserGuideTopics/Examples.md) <span>&ensp;</span>[Dependencies](docs/UserGuideTopics/Dependencies.md) <span>&ensp;</span>[Development](docs/UserGuideTopics/WorkInProgress.md)
 # Dynamatic
 Dynamatic is an academic, open-source high-level synthesis compiler that produces synchronous dynamically-scheduled circuits from C/C++ code. Dynamatic generates synthesizable RTL which currently targets Xilinx FPGAs and delivers significant performance improvements compared to state-of-the-art commercial HLS tools in specific situations (e.g., applications with irregular memory accesses or control-dominated code). The fully automated compilation flow of Dynamatic is based on MLIR. It is customizable and extensible to target different hardware platforms and easy to use with commercial tools such as Vivado (Xilinx) and Modelsim (Mentor Graphics).
 
@@ -12,12 +12,12 @@ There are currently two ways to setup and use Dynamatic
 We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [Build instructions](#build-instructions) below. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distributions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 **2. Use the Provided Virtual Machine**  
-We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](user-guide-topics/usage.md)) or as a starting point to use/[modify](user-guide-topics/advancedusage.md) Dynamatic in general.
+We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](docs/UserGuideTopics/usage.md)) or as a starting point to use/[modify](docs/UserGuideTopics/AdvancedUsage.md) Dynamatic in general.
 
 
 ### Build Instructions
 The following instructions can be used to setup Dynamatic from source.  
->If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](user-guide-topics/advanced-build.md) to learn how to customize the build process to your needs.
+>If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](docs/UserGuideTopics/AdvancedBuild.md) to learn how to customize the build process to your needs.
 
 **1. Install dependencies required by the project**  
 Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), cmake and ninja for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with .dot files, and standard command-line tools like git.
@@ -36,9 +36,9 @@ Dynamatic uses RTL generators written in Chisel (a hardware construction languag
 curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
 ```
 
-Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tutorial for guidance on [how to setup the Gurobi solver](user-guide-topics/advanced-build.md#1-gurobi).
+Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tutorial for guidance on [how to setup the Gurobi solver](docs/UserGuideTopics/AdvancedBuild.md#1-gurobi).
 
->While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](user-guide-topics/dependencies.md) section for a better understanding of how the tool works.
+>While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](docs/UserGuideTopics/Dependencies.md) section for a better understanding of how the tool works.
 
 Finally, Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) to run simulations, thus you need to install it before hand and add it to your environment variables.  
 
@@ -55,7 +55,7 @@ git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
 This creates a `dynamatic` folder in your current working directory.
 
 **3. Build the Project**  
-Run the build script from the directory created by the clone command (check out our [advanced build](user-guide-topics/advanced-build.md) instructions to see how you can customize the build process and/or build the interactive dataflow visualizer). You may want to check the [build](user-guide-topics/advanced-build.md#3-building) section of the advanced build page if you want more options for building such as multi-threaded build which is faster.
+Run the build script from the directory created by the clone command (check out our [advanced build](docs/UserGuideTopics/AdvancedBuild.md) instructions to see how you can customize the build process and/or build the interactive dataflow visualizer). You may want to check the [build](docs/UserGuideTopics/AdvancedBuild.md#3-building) section of the advanced build page if you want more options for building such as multi-threaded build which is faster.
 ```
 cd dynamatic
 chmod +x ./build.sh
@@ -69,7 +69,7 @@ After building the project, or at any time during development, you can run Dynam
 cd build
 ninja check-dynamatic
 ```
-Now, you have the groundwork for [using dynamatic](user-guide-topics/usage.md) and trying the [Advanced build](user-guide-topics/advanced-build.md) options.
+Now, you have the groundwork for [using dynamatic](docs/UserGuideTopics/Usage.md) and trying the [Advanced build](docs/UserGuideTopics/AdvancedBuild.md) options.
 For information on usage and features, please check out [the user manual](docs/UserManual.md).
 
 [Go to top of the page](#installing-dynamatic)
