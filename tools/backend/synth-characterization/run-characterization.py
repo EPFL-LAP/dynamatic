@@ -48,6 +48,8 @@ skipping_units = [
     "handshake.subf",
     "handshake.not"]
 
+# List of parameters and their ranges for characterization
+# This is used to generate the top files for characterization
 parameters_ranges = { 
     "DATA_TYPE": [1, 2, 4, 8, 16, 32, 64],
     "SIZE": [2],
