@@ -1,12 +1,12 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 
-[Input-Format](input-format.md) <span>&ensp;</span> [Data-Type-Support](data_type_support.md)
+[Input-Format](InputFormat.md) <span>&ensp;</span> [Data-Type-Support](DataTypeSupport.md)
 # Using Dynamatic
->Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](installation.md).
+>Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](../../README.md).
 
 This section covers:
 - how to use Dynamatic
-- constructs to include and invalid C/C++ features (see [input format](input-format.md) and [data type support](data_type_support.md))
+- constructs to include and invalid C/C++ features (see [input format](InputFormat.md) and [data type support](DataTypeSupport.md))
 - Dynamatic commands and respective flags.
 
 ## Introduction to Dynamatic
@@ -22,7 +22,7 @@ This tutorial guides you through the
 The tutorial assumes basic knowledge of dataflow circuits but does not require any insight into MLIR or compilers in general.
 
 Below are some technical details about this tutorial.
-- All resources are located in the repository's [tutorials/Introduction/Ch1](https://github.com/EPFL-LAP/dynamatic/blob/main/tutorials/Introduction/Ch1) folder.
+- All resources are located in the repository's [tutorials/Introduction/Ch1](../../tutorials/Introduction/Ch1) folder.
 - All relative paths mentionned throughout the tutorial are assumed to start at Dynamatic's top-level folder.
 
 This tutorial is divided into the following sections:
@@ -53,7 +53,7 @@ This kernel:
 
 >This function is purposefully simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
 
-You can find the source code of this function in [tutorials/Introduction/Ch1/loop_multiply.c](https://github.com/EPFL-LAP/dynamatic/blob/main/tutorials/Introduction/Ch1/loop_multiply.c). 
+You can find the source code of this function in [tutorials/Introduction/Ch1/loop_multiply.c](../../tutorials/Introduction/Ch1/loop_multiply.c). 
 
 Observe!
 - The `main` function in the file allows one to run the C kernel with user-provided arguments. 
@@ -96,12 +96,12 @@ The first step towards generating the VHDL design is compilation. Here,
 - the C source goes through our MLIR frontend ([Polygeist](https://github.com/llvm/Polygeist))
 - traverses a pre-defined sequence of transformation and optimization passes that ultimately yield a description of an equivalent dataflow circuit. 
 
-That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md#dialects). 
+That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../Tutorials/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](../docs/Tutorials/MLIRPrimer.md#dialects). 
 >A dialect is simply a collection of logically-connected IR entities like instructions, types, and attributes. 
 
 MLIR provides standard dialects for common usecases, while allowing external tools (like Dynamatic) to define custom dialects to model domain-specific semantics. We inherit part of the infrastructure surrounding the Handshake dialect from the [CIRCT project](https://github.com/llvm/circt) (a satellite project of LLVM/MLIR), but have tailored it to our specific usecases.
 
-To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/dynamatic/scripts)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
+To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](../../tools/dynamatic/scripts)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
 ```
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> compile
@@ -196,12 +196,12 @@ dynamatic> exit
 
 Goodbye!
 ```
-If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [tutorials/Introduction/Ch1/frontend-script.dyn](https://github.com/EPFL-LAP/dynamatic/blob/main/tutorials/Introduction/Ch1/frontend-script.dyn). You can replay this whole section by running the following from Dynamatic's top-level folder.
+If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [tutorials/Introduction/Ch1/frontend-script.dyn](../../tutorials/Introduction/Ch1/frontend-script.dyn). You can replay this whole section by running the following from Dynamatic's top-level folder.
 ```
 ./bin/dynamatic --run tutorials/Introduction/Ch1/frontend-script.dyn
 ```
 ### `visualize`
->To use the visualize command, you will need to go through the [interactive dataflow visualizer](advanced-build.md#4-interactive-dataflow-circuit-visualizer) section in the Advanced Build section first.
+>To use the visualize command, you will need to go through the [interactive dataflow visualizer](AdvancedBuild.md#4-interactive-dataflow-circuit-visualizer) section in the Advanced Build section first.
 >
 At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/Introduction/Ch1/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
 
@@ -253,6 +253,6 @@ Observe the circuit executes using the interactive controls at the bottom of the
 
 ### Conclusion
 Congratulations on reaching the end of this tutorial! You now know how to use Dynamatic to compile C kernels into functional dataflow circuits, visualize these circuits to better understand them to identify potential optimization opportunities.  
-Before moving on to use Dynamatic for your custom programs, kindly refer to the [dressing up your code for dynamatic](input-format.md) guide.
+Before moving on to use Dynamatic for your custom programs, kindly refer to the [dressing up your code for dynamatic](InputFormat.md) guide.
 
-We are now ready for an introduction to [modiying Dynamatic](advancedusage.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.
+We are now ready for an introduction to [modiying Dynamatic](AdvancedUsage.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.

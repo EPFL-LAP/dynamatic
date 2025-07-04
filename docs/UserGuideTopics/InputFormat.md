@@ -1,6 +1,6 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 
-[Data-Type-Support](data_type_support.md)
+[Data-Type-Support](DataTypeSupport.md)
 # Dressing up your C/C++ code for Dynamatic
 Before passing your C kernel (function) to Dynamatic for compilation, it is important that you ensure it meets the following guidelines.
 
@@ -114,4 +114,4 @@ void convolution(int kernel[3][3], unsigned char input[HEIGHT][WIDTH], unsigned 
 
 Dynamatic is being refined over time and is yet to support certain constructs such as local array declarations in the target function which must rather be passed as inputs. If you encounter any issue in using Dynamatic, kindly report the bug on the github repository.
 
-In the meantime, visit out [examples](examples.md) page to see an example of using Dynamatic our [supported data types and operations](data_type_support.md) page for information on the constructs currently supported by D    ynamatic.
+In the meantime, visit out [examples](Examples.md) page to see an example of using Dynamatic our [supported data types and operations](DataTypeSupport.md) page for information on the constructs currently supported by D    ynamatic.

@@ -1,4 +1,4 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 
 # Advanced Build Instructions
 ### Table of contents
@@ -8,7 +8,7 @@
 4. [Interactive Visualizer](#4-interactive-dataflow-circuit-visualizer)
 5. [Enabling XLS Integration](#5-enabling-the-xls-integration)
 
->This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](installation.md) page.
+>This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../../README.md) page.
 
 ## 1. Gurobi
 
@@ -47,7 +47,7 @@ export PATH="${GUROBI_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:$LD_LIBRARY_PATH"
 ```
 
-Once Gurobi is set up, you can change the buffer placement algorithm using the `--buffer-algorithm` compile flag and setting the value to either `fpga20` or `fpl22`. See [dynamatic usage](usage.md#compile-flags) page for details on how to use Dynamatic and modify the compile flags.
+Once Gurobi is set up, you can change the buffer placement algorithm using the `--buffer-algorithm` compile flag and setting the value to either `fpga20` or `fpl22`. See [Dynamatic usage](Usage.md#compile-flags) page for details on how to use Dynamatic and modify the compile flags.
 
 ## 2. Cloning
 
@@ -137,7 +137,7 @@ To reduce the build script's execution time when re-building the project regular
 
 The repository contains an optionally built tool that allows you to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at visual-dataflow/godot-cpp (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
 >**Warning**
-Note that Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in [`.gitmodules`](https://github.com/EPFL-LAP/dynamatic/blob/main/.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
+Note that Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in [`.gitmodules`](.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
 >
 Due to these extra dependencies, building this tool is opt-in, meaning that
 
@@ -175,7 +175,7 @@ Finally, run the command below to export the Godot project as an executable bina
 ./build.sh --visual-dataflow --export-godot /path/to/godot-engine
 ```
 The tool's binary is generated at `visual-dataflow/bin/visual-dataflow` and sym-linked at `bin/visual-dataflow` for convenience. 
-Now, you can visualize the dataflow graphs for your compiled programs with Godot. See [how to use Dynamatic](usage.md) for more details.
+Now, you can visualize the dataflow graphs for your compiled programs with Godot. See [how to use Dynamatic](Usage.md) for more details.
 >**Note:**
 Whenever you make a modification to the C++ library or to the Godot project itself, you can simply re-run the above command to recompile everything and re-generate the executable binary for the tool.
 >

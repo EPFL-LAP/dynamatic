@@ -1,12 +1,12 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 # Dependencies
 Dynamatic uses 
 - [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules) to manage its software dependencies (all hosted on GitHub). 
 - [Polygeist](https://github.com/llvm/Polygeist), a C/C++ frontend for MLIR which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project) through a git submodule. The project is set up so that you can include LLVM/MLIR headers directly from Dynamatic code without having to specify their path through Polygeist. 
 - [godot-cpp](https://github.com/godotengine/godot-cpp), the official C++ bindings for the Godot game engine which we use as the frontend to our interactive dataflow circuit visualizer.
-- [Modelsim](https://www.intel.com/content/www/us/en/software-kit/750368/modelsim-intel-fpgas-standard-edition-software-version-18-1.html) for our simulation tool. See [installation](installation.md) page on how to setup Modelsim.
+- [Modelsim](https://www.intel.com/content/www/us/en/software-kit/750368/modelsim-intel-fpgas-standard-edition-software-version-18-1.html) for our simulation tool. See [installation](../../README.md) page on how to setup Modelsim.
 - [CIRCT](https://github.com/EPFL-LAP/circt) project (details [below](#circt)) from which we inherit two MLIR dialects (Handshake and HW)
-- [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. See how to set up gurobi in the [advanced build section](advanced-build.md)
+- [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems. Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance. See how to set up gurobi in the [advanced build section](AdvancedBuild.md)
 
 ### Polygeist
 [Polygeist](https://github.com/llvm/Polygeist) is a C/C++ frontend for MLIR including polyhedral optimizations and parallel optimizations features. Polygeist is thus responsible for the first step of our compilation process, that is taking source code written in C/C++ into the MLIR ecosystem. In particular, we care that our entry point to MLIR is at a very high semantic level, namely, at a level where polyhedral analysis is possible. The latter allows us to easily identify dependencies between memory accesses in source programs in a very accurate manner, which is key to optimizing the allocation of memory interfaces and resources in our elastic circuits down the line. Polygeist is able to emit MLIR code in the [Affine](https://mlir.llvm.org/docs/Dialects/Affine/) dialect, which is perfectly suited for this kind of analysis.
@@ -18,4 +18,4 @@ Dynamatic uses
 [Gurobi]() is a state-of-the-art mathematical optimization solver developed by Gurobi Optimization. It supports a number of mathematical problems, the most relevant for us being the Mixed-Interger Linear Programming. Dataflow circuits are made of nodes, edges and similar components whicha can be represented mathematically and hence optimized by gurobi
 
 ### Godot
-Godot is an open source game engine that enables Dynamatic users to visualize dataflow graphs of their generated circuits and interact with them. See [advanced build](advanced-build.md) section for details on integrating godot to the Dynamatic build.
+Godot is an open source game engine that enables Dynamatic users to visualize dataflow graphs of their generated circuits and interact with them. See [advanced build](AdvancedBuild.md) section for details on integrating godot to the Dynamatic build.

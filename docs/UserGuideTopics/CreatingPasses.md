@@ -1,6 +1,6 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 # Creating Custom Compiler Passes  
-Custom compiler passes allow you to modify the way dynamatic compiles your circuit e.g the types of components used and when used. See [advanced usage](advancedusage.md) for a simple application.   
+Custom compiler passes allow you to modify the way dynamatic compiles your circuit e.g the types of components used and when used. See [advanced usage](AdvancedUsage.md) for a simple application.   
 This page gives you generic instructions on how to create any compiler pass to meet your needs.
 ## Writing a Simple MLIR pass
 To create a pass:  
@@ -23,7 +23,7 @@ TableGen's input format is mostly declarative,
 >It declares the existence of entities and characterizes their properties, but does not directly describe how they behave
 
 The behaviour of TableGen-defined entities must be written in C++ as we will do later. TableGen will automatically generate a registration function that will enable the Dynamatic optimizer to register and run our pass.  
-The files for this tutorial are available in the [tutorials](https://github.com/EPFL-LAP/dynamatic/tree/main/tutorials) folder of the repository for reference.
+The files for this tutorial are available in the [tutorials](../../tutorials) folder of the repository for reference.
 
 Inside `tutorials/CreatingPasses/include/tutorials/`, which already exists,
 - Create a directory named `MyCreatingPasses` which will contain all declarations for this tutorial. 
@@ -359,7 +359,7 @@ On stdout, you should see printed the message we put into the pass (My pass is r
 
 Congratulations on successfully building your own pass! It may seem like a long (and somewhat boilerplate) process but, once you are used to it, it takes only 5 to 10 minutes to setup a pass as these steps are mostly the same for all passes you will ever write. Also keep in mind that you usually won't have to do all of what we just did, since most of the time all the basic infrastructure (i.e., the Tablegen file, some of the headers, the `CMakeLists.txt` files) is already there. In those cases you would just have to declare an additional pass inside a `Passes.td` file, add a header/source file pair for your new pass, and include your pass's header inside an already existing Passes.h file.
 ## Implementing our transformation
-In this section, we will just be modifying `MySimplifyMergeLike.cpp`. As this tutorial is mostly about the pass creation process rather than MLIR's IR transformation capabilities, we will not go into the details of how to interact with MLIR data-structures. Instead, see the [MLIR primer](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/MLIRPrimer.md) for an introduction to these concepts.
+In this section, we will just be modifying `MySimplifyMergeLike.cpp`. As this tutorial is mostly about the pass creation process rather than MLIR's IR transformation capabilities, we will not go into the details of how to interact with MLIR data-structures. Instead, see the [MLIR primer](../Tutorials/MLIRPrimer.md) for an introduction to these concepts.
 
 First, modify the `runOnOperation` method inside `MySimplifyMergeLikePass` to call a helper function that will perform the transformation for each handshake function (`circt::handshake::FuncOp`) in the current MLIR module.
 ```
@@ -396,7 +396,7 @@ static LogicalResult performSimplification(handshake::FuncOp funcOp,
 ```
 The function returns a `LogicalResult`, which is the conventional MLIR type to indicate success (`return success();`) or failure (`return failure();`). At this point, the function just creates an operation builder (`OpBuilder`) from the passed MLIR context, which will enable us to `create/insert/erase` operation from the IR.
 
-Now, add the code of the first transformation step ([single-input merge erasure](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/CreatingPasses/1.SimplifyingMergeLikeOps.md#erasing-single-input-merges)) inside the function.
+Now, add the code of the first transformation step ([single-input merge erasure](../Tutorials/CreatingPasses/1.SimplifyingMergeLikeOps.md#erasing-single-input-merges)) inside the function.
 ```
 static LogicalResult performSimplification(handshake::FuncOp funcOp,
                                            MLIRContext *ctx) {
@@ -420,7 +420,7 @@ static LogicalResult performSimplification(handshake::FuncOp funcOp,
 ```
 This simply iterates over all `circt::handshake::MergeOp` inside the function and, if they have a single operand, rewires the circuit to bypass the useless merge before deleting the latter. Note that we wrap the `funcOp.getOps<handshake::MergeOp>()` iterator inside a call to `llvm::make_early_inc_range`. This is necessary because we are erasing the current element pointed to by the iterator inside the loop body (by calling `mergeOp.erase()`), which is normally unsafe. `make_early_inc_range` solves this by going to find the next iterator element before returning control to the loop body for the current element.
 
-Next, add the code for the second transformation step ([index-less control merge downgrading](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Tutorials/CreatingPasses/1.SimplifyingMergeLikeOps.md#downgrading-index-less-control-merges)) below the code we just added.
+Next, add the code for the second transformation step ([index-less control merge downgrading](../Tutorials/CreatingPasses/1.SimplifyingMergeLikeOps.md#downgrading-index-less-control-merges)) below the code we just added.
 ```
 static LogicalResult performSimplification(handshake::FuncOp funcOp,
                                            MLIRContext *ctx) {

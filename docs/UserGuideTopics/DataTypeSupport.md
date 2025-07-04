@@ -1,6 +1,6 @@
-[Home](../README.md) <span>&ensp;</span> [Usage](usage.md)<span>&ensp;</span> [Modification](advancedusage.md)<span>&ensp;</span> [Advanced-Build](advanced-build.md) <span>&ensp;</span>[Examples](examples.md) <span>&ensp;</span>[Dependencies](dependencies.md) <span>&ensp;</span>[Development](work-in-progress.md)
+[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
 
-[Input-Format](input-format.md)
+[Input-Format](InputFormat.md)
 
 # Data Type Support for Dynamatic
 These types are most crucial when dealing with function parameters. Some of the unsupported types may work on local variables without any compilation errors.
@@ -25,7 +25,7 @@ __int128|x|
 |Incremenetation | ✓ | ✓ | `x++;`| `x++;` | `x += 1;`/`x += 0.1` |
 |Decremenetation | ✓ | ✓ | `x--;`| `x--;` | `x -= 1;`/`x -= 0.1` |
 |Comparison|✓ |✓| `x >= 1` | `x <= 0.45` | all comparison formats and operations are supported|
-|AND|✓|x|`x && 2` | `x && 1.0f`(not supported just as in regular C)| `(x > 0.45f && x < 4.5f)` (works for compound conditions involving floats| 
+|AND|✓|x|`x && 2` | `x && 1.0f`(not supported just as in regular C)| `(x > 0.45f && x < 4.5f)` (works for compound conditions involving floats)| 
 |OR and NOT| ✓ | x | `x \|\| y` | `x \|\| 0.45` (invalid) | see AND|
 |Type Casting| ✓ |✓ | `(int)x` | `(float)x`| applies to all int and float/double types|
 |Precompiled math functions| Only `abs`| only `fabsf`| `abs(x)` | `fabsf(x*2.0f)` | most precompiled C libraries are not supported. Consider coding custom functions for use with dynamatic as it requires requires explicit C|
