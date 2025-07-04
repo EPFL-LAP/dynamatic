@@ -17,6 +17,7 @@ POLYGEIST_PATH=$7
 USE_SHARING=$8
 FPUNITS_GEN=$9
 USE_RIGIDIFICATION=${10}
+DISABLE_LSQ=${11}
 
 POLYGEIST_CLANG_BIN="$DYNAMATIC_DIR/bin/cgeist"
 CLANGXX_BIN="$DYNAMATIC_DIR/bin/clang++"
@@ -128,12 +129,21 @@ exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic)
-"$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
-  --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-  --mark-memory-interfaces \
-  > "$F_CF_DYN_TRANSFORMED"
-exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-  "Applied Dynamatic transformations to cf"
+if [[ $DISABLE_LSQ -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+    --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+    --mark-memory-interfaces --force-memory-interface="force-mc=true" \
+    > "$F_CF_DYN_TRANSFORMED"
+  exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+    "Applied Dynamatic transformations to cf"
+else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+    --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+    --mark-memory-interfaces \
+    > "$F_CF_DYN_TRANSFORMED"
+  exit_on_fail "Failed to apply Dynamatic transformations to cf" \
+    "Applied Dynamatic transformations to cf"
+fi
 
 # cf level -> handshake level
 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
