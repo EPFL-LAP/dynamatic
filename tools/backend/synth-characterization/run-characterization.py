@@ -237,6 +237,10 @@ generic map (
 
     return template_top, entity_name
 
+def _synth_worker(args):
+    synth_tool, tcl_file, log_file = args
+    os.system(f"{synth_tool} -mode batch -source {tcl_file} > {log_file}")
+
 def run_synthesis(tcl_files, synth_tool, log_file):
     """
     Run synthesis for the given TCL files using the specified synthesis tool in parallel (if NUM_CORES > 1).
@@ -244,10 +248,6 @@ def run_synthesis(tcl_files, synth_tool, log_file):
         tcl_files (list): List of TCL files to run synthesis on.
         synth_tool (str): Synthesis tool to use (e.g., 'vivado').
     """
-    def _synth_worker(args):
-        synth_tool, tcl_file, log_file = args
-        os.system(f"{synth_tool} -mode batch -source {tcl_file} > {log_file}")
-
     # Run synthesis in parallel using Vivado
     args_list = [(synth_tool, tcl_file, f"{log_file}{i}") for i, tcl_file in enumerate(tcl_files)]
     with Pool(processes=NUM_CORES) as pool:
