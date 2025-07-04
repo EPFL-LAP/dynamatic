@@ -42,7 +42,7 @@ It is important to remember that an attribute could be altered by other sections
 
 To avoid these problems, ideally information stored in the IR should be **decisions**: any information that is downstream of a set of decisions should be calculated on-demand, based on the real values of its causal variables. 
 
-### Good Examples
+## Good Examples
 #### FIFO-Depth for a Save-Commit
 
 The save-commit operation (the details of what this operation does are not relevant to this document) has an internal FIFO.
@@ -95,7 +95,7 @@ Helpful getter functions are also generated for each of its attributes.
 
 There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs. In best practice, values like this which can be calculated should not be stored as attributes.
 
-### Example to Avoid
+## Example to Avoid
 
 
 
