@@ -250,8 +250,9 @@ hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : 
 
 
 
-# Timing Information in FloPoCo units - The arch-suffix system (working title)
+# Timing Information in FloPoCo units - Current architecture naming standard
 
+**The following section describes the current state, however whether this is a satisfactory representation is still under discussion. Please update accorisngly if any changes are agreed on.**
 
 FloPoCo units are identified by the triplet **{operator name, bitwidth, measured internal delay}** which serves to uniquely identify them.
 
