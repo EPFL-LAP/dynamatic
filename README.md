@@ -20,7 +20,7 @@ For an high-level overview of the project's structure and of our contribution gu
 
 ## Building from source
 
-The following instructions can be used to setup Dynamatic from source. If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer, you can check our [advanced build instructions](docs/AdvancedBuild.md) to learn how to customize the build process to your needs.
+The following instructions can be used to setup Dynamatic from source. If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer, you can check our [advanced build instructions](docs/AdvancedBuild.md) to learn how to customize the build process to your needs. For information on usage and features, please check out [the user manual](docs/UserManual.md)
 
 1. **Install dependencies required by the project.**
 
