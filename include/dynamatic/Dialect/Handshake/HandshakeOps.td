@@ -325,6 +325,39 @@ def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
   }];
 }
 
+def SpecV2InterpolatorOp : Handshake_Op<"spec_v2_interpolator", [
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "shortOperand">,
+  IsIntSizedChannel<1, "longOperand">,
+  IsIntSizedChannel<1, "result">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "interpolator operation";
+  let description = [{
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
+  }];
+  
+  let arguments = (ins ChannelType:$shortOperand, ChannelType:$longOperand);
+  let results = (outs ChannelType:$result);
+
+  let assemblyFormat = [{
+    $shortOperand `,` $longOperand attr-dict `:` type($result)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "short" : "long";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "result";
+    }
+  }];
+}
+
 def NDWireOp : Handshake_Op<"ndwire", [
   HasClock, SameOperandsAndResultType
 ]> {

@@ -699,9 +699,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::PasserOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::SpecV2ResolverOp>([&](auto) {
-        // No parameters needed for these operations
-      })
+      .Case<handshake::SpecV2ResolverOp, handshake::SpecV2InterpolatorOp>(
+          [&](auto) {
+            // No parameters needed for these operations
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -1825,6 +1826,7 @@ public:
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
                     ConvertToHWInstance<handshake::InitOp>,
                     ConvertToHWInstance<handshake::SpecV2RepeatingInitOp>,
+                    ConvertToHWInstance<handshake::SpecV2InterpolatorOp>,
                     ConvertToHWInstance<handshake::PasserOp>,
                     ConvertToHWInstance<handshake::SpecV2ResolverOp>,
 

@@ -20,3 +20,5 @@ run sup_and --seq_length="0=1"
 run sup_fork
 run sup_mux --seq_length="0=2" --loop_strict=1,2
 run unify_sup --seq_length="0=1"
+run interpolator_ident
+run interpolator_ind --seq_length="0<=1"
