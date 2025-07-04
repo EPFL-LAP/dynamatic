@@ -312,7 +312,7 @@ createReachabilityCircuit(MLIRContext &context,
 // exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   size_t bufferSlots) {
+                   size_t bufferSlots, bool ndSpec) {
 
   // Get the LHS FuncOp from the LHS module, also check some required properties
   auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
@@ -379,6 +379,11 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 
   Operation *nextLocation;
 
+  if (ndSpec) {
+    assert(lhsFuncOp.getNumArguments() == 2 &&
+           "The ND speculator context only supports two arguments.");
+  }
+
   // Create the input side auxillary logic:
   // Every primary input of the LHS/RHS circuits is connected to a fork, which
   // splits the data for both sides under test. Both output sides of the fork
@@ -388,13 +393,33 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
   // the original input of the circuits. This completely decouples the
   // operation of the two circuits.
   for (unsigned i = 0; i < lhsFuncOp.getNumArguments(); ++i) {
-    BlockArgument lhsArg = lhsFuncOp.getArgument(i);
-    BlockArgument rhsArg = rhsFuncOp.getArgument(i);
-    BlockArgument miterArg = newFuncOp.getArgument(i);
+    Value lhsArg = lhsFuncOp.getArgument(i);
+    Value rhsArg = rhsFuncOp.getArgument(i);
+    Value miterArg = newFuncOp.getArgument(i);
     if (getHandshakeTypeBitWidth(miterArg.getType()) > 1) {
       return lhsFuncOp.emitError(
           "ElasticMiter currently supports only 1-bit or "
           "control inputs.");
+    }
+
+    if (ndSpec && i == 1) {
+      LazyForkOp forkOp = builder.create<LazyForkOp>(
+          newFuncOp.getLoc(), newFuncOp.getArgument(0), 2);
+      setHandshakeAttributes(builder, forkOp, BB_IN, "in_nd_fork");
+      newFuncOp.getArgument(0).replaceAllUsesExcept(forkOp.getResult()[0],
+                                                    forkOp);
+
+      SpecV2NDSpeculatorOp ndSpecOp = builder.create<SpecV2NDSpeculatorOp>(
+          newFuncOp.getLoc(), forkOp.getResult()[1]);
+      setHandshakeAttributes(builder, ndSpecOp, BB_IN, "in_nd_speculator");
+      SpecV2RepeatingInitOp riOp = builder.create<SpecV2RepeatingInitOp>(
+          newFuncOp.getLoc(), ndSpecOp.getResult());
+      setHandshakeAttributes(builder, riOp, BB_IN, "in_ri");
+      miterArg = riOp.getResult();
+
+      SinkOp sinkOp =
+          builder.create<SinkOp>(newFuncOp.getLoc(), newFuncOp.getArgument(1));
+      setHandshakeAttributes(builder, sinkOp, BB_IN, "in_sink");
     }
 
     std::string forkName = "in_fork_" + lhsFuncOp.getArgName(i).str();
@@ -556,7 +581,8 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
 FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
-                  const std::filesystem::path &outputDir, size_t nrOfTokens) {
+                  const std::filesystem::path &outputDir, size_t nrOfTokens,
+                  bool ndSpec) {
 
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
@@ -574,7 +600,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   }
   ModuleOp rhsModule = rhsModuleRef.get();
 
-  auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens);
+  auto ret =
+      createElasticMiter(context, lhsModule, rhsModule, nrOfTokens, ndSpec);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();
