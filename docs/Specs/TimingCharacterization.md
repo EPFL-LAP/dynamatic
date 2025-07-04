@@ -42,9 +42,6 @@ where the only key difference is the specification of the input JSON (`struct.js
 
 The script automates the extraction of VHDL entity information, testbench generation, synthesis script creation, dependency management, and parallel synthesis execution. Its primary goal is to characterize hardware units by sweeping parameter values and collecting synthesis/timing results.
 
-
-
-
 ## Where Characterization Data is Stored
 
 All generated files and results are organized in a user-specified directory structure:
@@ -56,63 +53,86 @@ All generated files and results are organized in a user-specified directory stru
 
 Each configuration (i.e., a unique set of parameter values) is associated with its own set of files, named to reflect the parameter values used.
 
+## Scripts Structure
+
+The scripts are organized according to the following structure:
+<pre lang="markdown">. 
+├── hdl_manager.py # Moves HDL files from the folder containing all the HDL files to the working directory 
+├── report_parser.py # Extracts delay information from synthesis reports 
+├── run-characterization.py # Main script: orchestrates filtering, generation, synthesis, parsing 
+├── run_synthesis.py # Runs synthesis (e.g., with Vivado), supports parallel execution 
+├── unit_characterization.py # Coordinates unit-level processing: port handling, VHDL generation, exploration across all parameters 
+└── utils.py # Shared helpers: common class definitions and constants </pre>
+
 ## Core Data Structures and Functions
 
-The script uses several key functions and data structures to orchestrate characterization:
+The scripts uses several key functions and data structures to orchestrate characterization:
 
 ### Parameter Management
 
-- **parameters_ranges**:
-A dictionary mapping parameter names to lists of values to sweep. Enables exhaustive exploration of the design space.
+- **parameters_ranges**: (File `utils.py`)
+
+    A dictionary mapping parameter names to lists of values to sweep. Enables exhaustive exploration of the design space. 
 
 
 ### Entity Extraction
 
-- **extract_generics_ports(vhdl_code, entity_name)**
-Parses VHDL code to extract the list of generics (parameters) and ports for the specified entity.
+- **extract_generics_ports(vhdl_code, entity_name)**: (File `unit_characterization.py`)
+    
+    Parses VHDL code to extract the list of generics (parameters) and ports for the specified entity.
     - Removes comments for robust parsing.
     - Handles multiple entity definitions in a single file.
-    - Returns: `(entity_name, generics, ports)`.
+    - Returns: `(entity_name, VhdlInterfaceInfo)`.
 
+- **VhdlInterfaceInfo**: (File `utils.py`)
+
+    A class that contains information related to generics and ports of a VHDL module
 
 ### Testbench Generation
 
-- **extract_template_top(entity_name, generics, ports, param_names)**
-Produces a VHDL testbench template for the entity, with generics mapped to parameter placeholders.
+- **extract_template_top(entity_name, VhdlInterfaceInfo, param_names)**: (File `unit_characterization.py`)
+
+    Produces a VHDL testbench template for the entity, with generics mapped to parameter placeholders.
     - Ensures all generics are parameterized.
     - Handles port mapping for instantiation.
 
 
 ### Synthesis Script Generation
 
-- **write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, ports)**
-Generates a TCL script for the synthesis tool (e.g., Vivado), including:
+- **write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, VhdlInterfaceInfo)**: (File `run_synthesis.py`)
+
+    Generates a TCL script for the synthesis tool (e.g., Vivado), including:
     - Reading HDL and constraint files.
     - Synthesizing and implementing the design.
     - Generating timing reports for relevant port pairs.
-- **write_sdc_constraints(sdc_file, period_ns)**
-Creates an SDC constraints file specifying the clock period.
+- **write_sdc_constraints(sdc_file, period_ns)**: (File `run_synthesis.py`)
+
+    Creates an SDC constraints file specifying the clock period.
 
 
 ### Dependency Handling
 
-- **get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list)**
-Ensures all required VHDL files (including dependencies) are present in the output directory for synthesis.
+- **get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list)**: (File `hdl_manager.py`)
+
+    Ensures all required VHDL files (including dependencies) are present in the output directory for synthesis.
 
 
 ### Synthesis Execution
 
-- **run_synthesis(tcl_files, synth_tool, log_file)**
-Runs synthesis jobs in parallel using the specified number of CPU cores.
+- **run_synthesis(tcl_files, synth_tool, log_file)**: (File `run_synthesis.py`)
+
+    Runs synthesis jobs in parallel using the specified number of CPU cores.
     - Each job is executed with its own TCL script and log file.
-- **run_tcl_file(args)**
-Worker function for executing a single synthesis job.
+- **_synth_worker(args)**: (File `run_synthesis.py`)
+
+    Worker function for executing a single synthesis job.
 
 
 ### High-Level Flow
 
-- **run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)**
-Orchestrates the full characterization process for a single unit:
+- **run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)**: (File `unit_characterization.py`)
+
+    Orchestrates the full characterization process for a single unit:
     - Gathers all HDL files and dependencies.
     - Extracts entity information and generates testbench templates.
     - Sweeps all parameter combinations, generating top files and TCL scripts for each.
