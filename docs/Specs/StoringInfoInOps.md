@@ -157,13 +157,14 @@ https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496
 
 It is important to note that since fifoDepth is a required attribute, fifoDepth **must** be passed to the builder in order to create a save-commit operation. The [builder methods](https://mlir.llvm.org/docs/DefiningDialects/Operations/#builder-methods) section of the MLIR Dialect documentation explains well how different C++ builder functions are generated from an operation's tablegen declaration. 
 
-The following getter function is also generated, for accessing the attribute's value:
+The following getter and setter functions are also generated, for accessing the attribute's value:
 
 ```c++
 saveCommitOp.getFifoDepth()
+saveCommitOp.setFifoDepth(int fifoDepth)
 ```
 
-This named getter is generated automatically by declaring the attribute in the tablegen file.
+These functions are generated automatically by declaring the attribute in the tablegen file.
 
 #### SharingWrapperOp for Crush
 
@@ -190,7 +191,7 @@ handshake::SharingWrapperOp wrapperOp =
         );
 ```
 
-Helpful getter functions are also generated for each of its attributes.
+Helpful getter and setter functions are also generated for each of its attributes.
 
 There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs. In best practice, values like this which can be calculated should not be stored as attributes.
 
