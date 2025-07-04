@@ -42,6 +42,8 @@ It is important to remember that an attribute could be altered by other sections
 
 To avoid these problems, ideally information stored in the IR should be **decisions**: any information that is downstream of a set of decisions should be calculated on-demand, based on the real values of its causal variables. 
 
+How to do this is discussed in-detail [below](#how-to-calculate-dependant-information-on-demand), to avoid breaking the logical flow.
+
 ## Maintaining Backwards Compatibility
 
 When an attribute is added to an operation, it alters the builders of that operation. Builders are used to add an operation to the IR. If a new attribute is added to an operation, any pre-existing code that adds that operation to the IR will break.
@@ -275,6 +277,115 @@ https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e1
 https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e11b4/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L693-L697 
 
 
+
+# How to Calculate Dependant Information On Demand
+
+
+We take the example case of specifying an arithmetic operation's implementation, which in turn defines its internal delay.
+
+We first represent the implementation as a StringAttr, add verification, and a custom builder. 
+```
+  let arguments = (ins StrAttr:$implementation);
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral IMPL1 = "IMPL1";
+    static constexpr ::llvm::StringLiteral IMPL2 = "IMPL2";
+    static constexpr ::llvm::StringLiteral IMPL3 = "IMPL3";
+
+    static LogicalResult verify(Operation *op) {
+      auto attr = op->getAttrOfType<StringAttr>("implementation");
+      if (!attr)
+        return op->emitError("requires 'implementation' attribute");
+      auto val = attr.getValue();
+      if (val != IMPL1 && val != IMPL2 && val != IMPL3)
+        return op->emitError() << "'implementation' must be '" << IMPL1
+                              << "', '" << IMPL3 << "', or '" << IMPL3 << "'";
+      return success();
+    }
+  }];
+
+  let builders = [
+    // Uses hardcoded string to set 'implementation' 
+    // since TableGen builders can't reference C++ constants
+    OpBuilder<(ins), [{
+      build($_builder, $_state, $_builder.getStringAttr("IMPL1"));
+    }]>
+  ];
+```
+
+then the function to calculate internal delay could look something like this:
+```
+int getInternalDelay() {
+  auto val = getImplementation().getValue();
+  if (val == IMPL1) return 1;
+  if (val == IMPL2) return 2;
+  if (val == IMPL3) return 3;
+  llvm_unreachable("Invalid implementation string");
+}
+```
+
+If this function should be callable across multiple operations, it could come from an interface:
+```
+def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
+  let methods = [
+    InterfaceMethod<[
+      "Returns the internal delay (as int) based on the implementation string."
+    ], "int", "getInternalDelay", (ins)>
+  ];
+}
+```
+
+and so the final operation would look something like:
+```
+def AddOp : Op<"mydialect.add", [InternalDelayInterface]> {
+  let summary = "Add operation with implementation mode";
+  let arguments = (ins StrAttr:$implementation);
+  let results = (outs);
+
+  let builders = [
+    // Uses hardcoded default value for 'implementation' 
+    // since TableGen builders can't reference C++ constants
+    OpBuilder<(ins), [{
+      build($_builder, $_state, $_builder.getStringAttr("IMPL1"));
+    }]>
+  ];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral IMPL1 = "IMPL1";
+    static constexpr ::llvm::StringLiteral IMPL2 = "IMPL2";
+    static constexpr ::llvm::StringLiteral IMPL3 = "IMPL3";
+
+    int getInternalDelay() {
+      auto val = getImplementation().getValue();
+      if (val == IMPL1) return 1;
+      if (val == IMPL2) return 2;
+      if (val == IMPL3) return 3;
+      llvm_unreachable("Invalid implementation string");
+    }
+
+    static LogicalResult verify(Operation *op) {
+      auto attr = op->getAttrOfType<StringAttr>("implementation");
+      if (!attr)
+        return op->emitError("requires 'implementation' attribute");
+      auto val = attr.getValue();
+      if (val != IMPL1 && val != IMPL2 && val != IMPL3)
+        return op->emitError() << "'implementation' must be '" << IMPL1
+                               << "', '" << IMPL2 << "', or '" << IMPL3 << "'";
+      return success();
+    }
+  }];
+}
+```
+
+Finally, to set the attribute in C++ would use the following code:
+
+```
+addOp.setImplementation(AddOp::IMPL1);
+```
 
 
 <!-- # RTL Entity Sharing
