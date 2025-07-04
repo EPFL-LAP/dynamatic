@@ -29,7 +29,7 @@ This is not order-specific: all types of arguments can be specified in any order
 
 Operation-specific attributes give us enough flexibility to store many types of information, generate convenient named getter functions, and allow easy constraints and verification of values.
 
-When used properly, they communicate clearly what information an operation must contain as well as what information it could contain. Rules for what kind of values are allowed are also easily to declaratively rpovide.
+When used properly, they communicate clearly what information an operation **must** contain (as well as what information it **could** contain). Rules for what kind of values are allowed are also easily to declaratively provide.
 
 While functions exist to remove operation-specific attributes from the operation, each operation is automatically verified at the end of each pass: if a required attribute has been removed, compilation will fail.
 
