@@ -139,29 +139,31 @@ def extract_template_top(entity_name, generics, ports, param_names):
             port = port.replace(f"{param}", f"{param}_const_value")
         tb_ports.append(port)
     # Create the template for the top file
-    template_top = "library ieee;\n" \
-                     "use ieee.std_logic_1164.all;\n" \
-                        "use ieee.numeric_std.all;\n" \
-                        "use ieee.math_real.all;\n" \
-                        "use work.types.all;\n" \
-                        f"entity tb is\n" \
-                        f"port (\n" \
-                        f"{';\n'.join(tb_ports)}\n" \
-                        ");\n" \
-                        f"end entity;\n" \
-                        "architecture tb_arch of tb is\n" \
-                        f"begin\n" \
-                        f"dut: entity work.{entity_name}\n" \
-                        "generic map (\n"
+    template_top = f"""library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use ieee.math_real.all;
+use work.types.all;
+entity tb is
+port (
+{';\n'.join(tb_ports)}
+);
+end entity;
+architecture tb_arch of tb is
+begin
+dut: entity work.{entity_name}
+generic map (
+"""
+
     for param in param_names:
         if param != "PREDICATE":
-            template_top += f"    {param} => {param}_const_value,\n"
+            template_top += f"{param} => {param}_const_value,\n"
     template_top = template_top.rstrip(",\n") + "\n" \
                      ")\n" \
                         "port map (\n"
     for port in ports:
         port_name = port.split(":")[0].strip()  # Get the port name before the colon
-        template_top += f"    {port_name} => {port_name},\n"
+        template_top += f"{port_name} => {port_name},\n"
     template_top = template_top.rstrip(",\n") + "\n" \
                      ");\n" \
                         "end architecture;\n"
