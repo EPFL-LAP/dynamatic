@@ -29,11 +29,6 @@ apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphv
 ```
 Note that you may need super user privileges for any package installation. You can use **sudo** before entering the commands
 
-On `pacman`-based Linux distributions:
-```
-pacman -Syu
-pacman -S clang lld ccache cmake ninja python jdk21-openjdk graphviz git curl gzip readline
-```
 `clang`, `lld`, and `ccache` are not strictly required but significantly speed up (re)builds. If you do not wish to install them, call the build script with the --disable-build-opt flag to prevent their usage.
 
 Dynamatic uses RTL generators written in Chisel (a hardware construction language embedded in the high-level programming language Scala) to produce synthesizable RTL designs. You can install Scala using the recommended way with the following command:
