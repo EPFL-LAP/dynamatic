@@ -45,20 +45,26 @@ std::string SequenceLengthRelationConstraint::createSmvConstraint(
     const std::string &moduleName,
     const dynamatic::experimental::ElasticMiterConfig &config) const {
 
-  std::string output = "INVAR";
+  std::string output = "INVAR ";
   output += constraint + "\n";
 
   // Replace all the occurences of the sequence with index i with its
   // corresponding sequence generator.
   // Example:
   // Input names: [A, B, C, D].
-  // Constraint: 1+2=3+4
+  // Constraint: 0+1=2+3
   // Resulting SMV constraint:
   // seq_generator_A.exact_tokens + seq_generator_B.exact_tokens =
-  // seq_generator_A.exact_tokens + seq_generator_B.exact_tokens
+  // seq_generator_C.exact_tokens + seq_generator_D.exact_tokens
+
+  // Replace 0 with {0}, 1 with {1}, ...
+  // This is because the number might be present in the argument names.
+  // Argument names cannot use { and }, preventing a conflict.
+  output = std::regex_replace(output, std::regex(R"(\d+)"), "{$&}");
+
   for (size_t i = 0; i < config.arguments.size(); i++) {
     auto [argumentName, _] = config.arguments[i];
-    std::regex numberRegex(std::to_string(i));
+    std::regex numberRegex("\\{" + std::to_string(i) + "\\}");
 
     output =
         std::regex_replace(output, numberRegex,
