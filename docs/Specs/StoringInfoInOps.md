@@ -42,6 +42,105 @@ It is important to remember that an attribute could be altered by other sections
 
 To avoid these problems, ideally information stored in the IR should be **decisions**: any information that is downstream of a set of decisions should be calculated on-demand, based on the real values of its causal variables. 
 
+## Maintaining Backwards Compatibility
+
+When an attribute is added to an operation, it alters the builders of that operation. Builders are used to add an operation to the IR. If a new attribute is added to an operation, any pre-existing code that adds that operation to the IR will break.
+
+There are 2 typical situations.
+
+1. This pre-existing code **should** break, as the attribute is now required to be specified, and you must alter the code to provide the attribute.
+2. The attribute is not relevant to the pre-existing code, and you should provide backwards compatibility.
+
+In order to do so, it is recommended to add a custom builder that provides a default value for the attribute:
+
+```tablegen
+def MyOp : Op<"my_op", []> {
+  let arguments = (ins F32Attr:$attr);
+
+  let builders = [
+    OpBuilder<(ins CArg<"float", "0.5f">:$val), [{
+      $_state.addAttribute("attr", $_builder.getF32FloatAttr(val));
+    }]>
+  ];
+}
+```
+which will result in the following C++:
+```c++
+/// Header file.
+class MyOp : /*...*/ {
+  /*...*/
+  static void build(::mlir::OpBuilder &builder, ::mlir::OperationState &state,
+                    float val = 0.5f);
+};
+
+/// Source file.
+MyOp::build(::mlir::OpBuilder &builder, ::mlir::OperationState &state,
+            float val) {
+  state.addAttribute("attr", builder.getF32FloatAttr(val));
+}
+```
+which will maintain backwards compability with any builders that do not provide the attribute.
+
+## Optional and Default Valued Attributes
+
+MLIR offers two attribute constraints which stack on top of normal ones: [OptionalAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#optional-attributes) and [DefaultValuedAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#attributes-with-default-values).
+
+While they appear helpful at first glance, neither works exactly as you might expect.
+
+### OptionalAttr
+
+An attribute marked with `OptionalAttr` means that verification will not fail if the attribute is not present. 
+
+It does not mean that the attribute is an optional argument when adding the operation to the IR. By default, some value **must** still be provided for the attribute when adding the operation to the IR, and so an `OptionalAttr` will still break backwards compatibility: any existing code which adds the operation to the IR will need to be changed. 
+
+As described above for required attributes, backwards compatibility should be maintained using custom builders. 
+
+I believe (but am not 100% sure) that providing a builder which does not take the optional attribute, and does not add it to the state, provides the required backwards compatibility:
+
+```tablegen
+def MyOp : Op<"my_op", []> {
+  let arguments = (ins
+    F32Attr:$requiredAttr,
+    OptionalAttr<F32Attr>:$optionalAttr
+  );
+
+  let builders = [
+    OpBuilder<(ins "float":$val), [{
+      $_state.addAttribute("requiredAttr", $_builder.getF32FloatAttr(val));
+    }]>
+  ];
+}
+```
+
+otherwise it can be explicitly set using:
+```tablegen
+def MyOp : Op<"my_op", []> {
+  let arguments = (ins
+    F32Attr:$requiredAttr,
+    OptionalAttr<F32Attr>:$optionalAttr
+  );
+
+  let builders = [
+    OpBuilder<(ins "float":$val), [{
+      build($_builder, $_state, val, std::nullopt);
+    }]>
+  ];
+}
+```
+
+
+
+### DefaultValuedAttr
+
+The use of `DefaultValueAttr` affects primarily IR printing and parsing: when a .mlir file is created or read in, any attributes which contain the default value will be skipped.
+
+The goal of this is to provide more concise IRs.
+
+Rarely, a `DefaultValueAttr` does result in an automatically generated custom builder, which allows us to add an operation to the IR without explicilty providing an attribute value. However, due to implementation reasons of C++, this usually does not happen.
+
+Therefore the use of `DefaultValueAttr` does not typically affect the previously described need for custom builders.
+
+
 ## Good Examples
 #### FIFO-Depth for a Save-Commit
 
@@ -138,7 +237,7 @@ Instead, we recommend to add the attribute (using wrapper methods) to an interfa
 
 As interfaces cannot store information, attributes cannot be directly added to the interface. The attribute must therefore be stored on the operation itself, using the [setAttr](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#ae5f0d4c61e6e57f360188b1b7ff982f6) and [getAttrOfType](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#a8ec626dafc87ed8fb20d8323017dec72) functions.
 
-Since the getAttr function relies on hardcoded strings to access the attribute, these calls should be wrapped in hand-written getters and setters. Since [getAttrOfType](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#a04107e2edf0122ca87f0550148e347a7) can return null, the getter is always safe to call, but must be checked to see if the attribute was actually returned.
+Since these function relies on hardcoded strings to access the attribute, these calls should be wrapped in hand-written getters and setters. Since [getAttrOfType](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#a04107e2edf0122ca87f0550148e347a7) can return null, the getter is always safe to call, but must be checked to see if the attribute was actually returned.
 
 ```tablegen
 InterfaceMethod<[{
@@ -173,6 +272,9 @@ https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e1
 https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e11b4/lib/Transforms/BufferPlacement/HandshakePlaceBuffers.cpp#L166-L175
 
 https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e11b4/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L693-L697 
+
+
+
 
 <!-- # RTL Entity Sharing
 
