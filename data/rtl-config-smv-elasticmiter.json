@@ -303,5 +303,14 @@
     "name": "handshake.init",
     "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t init",
     "hdl": "smv"
+  },
+  {
+    "name": "handshake.spec_v2_repeating_init",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t spec_v2_repeating_init",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.passer",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t passer -p bitwidth=$BITWIDTH"
   }
 ]

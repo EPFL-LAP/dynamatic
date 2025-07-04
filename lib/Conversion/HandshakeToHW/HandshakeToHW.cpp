@@ -693,7 +693,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::InitOp>([&](auto) {
+      .Case<handshake::InitOp, handshake::SpecV2RepeatingInitOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Case<handshake::PasserOp>([&](auto) {
@@ -1824,6 +1824,7 @@ public:
                     ConvertToHWInstance<handshake::ValidMergerOp>,
                     ConvertToHWInstance<handshake::SharingWrapperOp>,
                     ConvertToHWInstance<handshake::InitOp>,
+                    ConvertToHWInstance<handshake::SpecV2RepeatingInitOp>,
                     ConvertToHWInstance<handshake::PasserOp>,
                     ConvertToHWInstance<handshake::SpecV2ResolverOp>,
 

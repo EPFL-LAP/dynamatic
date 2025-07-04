@@ -18,6 +18,8 @@ import generators.handshake.select as select
 import generators.handshake.sink as sink
 import generators.handshake.source as source
 import generators.handshake.store as store
+import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
+import generators.handshake.passer as passer
 
 import generators.arith.absf as absf
 import generators.arith.addf as addf
@@ -150,6 +152,10 @@ def generate_code(name, mod_type, parameters):
             return ndwire.generate_ndwire(name, parameters)
         case "init":
             return init.generate_init(name, parameters)
+        case "spec_v2_repeating_init":
+            return spec_v2_repeating_init.generate_spec_v2_repeating_init(name, parameters)
+        case "passer":
+            return passer.generate_passer(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 
