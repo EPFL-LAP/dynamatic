@@ -1,0 +1,32 @@
+#include "handshake_buffer_2.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_spec_v2_resolver_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+
+
+MODULE elastic_miter_resolver_lhs_resolver_rhs_wrapper (Actual, Actual_valid, Generated, Generated_valid, EQ_Confirm_ready)
+
+
+-- input and output
+DEFINE EQ_Confirm := elastic_miter_resolver_lhs_resolver_rhs_wrapped.EQ_Confirm;
+DEFINE EQ_Confirm_valid := elastic_miter_resolver_lhs_resolver_rhs_wrapped.EQ_Confirm_valid;
+DEFINE elastic_miter_resolver_lhs_resolver_rhs_wrapped_EQ_Confirm_ready := EQ_Confirm_ready;
+DEFINE elastic_miter_resolver_lhs_resolver_rhs_wrapped_Actual := Actual;
+DEFINE elastic_miter_resolver_lhs_resolver_rhs_wrapped_Actual_valid := Actual_valid;
+DEFINE Actual_ready := elastic_miter_resolver_lhs_resolver_rhs_wrapped.Actual_ready;
+DEFINE elastic_miter_resolver_lhs_resolver_rhs_wrapped_Generated := Generated;
+DEFINE elastic_miter_resolver_lhs_resolver_rhs_wrapped_Generated_valid := Generated_valid;
+DEFINE Generated_ready := elastic_miter_resolver_lhs_resolver_rhs_wrapped.Generated_ready;
+
+
+VAR elastic_miter_resolver_lhs_resolver_rhs_wrapped : elastic_miter_resolver_lhs_resolver_rhs(elastic_miter_resolver_lhs_resolver_rhs_wrapped_Actual, elastic_miter_resolver_lhs_resolver_rhs_wrapped_Actual_valid, elastic_miter_resolver_lhs_resolver_rhs_wrapped_Generated, elastic_miter_resolver_lhs_resolver_rhs_wrapped_Generated_valid, elastic_miter_resolver_lhs_resolver_rhs_wrapped_EQ_Confirm_ready);
+
+-- properties

@@ -1,0 +1,34 @@
+#include "resolver_rhs.smv"
+
+
+MODULE bool_input_exact(nReady0, exact_tokens)
+  VAR outs : boolean;
+  VAR counter : 0..31;
+  ASSIGN
+    init(counter) := 0;
+    next(counter) := case
+      nReady0 & counter < exact_tokens : counter + 1;
+      TRUE : counter;
+    esac;
+
+  -- make sure outs is persistent
+  ASSIGN
+    next(outs) := case
+      outs_valid & !nReady0 : outs;
+      TRUE : {TRUE, FALSE};
+    esac;
+
+  DEFINE outs_valid := counter < exact_tokens;
+
+MODULE sink_main (ins_valid)
+  DEFINE ins_ready   := TRUE;
+
+MODULE main
+
+  VAR seq_generator_Actual : bool_input_exact(resolver_rhs.Actual_ready, 1);
+  VAR seq_generator_Generated : bool_input_exact(resolver_rhs.Generated_ready, 1);
+
+  VAR resolver_rhs : resolver_rhs (seq_generator_Actual.outs, seq_generator_Actual.outs_valid, seq_generator_Generated.outs, seq_generator_Generated.outs_valid, sink_Confirm.ins_ready);
+
+  VAR sink_Confirm : sink_main(resolver_rhs.Confirm_valid);
+

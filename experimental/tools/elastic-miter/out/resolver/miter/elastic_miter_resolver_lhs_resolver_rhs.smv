@@ -1,0 +1,57 @@
+#include "handshake_buffer_2.smv"
+#include "handshake_spec_v2_nd_speculator_0.smv"
+#include "handshake_spec_v2_resolver_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_sink_0.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_buffer_0.smv"
+
+
+MODULE elastic_miter_resolver_lhs_resolver_rhs (Actual, Actual_valid, Generated, Generated_valid, EQ_Confirm_ready)
+
+
+-- input and output
+DEFINE EQ_Confirm := out_eq_Confirm.result;
+DEFINE EQ_Confirm_valid := out_eq_Confirm.result_valid;
+DEFINE out_eq_Confirm_result_ready := EQ_Confirm_ready;
+DEFINE in_nd_fork_ins := Actual;
+DEFINE in_nd_fork_ins_valid := Actual_valid;
+DEFINE Actual_ready := in_nd_fork.ins_ready;
+DEFINE in_sink_ins := Generated;
+DEFINE in_sink_ins_valid := Generated_valid;
+DEFINE Generated_ready := in_sink.ins_ready;
+
+
+VAR in_fork_Actual : handshake_lazy_fork_0(in_nd_fork.outs_0, in_nd_fork.outs_0_valid, lhs_in_buf_Actual.ins_ready, rhs_in_buf_Actual.ins_ready);
+VAR lhs_in_buf_Actual : handshake_buffer_0(in_fork_Actual.outs_0, in_fork_Actual.outs_0_valid, lhs_in_ndw_Actual.ins_ready);
+VAR rhs_in_buf_Actual : handshake_buffer_0(in_fork_Actual.outs_1, in_fork_Actual.outs_1_valid, rhs_in_ndw_Actual.ins_ready);
+VAR lhs_in_ndw_Actual : handshake_ndwire_0(lhs_in_buf_Actual.outs, lhs_in_buf_Actual.outs_valid, lhs_passer.data_ready);
+VAR rhs_in_ndw_Actual : handshake_ndwire_0(rhs_in_buf_Actual.outs, rhs_in_buf_Actual.outs_valid, rhs_resolver.actualCondition_ready);
+VAR in_nd_fork : handshake_lazy_fork_0(in_nd_fork_ins, in_nd_fork_ins_valid, in_fork_Actual.ins_ready, in_nd_speculator.ins_ready);
+VAR in_nd_speculator : handshake_spec_v2_nd_speculator_0(in_nd_fork.outs_1, in_nd_fork.outs_1_valid, in_ri.ins_ready);
+VAR in_ri : handshake_spec_v2_repeating_init_0(in_nd_speculator.outs, in_nd_speculator.outs_valid, in_fork_Generated.ins_ready);
+VAR in_sink : handshake_sink_0(in_sink_ins, in_sink_ins_valid);
+VAR in_fork_Generated : handshake_lazy_fork_0(in_ri.outs, in_ri.outs_valid, lhs_in_buf_Generated.ins_ready, rhs_in_buf_Generated.ins_ready);
+VAR lhs_in_buf_Generated : handshake_buffer_0(in_fork_Generated.outs_0, in_fork_Generated.outs_0_valid, lhs_in_ndw_Generated.ins_ready);
+VAR rhs_in_buf_Generated : handshake_buffer_0(in_fork_Generated.outs_1, in_fork_Generated.outs_1_valid, rhs_in_ndw_Generated.ins_ready);
+VAR lhs_in_ndw_Generated : handshake_ndwire_0(lhs_in_buf_Generated.outs, lhs_in_buf_Generated.outs_valid, lhs_interpolator.long_ready);
+VAR rhs_in_ndw_Generated : handshake_ndwire_0(rhs_in_buf_Generated.outs, rhs_in_buf_Generated.outs_valid, rhs_resolver.generatedCondition_ready);
+VAR lhs_passer : handshake_passer_0(lhs_in_ndw_Actual.outs, lhs_in_ndw_Actual.outs_valid, lhs_fork.outs_0, lhs_fork.outs_0_valid, lhs_buf1.ins_ready);
+VAR lhs_buf1 : handshake_buffer_1(lhs_passer.result, lhs_passer.result_valid, lhs_buf2.ins_ready);
+VAR lhs_buf2 : handshake_buffer_2(lhs_buf1.outs, lhs_buf1.outs_valid, lhs_ri.ins_ready);
+VAR lhs_ri : handshake_spec_v2_repeating_init_0(lhs_buf2.outs, lhs_buf2.outs_valid, lhs_interpolator.short_ready);
+VAR lhs_interpolator : handshake_spec_v2_interpolator_0(lhs_ri.outs, lhs_ri.outs_valid, lhs_in_ndw_Generated.outs, lhs_in_ndw_Generated.outs_valid, lhs_fork.ins_ready);
+VAR lhs_fork : handshake_lazy_fork_0(lhs_interpolator.result, lhs_interpolator.result_valid, lhs_passer.ctrl_ready, lhs_out_ndw_Confirm.ins_ready);
+VAR rhs_resolver : handshake_spec_v2_resolver_0(rhs_in_ndw_Actual.outs, rhs_in_ndw_Actual.outs_valid, rhs_in_ndw_Generated.outs, rhs_in_ndw_Generated.outs_valid, rhs_out_ndw_Confirm.ins_ready);
+VAR lhs_out_ndw_Confirm : handshake_ndwire_0(lhs_fork.outs_1, lhs_fork.outs_1_valid, lhs_out_buf_Confirm.ins_ready);
+VAR rhs_out_ndw_Confirm : handshake_ndwire_0(rhs_resolver.confirmSpec, rhs_resolver.confirmSpec_valid, rhs_out_buf_Confirm.ins_ready);
+VAR lhs_out_buf_Confirm : handshake_buffer_0(lhs_out_ndw_Confirm.outs, lhs_out_ndw_Confirm.outs_valid, out_eq_Confirm.lhs_ready);
+VAR rhs_out_buf_Confirm : handshake_buffer_0(rhs_out_ndw_Confirm.outs, rhs_out_ndw_Confirm.outs_valid, out_eq_Confirm.rhs_ready);
+VAR out_eq_Confirm : handshake_cmpi_0(lhs_out_buf_Confirm.outs, lhs_out_buf_Confirm.outs_valid, rhs_out_buf_Confirm.outs, rhs_out_buf_Confirm.outs_valid, out_eq_Confirm_result_ready);
+
+-- properties

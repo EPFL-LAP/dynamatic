@@ -1,0 +1,35 @@
+#include "handshake_ndwire_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_lazy_fork_0.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_interpolator_0.smv"
+
+
+MODULE resolver_lhs (Actual, Actual_valid, Generated, Generated_valid, Confirm_ready)
+
+
+-- input and output
+DEFINE Confirm := ndw_out_Confirm.outs;
+DEFINE Confirm_valid := ndw_out_Confirm.outs_valid;
+DEFINE ndw_out_Confirm_outs_ready := Confirm_ready;
+DEFINE ndw_in_Actual_ins := Actual;
+DEFINE ndw_in_Actual_ins_valid := Actual_valid;
+DEFINE Actual_ready := ndw_in_Actual.ins_ready;
+DEFINE ndw_in_Generated_ins := Generated;
+DEFINE ndw_in_Generated_ins_valid := Generated_valid;
+DEFINE Generated_ready := ndw_in_Generated.ins_ready;
+
+
+VAR ndw_in_Actual : handshake_ndwire_0(ndw_in_Actual_ins, ndw_in_Actual_ins_valid, passer.data_ready);
+VAR ndw_in_Generated : handshake_ndwire_0(ndw_in_Generated_ins, ndw_in_Generated_ins_valid, interpolator.long_ready);
+VAR ndw_out_Confirm : handshake_ndwire_0(fork.outs_1, fork.outs_1_valid, ndw_out_Confirm_outs_ready);
+VAR passer : handshake_passer_0(ndw_in_Actual.outs, ndw_in_Actual.outs_valid, fork.outs_0, fork.outs_0_valid, buf1.ins_ready);
+VAR buf1 : handshake_buffer_0(passer.result, passer.result_valid, buf2.ins_ready);
+VAR buf2 : handshake_buffer_1(buf1.outs, buf1.outs_valid, ri.ins_ready);
+VAR ri : handshake_spec_v2_repeating_init_0(buf2.outs, buf2.outs_valid, interpolator.short_ready);
+VAR interpolator : handshake_spec_v2_interpolator_0(ri.outs, ri.outs_valid, ndw_in_Generated.outs, ndw_in_Generated.outs_valid, fork.ins_ready);
+VAR fork : handshake_lazy_fork_0(interpolator.result, interpolator.result_valid, passer.ctrl_ready, ndw_out_Confirm.ins_ready);
+
+-- properties

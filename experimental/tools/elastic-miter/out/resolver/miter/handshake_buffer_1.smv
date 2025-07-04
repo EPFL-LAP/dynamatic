@@ -1,0 +1,36 @@
+-- handshake_buffer_1 : buffer(['num_slots=1', 'bitwidth=1', 'transparent=False', "timing='#handshake<timing {D: 1, V: 1, R: 0}>'"])
+
+
+MODULE handshake_buffer_1 (ins, ins_valid, outs_ready)
+  VAR
+  inner_oehb : handshake_buffer_1__oehb_dataless(ins_valid, outs_ready);
+  data : boolean;
+
+  ASSIGN
+  init(data) := FALSE;
+  next(data) := case
+    ins_ready & ins_valid : ins;
+    TRUE : data;
+  esac;
+    
+  -- output
+  DEFINE
+  ins_ready := inner_oehb.ins_ready;
+  outs_valid := inner_oehb.outs_valid;
+  outs := data;
+
+
+MODULE handshake_buffer_1__oehb_dataless (ins_valid, outs_ready)
+  VAR
+  outs_valid_i : boolean;
+
+  ASSIGN
+  init(outs_valid_i) := FALSE;
+  next(outs_valid_i) := ins_valid | (outs_valid_i & !outs_ready);
+
+  -- output
+  DEFINE
+  ins_ready := !outs_valid_i | outs_ready;
+  outs_valid := outs_valid_i;
+
+
