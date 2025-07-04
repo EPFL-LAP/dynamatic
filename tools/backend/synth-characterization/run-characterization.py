@@ -9,39 +9,44 @@ from multiprocessing import Pool
 
 NUM_CORES = 10 # Number of cores to use for parallel synthesis (if applicable)
 
+# List of units to skip during characterization 
+# These units are either empty, unused, or characterized by other scripts
 skipping_units = [
-    "handshake.constant",
-    "handshake.lsq",
-    "handshake.sharing_wrapper",
-    "handshake.ready_remover",
-    "handshake.valid_merger",
+    # empty units
+    "handshake.constant", 
+    "handshake.br",
+    "handshake.source",
     "handshake.extsi",
     "handshake.extui",
     "handshake.trunci",
     "handshake.truncf",
-    "handshake.buffer",
+    "handshake.sink",
+    "handshake.store",
+    "handshake.maximumf",
+    "handshake.minimumf",
+    "handshake.extf",
+    "handshake.divsi",
+    "handshake.divui",
+    # unused units
+    "handshake.join",
+    "handshake.sharing_wrapper",
+    "handshake.ready_remover",
+    "handshake.valid_merger",
     "handshake.ndwire",
+    "handshake.mem_controller",
+    "mem_to_bram",
+    # units characterized by other scripts
     "handshake.fork",
     "handshake.lazy_fork",
-    "handshake.sink",
-    "handshake.mem_controller",
+    "handshake.lsq",
+    "handshake.mulf",
+    "handshake.negf",
+    "handshake.buffer",
     "handshake.addf",
     "handshake.cmpf",
     "handshake.divf",
     "handshake.subf",
-    "handshake.mulf",
-    "handshake.extf",
-    "handshake.maximumf",
-    "handshake.minimumf",
-    "handshake.divsi",
-    "handshake.divui",
-    "handshake.negf",
-    "handshake.br",
-    "handshake.source",
-    "handshake.store",
-    "handshake.join",
-    "handshake.not",
-    "mem_to_bram"]
+    "handshake.not"]
 
 parameters_ranges = { 
     "DATA_TYPE": [1, 2, 4, 8, 16, 32, 64],
