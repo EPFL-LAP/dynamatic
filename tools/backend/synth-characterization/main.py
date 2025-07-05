@@ -25,17 +25,25 @@ def extract_rtl_info(unit_info):
 
     return unit_name, list_params, generic, generator, dependencies
 
-# Extract list of dependencies from the dataflow units
+# Extract dependencies from the dataflow units
 # This function is essential to move the right RTL files
-def get_dependency_list(dataflow_units):
+# Example of a dependency dictionary:
+# {
+#     "unit_name": {"RTL": "path/to/rtl_file.vhd", "dependencies": ["dep1", "dep2"]},
+#     "dep1": {"RTL": "path/to/dep1.vhd", "dependencies": []},
+#     "dep2": {"RTL": "path/to/dep2.vhd", "dependencies": []},
+#     ...
+# }
+# The dependencies are used to copy the necessary RTL files to the output directory
+def get_dependency_dict(dataflow_units):
     """
-    Extract a list RTLs of all possible dependencies from the dataflow units.
+    Extract the RTLs of all possible dependencies from the dataflow units.
     Args:
         dataflow_units (list): List of dataflow unit dictionaries.
     Returns:
         list: A list of unique dependencies.
     """
-    dependency_list = {}
+    dependency_dict = {}
     for unit_info in dataflow_units:
         if not "name" in unit_info:
             rtl_file = unit_info.get("generic")
@@ -45,7 +53,7 @@ def get_dependency_list(dataflow_units):
                 dependencies = unit_info["dependencies"]
             else:
                 dependencies = []
-            dependency_list[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
+            dependency_dict[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
         elif "module-name" in unit_info:
             unit_name = unit_info["module-name"]
             rtl_file = unit_info["generic"]
@@ -53,10 +61,10 @@ def get_dependency_list(dataflow_units):
                 dependencies = unit_info["dependencies"]
             else:
                 dependencies = []
-            dependency_list[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
+            dependency_dict[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
         else:
             continue
-    return dependency_list
+    return dependency_dict
 
 
 def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period):
@@ -94,7 +102,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    all_dependencies_list = get_dependency_list(dataflow_units)
+    all_dependencies_list = get_dependency_dict(dataflow_units)
 
     map_unit2rpts = {}
 
