@@ -12,7 +12,7 @@ def copy_dependency_rtl_files(unit_name, dependency_list, hdl_out_dir, dynamatic
         dynamatic_dir (str): Path to the Dynamatic directory.
     """
     # Add dependency RTL files to the output directory
-    remaining_dependencies = dependency_list[unit_name].copy()
+    remaining_dependencies = dependency_list[unit_name]["dependencies"].copy()
     while remaining_dependencies:
         dependency_unit = remaining_dependencies.pop(0)
         # Find the dependecy unit location
