@@ -1,23 +1,23 @@
 # This script is used to move the HDL files in the hdl_out_dir and generate the necessary HDL files for the unit.
 import os
 
-def copy_dependency_rtl_files(unit_name, dependency_list, hdl_out_dir, dynamatic_dir):
+def copy_dependency_rtl_files(unit_name, dependency_dict, hdl_out_dir, dynamatic_dir):
     """
     Copy the RTL files of the dependencies of the given unit to the output directory.
 
     Args:
         unit_name (str): Name of the unit for which dependencies are to be copied.
-        dependency_list (dict): Dictionary containing the list of dependencies for all units.
+        dependency_dict (dict): Dictionary containing the list of dependencies for all units.
         hdl_out_dir (str): Directory where HDL files should be stored.
         dynamatic_dir (str): Path to the Dynamatic directory.
     """
     # Add dependency RTL files to the output directory
-    remaining_dependencies = dependency_list[unit_name]["dependencies"].copy()
+    remaining_dependencies = dependency_dict[unit_name]["dependencies"].copy()
     while remaining_dependencies:
         dependency_unit = remaining_dependencies.pop(0)
         # Find the dependecy unit location
-        assert dependency_unit in dependency_list, f"Dependency {dependency_unit} not found in dependency list."
-        dependency_info = dependency_list[dependency_unit]
+        assert dependency_unit in dependency_dict, f"Dependency {dependency_unit} not found in dependency list."
+        dependency_info = dependency_dict[dependency_unit]
         dependency_rtl = dependency_info["RTL"]
         dependency_rtl = dependency_rtl.replace("$DYNAMATIC", dynamatic_dir)
         if "_dataless" in dependency_unit:
@@ -33,7 +33,7 @@ def copy_dependency_rtl_files(unit_name, dependency_list, hdl_out_dir, dynamatic
     extra_dependencies = ["types", "logic", "oehb", "oehb_dataless", "br_dataless"]
     # Add extra dependencies that are not in the dependency list
     for extra_dependency in extra_dependencies:
-        extra_rtl = dependency_list[extra_dependency]["RTL"]
+        extra_rtl = dependency_dict[extra_dependency]["RTL"]
         extra_rtl = extra_rtl.replace("$DYNAMATIC", dynamatic_dir)
         rtl_filename = extra_rtl.split("/")[-1]
         if "_dataless" in extra_dependency:
@@ -41,7 +41,7 @@ def copy_dependency_rtl_files(unit_name, dependency_list, hdl_out_dir, dynamatic
         else:
             os.system(f"cp {extra_rtl} {hdl_out_dir}")  
 
-def get_hdl_files(unit_name, generic, generator, hdl_out_dir, dynamatic_dir, dependency_list):
+def get_hdl_files(unit_name, generic, generator, hdl_out_dir, dynamatic_dir, dependency_dict):
     """
     Generate or copy the HDL files for the given unit.
     
@@ -51,7 +51,7 @@ def get_hdl_files(unit_name, generic, generator, hdl_out_dir, dynamatic_dir, dep
         generator (str): Generator information for the unit.
         hdl_out_dir (str): Directory where HDL files should be stored.
         dynamatic_dir (str): Path to the Dynamatic directory.
-        dependency_list (dict): Dictionary containing the list of dependencies for all units.
+        dependency_dict (dict): Dictionary containing the list of dependencies for all units.
 
     Returns:
         str: Path to the generated or copied HDL file.
@@ -60,7 +60,7 @@ def get_hdl_files(unit_name, generic, generator, hdl_out_dir, dynamatic_dir, dep
     if not os.path.exists(hdl_out_dir):
         os.makedirs(hdl_out_dir)
     # Copy the RTL files of the dependencies to the output directory
-    copy_dependency_rtl_files(unit_name, dependency_list, hdl_out_dir, dynamatic_dir)
+    copy_dependency_rtl_files(unit_name, dependency_dict, hdl_out_dir, dynamatic_dir)
     # Check if the unit has RTL file
     if generic:
         # If generic is provided, copy the RTL file to the output directory
