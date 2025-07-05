@@ -2,7 +2,7 @@
 
 This document describes how Dynamatic obtains the timing characteristics of the dataflow units. Please check out [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md) if you are unfamiliar with Dynamatic's timing model. 
 
-Dynamatic uses a [Python script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/run-characterization.py) to obtain the timing characterization.
+Dynamatic uses a [Python script](https://github.com/EPFL-LAP/dynamatic/tree/main/tools/backend/synth-characterization/main.py) to obtain the timing characterization.
 
 **NOTE**: The script and the following documentation are tailored for the specific version of Dynamatic and the current status of the structure of the [timing information file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/components-vivado.json). When generating new dataflow units, try to follow the same structure as other dataflow units (in the timing information file and in the VHDL definition). This would make it possible to extend the characterization to new dataflow units.
 
@@ -30,11 +30,11 @@ Timing and synthesis reports are generated for each parameter combination and st
 
 An example on how to call the script is the following one:
 
-`python run-characterization.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado"`
+`python main.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado"`
 
 which would save the output JSON file in `out.json` which contains timing information, it would specify the dynamatic home directory as `/home/dynamatic/` and it would call vivado using the command `vivado-2019 vivado`. An alternative call is the following one:
 
-`python run-characterization.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado" --json-input struct.json`
+`python main.py --json-output out.json --dynamatic-dir /home/dynamatic/ --synth-tool "vivado-2019 vivado" --json-input struct.json`
 
 where the only key difference is the specification of the input JSON (`struct.json`) which contains information related to RTL characteristics of each component. If unspecified, the script will look for the following file `DYNAMATIC_DIR/data/rtl-config-vhdl-vivado.json`.
 
@@ -59,7 +59,7 @@ The scripts are organized according to the following structure:
 <pre lang="markdown">. 
 ├── hdl_manager.py # Moves HDL files from the folder containing all the HDL files to the working directory 
 ├── report_parser.py # Extracts delay information from synthesis reports 
-├── run-characterization.py # Main script: orchestrates filtering, generation, synthesis, parsing 
+├── main.py # Main script: orchestrates filtering, generation, synthesis, parsing 
 ├── run_synthesis.py # Runs synthesis (e.g., with Vivado), supports parallel execution 
 ├── unit_characterization.py # Coordinates unit-level processing: port handling, VHDL generation, exploration across all parameters 
 └── utils.py # Shared helpers: common class definitions and constants </pre>
