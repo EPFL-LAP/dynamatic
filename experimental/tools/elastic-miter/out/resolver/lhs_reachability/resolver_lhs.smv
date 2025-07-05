@@ -1,10 +1,10 @@
-#include "handshake_ndwire_0.smv"
 #include "handshake_passer_0.smv"
-#include "handshake_lazy_fork_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_buffer_1.smv"
+#include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_ndwire_0.smv"
 
 
 MODULE resolver_lhs (Actual, Actual_valid, Generated, Generated_valid, Confirm_ready)
@@ -30,6 +30,6 @@ VAR buf1 : handshake_buffer_0(passer.result, passer.result_valid, buf2.ins_ready
 VAR buf2 : handshake_buffer_1(buf1.outs, buf1.outs_valid, ri.ins_ready);
 VAR ri : handshake_spec_v2_repeating_init_0(buf2.outs, buf2.outs_valid, interpolator.short_ready);
 VAR interpolator : handshake_spec_v2_interpolator_0(ri.outs, ri.outs_valid, ndw_in_Generated.outs, ndw_in_Generated.outs_valid, fork.ins_ready);
-VAR fork : handshake_lazy_fork_0(interpolator.result, interpolator.result_valid, passer.ctrl_ready, ndw_out_Confirm.ins_ready);
+VAR fork : handshake_fork_0(interpolator.result, interpolator.result_valid, passer.ctrl_ready, ndw_out_Confirm.ins_ready);
 
 -- properties

@@ -1,4 +1,4 @@
--- handshake_buffer_0 : buffer(['num_slots=3', 'bitwidth=1', 'transparent=False', "timing='#handshake<timing {D: 1, V: 1, R: 0}>'"])
+-- handshake_buffer_0 : buffer(['num_slots=4', 'bitwidth=1', 'transparent=False', "timing='#handshake<timing {D: 1, V: 1, R: 0}>'"])
 
 
 MODULE handshake_buffer_0 (ins, ins_valid, outs_ready)
@@ -48,11 +48,12 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
   VAR mem_0 : boolean;
   VAR mem_1 : boolean;
   VAR mem_2 : boolean;
+  VAR mem_3 : boolean;
   VAR
   full : boolean;
   empty : boolean;
-  head : 0..2;
-  tail : 0..2;
+  head : 0..3;
+  tail : 0..3;
 
   DEFINE
   read_en := outs_ready & !empty;
@@ -63,7 +64,8 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
   next(tail) := case
     write_en & (tail = 0) : 1;
     write_en & (tail = 1) : 2;
-    write_en & (tail = 2) : 0;
+    write_en & (tail = 2) : 3;
+    write_en & (tail = 3) : 0;
     TRUE : tail;
   esac;
 
@@ -71,7 +73,8 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
   next(head) := case
     read_en & (head = 0) : 1;
     read_en & (head = 1) : 2;
-    read_en & (head = 2) : 0;
+    read_en & (head = 2) : 3;
+    read_en & (head = 3) : 0;
     TRUE : head;
   esac;
 
@@ -84,12 +87,15 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
   ASSIGN
   init(mem_2) := FALSE;
   next(mem_2) := write_en & (tail = 2) ? ins : mem_2;
+  ASSIGN
+  init(mem_3) := FALSE;
+  next(mem_3) := write_en & (tail = 3) ? ins : mem_3;
 
   init(full) := FALSE;
   next(full) := case
     write_en & !read_en : case
-      tail < 2 & head = tail + 1: TRUE;
-      tail = 2 & head = 0 : TRUE;
+      tail < 3 & head = tail + 1: TRUE;
+      tail = 3 & head = 0 : TRUE;
       TRUE : full;
     esac;
     !write_en & read_en : FALSE;
@@ -99,8 +105,8 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
   init(empty) := TRUE;
   next(empty) := case
     !write_en & read_en : case
-      head < 2 & tail = head + 1: TRUE;
-      head = 2 & tail = 0 : TRUE;
+      head < 3 & tail = head + 1: TRUE;
+      head = 3 & tail = 0 : TRUE;
       TRUE : empty;
     esac;
     write_en & !read_en : FALSE;
@@ -115,6 +121,7 @@ MODULE handshake_buffer_0__elastic_fifo_inner(ins, ins_valid, outs_ready)
     head = 0 : mem_0;
     head = 1 : mem_1;
     head = 2 : mem_2;
+    head = 3 : mem_3;
     TRUE : mem_0;
   esac;
 

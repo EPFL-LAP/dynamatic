@@ -305,8 +305,8 @@
     "hdl": "smv"
   },
   {
-    "name": "handshake.transfer_control",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t transfer_control -p bitwidth=$BITWIDTH",
+    "name": "handshake.blocker",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t blocker -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {

@@ -242,13 +242,6 @@ static std::string createSupportEntities(
     supportEntities << createTBJoin(nrOutChannels);
   } else
     supportEntities << "MODULE sink_main (ins_valid)\n"
-                    << "  VAR counter : 0..31;\n"
-                    << "  ASSIGN\n"
-                    << "    init(counter) := 0;\n"
-                    << "    next(counter) := case\n"
-                    << "      ins_valid & counter < 31 : counter + 1;\n"
-                    << "      TRUE : counter;\n"
-                    << "    esac;\n\n"
                        "  DEFINE ins_ready   := TRUE;\n\n";
 
   return supportEntities.str();

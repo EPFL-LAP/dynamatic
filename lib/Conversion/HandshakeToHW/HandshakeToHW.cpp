@@ -543,7 +543,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
       })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
-            handshake::NDWireOp, handshake::TransferControlOp>([&](auto) {
+            handshake::NDWireOp, handshake::BlockerOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -1813,7 +1813,7 @@ public:
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
                     ConvertToHWInstance<handshake::NDWireOp>,
                     ConvertToHWInstance<handshake::NDSourceOp>,
-                    ConvertToHWInstance<handshake::TransferControlOp>,
+                    ConvertToHWInstance<handshake::BlockerOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
                     ConvertToHWInstance<handshake::MergeOp>,

@@ -22,14 +22,6 @@ MODULE bool_input(nReady0, max_tokens)
   DEFINE outs_valid := counter < exact_tokens;
 
 MODULE sink_main (ins_valid)
-  VAR counter : 0..31;
-  ASSIGN
-    init(counter) := 0;
-    next(counter) := case
-      ins_valid & counter < 31 : counter + 1;
-      TRUE : counter;
-    esac;
-
   DEFINE ins_ready   := TRUE;
 
 MODULE main
@@ -45,7 +37,8 @@ MODULE main
 INVARSPEC (elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_Out1_valid -> elastic_miter_sup_mux_lhs_sup_mux_rhs.EQ_Out1);
 CTLSPEC AF (AG ((elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_In1.inner_elastic_fifo.head = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_In1.inner_elastic_fifo.head) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_In1.inner_elastic_fifo.tail = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_In1.inner_elastic_fifo.tail) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_In2.inner_elastic_fifo.head = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_In2.inner_elastic_fifo.head) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_In2.inner_elastic_fifo.tail = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_In2.inner_elastic_fifo.tail) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_Ctrl.inner_elastic_fifo.head = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_Ctrl.inner_elastic_fifo.head) & (elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_in_buf_Ctrl.inner_elastic_fifo.tail = elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_in_buf_Ctrl.inner_elastic_fifo.tail) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.lhs_out_buf_Out1.outs_valid) & (!elastic_miter_sup_mux_lhs_sup_mux_rhs.rhs_out_buf_Out1.outs_valid)));
 
-INVAR  seq_generator_In1.exact_tokens = seq_generator_Ctrl.exact_tokens 
+INVAR  seq_generator_In1.exact_tokens = seq_generator_Ctrl.exact_tokens ;
+INVAR  seq_generator_In1.exact_tokens = elastic_miter_sup_mux_lhs_sup_mux_rhs.out_nds_Out1.exact_tokens ;
 VAR Ctrl_false_token_cnt : 0..31;
 ASSIGN init(Ctrl_false_token_cnt) := 0;
 ASSIGN next(Ctrl_false_token_cnt) := case

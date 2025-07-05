@@ -8,7 +8,7 @@ module {
     %5 = buffer %4 {handshake.bb = 1 : ui32, handshake.name = "buf2", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_R", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 0, V: 0, R: 1}>}} : <i1>
     %6 = spec_v2_repeating_init %5 {handshake.bb = 1 : ui32, handshake.name = "ri"} : <i1>
     %7 = spec_v2_interpolator %6, %1 {handshake.bb = 1 : ui32, handshake.name = "interpolator"} : <i1>
-    %8:2 = lazy_fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "fork"} : <i1>
+    %8:2 = fork [2] %7 {handshake.bb = 1 : ui32, handshake.name = "fork"} : <i1>
     end {handshake.bb = 1 : ui32, handshake.name = "end0"} %2 : <i1>
   }
 }

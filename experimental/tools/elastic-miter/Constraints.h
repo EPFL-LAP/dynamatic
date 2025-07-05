@@ -25,7 +25,21 @@ public:
   // We don't need to parse a SequenceLengthRelationConstraint, we can just copy
   // the constraint string.
   SequenceLengthRelationConstraint(const std::string &option)
-      : constraint(option) {};
+      : constraint(option){};
+  std::string createSmvConstraint(
+      const std::string &moduleName,
+      const dynamatic::experimental::ElasticMiterConfig &config) const override;
+
+private:
+  std::string constraint;
+};
+
+class LengthRelationWithOutputConstraint : public ElasticMiterConstraint {
+public:
+  // We don't need to parse a LengthRelationWithOutputConstraint, we can just
+  // copy the constraint string.
+  LengthRelationWithOutputConstraint(const std::string &option)
+      : constraint(option){};
   std::string createSmvConstraint(
       const std::string &moduleName,
       const dynamatic::experimental::ElasticMiterConfig &config) const override;
@@ -80,7 +94,7 @@ private:
 // The same as a LoopConstraint, but the last token needs to be false.
 class StrictLoopConstraint : public LoopConstraint {
 public:
-  StrictLoopConstraint(const std::string &option) : LoopConstraint(option) {};
+  StrictLoopConstraint(const std::string &option) : LoopConstraint(option){};
   std::string
   createSmvConstraint(const std::string &moduleName,
                       const dynamatic::experimental::ElasticMiterConfig &config)

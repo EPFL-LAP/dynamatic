@@ -8,7 +8,7 @@ module {
     %buf2.outs = hw.instance "buf2" @handshake_buffer_1(ins: %buf1.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ri.outs = hw.instance "ri" @handshake_spec_v2_repeating_init_0(ins: %buf2.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %interpolator.result = hw.instance "interpolator" @handshake_spec_v2_interpolator_0(short: %ri.outs: !handshake.channel<i1>, long: %ndw_in_Generated.outs: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (result: !handshake.channel<i1>)
-    %fork.outs_0, %fork.outs_1 = hw.instance "fork" @handshake_lazy_fork_0(ins: %interpolator.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
+    %fork.outs_0, %fork.outs_1 = hw.instance "fork" @handshake_fork_0(ins: %interpolator.result: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs_0: !handshake.channel<i1>, outs_1: !handshake.channel<i1>)
     hw.output %ndw_out_Confirm.outs : !handshake.channel<i1>
   }
   hw.module.extern @handshake_ndwire_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.ndwire", hw.parameters = {DATA_TYPE = !handshake.channel<i1>}}
@@ -17,7 +17,7 @@ module {
   hw.module.extern @handshake_buffer_1(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.buffer", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_R", DATA_TYPE = !handshake.channel<i1>, NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 0, V: 0, R: 1}>}}
   hw.module.extern @handshake_spec_v2_repeating_init_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.spec_v2_repeating_init", hw.parameters = {}}
   hw.module.extern @handshake_spec_v2_interpolator_0(in %short : !handshake.channel<i1>, in %long : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.spec_v2_interpolator", hw.parameters = {}}
-  hw.module.extern @handshake_lazy_fork_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.channel<i1>, out outs_1 : !handshake.channel<i1>) attributes {hw.name = "handshake.lazy_fork", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
+  hw.module.extern @handshake_fork_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs_0 : !handshake.channel<i1>, out outs_1 : !handshake.channel<i1>) attributes {hw.name = "handshake.fork", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
   hw.module @resolver_lhs_wrapper(in %Actual : !handshake.channel<i1>, in %Generated : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out Confirm : !handshake.channel<i1>) {
     %resolver_lhs_wrapped.Confirm = hw.instance "resolver_lhs_wrapped" @resolver_lhs(Actual: %Actual: !handshake.channel<i1>, Generated: %Generated: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (Confirm: !handshake.channel<i1>)
     hw.output %resolver_lhs_wrapped.Confirm : !handshake.channel<i1>

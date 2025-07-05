@@ -24,12 +24,12 @@ module {
     %21 = init %20#0 {handshake.bb = 2 : ui32, handshake.name = "rhs_init_buffer_ctrl", hw.parameters = {INITIAL_TOKEN = false, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
     %22 = mux %21 [%9, %4] {handshake.bb = 2 : ui32, handshake.name = "rhs_data_mux"} : <i1>, [<i1>, <i1>] to <i1>
     %23 = passer %22[%20#1] {handshake.bb = 2 : ui32, handshake.name = "rhs_passer"} : <i1>, <i1>
-    %24 = ndsource {handshake.bb = 3 : ui32, handshake.name = "out_nds_Out1"} : <i1>
-    %25:2 = lazy_fork [2] %24 {handshake.bb = 3 : ui32, handshake.name = "out_lf_Out1"} : <i1>
-    %26 = buffer %25#0 {handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_Out1", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 2 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
-    %27 = buffer %25#1 {handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_Out1", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 2 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
-    %28 = transfer_control %18[%26] {handshake.bb = 3 : ui32, handshake.name = "out_lhs_tc_Out1"} : <i1>, <i1>
-    %29 = transfer_control %23[%27] {handshake.bb = 3 : ui32, handshake.name = "out_rhs_tc_Out1"} : <i1>, <i1>
+    %24 = ndsource {handshake.bb = 3 : ui32, handshake.name = "out_nds_Out1"} : <>
+    %25:2 = lazy_fork [2] %24 {handshake.bb = 3 : ui32, handshake.name = "out_lf_Out1"} : <>
+    %26 = buffer %25#0 {handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_Out1", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 2 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <>
+    %27 = buffer %25#1 {handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_Out1", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 2 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <>
+    %28 = blocker %18[%26] {handshake.bb = 3 : ui32, handshake.name = "out_lhs_bl_Out1"} : <i1>, <>
+    %29 = blocker %23[%27] {handshake.bb = 3 : ui32, handshake.name = "out_rhs_bl_Out1"} : <i1>, <>
     %30 = ndwire %28 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_ndw_Out1"} : <i1>
     %31 = ndwire %29 {handshake.bb = 3 : ui32, handshake.name = "rhs_out_ndw_Out1"} : <i1>
     %32 = buffer %30 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_buf_Out1", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 2 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>

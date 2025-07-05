@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_resolver_lhs_resolver_rhs.EQ_Confirm_valid -> elastic_miter_resolver_lhs_resolver_rhs.EQ_Confirm)  is true
 -- specification AF (AG (((((elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Actual.inner_elastic_fifo.head = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Actual.inner_elastic_fifo.head & elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Actual.inner_elastic_fifo.tail = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Actual.inner_elastic_fifo.tail) & elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Generated.inner_elastic_fifo.head = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Generated.inner_elastic_fifo.head) & elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Generated.inner_elastic_fifo.tail = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Generated.inner_elastic_fifo.tail) & !elastic_miter_resolver_lhs_resolver_rhs.lhs_out_buf_Confirm.outs_valid) & !elastic_miter_resolver_lhs_resolver_rhs.rhs_out_buf_Confirm.outs_valid))  is true
-elapse: 2.96 seconds, total: 2.96 seconds
+elapse: 107.40 seconds, total: 107.40 seconds

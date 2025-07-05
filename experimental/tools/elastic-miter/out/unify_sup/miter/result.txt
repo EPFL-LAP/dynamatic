@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_unify_sup_lhs_unify_sup_rhs.EQ_B_out_valid -> elastic_miter_unify_sup_lhs_unify_sup_rhs.EQ_B_out)  is true
 -- specification AF (AG ((((elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_A_in.outs_valid = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_A_in.outs_valid & elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_Cond1.outs_valid = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_Cond1.outs_valid) & elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_in_buf_Cond2.outs_valid = elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_in_buf_Cond2.outs_valid) & !elastic_miter_unify_sup_lhs_unify_sup_rhs.lhs_out_buf_B_out.outs_valid) & !elastic_miter_unify_sup_lhs_unify_sup_rhs.rhs_out_buf_B_out.outs_valid))  is true
-elapse: 0.23 seconds, total: 0.23 seconds
+elapse: 0.43 seconds, total: 0.43 seconds

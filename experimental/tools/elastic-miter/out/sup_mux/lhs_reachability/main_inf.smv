@@ -13,14 +13,6 @@ MODULE bool_input_inf(nReady0)
     DEFINE outs_valid := TRUE;
 
 MODULE sink_main (ins_valid)
-  VAR counter : 0..31;
-  ASSIGN
-    init(counter) := 0;
-    next(counter) := case
-      ins_valid & counter < 31 : counter + 1;
-      TRUE : counter;
-    esac;
-
   DEFINE ins_ready   := TRUE;
 
 MODULE main

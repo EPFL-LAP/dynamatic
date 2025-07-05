@@ -1,8 +1,8 @@
-#include "handshake_passer_0.smv"
 #include "handshake_spec_v2_repeating_init_0.smv"
-#include "handshake_mux_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_mux_0.smv"
 #include "handshake_fork_0.smv"
+#include "handshake_passer_0.smv"
 #include "handshake_init_0.smv"
 
 

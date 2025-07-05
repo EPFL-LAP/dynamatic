@@ -409,8 +409,13 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       newFuncOp.getArgument(0).replaceAllUsesExcept(forkOp.getResult()[0],
                                                     forkOp);
 
+      BufferOp ndSpecPreBufferOp = builder.create<BufferOp>(
+          forkOp.getLoc(), forkOp.getResult()[1], TimingInfo::break_dv(),
+          bufferSlots, dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, ndSpecPreBufferOp, BB_IN,
+                             "in_nd_spec_pre_buffer");
       SpecV2NDSpeculatorOp ndSpecOp = builder.create<SpecV2NDSpeculatorOp>(
-          newFuncOp.getLoc(), forkOp.getResult()[1]);
+          newFuncOp.getLoc(), ndSpecPreBufferOp.getResult());
       setHandshakeAttributes(builder, ndSpecOp, BB_IN, "in_nd_speculator");
       SpecV2RepeatingInitOp riOp = builder.create<SpecV2RepeatingInitOp>(
           newFuncOp.getLoc(), ndSpecOp.getResult());
@@ -524,19 +529,17 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
       setHandshakeAttributes(builder, rhsNDSBufferOp, BB_OUT,
                              "out_buf_rhs_nds_" + outName);
 
-      TransferControlOp lhsTransferControlOp =
-          builder.create<TransferControlOp>(nextLocation->getLoc(), lhsResult,
-                                            lhsNDSBufferOp.getResult());
-      setHandshakeAttributes(builder, lhsTransferControlOp, BB_OUT,
-                             "out_lhs_tc_" + outName);
-      TransferControlOp rhsTransferControlOp =
-          builder.create<TransferControlOp>(nextLocation->getLoc(), rhsResult,
-                                            rhsNDSBufferOp.getResult());
-      setHandshakeAttributes(builder, rhsTransferControlOp, BB_OUT,
-                             "out_rhs_tc_" + outName);
+      BlockerOp lhsBlockerOp = builder.create<BlockerOp>(
+          nextLocation->getLoc(), lhsResult, lhsNDSBufferOp.getResult());
+      setHandshakeAttributes(builder, lhsBlockerOp, BB_OUT,
+                             "out_lhs_bl_" + outName);
+      BlockerOp rhsBlockerOp = builder.create<BlockerOp>(
+          nextLocation->getLoc(), rhsResult, rhsNDSBufferOp.getResult());
+      setHandshakeAttributes(builder, rhsBlockerOp, BB_OUT,
+                             "out_rhs_bl_" + outName);
 
-      lhsResult = lhsTransferControlOp.getResult();
-      rhsResult = rhsTransferControlOp.getResult();
+      lhsResult = lhsBlockerOp.getResult();
+      rhsResult = rhsBlockerOp.getResult();
     }
 
     NDWireOp lhsEndNDWireOp;

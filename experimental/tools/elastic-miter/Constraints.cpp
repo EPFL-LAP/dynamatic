@@ -46,7 +46,7 @@ std::string SequenceLengthRelationConstraint::createSmvConstraint(
     const dynamatic::experimental::ElasticMiterConfig &config) const {
 
   std::string output = "INVAR ";
-  output += constraint + "\n";
+  output += constraint + ";\n";
 
   // Replace all the occurences of the sequence with index i with its
   // corresponding sequence generator.
@@ -71,8 +71,34 @@ std::string SequenceLengthRelationConstraint::createSmvConstraint(
                            " seq_generator_" + argumentName + ".exact_tokens ");
   }
 
-  output +=
-      "\nFAIRNESS sink_EQ_Out1.counter = seq_generator_In2.exact_tokens;\n";
+  return output;
+}
+
+std::string LengthRelationWithOutputConstraint::createSmvConstraint(
+    const std::string &moduleName,
+    const dynamatic::experimental::ElasticMiterConfig &config) const {
+
+  std::string output = "INVAR ";
+  output += constraint + ";\n";
+
+  for (size_t i = 0; i < config.arguments.size(); i++) {
+    auto [argumentName, _] = config.arguments[i];
+    std::regex numberRegex("\\{in:" + std::to_string(i) + "\\}");
+
+    output =
+        std::regex_replace(output, numberRegex,
+                           " seq_generator_" + argumentName + ".exact_tokens ");
+  }
+  for (size_t i = 0; i < config.results.size(); i++) {
+    auto [eqResultName, _] = config.results[i];
+    StringRef resultName(eqResultName);
+    resultName = resultName.substr(3); // Remove EQ_
+    std::regex numberRegex("\\{out:" + std::to_string(i) + "\\}");
+
+    output = std::regex_replace(output, numberRegex,
+                                " " + config.funcName + ".out_nds_" +
+                                    resultName.str() + ".exact_tokens ");
+  }
 
   return output;
 }

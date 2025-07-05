@@ -5,7 +5,7 @@ module {
     %actual_buf2 = buffer %actual_buf1 {handshake.bb = 1 : ui32, handshake.name = "buf2", hw.parameters = {BUFFER_TYPE = "ONE_SLOT_BREAK_R", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 0, V: 0, R: 1}>}} : <i1>
     %actual_ri = spec_v2_repeating_init %actual_buf2 {handshake.bb = 1 : ui32, handshake.name = "ri"} : <i1>
     %confirm = spec_v2_interpolator %actual_ri, %generated {handshake.bb = 1 : ui32, handshake.name = "interpolator"} : <i1>
-    %confirm_fork:2 = lazy_fork [2] %confirm {handshake.bb = 1 : ui32, handshake.name = "fork"} : <i1>
+    %confirm_fork:2 = fork [2] %confirm {handshake.bb = 1 : ui32, handshake.name = "fork"} : <i1>
     end {handshake.bb = 1 : ui32, handshake.name = "end0"} %confirm_fork#1 : <i1>
   }
 }

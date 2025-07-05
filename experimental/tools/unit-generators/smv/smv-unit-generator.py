@@ -56,7 +56,7 @@ import generators.arith.xori as xori
 import generators.handshake.ndwire as ndwire
 import generators.handshake.init as init
 import generators.handshake.ndsource as ndsource
-import generators.handshake.transfer_control as transfer_control
+import generators.handshake.blocker as blocker
 
 import generators.memory.memory_controller as memory_controller
 
@@ -157,8 +157,8 @@ def generate_code(name, mod_type, parameters):
             return ndwire.generate_ndwire(name, parameters)
         case "ndsource":
             return ndsource.generate_ndsource(name, parameters)
-        case "transfer_control":
-            return transfer_control.generate_transfer_control(name, parameters)
+        case "blocker":
+            return blocker.generate_blocker(name, parameters)
         case "init":
             return init.generate_init(name, parameters)
         case "spec_v2_repeating_init":

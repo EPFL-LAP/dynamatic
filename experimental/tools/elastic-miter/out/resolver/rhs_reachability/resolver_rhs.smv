@@ -1,5 +1,5 @@
-#include "handshake_spec_v2_resolver_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_spec_v2_resolver_0.smv"
 
 
 MODULE resolver_rhs (Actual, Actual_valid, Generated, Generated_valid, Confirm_ready)

@@ -11,4 +11,4 @@
 
 -- invariant (elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.EQ_B_out_valid -> elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.EQ_B_out)  is true
 -- specification AF (AG ((elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.lhs_in_buf_A_in.outs_valid = elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.rhs_in_buf_A_in.outs_valid & !elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.lhs_out_buf_B_out.outs_valid) & !elastic_miter_interpolator_ident_lhs_interpolator_ident_rhs.rhs_out_buf_B_out.outs_valid))  is true
-elapse: 0.05 seconds, total: 0.05 seconds
+elapse: 0.07 seconds, total: 0.07 seconds

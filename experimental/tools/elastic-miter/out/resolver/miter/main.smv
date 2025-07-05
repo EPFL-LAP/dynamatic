@@ -26,8 +26,8 @@ MODULE sink_main (ins_valid)
 
 MODULE main
 
-  VAR seq_generator_Actual : bool_input(elastic_miter_resolver_lhs_resolver_rhs.Actual_ready, 3);
-  VAR seq_generator_Generated : bool_input(elastic_miter_resolver_lhs_resolver_rhs.Generated_ready, 3);
+  VAR seq_generator_Actual : bool_input(elastic_miter_resolver_lhs_resolver_rhs.Actual_ready, 4);
+  VAR seq_generator_Generated : bool_input(elastic_miter_resolver_lhs_resolver_rhs.Generated_ready, 4);
 
   VAR elastic_miter_resolver_lhs_resolver_rhs : elastic_miter_resolver_lhs_resolver_rhs (seq_generator_Actual.outs, seq_generator_Actual.outs_valid, seq_generator_Generated.outs, seq_generator_Generated.outs_valid, sink_EQ_Confirm.ins_ready);
 
@@ -36,3 +36,4 @@ MODULE main
 INVARSPEC (elastic_miter_resolver_lhs_resolver_rhs.EQ_Confirm_valid -> elastic_miter_resolver_lhs_resolver_rhs.EQ_Confirm);
 CTLSPEC AF (AG ((elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Actual.inner_elastic_fifo.head = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Actual.inner_elastic_fifo.head) & (elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Actual.inner_elastic_fifo.tail = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Actual.inner_elastic_fifo.tail) & (elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Generated.inner_elastic_fifo.head = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Generated.inner_elastic_fifo.head) & (elastic_miter_resolver_lhs_resolver_rhs.lhs_in_buf_Generated.inner_elastic_fifo.tail = elastic_miter_resolver_lhs_resolver_rhs.rhs_in_buf_Generated.inner_elastic_fifo.tail) & (!elastic_miter_resolver_lhs_resolver_rhs.lhs_out_buf_Confirm.outs_valid) & (!elastic_miter_resolver_lhs_resolver_rhs.rhs_out_buf_Confirm.outs_valid)));
 
+INVAR  seq_generator_Actual.exact_tokens = elastic_miter_resolver_lhs_resolver_rhs.out_nds_Confirm.exact_tokens ;

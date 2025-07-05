@@ -26,7 +26,7 @@ Digraph G {
     "buf2" ["style"="filled", "fillcolor"="palegreen", "shape"="box", "label"="R [1]", "mlir_op"="handshake.buffer"]
     "ri" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_repeating_init", "mlir_op"="handshake.spec_v2_repeating_init"]
     "interpolator" ["style"="filled", "fillcolor"="moccasin", "shape"="box", "label"="spec_v2_interpolator", "mlir_op"="handshake.spec_v2_interpolator"]
-    "fork" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="lazy_fork", "mlir_op"="handshake.lazy_fork"]
+    "fork" ["style"="filled", "fillcolor"="lavender", "shape"="box", "label"="fork", "mlir_op"="handshake.fork"]
     "passer" -> "buf1" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="result", "to_idx"="0"]
     "buf1" -> "buf2" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]
     "buf2" -> "ri" ["dir"="both", "style"="solid", "arrowhead"="normal", "from_idx"="0", "to"="ins", "arrowtail"="none", "from"="outs", "to_idx"="0"]

@@ -376,7 +376,6 @@ def NDWireOp : Handshake_Op<"ndwire", [
 
 def NDSourceOp : Handshake_Op<"ndsource", [
   HasClock,
-  IsIntSizedChannel<1, "result">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "non-deterministic wire operation";
@@ -384,13 +383,12 @@ def NDSourceOp : Handshake_Op<"ndsource", [
     Represents a wire that non-determinastically stalls the propagation of a signal.
   }];
 
-  let results = (outs ChannelType:$result);
+  let results = (outs ControlType:$result);
 
   let builders = [OpBuilder<
     (ins), [{
-      auto dataType = $_builder.getIntegerType(1);
-      auto i1Type = ::dynamatic::handshake::ChannelType::get(dataType);
-      $_state.addTypes({i1Type});
+      auto controlType = ::dynamatic::handshake::ControlType::get($_builder.getContext());
+      $_state.addTypes({controlType});
   }]>];
 
   let assemblyFormat = [{
@@ -410,9 +408,8 @@ def NDSourceOp : Handshake_Op<"ndsource", [
   }];
 }
 
-def TransferControlOp : Handshake_Op<"transfer_control", [
+def BlockerOp : Handshake_Op<"blocker", [
   HasClock, AllTypesMatch<["ins", "outs"]>,
-  IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "non-deterministic wire operation";
@@ -420,7 +417,7 @@ def TransferControlOp : Handshake_Op<"transfer_control", [
     Represents a wire that non-determinastically stalls the propagation of a signal.
   }];
 
-  let arguments = (ins HandshakeType:$ins, ChannelType:$ctrl);
+  let arguments = (ins HandshakeType:$ins, ControlType:$ctrl);
   let results = (outs HandshakeType:$outs);
 
   let assemblyFormat = [{
@@ -786,25 +783,25 @@ def JoinOp : Handshake_Op<"join", [
 
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
 // once the backend supports variadic channels with zero or one item correctly.
-def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
-]> {
-  let summary = "blocker operation";
-  let description = [{
-    A data synchronizer. Blocks handshakes until all inputs are valid, 
-    then forwards the first input.
+// def BlockerOp : Handshake_Op<"blocker", [
+//   SameOperandsAndResultType
+// ]> {
+//   let summary = "blocker operation";
+//   let description = [{
+//     A data synchronizer. Blocks handshakes until all inputs are valid, 
+//     then forwards the first input.
 
-    Example:
+//     Example:
 
-    ```mlir
-    %0 = blocker %a, %b, %c : !handshake.channel<i32>
-    ```
-  }];
+//     ```mlir
+//     %0 = blocker %a, %b, %c : !handshake.channel<i32>
+//     ```
+//   }];
 
-  let arguments = (ins Variadic<ChannelType>:$data);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$data attr-dict `:` type($result)";
-}
+//   let arguments = (ins Variadic<ChannelType>:$data);
+//   let results = (outs ChannelType:$result);
+//   let assemblyFormat = "$data attr-dict `:` type($result)";
+// }
 
 def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
   let summary = "Logical negation";
