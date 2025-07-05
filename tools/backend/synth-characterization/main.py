@@ -163,7 +163,7 @@ if __name__ == "__main__":
         "--clock-period",
         type=float,
         default=4.0,
-        help="Clock period in nanoseconds (default: 4.0 ns)",
+        help="Clock period in nanoseconds to use for synthesis (default: 4.0 ns)",
     )
     args = parser.parse_args()
     json_input = args.json_input
