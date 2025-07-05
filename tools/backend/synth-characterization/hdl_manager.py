@@ -1,7 +1,7 @@
 # This script is used to move the HDL files in the hdl_out_dir and generate the necessary HDL files for the unit.
 import os
 
-def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dynamatic_dir, dependency_list):
+def get_hdl_files(unit_name, generic, generator, hdl_out_dir, dynamatic_dir, dependency_list):
     """
     Generate or copy the HDL files for the given unit.
     
@@ -9,14 +9,15 @@ def get_hdl_files(unit_name, generic, generator, dependencies, hdl_out_dir, dyna
         unit_name (str): Name of the unit.
         generic (str): Generic information for the unit.
         generator (str): Generator information for the unit.
-        dependencies (list): List of dependencies for the unit.
         hdl_out_dir (str): Directory where HDL files should be stored.
-        
+        dynamatic_dir (str): Path to the Dynamatic directory.
+        dependency_list (dict): Dictionary containing the list of dependencies for all units.
+
     Returns:
         str: Path to the generated or copied HDL file.
     """
     # Add dependency RTL files to the output directory
-    remaining_dependencies = dependencies.copy()
+    remaining_dependencies = dependency_list[unit_name].copy()
     while remaining_dependencies:
         dependency_unit = remaining_dependencies.pop(0)
         # Find the dependecy unit location

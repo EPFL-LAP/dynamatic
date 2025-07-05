@@ -94,7 +94,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    dependency_list = get_dependency_list(dataflow_units)
+    all_dependencies_list = get_dependency_list(dataflow_units)
 
     map_unit2rpts = {}
 
@@ -124,7 +124,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         os.system(f"rm -rf {tcl_dir}/*")
         # Copy the RTL files or generate them if necessary
         print(f"Processing unit: {unit_name}")
-        top_def_file = get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
+        top_def_file = get_hdl_files(unit_name, generic, generator, hdl_dir, dynamatic_dir, all_dependencies_list)
         # After generating the HDL files, we can proceed with characterization
         map_rpt2params = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period)
         # Store the results in the map_unit2rpts dictionary
