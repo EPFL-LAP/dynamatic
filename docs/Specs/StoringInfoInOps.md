@@ -4,7 +4,29 @@
 It is often useful to store additional information on an operation. One example is if we wish to parameterize the generation of their RTL. This requires storing the parameter value on the operation itself, as well as passing it to the relevant parts of the code-base to ensure correct generation.
 
 
-# Storing the Information
+- [Storing Information as an Attribute](#storing-information-as-an-attribute)
+  - [How to Store the Information](#how-to-store-the-information)
+  - [Why Do We Store it Like This?](#why-do-we-store-it-like-this)
+  - [What Types of Information to Store](#what-types-of-information-to-store)
+  - [Maintaining Backwards Compatibility](#maintaining-backwards-compatibility)
+  - [Optional and Default Valued Attributes](#optional-and-default-valued-attributes)
+    - [OptionalAttr](#optionalattr)
+    - [DefaultValuedAttr](#defaultvaluedattr)
+  - [Good Examples](#good-examples)
+    - [FIFO-Depth for a Save-Commit](#fifo-depth-for-a-save-commit)
+    - [SharingWrapperOp for Crush](#sharingwrapperop-for-crush)
+  - [Example to Avoid](#example-to-avoid)
+    - [BufferOp](#bufferop)
+
+- [Non-Operation Specific Information](#non-operation-specific-information)
+  - [How to Define Interface Attributes](#how-to-define-interface-attributes)
+  - [Good Example](#good-example)
+    - [InternalDelay for Arithmetic Ops](#internaldelay-for-arithmetic-ops)
+
+- [How to Calculate Dependant Information On Demand](#how-to-calculate-dependant-information-on-demand)
+
+
+# Storing Information as an Attribute
 
 ## How to Store the Information
 
@@ -230,7 +252,7 @@ There are also no named getters generated, and therefore these attributes must b
 
 https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
 
-# Non-Operation Specific Information
+# Non-Operation-Specific Information
 Sometimes information  may exist across many different operations. 
 
 If we followed the above rules, adding the new attribute to many operations would result in code duplication. 
