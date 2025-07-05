@@ -109,7 +109,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
 
     all_dependencies_dict = get_dependency_dict(dataflow_units)
 
-    map_unit2rpts = {}
+    map_unit_to_list_unit_chars = {}
 
     for unit_info in dataflow_units:
         # Extract the unit name and its RTL information
@@ -139,12 +139,12 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         print(f"Processing unit: {unit_name}")
         top_def_file = get_hdl_files(unit_name, generic, generator, hdl_dir, dynamatic_dir, all_dependencies_dict)
         # After generating the HDL files, we can proceed with characterization
-        map_rpt2params = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period)
-        # Store the results in the map_unit2rpts dictionary
-        map_unit2rpts[unit_name] = map_rpt2params
+        list_unit_chars = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period)
+        # Store the results in the map_unit_to_list_unit_chars dictionary
+        map_unit_to_list_unit_chars[unit_name] = list_unit_chars
     
     # Save the results to the output JSON file
-    extract_rpt_data(map_unit2rpts, json_output)
+    extract_rpt_data(map_unit_to_list_unit_chars, json_output)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run characterization of dataflow units")

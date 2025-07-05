@@ -1,8 +1,8 @@
-from run_synthesis import write_tcl, run_synthesis, write_sdc_constraints
+from run_synthesis import run_synthesis, write_sdc_constraints
 import os
 import re
 from itertools import product
-from utils import parameters_ranges, VhdlInterfaceInfo
+from utils import parameters_ranges, VhdlInterfaceInfo, UnitCharacterization
 from typing import List, Tuple
 
 def extract_generics_ports(vhdl_code, entity_name):
@@ -130,6 +130,10 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         tcl_dir (str): Directory where TCL files will be stored.
         rpt_dir (str): Directory where reports will be stored.
         log_dir (str): Directory where logs will be stored.
+        clock_period (float): Clock period in nanoseconds for the synthesis tool.
+    
+    Returns:
+        List[UnitCharacterization]: List of UnitCharacterization objects for the unit.
     """
     # Get list of hdl files needed for the unit already present in the hdl_out_dir
     hdl_files = [f"{hdl_out_dir}/{file}" for file in os.listdir(hdl_out_dir) if os.path.isfile(os.path.join(hdl_out_dir, file))]
@@ -155,7 +159,8 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     write_sdc_constraints(sdc_file, clock_period)  # Set a default period of 4 ns
     # Create a top file for each combination of parameters and the corresponding tcl file
     list_tcls = []
-    map_rpt2params = {}
+    # List to hold objects of UnitCharacterization
+    unit_characterization_list = []
     id = 0
     for combination in param_combinations:
         top_file = f"{hdl_out_dir}/{top_entity_name}_top_{id}.vhd" 
@@ -165,22 +170,14 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
             wrapper_top_combined = wrapper_top_combined.replace(f"{param_name}_const_value", str(param_value))
         with open(top_file, 'w') as f:
             f.write(wrapper_top_combined)
+        unit_char_obj = UnitCharacterization(unit_name, top_entity_name, dict(zip(param_names, combination)), [top_file] + hdl_files, vhdl_interface_info, id)
         # Write the tcl file for synthesis
-        tcl_file = f"{tcl_dir}/synth_{top_entity_name}_top_{id}.tcl"
-        list_tcls.append(tcl_file)
-        rpt_timing = f"{rpt_dir}/rpt_timing_{top_entity_name}_top_{id}.txt"
-        # Remove previous rpt_timing file if it exists
-        if os.path.exists(rpt_timing):
-            os.remove(rpt_timing)
-        write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, vhdl_interface_info)
+        list_tcls.append(unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file))
         id += 1
-        # Map the report file to the parameters used
-        map_rpt2params[rpt_timing] = {}
-        for param_name, param_value in zip(param_names, combination):
-            map_rpt2params[rpt_timing][param_name] = param_value
+        unit_characterization_list.append(unit_char_obj)
 
     # Run the synthesis tool for each tcl file
     log_file = f"{log_dir}/synth_{unit_name}_log.txt"
     run_synthesis(list_tcls, synth_tool, log_file)    
 
-    return map_rpt2params
+    return unit_characterization_list
