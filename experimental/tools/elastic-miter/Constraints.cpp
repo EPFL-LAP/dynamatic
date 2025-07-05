@@ -71,6 +71,9 @@ std::string SequenceLengthRelationConstraint::createSmvConstraint(
                            " seq_generator_" + argumentName + ".exact_tokens ");
   }
 
+  output +=
+      "\nFAIRNESS sink_EQ_Out1.counter = seq_generator_In2.exact_tokens;\n";
+
   return output;
 }
 
@@ -90,10 +93,6 @@ std::string LoopConstraint::createConstraintString(
   std::string dataSeqGeneratorName = "seq_generator_" + dataSequenceName;
 
   std::string falseTokenCounterString;
-  std::string forceFalseTokenInvar;
-  std::string limitFalseTokensInvar;
-  std::string seqLengthRelationInvar;
-  std::string emptyDataSequenceInvar;
 
   // Create a counter, which counts the total number of false token at the
   // control sequence input.
@@ -101,62 +100,20 @@ std::string LoopConstraint::createConstraintString(
       R"DELIM(VAR {0} : 0..31;
 ASSIGN init({0}) := 0;
 ASSIGN next({0}) := case
-  {1}.outs_valid & {1}.nReady0 & ({1}.outs = FALSE) & ({0} < {2}.exact_tokens) : ({0} + 1);
+  {1}.outs_valid & {1}.nReady0 & ({1}.outs = FALSE) & ({0} < 31) : ({0} + 1);
   TRUE : {0};
 esac;
 )DELIM",
-      falseCounterTokenCounterVariable, controlSeqGeneratorName,
-      dataSeqGeneratorName);
+      falseCounterTokenCounterVariable, controlSeqGeneratorName);
 
-  // Make sure enough false tokens are generated. When there are as many false
-  // tokens that still need to be generated, as there are total control tokens
-  // that can be generated, every token needs to be false.
-  forceFalseTokenInvar = llvm::formatv(
-      R"DELIM(INVAR ((({0}.exact_tokens - {1}) = ({2}.exact_tokens - {2}.counter)) &
-  (({0}.exact_tokens - {1}) >= 1)) -> {2}.outs = FALSE;
+  std::string counterConstraint =
+      llvm::formatv(R"DELIM(FAIRNESS {0} = {1}.exact_tokens
 )DELIM",
-      dataSeqGeneratorName, falseCounterTokenCounterVariable,
-      controlSeqGeneratorName);
+                    falseCounterTokenCounterVariable, dataSeqGeneratorName);
 
-  // Make sure that not to many false tokens are generated. If the last tokens
-  // needs to be false, this means we only generate false tokens as long as we
-  // still have one false token to spare. If the last token can be freely
-  // chosen, we only create false token as long as we haven't reached the total
-  // number of tokens.
-  // Example (last True or False): INVAR
-  // (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) = 0 ) &
-  // ((seq_generator_Cd.exact_tokens - seq_generator_Cd.counter) >= 1)) ->
-  // (seq_generator_Cd.outs = TRUE);
-  // Example (last False): INVAR
-  // (((seq_generator_Dd.exact_tokens - Cd_false_token_cnt) = 1 ) &
-  // ((seq_generator_Cd.exact_tokens - seq_generator_Cd.counter) >= 2)) ->
-  // (seq_generator_Cd.outs = TRUE);
-  limitFalseTokensInvar = llvm::formatv(
-      R"DELIM(INVAR ((({0}.exact_tokens - {1}) = {2}) &
-(({3}.exact_tokens - {3}.counter) >= {4})) ->
-({3}.outs = TRUE);
-)DELIM",
-      dataSeqGeneratorName, falseCounterTokenCounterVariable,
-      (unsigned)lastFalse, controlSeqGeneratorName, 1 + lastFalse);
-
-  // Make sure the control sequence generates at least as many tokens as the
-  // data sequence. Otherwise it will be impossible to have the same number of
-  // control false tokens as total data tokens.
-  seqLengthRelationInvar = llvm::formatv(
-      R"DELIM(INVAR ({0}.exact_tokens >= {1}.exact_tokens);
-)DELIM",
-      controlSeqGeneratorName, dataSeqGeneratorName);
-
-  // When there are no data tokens, there should also be no control tokens.
-  // Otherwise the control token cannot be consumed.
-  emptyDataSequenceInvar = llvm::formatv(
-      R"DELIM(INVAR ({0}.exact_tokens = 0) -> ({1}.exact_tokens = 0);
-)DELIM",
-      dataSeqGeneratorName, controlSeqGeneratorName);
-
-  return falseTokenCounterString + forceFalseTokenInvar +
-         limitFalseTokensInvar + seqLengthRelationInvar +
-         emptyDataSequenceInvar;
+  assert(!lastFalse && "strict: TODO add lastTokenTracker");
+  // if (!lastFalse)
+  return falseTokenCounterString + counterConstraint;
 }
 
 // Create the constraints to limit the number of tokens in the circuit.

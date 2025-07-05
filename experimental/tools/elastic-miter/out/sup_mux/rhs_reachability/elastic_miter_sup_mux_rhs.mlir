@@ -1,5 +1,5 @@
 module {
-  handshake.func @j_rhs(%arg0: !handshake.channel<i1>, %arg1: !handshake.channel<i1>, %arg2: !handshake.channel<i1>, ...) -> !handshake.channel<i1> attributes {argNames = ["In1", "In2", "Ctrl"], resNames = ["Out1"]} {
+  handshake.func @sup_mux_rhs(%arg0: !handshake.channel<i1>, %arg1: !handshake.channel<i1>, %arg2: !handshake.channel<i1>, ...) -> !handshake.channel<i1> attributes {argNames = ["In1", "In2", "Ctrl"], resNames = ["Out1"]} {
     %0 = ndwire %arg0 {handshake.bb = 0 : ui32, handshake.name = "ndw_in_In1"} : <i1>
     %1 = ndwire %arg1 {handshake.bb = 0 : ui32, handshake.name = "ndw_in_In2"} : <i1>
     %2 = ndwire %arg2 {handshake.bb = 0 : ui32, handshake.name = "ndw_in_Ctrl"} : <i1>

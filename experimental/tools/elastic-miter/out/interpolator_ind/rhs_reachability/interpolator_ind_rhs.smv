@@ -1,7 +1,7 @@
-#include "handshake_ndwire_0.smv"
 #include "handshake_passer_0.smv"
 #include "handshake_spec_v2_repeating_init_0.smv"
 #include "handshake_spec_v2_interpolator_0.smv"
+#include "handshake_ndwire_0.smv"
 
 
 MODULE interpolator_ind_rhs (A_in, A_in_valid, B_in, B_in_valid, Sup_in, Sup_in_valid, Sup_out_ready)

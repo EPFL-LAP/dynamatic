@@ -1,10 +1,12 @@
-#include "handshake_andi_0.smv"
-#include "handshake_passer_0.smv"
 #include "handshake_lazy_fork_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_buffer_0.smv"
-#include "handshake_fork_0.smv"
+#include "handshake_passer_0.smv"
+#include "handshake_andi_0.smv"
 #include "handshake_ndwire_0.smv"
+#include "handshake_transfer_control_0.smv"
+#include "handshake_ndsource_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_cmpi_0.smv"
+#include "handshake_fork_0.smv"
 
 
 MODULE elastic_miter_sup_and_lhs_sup_and_rhs (A_in, A_in_valid, B_in, B_in_valid, Cond, Cond_valid, EQ_C_out_ready)
@@ -43,11 +45,17 @@ VAR rhs_in_ndw_Cond : handshake_ndwire_0(rhs_in_buf_Cond.outs, rhs_in_buf_Cond.o
 VAR lhs_fork_cond : handshake_fork_0(lhs_in_ndw_Cond.outs, lhs_in_ndw_Cond.outs_valid, lhs_passer1.ctrl_ready, lhs_passer2.ctrl_ready);
 VAR lhs_passer1 : handshake_passer_0(lhs_in_ndw_A_in.outs, lhs_in_ndw_A_in.outs_valid, lhs_fork_cond.outs_0, lhs_fork_cond.outs_0_valid, lhs_andi.lhs_ready);
 VAR lhs_passer2 : handshake_passer_0(lhs_in_ndw_B_in.outs, lhs_in_ndw_B_in.outs_valid, lhs_fork_cond.outs_1, lhs_fork_cond.outs_1_valid, lhs_andi.rhs_ready);
-VAR lhs_andi : handshake_andi_0(lhs_passer1.result, lhs_passer1.result_valid, lhs_passer2.result, lhs_passer2.result_valid, lhs_out_ndw_C_out.ins_ready);
+VAR lhs_andi : handshake_andi_0(lhs_passer1.result, lhs_passer1.result_valid, lhs_passer2.result, lhs_passer2.result_valid, out_lhs_tc_C_out.ins_ready);
 VAR rhs_andi : handshake_andi_0(rhs_in_ndw_A_in.outs, rhs_in_ndw_A_in.outs_valid, rhs_in_ndw_B_in.outs, rhs_in_ndw_B_in.outs_valid, rhs_passer1.data_ready);
-VAR rhs_passer1 : handshake_passer_0(rhs_andi.result, rhs_andi.result_valid, rhs_in_ndw_Cond.outs, rhs_in_ndw_Cond.outs_valid, rhs_out_ndw_C_out.ins_ready);
-VAR lhs_out_ndw_C_out : handshake_ndwire_0(lhs_andi.result, lhs_andi.result_valid, lhs_out_buf_C_out.ins_ready);
-VAR rhs_out_ndw_C_out : handshake_ndwire_0(rhs_passer1.result, rhs_passer1.result_valid, rhs_out_buf_C_out.ins_ready);
+VAR rhs_passer1 : handshake_passer_0(rhs_andi.result, rhs_andi.result_valid, rhs_in_ndw_Cond.outs, rhs_in_ndw_Cond.outs_valid, out_rhs_tc_C_out.ins_ready);
+VAR out_nds_C_out : handshake_ndsource_0(out_lf_C_out.ins_ready);
+VAR out_lf_C_out : handshake_lazy_fork_0(out_nds_C_out.result, out_nds_C_out.result_valid, out_buf_lhs_nds_C_out.ins_ready, out_buf_rhs_nds_C_out.ins_ready);
+VAR out_buf_lhs_nds_C_out : handshake_buffer_0(out_lf_C_out.outs_0, out_lf_C_out.outs_0_valid, out_lhs_tc_C_out.ctrl_ready);
+VAR out_buf_rhs_nds_C_out : handshake_buffer_0(out_lf_C_out.outs_1, out_lf_C_out.outs_1_valid, out_rhs_tc_C_out.ctrl_ready);
+VAR out_lhs_tc_C_out : handshake_transfer_control_0(lhs_andi.result, lhs_andi.result_valid, out_buf_lhs_nds_C_out.outs, out_buf_lhs_nds_C_out.outs_valid, lhs_out_ndw_C_out.ins_ready);
+VAR out_rhs_tc_C_out : handshake_transfer_control_0(rhs_passer1.result, rhs_passer1.result_valid, out_buf_rhs_nds_C_out.outs, out_buf_rhs_nds_C_out.outs_valid, rhs_out_ndw_C_out.ins_ready);
+VAR lhs_out_ndw_C_out : handshake_ndwire_0(out_lhs_tc_C_out.outs, out_lhs_tc_C_out.outs_valid, lhs_out_buf_C_out.ins_ready);
+VAR rhs_out_ndw_C_out : handshake_ndwire_0(out_rhs_tc_C_out.outs, out_rhs_tc_C_out.outs_valid, rhs_out_buf_C_out.ins_ready);
 VAR lhs_out_buf_C_out : handshake_buffer_0(lhs_out_ndw_C_out.outs, lhs_out_ndw_C_out.outs_valid, out_eq_C_out.lhs_ready);
 VAR rhs_out_buf_C_out : handshake_buffer_0(rhs_out_ndw_C_out.outs, rhs_out_ndw_C_out.outs_valid, out_eq_C_out.rhs_ready);
 VAR out_eq_C_out : handshake_cmpi_0(lhs_out_buf_C_out.outs, lhs_out_buf_C_out.outs_valid, rhs_out_buf_C_out.outs, rhs_out_buf_C_out.outs_valid, out_eq_C_out_result_ready);

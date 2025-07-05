@@ -1,5 +1,5 @@
 module {
-  hw.module @j_rhs(in %In1 : !handshake.channel<i1>, in %In2 : !handshake.channel<i1>, in %Ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out Out1 : !handshake.channel<i1>) {
+  hw.module @sup_mux_rhs(in %In1 : !handshake.channel<i1>, in %In2 : !handshake.channel<i1>, in %Ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out Out1 : !handshake.channel<i1>) {
     %ndw_in_In1.outs = hw.instance "ndw_in_In1" @handshake_ndwire_0(ins: %In1: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_in_In2.outs = hw.instance "ndw_in_In2" @handshake_ndwire_0(ins: %In2: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
     %ndw_in_Ctrl.outs = hw.instance "ndw_in_Ctrl" @handshake_ndwire_0(ins: %Ctrl: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (outs: !handshake.channel<i1>)
@@ -17,9 +17,9 @@ module {
   hw.module.extern @handshake_init_0(in %ins : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.init", hw.parameters = {INITIAL_TOKEN = false, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}}
   hw.module.extern @handshake_mux_0(in %index : !handshake.channel<i1>, in %ins_0 : !handshake.channel<i1>, in %ins_1 : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out outs : !handshake.channel<i1>) attributes {hw.name = "handshake.mux", hw.parameters = {DATA_TYPE = !handshake.channel<i1>, SELECT_TYPE = !handshake.channel<i1>, SIZE = 2 : ui32}}
   hw.module.extern @handshake_passer_0(in %data : !handshake.channel<i1>, in %ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out result : !handshake.channel<i1>) attributes {hw.name = "handshake.passer", hw.parameters = {}}
-  hw.module @j_rhs_wrapper(in %In1 : !handshake.channel<i1>, in %In2 : !handshake.channel<i1>, in %Ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out Out1 : !handshake.channel<i1>) {
-    %j_rhs_wrapped.Out1 = hw.instance "j_rhs_wrapped" @j_rhs(In1: %In1: !handshake.channel<i1>, In2: %In2: !handshake.channel<i1>, Ctrl: %Ctrl: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (Out1: !handshake.channel<i1>)
-    hw.output %j_rhs_wrapped.Out1 : !handshake.channel<i1>
+  hw.module @sup_mux_rhs_wrapper(in %In1 : !handshake.channel<i1>, in %In2 : !handshake.channel<i1>, in %Ctrl : !handshake.channel<i1>, in %clk : i1, in %rst : i1, out Out1 : !handshake.channel<i1>) {
+    %sup_mux_rhs_wrapped.Out1 = hw.instance "sup_mux_rhs_wrapped" @sup_mux_rhs(In1: %In1: !handshake.channel<i1>, In2: %In2: !handshake.channel<i1>, Ctrl: %Ctrl: !handshake.channel<i1>, clk: %clk: i1, rst: %rst: i1) -> (Out1: !handshake.channel<i1>)
+    hw.output %sup_mux_rhs_wrapped.Out1 : !handshake.channel<i1>
   }
 }
 

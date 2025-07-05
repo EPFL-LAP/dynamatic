@@ -21,11 +21,17 @@ module {
     %18 = passer %17[%16] {handshake.bb = 1 : ui32, handshake.name = "lhs_passer3"} : <i1>, <i1>
     %19 = andi %9, %14 {handshake.bb = 2 : ui32, handshake.name = "rhs_andi"} : <i1>
     %20 = passer %4[%19] {handshake.bb = 2 : ui32, handshake.name = "rhs_passer"} : <i1>, <i1>
-    %21 = ndwire %18 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_ndw_B_out"} : <i1>
-    %22 = ndwire %20 {handshake.bb = 3 : ui32, handshake.name = "rhs_out_ndw_B_out"} : <i1>
-    %23 = buffer %21 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_buf_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
-    %24 = buffer %22 {handshake.bb = 3 : ui32, handshake.name = "rhs_out_buf_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
-    %25 = cmpi eq, %23, %24 {handshake.bb = 3 : ui32, handshake.name = "out_eq_B_out"} : <i1>
-    end {handshake.bb = 3 : ui32, handshake.name = "end"} %25 : <i1>
+    %21 = ndsource {handshake.bb = 3 : ui32, handshake.name = "out_nds_B_out"} : <i1>
+    %22:2 = lazy_fork [2] %21 {handshake.bb = 3 : ui32, handshake.name = "out_lf_B_out"} : <i1>
+    %23 = buffer %22#0 {handshake.bb = 3 : ui32, handshake.name = "out_buf_lhs_nds_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %24 = buffer %22#1 {handshake.bb = 3 : ui32, handshake.name = "out_buf_rhs_nds_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %25 = transfer_control %18[%23] {handshake.bb = 3 : ui32, handshake.name = "out_lhs_tc_B_out"} : <i1>, <i1>
+    %26 = transfer_control %20[%24] {handshake.bb = 3 : ui32, handshake.name = "out_rhs_tc_B_out"} : <i1>, <i1>
+    %27 = ndwire %25 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_ndw_B_out"} : <i1>
+    %28 = ndwire %26 {handshake.bb = 3 : ui32, handshake.name = "rhs_out_ndw_B_out"} : <i1>
+    %29 = buffer %27 {handshake.bb = 3 : ui32, handshake.name = "lhs_out_buf_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %30 = buffer %28 {handshake.bb = 3 : ui32, handshake.name = "rhs_out_buf_B_out", hw.parameters = {BUFFER_TYPE = "FIFO_BREAK_DV", NUM_SLOTS = 1 : ui32, TIMING = #handshake<timing {D: 1, V: 1, R: 0}>}} : <i1>
+    %31 = cmpi eq, %29, %30 {handshake.bb = 3 : ui32, handshake.name = "out_eq_B_out"} : <i1>
+    end {handshake.bb = 3 : ui32, handshake.name = "end"} %31 : <i1>
   }
 }

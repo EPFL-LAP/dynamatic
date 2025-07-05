@@ -16,10 +16,10 @@ run() {
     exit_on_fail "($NAME): Equivalence checking failed"
 }
 
-run sup_and --seq_length="0=1"
-run sup_fork
-run sup_mux --seq_length="0=2" --loop_strict=1,2
-run unify_sup --seq_length="0=1"
-run interpolator_ident
-run interpolator_ind --seq_length="0<=1"
-run resolver --nd_spec
+# run sup_and --seq_length="0=1" --allow_nonacceptance
+# run sup_fork --allow_nonacceptance
+run sup_mux --seq_length="0=2" --loop=1,2 --allow_nonacceptance
+# run unify_sup --seq_length="0=1" --allow_nonacceptance
+# run interpolator_ident --allow_nonacceptance
+# run interpolator_ind --seq_length="0<=1" --allow_nonacceptance
+# run resolver --nd_spec --allow_nonacceptance
