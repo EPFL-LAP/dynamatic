@@ -99,7 +99,11 @@ The scripts uses several key functions and data structures to orchestrate charac
 
 ### Synthesis Script Generation
 
-- **write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, VhdlInterfaceInfo)**: (File `run_synthesis.py`)
+- **UnitCharacterization**: (File `utils.py`)
+
+    A class that contains information related to parameters used for a characerization and the corresponding timing reports.
+
+- **write_tcl(top_file, top_entity_name, hdl_files, tcl_file, sdc_file, rpt_timing, VhdlInterfaceInfo)**: (File `utils.py`)
 
     Generates a TCL script for the synthesis tool (e.g., Vivado), including:
     - Reading HDL and constraint files.
@@ -129,10 +133,10 @@ The scripts uses several key functions and data structures to orchestrate charac
 
 ### Report Parsing
 
-- **extract_rpt_data(map_unit2rpts, json_output)**: (File `report_parser.py`)
+- **extract_rpt_data(map_unit_to_list_unit_chars, json_output)**: (File `report_parser.py`)
 
     Extract data from the different reports and it saves it into the `json_output` file. 
-    The data `map_unit2rpts` contains a mapping between unit and a list of reports and the corresponding swept parameters. 
+    The data `map_unit_to_list_unit_chars` contains a mapping between unit and a list of UnitCharacterization objects.
     Please look at the end of this doc to find an example of the structure of the expected report.
 
 ### High-Level Flow
@@ -152,8 +156,7 @@ For now the code has some specific information related to Vivado tool. However, 
 - `_synth_worker` -> This function runs the synthesis tool. It assumes the tool can be called as follows: `SYNTHESIS_TOOL -mode batch -source TCL_SCRIPT`. 
 - `write_tcl` -> This function writes the tcl script with tcl commands specific of Vivado. 
 - `write_sdc_constraints` -> This function writes the sdc file and it is tailored for Vivado. It might also require some changes.
-- `PATTERN_CONNECTION_INFO` and `PATTERN_DELAY_INFO` -> These are constants used to identify the lines where the report specifies the input/output ports and the delay value. This is tailored for Vivado.
-- `extract_connection_type` -> This function extracts the input and output ports names from the report. This is tailored for Vivado.
+- `PATTERN_DELAY_INFO` -> This is a constant string used to identify the line where the report specifies the delay value. This is tailored for Vivado.
 - `extract_delay` -> This function extracts the total delay of a path from the reports. This is tailored for Vivado.
 
 These files might require some changes if the synthesis tool has different features from Vivado.
@@ -179,11 +182,8 @@ The script will automatically:
 
 ## Example: Expected Report Structure
 
-The synthesis report is expected to contain these lines:
-1. `Command      : report_timing -from [get_ports INPUT_PORT] -to [get_ports OUTPUT_PORT]`
-2. `Data Path Delay:        DELAY_VALUEns`
+The synthesis report is expected to contain this line `Data Path Delay:        DELAY_VALUEns` which is used to extract its delay.
 
-The first one is used to extract input and output ports of the path and the second one to extract its delay.
 Please refer to `Using a New Synthesis Tool` section if the lines containing ports and delays information are different in your report.
 
 ## Notes
