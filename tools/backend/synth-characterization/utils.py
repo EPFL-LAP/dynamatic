@@ -279,7 +279,6 @@ class UnitCharacterization:
         self.hdl_files = hdl_files
         self.unique_id = unique_id
         self.vhdl_interface_info = vhdl_interface_info
-        self.map_signals_type_to_delay = {}
         self.map_signals_type_to_delay_rpt = {}
         self.tcl_file = None
 
