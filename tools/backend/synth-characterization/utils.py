@@ -252,7 +252,6 @@ class UnitCharacterization:
     top_entity_name: str # Name of the top entity for this unit
     params: dict # Dictionary of parameters used for characterization
     hdl_files: List[str] # List to hold HDL files generated or copied for this unit
-    map_signals_type_to_delay: dict # Dictionary to hold signal delays
     map_signals_type_to_delay_rpt: dict # Dictionary to hold delay reports for each signal
     vhdl_interface_info: VhdlInterfaceInfo # VHDL interface information containing generics and ports
     unique_id: int # Unique identifier for the characterization instance
