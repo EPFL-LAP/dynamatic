@@ -149,7 +149,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         vhdl_code = f.read()
     top_entity_name, vhdl_interface_info = extract_generics_ports(vhdl_code, unit_name)
     # Extract the template for the top file
-    template_top, top_entity_name = generate_wrapper_top(top_entity_name, vhdl_interface_info, param_names)
+    wrapper_top, top_entity_name = generate_wrapper_top(top_entity_name, vhdl_interface_info, param_names)
     # Create sdc constraints file
     sdc_file = f"{tcl_dir}/period.sdc"
     write_sdc_constraints(sdc_file, clock_period)  # Set a default period of 4 ns
@@ -159,12 +159,12 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     id = 0
     for combination in param_combinations:
         top_file = f"{hdl_out_dir}/{top_entity_name}_top_{id}.vhd" 
-        template_top_combined = template_top
+        wrapper_top_combined = wrapper_top
         for param_name, param_value in zip(param_names, combination):
             # Replace the constant value in the template
-            template_top_combined = template_top_combined.replace(f"{param_name}_const_value", str(param_value))
+            wrapper_top_combined = wrapper_top_combined.replace(f"{param_name}_const_value", str(param_value))
         with open(top_file, 'w') as f:
-            f.write(template_top_combined)
+            f.write(wrapper_top_combined)
         # Write the tcl file for synthesis
         tcl_file = f"{tcl_dir}/synth_{top_entity_name}_top_{id}.tcl"
         list_tcls.append(tcl_file)
