@@ -63,7 +63,12 @@ def get_dependency_dict(dataflow_units):
                 dependencies = []
             dependency_dict[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
         else:
-            continue
+            rtl_file = unit_info.get("generic")
+            if not rtl_file:
+                rtl_file = unit_info.get("generator")
+            dependencies = unit_info.get("dependencies", [])
+            unit_name = unit_info["name"]
+            dependency_dict[unit_name] = {"RTL": rtl_file, "dependencies": dependencies}
     return dependency_dict
 
 
