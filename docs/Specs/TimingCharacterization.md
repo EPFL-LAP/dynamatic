@@ -127,6 +127,13 @@ The scripts uses several key functions and data structures to orchestrate charac
 
     Worker function for executing a single synthesis job.
 
+### Report Parsing
+
+- **extract_rpt_data(map_unit2rpts, json_output)**: (File `report_parser.py`)
+
+    Extract data from the different reports and it saves it into the `json_output` file. 
+    The data `map_unit2rpts` contains a mapping between unit and a list of reports and the corresponding swept parameters. 
+    Please look at the end of this doc to find an example of the structure of the expected report.
 
 ### High-Level Flow
 
@@ -139,6 +146,17 @@ The scripts uses several key functions and data structures to orchestrate charac
     - Runs synthesis and collects reports.
     - Returns a mapping from report filenames to parameter values.
 
+## Using a New Synthesis Tool
+
+For now the code has some specific information related to Vivado tool. However, adding support for a new backend should not take too long. Here it is a list of places to change to use a different backend:
+- `_synth_worker` -> This function runs the synthesis tool. It assumes the tool can be called as follows: `SYNTHESIS_TOOL -mode batch -source TCL_SCRIPT`. 
+- `write_tcl` -> This function writes the tcl script with tcl commands specific of Vivado. 
+- `write_sdc_constraints` -> This function writes the sdc file and it is tailored for Vivado. It might also require some changes.
+- `PATTERN_CONNECTION_INFO` and `PATTERN_DELAY_INFO` -> These are constants used to identify the lines where the report specifies the input/output ports and the delay value. This is tailored for Vivado.
+- `extract_connection_type` -> This function extracts the input and output ports names from the report. This is tailored for Vivado.
+- `extract_delay` -> This function extracts the total delay of a path from the reports. This is tailored for Vivado.
+
+These files might require some changes if the synthesis tool has different features from Vivado.
 
 ## Example: Parameter Sweep and Synthesis
 
@@ -158,6 +176,15 @@ The script will automatically:
 - Run synthesis for each configuration in parallel.
 - Collect and store timing/resource reports for later analysis.
 
+
+## Example: Expected Report Structure
+
+The synthesis report is expected to contain these lines:
+1. `Command      : report_timing -from [get_ports INPUT_PORT] -to [get_ports OUTPUT_PORT]`
+2. `Data Path Delay:        DELAY_VALUEns`
+
+The first one is used to extract input and output ports of the path and the second one to extract its delay.
+Please refer to `Using a New Synthesis Tool` section if the lines containing ports and delays information are different in your report.
 
 ## Notes
 
