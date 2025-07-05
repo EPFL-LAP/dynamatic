@@ -59,7 +59,7 @@ def get_dependency_list(dataflow_units):
     return dependency_list
 
 
-def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
+def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period):
     """
     Run characterization of dataflow units based on the provided JSON input.
     
@@ -126,7 +126,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool):
         print(f"Processing unit: {unit_name}")
         top_def_file = get_hdl_files(unit_name, generic, generator, dependencies, hdl_dir, dynamatic_dir, dependency_list)
         # After generating the HDL files, we can proceed with characterization
-        map_rpt2params = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir)
+        map_rpt2params = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period)
         # Store the results in the map_unit2rpts dictionary
         map_unit2rpts[unit_name] = map_rpt2params
     
@@ -159,11 +159,18 @@ if __name__ == "__main__":
         default="vivado",
         help="Synthesis tool to use for characterization (default: vivado)",
     )
+    parser.add_argument(
+        "--clock-period",
+        type=float,
+        default=4.0,
+        help="Clock period in nanoseconds (default: 4.0 ns)",
+    )
     args = parser.parse_args()
     json_input = args.json_input
     json_output = args.json_output
     dynamatic_dir = args.dynamatic_dir
     synth_tool = args.synth_tool
+    clock_period = args.clock_period
     if not json_input:
         json_input = f"{dynamatic_dir}/data/rtl-config-vhdl-vivado.json"
-    run_characterization(json_input, json_output, dynamatic_dir, synth_tool)
+    run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period)

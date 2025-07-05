@@ -117,7 +117,7 @@ generic map (
 
     return template_top, entity_name
 
-def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir):
+def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period):
     """
     Run characterization for a single unit using the specified synthesis tool.
     
@@ -152,7 +152,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     template_top, top_entity_name = extract_template_top(top_entity_name, vhdl_interface_info, param_names)
     # Create sdc constraints file
     sdc_file = f"{tcl_dir}/period.sdc"
-    write_sdc_constraints(sdc_file, 4.0)  # Set a default period of 4 ns
+    write_sdc_constraints(sdc_file, clock_period)  # Set a default period of 4 ns
     # Create a top file for each combination of parameters and the corresponding tcl file
     list_tcls = []
     map_rpt2params = {}
