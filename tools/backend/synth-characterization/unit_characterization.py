@@ -60,17 +60,17 @@ def extract_generics_ports(vhdl_code, entity_name):
     return entity_name, VhdlInterfaceInfo(generics, ports)
 
 
-def extract_template_top(entity_name, vhdl_interface_info, param_names):
+def generate_wrapper_top(entity_name, vhdl_interface_info, param_names):
     """
-    Extract the template for the top file from the given top definition file.
+    Generate the wrapper for the top file from the given top definition file.
     
     Args:
         entity_name (str): Name of the top entity.
         vhdl_interface_info (VhdlInterfaceInfo): VHDL interface information containing generics and ports.
-        param_names (List[str]): List of parameter names to be used in the template.
+        param_names (List[str]): List of parameter names to be used in the wrapper.
         
     Returns:
-        str: The template for the top file.
+        str: The wrapper for the top file.
     """
     generics = vhdl_interface_info.get_list_generics()
     ports = vhdl_interface_info.get_list_ports()
@@ -85,8 +85,8 @@ def extract_template_top(entity_name, vhdl_interface_info, param_names):
         for param in param_names:
             port = port.replace(f"{param}", f"{param}_const_value")
         tb_ports.append(port)
-    # Create the template for the top file
-    template_top = f"""library ieee;
+    # Create the wrapper for the top file
+    wrapper_top = f"""library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
@@ -104,18 +104,18 @@ generic map (
 
     for param in param_names:
         if param != "PREDICATE":
-            template_top += f"{param} => {param}_const_value,\n"
-    template_top = template_top.rstrip(",\n") + "\n" \
+            wrapper_top += f"{param} => {param}_const_value,\n"
+    wrapper_top = wrapper_top.rstrip(",\n") + "\n" \
                      ")\n" \
                         "port map (\n"
     for port in ports:
         port_name = port.split(":")[0].strip()  # Get the port name before the colon
-        template_top += f"{port_name} => {port_name},\n"
-    template_top = template_top.rstrip(",\n") + "\n" \
+        wrapper_top += f"{port_name} => {port_name},\n"
+    wrapper_top = wrapper_top.rstrip(",\n") + "\n" \
                      ");\n" \
                         "end architecture;\n"
 
-    return template_top, entity_name
+    return wrapper_top, entity_name
 
 def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period):
     """
@@ -149,7 +149,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         vhdl_code = f.read()
     top_entity_name, vhdl_interface_info = extract_generics_ports(vhdl_code, unit_name)
     # Extract the template for the top file
-    template_top, top_entity_name = extract_template_top(top_entity_name, vhdl_interface_info, param_names)
+    template_top, top_entity_name = generate_wrapper_top(top_entity_name, vhdl_interface_info, param_names)
     # Create sdc constraints file
     sdc_file = f"{tcl_dir}/period.sdc"
     write_sdc_constraints(sdc_file, clock_period)  # Set a default period of 4 ns

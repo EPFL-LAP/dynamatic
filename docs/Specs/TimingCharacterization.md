@@ -90,9 +90,9 @@ The scripts uses several key functions and data structures to orchestrate charac
 
 ### Testbench Generation
 
-- **extract_template_top(entity_name, VhdlInterfaceInfo, param_names)**: (File `unit_characterization.py`)
+- **generate_wrapper_top(entity_name, VhdlInterfaceInfo, param_names)**: (File `unit_characterization.py`)
 
-    Produces a VHDL testbench template for the entity, with generics mapped to parameter placeholders.
+    Produces a VHDL testbench wrapper for the entity, with generics mapped to parameter placeholders.
     - Ensures all generics are parameterized.
     - Handles port mapping for instantiation.
 
