@@ -113,6 +113,7 @@ def MyOp : Op<"my_op", []> {
   ];
 }
 ```
+(If you are unfamiliar with tablegen builders, more info can be found [here](https://mlir.llvm.org/docs/DefiningDialects/Operations/#custom-builder-methods).)
 
 otherwise it can be explicitly set using:
 ```tablegen
