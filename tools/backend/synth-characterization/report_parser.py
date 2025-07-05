@@ -3,7 +3,52 @@ import os
 import re
 import json
 
-def extract_data_from_report(rpt_file):
+# Constants for parsing the report that specify which line 
+# contains the connection information and which line contains the delay information.
+# These patters are specific to the Vivado synthesis report format.
+# If a different synthesis tool is used, new patterns may need to be defined.
+PATTERN_CONNECTION_INFO = "Command      :"
+PATTERN_DELAY_INFO = "Data Path Delay:"
+
+# This function extracts the connection type and delay from a line in the report file.
+# It uses regular expressions to find the relevant information.
+# It is specific to the Vivado synthesis report format.
+# If a different synthesis tool is used, this function may need to be modified.
+def extract_connection_type(line):
+    """
+    Extract the connection type from a line in the report.
+    
+    Args:
+        line (str): A line from the report file.
+        
+    Returns:
+        tuple: A tuple containing the from_port and to_port.
+    """
+    match = re.search(r'report_timing\s+-from\s+\[get_ports\s+{?([\w\[\]]+)}?\]\s+-to\s+\[get_ports\s+{?([\w\[\]]+)}?\]', line)
+    assert match, f"Could not find connection type in line: {line}"
+    from_port = match.group(1)
+    to_port = match.group(2)
+    return from_port, to_port
+
+# This function extracts the delay from a line in the report file.
+# It uses a regular expression to find the delay value in nanoseconds.
+# It is specific to the Vivado synthesis report format.
+# If a different synthesis tool is used, this function may need to be modified.
+def extract_delay(line):
+    """
+    Extract the delay from a line in the report.
+    
+    Args:
+        line (str): A line from the report file.
+        
+    Returns:
+        float: The extracted delay in nanoseconds.
+    """
+    match = re.search(r'Data Path Delay:\s+([\d.]+)ns', line)
+    assert match, f"Could not find data path delay in line: {line}"
+    return float(match.group(1))
+
+def extract_single_rpt(rpt_file):
     """
     Extract data from the report file.
     
@@ -27,16 +72,11 @@ def extract_data_from_report(rpt_file):
     with open(rpt_file, 'r') as f:
         for line in f:
             # Extract connection type
-            if "Command      :" in line:
-                match = re.search(r'report_timing\s+-from\s+\[get_ports\s+{?([\w\[\]]+)}?\]\s+-to\s+\[get_ports\s+{?([\w\[\]]+)}?\]', line)
-                assert match, f"Could not find connection type in line: {line}"
-                from_port = match.group(1)
-                to_port = match.group(2)
+            if PATTERN_CONNECTION_INFO in line:
+                from_port, to_port = extract_connection_type(line)
             # Extract delay of the data path
-            if "Data Path Delay:" in line:
-                match = re.search(r'Data Path Delay:\s+([\d.]+)ns', line)
-                assert match, f"Could not find data path delay in line: {line}"
-                delay = float(match.group(1))
+            if PATTERN_DELAY_INFO in line:
+                delay = extract_delay(line)
                 connection_found = False
                 # Determine the connection type based on the ports names
                 validSignalFrom = "_valid" in from_port
@@ -91,7 +131,7 @@ def extract_data_from_report(rpt_file):
 
     return dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay
 
-def extract_data(map_unit2rpts, json_output):
+def extract_rpt_data(map_unit2rpts, json_output):
     """
     Extract the data from the map_unit2rpts dictionary and save it to a JSON file.
     IMPORTANT: For now we assume that only DATA_TYPE is the only parameter that can be used to characterize the unit.
@@ -120,7 +160,7 @@ def extract_data(map_unit2rpts, json_output):
                 continue
             traversedOnce = True
             # Extract data2data, valid2valid, ready2ready, VR, CV, CR, VC and VD
-            dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay = extract_data_from_report(rpt_file)
+            dataDelay, validDelay, readyDelay, VRDelay, CVDelay, CRDelay, VCDelay, VDDelay = extract_single_rpt(rpt_file)
             dataDict[str(params["DATA_TYPE"])] = dataDelay
             validDict["1"] = max(validDict["1"], validDelay)
             readyDict["1"] = max(readyDict["1"], readyDelay)

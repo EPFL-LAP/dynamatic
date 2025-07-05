@@ -2,7 +2,7 @@
 import argparse
 import json
 import os
-from report_parser import extract_data
+from report_parser import extract_rpt_data
 from hdl_manager import get_hdl_files
 from utils import VhdlInterfaceInfo, parameters_ranges, skipping_units
 from unit_characterization import run_unit_characterization
@@ -131,7 +131,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         map_unit2rpts[unit_name] = map_rpt2params
     
     # Save the results to the output JSON file
-    extract_data(map_unit2rpts, json_output)
+    extract_rpt_data(map_unit2rpts, json_output)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run characterization of dataflow units")
