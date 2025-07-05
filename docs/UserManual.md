@@ -103,6 +103,11 @@ The strategy for managing memory accesses is based on the concept of groups. A g
 
 The specifics of LSQ implementation are available in [the corresponding documentation folder.](./LSQ/) For more information on the concept itself, [see the original paper.](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2022/06/JosipovicTECS17_AnOutOfOrderLoadStoreQueueForSpatialComputing.pdf)
 
+Currently there is no user-friendly way to modify LSQ-related settings from the Dynamatic interactive shell, but one needs to modify the compilation script used by the shell, which is `tools/dynamatic/scripts/compile.sh`.
+- To force LSQ usage, in the script, find the command under `# cf transformations (dynamatic)` and there, add the following command line option: `--force-lsq`.
+- Similarly, to disable LSQs and use memory controllers instead, add `--force-mc` to the same command.
+- To run the LSQ sizing pass, find `# handshake transformations` and to the command below add the command line option `--handshake-size-lsqs`.
+
 ## Custom Compilation Flows
 
 Sometimes, for advanced usage, features provided by the `dynamatic` shell are not enough. In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.
