@@ -234,6 +234,8 @@ def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
                    StringAttr::get(op->getContext(), value));
     }]>,
     
+    // Return StringAttr instead of StringRef to ensure proper memory allocation.
+    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
     InterfaceMethod<[{
       Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
     }], "StringAttr", "getInternalDelay", (ins), [{
