@@ -543,7 +543,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
       })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::BufferOp,
-            handshake::NDWireOp>([&](auto) {
+            handshake::NDWireOp, handshake::TransferControlOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
@@ -704,6 +704,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // No parameters needed for these operations
           })
       .Case<handshake::SpecV2NDSpeculatorOp>([&](auto) {
+        // No parameters needed for these operations
+      })
+      .Case<handshake::NDSourceOp>([&](auto) {
         // No parameters needed for these operations
       })
       .Default([&](auto) {
@@ -1809,6 +1812,8 @@ public:
                                                       lowerState);
     patterns.insert<ConvertInstance, ConvertToHWInstance<handshake::BufferOp>,
                     ConvertToHWInstance<handshake::NDWireOp>,
+                    ConvertToHWInstance<handshake::NDSourceOp>,
+                    ConvertToHWInstance<handshake::TransferControlOp>,
                     ConvertToHWInstance<handshake::ConditionalBranchOp>,
                     ConvertToHWInstance<handshake::BranchOp>,
                     ConvertToHWInstance<handshake::MergeOp>,

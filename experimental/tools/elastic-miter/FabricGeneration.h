@@ -78,7 +78,8 @@ LogicalResult createMlirFile(const std::filesystem::path &mlirPath,
 // contain exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   size_t bufferSlots, bool ndSpec = false);
+                   size_t bufferSlots, bool ndSpec = false,
+                   bool allowNonacceptance = false);
 
 // Creates a reachability circuit. Essentially ND wires are put at all in- and
 // outputs of the circuit. Additionally creates a json config file with the name
@@ -94,7 +95,7 @@ FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpec = false);
+                  bool ndSpec = false, bool allowNonacceptance = false);
 
 } // namespace dynamatic::experimental
 

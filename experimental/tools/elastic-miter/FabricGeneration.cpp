@@ -312,7 +312,7 @@ createReachabilityCircuit(MLIRContext &context,
 // exactely one handshake.func.
 FailureOr<std::pair<ModuleOp, struct ElasticMiterConfig>>
 createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
-                   size_t bufferSlots, bool ndSpec) {
+                   size_t bufferSlots, bool ndSpec, bool allowNonacceptance) {
 
   // Get the LHS FuncOp from the LHS module, also check some required properties
   auto funcOrFailure = getModuleFuncOpAndCheck(lhsModule);
@@ -496,11 +496,48 @@ createElasticMiter(MLIRContext &context, ModuleOp lhsModule, ModuleOp rhsModule,
     Value lhsResult = lhsEndOp.getOperand(i);
     Value rhsResult = rhsEndOp.getOperand(i);
 
+    std::string outName = lhsFuncOp.getResName(i).str();
     std::string lhsBufName = "lhs_out_buf_" + lhsFuncOp.getResName(i).str();
     std::string rhsBufName = "rhs_out_buf_" + lhsFuncOp.getResName(i).str();
     std::string lhsNDwName = "lhs_out_ndw_" + lhsFuncOp.getResName(i).str();
     std::string rhsNDwName = "rhs_out_ndw_" + lhsFuncOp.getResName(i).str();
     std::string eqName = "out_eq_" + lhsFuncOp.getResName(i).str();
+
+    if (allowNonacceptance) {
+      NDSourceOp ndSourceOp =
+          builder.create<NDSourceOp>(nextLocation->getLoc());
+      setHandshakeAttributes(builder, ndSourceOp, BB_OUT, "out_nds_" + outName);
+      LazyForkOp lazyForkOp = builder.create<LazyForkOp>(
+          nextLocation->getLoc(), ndSourceOp.getResult(), 2);
+      setHandshakeAttributes(builder, lazyForkOp, BB_OUT, "out_lf_" + outName);
+
+      BufferOp lhsNDSBufferOp = builder.create<BufferOp>(
+          nextLocation->getLoc(), lazyForkOp.getResults()[0],
+          TimingInfo::break_dv(), bufferSlots,
+          dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, lhsNDSBufferOp, BB_OUT,
+                             "out_buf_lhs_nds_" + outName);
+      BufferOp rhsNDSBufferOp = builder.create<BufferOp>(
+          nextLocation->getLoc(), lazyForkOp.getResults()[1],
+          TimingInfo::break_dv(), bufferSlots,
+          dynamatic::handshake::BufferOp::FIFO_BREAK_DV);
+      setHandshakeAttributes(builder, rhsNDSBufferOp, BB_OUT,
+                             "out_buf_rhs_nds_" + outName);
+
+      TransferControlOp lhsTransferControlOp =
+          builder.create<TransferControlOp>(nextLocation->getLoc(), lhsResult,
+                                            lhsNDSBufferOp.getResult());
+      setHandshakeAttributes(builder, lhsTransferControlOp, BB_OUT,
+                             "out_lhs_tc_" + outName);
+      TransferControlOp rhsTransferControlOp =
+          builder.create<TransferControlOp>(nextLocation->getLoc(), rhsResult,
+                                            rhsNDSBufferOp.getResult());
+      setHandshakeAttributes(builder, rhsTransferControlOp, BB_OUT,
+                             "out_rhs_tc_" + outName);
+
+      lhsResult = lhsTransferControlOp.getResult();
+      rhsResult = rhsTransferControlOp.getResult();
+    }
 
     NDWireOp lhsEndNDWireOp;
     NDWireOp rhsEndNDWireOp;
@@ -582,7 +619,7 @@ FailureOr<std::pair<std::filesystem::path, struct ElasticMiterConfig>>
 createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
                   const std::filesystem::path &rhsPath,
                   const std::filesystem::path &outputDir, size_t nrOfTokens,
-                  bool ndSpec) {
+                  bool ndSpec, bool allowNonacceptance) {
 
   OwningOpRef<ModuleOp> lhsModuleRef =
       parseSourceFile<ModuleOp>(lhsPath.string(), &context);
@@ -600,8 +637,8 @@ createMiterFabric(MLIRContext &context, const std::filesystem::path &lhsPath,
   }
   ModuleOp rhsModule = rhsModuleRef.get();
 
-  auto ret =
-      createElasticMiter(context, lhsModule, rhsModule, nrOfTokens, ndSpec);
+  auto ret = createElasticMiter(context, lhsModule, rhsModule, nrOfTokens,
+                                ndSpec, allowNonacceptance);
   if (failed(ret)) {
     llvm::errs() << "Failed to create elastic-miter fabric.\n";
     return failure();

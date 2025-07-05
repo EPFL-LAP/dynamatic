@@ -113,6 +113,11 @@ static cl::opt<bool>
     ndSpec("nd_spec", cl::desc("Use non-deterministic speculator context"),
            cl::init(false), cl::cat(constraintsCategory));
 
+static cl::opt<bool>
+    allowNonacceptance("allow_nonacceptance",
+                       cl::desc("Outputs might not be accepted"),
+                       cl::init(false), cl::cat(constraintsCategory));
+
 static FailureOr<SmallVector<dynamatic::experimental::ElasticMiterConstraint *>>
 parseSequenceConstraints() {
 
@@ -186,7 +191,8 @@ static FailureOr<bool> checkEquivalence(
   // Create an elastic-miter circuit with a needed nrOfTokens to emulate an
   // infinite number of tokens
   auto failOrPair = dynamatic::experimental::createMiterFabric(
-      context, lhsPath, rhsPath, miterDir.string(), nrOfTokens, ndSpec);
+      context, lhsPath, rhsPath, miterDir.string(), nrOfTokens, ndSpec,
+      allowNonacceptance);
   if (failed(failOrPair)) {
     llvm::errs() << "Failed to create elastic-miter module.\n";
     return failure();

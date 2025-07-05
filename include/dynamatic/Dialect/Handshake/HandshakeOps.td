@@ -374,6 +374,72 @@ def NDWireOp : Handshake_Op<"ndwire", [
   }];
 }
 
+def NDSourceOp : Handshake_Op<"ndsource", [
+  HasClock,
+  IsIntSizedChannel<1, "result">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+
+  let results = (outs ChannelType:$result);
+
+  let builders = [OpBuilder<
+    (ins), [{
+      auto dataType = $_builder.getIntegerType(1);
+      auto i1Type = ::dynamatic::handshake::ChannelType::get(dataType);
+      $_state.addTypes({i1Type});
+  }]>];
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(false);
+      return "";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "result";
+    }
+  }];
+}
+
+def TransferControlOp : Handshake_Op<"transfer_control", [
+  HasClock, AllTypesMatch<["ins", "outs"]>,
+  IsIntSizedChannel<1, "ctrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "non-deterministic wire operation";
+  let description = [{
+    Represents a wire that non-determinastically stalls the propagation of a signal.
+  }];
+
+  let arguments = (ins HandshakeType:$ins, ChannelType:$ctrl);
+  let results = (outs HandshakeType:$outs);
+
+  let assemblyFormat = [{
+    $ins `[` $ctrl `]` attr-dict `:` custom<HandshakeType>(type($ins)) `,` type($ctrl)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return (idx == 0) ? "ins" : "ctrl";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+  }];
+}
+
 def SpecV2NDSpeculatorOp : Handshake_Op<"spec_v2_nd_speculator", [
   HasClock, SameOperandsAndResultType,
   IsIntSizedChannel<1, "operand">,
