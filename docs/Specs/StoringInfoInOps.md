@@ -122,7 +122,7 @@ which will maintain backwards compatibility with any builders that do not provid
 
 A general principle is to **avoid modifying core passes and builders**—especially when those changes would impact widely used or shared code—unless they represent fundamental structural or philosophical improvements. Instead, it's preferable to add custom solutions tailored to specific needs or passes, keeping the core infrastructure stable and broadly applicable.
 
-## 
+## Attribute Constraint Wrappers
 
 MLIR offers two attribute constraints that stack on top of normal ones: [OptionalAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#optional-attributes) and [DefaultValuedAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#attributes-with-default-values). These wrappers modify how attributes behave during parsing, printing, and code generation.
 
@@ -277,7 +277,7 @@ There are also no named getters generated, and therefore these attributes must b
 
 https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
 
-# 
+# Interface Attribute Approach
 
 Instead of defining attributes statically in the Operation TableGen, MLIR allows attributes to be added dynamically at runtime using C++ API functions:
 - [setAttr](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#ae5f0d4c61e6e57f360188b1b7ff982f6): assigns a value to an attribute.
@@ -300,7 +300,7 @@ To address this, we recommend using [interfaces](https://mlir.llvm.org/docs/Inte
 
 Hence, interfaces offer a more maintainable and scalable solution when attribute behavior becomes more complex or widely reused.
 
-## How to Define Interface Attribute
+## How to Define Interface Attributes
 
 The following TableGen snippet defines a simple interface for setting and getting a `StringAttr` named `myAttr`:
 ```tablegen
