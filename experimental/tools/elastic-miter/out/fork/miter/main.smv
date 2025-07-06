@@ -37,3 +37,4 @@ INVARSPEC (elastic_miter_fork_lhs_fork_rhs.EQ_B_out_valid -> elastic_miter_fork_
 INVARSPEC (elastic_miter_fork_lhs_fork_rhs.EQ_C_out_valid -> elastic_miter_fork_lhs_fork_rhs.EQ_C_out);
 CTLSPEC AF (AG ((elastic_miter_fork_lhs_fork_rhs.lhs_in_buf_A_in.outs_valid = elastic_miter_fork_lhs_fork_rhs.rhs_in_buf_A_in.outs_valid) & (!elastic_miter_fork_lhs_fork_rhs.lhs_out_buf_B_out.outs_valid) & (!elastic_miter_fork_lhs_fork_rhs.rhs_out_buf_B_out.outs_valid) & (!elastic_miter_fork_lhs_fork_rhs.lhs_out_buf_C_out.outs_valid) & (!elastic_miter_fork_lhs_fork_rhs.rhs_out_buf_C_out.outs_valid)));
 
+INVAR  seq_generator_A_in.exact_tokens = elastic_miter_fork_lhs_fork_rhs.out_nds_B_out.exact_tokens & seq_generator_A_in.exact_tokens = elastic_miter_fork_lhs_fork_rhs.out_nds_C_out.exact_tokens ;

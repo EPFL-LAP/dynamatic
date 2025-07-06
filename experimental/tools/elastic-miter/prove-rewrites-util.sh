@@ -16,4 +16,4 @@ run() {
     exit_on_fail "($NAME): Equivalence checking failed"
 }
 
-run fork --allow_nonacceptance
+run fork --allow_nonacceptance --seq_length_with_output="{in:0}={out:0}&{in:0}={out:1}"

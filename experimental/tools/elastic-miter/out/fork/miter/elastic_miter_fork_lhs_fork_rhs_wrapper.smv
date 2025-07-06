@@ -1,10 +1,12 @@
-#include "handshake_ndwire_0.smv"
-#include "handshake_transfer_control_0.smv"
-#include "handshake_cmpi_0.smv"
-#include "handshake_fork_0.smv"
-#include "handshake_buffer_0.smv"
 #include "handshake_lazy_fork_0.smv"
 #include "handshake_ndsource_0.smv"
+#include "handshake_buffer_1.smv"
+#include "handshake_blocker_0.smv"
+#include "handshake_lazy_fork_1.smv"
+#include "handshake_ndwire_0.smv"
+#include "handshake_fork_0.smv"
+#include "handshake_buffer_0.smv"
+#include "handshake_cmpi_0.smv"
 
 
 MODULE elastic_miter_fork_lhs_fork_rhs_wrapper (A_in, A_in_valid, EQ_B_out_ready, EQ_C_out_ready)
