@@ -3,13 +3,18 @@
 
 It is often useful to store additional information on an operation. One example is if we wish to parameterize the generation of their RTL. This requires storing the parameter value on the operation itself, as well as passing it to the relevant parts of the code-base to ensure correct generation.
 
+Additional information about an operation should be stored as an operation-specific attribute. There are two main ways to define an attribute:
+- In TableGen: declared as part of the operation's definition (at compile-time)
+- In interface: set dynamically in a pass or transformation by an interface (at runtime)
+  
+The rest of this document explores both approaches in detail, highlighting their respective advantages and trade-offs. Below is an outline of the document structure:
 
-- [Storing Information as an Attribute](#storing-information-as-an-attribute)
+- [TableGen Approach](#tablegen-approach)
   - [How to Store the Information](#how-to-store-the-information)
   - [Why Do We Store it Like This?](#why-do-we-store-it-like-this)
   - [What Types of Information to Store](#what-types-of-information-to-store)
   - [Maintaining Backwards Compatibility](#maintaining-backwards-compatibility)
-  - [Optional and Default Valued Attributes](#optional-and-default-valued-attributes)
+  - [Attributes Constraint Typs](#optional-and-default-valued-attributes)
     - [OptionalAttr](#optionalattr)
     - [DefaultValuedAttr](#defaultvaluedattr)
   - [Good Examples](#good-examples)
@@ -18,7 +23,7 @@ It is often useful to store additional information on an operation. One example 
   - [Example to Avoid](#example-to-avoid)
     - [BufferOp](#bufferop)
 
-- [Non-Operation Specific Information](#non-operation-specific-information)
+- [Interface Approach](#interface-approach)
   - [How to Define Interface Attributes](#how-to-define-interface-attributes)
   - [Good Example](#good-example)
     - [InternalDelay for Arithmetic Ops](#internaldelay-for-arithmetic-ops)
@@ -26,12 +31,12 @@ It is often useful to store additional information on an operation. One example 
 - [How to Calculate Dependant Information On Demand](#how-to-calculate-dependant-information-on-demand)
 
 
-# Storing Information as an Attribute
+# TableGen Approach
 
 ## How to Store the Information
 
-Additional information about an operation should be stored as an operation-specific attribute. The [operation definition specification](https://mlir.llvm.org/docs/DefiningDialects/Operations/) (ODS) covers how MLIR uses tablegen files to declaratively define operations, including attributes. 
-The [specific section](https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments) of the ODS relevant to attributes is on operation arguments. Specifically, attributes are operation arguments which are "compile-time known constant values".
+The [operation definition specification](https://mlir.llvm.org/docs/DefiningDialects/Operations/) (ODS) covers how MLIR uses tablegen files to declaratively define operations, including attributes. 
+The [specific section](https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments) of the ODS relevant to attributes is on operation arguments. 
 
 Arguments are specified in an operation's tablegen entry like so:
 
@@ -39,32 +44,40 @@ Arguments are specified in an operation's tablegen entry like so:
 let arguments = (ins
   <type-constraint>:$<operand-name>,
   ...
-  <attr-constraint>:$<attr-name>,
-  ...
-  <property>:$<property-name>,
+  <attr-constraint>:$<attr-name>
 );
 ```
+Operands and attributes are both listed in the `ins` section. The constraint type determines which is which:
+- Type constraints define operands (runtime values).
+- Attribute constraints define attributes (compile-time constants).
 
-This is not order-specific: all types of arguments can be specified in any order, and attributes are identified by the fact they are preceded by an attribute constraint.
+For example, in the integer comparator from Dynamatic:
 
-## Why Do We Store it Like This?
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L225-L226
+
+Here, `$lhs` and `$rhs` are operands constrained to a custom type constraint (`ChannelType`), while `$predicate` is an attribute using a custom enum-based attribute constraint (`Handshake_CmpIPredicateAttr`).
+
+Argument order is flexible; operands and attributes can be mixed, as long as their constraint types clarify their roles.
+
+## Why Do We Store It Like This?
 
 Operation-specific attributes give us enough flexibility to store many types of information, generate convenient named getter functions, and allow easy constraints and verification of values.
 
-When used properly, they communicate clearly what information an operation **must** contain (as well as what information it **could** contain). Rules for what kind of values are allowed are also easily to declaratively provide.
+When used properly, they communicate clearly what information an operation **must** contain (as well as what information it **could** contain). Rules for what kind of values are allowed are also easy to declaratively provide.
 
 While functions exist to remove operation-specific attributes from the operation, each operation is automatically verified at the end of each pass: if a required attribute has been removed, compilation will fail.
 
 ## What Types of Information to Store
 
-It is important to remember that an attribute could be altered by other sections of the code-base- it is therefore dangerous to place dependant data in an attribute. Given value A dependant on value B, there are 2 problematic scenarios: 
+It is important to remember that an attribute could be altered by other sections of the code-base- it is therefore dangerous to place dependant data in an attribute. Consider a scenario where a pass assigns two attributes to an operation: `mode` and `latency`, where the `latency` value depends on the chosen `mode`. This setup can lead to two common problems:
+1. A later pass updates `mode` but forgets to update `latency`, leaving inconsistent or outdated information in the IR
+2. Another pass modifies `latency` without realizing it's derived from `mode`, potentially storing an invalid or contradictory combination.
 
-1. Value B is updated by another pass later on, but value A is not, which leaves stale information in the IR.
-2. A later pass does not realize that value A is dependant on value B, and illegally changes value A directly, and then stores impossible information in the IR.
+To avoid these issues, the IR should ideally store **decisions**, not derived data. In this case, the IR should only store `mode`—the actual decision—and compute `latency` on demand when needed. If both values must be persisted, they should be combined into a single, coherent attribute (e.g., a struct or enum) that captures their relationship explicitly.
 
-To avoid these problems, ideally information stored in the IR should be **decisions**: any information that is downstream of a set of decisions should be calculated on-demand, based on the real values of its causal variables. 
+Any data that depends on other values should be derived, not stored. This ensures that updates to the underlying decision automatically propagate, and future passes can't accidentally introduce inconsistencies.
 
-How to do this is discussed in-detail [below](#how-to-calculate-dependant-information-on-demand), to avoid breaking the logical flow.
+How to calculate dependant information on-demand (i.e., `latency` in the example) is discussed in detail [below](#how-to-calculate-dependant-information-on-demand), to avoid breaking the logical flow.
 
 ## Maintaining Backwards Compatibility
 
@@ -75,7 +88,7 @@ There are 2 typical situations.
 1. This pre-existing code **should** break, as the attribute is now required to be specified, and you must alter the code to provide the attribute.
 2. The attribute is not relevant to the pre-existing code, and you should provide backwards compatibility.
 
-In order to do so, it is recommended to add a custom builder that provides a default value for the attribute:
+In order to provide backward compatibility, it is recommended to add a custom builder that provides a default value for the attribute:
 
 ```tablegen
 def MyOp : Op<"my_op", []> {
@@ -88,7 +101,7 @@ def MyOp : Op<"my_op", []> {
   ];
 }
 ```
-which will result in the following C++:
+In this example, we define an attribute `$attr` with the constraint type `F32Attr`.  We also add a custom builder that takes a float input with a default value of 0.5 (`ins CArg<"float", "0.5f">:$val`). The builder assigns  `val` to the `$attr` attribute. For more details on custom builders, see the [MLIR doc](https://mlir.llvm.org/docs/DefiningDialects/Operations/#custom-builder-methods). Then, MLIR generates the following C++ code from the tablegen definition:
 ```c++
 /// Header file.
 class MyOp : /*...*/ {
@@ -103,11 +116,13 @@ MyOp::build(::mlir::OpBuilder &builder, ::mlir::OperationState &state,
   state.addAttribute("attr", builder.getF32FloatAttr(val));
 }
 ```
-which will maintain backwards compability with any builders that do not provide the attribute.
+which will maintain backwards compatibility with any builders that do not provide the attribute.
+
+A general principle is to **avoid modifying core passes** and builders—especially when those changes would impact widely used or shared code—unless they represent fundamental structural or philosophical improvements. Instead, it's preferable to add custom solutions tailored to specific needs or passes, keeping the core infrastructure stable and broadly applicable.
 
 ## Optional and Default Valued Attributes
 
-MLIR offers two attribute constraints which stack on top of normal ones: [OptionalAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#optional-attributes) and [DefaultValuedAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#attributes-with-default-values).
+MLIR offers two attribute constraints that stack on top of normal ones: [OptionalAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#optional-attributes) and [DefaultValuedAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#attributes-with-default-values).
 
 While they appear helpful at first glance, neither works exactly as you might expect.
 
@@ -252,7 +267,7 @@ There are also no named getters generated, and therefore these attributes must b
 
 https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
 
-# Non-Operation-Specific Information
+# Interface Approach
 Sometimes information  may exist across many different operations. 
 
 If we followed the above rules, adding the new attribute to many operations would result in code duplication. 
