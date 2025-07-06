@@ -11,23 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Location.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -47,134 +42,73 @@ struct HandshakeSpeculationV2Pass
   std::optional<Value> specLoopExit;
   std::optional<Value> confirmSpec;
 
-  void placeSpeculator(FuncOp &funcOp, unsigned specBB);
-
-  void replaceBranches(FuncOp &funcOp, unsigned specBB);
-  void replaceLoopHeaders(FuncOp &funcOp, unsigned specBB);
-  void placeCommits(FuncOp &funcOp, unsigned specBB);
-  void placeCommitsTraversal(llvm::DenseSet<Operation *> &visited,
-                             OpOperand &currOpOperand, unsigned specBB);
-
   void runDynamaticPass() override;
 };
 } // namespace
 
-void HandshakeSpeculationV2Pass::placeSpeculator(FuncOp &funcOp,
-                                                 unsigned specBB) {
-
+static FailureOr<std::pair<Value, bool>>
+findLoopCondition(FuncOp &funcOp, unsigned loopHeadBB, unsigned loopTailBB) {
   ConditionalBranchOp condBrOp = nullptr;
   for (auto condBrCandidate : funcOp.getOps<ConditionalBranchOp>()) {
     auto condBB = getLogicBB(condBrCandidate);
-    if (condBB && *condBB == specBB) {
-      // Found the condBr in the specBB
+    if (condBB && *condBB == loopTailBB) {
       condBrOp = condBrCandidate;
       break;
     }
   }
-  assert(condBrOp && "Could not find any ConditionalBranchOp");
 
-  OpBuilder builder(funcOp->getContext());
-  builder.setInsertionPoint(condBrOp);
+  if (!condBrOp)
+    return funcOp.emitError(
+        "Could not find ConditionalBranchOp in loop tail BB");
 
-  Value loopContinue = condBrOp.getConditionOperand();
-  Location specLoc = loopContinue.getLoc();
-  ChannelType conditionType = loopContinue.getType().cast<ChannelType>();
-
-  // Append CommitControl
-  BackedgeBuilder backedgeBuilder(builder, specLoc);
-  Backedge generatedConditionBackedge = backedgeBuilder.get(conditionType);
-
-  SpecV2ResolverOp specResolverOp = builder.create<SpecV2ResolverOp>(
-      specLoc, loopContinue, generatedConditionBackedge);
-  inheritBB(condBrOp, specResolverOp);
-
-  NotOp loopContinueNot = builder.create<NotOp>(specLoc, loopContinue);
-  inheritBB(condBrOp, loopContinueNot);
-
-  AndIOp andCondition = builder.create<AndIOp>(
-      specLoc, loopContinueNot.getResult(), specResolverOp.getConfirmSpec());
-  inheritBB(condBrOp, andCondition);
-
-  PasserOp loopContinueSuppressor =
-      builder.create<PasserOp>(specLoc, loopContinue, andCondition.getResult());
-  inheritBB(condBrOp, loopContinueSuppressor);
-
-  SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
-  inheritBB(condBrOp, conditionGenerator);
-  conditionGenerator->setAttr("specv2_ignore_buffer",
-                              builder.getBoolAttr(true));
-  ConstantOp conditionConstant = builder.create<ConstantOp>(
-      specLoc, IntegerAttr::get(conditionType.getDataType(), 1),
-      conditionGenerator.getResult());
-  inheritBB(condBrOp, conditionConstant);
-  conditionConstant->setAttr("specv2_ignore_buffer", builder.getBoolAttr(true));
-
-  BufferOp specLoopContinueTehb = builder.create<BufferOp>(
-      specLoc, loopContinueSuppressor.getResult(), TimingInfo::break_r(), 1,
-      BufferOp::ONE_SLOT_BREAK_R);
-  inheritBB(condBrOp, specLoopContinueTehb);
-  specLoopContinueTehb->setAttr("specv2_buffer_as_sink",
-                                builder.getBoolAttr(true));
-
-  MergeOp merge = builder.create<MergeOp>(
-      specLoc, llvm::ArrayRef<Value>{specLoopContinueTehb.getResult(),
-                                     conditionConstant.getResult()});
-  inheritBB(condBrOp, merge);
-  merge->setAttr("specv2_buffer_as_source", builder.getBoolAttr(true));
-
-  // Buffer after a merge is required, which is added in the buffering pass.
-
-  generatedConditionBackedge.setValue(merge.getResult());
-
-  specLoopContinue = merge.getResult();
-  specLoopExit = andCondition.getResult();
-  confirmSpec = specResolverOp.getConfirmSpec();
-}
-
-/// Returns operands to traverse next when placing Commit or SaveCommit.
-/// For LoadOps, only data result uses are included. For StoreOp, no targets.
-/// For others, all result uses.
-static llvm::SmallVector<OpOperand *>
-getSpecRegionTraversalTargets(Operation *op) {
-  llvm::SmallVector<OpOperand *> targets;
-  if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    // Continue traversal only the data result of the LoadOp, skipping results
-    // connected to the memory controller.
-    for (OpOperand &dstOpOperand : loadOp.getDataResult().getUses()) {
-      targets.push_back(&dstOpOperand);
-    }
-  } else if (isa<handshake::StoreOp>(op)) {
-    // Traversal ends here; edges to the memory controller are skipped
-    return {};
-  } else {
-    for (OpResult res : op->getResults()) {
-      for (OpOperand &dstOpOperand : res.getUses()) {
-        targets.push_back(&dstOpOperand);
-      }
-    }
+  std::optional<unsigned> trueResultBB =
+      getLogicBB(condBrOp.getTrueResult().getDefiningOp());
+  std::optional<unsigned> falseResultBB =
+      getLogicBB(condBrOp.getTrueResult().getDefiningOp());
+  if (trueResultBB && *trueResultBB == loopHeadBB) {
+    // The loop continue is the condition operand
+    return std::pair<Value, bool>{condBrOp.getConditionOperand(), false};
   }
-  return targets;
+  if (falseResultBB && *falseResultBB == loopHeadBB) {
+    // The loop continue is the inverted condition operand
+    return std::pair<Value, bool>{condBrOp.getConditionOperand(), true};
+  }
+  return funcOp.emitError("Either true or false result of ConditionalBranchOp "
+                          "is not the loop backedge.");
 }
 
-void HandshakeSpeculationV2Pass::replaceBranches(FuncOp &funcOp,
-                                                 unsigned specBB) {
+static std::pair<Value, Value> generateLoopContinueAndExit(OpBuilder &builder,
+                                                           Value loopCondition,
+                                                           bool isInverted) {
+  builder.setInsertionPoint(loopCondition.getDefiningOp());
+  NotOp invertCondition =
+      builder.create<NotOp>(loopCondition.getLoc(), loopCondition);
+  inheritBB(loopCondition.getDefiningOp(), invertCondition);
+  if (isInverted)
+    return {invertCondition.getResult(), loopCondition};
+  else
+    return {loopCondition, invertCondition.getResult()};
+}
+
+static void replaceBranches(FuncOp &funcOp, unsigned loopTailBB,
+                            Value loopContinue, Value loopExit) {
   OpBuilder builder(funcOp->getContext());
 
   // Replace all branches in the specBB with the speculator
   for (auto branchOp :
        llvm::make_early_inc_range(funcOp.getOps<ConditionalBranchOp>())) {
-    if (getLogicBB(branchOp) != specBB)
+    if (getLogicBB(branchOp) != loopTailBB)
       continue;
 
     // Assume trueResult is backedge
     builder.setInsertionPoint(branchOp);
     PasserOp loopSuppressor = builder.create<PasserOp>(
-        branchOp.getLoc(), branchOp.getDataOperand(), specLoopContinue.value());
+        branchOp.getLoc(), branchOp.getDataOperand(), loopContinue);
     inheritBB(branchOp, loopSuppressor);
     branchOp.getTrueResult().replaceAllUsesWith(loopSuppressor.getResult());
 
     PasserOp exitSuppressor = builder.create<PasserOp>(
-        branchOp.getLoc(), branchOp.getDataOperand(), specLoopExit.value());
+        branchOp.getLoc(), branchOp.getDataOperand(), loopExit);
     inheritBB(branchOp, exitSuppressor);
     branchOp.getFalseResult().replaceAllUsesWith(exitSuppressor.getResult());
 
@@ -182,25 +116,27 @@ void HandshakeSpeculationV2Pass::replaceBranches(FuncOp &funcOp,
   }
 }
 
-void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
-                                                    unsigned specBB) {
+static Value replaceLoopHeaders(FuncOp &funcOp, unsigned loopHeadBB,
+                                unsigned loopTailBB, Value loopContinue) {
   OpBuilder builder(funcOp->getContext());
   builder.setInsertionPoint(funcOp.getBodyBlock(),
                             funcOp.getBodyBlock()->begin());
 
-  InitOp initOp = builder.create<InitOp>(specLoopContinue->getLoc(),
-                                         specLoopContinue.value());
-  inheritBB(specLoopContinue.value().getDefiningOp(), initOp);
+  InitOp initOp = builder.create<InitOp>(loopContinue.getLoc(), loopContinue);
+  setBB(initOp, loopHeadBB);
 
   for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
-    if (getLogicBB(muxOp) != specBB)
+    if (getLogicBB(muxOp) != loopHeadBB)
       continue;
 
     assert(muxOp.getDataOperands().size() == 2 &&
            "MuxOp in specBB should have two data operands");
 
+    muxOp.getSelectOperandMutable()[0].set(initOp.getResult());
+
     Operation *definingOp = muxOp.getDataOperands()[1].getDefiningOp();
-    if (!definingOp || getLogicBB(definingOp) != specBB) {
+    if (!definingOp || getLogicBB(definingOp) != loopTailBB) {
+      // Backedge is the second operand, so swap operands
       Value entry = muxOp.getDataOperands()[1];
       muxOp.getDataOperandsMutable()[1].set(muxOp.getDataOperands()[0]);
       muxOp.getDataOperandsMutable()[0].set(entry);
@@ -209,7 +145,7 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
 
   for (auto cmergeOp :
        llvm::make_early_inc_range(funcOp.getOps<handshake::ControlMergeOp>())) {
-    if (getLogicBB(cmergeOp) != specBB)
+    if (getLogicBB(cmergeOp) != loopHeadBB)
       continue;
 
     assert(cmergeOp.getDataOperands().size() == 2 &&
@@ -217,7 +153,7 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
 
     Value entry, backedge;
     Operation *definingOp = cmergeOp.getDataOperands()[1].getDefiningOp();
-    if (!definingOp || getLogicBB(definingOp) != specBB) {
+    if (!definingOp || getLogicBB(definingOp) != loopTailBB) {
       entry = cmergeOp.getDataOperands()[1];
       backedge = cmergeOp.getDataOperands()[0];
     } else {
@@ -232,56 +168,56 @@ void HandshakeSpeculationV2Pass::replaceLoopHeaders(FuncOp &funcOp,
     inheritBB(cmergeOp, muxOp);
 
     cmergeOp.getResult().replaceAllUsesWith(muxOp.getResult());
-    cmergeOp.getIndex().replaceAllUsesWith(initOp.getResult());
+
+    // Erase the old fork
+    (*cmergeOp.getIndex().getUsers().begin())->erase();
 
     cmergeOp->erase();
   }
+
+  return initOp.getResult();
 }
 
-void HandshakeSpeculationV2Pass::placeCommitsTraversal(
-    llvm::DenseSet<Operation *> &visited, OpOperand &currOpOperand,
-    unsigned specBB) {
-  Operation *currOp = currOpOperand.getOwner();
-  OpBuilder builder(currOp->getContext());
-
-  if (isa<handshake::PasserOp>(currOp)) {
-    return;
-  }
-
-  if (isa<handshake::StoreOp>(currOp) ||
-      isa<handshake::MemoryControllerOp>(currOp) ||
-      isa<handshake::EndOp>(currOp)) {
-    builder.setInsertionPoint(currOp);
-    PasserOp commitSuppressor = builder.create<PasserOp>(
-        confirmSpec.value().getLoc(), currOpOperand.get(), confirmSpec.value());
-    inheritBB(currOpOperand.get().getDefiningOp(), commitSuppressor);
-    currOpOperand.get().replaceAllUsesExcept(commitSuppressor.getResult(),
-                                             commitSuppressor);
-    return;
-  }
-
-  // currOp->dump();
-  assert(getLogicBB(currOp) == specBB &&
-         "Operation should be in the speculation BB");
-
-  auto [_, isNewOp] = visited.insert(currOp);
-
-  // End traversal if currOp is already in visited set
-  if (!isNewOp)
-    return;
-
-  for (OpOperand *target : getSpecRegionTraversalTargets(currOp)) {
-    placeCommitsTraversal(visited, *target, specBB);
-  }
+static Value appendRepeatingInit(OpBuilder &builder, Value specLoopContinue) {
+  builder.setInsertionPoint(specLoopContinue.getDefiningOp());
+  SpecV2RepeatingInitOp repeatingInitOp = builder.create<SpecV2RepeatingInitOp>(
+      specLoopContinue.getLoc(), specLoopContinue);
+  inheritBB(specLoopContinue.getDefiningOp(), repeatingInitOp);
+  return repeatingInitOp.getResult();
 }
 
-void HandshakeSpeculationV2Pass::placeCommits(FuncOp &funcOp, unsigned specBB) {
-  llvm::DenseSet<Operation *> visited;
-  Value entry = (*funcOp.getOps<handshake::InitOp>().begin()).getResult();
-  for (auto &use : entry.getUses()) {
-    // Start traversal from the entry point
-    placeCommitsTraversal(visited, use, specBB);
+static Value appendInit(OpBuilder &builder, Value specLoopContinue) {
+  specLoopContinue.getDefiningOp()->dump();
+  builder.setInsertionPoint(specLoopContinue.getDefiningOp());
+  InitOp initOp =
+      builder.create<InitOp>(specLoopContinue.getLoc(), specLoopContinue);
+  inheritBB(specLoopContinue.getDefiningOp(), initOp);
+  initOp->dump();
+  return initOp.getResult();
+}
+
+static LogicalResult performMuxSupRewriting(MuxOp muxOp, Value newSelector,
+                                            Value newSpecLoopContinue) {
+  if (auto supOp =
+          dyn_cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp())) {
+    muxOp.getDataOperandsMutable()[1].set(supOp.getData());
+    supOp.getDataMutable()[0].set(muxOp.getResult());
+    muxOp.getResult().replaceAllUsesExcept(supOp.getResult(), supOp);
+    muxOp.getSelectOperandMutable()[0].set(newSelector);
+    supOp.getCtrlMutable()[0].set(newSpecLoopContinue);
+    return success();
   }
+  return muxOp.emitError(
+      "Expected the first data operand of MuxOp to come from a PasserOp");
+}
+
+static LogicalResult eraseOldInit(Value oldSelector) {
+  if (auto oldInitOp = dyn_cast<InitOp>(oldSelector.getDefiningOp())) {
+    oldInitOp->erase();
+    return success();
+  }
+  return oldSelector.getDefiningOp()->emitError(
+      "Expected the selector to be defined by an InitOp");
 }
 
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
@@ -289,18 +225,37 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
   // Support only one funcOp
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
+  OpBuilder builder(funcOp->getContext());
 
   // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
-  unsigned specBB = 2;
+  unsigned loopHeadBB = 2, loopTailBB = 2;
+  auto loopConditionOrFailure =
+      findLoopCondition(funcOp, loopHeadBB, loopTailBB);
+  if (failed(loopConditionOrFailure))
+    return signalPassFailure();
+  auto [loopCondition, isInverted] = loopConditionOrFailure.value();
+  auto [loopContinue, loopExit] =
+      generateLoopContinueAndExit(builder, loopCondition, isInverted);
 
-  placeSpeculator(funcOp, specBB);
-  replaceBranches(funcOp, specBB);
-  replaceLoopHeaders(funcOp, specBB);
-  placeCommits(funcOp, specBB);
+  replaceBranches(funcOp, loopTailBB, loopContinue, loopExit);
+  Value selector =
+      replaceLoopHeaders(funcOp, loopHeadBB, loopTailBB, loopContinue);
 
-  // if (failed(eraseUnusedControlNetwork(funcOp, 1)))
-  //   return signalPassFailure();
+  Value specLoopContinue = loopContinue;
+  Value newSpecLoopContinue = appendRepeatingInit(builder, specLoopContinue);
+  Value newSelector = appendInit(builder, newSpecLoopContinue);
+
+  for (auto muxOp :
+       llvm::make_early_inc_range(funcOp.getOps<handshake::MuxOp>())) {
+    if (getLogicBB(muxOp) != loopHeadBB)
+      continue;
+    if (failed(performMuxSupRewriting(muxOp, newSelector, newSpecLoopContinue)))
+      return signalPassFailure();
+  }
+
+  if (failed(eraseOldInit(selector)))
+    return signalPassFailure();
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>

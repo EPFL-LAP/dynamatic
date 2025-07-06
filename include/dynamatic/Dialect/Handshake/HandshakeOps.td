@@ -312,8 +312,8 @@ def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
     Similar to a buffer, its timing behavior is configurable.
   }];
   
-  let arguments = (ins HandshakeType:$operand);
-  let results = (outs HandshakeType:$result);
+  let arguments = (ins ChannelType:$operand);
+  let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
@@ -321,7 +321,7 @@ def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
   }];
 
   let assemblyFormat = [{
-    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+    $operand attr-dict `:` type($operand)
   }];
 }
 
