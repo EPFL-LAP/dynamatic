@@ -13,7 +13,7 @@ We support building from source on Linux and on Windows (through [WSL](https://l
 
 **2. Use the Provided Virtual Machine**  
 We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](docs/UserGuideTopics/usage.md)) or as a starting point to use/[modify](docs/UserGuideTopics/AdvancedUsage.md) Dynamatic in general.  
-> You will need to install Modelsim or Questa manually to run simulations! Click [here]() for instructions on installing them.
+> You will need to install Modelsim or Questa manually to run simulations! Click [here](docs/UserGuideTopics/AdvancedBuild.md#6-modelsimquesta-sim-installation) for instructions on installing them.
 
 
 ### Build Instructions
@@ -41,7 +41,7 @@ Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tu
 
 >While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](docs/UserGuideTopics/Dependencies.md) section for a better understanding of how the tool works.
 
-Finally, Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) to run simulations, thus you need to install it before hand and add it to your environment variables.  
+Finally, Dynamatic uses [Modelsim](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) or [Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) to run simulations, thus you need to [install](docs/UserGuideTopics/AdvancedBuild.md#6-modelsimquesta-installation) it before hand and add it to your environment variables.  
 
 Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
