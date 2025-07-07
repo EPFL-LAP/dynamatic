@@ -34,7 +34,7 @@ F_AFFINE="$COMP_DIR/affine.mlir"
 F_AFFINE_MEM="$COMP_DIR/affine_mem.mlir"
 F_SCF="$COMP_DIR/scf.mlir"
 F_CF="$COMP_DIR/cf.mlir"
-F_CF_TRANFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -124,25 +124,29 @@ exit_on_fail "Failed to compile scf to cf" "Compiled scf to cf"
 # cf transformations (standard)
 "$DYNAMATIC_OPT_BIN" "$F_CF" --canonicalize --cse --sccp --symbol-dce \
     --control-flow-sink --loop-invariant-code-motion --canonicalize \
-    > "$F_CF_TRANFORMED"
+    > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply standard transformations to cf" \
   "Applied standard transformations to cf"
 
 # cf transformations (dynamatic)
-if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
+"$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-    --mark-memory-interfaces --force-memory-interface="force-mc=true" \
-    > "$F_CF_DYN_TRANSFORMED"
+    > "$F_CF_DYN_TRANSFORMED.tmp"
   exit_on_fail "Failed to apply Dynamatic transformations to cf" \
     "Applied Dynamatic transformations to cf"
+
+if [[ $DISABLE_LSQ -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED.tmp" \
+    --force-memory-interface="force-mc=true" \
+    > "$F_CF_DYN_TRANSFORMED"
+  exit_on_fail "Failed to apply memory interface transformations to cf" \
+    "Applied memory interface transformations to cf (LSQ disabled!)"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANFORMED" \
-    --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED.tmp" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED"
   exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-    "Applied Dynamatic transformations to cf"
+    "Applied memory interface transformations to cf"
 fi
 
 # cf level -> handshake level
