@@ -101,6 +101,8 @@ The latest version of these delays has been computed using Vivado 2019.1.
 
 Timing data is primarily used during **buffer placement**, which inserts buffers in the dataflow circuit. While basic buffer placement (i.e., `on-merges`) ignores timing, the advanced MILP algorithms (fpga20 and flp22) rely heavily on this information to optimize circuit performance and area.
 
+Timing information (especially reg2reg delays) is also used in the **backend**, in order to generate appropriate RTL units which meet speed requirements. 
+
 # Implementation Overview
 
 In this section, we present the data structures used to store timing information, along with the code that extracts this information from the JSON and populates those structures.
@@ -258,7 +260,7 @@ hw.module.extern @handshake_addf_0(in %lhs : !handshake.channel<i32>, in %rhs : 
 
 **The following section describes the current state, however whether this is a satisfactory representation is still under discussion. Please update accorisngly if any changes are agreed on.**
 
-FloPoCo units are identified by the triplet **{operator name, bitwidth, measured internal delay}** which serves to uniquely identify them.
+FloPoCo units are identified by the triplet **{operator name, bitwidth, measured internal delay}** which serves to uniquely identify them. The "measured internal delay" terminology here refers to the **reg2reg** delay mentionned above : the name "measured" is becauseFloPoCo-generated units often run slower than the requested speed; the profiler executable then uses Vivado to approximate the actual speed, and this value is the one used.  
 
 The legacy Dynamatic backend supports the existence of multiple implementations of a given operator, by allowing an "arch-name" to be specified. This system is leveraged by having each floating point wrapper file (addf.vhd, mulf.vhd, etc.) contain a seperate arch for each FloPoCo implementation, identified by a bitwidth-delay pair, added as a suffix to "arch" to form a unique name. The implemented operator is tracked with the seperation of the wrappers based on the operators. The implementations are contained in a [seperate file](https://github.com/EPFL-LAP/dynamatic/blob/main/data/vhdl/support/flopoco_ip_cores.vhd), and the portion relevant to each operator are also appropriately tagged with the suffix to avoid any cross-usage, which has been observed to cause incorrect calculations unless managed cautiously.
 
@@ -306,11 +308,10 @@ end architecture;
 
 Therefore, the desired version of the operator is used, based on the timing information passed through the hardware IR's INTERNAL_DELAY field. 
 
-**Caution : Strict usage of the dedicated flopco unit module is required to ensure consistent data. This is for three reasons**:
+**Note :  usage of the dedicated flopco unit module is reccomended to ensure consistent data.**:
 
--For now, there is no mechanism in-Dynamatic ensuring consistency between the components.json file and the units listed. In pratice, both are generated from a shared post-profiling csv file, which works, but is vulnerable to accidental changes in one file. In the current state, such a mismatch would cause an "entity not found" error at the simulation stage, resulting in premature termination.  
 
--Secondly, there is no in-Dynamatic check to ensure that sub-optimal (ie higher delay and latency that another implementation) implementations aren't listed. These are also removed from components.json by the external executable, but were the component.json to be edited to feature them, the logic would not identify them. This is in keeping with the absence of checks on bitwidth/latency tradeoffs present in the legacy code, and is motivated by the possibility that such a sub-optimal implementation could have other advantages (area, etc.) currently not represented.
+-There is no in-Dynamatic check to ensure that sub-optimal (ie higher delay and latency that another implementation) implementations aren't listed. These are also removed from components.json by the external executable, but were the component.json to be edited to feature them, the logic would not identify them. This is in keeping with the absence of checks on bitwidth/latency tradeoffs present in the legacy code, and is motivated by the possibility that such a sub-optimal implementation could have other advantages (area, etc.) currently not represented.
 
--Thirdly, the system relies on {operator name, bitwidth, measured internal delay} being unique. This is guaranteed in pratice in FloPoCo, and enforced in the module with it's removal of non-pareto optimal points. Adding units seperately would bypass this guarantee and lead to unpredictable behaviour.
+-The system relies on {operator name, bitwidth, measured internal delay} being unique. This is guaranteed in pratice in FloPoCo, and enforced in the module with it's removal of non-pareto optimal points. Adding units seperately would bypass this guarantee and lead to unpredictable behaviour.
 
