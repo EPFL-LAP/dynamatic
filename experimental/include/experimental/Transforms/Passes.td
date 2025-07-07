@@ -75,7 +75,8 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   let options = [
     Option<"headBB", "head-bb", "unsigned", "", "the loop head BB">,
     Option<"tailBB", "tail-bb", "unsigned", "", "the loop tail BB">,
-    Option<"n", "n", "unsigned", "", "the number of iterations to speculate">
+    Option<"n", "n", "unsigned", "", "the number of iterations to speculate">,
+    Option<"variable", "variable", "bool", "false", "enable variable speculation">
   ];
 }
 

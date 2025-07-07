@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
@@ -586,10 +587,8 @@ static bool isExitSuppressorUnifiable(PasserOp bottomSuppressor, Value loopExit,
   if (!isa<PasserOp>(topOp))
     return false;
   auto topSuppressor = cast<PasserOp>(topOp);
-  if (!isEqualUnderMaterialization(topSuppressor.getCtrl(), confirmSpec))
-    return false;
 
-  return true;
+  return isEqualUnderMaterialization(topSuppressor.getCtrl(), confirmSpec);
 }
 
 static void unifyExitSuppressor(PasserOp bottomSuppressor, Value specLoopExit) {
@@ -598,6 +597,60 @@ static void unifyExitSuppressor(PasserOp bottomSuppressor, Value specLoopExit) {
   bottomSuppressor.getCtrlMutable()[0].set(specLoopExit);
   bottomSuppressor.getDataMutable()[0].set(topSuppressor.getData());
   topSuppressor->erase();
+}
+
+static MergeOp replaceRIChainWithMerge(OpBuilder &builder,
+                                       SpecV2RepeatingInitOp bottomRI,
+                                       unsigned n) {
+  SpecV2RepeatingInitOp topRI = bottomRI;
+  for (unsigned i = 1; i < n; i++) {
+    topRI = cast<SpecV2RepeatingInitOp>(topRI.getOperand().getDefiningOp());
+  }
+
+  builder.setInsertionPoint(bottomRI);
+  Location specLoc = bottomRI.getLoc();
+  unsigned bb = getLogicBB(bottomRI).value();
+
+  SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
+  setBB(conditionGenerator, bb);
+  conditionGenerator->setAttr("specv2_ignore_buffer",
+                              builder.getBoolAttr(true));
+  ConstantOp conditionConstant = builder.create<ConstantOp>(
+      specLoc, IntegerAttr::get(builder.getIntegerType(1), 1),
+      conditionGenerator.getResult());
+  setBB(conditionConstant, bb);
+  conditionConstant->setAttr("specv2_ignore_buffer", builder.getBoolAttr(true));
+
+  topRI.getOperand().dump();
+  BufferOp specLoopContinueTehb = builder.create<BufferOp>(
+      specLoc, topRI.getOperand(), TimingInfo::break_r(), 1,
+      BufferOp::ONE_SLOT_BREAK_R);
+  setBB(specLoopContinueTehb, bb);
+  specLoopContinueTehb->setAttr("specv2_buffer_as_sink",
+                                builder.getBoolAttr(true));
+
+  MergeOp merge = builder.create<MergeOp>(
+      specLoc, llvm::ArrayRef<Value>{specLoopContinueTehb.getResult(),
+                                     conditionConstant.getResult()});
+
+  setBB(merge, bb);
+  merge->setAttr("specv2_buffer_as_source", builder.getBoolAttr(true));
+
+  // Buffer after a merge is required, which is added in the buffering pass.
+
+  bottomRI.getResult().replaceAllUsesWith(merge.getResult());
+
+  SpecV2RepeatingInitOp ri = bottomRI;
+  SpecV2RepeatingInitOp nextRI;
+  for (unsigned i = 0; i < n; i++) {
+    if (i < n - 1) {
+      nextRI = cast<SpecV2RepeatingInitOp>(ri.getOperand().getDefiningOp());
+    }
+    ri->erase();
+    ri = nextRI;
+  }
+
+  return merge;
 }
 
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
@@ -709,6 +762,18 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   for (auto passerOp : llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
     if (passerOp.getResult().use_empty())
       passerOp->erase();
+  }
+
+  if (variable) {
+    MergeOp merge = replaceRIChainWithMerge(
+        builder,
+        cast<SpecV2RepeatingInitOp>(specLoopContinues[n - 1].getDefiningOp()),
+        n);
+
+    // Optimize for buffering
+    auto passer = cast<PasserOp>(
+        merge->getOperand(0).getDefiningOp()->getOperand(0).getDefiningOp());
+    passer.getCtrlMutable()[0].set(specLoopExit);
   }
 }
 
