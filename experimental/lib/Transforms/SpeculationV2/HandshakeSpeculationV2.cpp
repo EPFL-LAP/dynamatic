@@ -211,16 +211,59 @@ static Value appendInit(OpBuilder &builder, Value specLoopContinue) {
   return initOp.getResult();
 }
 
+void assertResultIsMaterialized(PasserOp passerOp) {
+  Value result = passerOp.getResult();
+  if (result.use_empty())
+    return;
+  if (result.hasOneUse())
+    return;
+  passerOp->emitError("PasserOp has multiple users, and the algorithm cannot "
+                      "proceed. When PasserOp is placed, its result needs to "
+                      "be materializeits result needs to be materialized.");
+  llvm_unreachable("SpeculationV2 algorithm failed");
+}
+
+void materializeResult(PasserOp passerOp) {
+  Value result = passerOp.getResult();
+  if (result.use_empty())
+    return;
+  if (result.hasOneUse())
+    return;
+
+  unsigned numUses =
+      std::distance(result.getUses().begin(), result.getUses().end());
+
+  OpBuilder builder(passerOp.getContext());
+  builder.setInsertionPoint(passerOp);
+  ForkOp forkOp = builder.create<ForkOp>(passerOp.getLoc(), result, numUses);
+  inheritBB(passerOp, forkOp);
+
+  int i = 0;
+  // To allow the mutation of operands, we use early increment range
+  // TODO: Maybe he was not aware of this approach and the materialization pass
+  // is dirty. Update it to use early increment range as well.
+  for (OpOperand &opOperand : llvm::make_early_inc_range(result.getUses())) {
+    if (opOperand.getOwner() == forkOp)
+      continue;
+    opOperand.set(forkOp.getResult()[i]);
+    i++;
+  }
+}
+
 static FailureOr<PasserOp> performMuxSupRewriting(MuxOp muxOp,
                                                   Value newSelector,
                                                   Value newSpecLoopContinue) {
   if (auto passerOp =
           dyn_cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp())) {
+    assertResultIsMaterialized(passerOp);
     muxOp.getDataOperandsMutable()[1].set(passerOp.getData());
     passerOp.getDataMutable()[0].set(muxOp.getResult());
     muxOp.getResult().replaceAllUsesExcept(passerOp.getResult(), passerOp);
     muxOp.getSelectOperandMutable()[0].set(newSelector);
     passerOp.getCtrlMutable()[0].set(newSpecLoopContinue);
+
+    materializeResult(passerOp);
+
     return passerOp;
   }
   return muxOp.emitError(
@@ -271,6 +314,66 @@ static llvm::SmallVector<Value> getSubjectResults(Operation *op) {
   return results;
 }
 
+static bool tryMovingSup(OpBuilder &builder, PasserOp passerOp,
+                         DenseSet<PasserOp> &frontiers) {
+  Value passerControl = passerOp.getCtrl();
+  Location passerLoc = passerOp.getLoc();
+
+  for (Operation *targetOp : passerOp.getResult().getUsers()) {
+    bool updated = false;
+    TypeSwitch<Operation *>(targetOp)
+        .Case<ArithOpInterface, ForkOp, LazyForkOp, BufferOp, LoadOp>(
+            [&](auto) {
+              DenseSet<PasserOp> rewrittenPassers;
+              bool isEligible = true;
+              for (Value operand : getSubjectOperands(targetOp)) {
+                if (auto passerOp =
+                        dyn_cast<PasserOp>(operand.getDefiningOp())) {
+                  if (passerControl && passerControl != passerOp.getCtrl()) {
+                    isEligible = false;
+                    break;
+                  }
+                  assertResultIsMaterialized(passerOp);
+                  rewrittenPassers.insert(passerOp);
+                  continue;
+                }
+                if (isSourced(operand))
+                  continue;
+
+                isEligible = false;
+                break;
+              }
+              if (isEligible) {
+                for (auto passer : rewrittenPassers) {
+                  passer.getResult().replaceAllUsesWith(passer.getData());
+                  frontiers.erase(passer);
+                  passer->erase();
+                }
+                for (auto result : getSubjectResults(targetOp)) {
+                  if (!result.getUses().empty()) {
+                    builder.setInsertionPoint(targetOp);
+                    PasserOp newPasser = builder.create<PasserOp>(
+                        passerLoc, result, passerControl);
+                    inheritBB(targetOp, newPasser);
+                    result.replaceAllUsesExcept(newPasser.getResult(),
+                                                newPasser);
+                    materializeResult(newPasser);
+                    frontiers.insert(newPasser);
+                  }
+                }
+                updated = true;
+              }
+            })
+        .Default([&](Operation *op) {
+          // op->dump();
+        });
+    if (updated) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void HandshakeSpeculationV2Pass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -280,102 +383,52 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
 
   // NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
 
-  unsigned loopHeadBB = 2, loopTailBB = 2;
-  auto loopConditionOrFailure =
-      findLoopCondition(funcOp, loopHeadBB, loopTailBB);
+  auto loopConditionOrFailure = findLoopCondition(funcOp, headBB, tailBB);
   if (failed(loopConditionOrFailure))
     return signalPassFailure();
   auto [loopCondition, isInverted] = loopConditionOrFailure.value();
   auto [loopContinue, loopExit] =
       generateLoopContinueAndExit(builder, loopCondition, isInverted);
 
-  replaceBranches(funcOp, loopTailBB, isInverted, loopContinue, loopExit);
-  Value selector =
-      replaceLoopHeaders(funcOp, loopHeadBB, loopTailBB, loopContinue);
+  replaceBranches(funcOp, tailBB, isInverted, loopContinue, loopExit);
 
   Value specLoopContinue = loopContinue;
-  Value newSpecLoopContinue = appendRepeatingInit(builder, specLoopContinue);
-  Value newSelector = appendInit(builder, newSpecLoopContinue);
+  Value selector = replaceLoopHeaders(funcOp, headBB, tailBB, loopContinue);
 
   DenseSet<PasserOp> frontiers;
-  for (auto muxOp :
-       llvm::make_early_inc_range(funcOp.getOps<handshake::MuxOp>())) {
-    if (getLogicBB(muxOp) != loopHeadBB)
-      continue;
-    auto passerOpOrFailure =
-        performMuxSupRewriting(muxOp, newSelector, newSpecLoopContinue);
-    if (failed(passerOpOrFailure))
+  for (unsigned i = 0; i < n; i++) {
+    frontiers.clear();
+    Value newSpecLoopContinue = appendRepeatingInit(builder, specLoopContinue);
+    Value newSelector = appendInit(builder, newSpecLoopContinue);
+
+    for (auto muxOp :
+         llvm::make_early_inc_range(funcOp.getOps<handshake::MuxOp>())) {
+      if (getLogicBB(muxOp) != headBB)
+        continue;
+      auto passerOpOrFailure =
+          performMuxSupRewriting(muxOp, newSelector, newSpecLoopContinue);
+      if (failed(passerOpOrFailure))
+        return signalPassFailure();
+      frontiers.insert(passerOpOrFailure.value());
+    }
+
+    if (failed(eraseOldInit(selector)))
       return signalPassFailure();
-    frontiers.insert(passerOpOrFailure.value());
-  }
 
-  if (failed(eraseOldInit(selector)))
-    return signalPassFailure();
-
-  bool frontiersUpdated;
-  do {
-    frontiersUpdated = false;
-    for (auto passerOp : frontiers) {
-      Value passerControl = passerOp.getCtrl();
-      Location passerLoc = passerOp.getLoc();
-
-      bool updated = false;
-      for (Operation *targetOp : passerOp.getResult().getUsers()) {
-        TypeSwitch<Operation *>(targetOp)
-            .Case<ArithOpInterface, ForkOp, LazyForkOp, BufferOp, LoadOp>(
-                [&](auto) {
-                  DenseSet<PasserOp> rewrittenPassers;
-                  bool isEligible = true;
-                  for (Value operand : getSubjectOperands(targetOp)) {
-                    if (auto passerOp =
-                            dyn_cast<PasserOp>(operand.getDefiningOp())) {
-                      if (passerControl &&
-                          passerControl != passerOp.getCtrl()) {
-                        isEligible = false;
-                        break;
-                      }
-                      rewrittenPassers.insert(passerOp);
-                      continue;
-                    }
-                    if (isSourced(operand))
-                      continue;
-
-                    isEligible = false;
-                    break;
-                  }
-                  if (isEligible) {
-                    for (auto passer : rewrittenPassers) {
-                      passer.getResult().replaceAllUsesWith(passer.getData());
-                      frontiers.erase(passer);
-                      passer->erase();
-                    }
-                    for (auto result : getSubjectResults(targetOp)) {
-                      if (!result.getUses().empty()) {
-                        builder.setInsertionPoint(targetOp);
-                        PasserOp newPasser = builder.create<PasserOp>(
-                            passerLoc, result, passerControl);
-                        inheritBB(targetOp, newPasser);
-                        result.replaceAllUsesExcept(newPasser.getResult(),
-                                                    newPasser);
-                        frontiers.insert(newPasser);
-                      }
-                    }
-                    updated = true;
-                  }
-                })
-            .Default([&](Operation *op) {
-              // op->dump();
-            });
-        if (updated) {
+    bool frontiersUpdated;
+    do {
+      frontiersUpdated = false;
+      for (auto passerOp : frontiers) {
+        if (tryMovingSup(builder, passerOp, frontiers)) {
+          frontiersUpdated = true;
           break;
         }
       }
-      if (updated) {
-        frontiersUpdated = true;
-        break;
-      }
-    }
-  } while (frontiersUpdated);
+    } while (frontiersUpdated);
+
+    specLoopContinue = newSpecLoopContinue;
+    selector = newSelector;
+  }
 }
 
 std::unique_ptr<dynamatic::DynamaticPass>

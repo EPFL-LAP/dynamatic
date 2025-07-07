@@ -234,7 +234,7 @@ def run_test(c_file, id, timeout):
     with open(handshake_speculation, "w") as f:
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_transformed,
-            "--handshake-speculation-v2",
+            "--handshake-speculation-v2=head-bb=2 tail-bb=2 n=5",
             "--handshake-materialize",
             "--handshake-canonicalize"
         ],

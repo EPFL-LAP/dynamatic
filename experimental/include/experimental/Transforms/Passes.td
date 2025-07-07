@@ -72,7 +72,11 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   let description = [{
   }];
   let constructor = "dynamatic::experimental::speculationv2::createHandshakeSpeculationV2()";
-  let options = [];
+  let options = [
+    Option<"headBB", "head-bb", "unsigned", "", "the loop head BB">,
+    Option<"tailBB", "tail-bb", "unsigned", "", "the loop tail BB">,
+    Option<"n", "n", "unsigned", "", "the number of iterations to speculate">
+  ];
 }
 
 def CreditBasedSharing : DynamaticPass<"credit-based-sharing"> {
