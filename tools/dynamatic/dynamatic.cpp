@@ -295,9 +295,9 @@ public:
                "costaware (throughput- and area-driven buffering)"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
-    addFlag({DISABLE_LSQ, 
-             "Force usage of memory controllers instead of LSQs. "
-             "Warning: This may result in out-of-order memory accesses, use with caution!"});
+    addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
+                          "Warning: This may result in out-of-order memory "
+                          "accesses, use with caution!"});
   }
 
   CommandResult execute(CommandArguments &args) override;
