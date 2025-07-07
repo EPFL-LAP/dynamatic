@@ -41,7 +41,7 @@ begin
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
   assert false
-  report "simulation done!"
+  report "Simulation done! Latency = " & integer'image(now / (2 * HALF_CLK_PERIOD)) & " cycles"
   severity note;
   assert false
   report "NORMAL EXIT (note: failure is to force the simulator to stop)"
