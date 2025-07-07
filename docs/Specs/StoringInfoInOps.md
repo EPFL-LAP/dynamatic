@@ -1,46 +1,71 @@
 
 # Storing Information in Operations
 
-It is often useful to store additional information on an operation. One example is if we wish to parameterize the generation of their RTL. This requires storing the parameter value on the operation itself, as well as passing it to the relevant parts of the code-base to ensure correct generation.
+It is often useful to store additional information on an operation. One example is if we wish to parameterize the generation of its RTL. This requires storing the parameter value on the operation itself, as well as passing it to the relevant parts of the codebase to ensure correct generation. 
 
-Additional information about an operation should be stored as an operation-specific attribute. There are two main ways to define an attribute:
-- In Operation TableGen: declared as part of the operation's definition (at compile-time)
-- In Interface Attribute: set dynamically in a pass by an interface (at runtime)
-  
-The rest of this document explores both approaches in detail, highlighting their respective advantages and trade-offs. Below is an outline of the document structure:
-
-- [Operation TableGen Approach](#operation-tablegen-approach)
-  - [How to Store the Information](#how-to-store-the-information)
-  - [Why Do We Store it Like This?](#why-do-we-store-it-like-this)
-  - [What Types of Information to Store](#what-types-of-information-to-store)
+- [What are Attributes](#what-are-attributes)
+- [Attributes in Tablegen](#attributes-in-tablegen)
+  - [How to Declare an Attribute in Tablegen](#how-to-declare-an-attribute-in-tablegen)
   - [Maintaining Backwards Compatibility](#maintaining-backwards-compatibility)
-  - [Attribute Constraint Wrappers](#optional-and-default-valued-attributes)
+  - [Attribute Constraint Wrappers](#attribute-constraint-wrappers)
     - [OptionalAttr](#optionalattr)
     - [DefaultValuedAttr](#defaultvaluedattr)
   - [Good Examples](#good-examples)
     - [FIFO-Depth for a Save-Commit](#fifo-depth-for-a-save-commit)
     - [SharingWrapperOp for Crush](#sharingwrapperop-for-crush)
-  - [Example to Avoid](#example-to-avoid)
+- [Manually Abstracting and Verifying Attributes](#manually-abstracting-and-verifying-attributes)
+  - [Abstracting](#abstracting)
+  - [Verifying](#verifying)
+  - [Mixed Example](#mixed-example)
     - [BufferOp](#bufferop)
-
-- [Interface Attribute Approach](#interface-attribute-approach)
-  - [How to Define Interface Attributes](#how-to-define-interface-attributes)
-  - [Good Example](#good-example)
-    - [InternalDelay for Arithmetic Ops](#internaldelay-for-arithmetic-ops)
-
+- [Multi-Operation Attributes](#multi-operation-attributes)
+  - [Interfaces](#interfaces)
+    - [Good Example](#good-example)
+      - [InternalDelay for Arithmetic Ops](#internaldelay-for-arithmetic-ops)
+  - [Free Functions](#free-functions)
+    - [Medium Example](#medium-example)
+      - [Basic Block Number](#basic-block-number)
 - [Pros and Cons Summary](#pros-and-cons-summary)
+- [Appendix: How to Calculate Dependent Information On Demand](#appendix-how-to-calculate-dependent-information-on-demand)
 
-- [Appendix: How to Calculate Dependant Information On Demand](#how-to-calculate-dependant-information-on-demand)
+# What are Attributes?
+
+Additional information about an operation should be stored using attributes. Each operation in MLIR has an attribute dictionary, which stores compile-time constants in name-value pairs. However, due to the fragility of name-value pairs, this underlying structure should be both **abstracted** and **strictly verified**.
+
+MLIR offers us an automated flow to perform this abstraction and verification, by declaring the attribute in an operation's tablegen definition. However, if the generated code is not exactly what you require, it is also possible to implement manually.
+
+Additionally, if an attribute should be present on many units, the automated flow can be cumbersome to add to many operations. We discuss this case [at the end](#multi-operation-attributes), and provide two possible solutions.
+
+## Why Do We Store It Like This?
+
+Intermediate representations must be serializable, which means to convert them to a text representation and store them in a file. Therefore the complex C++ data structures representing operations, and their connections, must be serializable. Since attributes are a feature of MLIR, this serialization (and de-serializaton) of our extra information is handled automatically.
+
+If your information does not need to persist between passes, you may be better off using a custom temporary data structure. However, any information that should remain attached to an operation for the rest of compilation should be an attribute.
 
 
-# Operation TableGen Approach
+## What Types of Information to Store
 
-## How to Store the Information
+It is important to remember that an attribute could be altered by other sections of the codebase- it is therefore dangerous to place dependent data in an attribute. Consider a scenario where a pass assigns two attributes to an operation: `mode` and `latency`, where the `latency` value depends on the chosen `mode`. This setup can lead to two common problems:
+1. A later pass updates `mode` but forgets to update `latency`, leaving inconsistent or outdated information in the IR
+2. Another pass modifies `latency` without realizing it's derived from `mode`, potentially storing an invalid or contradictory combination.
+
+To avoid these issues, the IR should ideally store **decisions**, not derived data. In this case, the IR should only store `mode`—the actual decision—and compute `latency` on demand when needed.
+
+Any data that depends on other values should be derived, not stored. This ensures that updates to the underlying decision automatically propagate, and future passes can't accidentally introduce inconsistencies.
+
+How to calculate dependent information on-demand (i.e., `latency` in the example) is discussed in detail [below](#how-to-calculate-dependent-information-on-demand), to avoid breaking the logical flow.
+
+
+# Attributes in Tablegen
+
+If you declare an attribute using tablegen, the abstraction and verification of the name-value pair is handled automatically. 
+
+## How to Declare an Attribute in Tablegen
 
 The [operation definition specification](https://mlir.llvm.org/docs/DefiningDialects/Operations/) (ODS) covers how MLIR uses tablegen files to declaratively define operations, including attributes. 
 The [specific section](https://mlir.llvm.org/docs/DefiningDialects/Operations/#operation-arguments) of the ODS relevant to attributes is on operation arguments. 
 
-Arguments are specified in an operation's tablegen entry like so:
+Arguments can be specified in an operation's tablegen entry like so:
 
 ```tablegen
 let arguments = (ins
@@ -59,38 +84,22 @@ https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496
 
 Here, `$lhs` and `$rhs` are operands constrained to a custom type constraint (`ChannelType`), while `$predicate` is an attribute using a custom enum-based attribute constraint (`Handshake_CmpIPredicateAttr`).
 
-Argument order is flexible; operands and attributes can be mixed, as long as their constraint types clarify their roles.
-
-## Why Do We Store It Like This?
-
-Operation-specific attributes give us enough flexibility to store many types of information, generate convenient named getter functions, and allow easy constraints and verification of values.
-
-When used properly, they communicate clearly what information an operation **must** contain (as well as what information it **could** contain). Rules for what kind of values are allowed are also easy to declaratively provide.
-
-While functions exist to remove operation-specific attributes from the operation, each operation is automatically verified at the end of each pass: if a required attribute has been removed, compilation will fail.
-
-## What Types of Information to Store
-
-It is important to remember that an attribute could be altered by other sections of the code-base- it is therefore dangerous to place dependant data in an attribute. Consider a scenario where a pass assigns two attributes to an operation: `mode` and `latency`, where the `latency` value depends on the chosen `mode`. This setup can lead to two common problems:
-1. A later pass updates `mode` but forgets to update `latency`, leaving inconsistent or outdated information in the IR
-2. Another pass modifies `latency` without realizing it's derived from `mode`, potentially storing an invalid or contradictory combination.
-
-To avoid these issues, the IR should ideally store **decisions**, not derived data. In this case, the IR should only store `mode`—the actual decision—and compute `latency` on demand when needed. If both values must be persisted, they should be combined into a single, coherent attribute (e.g., a struct or enum) that captures their relationship explicitly.
-
-Any data that depends on other values should be derived, not stored. This ensures that updates to the underlying decision automatically propagate, and future passes can't accidentally introduce inconsistencies.
-
-How to calculate dependant information on-demand (i.e., `latency` in the example) is discussed in detail [below](#how-to-calculate-dependant-information-on-demand), to avoid breaking the logical flow.
+Argument order is flexible; operands and attributes can be mixed, as their constraint types specify their roles.
 
 ## Maintaining Backwards Compatibility
 
-When an attribute is added to an operation, it alters the builders of that operation. Builders are used to add an operation to the IR. If a new attribute is added to an operation, any pre-existing code that adds that operation to the IR will break.
+When an attribute is added to an operation, it alters the default builder of that operation. Builders are used to add an operation to the IR. If a new attribute is added to an operation, any pre-existing code that adds that operation to the IR will break.
 
 There are 2 typical situations.
 
 1. This pre-existing code **should** break, as the attribute is now required to be specified, and you must alter the code to provide the attribute.
 2. The attribute is not relevant to the pre-existing code, and you should provide backwards compatibility.
 
-In order to provide backward compatibility, it is recommended to add a custom builder that provides a default value for the attribute:
+To choose between the two, you must consider allocation of responsibility. Is your attribute relevant to the pre-existing code? If not, it should not be responsible for choosing the value of the attribute. 
+
+This includes setting the value to null: if your attribute is not relevant to the pre-existing code, that code should remain unaware of the attribute.
+
+In order to implement option 2, and provide backward compatibility, it is recommended to add a custom builder that provides a default value for the attribute:
 
 ```tablegen
 def MyOp : Op<"my_op", []> {
@@ -120,8 +129,6 @@ MyOp::build(::mlir::OpBuilder &builder, ::mlir::OperationState &state,
 ```
 which will maintain backwards compatibility with any builders that do not provide the attribute.
 
-A general principle is to **avoid modifying core passes and builders**—especially when those changes would impact widely used or shared code—unless they represent fundamental structural or philosophical improvements. Instead, it's preferable to add custom solutions tailored to specific needs or passes, keeping the core infrastructure stable and broadly applicable.
-
 ## Attribute Constraint Wrappers
 
 MLIR offers two attribute constraints that stack on top of normal ones: [OptionalAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#optional-attributes) and [DefaultValuedAttr](https://mlir.llvm.org/docs/DefiningDialects/Operations/#attributes-with-default-values). These wrappers modify how attributes behave during parsing, printing, and code generation.
@@ -133,6 +140,7 @@ def MyOp : Op<"my_op", []> {
   let arguments = (ins
     OptionalAttr<F32Attr>:$optionalAttr
   );
+}
 ```
 In this case, `$optionalAttr` is an attribute of type `F32Attr` wrapped with the `OptionalAttr` constraint.
 
@@ -142,7 +150,7 @@ While they appear helpful at first glance, neither works exactly as you might ex
 
 An attribute marked with `OptionalAttr` means that verification will not fail if the attribute is not present. Hence, the attribute is no longer required for the operation to be valid.
 
-It does not mean that the attribute is an optional argument when adding the operation to the IR. By default, some value **must** still be provided for the attribute when adding the operation to the IR. The builder of the operation still requires the attribute as one of its inputs, which would break backwards compatibility (look [here](#maintaining-backwards-compatibility) for more info on backward compatibility).
+It does not mean that the attribute is an optional argument when adding the operation to the IR. By default, some value **must** still be provided for the attribute when adding the operation to the IR. Like any [std::optional](https://en.cppreference.com/w/cpp/utility/optional.html), a value of [std::nullopt](https://en.cppreference.com/w/cpp/utility/optional/nullopt.html) is used to indicate that no value is present. Since the builder of the operation still requires the attribute as one of its inputs, adding an optional attribute will still break backwards compatibility (look [here](#maintaining-backwards-compatibility) for more info on backward compatibility).
 
 As described above, backwards compatibility should be maintained using custom builders. 
 
@@ -184,11 +192,11 @@ def MyOp : Op<"my_op", []> {
 
 ### DefaultValuedAttr
 
-The use of `DefaultValueAttr` affects primarily IR printing and parsing: attributes set to their default values are omitted in the .mlir file for more concise IR.
+The use of `DefaultValuedAttr` affects primarily IR printing and parsing: attributes set to their default values are omitted in the .mlir file for a more concise IR.
 
-Rarely, a `DefaultValueAttr` does result in an automatically generated custom builder, which allows us to add an operation to the IR without explicitly providing an attribute value. However, due to implementation reasons of C++, this usually does not happen.
+Rarely, a `DefaultValuedAttr` does result in an automatically generated custom builder, which allows us to add an operation to the IR without explicitly providing an attribute value. However, due to implementation reasons of C++, this usually does not happen.
 
-Therefore, the use of `DefaultValueAttr` does not typically affect the previously described need for custom builders when maintaining backward compatibility.
+Therefore, the use of `DefaultValuedAttr` does not typically affect the previously described need for custom builders when maintaining backward compatibility.
 
 
 ## Good Examples
@@ -245,41 +253,12 @@ Helpful getter and setter functions are also generated for each of its attribute
 
 There is an interesting redudancy to note in the attributes of the SharingWrapperOp- `numSharedOperations` **must** be equal both to the size of `credits`, and is also determistic based on its number of inputs. In best practice, values like this which can be calculated should not be stored as attributes.
 
-## Example to Avoid
+# Manually Abstracting and Verifying Attributes
 
+Instead of declaratively specifying an attribute in a single line in the Operation TableGen, you could implement this directly.
 
+The lower level functions to manage the attribute by name-value pair are:
 
-#### BufferOp
-As of time of writing, the buffer operation stores its RTL parameter attributes in a dictionary called "hw.parameters". 
-
-Since this dictionary is not verified, a BufferOp may not even have the attributes present at all when the operation is passed to the backend.
-
-Its arguments do not contain any attribute information:
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L226
-
-But it defines additional hardcoded strings to use as dictionary keys using:
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L233-L271
-
-To try and replicate some of the behaviour of dedicated attributes, a custom builder is declared in tablegen:
-
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L229-L232
-
-and then implemented separately in C++:
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/lib/Dialect/Handshake/HandshakeOps.cpp#L198-L221
-
-Due to this custom builder, the C++ to add a new operation looks as if it had used dedicated attributes:
-
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Transforms/HandshakePlaceBuffersCustom.cpp#L102-L103
-
-This builder successfully enforces the presence of buffer type at construction, but does not prevent later code from removing this attribute from the hw.parameters dictionary (in the above c++ accessed through RTL_PARAMETERS_ATTR_NAME). 
-
-There are also no named getters generated, and therefore these attributes must be accessed very awkwardly through the dictionary attribute:
-
-https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
-
-# Interface Attribute Approach
-
-Instead of defining attributes statically in the Operation TableGen, MLIR allows attributes to be added dynamically at runtime using C++ API functions:
 - [setAttr](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#ae5f0d4c61e6e57f360188b1b7ff982f6): assigns a value to an attribute.
 - [getAttrOfType](https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html#a8ec626dafc87ed8fb20d8323017dec72): retrieves an attribute of a specific type.
 
@@ -291,16 +270,102 @@ StringAttr op->getAttrOfType<StringAttr>("mode");
 ```
 In this example, an attribute named `mode` of type `StringAttr` with value `EXEC` is attached to an operation using the `setAttr` function. The attribute is later retrieved with the `getAttrOfType`.
 
-This dynamic approach is simple and flexible—it doesn’t require modifying TableGen definitions or maintaining custom builders. However, it introduces fragility through hardcoded attribute names (e.g.,`mode` in the example), which can lead to duplication and errors.
+This approach can be beneficial, as it avoids MLIR taking actions we do not want, such as breaking backwards compatibility of builders. However, it introduces fragility through hardcoded attribute names (e.g.,`mode` in the example).
 
-To address this, we recommend using [interfaces](https://mlir.llvm.org/docs/Interfaces/). Interfaces in MLIR allow operations, types, or attributes to expose structured, reusable behavior through custom methods. This enables:
-- Avoiding hardcoded strings,
-- Encapsulating attribute logic,
-- Sharing attribute handling across multiple operations.
+## Abstracting
 
-Hence, interfaces offer a more maintainable and scalable solution when attribute behavior becomes more complex or widely reused.
+Therefore, these functions should almost always be wrapped in dedicated getters or setters, which should be declared in `extraClassDeclaration`
 
-## How to Define Interface Attributes
+```tablegen
+let extraClassDeclaration = [{
+  void setMyAttr(StringRef value);
+  StringAttr getMyAttr();
+}];
+```
+
+These must then be implemented in `lib/Dialect/Handshake/HandshakeOps.cpp` (or in a similar file, if not a handshake operation) like so:
+
+```c++
+void MyOp::setMyAttr(StringRef value) {
+  (*this)->setAttr("myAttr", StringAttr::get(getContext(), value));
+}
+
+StringAttr MyOp::getMyAttr() {
+  return (*this)->getAttrOfType<StringAttr>("myAttr");
+}
+```
+
+`getAttrOfType` is safe to call if the attribute is not present, but will return a null pointer.
+
+## Verifying
+
+The attribute should additionally be verified, to make sure any rules for its presence or value are respected.
+
+You can add additional verification to an operation by adding
+```tablegen
+let hasVerifier = 1;
+```
+to its tablegen definition.
+
+This adds a verify function to the operation, which you can add a custom definition for (again in `lib/Dialect/Handshake/HandshakeOps.cpp` or similar)
+
+```c++
+mlir::LogicalResult MyOp::verify() {
+  if (!getMyAttr())
+    return emitOpError("requires 'myAttr' to be set");
+
+  return mlir::success();
+}
+```
+
+This verify function will be called at the end of every pass.
+
+## Mixed Example
+
+#### BufferOp
+As of time of writing, the buffer operation stores its RTL parameter attributes in a dictionary called "hw.parameters". This is less ideal than the above description of manual attribute handling, but in other ways this operation follows this paradigm.
+
+Its arguments do not contain any attribute information:
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L226
+
+But it defines additional hardcoded strings to use as dictionary keys using:
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L233-L271
+
+A custom builder is declared in tablegen:
+
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L229-L232
+
+and then implemented separately in C++:
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/lib/Dialect/Handshake/HandshakeOps.cpp#L198-L221
+
+This C++ does not use dedicated getters and setters, but rather `constexpr llvm::StringLiteral`.
+
+Due to this custom builder, the C++ to add a new operation looks as if it had used dedicated attributes:
+
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Transforms/HandshakePlaceBuffersCustom.cpp#L102-L103
+
+
+Verification is done manually, but weakly: the presence of the attributes is optional, as if the upper level hw.parameters is not present, verification passes. Direct strings are used to access the attributes, which is a very fragile approach. 
+
+https://github.com/EPFL-LAP/dynamatic/blob/7532a8e33cd3acf4196fece75a4dc20a60b66bb3/lib/Dialect/Handshake/HandshakeOps.cpp#L429-L455
+
+There are also no named getters written, and therefore these attributes must be accessed very awkwardly through the dictionary attribute:
+
+https://github.com/EPFL-LAP/dynamatic/blob/66162ef6eb9cf2ee429e58f52c5e5e3c61496bdd/experimental/lib/Support/SubjectGraph.cpp#L825-L830
+
+The above getter is also not safe, as the buffer verification does not enforce that hw.parameters is present, and could cause a null pointer exception.
+
+# Multi-Operation Attributes
+
+As mentioned at the beginning, if an attribute could be present on many operations, to perform the above steps per operation can become burdensome.
+
+There are 2 alternatives:
+1. Interfaces
+2. Free Functions
+
+## Interfaces
+
+To address this, we recommend using [interfaces](https://mlir.llvm.org/docs/Interfaces/). Interfaces in MLIR allow operations to share methods, reducing code duplication. The hardcode string of the attribute name can be placed in these shared methods, reducing the fragility of name-value pairs.
 
 The following TableGen snippet defines a simple interface for setting and getting a `StringAttr` named `myAttr`:
 ```tablegen
@@ -318,48 +383,42 @@ def MyInterface : OpInterface<"MyInterface"> {
         Gets the StringAttr named "myAttr". 
       }], "StringAttr", "getMyAttr", (ins), [{
         Operation *op = $_op.getOperation();
-        if ( auto attr = op->getAttrOfType<StringAttr>("myAttr") )
-          return attr;
-        return StringAttr::get(op->getContext, "NULL");      
+        return op->getAttrOfType<StringAttr>("myAttr") )
       }]>
   ]
 }
 ```
 This interface defines:
 - `setMyAttr`: assigns a string attribute called `myAttr` using `setAttr`.
-- `getMyAttr`: retrieves the `myAttr` attribute, returning `NULL` if it's not set.
+- `getMyAttr`: retrieves the `myAttr` attribute, returning a null pointer if it is not present.
 
 To enable an operation to use this interface, list it in the operation definition:
 ```tablegen
 def MyOp : Op<"my_op", [MyInterface]> {
   let arguments = ...
 ```
-Now, any `MyOp` operation supports `getMyAttr()` and `setMyAttr(...)` methods. Here's how you would safely use the interface in C++:
+Now, any `MyOp` operation supports `getMyAttr()` and `setMyAttr(...)` methods, usable in C++:
 ```
 if (auto myInterface = llvm::dyn_cast<MyInterface>(op)) {
-  myInterface.setMyAttr("EXEC");
+  myInterface.setMyAttr("foo");
 }
 ```
-This dynamically checks whether the operation implements `MyInterface` before calling the setter method.
 
-As mentioned before, using interfaces to manage attributes in MLIR avoids hardcoding attribute names and centralizes logic, making code more maintainable and reusable. It also allows you to extend operations without modifying their core definitions or builders, which is useful for adding dynamic behavior across multiple ops.
+However, you cannot add custom verification directly to an interface, making interface attribute methods less safe than operation attribute methods. If desired, you could call an interface verify function from the verify function of each operation that implements it, but this scales poorly. 
 
-However, attributes added via interfaces are not verified by MLIR, so their presence isn't guaranteed. This makes the approach more flexible but also riskier—getters must always check for attribute existence, and changes elsewhere in the codebase can silently break assumptions.
+In this way, interfaces offer attribute abstraction, but not attribute verification.
 
+### Good Example
 
-## Good Example
-
-### InternalDelay for Arithmetic Ops
+#### InternalDelay for Arithmetic Ops
 
 This is an example of an interface to store the attribute that saves internal delay information in Dynamatic.
-
-This is the code structure of the interfaces in TableGen:
 
 https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e11b4/include/dynamatic/Dialect/Handshake/HandshakeInterfaces.td#L221-L246
 
 The two functions in the interface set and retrieve the attribute. Rather than returning null attributes, if the attribute is not present, a default value of "0.0" is returned.
 
-Then, all Handshake_Arith_Op operations can use this interface since we added it in the corresponding TableGen:
+The interface is added to Handshake_Arith_Op, the base class for all arithmetic operations.
 
 https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e11b4/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L21-L23
 
@@ -371,79 +430,126 @@ https://github.com/EPFL-LAP/dynamatic/blob/f52cb1f922897faf1b66fb087a601064f89e1
 
 As shown in this example, this interface can be used across different passes and at different stages of the flow.
 
+## Free Functions
+
+If the presence or absence of an attribute is independent of an operation's type, interfaces may not make sense, as the interface would need to be added to every single operation. Instead getters and setters can be implemented as free functions. Free functions are functions which are not part of any class.
+
+Free verification functions could also be written if desired, but like with interfaces, they would need to be manually added to the verify function of each individual operation, which makes verification more-or-less impossible.
+
+### Medium Example
+
+#### Basic Block Number
+
+Operations in the Handshake IR have a non-operation-specific attribute to indicate which basic block they belong to.
+
+And free getter is provided to get the attribute:
+
+https://github.com/EPFL-LAP/dynamatic/blob/7532a8e33cd3acf4196fece75a4dc20a60b66bb3/lib/Support/CFG.cpp#L33-L38
+
+And a free setter is used to set the attribute.
+https://github.com/EPFL-LAP/dynamatic/blob/7532a8e33cd3acf4196fece75a4dc20a60b66bb3/lib/Support/CFG.cpp#L56-L60
+
+Interesting, a `constexpr llvm::StringLiteral` is used to store the attribute name.
+
+https://github.com/EPFL-LAP/dynamatic/blob/7532a8e33cd3acf4196fece75a4dc20a60b66bb3/include/dynamatic/Support/CFG.h#L32-L34
+
+This is due to inconsistant design of how the BB attribute is accessed and used, which increases the fragility of name-value pairs. While you may wish to use a `constexpr llvm::StringLiteral` even when you are stricter with your getter and setter, needing this is a sign of poor design.
+
 # Pros and Cons Summary
 
-The following is a table that sums up the pros and cons of both approaches
+## Declarative (TableGen-Based) Operation Attributes
+| Aspect                  | Description                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Use Case                | Best when attributes are operation-specific.                                  |
+| Abstraction             | Declared in the `let arguments` list using attribute constraints. MLIR auto-generates typed getters and setters.                 |
+| Verification            | Automatic verification of attribute presence. Value is verified using the provided attribute constraint.  |
+| Attribute Name Handling | Attribute name is embedded in generated getter and setter. |
+| Integration             | **Breaks the default builder**, often requiring custom builders to be provided.          |
+| Scalability             | Not scalable across many ops, as requires logic to be duplicated.                           |
 
-TableGen-Based Attribute:
+## Manual Operation Attribute Handling
+| Aspect                  | Description                                                                                              |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| Use Case                | Best when attributes are operation-specific. |
+| Abstraction             | Implemented using explicit getter/setter methods that call `getAttrOfType` / `setAttr`.                  |
+| Verification            | Must be added manually using `let hasVerifier = 1` and a custom `verify()` method.                       |
+| Attribute Name Handling | Attribute name is hardcoded in getter and setter.  |
+| Integration             | Does not alter the default builder, which avoids breaking backwards compatibility with existing code.             |
+| Scalability             | Not scalable across many ops, as requires logic to be duplicated.                        |
 
-| Pros | Cons |
-|------|------|
-| Declarative | Adding optional/default values may require custom builders |
-| Built-in verification | May break existing code if attribute definitions change |
-| Good IR printing/parsing support | Less flexible at runtime |
-| Clear schema for operation authors |  |
+## Interfaces
 
-Interface-Based Attribute:
+| Aspect                  | Description                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Use Case                | Best suited when the same attribute and logic are shared across many related operations.                        |
+| Abstraction             | Define shared getter/setter methods via `OpInterface`.      |
+| Verification            | No built-in verification: if needed, it must be added manually in each op’s `verify()`, which **scales poorly**.              |
+| Attribute Name Handling | Centralized in one place inside the interface getter and setter.    |
+| Integration             | Only requires adding the interface to each participating op's definition. External logic handling the attribute can check for a single interface, rather than many operations. |
+| Scalability             | Scales well for logic reuse, but poorly for enforcing correctness or presence of the attribute.                 |
 
-| Pros | Cons |
-|------|------|
-| Highly flexible and runtime configurable | No built-in attribute verification |
-| Allows adding logic without touching op definitions | Getters must always check for attribute presence |
-| Logic can be reused across ops via interfaces | Harder to trace and debug if misused |
-| Avoids hardcoding attribute names when wrapped in interface |  |
+## Free Functions
 
+| Aspect                  | Description                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Use Case                | Best suited when attribute presence is independent of operation type and may apply to many ops.                                 |
+| Abstraction             | Implement free getter/setter functions, defined outside of any operation class.                                                 |
+| Verification            | Possible via helper functions, but must be manually called from each op’s `verify()`, making it **not scalable**.                |
+| Attribute Name Handling | Should be centralized inside the free getter and setter. If not centralized, storing attribute name in a `constexpr llvm::StringLiteral` can reduce fragility, but usually indicates poor design. |
+| Integration             | Doesn't require editing op definitions as functions are external.                                                            |
+| Scalability             | Easy to reuse logic across many ops                                   |
 
-# Appendix: How to Calculate Dependant Information On Demand
+# Appendix: How to Calculate dependent Information On Demand
 
 In this section, we show how we can extract information on demand from decisions made in previous passes.
 
 We take the example case of specifying an arithmetic operation's implementation (decision), which in turn defines its internal delay (information).
 
-We first represent the implementation as a StringAttr, add verification logic (in the `verify` function), and a custom builder. 
+We first represent the implementation as a custom `EnumAttr`, to enforce a limited set of choices. Since the implementations vary per operation, this enum would be defined per arithmetic operation.
 ```
-  let arguments = (ins StrAttr:$implementation);
+def Handshake_MyOpImpAttr : I64EnumAttr<
+    "MyOpImp", "",
+    [
+      I64EnumAttrCase<"Impl0", 0, "impl1">,
+      I64EnumAttrCase<"Impl1", 1>,
+      I64EnumAttrCase<"Impl2", 2>,
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+```
 
-  let hasVerifier = 1;
+An `I64EnumAttrCase<symbol, intVal, strVal>` is used to specify the cases. 
+1.`symbol` is the C++ used to retrieve constants, e.g. `MyOpImp::IMPL0`
+2.`intVal` is the integer value of the enum case.
+3.`strVal` is an optional value, which will be returned by the auto-generated `ConvertToString(MyOpImp val)` function, if you wish to use that function for something. If `strVal` is absent, `ConvertToString(MyOpImp val)` returns `symbol` instead.
 
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral IMPL1 = "IMPL1";
-    static constexpr ::llvm::StringLiteral IMPL2 = "IMPL2";
-    static constexpr ::llvm::StringLiteral IMPL3 = "IMPL3";
 
-    static LogicalResult verify(Operation *op) {
-      auto attr = op->getAttrOfType<StringAttr>("implementation");
-      if (!attr)
-        return op->emitError("requires 'implementation' attribute");
-      auto val = attr.getValue();
-      if (val != IMPL1 && val != IMPL2 && val != IMPL3)
-        return op->emitError() << "'implementation' must be '" << IMPL1
-                              << "', '" << IMPL3 << "', or '" << IMPL3 << "'";
-      return success();
-    }
-  }];
+We then use this attribute constraint to declaratively add an attribute to the operation in tablegen. Additionally, we add a custom builder to maintain backwards compatibility.
+
+```
+def MyOp : Op<> {
+  let arguments = (ins Handshake_MyOpImpAttr:$implementation);
 
   let builders = [
-    // Uses hardcoded string to set 'implementation' 
-    // since TableGen builders can't reference C++ constants
     OpBuilder<(ins), [{
-      build($_builder, $_state, /*implementation=*/"IMPL1");
+      build($_builder, $_state, /*implementation=*/MyOpImp::Impl1);
     }]>
   ];
+}
 ```
-In this way, we ensure that a decision respects the required assumptions. For instance, in the example, the attribute has to exist, and it must be one of three types (`IMPL1`, `IMPL2`, or `IMPL3`). Additionally, the custom builder allows to respect backward compatibility.
 
 Then, the function to calculate internal delay could look something like this:
 ```
 int getInternalDelay() {
-  auto val = getImplementation().getValue();
-  if (val == IMPL1) return 1;
-  if (val == IMPL2) return 2;
-  if (val == IMPL3) return 3;
-  llvm_unreachable("Invalid implementation string");
+  switch (getImplementation().getValue()) {
+    case MyOpImp::Impl1: return 1;
+    case MyOpImp::Impl2: return 2;
+    case MyOpImp::Impl3: return 3;
+  }
+  llvm_unreachable("Invalid implementation enum");
 }
 ```
-The information (delay) can be extracted from the decision (implementation).
+The information (delay) is extracted from the decision (implementation).
 
 If this function should be callable across multiple operations, it could come from an interface:
 ```
@@ -455,59 +561,43 @@ def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
   ];
 }
 ```
-This would ensure a safe execution across different passes and operations.
 
 The final operation would look something like:
 ```
-def AddOp : Op<"mydialect.add", [InternalDelayInterface]> {
-  let summary = "Add operation with implementation mode";
-  let arguments = (ins StrAttr:$implementation);
+def Handshake_MyOpImpAttr : I64EnumAttr<
+    "MyOpImp", "",
+    [
+      I64EnumAttrCase<"Impl0", 0, "impl1">,
+      I64EnumAttrCase<"Impl1", 1>,
+      I64EnumAttrCase<"Impl2", 2>,
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+def MyOp : Op<[InternalDelayInterface]> {
+  let summary = "Operation with implementation mode";
+  let arguments = (ins Handshake_MyOpImpAttr:$implementation);
   let results = (outs);
 
   let builders = [
-    // Uses hardcoded string to set 'implementation' 
-    // since TableGen builders can't reference C++ constants
     OpBuilder<(ins), [{
-      build($_builder, $_state, /*implementation=*/"IMPL1");
+      build($_builder, $_state, /*implementation=*/MyOpImp::Impl1);
     }]>
   ];
 
-  let hasVerifier = 1;
-
   let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral IMPL1 = "IMPL1";
-    static constexpr ::llvm::StringLiteral IMPL2 = "IMPL2";
-    static constexpr ::llvm::StringLiteral IMPL3 = "IMPL3";
-
     int getInternalDelay() {
-      auto val = getImplementation().getValue();
-      if (val == IMPL1) return 1;
-      if (val == IMPL2) return 2;
-      if (val == IMPL3) return 3;
-      llvm_unreachable("Invalid implementation string");
-    }
-
-    static LogicalResult verify(Operation *op) {
-      auto attr = op->getAttrOfType<StringAttr>("implementation");
-      if (!attr)
-        return op->emitError("requires 'implementation' attribute");
-      auto val = attr.getValue();
-      if (val != IMPL1 && val != IMPL2 && val != IMPL3)
-        return op->emitError() << "'implementation' must be '" << IMPL1
-                               << "', '" << IMPL2 << "', or '" << IMPL3 << "'";
-      return success();
+      switch (getImplementation().getValue()) {
+        case MyOpImp::Impl1: return 1;
+        case MyOpImp::Impl2: return 2;
+        case MyOpImp::Impl3: return 3;
+      }
+      llvm_unreachable("Invalid implementation enum");
     }
   }];
 }
 ```
 which combines the previous codes.
-
-Finally, to set the attribute in C++ would use the following code:
-
-```
-addOp.setImplementation(AddOp::IMPL1);
-```
-which would be a safe assignment that would not break backward compatibility.
 
 <!-- # RTL Entity Sharing
 
