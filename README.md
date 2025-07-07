@@ -2,7 +2,7 @@
 # Dynamatic
 Dynamatic is an academic, open-source high-level synthesis compiler that produces synchronous dynamically-scheduled circuits from C/C++ code. Dynamatic generates synthesizable RTL which currently targets Xilinx FPGAs and delivers significant performance improvements compared to state-of-the-art commercial HLS tools in specific situations (e.g., applications with irregular memory accesses or control-dominated code). The fully automated compilation flow of Dynamatic is based on MLIR. It is customizable and extensible to target different hardware platforms and easy to use with commercial tools such as Vivado (Xilinx) and Modelsim (Mentor Graphics).
 
-We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/GettingStarted.md#contributing).
+We welcome contributions and feedback from the community. If you would like to participate, please check out our [contribution guidelines](docs/GettingStarted.md#contributing).
 
 ## Setting up Dynamatic
 
@@ -12,7 +12,8 @@ There are currently two ways to setup and use Dynamatic
 We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [Build instructions](#build-instructions) below. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distributions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 **2. Use the Provided Virtual Machine**  
-We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic, Modelsim, and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](docs/UserGuideTopics/usage.md)) or as a starting point to use/[modify](docs/UserGuideTopics/AdvancedUsage.md) Dynamatic in general.
+We provide an [Ubuntu-based Virtual Machine](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/VMSetup.md) (VM) that already has Dynamatic and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](docs/UserGuideTopics/usage.md)) or as a starting point to use/[modify](docs/UserGuideTopics/AdvancedUsage.md) Dynamatic in general.  
+> You will need to install Modelsim or Questa manually to run simulations! Click [here]() for instructions on installing them.
 
 
 ### Build Instructions
@@ -72,4 +73,4 @@ ninja check-dynamatic
 Now, you have the groundwork for [using dynamatic](docs/UserGuideTopics/Usage.md) and trying the [Advanced build](docs/UserGuideTopics/AdvancedBuild.md) options.
 For information on usage and features, please check out [the user manual](docs/UserManual.md).
 
-[Go to top of the page](#installing-dynamatic)
+[Go to top of the page](#setting-up-dynamatic)
