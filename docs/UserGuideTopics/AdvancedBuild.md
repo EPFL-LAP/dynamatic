@@ -7,6 +7,7 @@
 3. [Building](#3-building)
 4. [Interactive Visualizer](#4-interactive-dataflow-circuit-visualizer)
 5. [Enabling XLS Integration](#5-enabling-the-xls-integration)
+6. [Modelsim/Questa sim installation](#6-modelsimquesta-sim-installation)
 
 >This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../../README.md) page.
 
@@ -191,3 +192,41 @@ rm build/CMakeCache.txt
 ./build.sh --experimental-enable-xls
 ```
 Once enabled, you do not need to provide `./build.sh` with `--experimental-enable-xls` to re-build.
+
+## 6. Modelsim/Questa installation
+Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) (has 32 bit dependencies) or [Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) (64 bit simulator) to run simulations, thus you need to install it before hand. [Download](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) Modelsim or Questa, install it (in a directory with no special access permissions) and add it to path for Dynamatic to be able to run it. Add the following lines to the `.bashrc` file in your home directory to add modelsim to path variables.  
+> Ensure you write the full path
+```
+export MODELSIM_HOME=/path/to/modelsim  # path will look like /home/username/intelFPGA/20.1/modelsim_ase
+export PATH="$MODELSIM_HOME/bin:$PATH"  # (adjust the path accordingly)
+```
+or
+```
+export MODELSIM_HOME=/path/to/questa    # path will look like home/username/altera/24.1std/questa_fse/
+export PATH="$MODELSIM_HOME/bin:$PATH"
+```
+
+In any terminal, `source` .bashrc file and run the `vsim` command to verify that modelsim was added to path properly and runs.
+```
+source ~/.bashrc
+vsim
+```
+If you encounter any issue related to `libXext` (if you installed Modelsim) you may need to install a few more libraries to enable the 32 bit architecture which supports packages needed by Modelsim:
+```
+sudo dpkg -add-architecture i386
+sudo apt update
+sudo apt install libxext6:i386 libxft2:i386 libxrender1:i386
+```
+
+If you are using Questa, running `vsim` will give you an error relating to the absence of a license.
+To obtain a license (free or paid):
+- Create an account on Intel's [Self Servicing License Center](https://www.intel.com/content/www/us/en/docs/programmable/683472/22-1/and-software-license.html) page. The page has detailed instructions on how to obtain a license.
+- Request for a license. You will receive an authorization email with instructions on setting up a fixed or floating license (a fixed license suffices). This could take some minutes or up to a few hours.
+- Download the license file and add it to path as shown below
+```
+#Questa license set up
+export LM_LICENSE_FILE=/path/to/license/file     # looks like this "home/username/.../LR-240645_License.dat:$LM_LICENSE_FILE"
+export MGLS_LICENSE_FILE=/path/to/license/file   # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
+export SALT_LICENSE_SERVER=/path/to/license/file # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
+```
+> You may need only one of the three lines above based on the version of Questa you are using. Refer to the release notes for the version you have installed. Having the three lines poses no issue nonetheless.
