@@ -38,7 +38,7 @@ Additionally, if an attribute should be present on many units, the automated flo
 
 ## Why Do We Store It Like This?
 
-Intermediate representations must be serializable, which means to convert them to a text representation and store them in a file. Therefore the complex C++ data structures representing operations, and their connections, must be serializable. Since attributes are a feature of MLIR, this serialization (and de-serializaton) of our extra information is handled automatically.
+Intermediate representations must be serializable, which means to convert them to a text representation and store them in a file. Therefore the complex C++ data structures representing operations, and their connections, must be serializable. Since attributes are a feature of MLIR, this serialization (and de-serialization) of our extra information is handled automatically.
 
 If your information does not need to persist between passes, you may be better off using a custom temporary data structure. However, any information that should remain attached to an operation for the rest of compilation should be an attribute.
 
