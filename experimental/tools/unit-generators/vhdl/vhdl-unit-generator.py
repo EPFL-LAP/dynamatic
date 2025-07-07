@@ -44,6 +44,7 @@ import generators.handshake.init as init
 import generators.handshake.passer as passer
 import generators.handshake.spec_v2.resolver as spec_v2_resolver
 import generators.handshake.spec_v2.repeating_init as spec_v2_repeating_init
+import generators.handshake.spec_v2.interpolator as spec_v2_interpolator
 
 
 def generate_code(name, mod_type, parameters):
@@ -132,6 +133,8 @@ def generate_code(name, mod_type, parameters):
             return spec_v2_resolver.generate_spec_v2_resolver(name, parameters)
         case "spec_v2_repeating_init":
             return spec_v2_repeating_init.generate_spec_v2_repeating_init(name, parameters)
+        case "spec_v2_interpolator":
+            return spec_v2_interpolator.generate_spec_v2_interpolator(name, parameters)
         case _:
             raise ValueError(f"Module type {mod_type} not found")
 

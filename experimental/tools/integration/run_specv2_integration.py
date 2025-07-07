@@ -293,7 +293,7 @@ def run_test(c_file, id, timeout):
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=6.000 timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout
