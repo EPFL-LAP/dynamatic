@@ -58,62 +58,125 @@ In the VHDL Signal Name column, the following placeholders are used: `{g}` for t
 The Group Allocator has the following responsibilities:
 
 1. **Queue Space Calculator**  
-This initial block calculates the number of currently free entries in both the load queue and the store queue.
+![Occupied Entry Calculation Description](./figs/ga/GA_1_Queue_Space_Calculator.png)  
+![Occupied Entry Calculation](./figs/ga/GA_1.png)  
+    This block performs an initial calculation of the number of occupied entries in each queue.  
+    - **Input**:  
+        - `ldq_head_i`, `ldq_tail_i`: Head and tail pointers for the Load Queue.
+        - `stq_head_i`, `stq_tail_i`: Head and tail pointers for the Store Queue.  
+    - **Processing**:  
+        - It performs a cyclic subtraction (`WrapSub`) of the pointers for each queue. This calculation gives the number of empty slots but is ambiguous when the two pointers are the same (`head == tail`) since it can either mean empty or full.  
 
-    - It takes the `head` and `tail` pointers for each queue as inputs.
-    - It performs a cyclic subtraction (`WrapSub`) on the pointers (`head - tail`) to determine how many slots are currently free.
-    - However, it does not reflect when the queue is empty, so we need a further step. 
-    - The results are stored in intermediate signals (`loads_sub`, `stores_sub`).
+              WrapSub
+
+                if head >= tail:
+                    out = head - tail
+                else:
+                    out = (head + numEntries) - tail
+    - **Output**:  
+        - `loads_sub`, `stores_sub`: Intermediate signals holding the result of the cyclic subtraction for each queue.
+
 
 2. **Free Entry Calculation**  
-This block determines the final number of free entries available in each queue, which is the most critical information for deciding if a new group can be allocated.
-
-    - It uses the free entry counts from the previous block.
-    - It uses a multiplexer logic: If the queue is empty (indicated by the `ldq_empty_i` or `stq_empty_i` signal), it outputs the maximum queue size. Otherwise, it outputs `loads_sub` or `stores_sub`.
-    - The results are the final free-space counts (`empty_loads`, `empty_stores`).
-
+![Free Entry Calculation Description](./figs/ga/GA_2_Free_Entry_Calculation.png)  
+![Free Entry Calculation](./figs/ga/GA_2.png)  
+    This block determines the final number of free entries available in each queue.
+    - **Input**:
+        - `loads_sub`, `stores_sub`: The tentative free entry counts from the previous block.
+        - `ldq_empty_i`, `stq_empty_i`: Flags indicating if each queue is empty.
+    - **Processing**:
+        - It uses multiplexer logic to resolve the ambiguity of the previous step.
+        - If a queue's `empty` flag is asserted, it outputs the maximum queue size (`numLdqEntries` or `numStqEntries`).
+        - Otherwise, it outputs the result from the `WrapSub` calculation.
+    - **Output**:
+        - `empty_loads`, `empty_stores`: The definitive number of free entries in the load and store queues.
 
 3. **Ready Signal Generation**  
-This block checks if the load queue and the store queue are ready to accept a specific group allocation request.
-
-    - It compares the available free entries (from block 2) with the number of loads and stores required by each incoming group (`gaNumLoads`, `gaNumStores`).
-    - If there is enough space in both the Load and Store queues for a given group, it generates a `ready` signal for that specific group.
+![Ready Signal Generation Description](./figs/ga/GA_3_Ready_Signal_Generation.png)  
+![Ready Signal Generation](./figs/ga/GA_3.png)  
+    This block checks if there is sufficient space in the queues for each potential group.
+    - **Input**:
+        - `empty_loads`, `empty_stores`: The number of free entries available in each queue.
+        - `gaNumLoads`, `gaNumStores`: Configuration arrays specifying the number of loads and stores required by each group.
+    - **Processing**:
+        - For each group, it compares the available space (`empty_loads`, `empty_stores`) with the required space (`gaNumLoads[g]`, `gaNumStores[g]`).
+        - A group is considered "ready" only if there is enough space for *both* its loads and its stores.
+    - **Output**:
+        - `group_init_ready`: An array of ready signals, one for each group, indicating whether it could be allocated.
+        - `group_init_ready_o`: The final ready signals sent to the external logic.
 
 
 4. **Handshake and Arbitration**  
-This block performs the final handshake to select a single "winning" group for the current cycle.
+![Handshake and Arbitration Description](./figs/ga/GA_4_Handshake_and_Arbitration.png)  
+![Handshake and Arbitration](./figs/ga/GA_4.png)  
+    This block performs the final handshake to select a single oldest group for the current cycle. However, the arbitration happens when one of the configuration signal `gaMulti` is on, and this diagram depicts when `gaMulti` is off.  
+    - **Input**:
+        - `group_init_ready`: The readiness status for each group from the previous block.
+        - `group_init_valid_i`: The external valid signals for each group.
+        - (Optional) `ga_rr_mask`: A round-robin mask used for arbitration if multiple groups can be allocated (`gaMulti` is true).
+    - **Processing**:
+        - It combines the `ready` and `valid` signals. A group must be both ready and valid to be a candidate for allocation.
+        - If multiple groups are candidates, an arbitrator (e.g., `CyclicPriorityMasking`) selects a single group. If `gaMulti` is false, it assumes only one valid allocation request can occur at a time as depicted.
+    - **Output**:
+        - `group_init_hs`: A one-hot signal indicating the single group that will be allocated at the current cycle.
 
-    - It takes the `ready` signals for all groups (from block 3) and combines them with the external `group_init_valid_i` request signals.
-    - If multiple groups are both valid and ready, a round-robin arbitrator selects one group to be allocated. This block outputs the one-hot signal that indicates the winning group.
+
 
 5. **Port Index Generation**  
-This block generates the correctly aligned port indices for the newly allocated entries.
+![Port Index Generation Description](./figs/ga/GA_5_Port_Index_Generator.png)  
+![Port Index Generation](./figs/ga/GA_5.png)  
+    This block generates the correctly aligned port indices for the entries being allocated.
+    - **Input**:
+        - `group_init_hs`: A one-hot signal indicating the single group that will be allocated at the current cycle.
+        - `ldq_tail_i`, `stq_tail_i`: The current tail pointers of the queues.
+        - `gaLdPortIdx`, `gaStPortIdx`: Pre-compiled ROMs containing the port indices for each group.
+    - **Processing**:
+        - Uses the `group_init_hs` signal to perform a ROM lookup (`Mux1HROM`), selecting the list of port indices for the allocated group.
+        - Performs `CyclicLeftShift` on the selected list, using the corresponding queue's `tail` pointer as the shift amount. This aligns the indices to the correct physical queue entry slots.
+    - **Output**:
+        - `ldq_port_idx_o`, `stq_port_idx_o`: The final, shifted port indices to be written into the newly allocated queue entries.
 
-    - It performs a **ROM lookup** using the winning group's ID to fetch the pre-compiled list of port indices (e.g., `gaLdPortIdx`).
-    - It then applies a **`CyclicLeftShift`** to this list, using the queue's current `tail` pointer as the shift amount. This aligns the port indices with the correct physical entry slots in the queue.
-    - The final outputs are `ldq_port_idx_o` and `stq_port_idx_o`.
 
 6. **Order Matrix Generation**  
-This block generates the correctly aligned intra-group order matrix for the new entries.
-
-    - It performs a **ROM lookup** for the winning group to fetch its pre-compiled 2D order sub-matrix (`gaLdOrder`).
-    - It then performs a 2D `CyclicLeftShift` on this sub-matrix, using both the load and store queue `tail` pointers. This correctly places the sub-matrix within the LSQ's main order matrix, defining the dependencies for the new entries relative to existing ones.
-    - The final output is `ga_ls_order_o`.
+![Order Matrix Generation Description](./figs/ga/GA_6_Order_Matrix_Generation.png)  
+![Order Matrix Generation](./figs/ga/GA_6.png)  
+    This block generates the load-store order matrix between the new loads and stores in the allocated group.
+    - **Input**:
+        - `group_init_hs`: A one-hot signal indicating the single group that will be allocated at the current cycle.
+        - `ldq_tail_i`, `stq_tail_i`: The current tail pointers of the queues.
+        - `gaLdOrder`: A pre-compiled ROM containing the load-store order information for each group. For each group, the corresponding list indicates, from the perspective of a load, the number of stores that come before it within the same group.
+    - **Processing**:
+        - Uses `group_init_hs` to perform a ROM lookup, selecting the order information for the allocated group. This information is used to build an un-aligned load-store order matrix.
+        - A `1` in `(le, se)` indicates that `store_{se}` comes before `load_{le}`. This is built by the function `MaskLess`.
+        - Performs `CyclicLeftShift` on this matrix two times, shifting it horizontally by `stq_tail_i` and vertically by `ldq_tail_i`. This correctly places the sub-matrix within the LSQ's main order matrix.
+    - **Output**:
+        - `ga_ls_order_o`: The final, shifted load-store order matrix defining order of the new loads and stores.
 
 7. **Load/Store Count Extraction**  
-This block simply extracts the number of loads and stores for the winning group.
+![Load/Store Count Extraction Description](./figs/ga/GA_7_Load_Store_Count_Extraction.png)  
+![Load/Store Count Extraction](./figs/ga/GA_7.png)  
+    This block extracts the number of loads and stores for the allocated group.
+    - **Input**:
+        - `group_init_hs`: A one-hot signal indicating the single group that will be allocated at the current cycle.
+        - `gaNumLoads`, `gaNumStores`: Pre-compiled ROMs containing the load/store counts for each group.
+    - **Processing**:
+        - Performs a simple ROM lookup (`Mux1HROM`) using `group_init_hs` to select the number of loads and stores corresponding to the allocated group.
+    - **Output**:
+        - `num_loads_o`, `num_stores_o`: The number of loads and stores in the newly allocated group.
 
-    - It performs a **ROM lookup** for the winning group to get its specific `numLoads` and `numStores` values.
-    - These values are passed to the outputs `num_loads_o` and `num_stores_o`.
 
 8. **Write Enable Generation**  
-This final block generates the write-enable pulses that activate the newly allocated queue entries.
-
-    - It first creates an unshifted bitmask (`ldq_wen_unshifted`) based on the load/store counts from block 7. For example, if `num_loads` is 3, the mask is `0...0111`.
-    - It then applies a `CyclicLeftShift` to this mask, using the queue's `tail` pointer as the shift amount.
-    - The final shifted vector is the output (`ldq_wen_o` or `stq_wen_o`), which asserts a '1' for the precise entries in the queue that are being allocated in this cycle.
-
-
+![Write Enable Generation Description](./figs/ga/GA_8_Write_Enable_Generation.png)  
+![Write Enable Generation](./figs/ga/GA_8.png)  
+    This final block generates the write-enable signals to allocate the new queue entries.
+    - **Input**:
+        - `num_loads`, `num_stores`: The load/store counts from the previous block.
+        - `ldq_tail_i`, `stq_tail_i`: The current tail pointers of the queues.
+    - **Processing**:
+        - First, it creates an unshifted bitmask. For example, if `num_loads` is 3, the mask is `...00111`.
+        - It then applies `CyclicLeftShift` to this mask, using the queue's `tail` pointer as the shift amount. This rotates the block of `1`s to start at the `tail` position.
+    - **Output**:
+        - `ldq_wen_o`, `stq_wen_o`: The final write-enable vectors, which assert a '1' for the precise entries in each queue that are being allocated.
 
 
 ## 3. Dataflow Walkthrough
@@ -128,7 +191,7 @@ This walkthrough explains the step-by-step operation of the `Group Allocator` ba
     * Load Queue: `ldq_tail`=1, `ldq_head`=4, `ldq_empty_i`=0 (Not Empty)
     * Store Queue: `stq_tail`=1, `stq_head`=1, `stq_empty_i`=1 (Empty)
 * **Queue Sizes**: `numLdqEntries`=6, `numStqEntries`=4
-* **Group Request**: `group_init_valid_i`=`[1,0,0,0,0]` (Only Group 0 is requesting)
+* **Group Allocation Request**: `group_init_valid_i`=`[1,0,0,0,0]` (Only Group 0 is requesting for the allocation)
 * **Group Configurations**:
     * `gaNumLoads` = `[3, 2, 1, 6, 3]`
     * `gaNumStores` = `[2, 1, 2, 3, 4]`
