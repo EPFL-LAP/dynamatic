@@ -6,7 +6,8 @@ use ieee.std_logic_1164.all;
 -- Entity of eager_fork_register_block
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- inputs
     ins_valid    : in std_logic;
     outs_ready   : in std_logic;

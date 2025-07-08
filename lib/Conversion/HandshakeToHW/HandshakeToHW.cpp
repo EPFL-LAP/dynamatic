@@ -649,13 +649,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             handshake::AbsFOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
-        auto delayAttr = op->getAttrOfType<StringAttr>("internal_delay");
-        if (!delayAttr) {
-          llvm::errs() << "Missing 'internal_delay' attribute in op: "
-                       << op->getName() << "\n";
-          delayAttr = StringAttr::get(op->getContext(), "0.0");
-        }
-        addParam("INTERNAL_DELAY", delayAttr);
       })
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
@@ -696,6 +689,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
+
+  if (auto internalDelayInterface =
+          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+    auto delayAttr = internalDelayInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {

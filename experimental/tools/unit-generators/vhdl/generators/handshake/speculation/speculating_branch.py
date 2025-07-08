@@ -29,7 +29,8 @@ use ieee.std_logic_1164.all;
 -- Entity of speculating_branch
 entity {name} is
   port(
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- data input channel
     {data(f"data       : in  std_logic_vector({data_bitwidth} - 1 downto 0);", data_bitwidth)}
     data_valid : in  std_logic;
