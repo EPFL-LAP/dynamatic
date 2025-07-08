@@ -283,6 +283,14 @@ static bool isEqualUnderMaterialization(Value a, Value b) {
   return a == b;
 }
 
+static Operation *getDefiningOpMaterialized(Value value) {
+  Operation *definingOp = value.getDefiningOp();
+  if (auto forkOp = dyn_cast<ForkOp>(definingOp)) {
+    return getDefiningOpMaterialized(forkOp.getOperand());
+  }
+  return definingOp;
+}
+
 static FailureOr<PasserOp> performMuxSupRewriting(MuxOp muxOp,
                                                   Value newSelector,
                                                   Value newSpecLoopContinue) {
@@ -511,12 +519,24 @@ static void runSuppressorInduction(PasserOp bottomSuppressor,
   topSuppressor->erase();
 }
 
-static void moveResolverTop(OpBuilder &builder, Value shortOperand) {
-  auto oldRepeatingInitOp =
-      cast<SpecV2RepeatingInitOp>(shortOperand.getDefiningOp());
+static void moveResolverTop(OpBuilder &builder,
+                            SpecV2InterpolatorOp interpolator) {
+  auto oldRepeatingInitOp = cast<SpecV2RepeatingInitOp>(
+      interpolator.getShortOperand().getDefiningOp());
 
   // Materialize the long operand
-  materializeValue(shortOperand);
+  if (interpolator.getShortOperand() != interpolator.getLongOperand()) {
+    materializeValue(interpolator.getShortOperand());
+  } else {
+    builder.setInsertionPoint(oldRepeatingInitOp);
+    auto forkOp = builder.create<ForkOp>(oldRepeatingInitOp.getLoc(),
+                                         oldRepeatingInitOp.getResult(), 2);
+    inheritBB(oldRepeatingInitOp, forkOp);
+    oldRepeatingInitOp.getResult().replaceAllUsesExcept(forkOp.getResult()[0],
+                                                        forkOp);
+    interpolator.getShortOperandMutable()[0].set(forkOp.getResult()[1]);
+    materializeValue(forkOp.getResult()[0]);
+  }
 
   // Move the repeating init op below the fork
   auto forkOp =
@@ -546,7 +566,7 @@ static Value introduceSpecResolver(OpBuilder &builder,
                                    SpecV2InterpolatorOp interpolator) {
   // Confirm the context
   auto riOp = cast<SpecV2RepeatingInitOp>(
-      interpolator.getShortOperand().getDefiningOp());
+      getDefiningOpMaterialized(interpolator.getShortOperand()));
   auto passerOp = cast<PasserOp>(riOp.getOperand().getDefiningOp());
   // Todo: confirm the longOperand
   auto resolverOp = builder.create<SpecV2ResolverOp>(
@@ -555,7 +575,7 @@ static Value introduceSpecResolver(OpBuilder &builder,
   interpolator.getResult().replaceAllUsesWith(resolverOp.getResult());
   interpolator->erase();
   riOp->erase();
-  passerOp->erase();
+  // passerOp->erase();
   return resolverOp.getResult();
 }
 
@@ -711,50 +731,65 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     selector = newSelector;
   }
 
-  SpecV2InterpolatorOp interpolator =
-      useIdentInterpolator(builder, specLoopContinues[0]);
-  for (unsigned i = 1; i < n; i++) {
-    auto newInterpolatorOrFailure =
-        introduceNewInterpolator(builder, interpolator);
-    if (failed(newInterpolatorOrFailure))
-      return signalPassFailure();
+  if (n > 0) {
+    SpecV2InterpolatorOp interpolator =
+        useIdentInterpolator(builder, specLoopContinues[0]);
+    for (unsigned i = 1; i < n; i++) {
+      auto newInterpolatorOrFailure =
+          introduceNewInterpolator(builder, interpolator);
+      if (failed(newInterpolatorOrFailure))
+        return signalPassFailure();
 
-    SpecV2InterpolatorOp newInterpolator = newInterpolatorOrFailure.value();
-    for (Operation *user :
-         llvm::make_early_inc_range(interpolator.getResult().getUsers())) {
-      if (auto suppressor = dyn_cast<PasserOp>(user)) {
-        if (isEligibleToSuppressorInduction(suppressor, newInterpolator)) {
-          runSuppressorInduction(suppressor, newInterpolator);
-        }
-      }
-    }
-
-    if (!interpolator.getResult().use_empty()) {
-      interpolator.emitError("The old interpolator still has users.");
-      return signalPassFailure();
-    }
-
-    interpolator->erase();
-    interpolator = newInterpolator;
-  }
-
-  moveResolverTop(builder, interpolator.getShortOperand());
-  Value confirmSpec = introduceSpecResolver(builder, interpolator);
-
-  Value specLoopExit = generateSpecLoopExit(builder, loopExit, confirmSpec);
-  for (Operation *user : iterateOverPossiblyMaterializedUsers(loopExit)) {
-    if (auto passer = dyn_cast<PasserOp>(user)) {
-      if (passer.getCtrl() == confirmSpec) {
-        for (Operation *bottomSuppressor : passer.getResult().getUsers()) {
-          auto bottomPasser = cast<PasserOp>(bottomSuppressor);
-          if (isExitSuppressorUnifiable(bottomPasser, loopExit, confirmSpec)) {
-            unifyExitSuppressor(bottomPasser, specLoopExit);
-          } else {
-            bottomPasser->emitError(
-                "Expected the exit suppressor to be unifiable");
+      SpecV2InterpolatorOp newInterpolator = newInterpolatorOrFailure.value();
+      for (Operation *user :
+           llvm::make_early_inc_range(interpolator.getResult().getUsers())) {
+        if (auto suppressor = dyn_cast<PasserOp>(user)) {
+          if (isEligibleToSuppressorInduction(suppressor, newInterpolator)) {
+            runSuppressorInduction(suppressor, newInterpolator);
           }
         }
       }
+
+      if (!interpolator.getResult().use_empty()) {
+        interpolator.emitError("The old interpolator still has users.");
+        return signalPassFailure();
+      }
+
+      interpolator->erase();
+      interpolator = newInterpolator;
+    }
+
+    moveResolverTop(builder, interpolator);
+    Value confirmSpec = introduceSpecResolver(builder, interpolator);
+
+    Value specLoopExit = generateSpecLoopExit(builder, loopExit, confirmSpec);
+    for (Operation *user : iterateOverPossiblyMaterializedUsers(loopExit)) {
+      if (auto passer = dyn_cast<PasserOp>(user)) {
+        if (passer.getCtrl() == confirmSpec) {
+          for (Operation *bottomSuppressor : passer.getResult().getUsers()) {
+            auto bottomPasser = cast<PasserOp>(bottomSuppressor);
+            if (isExitSuppressorUnifiable(bottomPasser, loopExit,
+                                          confirmSpec)) {
+              unifyExitSuppressor(bottomPasser, specLoopExit);
+            } else {
+              bottomPasser->emitError(
+                  "Expected the exit suppressor to be unifiable");
+            }
+          }
+        }
+      }
+    }
+
+    if (variable) {
+      MergeOp merge = replaceRIChainWithMerge(
+          builder,
+          cast<SpecV2RepeatingInitOp>(specLoopContinues[n - 1].getDefiningOp()),
+          n);
+
+      // Optimize for buffering
+      auto passer = cast<PasserOp>(
+          merge->getOperand(0).getDefiningOp()->getOperand(0).getDefiningOp());
+      passer.getCtrlMutable()[0].set(specLoopExit);
     }
   }
 
@@ -762,18 +797,6 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   for (auto passerOp : llvm::make_early_inc_range(funcOp.getOps<PasserOp>())) {
     if (passerOp.getResult().use_empty())
       passerOp->erase();
-  }
-
-  if (variable) {
-    MergeOp merge = replaceRIChainWithMerge(
-        builder,
-        cast<SpecV2RepeatingInitOp>(specLoopContinues[n - 1].getDefiningOp()),
-        n);
-
-    // Optimize for buffering
-    auto passer = cast<PasserOp>(
-        merge->getOperand(0).getDefiningOp()->getOperand(0).getDefiningOp());
-    passer.getCtrlMutable()[0].set(specLoopExit);
   }
 }
 

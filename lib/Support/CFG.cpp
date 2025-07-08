@@ -245,15 +245,15 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
   if (bbs.srcBB < bbs.dstBB)
     return false;
 
-  if (val.hasOneUse()) {
-    Operation *user = *val.user_begin();
-    if (isa<handshake::InitOp, handshake::SpecV2RepeatingInitOp>(user))
-      return true;
-    if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
-      if (val != muxOp.getSelectOperand())
-        return true;
-    }
-  }
+  // if (val.hasOneUse()) {
+  //   Operation *user = *val.user_begin();
+  //   if (isa<handshake::InitOp, handshake::SpecV2RepeatingInitOp>(user))
+  //     return true;
+  //   if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
+  //     if (val != muxOp.getSelectOperand())
+  //       return true;
+  //   }
+  // }
 
   // If both source and destination blocks are identical, the edge must be
   // located between a branch-like operation and a merge-like operation
