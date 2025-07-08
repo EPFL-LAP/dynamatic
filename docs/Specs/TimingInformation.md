@@ -15,7 +15,7 @@ We classify combinational delays into two categories:
 
 - **Port2Reg delays**: Combinational delays either from an input port to the first register stage, or from the last register stage to an output port. These capture the logic surrounding the sequential boundaries of an operator.
 
-- **Reg2Reg delay** : The longest combinational path delay within a single operator — i.e., the time it takes for signals to propagate through the most complex logic path inside that operator without being interrupted by clocked elements. While the above focuses on delays relevant to relative placement and timing of operators, the operating frequency of the entire circuit is ultimately limited by the operating frequency of the slowest operator, which is defined as the inverse of this internal delay.
+- **Reg2Reg delay** :Combinational delays from one register stage to the next register stage within a single pipelined operation, representing the longest logic path between these sequential elements.
 
 This difference is a key distinction between **pipelined** and **non-pipelined** operations. Consider the following graph :
 
@@ -79,7 +79,7 @@ All timing information lives in the [components JSON file](https://github.com/EP
 ```
 
 The JSON object encodes the following timing information:
-- `latency`: A dictionary mapping bitwidths to the latency (in clock cycles) of the component at that bitwidth. For every bitwidth, a map lists all existing implementations, providing their internal combinational delay as key and the latency as value.
+- `latency`: A dictionary mapping bitwidths to timing features of multiple implementation of the component available for that bitwidth. This is done as a map listing all existing implementations, providing their internal combinational delay as key and their latency as value.
 - `delays`: A dictionary describing intra-port delays — i.e., combinational delays between input and output ports with no intervening registers (in nanoseconds).
 - `inport`: A dictionary specifying port2reg delays from an input port to the first register stage (in nanoseconds).
 - `outport`: A dictionary specifying port2reg delays from the last register stage to an output port (in nanoseconds).
@@ -129,7 +129,7 @@ The timing system uses the following core data structures:
   - This structure contains three fields : data, valid and ready delays. The first one is represented using the `BitwidthDepMetric` structure.
 
 - **[BitwidthDepMetric](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Support/TimingModels.h#L46)**: Bitwidth-dependent timing map
-  - Maps bitwidths to timing values (e.g., for latency 32-bit → 3ns delay) - these values can be complex structures, like maps.
+  - Maps bitwidths to timing information. This information can for instance be integers, or complex structures, like maps.
   - Supports queries like `getCeilMetric(bitwidth)` to return the timing value for the closest equal or greater supported bitwidth.
 
 
