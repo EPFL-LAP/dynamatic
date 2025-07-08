@@ -1,4 +1,4 @@
-[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
+[Table of Contents](../README.md)
 
 # Advanced Build Instructions
 ### Table of contents
@@ -7,9 +7,9 @@
 3. [Building](#3-building)
 4. [Interactive Visualizer](#4-interactive-dataflow-circuit-visualizer)
 5. [Enabling XLS Integration](#5-enabling-the-xls-integration)
-6. [Modelsim/Questa sim installation](#6-modelsimquesta-sim-installation)
+6. [Modelsim/Questa sim installation](#6-modelsimquesta-installation)
 
->This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../../README.md) page.
+>This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../GettingStarted/InstallDynamatic.md) page.
 
 ## 1. Gurobi
 
@@ -48,7 +48,7 @@ export PATH="${GUROBI_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:$LD_LIBRARY_PATH"
 ```
 
-Once Gurobi is set up, you can change the buffer placement algorithm using the `--buffer-algorithm` compile flag and setting the value to either `fpga20` or `fpl22`. See [Dynamatic usage](Usage.md#compile-flags) page for details on how to use Dynamatic and modify the compile flags.
+Once Gurobi is set up, you can change the buffer placement algorithm using the `--buffer-algorithm` compile flag and setting the value to either `fpga20` or `fpl22`. See [Using Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md#compile-flags) page for details on how to use Dynamatic and modify the compile flags.
 
 ## 2. Cloning
 
@@ -82,7 +82,7 @@ The build script successively builds all parts of the project using CMake and Ni
   1. LLVM (with MLIR and clang as additional tools),
   2. Polygeist (our C/C++ frontend for MLIR),
   3. Dynamatic, and
-  4. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#visualizer)).
+  4. (optionally) the interactive dataflow circuit visualizer ([see instructions below](#4-interactive-dataflow-circuit-visualizer)).
 
 It creates build folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a **`bin`** folder in the top-level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
@@ -176,12 +176,12 @@ Finally, run the command below to export the Godot project as an executable bina
 ./build.sh --visual-dataflow --export-godot /path/to/godot-engine
 ```
 The tool's binary is generated at `visual-dataflow/bin/visual-dataflow` and sym-linked at `bin/visual-dataflow` for convenience. 
-Now, you can visualize the dataflow graphs for your compiled programs with Godot. See [how to use Dynamatic](Usage.md) for more details.
+Now, you can visualize the dataflow graphs for your compiled programs with Godot. See [how to use Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md) for more details.
 >**Note:**
 Whenever you make a modification to the C++ library or to the Godot project itself, you can simply re-run the above command to recompile everything and re-generate the executable binary for the tool.
 >
 ## 5. Enabling the XLS Integration
-The experimental integration with the XLS HLS tool (see [here](xls-integration.md) for more information) can be enabled by providing the `--experimental-enable-xls` flag to build.sh.
+The experimental integration with the XLS HLS tool (see [here](../Xls/XlsIntegration.md) for more information) can be enabled by providing the `--experimental-enable-xls` flag to build.sh.
 ><span style="color:brown">Warning</span>
 Note that `--experimental-enable-xls`, just like any other cmake-related flags, will only be applied if `./build.sh` configures CMake, which it, by default, will not do if a build folder (with a `CMakeCache.txt`) exists. To enable xls if you already have a local build, you can either force a reconfigure of all projects by providing the `--force` flag, or delete the Dynamatic's `CMakeCache.txt` to only force a reconfigure (and costly rebuild) of Dynamatic:
 >

@@ -1,6 +1,6 @@
-[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
+[Table of Contents](../README.md)
 
-[Input-Format](InputFormat.md)
+[Writing C Code for Dynamatic](WritingHLSCode.md)
 
 # Data Type Support for Dynamatic
 These types are most crucial when dealing with function parameters. Some of the unsupported types may work on local variables without any compilation errors.

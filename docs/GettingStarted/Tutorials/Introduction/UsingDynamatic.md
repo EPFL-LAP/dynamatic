@@ -1,5 +1,3 @@
-[Home](../../README.md) <span>&ensp;</span> [Usage](Usage.md)<span>&ensp;</span> [Modification](AdvancedUsage.md)<span>&ensp;</span> [Advanced-Build](AdvancedBuild.md) <span>&ensp;</span>[Examples](Examples.md) <span>&ensp;</span>[Dependencies](Dependencies.md) <span>&ensp;</span>[Development](WorkInProgress.md)
-
 [Input-Format](InputFormat.md) <span>&ensp;</span> [Data-Type-Support](DataTypeSupport.md)
 # Using Dynamatic
 >Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](../../README.md).
@@ -185,6 +183,7 @@ The command creates a new folder `out/sim`. In this case, it is located at `tuto
 - their return values were the same after execution on kernel inputs computed in the `main` function. 
 - if any arguments were pointers to memory regions, `simulate` also checked that the states of these memories are the same after the C kernel call and VHDL simulation.
 
+
 That's it, you have successfully synthesized your first dataflow circuit from C code and functionally verified it using Dynamatic!
 
 At this point, you can quit the Dynamatic frontend by inputting the exit command:
@@ -253,6 +252,6 @@ Observe the circuit executes using the interactive controls at the bottom of the
 
 ### Conclusion
 Congratulations on reaching the end of this tutorial! You now know how to use Dynamatic to compile C kernels into functional dataflow circuits, visualize these circuits to better understand them to identify potential optimization opportunities.  
-Before moving on to use Dynamatic for your custom programs, kindly refer to the [dressing up your code for dynamatic](InputFormat.md) guide.
+Before moving on to use Dynamatic for your custom programs, kindly refer to the [dressing up your code for dynamatic](../../../UserGuide/WritingHLSCode.md) guide. You can also view a more [detailed example](Examples.md) that uses some of the optional commands not mentioned in this introductory tutorial.
 
-We are now ready for an introduction to [modiying Dynamatic](AdvancedUsage.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.
+We are now ready for an introduction to [modiying Dynamatic](ModifyingDynamatic.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.
