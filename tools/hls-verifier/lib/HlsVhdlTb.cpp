@@ -344,6 +344,7 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
     c.declareConstants(os, inputVectorPath, outputFilePath);
   }
   declareConstant(os, "HALF_CLK_PERIOD", "TIME", "2.00 ns");
+  declareConstant(os, "RESET_LATENCY", "TIME", "10.00 ns");
   declareConstant(os, "TRANSACTION_NUM", "INTEGER", to_string(1));
 }
 
