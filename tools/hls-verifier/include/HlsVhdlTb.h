@@ -37,7 +37,7 @@ begin
   wait until tb_clk'event and tb_clk = '1';
   wait until tb_clk'event and tb_clk = '1';
   assert false
-  report "simulation done!"
+  report "Simulation done! Latency = " & integer'image((now - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)) & " cycles"
   severity note;
   assert false
   report "NORMAL EXIT (note: failure is to force the simulator to stop)"
@@ -58,7 +58,7 @@ end process;
 gen_reset_proc : process
 begin
   tb_rst <= '1';
-  wait for 10 ns;
+  wait for RESET_LATENCY;
   tb_rst <= '0';
   wait;
 end process;
