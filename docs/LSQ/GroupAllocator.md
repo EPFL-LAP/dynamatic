@@ -5,7 +5,7 @@ This document explains how groups are allocated to the Load-Store Queue (LSQ) in
 
 ## 1. Overview and Purpose  
 
-![Group Allocator Top-Level](./figs/ga/LSQ_Top-Level_group_allocator.png)
+![Group Allocator Top-Level](./figs/ga/LSQ_Top-level_group_allocator.png)
 
 Dataflow circuits have no inherent notion of sequential instructions, and therefore no Fetch or Decode stages. This is a critical problem, because a traditional LSQ relies on this intrinsic program order to resolve potential memory dependencies. Without it, the LSQ is blind.
 
