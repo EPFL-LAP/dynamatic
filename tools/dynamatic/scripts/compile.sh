@@ -36,6 +36,7 @@ F_SCF="$COMP_DIR/scf.mlir"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_DYN_TRANSFORMED="$COMP_DIR/cf_dyn_transformed.mlir"
+F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_dyn_transformed_mem_dep_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -131,26 +132,26 @@ exit_on_fail "Failed to apply standard transformations to cf" \
 # cf transformations (dynamatic)
 "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --arith-reduce-strength="max-adder-depth-mul=1" --push-constants \
-    > "$F_CF_DYN_TRANSFORMED.tmp"
+    > "$F_CF_DYN_TRANSFORMED"
   exit_on_fail "Failed to apply Dynamatic transformations to cf" \
     "Applied Dynamatic transformations to cf"
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED.tmp" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
     --force-memory-interface="force-mc=true" \
-    > "$F_CF_DYN_TRANSFORMED"
-  exit_on_fail "Failed to apply memory interface transformations to cf" \
-    "Applied memory interface transformations to cf (LSQ disabled!)"
+    > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
+  exit_on_fail "Failed to force usage of MC interface" \
+    "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED.tmp" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" \
     --mark-memory-interfaces \
-    > "$F_CF_DYN_TRANSFORMED"
-  exit_on_fail "Failed to apply Dynamatic transformations to cf" \
-    "Applied memory interface transformations to cf"
+    > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
+  exit_on_fail "Failed to mark memory interfaces in cf" \
+    "Marked memory accesses with the corresponding interfaces in cf"
 fi
 
 # cf level -> handshake level
-"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED" --lower-cf-to-handshake \
+"$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
   > "$F_HANDSHAKE"
 exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 
