@@ -287,8 +287,8 @@ def InitOp : Handshake_Op<"init", [
     A single-slot buffer which contains a token in its reset state.
     Similar to a buffer, its timing behavior is configurable.
   }];
-  
-  let arguments = (ins HandshakeType:$operand);
+
+  let arguments = (ins HandshakeType:$operand, UI1Attr:$initToken);
   let results = (outs HandshakeType:$result);
 
   let extraClassDeclaration = [{
@@ -312,7 +312,7 @@ def SpecV2RepeatingInitOp : Handshake_Op<"spec_v2_repeating_init", [
     Similar to a buffer, its timing behavior is configurable.
   }];
   
-  let arguments = (ins ChannelType:$operand);
+  let arguments = (ins ChannelType:$operand, UI32Attr:$initToken);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{

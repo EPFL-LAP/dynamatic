@@ -260,7 +260,13 @@
   },
   {
     "name": "handshake.init",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init"
+    "parameters": [
+      {
+        "name": "INIT_TOKEN",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p init_token=$INIT_TOKEN"
   },
   {
     "name": "handshake.passer",
@@ -272,7 +278,13 @@
   },
   {
     "name": "handshake.spec_v2_repeating_init",
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_v2_repeating_init"
+    "parameters": [
+      {
+        "name": "INIT_TOKEN",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_v2_repeating_init -p init_token=$INIT_TOKEN"
   },
   {
     "name": "handshake.spec_v2_interpolator",

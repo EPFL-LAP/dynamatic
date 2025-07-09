@@ -693,9 +693,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
-      .Case<handshake::InitOp, handshake::SpecV2RepeatingInitOp>([&](auto) {
-        // No parameters needed for these operations
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        addUnsigned("INIT_TOKEN", initOp.getInitToken());
       })
+      .Case<handshake::SpecV2RepeatingInitOp>(
+          [&](handshake::SpecV2RepeatingInitOp initOp) {
+            addUnsigned("INIT_TOKEN", initOp.getInitToken());
+          })
       .Case<handshake::PasserOp>([&](auto) {
         // No parameters needed for these operations
       })

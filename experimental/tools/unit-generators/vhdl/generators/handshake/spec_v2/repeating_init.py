@@ -1,4 +1,6 @@
-def generate_spec_v2_repeating_init(name, _):
+def generate_spec_v2_repeating_init(name, params):
+    init_token = params["init_token"]
+
     return f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -33,7 +35,8 @@ begin
       end if;
     end if;
   end process;
-  outs <= "1" when emit_init else ins;
+
+  outs <= "{init_token}" when emit_init else ins;
   outs_valid <= emit_init or ins_valid;
   ins_ready <= not emit_init and outs_ready;
 end architecture;

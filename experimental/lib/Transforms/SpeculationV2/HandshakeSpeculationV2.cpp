@@ -163,7 +163,8 @@ static FailureOr<Value> updateLoopHeader(FuncOp &funcOp, unsigned loopHeadBB,
                             funcOp.getBodyBlock()->begin());
 
   // Build an InitOp[False]
-  InitOp initOp = builder.create<InitOp>(loopContinue.getLoc(), loopContinue);
+  InitOp initOp =
+      builder.create<InitOp>(loopContinue.getLoc(), loopContinue, 0);
   setBB(initOp, loopHeadBB);
 
   // Find control merge in the loop head BB.
@@ -238,7 +239,7 @@ static Value appendRepeatingInit(Value val) {
   builder.setInsertionPoint(val.getDefiningOp());
 
   SpecV2RepeatingInitOp repeatingInitOp =
-      builder.create<SpecV2RepeatingInitOp>(val.getLoc(), val);
+      builder.create<SpecV2RepeatingInitOp>(val.getLoc(), val, 1);
   inheritBB(val.getDefiningOp(), repeatingInitOp);
 
   return repeatingInitOp.getResult();
@@ -249,7 +250,7 @@ static Value appendInit(Value val) {
   OpBuilder builder(val.getContext());
   builder.setInsertionPoint(val.getDefiningOp());
 
-  InitOp initOp = builder.create<InitOp>(val.getLoc(), val);
+  InitOp initOp = builder.create<InitOp>(val.getLoc(), val, 0);
   inheritBB(val.getDefiningOp(), initOp);
 
   return initOp.getResult();
@@ -624,7 +625,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
   // Perform repeating init motion
   builder.setInsertionPoint(forkOp);
   if (performMotion<SpecV2RepeatingInitOp>(forkOp, [&](Value v) {
-        return builder.create<SpecV2RepeatingInitOp>(topRI.getLoc(), v);
+        return builder.create<SpecV2RepeatingInitOp>(topRI.getLoc(), v, 1);
       }).failed()) {
     forkOp->emitError("Failed to perform motion for SpecV2RepeatingInitOp");
     llvm_unreachable("SpeculationV2 algorithm failed");

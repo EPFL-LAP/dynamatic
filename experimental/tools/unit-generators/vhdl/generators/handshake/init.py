@@ -1,4 +1,6 @@
-def generate_init(name, _):
+def generate_init(name, params):
+    init_token = params["init_token"]
+
     return f"""
 library ieee;
 use ieee.std_logic_1164.all;
@@ -23,7 +25,7 @@ end entity;
 architecture arch of {name} is
   signal init : std_logic;
 begin
-  outs <= "0" when init else ins;
+  outs <= "{init_token}" when init else ins;
   outs_valid <= '1' when init else ins_valid;
   ins_ready <= '0' when init else outs_ready;
 
