@@ -34,7 +34,7 @@ void materializeValue(Value val);
 /// value.
 Operation *getUniqueUser(Value val);
 
-bool equalsForContext(Value a, Value b);
+bool equalsIndirectly(Value a, Value b);
 
 void eraseMaterializedOperation(Operation *op);
 
@@ -43,6 +43,6 @@ void assertMaterialization(Value val);
 llvm::SmallVector<Operation *>
 iterateOverPossiblyMaterializedUsers(Value result);
 
-Operation *getDefiningOpForContext(Value value);
+Operation *getIndirectDefiningOp(Value value);
 
 #endif // DYNAMATIC_TRANSFORMS_MATERIALIZATION_UTIL_H

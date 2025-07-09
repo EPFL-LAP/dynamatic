@@ -112,12 +112,12 @@ Operation *getUniqueUser(Value val) {
   return *val.getUsers().begin();
 }
 
-bool equalsForContext(Value a, Value b) {
+bool equalsIndirectly(Value a, Value b) {
   if (auto fork = dyn_cast<ForkOp>(a.getDefiningOp())) {
-    return equalsForContext(fork.getOperand(), b);
+    return equalsIndirectly(fork.getOperand(), b);
   }
   if (auto fork = dyn_cast<ForkOp>(b.getDefiningOp())) {
-    return equalsForContext(a, fork.getOperand());
+    return equalsIndirectly(a, fork.getOperand());
   }
   return a == b;
 }
@@ -174,10 +174,10 @@ iterateOverPossiblyMaterializedUsers(Value result) {
   return users;
 }
 
-Operation *getDefiningOpForContext(Value value) {
+Operation *getIndirectDefiningOp(Value value) {
   Operation *definingOp = value.getDefiningOp();
   if (auto forkOp = dyn_cast<ForkOp>(definingOp)) {
-    return getDefiningOpForContext(forkOp.getOperand());
+    return getIndirectDefiningOp(forkOp.getOperand());
   }
   return definingOp;
 }
