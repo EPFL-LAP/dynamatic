@@ -1,60 +1,34 @@
 # VM Setup Instructions
 
-We provide a virtual machine (VM) which contains a pre-built/ready-to-use version of our entire toolchain. While it is slightly heavy (around 16GB) it is very easy to set up on your machine using QEMU (an open-source virtualizer available on all operating systems). You can download the VM image [here](https://drive.google.com/file/d/1s86dzU8jbSSdh13DctS922OKoACgvVD5/view?usp=drive_link).
+We provide a virtual machine (VM) which contains a pre-built/ready-to-use version of our entire toolchain except for the [simulator](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) which the user must install and add to path manually. 
 
-This VM was originally set-up for the [*Dynamatic Reloaded tutorial* given at the FPGA'24 conference](https://www.isfpga.org/workshops-tutorials/#t7) in Monterey, California. You can use it to simply follow the tutorial (available in the [repository's documentation](Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
+## Add Virtual Machine
+DynamaticVM requires ~40GB of hard disk and 4GB of memory to dedicate to the VM.  
+On Linux, you need to 
+- install exFAT package to mount the USB drive.  
+- CenOS/RedHat: sudo yum install exfat-utils fuse-exfat  
+- Ubuntu/Debian: sudo apt-get install exfat-fuse exfat-utils.  
+
+If you do not have the USB available, you can download the VM image [here](https://drive.google.com/file/d/1s86dzU8jbSSdh13DctS922OKoACgvVD5/view).
+
+The Dynamatic virtual machine is compatible with Virtualbox 5.2 or later releases. You can use it to simply follow the tutorial (available in the [repository's documentation](Tutorials/Introduction/Introduction.md)) or as a starting point to use/modify Dynamatic in general.
 
 > [!NOTE]
-> Note that Dynamatic's repository on the VM does not track the `main` branch but a branch specifically made for the tutorial. If you would like to build Dynamatic's latest version from the VM, you can checkout the `main` branch and use the [regular build instructions](../README.md#building-from-source) from the top-level README to build the project's latest version.
+> Note that Dynamatic's repository on the VM does not track the `main` branch but a branch specifically made for the tutorial. If you would like to build Dynamatic's latest version from the VM, you can checkout the `main` branch and use the [regular build instructions](../GettingStarted/InstallDynamatic.md#build-instructions) from the top-level README to build the project's latest version.
 
-## System-based instructions
+To install the virual machine:
+1. Extract the `.zip` in your local folder.
+> The .vbox file contains all the settings required to run the VM, while the .vdi file
+contains the virtual hard drive.  
 
-While the VM should work on all machines based on the x86_64 architecture, from our personal experience it works better on Linux than MacOS or Windows. Therefore, if you have the possibility, try to run the VM from Linux. While the VM can be emulated on MacOS on arm64, its performance is extremely degraded due to architecture emulation and so we do not recommend it. If you want to try anyway, you can follow the same instructions as for MacOS on x86_64 (just remove the -accel hvf part of the command to run the VM).
-
-### Linux
-
-1. Install the QEMU package on your machine following instructions here (many Linux distributions supported).
-    - For Debian/Ubuntu, the option you should choose is `apt-get install qemu-system`.
-2. From a terminal, run the VM using
-  
-    ```sh
-    qemu-system-x86_64 -accel kvm -m 8G -vga virtio -smp cores=4 -usb -device usb-tablet -display default,show-cursor=on /path/to/dynamatic-image.qcow2
-    ```
-
-### MacOS
-
-1. Install the QEMU package on your machine using Homebrew by typing `brew install qemu` in a terminal.
-    - If Homebrew is not installed on your machine, you can set it up with the following command.
-
-      ```sh
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      ```
-
-2. From a terminal, run the VM using
-
-    ```sh
-    qemu-system-x86_64 -accel hvf -m 8G -vga virtio -smp cores=4 -usb -device usb-tablet -display default,show-cursor=on /path/to/dynamatic-image.qcow2
-    ```
-
-### Windows
-
-1. Download the QEMU installer here.
-2. Run the executable and go through the simple installation process. Remember QEMU's install location; typically, it is `C:\ProgramFiles\qemu`.
-3. Enable Windows virtualization on your system.
-    1. Click the search icon in the Windows tray.
-    2. Type **Turn Windows features on or off** in the search bar and open the corresponding control panel page.
-    3. Check the **Virtual Machine Platform** and **Windows Hypervisor Platform** boxes if they are not already checked (these names may be slightly different depending on the exact Windows version, anything to do with virtualization/hypervision must be checked).
-4. Click the search icon in the Windows tray and type **Command Prompt** to open-up a terminal. Then, `cd` to QEMU's install location and run the VM using
-
-    ```sh
-    qemu-system-x86_64 -accel whpx -m 8G -vga virtio -smp cores=4 -usb -device usb-tablet -display default,show-cursor=on \path\to\dynamatic-image.qcow2
-    ```
+2. Add DynamaticVM with the following steps:
+- Click on `Machine`->`+Add`, and select the file `DynamaticVM.vbox`.
+<img src="">  
+- Start DynamaticVM by clicking on `Start`
 
 ## Troubleshooting
-
-- Note that the window which opens when you run the `qemu-system-x86_64` command may remain black and unresponsive for a couple minutes while the VM boots. Avoid resizing the window before the Ubuntu desktop appears, as it can cause graphical issues down the line.
-- By default the VM is allocated 8GB of RAM (`-m 8G`) and 4 CPU cores (`-smp cores=4`) on boot. You can modify those values if you wish to, but we do not recommend going for much less than these resources.
-- If you experience graphical or mouse cursor issues in the VM, try replacing the `-vga virtio` part of the command with `-vga std`. The latter may work better for your hardware.
+In case of resolution issues, go to “View”->”+Virtual Screen 1” and select a zoom factor that best suit your screen, for
+example 300. Then, go to `View` and select the option `Full screen mode`.
 
 ## Inside the VM
 

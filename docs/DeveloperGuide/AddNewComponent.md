@@ -81,8 +81,8 @@ Here’s a breakdown of each part of the op definition:
   - `HandshakeType:$operand1`: Defines `operand1` as an operand of type `HandshakeType`.
 
   - `UI32Attr:$attr1`: Defines `attr1` as an attribute of type `UI32Attr`. Attributes represent op-specific data, such as comparison predicates or internal FIFO depths. For example:
-  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L225
-  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1196
+  [Example 1](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeArithOps.td#L225)  
+  [Example 2](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1196)
 
 - `let results = ...`
    Defines the results produced by the op.
@@ -103,14 +103,14 @@ For more details, refer to the [MLIR documentation](https://mlir.llvm.org/docs/D
 A complete guideline for designing an op will be provided in a separate document. Below are some key points to keep in mind:
 
 - **Define operands and results clearly.** Here's an example of poor design, where the declaration gives no insight into the operands:
-  https://github.com/EPFL-LAP/dynamatic/blob/13f600398f6f028adc9538ab29390973bff44503/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1398
+  [poor design](https://github.com/EPFL-LAP/dynamatic/blob/13f600398f6f028adc9538ab29390973bff44503/include/dynamatic/Dialect/Handshake/HandshakeOps.td#L1398)
   Use precise and meaningful types for operands and results. Avoid using variadic operands/results for fundamentally different values. This makes the op's intent explicit and helps prevent it from being used in unintended ways that could cause incorrect behavior.
 - **Use traits to enforce type constraints.** Apply appropriate type constraints directly using traits in TableGen. Avoid relying on op-specific verify methods for this purpose unless absolutely necessary.  
 Below are poor examples from CMerge and Mux, for two main reasons:  
   (1) The constraints should be expressed as traits, and  
   (2) They should be written in the TableGen definition for better traceability.
-  https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305
-  https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377
+  [Poor example of CMerge and Mux 1](https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L302-L305)
+  [Poor example of CMerge and Mux 2](https://github.com/EPFL-LAP/dynamatic/blob/69274ea6429c40d1c469ffaf8bc36265cbef2dd3/lib/Dialect/Handshake/HandshakeOps.cpp#L375-L377)
 - **Prefer declarative definitions over external C++ implementations.** Write methods in TableGen whenever possible. Only use external C++ definitions if the method becomes too long or compromises readability.
 - **Use dedicated attributes instead of `hw.parameters`.** The `hw.parameters` attribute in the *Handshake* IR is a legacy mechanism for passing data directly to the backend. While some existing operations like `BufferOp` still use it in the Handshake IR, new implementations should use dedicated attributes instead, as described above. Information needed for RTL generation should be extracted later in a serialized form.
   Note: `hw.parameters` remains valid in the *HW* IR, and the legacy backend requires it.
@@ -131,19 +131,19 @@ First, update the conversion pass from Handshake IR to HW IR, located in
 
 Start by registering a rewrite pattern for your op, like this:
 
-https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L1786
+[Registring a rewrite pattern](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L1786)
 
 Then, implement the corresponding rewrite pattern (**module discriminator**). Most of the infrastructure is already in place; you mainly need to define op-specific hardware parameters (`hw.parameters`) where applicable. For the **legacy backend**, you need to explicitly register type information and any additional data here for the RTL generation. For example:
 
-https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521
+[Register type information and additional data](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L517-L521)
 
 You should also add dedicated attributes to `hw.parameters` at this stage:
-https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L662-L664
-https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L683
+[Adding dedicated attributes 1](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L662-L664)  
+[Addind dedicated attributes 2](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L680-L683)
 
 For the **beta backend**, most parameter registration is handled in `RTL.cpp`. However, if you define dedicated attributes, you need to pass their values into `hw.parameters` here, as shown above. Note that even if no extraction is needed, you still have to add an empty case for the op here, as follows:
 
-https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679
+[Adding an empty case for an op](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Conversion/HandshakeToHW/HandshakeToHW.cpp#L676-L679)
 
 ### `RTL.cpp` (Parameter Analysis)
 
@@ -151,9 +151,9 @@ Second, to support the **beta backend**, you need to update `lib/Support/RTL/RTL
 
 In most cases, if your op enforces traits like `AllTypesMatch` across all operands and results, extracting a single bitwidth or `extra_signals` is sufficient. Examples (you can **scroll** these code blocks):
 
-https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L338-L350
+[Adding parameter analysis for your op 1](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L338-L350)
 
-https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L434-L453
+[Adding parameter analysis for your op 1](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/lib/Support/RTL/RTL.cpp#L434-L453)
 
 > [!NOTE]
 > At this stage, you're working with HW IR, not Handshake IR, so operands and results must be accessed by index, not by name.
@@ -165,12 +165,12 @@ The reason this analysis is performed here is to bypass all earlier passes and a
 You'll need to update the appropriate JSON file to enable RTL matching for your op.
 
 - For the **legacy backend**, we use `data/rtl-config-vhdl.json`. You need to add a new entry specifying the VHDL file and any `hw.parameters` you registered in `HandshakeToHW.cpp`, like in this example:
-  https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/data/rtl-config-vhdl.json#L10-L17
+  [Adding new entry specifying VHDL file and `hw.parameters`](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/data/rtl-config-vhdl.json#L10-L17)
 - For the **beta backend**, we use `data/rtl-config-vhdl-beta.json`. This JSON file resolves compatibility with the current `export-rtl` tool. Basically, you just need to specify the generator and pass the required parameters as arguments:
-  https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/data/rtl-config-vhdl-beta.json#L7-L10
+  [Specifying generator and passing required parameters](https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/data/rtl-config-vhdl-beta.json#L7-L10)  
   However, if you define dedicated attributes and implement a module discriminator, you should declare the parameters in the JSON, as well as specifying them as arguments, in the following way:
-  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L30-L39
-  https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L211-L220
+  [Declare parameters in the JSON and specify them as arguments 1](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L30-L39)  
+  [Declare parameters in the JSON and specify them as arguments 2](https://github.com/EPFL-LAP/dynamatic/blob/1875891e577c655f374a814b7a42dd96cd59c8da/data/rtl-config-vhdl-beta.json#L211-L220)
   The parameter names match those used in the `addUnsigned` or `addString` calls within each module discriminator.
 
 - You may also need to update the JSON files for other backends, such as Verilog or SMV, depending on your use case.
@@ -185,11 +185,11 @@ To complete support for your op, you need to provide an RTL implementation for t
 
   Your generator should define a function named `generate_<unit_name>(name, params)`, as shown in this example:
 
-  https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/experimental/tools/unit-generators/vhdl/generators/handshake/addi.py#L5-L12
+  [Generator defining a function name](https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/experimental/tools/unit-generators/vhdl/generators/handshake/addi.py#L5-L12)
 
   After that, register your generator in `experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py`:
 
-  https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py#L39-L44
+  [Registering generator](https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py#L39-L44)
 
 - You may also need to implement RTL for other backends, such as Verilog and SMV. Additionally, to support XLS generation, you'll need to update the `HandshakeToXls` pass accordingly.
 
@@ -201,4 +201,4 @@ To fully integrate your op into Dynamatic, additional steps may be required. The
 
 - `export-dot`: To assign a color to your op in the visualized circuit, you’ll need to add a case for it in `tools/export-dot/export-dot.cpp`:
 
-  https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/tools/export-dot/export-dot.cpp#L276-L283
+  [Adding case for ops to assign color](https://github.com/EPFL-LAP/dynamatic/blob/1887ba219bbbc08438301e22fbb7487e019f2dbe/tools/export-dot/export-dot.cpp#L276-L283)
