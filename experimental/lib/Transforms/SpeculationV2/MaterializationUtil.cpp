@@ -11,23 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "MaterializationUtil.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm::sys;
@@ -118,39 +111,6 @@ Operation *getUniqueUser(Value val) {
 
   return *val.getUsers().begin();
 }
-
-// Value forkValue(Value val) {
-//   Operation *user = getUniqueUser(val);
-
-//   OpBuilder builder(val.getContext());
-//   builder.setInsertionPoint(user);
-
-//   if (auto forkOp = dyn_cast<ForkOp>(user)) {
-//     unsigned existingResults = forkOp.getResults().size();
-
-//     // Extend the existing fork
-//     ForkOp newForkOp = builder.create<ForkOp>(val.getLoc(),
-//     forkOp.getOperand(),
-//                                               existingResults + 1);
-//     inheritBB(forkOp, newForkOp);
-
-//     // Update the existing results
-//     for (unsigned i = 0; i < existingResults; ++i) {
-//       forkOp.getResult()[i].replaceAllUsesWith(newForkOp.getResult()[i]);
-//     }
-
-//     // Erase the old fork
-//     forkOp->erase();
-
-//     return newForkOp.getResult()[existingResults];
-//   }
-
-//   // Create a new fork
-//   ForkOp forkOp = builder.create<ForkOp>(val.getLoc(), val, 2);
-//   inheritBB(user, forkOp);
-//   val.replaceAllUsesExcept(forkOp.getResult()[0], forkOp);
-//   return forkOp.getResult()[1];
-// }
 
 bool equalsForContext(Value a, Value b) {
   if (auto fork = dyn_cast<ForkOp>(a.getDefiningOp())) {

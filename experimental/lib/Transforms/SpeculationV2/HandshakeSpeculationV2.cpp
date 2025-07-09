@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
+#include "HandshakeSpeculationV2.h"
 #include "MaterializationUtil.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -23,7 +23,6 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"

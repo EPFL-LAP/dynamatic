@@ -13,24 +13,13 @@
 #ifndef DYNAMATIC_TRANSFORMS_MATERIALIZATION_UTIL_H
 #define DYNAMATIC_TRANSFORMS_MATERIALIZATION_UTIL_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/SpeculationV2/HandshakeSpeculationV2.h"
 #include "mlir/IR/AsmState.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -44,8 +33,6 @@ void materializeValue(Value val);
 /// as it's handshake-typed). This function returns the unique user of the
 /// value.
 Operation *getUniqueUser(Value val);
-
-// Value forkValue(Value val);
 
 bool equalsForContext(Value a, Value b);
 
