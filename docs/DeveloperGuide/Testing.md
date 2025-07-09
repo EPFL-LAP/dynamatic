@@ -1,4 +1,8 @@
+[Table of Contents](../README.md)
 # Testing Infrastructure
+Dynamatic features unit tests that evaluate the behavior of a small part of the implementation (typically, one compiler pass) against an expected output. All files within the `test` directory with the `.mlir` extension are automatically considered as unit test files. They can be ran/checked all at once by running `ninja check-dynamatic` from a terminal within the top level `build` directory. We use the [`FileCheck`](https://llvm.org/docs/CommandGuide/FileCheck.html) LLVM utility to compare the actual output of the implementation with the expected one.
+
+Dynamatic also contains integration tests that assess the whole flow by going from C to VHDL. Each folder containing C source code inside the `integration-test` directory is a separate integration test.
 
 ## Understanding `FileCheck` unit test files
 
