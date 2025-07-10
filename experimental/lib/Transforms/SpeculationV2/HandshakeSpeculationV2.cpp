@@ -42,8 +42,8 @@ namespace dynamatic {
 namespace experimental {
 namespace speculationv2 {
 
-// std::unique_ptr<dynamatic::DynamaticPass> createHandshakeSpeculationV2();
-
+/// Implement the base class and auto-generated create functions.
+/// Must be called from the .cpp file to avoid multiple definitions
 #define GEN_PASS_DEF_HANDSHAKESPECULATIONV2
 #include "experimental/Transforms/Passes.h.inc"
 
