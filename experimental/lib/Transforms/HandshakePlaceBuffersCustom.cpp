@@ -76,7 +76,7 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
     handshake::TimingInfo timing;
-    BufferType bufferType;
+    handshake::BufferType bufferType;
     if (type == "one_slot_break_dv") {
       timing = handshake::TimingInfo::break_dv();
       bufferType = handshake::BufferType::ONE_SLOT_BREAK_DV;
