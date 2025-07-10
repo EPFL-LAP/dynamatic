@@ -38,16 +38,27 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculationv2;
 
-namespace {
+namespace dynamatic {
+namespace experimental {
+namespace speculationv2 {
+
+// std::unique_ptr<dynamatic::DynamaticPass> createHandshakeSpeculationV2();
+
+#define GEN_PASS_DEF_HANDSHAKESPECULATIONV2
+#include "experimental/Transforms/Passes.h.inc"
+
+} // namespace speculationv2
+} // namespace experimental
+} // namespace dynamatic
 
 struct HandshakeSpeculationV2Pass
     : public dynamatic::experimental::speculationv2::impl::
           HandshakeSpeculationV2Base<HandshakeSpeculationV2Pass> {
-  HandshakeSpeculationV2Pass() {}
+  using HandshakeSpeculationV2Base<
+      HandshakeSpeculationV2Pass>::HandshakeSpeculationV2Base;
 
   void runDynamaticPass() override;
 };
-} // namespace
 
 /// Returns whether the loop condition is inverted (i.e., false continues the
 /// loop).
@@ -1054,9 +1065,4 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       }
     }
   }
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::speculationv2::createHandshakeSpeculationV2() {
-  return std::make_unique<HandshakeSpeculationV2Pass>();
 }

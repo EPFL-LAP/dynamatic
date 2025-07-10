@@ -71,7 +71,6 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   let summary = "Place Speculation operations";
   let description = [{
   }];
-  let constructor = "dynamatic::experimental::speculationv2::createHandshakeSpeculationV2()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the kernel information related to speculation.">,

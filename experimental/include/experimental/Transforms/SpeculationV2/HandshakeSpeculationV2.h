@@ -19,10 +19,7 @@ namespace dynamatic {
 namespace experimental {
 namespace speculationv2 {
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeSpeculationV2();
-
 #define GEN_PASS_DECL_HANDSHAKESPECULATIONV2
-#define GEN_PASS_DEF_HANDSHAKESPECULATIONV2
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace speculationv2
