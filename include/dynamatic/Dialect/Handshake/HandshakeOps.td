@@ -269,6 +269,7 @@ def BufferOp : Handshake_Op<"buffer", [
                         Handshake_BufferTypeEnumAttr:$bufferType,
                         ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSlots
                         );
+                        
   let results = (outs HandshakeType:$result);
 
 
