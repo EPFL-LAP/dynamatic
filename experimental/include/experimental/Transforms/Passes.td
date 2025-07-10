@@ -73,8 +73,8 @@ def HandshakeSpeculationV2 : DynamaticPass<"handshake-speculation-v2"> {
   }];
   let constructor = "dynamatic::experimental::speculationv2::createHandshakeSpeculationV2()";
   let options = [
-    Option<"headBB", "head-bb", "unsigned", "", "the loop head BB">,
-    Option<"tailBB", "tail-bb", "unsigned", "", "the loop tail BB">,
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the kernel information related to speculation.">,
     Option<"n", "n", "unsigned", "", "the number of iterations to speculate">,
     Option<"variable", "variable", "bool", "false", "enable variable speculation">
   ];

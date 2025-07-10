@@ -1,11 +1,11 @@
 """
 Script for running Dynamatic speculative integration tests.
 """
-import json
 import os
 import shutil
 import subprocess
 import sys
+import argparse
 from pathlib import Path
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
@@ -57,20 +57,9 @@ def fail(id, msg):
     }
 
 
-def run_test(c_file, id, timeout):
+def run_test(c_file, n, variable):
     """
     Runs the specified integration test.
-
-    Arguments:
-    `c_file`   -- Path to .c source file of integration test.
-    `id`       -- Index used to identify the test.
-    `timeout`  -- Timeout in seconds for running the test.
-
-    Returns:
-    Dictionary with the following keys:
-    `id`      -- Index of the test that was given as argument.
-    `msg`     -- Message indicating the result of the test.
-    `status`  -- One of 'pass', `fail` or `timeout`.
     """
 
     print(c_file)
@@ -232,9 +221,11 @@ def run_test(c_file, id, timeout):
     handshake_speculation = os.path.join(
         comp_out_dir, "handshake_speculation.mlir")
     with open(handshake_speculation, "w") as f:
+        print(f"n={n}, variable={variable}")
+        json_path = os.path.join(c_file_dir, "specv2.json")
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_transformed,
-            "--handshake-speculation-v2=head-bb=2 tail-bb=2 n=5 variable",
+            f"--handshake-speculation-v2=json-path={json_path} n={n} {"variable" if variable else ""}",
             "--handshake-materialize",
             "--handshake-canonicalize"
         ],
@@ -410,6 +401,14 @@ def run_test(c_file, id, timeout):
 
     if result.returncode == 0:
         print("Simulation succeeded")
+        result = os.path.join(out_dir, "sim/report.txt")
+        with open(result, "r") as f:
+            report = f.read()
+            # Match Latency = \d+ cycles
+            latency_match = report.split("Latency = ")
+            if len(latency_match) > 1:
+                latency = latency_match[1].split(" cycles")[0]
+                print(f"Latency: {latency} cycles")
     else:
         return fail(id, "Failed to simulate")
 
@@ -425,8 +424,24 @@ def main():
     Entry point for the script.
     """
 
-    result = run_test(INTEGRATION_FOLDER / "nested_loop" /
-                      "nested_loop.c", 0, 10)
+    parser = argparse.ArgumentParser(
+        description="Run speculation integration test")
+    parser.add_argument(
+        "test_name", type=str, help="Name of the test to run")
+    parser.add_argument(
+        "--n", type=int, default=3,
+        help="Number of iterations to speculate")
+    parser.add_argument(
+        "--variable", type=bool, default=False,
+        help="Run variable speculation")
+
+    args = parser.parse_args()
+    test_name = args.test_name
+    n = args.n
+    variable = args.variable
+
+    result = run_test(INTEGRATION_FOLDER / test_name /
+                      f"{test_name}.c", n, variable)
     if result["status"] == "pass":
         color_print(result["msg"], TermColors.OKGREEN)
     elif result["status"] == "fail":
