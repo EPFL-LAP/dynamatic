@@ -1,4 +1,15 @@
 [Table of Contents](../README.md)
+
+1. [Clock frequency](#1-achieving-a-specific-clock-frequency)  
+2. [Area](#2-area)  
+3. [Latency and throughput](#3-latency-and-throughput)  
+4. [Optimization algorithms in Dynamatic](#optimization-algorithms-in-dynamatic)
+    - [Buffer placement algorithm: FPGA'20](#buffer-placement-algorithm-fpga20)
+    - [Buffer placement algorithm: FPL'22](#buffer-placement-algorithm-fpl22)
+    - [Area optimization: Sizing Load Store Queue depths](#area-optimization-sizing-load-store-queue-depths)
+    - [Resource sharing of functional units](#resource-sharing-of-functional-units)
+5. [Custom compilation flows](#custom-compilation-flows)  
+
 ## Overview: What if I want to Optimize ...
 
 ### 1. Achieving a specific clock frequency  
@@ -65,5 +76,5 @@ The specifics of LSQ implementation are available in [the corresponding document
 ### Resource Sharing of Functional Units
 
 
-### Custom Compilation Flows  
+## Custom Compilation Flows  
 Sometimes, for advanced usage, features provided by the `dynamatic` shell are not enough. In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.
