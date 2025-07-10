@@ -9,7 +9,8 @@
 5. [Enabling XLS Integration](#5-enabling-the-xls-integration)
 6. [Modelsim/Questa sim installation](#6-modelsimquesta-installation)
 
->This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../GettingStarted/InstallDynamatic.md) page.
+> [!NOTE]
+> This document contains advanced build instructions targeted at users who would like to modify Dynamatic's build process and/or use the interactive dataflow circuit visualizer. For basic setup instructions, see the [installation](../GettingStarted/InstallDynamatic.md) page.
 
 ## 1. Gurobi
 

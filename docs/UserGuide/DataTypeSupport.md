@@ -6,7 +6,7 @@
 These types are most crucial when dealing with function parameters. Some of the unsupported types may work on local variables without any compilation errors.
 > Arrays of supported data types are also supported as function parameters
 
-| buffer algorithm/data type | Support
+| buffer algorithm/data type | Supported
 |---|---|
 |unsigned | ✓ |
 |int32_t / int16_t / int8_t|✓|
