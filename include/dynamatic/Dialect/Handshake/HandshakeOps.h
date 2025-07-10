@@ -19,11 +19,13 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/RegionKindInterface.h"
+
 
 namespace dynamatic {
 namespace handshake {
