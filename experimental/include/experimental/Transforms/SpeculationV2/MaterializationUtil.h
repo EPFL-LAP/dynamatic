@@ -26,7 +26,11 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+/// Flatten nested forks. Returns the new top fork.
 ForkOp flattenFork(ForkOp topFork);
+
+/// Materialize the value (i.e., ensuring it has a single user), by introducing
+/// a fork unit. Nested forks are flattened internally.
 void materializeValue(Value val);
 
 /// Under the materialization, the user of the value should be unique (as long
@@ -34,15 +38,20 @@ void materializeValue(Value val);
 /// value.
 Operation *getUniqueUser(Value val);
 
+/// Computes the equality while ignoring differences in fork results.
 bool equalsIndirectly(Value a, Value b);
 
+/// Erase the operation as well as downstream unused forks.
 void eraseMaterializedOperation(Operation *op);
 
+/// Asserts the value is materialized.
 void assertMaterialization(Value val);
 
-llvm::SmallVector<Operation *>
-iterateOverPossiblyMaterializedUsers(Value result);
+/// Returns the vector of indirect users of the value, including those that use
+/// forked values.
+llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result);
 
+/// Retrieves the defining operation, ignoring any forks present between uses.
 Operation *getIndirectDefiningOp(Value value);
 
 #endif // DYNAMATIC_TRANSFORMS_MATERIALIZATION_UTIL_H

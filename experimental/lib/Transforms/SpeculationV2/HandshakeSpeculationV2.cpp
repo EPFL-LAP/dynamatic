@@ -84,8 +84,8 @@ static FailureOr<bool> isLoopConditionInverted(FuncOp &funcOp,
 
 /// Replaces all branches in the specified BB with passers, and returns the
 /// passer control values for trueValue and falseValue.
-/// Can be performed to branches inside a loop, or to branches not at the bottom
-/// of the loop (when there are multiple loop exits).
+/// Potentially can be applied to branches inside loops (i.e. PMSC), or to those
+/// not at the loop's bottom in cases with multiple loop exits.
 static FailureOr<std::pair<Value, Value>>
 replaceBranchesWithPassers(FuncOp &funcOp, unsigned bb) {
   // Find one ConditionBranchOp in the BB
@@ -116,7 +116,8 @@ replaceBranchesWithPassers(FuncOp &funcOp, unsigned bb) {
     if (getLogicBB(branch) != bb)
       continue;
 
-    // The condition must be the same
+    // The condition must be the same (ignoring the difference of the fork
+    // outputs)
     if (!equalsIndirectly(condition, branch.getConditionOperand()))
       return branch.emitError("Branch condition does not match the condition "
                               "of the reference branch");
@@ -125,36 +126,27 @@ replaceBranchesWithPassers(FuncOp &funcOp, unsigned bb) {
 
     builder.setInsertionPoint(branch);
 
-    // Build a passer for the trueResult, unless the user is a sink.
-    Operation *trueResultUser = getUniqueUser(branch.getTrueResult());
-    if (isa<SinkOp>(trueResultUser)) {
-      trueResultUser->erase();
-    } else {
-      PasserOp passer =
-          builder.create<PasserOp>(branch.getLoc(), data, condition);
-      setBB(passer, bb);
-      branch.getTrueResult().replaceAllUsesWith(passer.getResult());
-    }
+    // Build a passer for the trueResult
+    PasserOp trueResultPasser =
+        builder.create<PasserOp>(branch.getLoc(), data, condition);
+    setBB(trueResultPasser, bb);
+    branch.getTrueResult().replaceAllUsesWith(trueResultPasser.getResult());
 
-    // Build a passer for the falseResult, unless the user is a sink.
+    // Build a passer for the falseResult
     // The passer ctrl is inverted condition.
-    Operation *falseResultUser = getUniqueUser(branch.getFalseResult());
-    if (isa<SinkOp>(falseResultUser)) {
-      falseResultUser->erase();
-    } else {
-      PasserOp passer = builder.create<PasserOp>(branch.getLoc(), data,
-                                                 invertCondition.getResult());
-      setBB(passer, bb);
-      branch.getFalseResult().replaceAllUsesWith(passer.getResult());
-    }
+    PasserOp falseResultPasser = builder.create<PasserOp>(
+        branch.getLoc(), data, invertCondition.getResult());
+    setBB(falseResultPasser, bb);
+    branch.getFalseResult().replaceAllUsesWith(falseResultPasser.getResult());
 
+    // Erase the branch
     branch->erase();
   }
 
   return std::pair<Value, Value>{condition, invertCondition.getResult()};
 }
 
-/// Replace the CMerge-controlled loop header with InitOp[False].
+/// Replace the CMerge-controlled loop header with Init[False]-controlled one.
 static FailureOr<Value> updateLoopHeader(FuncOp &funcOp, unsigned loopHeadBB,
                                          unsigned loopTailBB,
                                          Value loopContinue) {
@@ -185,28 +177,24 @@ static FailureOr<Value> updateLoopHeader(FuncOp &funcOp, unsigned loopHeadBB,
   assert(cmergeOp.getDataOperands().size() == 2 &&
          "The loop head BB must have exactly two predecessors");
 
-  // Inverted: the backedge is the first operand.
-  bool isInverted;
+  // The backedge must be the second operand. If it is the first operand, we
+  // need to swap operands.
+  bool needsSwapping;
   Operation *definingOp0 = cmergeOp.getDataOperands()[0].getDefiningOp();
   Operation *definingOp1 = cmergeOp.getDataOperands()[1].getDefiningOp();
   Value entry, backedge;
   if (definingOp0 && getLogicBB(definingOp0) == loopTailBB) {
-    isInverted = true;
+    needsSwapping = true;
     entry = cmergeOp.getDataOperands()[1];
     backedge = cmergeOp.getDataOperands()[0];
   } else if (definingOp1 && getLogicBB(definingOp1) == loopTailBB) {
-    isInverted = false;
+    needsSwapping = false;
     entry = cmergeOp.getDataOperands()[0];
     backedge = cmergeOp.getDataOperands()[1];
+  } else {
+    return cmergeOp.emitError(
+        "Expected one of the operands to be defined in the loop tail BB");
   }
-
-  // Build a MuxOp to replace the CMergeOp
-  builder.setInsertionPoint(cmergeOp);
-  MuxOp muxOp =
-      builder.create<MuxOp>(cmergeOp.getLoc(), cmergeOp.getResult().getType(),
-                            loopContinue, llvm::ArrayRef{entry, backedge});
-  setBB(muxOp, loopHeadBB);
-  cmergeOp.getResult().replaceAllUsesWith(muxOp.getResult());
 
   // Update muxes
   for (auto muxOp : funcOp.getOps<handshake::MuxOp>()) {
@@ -218,13 +206,22 @@ static FailureOr<Value> updateLoopHeader(FuncOp &funcOp, unsigned loopHeadBB,
     // Update the select operand
     muxOp.getSelectOperandMutable()[0].set(initOp.getResult());
 
-    if (isInverted) {
+    if (needsSwapping) {
       // Swap operands
       Value entry = muxOp.getDataOperands()[1];
       muxOp.getDataOperandsMutable()[1].set(muxOp.getDataOperands()[0]);
       muxOp.getDataOperandsMutable()[0].set(entry);
     }
   }
+
+  // Build a MuxOp to replace the CMergeOp
+  // Use the result of the init as the selector.
+  builder.setInsertionPoint(cmergeOp);
+  MuxOp muxOp = builder.create<MuxOp>(
+      cmergeOp.getLoc(), cmergeOp.getResult().getType(),
+      /*selector=*/initOp.getResult(), llvm::ArrayRef{entry, backedge});
+  setBB(muxOp, loopHeadBB);
+  cmergeOp.getResult().replaceAllUsesWith(muxOp.getResult());
 
   // Erase CMerge (and possibly connected fork)
   eraseMaterializedOperation(cmergeOp);
@@ -256,9 +253,9 @@ static Value appendInit(Value val) {
   return initOp.getResult();
 }
 
-/// Returns if the MuxPasserSwap is eligible.
-static bool isMuxPasserSwapEligible(MuxOp muxOp, Value newSelector,
-                                    Value newSpecLoopContinue) {
+/// Returns if the circuit is eligible for MuxPasserSwap.
+static bool isEligibleForMuxPasserSwap(MuxOp muxOp, Value newSelector,
+                                       Value newSpecLoopContinue) {
   // Ensure the rewritten subcircuit structure.
   Operation *backedgeDefiningOp = muxOp.getDataOperands()[1].getDefiningOp();
   if (!isa<PasserOp>(backedgeDefiningOp))
@@ -305,6 +302,7 @@ static PasserOp performMuxPasserSwap(MuxOp muxOp, Value newSelector,
   auto passerOp =
       dyn_cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp());
 
+  // Materialization is required for swapping
   assertMaterialization(passerOp.getResult());
 
   // Swap mux and passer
@@ -344,27 +342,29 @@ static bool isSourced(Value value) {
 
   if (isa<SourceOp>(value.getDefiningOp()))
     return true;
+
+  // If all operands of the defining operation are sourced, the value is also
+  // sourced.
   return llvm::all_of(value.getDefiningOp()->getOperands(),
                       [](Value v) { return isSourced(v); });
 }
 
-/// Returns the operands excluding the channels to MemoryControllerOp for
-/// LoadOp.
-static llvm::SmallVector<Value> getSubjectOperands(Operation *op) {
+/// If op is LoadOp, excludes operands coming from MemoryControllerOp.
+static llvm::SmallVector<Value> getEffectiveOperands(Operation *op) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    // For LoadOp, only the data result is considered a subject operand
+    // For LoadOp, only the data result is effective for rewriting
     return {loadOp.getAddress()};
   }
   return llvm::to_vector(op->getOperands());
 }
 
-/// Returns the results excluding the channels to MemoryControllerOp for
-/// LoadOp.
-static llvm::SmallVector<Value> getSubjectResults(Operation *op) {
+/// If op is LoadOp, excludes results going to MemoryControllerOp.
+static llvm::SmallVector<Value> getEffectiveResults(Operation *op) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-    // For LoadOp, only the data result is considered a subject operand
+    // For LoadOp, only the data result is effective for rewriting
     return {loadOp.getDataResult()};
   }
+  // Unlike the operands, to_vector doesn't work
   llvm::SmallVector<Value> results;
   for (OpResult result : op->getResults()) {
     results.push_back(result);
@@ -376,7 +376,8 @@ static llvm::SmallVector<Value> getSubjectResults(Operation *op) {
 template <typename OpT>
 static LogicalResult performMotion(Operation *pmOp,
                                    std::function<OpT(Value)> buildOp) {
-  for (Value result : getSubjectResults(pmOp)) {
+  // Add new OpT for each effective result of the PM unit.
+  for (Value result : getEffectiveResults(pmOp)) {
     OpT newOp = buildOp(result);
     inheritBB(pmOp, newOp);
 
@@ -386,28 +387,61 @@ static LogicalResult performMotion(Operation *pmOp,
     result.replaceAllUsesExcept(newOp->getResult(0), newOp);
   }
 
-  for (Value operand : getSubjectOperands(pmOp)) {
-    if (isSourced(operand))
-      continue;
+  // Remove OpT from each effective operand of the PM unit.
+  for (Value operand : getEffectiveOperands(pmOp)) {
+    Operation *definingOp = operand.getDefiningOp();
+    if (!isa<OpT>(definingOp)) {
+      // If the operand is sourced, it doesn't need to be defined by OpT.
+      if (isSourced(operand))
+        continue;
+      return pmOp->emitError("Expected all operands to be defined by the OpT");
+    }
+
+    if (definingOp->getNumResults() != 1)
+      return pmOp->emitError("Expected OpT to have a single result");
 
     // The operand must be materialized to perform the motion correctly.
     assertMaterialization(operand);
 
-    Operation *definingOp = operand.getDefiningOp();
-    if (!isa<OpT>(definingOp))
-      return pmOp->emitError("Expected all operands to be defined by the OpT");
-    if (definingOp->getNumResults() != 1)
-      return pmOp->emitError("Expected OpT to have a single result");
-
+    // Remove the defining OpT operation.
     definingOp->getResult(0).replaceAllUsesWith(definingOp->getOperand(0));
     definingOp->erase();
   }
   return success();
 }
 
-/// Tries moving the specified passer past a PM unit.
-/// Returns true if the motion was successful, false otherwise.
-static bool tryMovingPasser(PasserOp passerOp, DenseSet<PasserOp> &frontiers) {
+/// Returns if the specified PasserOp is eligible for motion past a PM unit.
+static bool isEligibleForPasserMotionPastPM(PasserOp passerOp) {
+  Value passerControl = passerOp.getCtrl();
+
+  Operation *targetOp = getUniqueUser(passerOp.getResult());
+
+  // If the targetOp is not a PM unit, return false.
+  if (!isa<ArithOpInterface, NotOp, ForkOp, LazyForkOp, BufferOp, LoadOp>(
+          targetOp))
+    return false;
+
+  // Iterate over operands of the targetOp to decide the eligibility for
+  // motion.
+  for (Value operand : getEffectiveOperands(targetOp)) {
+    if (auto passerOp = dyn_cast<PasserOp>(operand.getDefiningOp())) {
+      // If this passerOp is controlled by different control from the specified
+      // one, not eligible.
+      if (!equalsIndirectly(passerControl, passerOp.getCtrl()))
+        return false;
+    } else if (!isSourced(operand)) {
+      // Each operand must be defined by a passer, except when it is driven by a
+      // source op.
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// Move the specified passer past a PM unit.
+static void performPasserMotionPastPM(PasserOp passerOp,
+                                      DenseSet<PasserOp> &frontiers) {
   Value passerControl = passerOp.getCtrl();
   Location passerLoc = passerOp.getLoc();
   OpBuilder builder(passerOp->getContext());
@@ -415,64 +449,31 @@ static bool tryMovingPasser(PasserOp passerOp, DenseSet<PasserOp> &frontiers) {
 
   Operation *targetOp = getUniqueUser(passerOp.getResult());
 
-  if (isa<ArithOpInterface, NotOp, ForkOp, LazyForkOp, BufferOp, LoadOp>(
-          targetOp)) {
-
-    DenseSet<PasserOp> passersToBeMoved;
-
-    bool isEligible = true;
-
-    // Iterate over operands of the targetOp to decide the eligibility for
-    // motion. getSubjectOperands excludes channels connected to
-    // MemoryControllerOp for LoadOp.
-    for (Value operand : getSubjectOperands(targetOp)) {
-      if (auto passerOp = dyn_cast<PasserOp>(operand.getDefiningOp())) {
-        // If another passerOp is controlled by different control, not eligible.
-        if (!equalsIndirectly(passerControl, passerOp.getCtrl())) {
-          isEligible = false;
-          break;
-        }
-        assertMaterialization(operand);
-        passersToBeMoved.insert(passerOp);
-        continue;
-      }
-
-      // Even if the operand is not defined by a PasserOp, if it is sourced,
-      // eligible.
-      if (!isSourced(operand)) {
-        isEligible = false;
-        break;
-      }
-    }
-
-    if (isEligible) {
-      // Erase the passers that are going to be moved
-      for (auto passer : passersToBeMoved)
-        frontiers.erase(passer);
-
-      // Perform the motion
-      auto motionResult = performMotion<PasserOp>(targetOp, [&](Value v) {
-        return builder.create<PasserOp>(passerLoc, v, passerControl);
-      });
-
-      if (failed(motionResult)) {
-        targetOp->emitError("Failed to perform motion for PasserOp");
-        llvm_unreachable("SpeculationV2 algorithm failed");
-      }
-
-      // Add the new passer to the frontiers
-      for (auto result : getSubjectResults(targetOp)) {
-        auto newPasser = cast<PasserOp>(getUniqueUser(result));
-        frontiers.insert(newPasser);
-        // Materialize the result of the new passer for further rewriting.
-        materializeValue(newPasser.getResult());
-      }
-
-      // Motion is performed
-      return true;
+  // Remove passers from the frontiers
+  for (Value operand : getEffectiveOperands(targetOp)) {
+    if (auto passerOp = dyn_cast<PasserOp>(operand.getDefiningOp())) {
+      frontiers.erase(passerOp);
     }
   }
-  return false;
+
+  // Perform the motion
+  auto motionResult = performMotion<PasserOp>(targetOp, [&](Value v) {
+    // Use unchanged passer control.
+    return builder.create<PasserOp>(passerLoc, v, passerControl);
+  });
+
+  if (failed(motionResult)) {
+    targetOp->emitError("Failed to perform motion for PasserOp");
+    llvm_unreachable("SpeculationV2 algorithm failed");
+  }
+
+  // Add new passers to the frontiers
+  for (auto result : getEffectiveResults(targetOp)) {
+    auto newPasser = cast<PasserOp>(getUniqueUser(result));
+    frontiers.insert(newPasser);
+    // Materialize the result of the new passer for further rewriting.
+    materializeValue(newPasser.getResult());
+  }
 }
 
 /// Builds an interpolator op that uses the same value for both operands.
@@ -485,23 +486,17 @@ static SpecV2InterpolatorOp introduceIdentInterpolator(Value val) {
       builder.create<SpecV2InterpolatorOp>(val.getLoc(), val, val);
   inheritBB(val.getDefiningOp(), interpolatorOp);
 
-  /// Interpolator is only used by PasserOps for the chain reduction.
-  /// Passers using the oldest Spec Loop Continue must be eligible for the
-  /// passer induction.
-  val.replaceUsesWithIf(interpolatorOp.getResult(), [](OpOperand &operand) {
-    return isa<PasserOp>(operand.getOwner());
-  });
-
   return interpolatorOp;
 }
 
+/// Adds a next interpolator for the passer induction.
 static FailureOr<SpecV2InterpolatorOp>
-addNextInterpolator(SpecV2InterpolatorOp interpolatorOp) {
+addNextInterpolator(SpecV2InterpolatorOp oldInterpolator) {
   // The new long operand will be the result of a repeating init, which uses the
   // same value as the previous interpolator's long operand.
   Value newLongOperand = nullptr;
   for (Operation *user :
-       iterateOverPossiblyMaterializedUsers(interpolatorOp.getLongOperand())) {
+       iterateOverPossiblyIndirectUsers(oldInterpolator.getLongOperand())) {
     if (auto riOp = dyn_cast<SpecV2RepeatingInitOp>(user)) {
       // If the long operand is a SpecV2RepeatingInitOp, we can use it as the
       // new long operand
@@ -510,29 +505,29 @@ addNextInterpolator(SpecV2InterpolatorOp interpolatorOp) {
     }
   }
   if (!newLongOperand) {
-    return interpolatorOp->emitError("Expected the long operand value to be "
-                                     "also used by a SpecV2RepeatingInitOp");
+    return oldInterpolator->emitError("Expected the long operand value to be "
+                                      "also used by a SpecV2RepeatingInitOp");
   }
 
-  OpBuilder builder(interpolatorOp->getContext());
-  builder.setInsertionPoint(interpolatorOp);
+  OpBuilder builder(oldInterpolator->getContext());
+  builder.setInsertionPoint(oldInterpolator);
 
   // Build a new interpolator
   // Short operand remains the same
   // Long operand is the result of a repeating init
   auto newInterpolatorOp = builder.create<SpecV2InterpolatorOp>(
-      interpolatorOp.getLoc(), interpolatorOp.getShortOperand(),
+      oldInterpolator.getLoc(), oldInterpolator.getShortOperand(),
       newLongOperand);
-  inheritBB(interpolatorOp, newInterpolatorOp);
+  inheritBB(oldInterpolator, newInterpolatorOp);
 
   return newInterpolatorOp;
 }
 
-/// Returns if the passer induction is eligible.
-/// The arguments are the bottom passer and the new interpolator. Other units
+/// Returns if the circuit is eligible for the passer induction.
+/// The arguments are the bottom passer and new interpolator. Other units
 /// are referenced from the structure.
-static bool isPasserInductionEligible(PasserOp bottomPasser,
-                                      SpecV2InterpolatorOp newInterpolator) {
+static bool isEligibleForPasserInduction(PasserOp bottomPasser,
+                                         SpecV2InterpolatorOp newInterpolator) {
   // 1. Ensure the rewritten subcircuit structure.
   // The upstream unit of the bottom passer must be a passer.
   Operation *upstreamOp = bottomPasser.getData().getDefiningOp();
@@ -546,9 +541,9 @@ static bool isPasserInductionEligible(PasserOp bottomPasser,
   // The ctrl of the bottom passer must be generated by an interpolator.
   if (!isa<SpecV2InterpolatorOp>(ctrlDefiningOp))
     return false;
+  auto oldInterpolator = cast<SpecV2InterpolatorOp>(ctrlDefiningOp);
 
   // The short operand must remain the same
-  auto oldInterpolator = cast<SpecV2InterpolatorOp>(ctrlDefiningOp);
   if (!equalsIndirectly(oldInterpolator.getShortOperand(),
                         newInterpolator.getShortOperand()))
     return false;
@@ -557,10 +552,10 @@ static bool isPasserInductionEligible(PasserOp bottomPasser,
   Operation *topCtrlDefiningOp = getIndirectDefiningOp(topPasser.getCtrl());
   if (!isa<SpecV2RepeatingInitOp>(topCtrlDefiningOp))
     return false;
+  auto topRepeatingInit = cast<SpecV2RepeatingInitOp>(topCtrlDefiningOp);
 
   // The top repeating init must use the same value as the old interpolator's
   // long operand.
-  auto topRepeatingInit = cast<SpecV2RepeatingInitOp>(topCtrlDefiningOp);
   if (!equalsIndirectly(topRepeatingInit.getOperand(),
                         oldInterpolator.getLongOperand()))
     return false;
@@ -577,8 +572,8 @@ static bool isPasserInductionEligible(PasserOp bottomPasser,
 /// Performs the passer induction.
 /// The arguments are the bottom passer and the new interpolator. Other units
 /// are referenced from the structure.
-static void runPasserInduction(PasserOp bottomPasser,
-                               SpecV2InterpolatorOp newInterpolator) {
+static void performPasserInduction(PasserOp bottomPasser,
+                                   SpecV2InterpolatorOp newInterpolator) {
   auto topPasser = cast<PasserOp>(bottomPasser.getData().getDefiningOp());
 
   // Perform the rewriting
@@ -589,17 +584,16 @@ static void runPasserInduction(PasserOp bottomPasser,
   topPasser->erase();
 }
 
-/// Move the top (least recently added) repeating init and passer down the fork
-/// as a preparation for the resolver insertion.
+/// Move the top (least recently added) repeating init and passer below the fork
+/// as the preparation for the resolver insertion.
 static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
                                SpecV2RepeatingInitOp topRI, unsigned n) {
-  auto oldPasserOp = cast<PasserOp>(getIndirectDefiningOp(topRI.getOperand()));
+  auto oldPasserOp = cast<PasserOp>(topRI.getOperand().getDefiningOp());
 
   OpBuilder builder(topRI->getContext());
 
-  // Materialize the result of the last repeating init.
-  // When n=1, we need a nested fork for the appropriate motion of repeating
-  // init and passer later.
+  // Materialize the result of the last repeating init for the motion.
+  // When n=1, we need a nested fork structure (will be documented later).
   if (n > 1) {
     assert(!equalsIndirectly(interpolator.getShortOperand(),
                              interpolator.getLongOperand()));
@@ -613,7 +607,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
     // Only the interpolator uses the output#1
     interpolator.getShortOperandMutable()[0].set(forkOp.getResult()[1]);
 
-    // Other users are allocated to the output#0, which is materialized in a
+    // Other users are assigned to the output#0, which is materialized in the
     // usual way.
     topRI.getResult().replaceAllUsesExcept(forkOp.getResult()[0], forkOp);
     materializeValue(forkOp.getResult()[0]);
@@ -622,7 +616,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
   // Now the user of the repeating init's result is a fork.
   auto forkOp = cast<ForkOp>(getUniqueUser(topRI.getResult()));
 
-  // Perform repeating init motion
+  // Perform repeating init motion over this fork.
   builder.setInsertionPoint(forkOp);
   if (performMotion<SpecV2RepeatingInitOp>(forkOp, [&](Value v) {
         return builder.create<SpecV2RepeatingInitOp>(topRI.getLoc(), v, 1);
@@ -631,7 +625,7 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
     llvm_unreachable("SpeculationV2 algorithm failed");
   }
 
-  // Perform passer motion
+  // Perform passer motion over this fork.
   builder.setInsertionPoint(forkOp);
   if (performMotion<PasserOp>(forkOp, [&](Value v) {
         return builder.create<PasserOp>(oldPasserOp.getLoc(), v,
@@ -642,9 +636,9 @@ static void moveTopRIAndPasser(SpecV2InterpolatorOp interpolator,
   }
 }
 
-/// Returns if the introduction of the resolver is eligible.
+/// Returns if the circuit is eligible for the introduction of the resolver.
 static bool
-isIntroductionOfResolverEligible(SpecV2InterpolatorOp interpolator) {
+isEligibleForResolverIntroduction(SpecV2InterpolatorOp interpolator) {
   // Ensure the structure
   Operation *shortOperandDefiningOp =
       interpolator.getShortOperand().getDefiningOp();
@@ -660,10 +654,11 @@ isIntroductionOfResolverEligible(SpecV2InterpolatorOp interpolator) {
   return true;
 }
 
-/// Introduce a spec resolver.
+/// Introduces a spec resolver.
+/// Returns the resolver result value.
 static Value introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
   auto riOp = cast<SpecV2RepeatingInitOp>(
-      getIndirectDefiningOp(interpolator.getShortOperand()));
+      (interpolator.getShortOperand().getDefiningOp()));
   auto passerOp = cast<PasserOp>(riOp.getOperand().getDefiningOp());
 
   OpBuilder builder(interpolator->getContext());
@@ -672,6 +667,7 @@ static Value introduceSpecResolver(SpecV2InterpolatorOp interpolator) {
   auto resolverOp = builder.create<SpecV2ResolverOp>(
       interpolator.getLoc(), passerOp.getData(), interpolator.getLongOperand());
   inheritBB(interpolator, resolverOp);
+
   interpolator.getResult().replaceAllUsesWith(resolverOp.getResult());
   interpolator->erase();
   riOp->erase();
@@ -685,14 +681,15 @@ static Value generateSpecLoopExit(Value loopExit, Value confirmSpec) {
   builder.setInsertionPoint(confirmSpec.getDefiningOp());
 
   AndIOp andOp =
-      builder.create<AndIOp>(confirmSpec.getLoc(), confirmSpec, loopExit);
+      builder.create<AndIOp>(confirmSpec.getLoc(), loopExit, confirmSpec);
   inheritBB(confirmSpec.getDefiningOp(), andOp);
 
   return andOp.getResult();
 }
 
-static bool isExitPasserSimplifiable(PasserOp bottomPasser, Value loopExit,
-                                     Value confirmSpec) {
+/// Returns if the simplification of 3 passers is possible.
+static bool isPasserSimplifiable(PasserOp bottomPasser, Value cond1,
+                                 Value cond2, Value andCond) {
   // Ensure the structure
   Operation *ctrlDefiningOp = bottomPasser.getCtrl().getDefiningOp();
   if (!isa<PasserOp>(ctrlDefiningOp))
@@ -705,20 +702,39 @@ static bool isExitPasserSimplifiable(PasserOp bottomPasser, Value loopExit,
   auto topPasser = cast<PasserOp>(topOp);
 
   // Confirm the context
-  if (!equalsIndirectly(ctrlDefiningPasser.getData(), loopExit))
+  if (!equalsIndirectly(ctrlDefiningPasser.getData(), cond1))
     return false;
 
-  if (!equalsIndirectly(ctrlDefiningPasser.getCtrl(), confirmSpec))
+  if (!equalsIndirectly(ctrlDefiningPasser.getCtrl(), cond2))
     return false;
 
-  return equalsIndirectly(topPasser.getCtrl(), confirmSpec);
+  if (!equalsIndirectly(topPasser.getCtrl(), cond2))
+    return false;
+
+  Operation *andCondDefiningOp = andCond.getDefiningOp();
+  if (!isa<AndIOp>(andCondDefiningOp))
+    return false;
+  auto andOp = cast<AndIOp>(andCondDefiningOp);
+
+  if (!equalsIndirectly(andOp.getLhs(), cond1))
+    return false;
+  if (!equalsIndirectly(andOp.getRhs(), cond2))
+    return false;
+
+  return true;
 }
 
-static void simplifyExitPasser(PasserOp bottomPasser, Value specLoopExit) {
+/// Simplify 3 passers into a single one.
+static void simplifyPassers(PasserOp bottomPasser, Value andCond) {
   auto topPasser = cast<PasserOp>(bottomPasser.getData().getDefiningOp());
-  bottomPasser.getCtrlMutable()[0].set(specLoopExit);
+  auto ctrlDefiningPasser =
+      cast<PasserOp>(bottomPasser.getCtrl().getDefiningOp());
+
+  bottomPasser.getCtrlMutable()[0].set(andCond);
   bottomPasser.getDataMutable()[0].set(topPasser.getData());
+
   topPasser->erase();
+  ctrlDefiningPasser->erase();
 }
 
 /// Replace the repeating init chain with a merge to enable variable
@@ -738,6 +754,7 @@ static MergeOp replaceRIChainWithMerge(SpecV2RepeatingInitOp bottomRI,
   Location specLoc = bottomRI.getLoc();
   unsigned bb = getLogicBB(bottomRI).value();
 
+  // Generate the source and constant providing the continue token constantly.
   SourceOp conditionGenerator = builder.create<SourceOp>(specLoc);
   setBB(conditionGenerator, bb);
   conditionGenerator->setAttr("specv2_ignore_buffer",
@@ -791,9 +808,10 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   FuncOp funcOp = *modOp.getOps<FuncOp>().begin();
   OpBuilder builder(funcOp->getContext());
 
-  // Obtain if the loop condition is inverted (i.e., false continues the loop).
-  auto isNegatedOrFailure = isLoopConditionInverted(funcOp, headBB, tailBB);
-  if (failed(isNegatedOrFailure))
+  // Determines whether the loop condition is inverted (i.e., the loop continues
+  // when false).
+  auto isInvertedOrFailure = isLoopConditionInverted(funcOp, headBB, tailBB);
+  if (failed(isInvertedOrFailure))
     return signalPassFailure();
 
   // Replace branches with passers
@@ -802,9 +820,9 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     return signalPassFailure();
   auto [loopCondition, invertedCondition] = loopConditionsOrFailure.value();
 
-  // Define loopContinue and loopExit based on the negation of the condition.
+  // Define loopContinue and loopExit based on the polarity of the condition.
   Value loopContinue, loopExit;
-  if (isNegatedOrFailure.value()) {
+  if (isInvertedOrFailure.value()) {
     loopContinue = invertedCondition;
     loopExit = loopCondition;
   } else {
@@ -827,7 +845,7 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   for (unsigned i = 0; i < n; i++) {
     frontiers.clear();
 
-    // Append a repeating init and init before MuxPasserSwap.
+    // Append a repeating init and init.
     Value newSpecLoopContinue = appendRepeatingInit(specLoopContinue);
     Value newSelector = appendInit(newSpecLoopContinue);
 
@@ -840,7 +858,8 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       if (getLogicBB(muxOp) != headBB)
         continue;
 
-      if (!isMuxPasserSwapEligible(muxOp, newSelector, newSpecLoopContinue)) {
+      if (!isEligibleForMuxPasserSwap(muxOp, newSelector,
+                                      newSpecLoopContinue)) {
         muxOp.emitWarning("MuxOp is not eligible for Passer swap, skipping");
         continue;
       }
@@ -861,8 +880,8 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     do {
       frontiersUpdated = false;
       for (auto passerOp : frontiers) {
-        // Try to move the passerOp with other passers in the frontiers.
-        if (tryMovingPasser(passerOp, frontiers)) {
+        if (isEligibleForPasserMotionPastPM(passerOp)) {
+          performPasserMotionPastPM(passerOp, frontiers);
           frontiersUpdated = true;
           // If frontiers are updated, the iterator is outdated.
           // Break and restart the loop.
@@ -878,11 +897,20 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
   }
 
   if (n > 0) {
-    // Reduce the passer chain by introducing interpolator op and reduction.
+    // Reduce the passer chain by introducing interpolator op and performing
+    // induction.
 
     // Introduce a trivial interpolator
     SpecV2InterpolatorOp interpolator =
         introduceIdentInterpolator(repeatingInits[0].getResult());
+
+    /// The interpolator is used exclusively by PasserOps during chain
+    /// reduction.
+    /// Passers using the oldest Spec Loop Continue must qualify for passer
+    /// induction.
+    repeatingInits[0].getResult().replaceUsesWithIf(
+        interpolator.getResult(),
+        [](OpOperand &operand) { return isa<PasserOp>(operand.getOwner()); });
 
     // Perform induction
     for (unsigned i = 1; i < n; i++) {
@@ -896,11 +924,12 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
       for (Operation *user :
            llvm::make_early_inc_range(interpolator.getResult().getUsers())) {
         if (auto passer = dyn_cast<PasserOp>(user)) {
-          if (isPasserInductionEligible(passer, newInterpolator)) {
-            runPasserInduction(passer, newInterpolator);
+          if (isEligibleForPasserInduction(passer, newInterpolator)) {
+            performPasserInduction(passer, newInterpolator);
+          } else {
+            passer->emitError("The passer is not eligible for induction");
+            return signalPassFailure();
           }
-          // Some passers (e.g., passers on the backedges) are not eligible, and
-          // just ignore them.
         }
       }
 
@@ -915,29 +944,30 @@ void HandshakeSpeculationV2Pass::runDynamaticPass() {
     }
 
     // Preparation for the resolver insertion
-    moveTopRIAndPasser(interpolator, repeatingInits[0], n);
+    moveTopRIAndPasser(interpolator, /*topRI=*/repeatingInits[0], n);
 
     // Introduce the resolver
-    if (!isIntroductionOfResolverEligible(interpolator)) {
+    if (!isEligibleForResolverIntroduction(interpolator)) {
       interpolator.emitError(
-          "The introduction of the resolver is not eligible");
+          "The circuit is not eligible for the resolver introduction");
       return signalPassFailure();
     }
     Value confirmSpec = introduceSpecResolver(interpolator);
 
-    Value specLoopExit = generateSpecLoopExit(loopExit, confirmSpec);
     // Simplify the exit passers.
-    for (Operation *user : iterateOverPossiblyMaterializedUsers(loopExit)) {
+    Value specLoopExit = generateSpecLoopExit(loopExit, confirmSpec);
+    for (Operation *user : iterateOverPossiblyIndirectUsers(loopExit)) {
       if (auto topPasser = dyn_cast<PasserOp>(user)) {
-        if (topPasser.getCtrl() == confirmSpec) {
-          // Passer's result must be materialized
+        if (equalsIndirectly(topPasser.getCtrl(), confirmSpec)) {
+          // Passer's result is materialized
           Operation *downstreamOp = getUniqueUser(topPasser.getResult());
           if (auto bottomPasser = dyn_cast<PasserOp>(downstreamOp)) {
-            if (isExitPasserSimplifiable(bottomPasser, loopExit, confirmSpec)) {
-              simplifyExitPasser(bottomPasser, specLoopExit);
+            if (isPasserSimplifiable(bottomPasser, loopExit, confirmSpec,
+                                     specLoopExit)) {
+              simplifyPassers(bottomPasser, specLoopExit);
             } else {
               bottomPasser->emitError(
-                  "Expected the exit passer to be unifiable");
+                  "Expected the exit passer to be simplifiable");
             }
           }
         }

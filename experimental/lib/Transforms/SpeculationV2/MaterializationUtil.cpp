@@ -34,10 +34,11 @@ ForkOp flattenFork(ForkOp topFork) {
   for (OpResult result : llvm::make_early_inc_range(topFork.getResults())) {
     materializeValue(result);
     Operation *user = getUniqueUser(result);
+
     if (auto forkOp = dyn_cast<ForkOp>(user)) {
       ForkOp newForkOp = flattenFork(forkOp);
       for (OpResult forkResult : newForkOp.getResults()) {
-        assert(forkResult.hasOneUse());
+        assertMaterialization(forkResult);
         values.push_back(forkResult);
       }
       forksToBeErased.push_back(newForkOp);
@@ -63,7 +64,7 @@ ForkOp flattenFork(ForkOp topFork) {
     // Erase the old fork
     forkOp->erase();
   }
-  topFork.erase();
+  topFork->erase();
 
   return newForkOp;
 }
@@ -87,9 +88,10 @@ void materializeValue(Value val) {
   inheritBB(definingOp, forkOp);
 
   int i = 0;
-  // To allow the mutation of operands, we use early increment range
-  // TODO: Maybe he was not aware of this approach and the materialization pass
-  // is dirty. Update it to use early increment range as well.
+  // To allow operand mutation, we use an early-increment range.
+  // TODO: The original author may have been unaware of this approach;
+  // the materialization pass appears unnecessarily complex. Consider
+  // refactoring it to use an early-increment range as well.
   for (OpOperand &opOperand : llvm::make_early_inc_range(val.getUses())) {
     if (opOperand.getOwner() == forkOp)
       continue;
@@ -101,14 +103,7 @@ void materializeValue(Value val) {
 }
 
 Operation *getUniqueUser(Value val) {
-  if (!val.hasOneUse()) {
-    val.getDefiningOp()->emitError("Expected the value to be materialized");
-    for (Operation *user : val.getUsers()) {
-      user->dump();
-    }
-    llvm_unreachable("MaterializationUtil failed");
-  }
-
+  assertMaterialization(val);
   return *val.getUsers().begin();
 }
 
@@ -127,11 +122,12 @@ void eraseMaterializedOperation(Operation *op) {
     if (result.use_empty())
       continue;
     Operation *user = getUniqueUser(result);
-    if (auto forkOp = dyn_cast<ForkOp>(user)) {
+    if (auto sinkOp = dyn_cast<SinkOp>(user)) {
+      sinkOp->erase();
+    } else if (auto forkOp = dyn_cast<ForkOp>(user)) {
       eraseMaterializedOperation(forkOp);
     } else {
       op->emitError("Op has still uses, cannot be erased");
-      user->dump();
       llvm_unreachable("MaterializationUtil failed");
     }
   }
@@ -146,11 +142,10 @@ void assertMaterialization(Value val) {
   llvm_unreachable("MaterializationUtil failed");
 }
 
-llvm::SmallVector<Operation *>
-iterateOverPossiblyMaterializedUsers(Value result) {
+llvm::SmallVector<Operation *> iterateOverPossiblyIndirectUsers(Value result) {
   if (auto forkOp = dyn_cast<ForkOp>(result.getDefiningOp())) {
     // If the result is from a ForkOp, start iteration from the top of the fork.
-    return iterateOverPossiblyMaterializedUsers(forkOp.getOperand());
+    return iterateOverPossiblyIndirectUsers(forkOp.getOperand());
   }
 
   llvm::SmallVector<Operation *> users;
