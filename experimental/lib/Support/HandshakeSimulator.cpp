@@ -1404,17 +1404,13 @@ void Simulator::associateModel(Operation *op) {
         registerModel<GenericUnaryOpModel<handshake::NotOp>>(notOp, callback);
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
-        auto params =
-            bufferOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-        auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-        if (auto timing =
-                dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-          auto info = timing.getInfo();
+          auto info = bufferOp->getTiming()->getValue().getInfo();
+
           if (info == handshake::TimingInfo::break_dv())
             registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
           if (info == handshake::TimingInfo::break_r())
             registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
-        }
+        
       })
       .Case<handshake::SinkOp>([&](handshake::SinkOp sinkOp) {
         registerModel<SinkModel, handshake::SinkOp>(sinkOp);

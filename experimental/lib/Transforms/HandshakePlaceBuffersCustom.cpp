@@ -76,25 +76,25 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
     handshake::TimingInfo timing;
-    StringRef bufferType;
+    BufferType bufferType;
     if (type == "one_slot_break_dv") {
       timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
+      bufferType = handshake::BufferType::ONE_SLOT_BREAK_DV;
     } else if (type == "one_slot_break_r") {
       timing = handshake::TimingInfo::break_r();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
+      bufferType = handshake::BufferType::ONE_SLOT_BREAK_R;
     } else if (type == "fifo_break_dv") {
       timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::FIFO_BREAK_DV;
+      bufferType = handshake::BufferType::FIFO_BREAK_DV;
     } else if (type == "fifo_break_none") {
       timing = handshake::TimingInfo::break_none();
-      bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
+      bufferType = handshake::BufferType::FIFO_BREAK_NONE;
     } else if (type == "one_slot_break_dvr") {
       timing = handshake::TimingInfo::break_dvr();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
+      bufferType = handshake::BufferType::ONE_SLOT_BREAK_DVR;
     } else if (type == "shift_reg_break_dv") {
       timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::SHIFT_REG_BREAK_DV;
+      bufferType = handshake::BufferType::SHIFT_REG_BREAK_DV;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();

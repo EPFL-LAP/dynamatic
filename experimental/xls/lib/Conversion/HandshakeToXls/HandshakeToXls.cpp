@@ -1420,41 +1420,10 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
     return failure();
   }
 
-  auto params = bufOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-  if (!params) {
-    bufOp.emitError() << "underdefined buffer (params)";
-    return failure();
-  }
+  auto numSlots = bufOp->getNumSlots();
+  uint64_t depth = numSlots.getValue().getZExtValue();
 
-  auto numSlotsAttr = params.getNamed(BufferOp::NUM_SLOTS_ATTR_NAME);
-  if (!numSlotsAttr) {
-    bufOp.emitError() << "underdefined buffer (numSlots)";
-    return failure();
-  }
-  auto numSlots = dyn_cast<IntegerAttr>(numSlotsAttr->getValue());
-  if (!numSlots) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  if (!numSlots.getType().isUnsignedInteger()) {
-    bufOp.emitError() << "invalid buffer (slots)";
-    return failure();
-  }
-  uint64_t depth = numSlots.getUInt();
-
-  auto timingAttr = params.getNamed(BufferOp::TIMING_ATTR_NAME);
-  if (!timingAttr) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  auto timing = dyn_cast<TimingAttr>(timingAttr->getValue());
-  if (!timing) {
-    bufOp.emitError() << "underdefined buffer (timing)";
-    return failure();
-  }
-
-  TimingInfo info = timing.getInfo();
+  TimingInfo info = bufferOp->getTiming().getValue().getInfo()
 
   if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
       (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
