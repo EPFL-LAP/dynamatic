@@ -1420,10 +1420,9 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
     return failure();
   }
 
-  auto numSlots = bufOp->getNumSlots();
-  uint64_t depth = numSlots.getValue().getZExtValue();
+  uint64_t depth = bufOp.getNumSlots();
 
-  TimingInfo info = bufferOp->getTiming().getValue().getInfo()
+  TimingInfo info = bufferOp.getTiming().getInfo()
 
   if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
       (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
