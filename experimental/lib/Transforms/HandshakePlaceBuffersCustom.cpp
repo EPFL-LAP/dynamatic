@@ -79,6 +79,7 @@ struct HandshakePlaceBuffersCustomPass
     transform(type.begin(), type.end(), type.begin(),
           ::toupper);
 
+    // returns optional wrapper around buffer type enum
     auto bufferTypeOpt = handshake::symbolizeBufferType(type);
 
     if(!bufferTypeOpt){
@@ -86,6 +87,7 @@ struct HandshakePlaceBuffersCustomPass
       return signalPassFailure();
     }
 
+    // dereference the optional to get the enum itself
     auto bufferType = *bufferTypeOpt;
 
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
