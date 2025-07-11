@@ -80,27 +80,6 @@ def _generate_shift_reg_break_dv(name, num_slots, bitwidth):
     inner_name = f"{name}_inner"
 
     dependencies = _generate_shift_reg_break_dv_dataless(inner_name)
-
-    entity = f"""
-    library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of shift_reg_break_dv
-entity {name} is
-  port (
-    clk, rst : in std_logic;
-    -- input channel
-    ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
-    ins_valid : in  std_logic;
-    ins_ready : out std_logic;
-    -- output channel
-    outs       : out std_logic_vector({bitwidth} - 1 downto 0);
-    outs_valid : out std_logic;
-    outs_ready : in  std_logic
-  );
-end entity;
-"""
     
     entity = f"""
 
@@ -125,43 +104,10 @@ entity {name} is
 end entity;
 
     """
-    
+
+
     architecture = f"""
 -- Architecture of shift_reg_break_dv
-architecture arch of {name} is
-  signal enable, inputReady : std_logic;
-  signal dataReg: std_logic_vector({bitwidth} - 1 downto 0);
-begin
-
-  control : entity work.{inner_name}
-    port map(
-      clk        => clk,
-      rst        => rst,
-      ins_valid  => ins_valid,
-      ins_ready  => inputReady,
-      outs_valid => outs_valid,
-      outs_ready => outs_ready
-    );
-
-  p_data : process (clk) is
-  begin
-    if (rising_edge(clk)) then
-      if (rst = '1') then
-        dataReg <= (others => '0');
-      elsif (enable) then
-        dataReg <= ins;
-      end if;
-    end if;
-  end process;
-
-  ins_ready <= inputReady;
-  enable <= ins_valid and inputReady;
-  outs <= dataReg;
-
-end architecture;
-"""
-
-    architecture = f"""
 
 architecture arch of {name} is
 
