@@ -264,7 +264,6 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
   
   let arguments = (ins HandshakeType:$operand, 
-                        TimingAttr:$timing, 
                         Handshake_BufferTypeEnumAttr:$bufferType,
                         ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
                         );
@@ -273,9 +272,22 @@ def BufferOp : Handshake_Op<"buffer", [
 
 
   let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral NUM_SLOTS_ATTR_NAME = "NUM_SLOTS",
-                                           TIMING_ATTR_NAME = "TIMING",
-                                           BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
+    TimingInfo getTiming() {
+      switch (getBufferType().getValue()) {
+        case BufferType::ONE_SLOT_BREAK_DV:
+        case BufferType::FIFO_BREAK_DV:
+        case BufferType::SHIFT_REG_BREAK_DV:
+          return TimingInfo::break_dv();
+        case BufferType::ONE_SLOT_BREAK_R:
+          return TimingInfo::break_r();
+        case BufferType::FIFO_BREAK_NONE:
+          return TimingInfo::break_none();
+        case BufferType::ONE_SLOT_BREAK_DVR:
+          return TimingInfo::break_dvr();
+        default:
+          llvm_unreachable("Unknown BufferType in getTiming()");
+      }
+    }
   }];
 
   
@@ -283,13 +295,11 @@ def BufferOp : Handshake_Op<"buffer", [
     OpBuilder<(
       ins
         "Value":$operand,
-        "const ::dynamatic::handshake::TimingInfo &":$timingInfo,
         "int":$numSlots,
         "::dynamatic::handshake::BufferType":$bufferType
     ), [{
       $_state.addOperands(operand);
       $_state.addTypes(operand.getType());
-      $_state.addAttribute("timing", ::dynamatic::handshake::TimingAttr::get($_builder.getContext(), timingInfo));
       $_state.addAttribute("bufferType", ::dynamatic::handshake::BufferTypeAttr::get($_builder.getContext(), bufferType));
       $_state.addAttribute("numSlots", $_builder.getI64IntegerAttr(numSlots));
     }]>
