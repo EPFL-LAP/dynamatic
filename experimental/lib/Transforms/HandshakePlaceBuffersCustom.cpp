@@ -79,12 +79,14 @@ struct HandshakePlaceBuffersCustomPass
     type = transform(type.begin(), type.end(), type.begin(),
            ::toupper);
 
-    auto bufferType = handshake::symbolizeBufferType(type);
+    auto bufferTypeOpt = handshake::symbolizeBufferType(type);
 
-    if(!bufferType){
+    if(!bufferTypeOpt){
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
+
+    auto bufferType = *bufferTypeOpt;
 
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
                                                      slots, bufferType);
