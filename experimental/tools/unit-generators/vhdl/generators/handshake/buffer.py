@@ -16,16 +16,27 @@ class BufferType(Enum):
 
 def generate_buffer(name, params):
     num_slots = params["num_slots"]
-    transparent = params["transparent"]
 
     try:
-        print(params["buffer_type"])
         buffer_type = BufferType(params["buffer_type"])
     except ValueError:
         raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
                          f"Beta backend supports: {[bt.value for bt in BufferType]}")
-
-    print(buffer_type)
+    match buffer_type:
+        case BufferType.ONE_SLOT_BREAK_R:
+            transparent = True
+        case BufferType.FIFO_BREAK_NONE:
+            transparent = True
+        case BufferType.ONE_SLOT_BREAK_DV:
+            transparent = False
+        case BufferType.FIFO_BREAK_DV:
+            transparent = False
+        case BufferType.ONE_SLOT_BREAK_DVR:
+            transparent = False
+        case BufferType.SHIFT_REG_BREAK_DV:
+            transparent = False
+        case _:
+            raise ValueError(f"Unhandled buffer type: {buffer_type}")
 
     if transparent and num_slots > 1:
         return generate_tfifo(name, params)
