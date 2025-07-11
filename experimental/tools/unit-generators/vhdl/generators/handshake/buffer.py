@@ -5,7 +5,7 @@ from generators.handshake.oehb import generate_oehb
 
 from enum import Enum
 
-def BufferType(Enum):
+class BufferType(Enum):
     ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
     ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
     FIFO_BREAK_NONE = "FIFO_BREAK_NONE"
