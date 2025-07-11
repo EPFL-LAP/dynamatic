@@ -823,7 +823,7 @@ BufferSubjectGraph::BufferSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op);
 
   // Get the Buffer type and data width from the operation attributes
-  bufferType = handshake::stringifyEnum(bufferOp.getBufferType.getValue());
+  bufferType = handshake::stringifyEnum(bufferOp.getBufferType().getValue());
 
   dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
 
