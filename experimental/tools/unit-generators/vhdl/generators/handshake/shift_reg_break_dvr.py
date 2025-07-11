@@ -185,7 +185,7 @@ begin
   -- Hence, there is no need to reset the data as well.
   -- If reset is required, then add the following lines:
   -- if (rst = '1') then
-  --   for i in 0 to NUM_SLOTS - 1 loop
+  --   for i in 0 to {num_slots} - 1 loop
   --     Memory(i) <= (others => '0');
   --   end loop;
 
