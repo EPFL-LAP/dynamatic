@@ -554,7 +554,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
 
         // uses variable as is accessed elsewhere in the code
-        addParam(BUFFER_TIMING_ATTR_NAME, TimingAttr::get(builder.getContext(), bufferOp.getTiming()));
+        addParam(BUFFER_TIMING_ATTR_NAME, TimingAttr::get(ctx, bufferOp.getTiming()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
