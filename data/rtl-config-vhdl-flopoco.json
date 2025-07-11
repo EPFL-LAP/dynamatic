@@ -260,13 +260,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/oehb.vhd",
@@ -277,14 +270,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DV", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "generic": false
-      }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/oehb.vhd",
     "module-name": "oehb",
@@ -301,13 +287,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/support/dataless/elastic_fifo_inner.vhd",
@@ -318,14 +297,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_DV", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "generic": false
-      }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/support/elastic_fifo_inner.vhd",
     "module-name": "elastic_fifo_inner",
@@ -342,12 +314,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "ready-lat-eq": 1,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tehb.vhd",
@@ -358,13 +324,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_R", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "ready-lat-eq": 1,
-        "generic": false
-      }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tehb.vhd",
     "module-name": "tehb",
@@ -381,14 +341,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 0,
-        "valid-lat-eq": 0,
-        "ready-lat-eq": 0,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/tfifo.vhd",
@@ -400,15 +352,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "FIFO_BREAK_NONE", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 0,
-        "valid-lat-eq": 0,
-        "ready-lat-eq": 0,
-        "generic": false
-      }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/tfifo.vhd",
     "module-name": "tfifo",
@@ -425,14 +369,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "ready-lat-eq": 1,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/one_slot_break_dvr.vhd",
@@ -443,15 +379,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "ONE_SLOT_BREAK_DVR", "generic": false },
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "ready-lat-eq": 1,
-        "generic": false
-      }
+      { "name": "NUM_SLOTS", "type": "unsigned", "eq": 1, "generic": false }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/one_slot_break_dvr.vhd",
     "module-name": "one_slot_break_dvr",
@@ -468,14 +396,6 @@
         "data-eq": 0,
         "extra-eq": 0,
         "generic": false
-      },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "ready-lat-eq": 0,
-        "generic": false
       }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/dataless/shift_reg_break_dv.vhd",
@@ -486,15 +406,7 @@
     "parameters": [
       { "name": "BUFFER_TYPE", "type": "string", "eq": "SHIFT_REG_BREAK_DV", "generic": false },
       { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      {
-        "name": "TIMING",
-        "type": "timing",
-        "data-lat-eq": 1,
-        "valid-lat-eq": 1,
-        "ready-lat-eq": 0,
-        "generic": false
-      }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/handshake/shift_reg_break_dv.vhd",
     "module-name": "shift_reg_break_dv",

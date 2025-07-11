@@ -122,11 +122,11 @@ handshake.func @condBrBW(%arg0: !handshake.channel<i32>, %cond: !handshake.chann
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                             %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i16>
-// CHECK:           %[[VAL_3:.*]] = buffer %[[VAL_2]] : <i16>
+// CHECK:           %[[VAL_3:.*]] = buffer %[[VAL_2]], bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 : <i16>
 // CHECK:           end %[[VAL_3]] : <i16>
 // CHECK:         }
 handshake.func @bufferBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
-  %buf = buffer %arg0 : <i32>
+  %buf = buffer %arg0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 : <i32>
   %trunc = trunci %buf : <i32> to <i16>
   end %trunc : <i16>
 }
