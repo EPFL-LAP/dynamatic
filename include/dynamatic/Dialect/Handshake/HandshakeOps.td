@@ -215,7 +215,6 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 
-// Same as the arithmetic floating predicates
 def Handshake_BufferTypeEnumAttr : I64EnumAttr<
     "BufferType", "",
     [

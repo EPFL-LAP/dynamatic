@@ -147,27 +147,9 @@ static std::string getPrettyNodeLabel(Operation *op) {
           [&](handshake::BufferOp bufferOp) -> std::string {
             // Try to infer the buffer type from HW parameters, if present
 
-            std::string numSlotsStr = " [" + std::to_string(bufferOp.getNumSlots()) + "]";
-            switch (bufferOp.getBufferType()) {
-              case BufferType::ONE_SLOT_BREAK_DV:
-                return "DV" + numSlotsStr;
-                break;
-              case BufferType::ONE_SLOT_BREAK_R:
-                return "R" + numSlotsStr;
-                break;
-              case BufferType::FIFO_BREAK_NONE:
-                return "NONE" + numSlotsStr;
-                break;
-              case BufferType::FIFO_BREAK_DV:
-                return "DV" + numSlotsStr;
-                break;
-              case BufferType::ONE_SLOT_BREAK_DVR:
-                return "DVR" + numSlotsStr;
-                break;
-              case BufferType::SHIFT_REG_BREAK_DV:
-                return "SRDV" + numSlotsStr;
-                break;
-            }
+            std::string numSlots = std::to_string(bufferOp.getNumSlots());
+            std::string bufferType = stringifyEnum(bufferOp.getBufferType());
+            return bufferType + " [" + numSlots + "]";
           })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {
         return getMemLabel("MC", getMemName(mcOp.getMemRef()));
