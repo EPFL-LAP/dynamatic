@@ -1422,18 +1422,21 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
 
   uint64_t depth = bufOp.getNumSlots();
 
-  TimingInfo info = bufferOp.getTiming();
-
-  if ((!(info == TimingInfo::break_dv())) && (!(info == TimingInfo::break_r())) &&
-      (!(info == TimingInfo::break_none())) && (!(info == TimingInfo::break_dvr()))) {
-    bufOp.emitError() << "unknown buffer";
-    return failure();
+  switch (bufferOp.getBufferType()) {
+    case BufferType::ONE_SLOT_BREAK_DV:
+    case BufferType::ONE_SLOT_BREAK_DVR:
+    case BufferType::ONE_SLOT_BREAK_R:
+    case BufferType::FIFO_BREAK_DV:
+    case BufferType::FIFO_BREAK_NONE:
+      break;
+    case BufferType::SHIFT_REG_BREAK_DV:
+      bufOp.emitError() << "unknown buffer";
+      return failure();
   }
 
-  bool bypass = info == TimingInfo::break_r();
   auto newFifoConfig =
       xls::FifoConfigAttr::get(rewriter.getContext(), /*fifo_depth=*/depth,
-                               /*bypass=*/bypass,
+                               /*bypass=*/bufferOp.isBypass(),
                                /*register_push_outputs=*/false,
                                /*register_pop_outputs=*/false);
   ch.setFifoConfigAttr(newFifoConfig);
