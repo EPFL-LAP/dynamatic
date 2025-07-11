@@ -380,7 +380,7 @@ void RTLMatch::registerTransparentParameter(hw::HWModuleExternOp &modOp,
   if (modName == "handshake.buffer") {
     auto params =
         modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
+    auto optTiming = params.getNamed(BUFFER_TIMING_ATTR_NAME);
     if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
       auto info = timing.getInfo();
       if (info == handshake::TimingInfo::break_r() ||

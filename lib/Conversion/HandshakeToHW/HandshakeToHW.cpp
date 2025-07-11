@@ -552,7 +552,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
-        addParam("TIMING", TimingAttr::get(builder.getContext(), bufferOp.getTiming()));
+
+        // uses variable as is accessed elsewhere in the code
+        addParam(BUFFER_TIMING_ATTR_NAME, TimingAttr::get(builder.getContext(), bufferOp.getTiming()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {

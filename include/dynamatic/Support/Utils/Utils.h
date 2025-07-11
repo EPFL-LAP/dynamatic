@@ -27,6 +27,10 @@ static constexpr const char *RTL_NAME_ATTR_NAME = "hw.name";
 /// of the associated RTL component to be stored.
 static constexpr const char *RTL_PARAMETERS_ATTR_NAME = "hw.parameters";
 
+/// Temporarily defining timing info key here
+static constexpr const char *BUFFER_TIMING_ATTR_NAME = "TIMING";
+
+
 /// The type of a signal in a handshake channel: DATA, VALID, or READY.
 enum class SignalType { DATA, VALID, READY };
 
