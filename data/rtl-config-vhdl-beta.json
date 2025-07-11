@@ -84,7 +84,7 @@
       }
       
     ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS timing=\"$TIMING\" bitwidth=$BITWIDTH transparent=\"$TRANSPARENT\" extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH transparent=\"$TRANSPARENT\" extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.fork",
