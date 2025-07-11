@@ -515,7 +515,7 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
       // If the node is a buffer, check if it is a tehb buffer and if so,
       // check the latency of the nodes connected to the buffer
       if (BufferOp bufferOp = dyn_cast<handshake::BufferOp>(succedingOp)) {
-        handshake::TimingInfo info = bufferOp.getTiming().getInfo();
+        handshake::TimingInfo info = bufferOp.getTiming();
 
         if (info == TimingInfo::break_r() || info == TimingInfo::break_none()) {
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
