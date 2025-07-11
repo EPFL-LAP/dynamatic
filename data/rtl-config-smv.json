@@ -7,10 +7,9 @@
   {
     "name": "handshake.buffer",
    "parameters": [
-    {"name": "NUM_SLOTS", "type": "unsigned"},
-    {"name": "TRANSPARENT", "type": "string"}
+    {"name": "NUM_SLOTS", "type": "unsigned"}
   ],
-    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH transparent=\"$TRANSPARENT\"",
+    "generator": "python3 $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {
