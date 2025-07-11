@@ -1404,7 +1404,7 @@ void Simulator::associateModel(Operation *op) {
         registerModel<GenericUnaryOpModel<handshake::NotOp>>(notOp, callback);
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
-          auto info = bufferOp.getTiming().getValue().getInfo();
+          auto info = bufferOp.getTiming().getInfo();
 
           if (info == handshake::TimingInfo::break_dv())
             registerModel<OEHBModel, handshake::BufferOp>(bufferOp);

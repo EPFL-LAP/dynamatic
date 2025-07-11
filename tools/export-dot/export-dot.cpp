@@ -147,7 +147,7 @@ static std::string getPrettyNodeLabel(Operation *op) {
           [&](handshake::BufferOp bufferOp) -> std::string {
             // Try to infer the buffer type from HW parameters, if present
 
-            std::string numSlotsStr = " [" + std::to_string(bufferOp.getNumSlots().getInt()) + "]";
+            std::string numSlotsStr = " [" + std::to_string(bufferOp.getNumSlots()) + "]";
             switch (bufferOp.getBufferType()) {
               case BufferType::ONE_SLOT_BREAK_DV:
                 return "DV" + numSlotsStr;

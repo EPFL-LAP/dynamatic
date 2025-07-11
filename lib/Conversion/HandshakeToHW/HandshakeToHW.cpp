@@ -548,7 +548,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
-        addType("DATA_TYPE", op.getOperand());
+        addType("DATA_TYPE", bufferOp.getOperand());
 
         addParam("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
