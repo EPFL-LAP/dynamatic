@@ -46,19 +46,9 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
     return latency;
   }
 
-  if (isa<handshake::BufferOp>(op)) {
-    auto params = op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME);
-    if (!params)
-      return 0;
-
-    auto optTiming = params.getNamed(handshake::BufferOp::TIMING_ATTR_NAME);
-    if (!optTiming)
-      return 0;
-
-    if (auto timing = dyn_cast<handshake::TimingAttr>(optTiming->getValue())) {
-      handshake::TimingInfo info = timing.getInfo();
-      return info.getLatency(SignalType::DATA).value_or(0);
-    }
+  if (auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op)) {
+    auto info = bufferOp.getTiming();
+    return info.getLatency(SignalType::DATA).value_or(0);
   }
 
   return 0;
