@@ -126,6 +126,6 @@ handshake.func @condBrFw(%arg0: !handshake.channel<i16>, %cond: !handshake.chann
 // CHECK:         }
 handshake.func @bufferFW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %ext0 = extsi %arg0 : <i16> to <i32>
-  %buf = buffer %ext0 : <i32>
+  %buf = buffer %ext0, bufferType = ONE_SLOT_BREAK_DV, numSlots = 1 : <i32>
   end %buf : <i32>
 }
