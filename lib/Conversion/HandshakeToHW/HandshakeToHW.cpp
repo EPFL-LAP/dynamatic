@@ -557,13 +557,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             case handshake::BufferType::ONE_SLOT_BREAK_R:
             case handshake::BufferType::FIFO_BREAK_NONE:
               addString("TRANSPARENT", "True");
-              break
+              break;
             case handshake::BufferType::ONE_SLOT_BREAK_DV:
             case handshake::BufferType::FIFO_BREAK_DV:
             case handshake::BufferType::SHIFT_REG_BREAK_DV:
             case handshake::BufferType::ONE_SLOT_BREAK_DVR:
               addString("TRANSPARENT", "False");
-              break
+              break;
             default:
               llvm_unreachable("Unknown buffer type");
         }
