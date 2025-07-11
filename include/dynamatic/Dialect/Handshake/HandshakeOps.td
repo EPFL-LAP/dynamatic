@@ -215,7 +215,7 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 
-def Handshake_BufferTypeEnumAttr : I64EnumAttr<
+def Handshake_BufferTypeAttr : I64EnumAttr<
     "BufferType", "",
     [
       /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
@@ -264,7 +264,7 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
   
   let arguments = (ins HandshakeType:$operand, 
-                        Handshake_BufferTypeEnumAttr:$bufferType,
+                        Handshake_BufferTypeAttr:$bufferType,
                         ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
                         );
 
