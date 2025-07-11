@@ -19,6 +19,7 @@ def generate_buffer(name, params):
     transparent = params["transparent"]
 
     try:
+        print(params["buffer_type"])
         buffer_type = BufferType(params["buffer_type"])
     except ValueError:
         raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
