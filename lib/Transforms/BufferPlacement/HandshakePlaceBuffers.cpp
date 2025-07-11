@@ -588,7 +588,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
 
     Value bufferIn = channel;
     auto placeBuffer = [&](const TimingInfo &timing,
-                           const BufferOp::BufferType bufferType, unsigned numSlots) {
+                           BufferType bufferType, unsigned numSlots) {
       if (numSlots == 0)
         return;
 
@@ -608,7 +608,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     placeBuffer(TimingInfo::break_dv(), BufferType::SHIFT_REG_BREAK_DV,
                 placeRes.numShiftRegDV);
     for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
-      placeBuffer(TimingInfo::break_dvr(), BufferType:::ONE_SLOT_BREAK_DVR, 1);
+      placeBuffer(TimingInfo::break_dvr(), BufferType::ONE_SLOT_BREAK_DVR, 1);
     }
     for (unsigned int i = 0; i < placeRes.numOneSlotDV; i++) {
       placeBuffer(TimingInfo::break_dv(), BufferType::ONE_SLOT_BREAK_DV, 1);

@@ -406,7 +406,7 @@ LogicalResult BufferOp::verify() {
        bufferType == BufferType::ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
-           << bufferType << "' requires NUM_SLOTS = 1, but got " << numSlots;
+           << stringifyEnum(bufferType) << "' requires NUM_SLOTS = 1, but got " << numSlots;
   }
 
   return success();
