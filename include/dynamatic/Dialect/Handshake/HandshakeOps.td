@@ -304,10 +304,10 @@ def BufferOp : Handshake_Op<"buffer", [
     }]>
   ];
 
-  let assemblyFormat = [{
-    $operand attr-dict `:` custom<HandshakeType>(type($operand))
-  }];
 
+  let assemblyFormat = [{
+    $operand `,` bufferType `=` $bufferType `,` numSlots `=` $numSlots attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
 
   let hasVerifier = 1;
 }
