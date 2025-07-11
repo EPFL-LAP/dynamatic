@@ -122,6 +122,7 @@ def generate_code(name, mod_type, parameters):
 
 
 def parse_parameters(param_list):
+    print(param_list)
     try:
         param_dict = {}
         if param_list is not None:
