@@ -76,8 +76,8 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
 
-    type = transform(type.begin(), type.end(), type.begin(),
-           ::toupper);
+    transform(type.begin(), type.end(), type.begin(),
+          ::toupper);
 
     auto bufferTypeOpt = handshake::symbolizeBufferType(type);
 
