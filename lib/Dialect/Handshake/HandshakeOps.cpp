@@ -403,11 +403,13 @@ LogicalResult BufferOp::verify() {
   int numSlots = getNumSlots();
   BufferType bufferType = getBufferType();
 
-  if ((bufferType == BufferType::ONE_SLOT_BREAK_DV || bufferType == BufferType::ONE_SLOT_BREAK_R ||
+  if ((bufferType == BufferType::ONE_SLOT_BREAK_DV ||
+       bufferType == BufferType::ONE_SLOT_BREAK_R ||
        bufferType == BufferType::ONE_SLOT_BREAK_DVR) &&
       numSlots != 1) {
     return emitOpError("buffer type '")
-           << stringifyEnum(bufferType) << "' requires NUM_SLOTS = 1, but got " << numSlots;
+           << stringifyEnum(bufferType) << "' requires NUM_SLOTS = 1, but got "
+           << numSlots;
   }
 
   return success();

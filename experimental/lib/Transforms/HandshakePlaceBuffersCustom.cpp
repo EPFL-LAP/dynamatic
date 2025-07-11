@@ -76,13 +76,12 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
 
-    transform(type.begin(), type.end(), type.begin(),
-          ::toupper);
+    transform(type.begin(), type.end(), type.begin(), ::toupper);
 
     // returns optional wrapper around buffer type enum
     auto bufferTypeOpt = handshake::symbolizeBufferType(type);
 
-    if(!bufferTypeOpt){
+    if (!bufferTypeOpt) {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }

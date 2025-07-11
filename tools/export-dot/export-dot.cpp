@@ -148,7 +148,8 @@ static std::string getPrettyNodeLabel(Operation *op) {
             // Try to infer the buffer type from HW parameters, if present
 
             std::string numSlots = std::to_string(bufferOp.getNumSlots());
-            std::string bufferType = stringifyEnum(bufferOp.getBufferType()).str();
+            std::string bufferType =
+                stringifyEnum(bufferOp.getBufferType()).str();
             return bufferType + " [" + numSlots + "]";
           })
       .Case<handshake::MemoryControllerOp>([&](MemoryControllerOp mcOp) {

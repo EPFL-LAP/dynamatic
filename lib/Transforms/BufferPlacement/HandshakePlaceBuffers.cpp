@@ -604,8 +604,7 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
     /// Prefered order of each buffer type on a channel:
     /// {SHIFT_REG_BREAK_DV, ONE_SLOT_BREAK_DVR, ONE_SLOT_BREAK_DV,
     /// FIFO_BREAK_DV, FIFO_BREAK_NONE, ONE_SLOT_BREAK_R}
-    placeBuffer(BufferType::SHIFT_REG_BREAK_DV,
-                placeRes.numShiftRegDV);
+    placeBuffer(BufferType::SHIFT_REG_BREAK_DV, placeRes.numShiftRegDV);
     for (unsigned int i = 0; i < placeRes.numOneSlotDVR; i++) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_DVR, 1);
     }

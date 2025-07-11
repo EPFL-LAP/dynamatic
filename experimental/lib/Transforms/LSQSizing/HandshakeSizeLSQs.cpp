@@ -516,7 +516,7 @@ HandshakeSizeLSQsPass::getLoadDeallocTimes(CFDFCGraph graph,
       // check the latency of the nodes connected to the buffer
       if (BufferOp bufferOp = dyn_cast<handshake::BufferOp>(succedingOp)) {
 
-        if(bufferOp.isBypass()){
+        if (bufferOp.isBypass()) {
           for (auto &succedingOp2 : graph.getConnectedOps(succedingOp)) {
             // -1 because buffer can get the load result 1 cycle earlier
             // Maybe it could also be earlier for a buffer with multiple slots

@@ -1404,15 +1404,15 @@ void Simulator::associateModel(Operation *op) {
         registerModel<GenericUnaryOpModel<handshake::NotOp>>(notOp, callback);
       })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
-          // Does this simulator support FIFOs?
-          // Before I changed this it didn't throw an error if it got one
-          // but it didn't register them either
-          // Now I guess it adds a 1-slot buffer based only on bypass behaviour?
+        // Does this simulator support FIFOs?
+        // Before I changed this it didn't throw an error if it got one
+        // but it didn't register them either
+        // Now I guess it adds a 1-slot buffer based only on bypass behaviour?
 
-          if (bufferOp.isBypass())
-            registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
-          else
-            registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
+        if (bufferOp.isBypass())
+          registerModel<TEHBModel, handshake::BufferOp>(bufferOp);
+        else
+          registerModel<OEHBModel, handshake::BufferOp>(bufferOp);
       })
       .Case<handshake::SinkOp>([&](handshake::SinkOp sinkOp) {
         registerModel<SinkModel, handshake::SinkOp>(sinkOp);
