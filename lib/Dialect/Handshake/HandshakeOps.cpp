@@ -399,8 +399,8 @@ LogicalResult FuncOp::verify() {
 
 LogicalResult BufferOp::verify() {
 
-  int numSlots = getNumSlots().getValue()
-  BufferType bufferType = getBufferType()
+  int numSlots = getNumSlots();
+  BufferType bufferType = getBufferType();
 
   if ((bufferType == BufferType::ONE_SLOT_BREAK_DV || bufferType == BufferType::ONE_SLOT_BREAK_R ||
        bufferType == BufferType::ONE_SLOT_BREAK_DVR) &&
