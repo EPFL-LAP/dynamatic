@@ -289,7 +289,7 @@ def BufferOp : Handshake_Op<"buffer", [
   //   }
   // }];
 
-  let let extraClassDeclaration [{
+  let extraClassDeclaration [{
     // can a data token bypass the buffer
     bool isBypass(){
       switch (getBufferType()) {
