@@ -296,7 +296,7 @@ def run_test(c_file: str, spec: bool) -> bool:
     # Simulate
     print("Simulator launching")
     result = subprocess.run([
-        SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name
+        SIMULATE_SH, DYNAMATIC_ROOT, c_file_dir, out_dir, kernel_name, "false"
     ])
 
     if result.returncode == 0:
