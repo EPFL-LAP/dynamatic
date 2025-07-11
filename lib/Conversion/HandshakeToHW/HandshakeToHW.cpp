@@ -550,7 +550,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Bitwidth
         addType("DATA_TYPE", bufferOp.getOperand());
 
-        addParam("NUM_SLOTS", bufferOp.getNumSlots());
+        addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
         addParam("TIMING", bufferOp.getTiming());
       })
