@@ -79,10 +79,6 @@
         "type": "unsigned"
       },
       {
-        "name": "TIMING",
-        "type": "timing"
-      },
-      {
         "name": "TRANSPARENT",
         "type": "string"
       }
