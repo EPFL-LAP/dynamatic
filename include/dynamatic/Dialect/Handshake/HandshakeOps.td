@@ -282,10 +282,10 @@ def BufferOp : Handshake_Op<"buffer", [
   
   let builders = [
     OpBuilder<(
-      ins 
-        "Value":$operand, 
-        "const ::dynamatic::handshake::TimingInfo &":$timingInfo, 
-        "::dynamatic::handshake::BufferType":$bufferType, 
+      ins
+        "Value":$operand,
+        "const ::dynamatic::handshake::TimingInfo &":$timingInfo,
+        "::dynamatic::handshake::BufferType":$bufferType,
         "int":$numSlots
     ), [{
       $_state.addOperands(operand);
