@@ -2,7 +2,7 @@
 > Flow script [compile.sh](../../tools/dynamatic/scripts/compile.sh)
 
 ## Diagram of the overall compilation flow
-![HLS Flow Diagram](../Figures/Compilation_flow.svg)
+![HLS Flow Diagram](Figures/Compilation_flow.svg)
 
 ### Stage 1: Source -> Affine level 
 In this stage, we convert source code to affine level mlir dialect with `polygist` and generate the `affine.mlir` file.

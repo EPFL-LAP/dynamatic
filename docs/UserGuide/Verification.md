@@ -2,12 +2,12 @@
 
 # Verifying the Generated Design
 ## C-RTL Cosimulation  
-To verify the correctness of your circuit after generating it with Dynamatic, the easiest way is to run a simulation.  
-Before doing so, you must ensure that you have done the following in your C program:  
-- Included the `dynamatic/Integration.h` header
-- Created a main function
-- Declared and instantiated variables that will serve as inputs to your function under test
-- Used the `CALL_KERNEL` macro to call the function and pass its inputs from the previous step  
+
+To verify the correctness of your circuit after generating it with Dynamatic, the easiest way is to run a simulation.   
+Dynamatic has a cosimulation framework that allows the user to write a testbench in C code. To take advantage of this, you must ensure that you:   
+- Includ the `dynamatic/Integration.h` header
+- Create a main function where your test inputs will be instantiated
+- Make a function call to the function under test in the main function using the following syntax: `CALL_KERNEL(<func_name>, <arg1>, <arg2>, ..., <argN>);` . The values of the arguments passed to the function (i.e., `<arg1>, <arg2>, ..., <argN>`) will be used internally by our cosimulation framework as test stimuli.  
 > [!TIP]
 > The variables declared in the `main` function must have the same names and data types as the function parameters of your function under test  
 
@@ -35,4 +35,4 @@ Contains Modelsim information and a script to compile and run the HDL simulation
 #### 7. report.txt  
 The report file gives information on the HDL simulation in Modelsim/Questa as well as some runtime and clock cycle information. If simulation fails, this file will also contain error logs to helo the user understand the cause of failure.  
 
-Dynamatic compares the files in `C_OUT` and `HDK_OUT` to determine whether the HDL code generated does what the C program was intended to do.
+Dynamatic compares the files in `C_OUT` and `HDL_OUT` to determine whether the HDL code generated does what the C program was intended to do.

@@ -8,7 +8,7 @@ This VM was originally set-up for the [*Dynamatic Reloaded tutorial* given at th
 
 Once you have downloaded the .zip archive from the link above, you can extract it and inside you will see two files The .vbox file contains all the settings required to run the VM, while the .vdi file contains the virtual hard drive. To load the VM, open VirtualBox and click on *Machine - Add*, then select the file *DynamaticVM.vbox* when prompted. 
 
-![](../Figures/virtualbox1.png)
+![](Figures/virtualbox1.png)
 
 Then, you can run it by either clicking *Start* or simply double-clicking the virtual machine in the sidebar.
 
