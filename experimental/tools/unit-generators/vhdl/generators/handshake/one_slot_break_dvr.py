@@ -90,9 +90,6 @@ use ieee.numeric_std.all;
 
 -- Entity of one_slot_break_dvr
 entity {name} is
-  generic (
-    DATA_TYPE : integer
-  );
   port (
     clk, rst : in std_logic;
     -- input channel
@@ -111,7 +108,7 @@ end entity;
 -- Architecture of one_slot_break_dvr
 architecture arch of {name} is
   signal enable, inputReady : std_logic;
-  signal dataReg: std_logic_vector(DATA_TYPE - 1 downto 0);
+  signal dataReg: std_logic_vector({bitwidth} - 1 downto 0);
 begin
 
   control : entity work.{inner_name}

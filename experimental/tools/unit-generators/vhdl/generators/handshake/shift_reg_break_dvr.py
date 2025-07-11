@@ -88,9 +88,6 @@ use ieee.numeric_std.all;
 
 -- Entity of shift_reg_break_dv
 entity {name} is
-  generic (
-    DATA_TYPE : integer
-  );
   port (
     clk, rst : in std_logic;
     -- input channel
@@ -133,7 +130,7 @@ end entity;
 -- Architecture of shift_reg_break_dv
 architecture arch of {name} is
   signal enable, inputReady : std_logic;
-  signal dataReg: std_logic_vector(DATA_TYPE - 1 downto 0);
+  signal dataReg: std_logic_vector({bitwidth} - 1 downto 0);
 begin
 
   control : entity work.{inner_name}
@@ -169,7 +166,7 @@ end architecture;
 architecture arch of {name} is
 
   signal regEn, inputReady : std_logic;
-  type REG_MEMORY is array (0 to {num_slots} - 1) of std_logic_vector(DATA_TYPE - 1 downto 0);
+  type REG_MEMORY is array (0 to {num_slots} - 1) of std_logic_vector({bitwidth} - 1 downto 0);
   signal Memory  : REG_MEMORY;
 
 begin
