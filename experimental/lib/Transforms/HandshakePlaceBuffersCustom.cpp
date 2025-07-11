@@ -76,22 +76,17 @@ struct HandshakePlaceBuffersCustomPass
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
     handshake::BufferType bufferType;
-    if (type == "one_slot_break_dv") {
-      bufferType = handshake::BufferType::ONE_SLOT_BREAK_DV;
-    } else if (type == "one_slot_break_r") {
-      bufferType = handshake::BufferType::ONE_SLOT_BREAK_R;
-    } else if (type == "fifo_break_dv") {
-      bufferType = handshake::BufferType::FIFO_BREAK_DV;
-    } else if (type == "fifo_break_none") {
-      bufferType = handshake::BufferType::FIFO_BREAK_NONE;
-    } else if (type == "one_slot_break_dvr") {
-      bufferType = handshake::BufferType::ONE_SLOT_BREAK_DVR;
-    } else if (type == "shift_reg_break_dv") {
-      bufferType = handshake::BufferType::SHIFT_REG_BREAK_DV;
-    } else {
+
+    type = transform(type.begin(), type.end(), type.begin(),
+           ::toupper);
+
+    auto bufferType = handshake::symbolizeBufferType(type);
+
+    if(!bufferType){
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
+
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
                                                      slots, bufferType);
     inheritBB(succ, bufOp);
