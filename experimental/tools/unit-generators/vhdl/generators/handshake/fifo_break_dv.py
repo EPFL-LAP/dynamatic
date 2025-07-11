@@ -85,7 +85,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of ofifo_dataless
+-- Entity of fifo_break_dv_dataless
 entity {name} is
   port (
     clk : in std_logic;
@@ -101,7 +101,7 @@ end entity;
 """
 
     architecture = f"""
--- Architecture of ofifo_dataless
+-- Architecture of fifo_break_dv_dataless
 architecture arch of {name} is
 begin
   fifo : entity work.{fifo_name}(arch)
