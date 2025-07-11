@@ -284,9 +284,8 @@ def BufferOp : Handshake_Op<"buffer", [
           return TimingInfo::break_none();
         case BufferType::ONE_SLOT_BREAK_DVR:
           return TimingInfo::break_dvr();
-        default:
-          llvm_unreachable("Unknown BufferType in getTiming()");
       }
+      llvm_unreachable("Unknown BufferType in getTiming()");
     }
   }];
 
