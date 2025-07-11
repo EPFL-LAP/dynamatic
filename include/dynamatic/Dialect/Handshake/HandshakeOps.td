@@ -289,6 +289,21 @@ def BufferOp : Handshake_Op<"buffer", [
   //   }
   // }];
 
+  let let extraClassDeclaration [{
+    // can a data token bypass the buffer
+    bool isBypass(){
+      switch (getBufferType()) {
+        case BufferType::ONE_SLOT_BREAK_DV:
+        case BufferType::FIFO_BREAK_DV:
+        case BufferType::SHIFT_REG_BREAK_DV:
+        case BufferType::ONE_SLOT_BREAK_DVR:
+          return false;
+        case BufferType::ONE_SLOT_BREAK_R:
+        case BufferType::FIFO_BREAK_NONE:
+          return true;
+    }
+  }]
+
   
   let builders = [
     OpBuilder<(
