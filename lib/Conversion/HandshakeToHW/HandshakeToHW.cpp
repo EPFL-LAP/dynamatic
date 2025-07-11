@@ -553,6 +553,21 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
 
+        switch(bufferOp.getBufferType()){
+            case handshake::BufferType::ONE_SLOT_BREAK_R:
+            case handshake::BufferType::FIFO_BREAK_NONE:
+              addString("TRANSPARENT", "True");
+              break
+            case handshake::BufferType::ONE_SLOT_BREAK_DV:
+            case handshake::BufferType::FIFO_BREAK_DV:
+            case handshake::BufferType::SHIFT_REG_BREAK_DV:
+            case handshake::BufferType::ONE_SLOT_BREAK_DVR:
+              addString("TRANSPARENT", "False");
+              break
+            default:
+              llvm_unreachable("Unknown buffer type");
+        }
+
         // uses variable as is accessed elsewhere in the code
         addParam(BUFFER_TIMING_ATTR_NAME, TimingAttr::get(ctx, bufferOp.getTiming()));
       })
