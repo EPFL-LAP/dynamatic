@@ -17,8 +17,6 @@ class BufferType(Enum):
 
 
 def generate_buffer(name, params):
-    num_slots = params["num_slots"]
-
     try:
         buffer_type = BufferType(params["buffer_type"])
     except ValueError:

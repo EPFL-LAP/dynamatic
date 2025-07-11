@@ -6,20 +6,42 @@ from generators.support.oehb import generate_oehb
 
 from enum import Enum
 
+class BufferType(Enum):
+    ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
+    ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
+    FIFO_BREAK_NONE = "FIFO_BREAK_NONE"
+    FIFO_BREAK_DV = "FIFO_BREAK_DV"
+    ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR"
+    SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV"
+
 def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
-    bufferType = params[ATTR_BUFFER_TYPE]
-    transparent = params[ATTR_TRANSPARENT]
     bitwidth = params[ATTR_BITWIDTH]
 
+    try:
+        buffer_type = BufferType(params[ATTR_BUFFER_TYPE])
+    except ValueError:
+        raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
+                         f"Beta backend supports: {[bt.value for bt in BufferType]}")
+    match buffer_type:
+        case BufferType.ONE_SLOT_BREAK_R:
+            return generate_tehb(name, {ATTR_BITWIDTH: bitwidth})
+        case BufferType.FIFO_BREAK_NONE:
+            return generate_tfifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+        case BufferType.ONE_SLOT_BREAK_DV:
+            return generate_oehb(name, params)
+        case BufferType.FIFO_BREAK_DV:
+            # this is not an ofifo
+            # but it is what was being generated based on the previous code
+            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+        case BufferType.ONE_SLOT_BREAK_DVR:
+            # this is not an ofifo
+            # but it is what was being generated based on the previous code
+            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+        case BufferType.SHIFT_REG_BREAK_DV:
+            # this is not an ofifo
+            # but it is what was being generated based on the previous code
+            return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+        case _:
+            raise ValueError(f"Unhandled buffer type: {buffer_type}")
 
-    if transparent and slots > 1:
-        return generate_tfifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
-    elif transparent and slots == 1:
-        return generate_tehb(name, {ATTR_BITWIDTH: bitwidth})
-    elif not transparent and slots > 1:
-        return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
-    elif not transparent and slots == 1:
-        return generate_oehb(name, {ATTR_BITWIDTH: bitwidth})
-    else:
-        raise ValueError(f"Buffer implementation not found")
