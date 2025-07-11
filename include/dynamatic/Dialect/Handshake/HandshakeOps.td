@@ -301,8 +301,9 @@ def BufferOp : Handshake_Op<"buffer", [
         case BufferType::ONE_SLOT_BREAK_R:
         case BufferType::FIFO_BREAK_NONE:
           return true;
+      llvm_unreachable("Unknown BufferType in isBypass()");
     }
-  }]
+  }];
 
   
   let builders = [
