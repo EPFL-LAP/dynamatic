@@ -1,6 +1,8 @@
 from generators.handshake.tfifo import generate_tfifo
 from generators.handshake.tehb import generate_tehb
-from generators.handshake.ofifo import generate_ofifo
+from generators.handshake.fifo_break_dv import generate_fifo_break_dv
+from generators.handshake.one_slot_break_dvr import generate_one_slot_break_dvr
+from generators.handshake.shift_reg_break_dvr import generate_shift_reg_break_dv
 from generators.handshake.oehb import generate_oehb
 
 from enum import Enum
@@ -24,26 +26,16 @@ def generate_buffer(name, params):
                          f"Beta backend supports: {[bt.value for bt in BufferType]}")
     match buffer_type:
         case BufferType.ONE_SLOT_BREAK_R:
-            transparent = True
+            return generate_tehb(name, params)
         case BufferType.FIFO_BREAK_NONE:
-            transparent = True
+            return generate_tfifo(name, params)
         case BufferType.ONE_SLOT_BREAK_DV:
-            transparent = False
+            return generate_oehb(name, params)
         case BufferType.FIFO_BREAK_DV:
-            transparent = False
+            return generate_fifo_break_dv(name, params)
         case BufferType.ONE_SLOT_BREAK_DVR:
-            transparent = False
+            return generate_one_slot_break_dvr(name, params)
         case BufferType.SHIFT_REG_BREAK_DV:
-            transparent = False
+            return generate_shift_reg_break_dv(name, params)
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")
-
-    if transparent and num_slots > 1:
-        return generate_tfifo(name, params)
-    elif transparent and num_slots == 1:
-        return generate_tehb(name, params)
-    elif not transparent and num_slots > 1:
-        return generate_ofifo(name, params)
-    elif not transparent and num_slots == 1:
-        return generate_oehb(name, params)
-    raise ValueError("Invalid buffer configuration")
