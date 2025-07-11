@@ -279,6 +279,22 @@ def BufferOp : Handshake_Op<"buffer", [
                                            BUFFER_TYPE_ATTR_NAME = "BUFFER_TYPE";
   }];
 
+  
+  let builders = [
+    OpBuilder<(ins 
+      Value:$operand,
+      ::dynamatic::handshake::TimingInfo:$timingInfo,
+      ::dynamatic::handshake::BufferType:$bufferType,
+      int:$numSlots
+    ), [{
+      $_state.addOperands(operand);
+      $_state.addTypes(operand.getType());
+      $_state.addAttribute("timing", ::dynamatic::handshake::TimingAttr::get($_builder.getContext(), timingInfo));
+      $_state.addAttribute("bufferType", ::dynamatic::handshake::BufferTypeAttr::get($_builder.getContext(), bufferType));
+      $_state.addAttribute("numSlots", $_builder.getI32IntegerAttr(numSlots));
+    }]>
+  ];
+
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
