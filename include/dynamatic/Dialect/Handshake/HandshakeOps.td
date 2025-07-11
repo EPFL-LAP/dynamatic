@@ -273,7 +273,7 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let extraClassDeclaration = [{
     TimingInfo getTiming() {
-      switch (getBufferType().getValue()) {
+      switch (getBufferType()) {
         case BufferType::ONE_SLOT_BREAK_DV:
         case BufferType::FIFO_BREAK_DV:
         case BufferType::SHIFT_REG_BREAK_DV:
