@@ -565,9 +565,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
               addString("TRANSPARENT", "False");
               break;
         }
-
-        // uses variable as is accessed elsewhere in the code
-        // addParam(BUFFER_TIMING_ATTR_NAME, TimingAttr::get(ctx, bufferOp.getTiming()));
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {

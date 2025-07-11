@@ -7,6 +7,9 @@ from generators.handshake.oehb import generate_oehb
 def generate_buffer(name, params):
     num_slots = params["num_slots"]
     transparent = params["transparent"]
+    buffer_type = params["buffer_type"]
+
+    print(buffer_type)
 
     if transparent and num_slots > 1:
         return generate_tfifo(name, params)

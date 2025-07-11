@@ -4,11 +4,14 @@ from generators.support.tehb import generate_tehb
 from generators.support.ofifo import generate_ofifo
 from generators.support.oehb import generate_oehb
 
+from enum import Enum
 
 def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
+    bufferType = params[ATTR_BUFFER_TYPE]
     transparent = params[ATTR_TRANSPARENT]
     bitwidth = params[ATTR_BITWIDTH]
+
 
     if transparent and slots > 1:
         return generate_tfifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})

@@ -270,25 +270,6 @@ def BufferOp : Handshake_Op<"buffer", [
 
   let results = (outs HandshakeType:$result);
 
-
-  // let extraClassDeclaration = [{
-  //   TimingInfo getTiming() {
-  //     switch (getBufferType()) {
-  //       case BufferType::ONE_SLOT_BREAK_DV:
-  //       case BufferType::FIFO_BREAK_DV:
-  //       case BufferType::SHIFT_REG_BREAK_DV:
-  //         return TimingInfo::break_dv();
-  //       case BufferType::ONE_SLOT_BREAK_R:
-  //         return TimingInfo::break_r();
-  //       case BufferType::FIFO_BREAK_NONE:
-  //         return TimingInfo::break_none();
-  //       case BufferType::ONE_SLOT_BREAK_DVR:
-  //         return TimingInfo::break_dvr();
-  //     }
-  //     llvm_unreachable("Unknown BufferType in getTiming()");
-  //   }
-  // }];
-
   let extraClassDeclaration = [{
     // can a data token bypass the buffer
     bool isBypass(){
