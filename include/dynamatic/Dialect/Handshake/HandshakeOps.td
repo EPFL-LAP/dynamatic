@@ -285,8 +285,8 @@ def BufferOp : Handshake_Op<"buffer", [
       ins
         "Value":$operand,
         "const ::dynamatic::handshake::TimingInfo &":$timingInfo,
-        "::dynamatic::handshake::BufferType":$bufferType,
-        "int":$numSlots
+        "int":$numSlots,
+        "::dynamatic::handshake::BufferType":$bufferType
     ), [{
       $_state.addOperands(operand);
       $_state.addTypes(operand.getType());
