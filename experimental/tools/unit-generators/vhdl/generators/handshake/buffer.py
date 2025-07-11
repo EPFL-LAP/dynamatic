@@ -3,6 +3,8 @@ from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 from generators.handshake.oehb import generate_oehb
 
+from enum import Enum
+
 def BufferType(Enum):
     ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
     ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
