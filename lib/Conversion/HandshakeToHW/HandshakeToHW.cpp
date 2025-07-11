@@ -552,19 +552,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
-
-        switch(bufferOp.getBufferType()){
-            case handshake::BufferType::ONE_SLOT_BREAK_R:
-            case handshake::BufferType::FIFO_BREAK_NONE:
-              addString("TRANSPARENT", "True");
-              break;
-            case handshake::BufferType::ONE_SLOT_BREAK_DV:
-            case handshake::BufferType::FIFO_BREAK_DV:
-            case handshake::BufferType::SHIFT_REG_BREAK_DV:
-            case handshake::BufferType::ONE_SLOT_BREAK_DVR:
-              addString("TRANSPARENT", "False");
-              break;
-        }
       })
       .Case<handshake::ConditionalBranchOp>(
           [&](handshake::ConditionalBranchOp cbrOp) {
