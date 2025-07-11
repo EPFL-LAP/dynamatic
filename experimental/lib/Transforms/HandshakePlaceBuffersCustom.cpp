@@ -75,32 +75,25 @@ struct HandshakePlaceBuffersCustomPass
     // channel.
     Operation *succ = *channel.getUsers().begin();
     builder.setInsertionPoint(succ);
-    handshake::TimingInfo timing;
     handshake::BufferType bufferType;
     if (type == "one_slot_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
       bufferType = handshake::BufferType::ONE_SLOT_BREAK_DV;
     } else if (type == "one_slot_break_r") {
-      timing = handshake::TimingInfo::break_r();
       bufferType = handshake::BufferType::ONE_SLOT_BREAK_R;
     } else if (type == "fifo_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
       bufferType = handshake::BufferType::FIFO_BREAK_DV;
     } else if (type == "fifo_break_none") {
-      timing = handshake::TimingInfo::break_none();
       bufferType = handshake::BufferType::FIFO_BREAK_NONE;
     } else if (type == "one_slot_break_dvr") {
-      timing = handshake::TimingInfo::break_dvr();
       bufferType = handshake::BufferType::ONE_SLOT_BREAK_DVR;
     } else if (type == "shift_reg_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
       bufferType = handshake::BufferType::SHIFT_REG_BREAK_DV;
     } else {
       llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
       return signalPassFailure();
     }
     auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots, bufferType);
+                                                     slots, bufferType);
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
