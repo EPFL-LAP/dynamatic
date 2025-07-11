@@ -3,11 +3,24 @@ from generators.handshake.tehb import generate_tehb
 from generators.handshake.ofifo import generate_ofifo
 from generators.handshake.oehb import generate_oehb
 
+def BufferType(Enum):
+    ONE_SLOT_BREAK_DV = "ONE_SLOT_BREAK_DV"
+    ONE_SLOT_BREAK_R = "ONE_SLOT_BREAK_R"
+    FIFO_BREAK_NONE = "FIFO_BREAK_NONE"
+    FIFO_BREAK_DV = "FIFO_BREAK_DV"
+    ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR"
+    SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV"
+
 
 def generate_buffer(name, params):
     num_slots = params["num_slots"]
     transparent = params["transparent"]
-    buffer_type = params["buffer_type"]
+
+    try:
+        buffer_type = BufferType(params["buffer_type"])
+    except ValueError:
+        raise ValueError(f"Invalid buffer_type: '{params['buffer_type']}'. "
+                         f"Beta backend supports: {[bt.value for bt in BufferType]}")
 
     print(buffer_type)
 
