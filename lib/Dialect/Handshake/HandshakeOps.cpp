@@ -398,7 +398,8 @@ LogicalResult FuncOp::verify() {
 }
 
 LogicalResult BufferOp::verify() {
-
+  // this is additional verification
+  // so both attributes have already been verified as present
   int numSlots = getNumSlots();
   BufferType bufferType = getBufferType();
 
