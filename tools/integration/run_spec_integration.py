@@ -301,6 +301,17 @@ def run_test(c_file: str, spec: bool) -> bool:
 
     if result.returncode == 0:
         print("Simulation succeeded")
+
+        result = os.path.join(out_dir, "sim/report.txt")
+        with open(result, "r") as f:
+            report = f.read()
+            # Match Latency = \d+ cycles
+            latency_match = report.split("Latency = ")
+            if len(latency_match) > 1:
+                latency = latency_match[1].split(" cycles")[0]
+                print(f"Latency: {latency} cycles")
+            else:
+                print("Latency not found in report")
     else:
         color_print("Failed to simulate", TermColors.FAIL)
         return False
