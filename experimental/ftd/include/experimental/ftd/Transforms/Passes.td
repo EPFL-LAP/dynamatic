@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the definition of all experimental transformation passes.
+// This file contains the definition of all ftd transformation passes.
 //
 //===----------------------------------------------------------------------===//
 
