@@ -1,4 +1,4 @@
-//===- InitAllPasses.h - Experimental passes registration --------*- C++-*-===//
+//===- InitAllPasses.h - FTD passes registration --------*- C++-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
