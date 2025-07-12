@@ -34,84 +34,89 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::buffer;
 
+namespace dynamatic {
+namespace experimental {
+
+// import auto-generated base class definition
+#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERSCUSTOM
+#include "experimental/Transforms/Passes.h.inc"
+
+} // namespace experimental
+} // namespace dynamatic
+
 namespace {
 
 struct HandshakePlaceBuffersCustomPass
     : public dynamatic::experimental::buffer::impl::
-          HandshakePlaceBuffersCustomBase<HandshakePlaceBuffersCustomPass> {
+          HandshakePlaceBuffersCustomPass<HandshakePlaceBuffersCustomPass> {
+  // use auto-generated constructors from base class
+  using HandshakePlaceBuffersCustomPass::HandshakePlaceBuffersCustomPass;
 
-  /// Trivial field-by-field constructor.
-  HandshakePlaceBuffersCustomPass(const std::string &pred, const int &outid,
-                                  const int &slots, const std::string &type) {
-    this->pred = pred;
-    this->outid = outid;
-    this->slots = slots;
-    this->type = type;
-  }
+  // TableGen Pass Options
+  // - std::string pred
+  // - unsigned outid
+  // - unsigned slot
+  // - type std::string
 
   /// Called on the MLIR module provided as input.
-  void runDynamaticPass() override {
-    mlir::ModuleOp modOp = getOperation();
-    MLIRContext *ctx = &getContext();
-
-    // Check if the IR is after being materialized, if not, reject the input
-    // IR.
-    if (failed(verifyIRMaterialized(modOp))) {
-      modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
-      return signalPassFailure();
-    }
-
-    OpBuilder builder(ctx);
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
-    Operation *op = namer.getOp(pred);
-    if (!op) {
-      llvm::errs() << "No operation named \"" << pred << "\" exists\n";
-      return signalPassFailure();
-    }
-    assert(outid < op->getNumResults() &&
-           "The output id exceeds the number of output ports!");
-    Value channel = op->getResult(outid);
-    // Set the insertion point to be before the original successor of the
-    // channel.
-    Operation *succ = *channel.getUsers().begin();
-    builder.setInsertionPoint(succ);
-    handshake::TimingInfo timing;
-    StringRef bufferType;
-    if (type == "one_slot_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
-    } else if (type == "one_slot_break_r") {
-      timing = handshake::TimingInfo::break_r();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
-    } else if (type == "fifo_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::FIFO_BREAK_DV;
-    } else if (type == "fifo_break_none") {
-      timing = handshake::TimingInfo::break_none();
-      bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
-    } else if (type == "one_slot_break_dvr") {
-      timing = handshake::TimingInfo::break_dvr();
-      bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
-    } else if (type == "shift_reg_break_dv") {
-      timing = handshake::TimingInfo::break_dv();
-      bufferType = handshake::BufferOp::SHIFT_REG_BREAK_DV;
-    } else {
-      llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
-      return signalPassFailure();
-    }
-    auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
-                                                     timing, slots, bufferType);
-    inheritBB(succ, bufOp);
-    Value bufferRes = bufOp->getResult(0);
-    succ->replaceUsesOfWith(channel, bufferRes);
-  }
+  void runDynamaticPass() override;
 };
-} // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::buffer::createHandshakePlaceBuffersCustom(
-    const std::string &pred, const unsigned &outid, const unsigned &slots,
-    const std::string &type) {
-  return std::make_unique<HandshakePlaceBuffersCustomPass>(pred, outid, slots,
-                                                           type);
+/// Called on the MLIR module provided as input.
+void HandshakePlaceBuffersCustomPass::runDynamaticPass() {
+  mlir::ModuleOp modOp = getOperation();
+  MLIRContext *ctx = &getContext();
+
+  // Check if the IR is after being materialized, if not, reject the input
+  // IR.
+  if (failed(verifyIRMaterialized(modOp))) {
+    modOp->emitError() << ERR_NON_MATERIALIZED_MOD;
+    return signalPassFailure();
+  }
+
+  OpBuilder builder(ctx);
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  Operation *op = namer.getOp(pred);
+  if (!op) {
+    llvm::errs() << "No operation named \"" << pred << "\" exists\n";
+    return signalPassFailure();
+  }
+  assert(outid < op->getNumResults() &&
+          "The output id exceeds the number of output ports!");
+  Value channel = op->getResult(outid);
+  // Set the insertion point to be before the original successor of the
+  // channel.
+  Operation *succ = *channel.getUsers().begin();
+  builder.setInsertionPoint(succ);
+  handshake::TimingInfo timing;
+  StringRef bufferType;
+  if (type == "one_slot_break_dv") {
+    timing = handshake::TimingInfo::break_dv();
+    bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DV;
+  } else if (type == "one_slot_break_r") {
+    timing = handshake::TimingInfo::break_r();
+    bufferType = handshake::BufferOp::ONE_SLOT_BREAK_R;
+  } else if (type == "fifo_break_dv") {
+    timing = handshake::TimingInfo::break_dv();
+    bufferType = handshake::BufferOp::FIFO_BREAK_DV;
+  } else if (type == "fifo_break_none") {
+    timing = handshake::TimingInfo::break_none();
+    bufferType = handshake::BufferOp::FIFO_BREAK_NONE;
+  } else if (type == "one_slot_break_dvr") {
+    timing = handshake::TimingInfo::break_dvr();
+    bufferType = handshake::BufferOp::ONE_SLOT_BREAK_DVR;
+  } else if (type == "shift_reg_break_dv") {
+    timing = handshake::TimingInfo::break_dv();
+    bufferType = handshake::BufferOp::SHIFT_REG_BREAK_DV;
+  } else {
+    llvm::errs() << "Unknown buffer type: \"" << type << "\"!\n";
+    return signalPassFailure();
+  }
+  auto bufOp = builder.create<handshake::BufferOp>(channel.getLoc(), channel,
+                                                    timing, slots, bufferType);
+  inheritBB(succ, bufOp);
+  Value bufferRes = bufOp->getResult(0);
+  succ->replaceUsesOfWith(channel, bufferRes);
 }
+
+} // namespace

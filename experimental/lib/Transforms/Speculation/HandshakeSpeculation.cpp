@@ -53,7 +53,7 @@ namespace {
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  // use auto-generated constructors
+  // use auto-generated constructors from base class
   using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
   // TableGen Pass Options

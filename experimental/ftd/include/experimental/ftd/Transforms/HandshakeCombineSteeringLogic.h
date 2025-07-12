@@ -18,6 +18,9 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+// import auto-generate base class declaration
+// options struct
+// and create function
 #define GEN_PASS_DECL_HANDSHAKECOMBINESTEERINGLOGIC
 #include "experimental/ftd/Transforms/Passes.h.inc"
 

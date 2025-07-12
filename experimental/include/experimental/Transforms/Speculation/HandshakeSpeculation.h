@@ -21,8 +21,9 @@
 namespace dynamatic {
 namespace experimental {
 
-// include auto-generated constructors
-// and options struct
+// import auto-generate base class declaration
+// options struct
+// and create function
 #define GEN_PASS_DECL_HANDSHAKESPECULATION
 #include "experimental/Transforms/Passes.h.inc"
 
