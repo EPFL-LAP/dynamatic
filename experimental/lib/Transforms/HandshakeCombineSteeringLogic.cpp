@@ -33,7 +33,7 @@ namespace experimental {
 namespace ftd {
 
 #define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
-#include "experimental/Transforms/Passes.h.inc"
+#include "experimental/ftd/Transforms/Passes.h.inc"
 
 } // namespace ftd
 } // namespace experimental
