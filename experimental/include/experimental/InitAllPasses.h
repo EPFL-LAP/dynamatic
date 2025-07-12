@@ -22,7 +22,6 @@ namespace experimental {
 
 inline void registerAllPasses() {
   registerAnalysisPasses();
-  registerHandshakeCombineSteeringLogic();
   registerHandshakeSpeculation();
   registerHandshakePlaceBuffersCustom();
   registerCreditBasedSharing();

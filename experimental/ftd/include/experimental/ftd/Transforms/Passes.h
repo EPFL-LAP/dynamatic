@@ -15,6 +15,7 @@
 #define FTD_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/ftd/Transforms/HandshakeCombineSteeringLogic.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
