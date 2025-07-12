@@ -38,16 +38,27 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
+namespace dynamatic{
+namespace experimental{
+
+// include auto-generated base class
+#define GEN_PASS_DEF_HANDSHAKESPECULATION
+#include "experimental/Transforms/Passes.h.inc"
+
+} // namespace experimental
+} // namespace dynamatic
+
 namespace {
 
 struct HandshakeSpeculationPass
-    : public dynamatic::experimental::speculation::impl::
+    : public dynamatic::experimental::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(const std::string &jsonPath = "",
-                           bool automatic = true) {
-    this->jsonPath = jsonPath;
-    this->automatic = automatic;
-  }
+  // use auto-generated constructors
+  using HandshakeSpeculationBase::HandshakeSpeculationBase;
+
+  // Inherited options from TableGen (handled in base):
+  // - std::string jsonPath
+  // - bool automatic
 
   void runDynamaticPass() override;
 
@@ -875,10 +886,4 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::speculation::createHandshakeSpeculation(
-    const std::string &jsonPath, bool automatic) {
-  return std::make_unique<HandshakeSpeculationPass>(jsonPath, automatic);
 }
