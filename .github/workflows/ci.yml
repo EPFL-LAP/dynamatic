@@ -75,6 +75,7 @@ jobs:
         with: 
           name: integration-report
           path: |
-            integration-test/*/out/
-            integration-test/*/out_spec/
+            integration-test/*/out*/comp
+            integration-test/*/out*/sim/report.txt
+            integration-test/*/out/dynamatic_out.txt
 
