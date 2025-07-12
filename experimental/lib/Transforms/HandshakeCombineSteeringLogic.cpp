@@ -28,7 +28,27 @@
 using namespace mlir;
 using namespace dynamatic;
 
+namespace dynamatic {
+namespace experimental {
+namespace ftd {
+
+#define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
+#include "experimental/Transforms/Passes.h.inc"
+
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic
+
 namespace {
+
+/// Simple driver for the Handshake Combine Branches Merges pass, based on a
+/// greedy pattern rewriter.
+struct HandshakeCombineSteeringLogicPass
+    : public dynamatic::experimental::ftd::impl::
+          HandshakeCombineSteeringLogicBase<HandshakeCombineSteeringLogicPass> {
+
+  void runDynamaticPass() override;
+};
 
 /// Combine redundant init merges. These merges have one constant input and a
 /// condition input. If two merges are identical, then one of them can be
@@ -382,12 +402,7 @@ struct CombineBranchesSameSign
   }
 };
 
-/// Simple driver for the Handshake Combine Branches Merges pass, based on a
-/// greedy pattern rewriter.
-struct HandshakeCombineSteeringLogicPass
-    : public dynamatic::experimental::ftd::impl::
-          HandshakeCombineSteeringLogicBase<HandshakeCombineSteeringLogicPass> {
-  void runDynamaticPass() override {
+  void HandshakeCombineSteeringLogic::runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
     GreedyRewriteConfig config;
@@ -400,10 +415,5 @@ struct HandshakeCombineSteeringLogicPass
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
-};
-}; // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::ftd::combineSteeringLogic() {
-  return std::make_unique<HandshakeCombineSteeringLogicPass>();
-}
+}; // namespace

@@ -18,10 +18,7 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-std::unique_ptr<dynamatic::DynamaticPass> combineSteeringLogic();
-
 #define GEN_PASS_DECL_HANDSHAKECOMBINESTEERINGLOGIC
-#define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
 #include "experimental/Transforms/Passes.h.inc"
 
 } // namespace ftd

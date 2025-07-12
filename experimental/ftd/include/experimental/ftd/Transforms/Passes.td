@@ -24,7 +24,6 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
       outputs. This is a simplification which comes immediately after the FTD
       logic.
   }];
-  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
 }
 
 #endif // FTD_TRANSFORMS_PASSES_TD

@@ -20,7 +20,7 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace ftd{
+namespace ftd {
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
