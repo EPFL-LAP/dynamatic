@@ -23,7 +23,7 @@
 namespace fs = std::filesystem;
 
 int runIntegrationTest(const std::string &name, int &outSimTime);
-bool runSpecIntegrationTest(const std::string& name);
+bool runSpecIntegrationTest(const std::string& name, int &outSimTime);
 int getSimulationTime(const fs::path &logFile);
 
 #endif // UTIL_H
