@@ -232,5 +232,5 @@ export LM_LICENSE_FILE=/path/to/license/file     # looks like this "home/usernam
 export MGLS_LICENSE_FILE=/path/to/license/file   # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
 export SALT_LICENSE_SERVER=/path/to/license/file # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
 ```
-> [!NOTE]
+> [!NOTE]  
 > You may need only one of the three lines above based on the version of Questa you are using. Refer to the release notes for the version you have installed. Having the three lines poses no issue nonetheless.
