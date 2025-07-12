@@ -35,23 +35,22 @@ TEST_P(SpecFixture, spec) {
   RecordProperty("cycles", std::to_string(simTime));
 }
 
-INSTANTIATE_TEST_SUITE_P(BasicAllTests, BasicFixture,
-                         testing::Values("single_loop"));
-// testing::Values("atax", "atax_float", "bicg", "bicg_float", "binary_search",
-//                 "factorial", "fir", "float_basic", "gaussian", "gcd",
-//                 "gemm", "gemm_float", "gemver", "gemver_float",
-//                 "gesummv_float", "get_tanh", "gsum", "gsumif", "histogram",
-//                 "if_loop_1", "if_loop_2", "if_loop_3", "if_loop_add",
-//                 "if_loop_mul", "iir", "image_resize", "insertion_sort",
-//                 "iterative_division", "iterative_sqrt", "jacobi_1d_imper",
-//                 "kernel_2mm", "kernel_2mm_float", "kernel_3mm",
-//                 "kernel_3mm_float", "kmp", "loop_array", "lu", "matching",
-//                 "matching_2", "matrix", "matrix_power", "matvec", "memory",
-//                 "mul_example", "mvt_float", "pivot", "polyn_mult",
-//                 "sharing", "simple_example_1", "sobel", "spmv",
-//                 "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
-//                 "test_stdint", "threshold", "triangular", "vector_rescale",
-//                 "video_filter", "while_loop_1", "while_loop_3"));
+INSTANTIATE_TEST_SUITE_P(
+    BasicAllTests, BasicFixture,
+    testing::Values(
+        "single_loop", "atax", "atax_float", "bicg", "bicg_float",
+        "binary_search", "factorial", "fir", "float_basic", "gaussian", "gcd",
+        "gemm", "gemm_float", "gemver", "gemver_float", "gesummv_float",
+        "get_tanh", "gsum", "gsumif", "histogram", "if_loop_1", "if_loop_2",
+        "if_loop_3", "if_loop_add", "if_loop_mul", "iir", "image_resize",
+        "insertion_sort", "iterative_division", "iterative_sqrt",
+        "jacobi_1d_imper", "kernel_2mm", "kernel_2mm_float", "kernel_3mm",
+        "kernel_3mm_float", "kmp", "loop_array", "lu", "matching", "matching_2",
+        "matrix", "matrix_power", "matvec", "memory", "mul_example",
+        "mvt_float", "pivot", "polyn_mult", "sharing", "simple_example_1",
+        "sobel", "spmv", "stencil_2d", "sumi3_mem", "symm_float", "syr2k_float",
+        "test_stdint", "threshold", "triangular", "vector_rescale",
+        "video_filter", "while_loop_1", "while_loop_3"));
 
 INSTANTIATE_TEST_SUITE_P(SpecSingleLoop, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
