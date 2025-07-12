@@ -32,7 +32,6 @@
 using namespace llvm;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::buffer;
 
 namespace dynamatic {
 namespace experimental {
