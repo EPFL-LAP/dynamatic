@@ -52,7 +52,7 @@ INSTANTIATE_TEST_SUITE_P(
         "test_stdint", "threshold", "triangular", "vector_rescale",
         "video_filter", "while_loop_1", "while_loop_3"));
 
-INSTANTIATE_TEST_SUITE_P(SpecSingleLoop, SpecFixture,
+INSTANTIATE_TEST_SUITE_P(SpecSingleLoop_NoCI, SpecFixture,
                          testing::Values("single_loop", "fixed", "if_convert",
                                          "loop_path", "nested_loop",
                                          "single_loop", "sparse", "subdiag",

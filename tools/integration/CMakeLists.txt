@@ -33,10 +33,19 @@ gtest_discover_tests(
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
 add_custom_target(
-  run-integration-tests
+  run-all-integration-tests
   COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
   COMMENT "Run integration tests."
+  VERBATIM
+)
+
+add_custom_target(
+  run-ci-integration-tests
+  COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --output-on-failure --exclude-regex _NoCI
+  DEPENDS dynamatic-opt integration
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
+  COMMENT "Run integration tests that aren't marked with '_NoCI'."
   VERBATIM
 )
