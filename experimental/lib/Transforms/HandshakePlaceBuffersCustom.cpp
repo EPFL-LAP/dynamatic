@@ -47,9 +47,9 @@ namespace {
 
 struct HandshakePlaceBuffersCustomPass
     : public dynamatic::experimental::impl::
-          HandshakePlaceBuffersCustomPass<HandshakePlaceBuffersCustomPass> {
+          HandshakePlaceBuffersCustomBase<HandshakePlaceBuffersCustomPass> {
   // use auto-generated constructors from base class
-  using HandshakePlaceBuffersCustomPass::HandshakePlaceBuffersCustomPass;
+  using HandshakePlaceBuffersCustomBase::HandshakePlaceBuffersCustomBase;
 
   // TableGen Pass Options
   // - std::string pred
