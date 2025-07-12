@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.tehb import generate_tehb
 from generators.support.elastic_fifo_inner import generate_elastic_fifo_inner
 
@@ -35,7 +36,8 @@ use ieee.numeric_std.all;
 -- Entity of ofifo
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     ins       : in  std_logic_vector({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic;
@@ -108,7 +110,8 @@ use ieee.numeric_std.all;
 -- Entity of ofifo_dataless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channel
     ins_valid : in  std_logic;
     ins_ready : out std_logic;
@@ -159,17 +162,17 @@ end architecture;
 
 def _generate_ofifo_signal_manager(name, size, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_concat_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_ofifo(name, size, bitwidth + extra_signals_bitwidth))
+        extra_signals,
+        lambda name: _generate_ofifo(name, size, bitwidth + extra_signals_bitwidth))

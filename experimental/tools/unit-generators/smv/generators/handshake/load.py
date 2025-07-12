@@ -16,7 +16,7 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   inner_addr_tehb : {name}__addr_tehb(addrIn, addrIn_valid, addrOut_ready);
   inner_data_tehb : {name}__data_tehb(dataFromMem, dataFromMem_valid, dataOut_ready);
 
-  //output
+  -- outputs
   DEFINE
   addrIn_ready := inner_addr_tehb.ins_ready;
   addrOut := inner_addr_tehb.outs;

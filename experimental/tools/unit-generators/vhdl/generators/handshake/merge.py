@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 from generators.handshake.merge_notehb import generate_merge_notehb
 from generators.handshake.tehb import generate_tehb
 
@@ -32,7 +33,8 @@ use ieee.numeric_std.all;
 -- Entity of merge_dataless
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channels
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
     ins_ready : out std_logic_vector({size} - 1 downto 0);
@@ -94,7 +96,8 @@ use work.types.all;
 -- Entity of merge
 entity {name} is
   port (
-    clk, rst : in std_logic;
+    clk : in std_logic;
+    rst : in std_logic;
     -- input channels
     ins       : in  data_array({size} - 1 downto 0)({bitwidth} - 1 downto 0);
     ins_valid : in  std_logic_vector({size} - 1 downto 0);
@@ -147,19 +150,18 @@ end architecture;
 def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
     # Haven't tested this function yet
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-    return generate_signal_manager(name, {
-        "type": "concat",
-        "in_ports": [{
+    return generate_concat_signal_manager(
+        name,
+        [{
             "name": "ins",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals,
-            "2d": True,
             "size": size
         }],
-        "out_ports": [{
+        [{
             "name": "outs",
             "bitwidth": bitwidth,
             "extra_signals": extra_signals
         }],
-        "extra_signals": extra_signals
-    }, lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
+        extra_signals,
+        lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))

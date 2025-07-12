@@ -52,8 +52,23 @@ Each buffer type corresponds to a specific RTL backend HDL module with different
 | `FIFO_BREAK_NONE`      | TFIFO              | Data: 0, Valid: 0, Ready: 0 | Bypass: D, V, R           |
 | `SHIFT_REG_BREAK_DV`   | N/A                | Data: 1, Valid: 1, Ready: 0 | Break: D, V; Bypass: R    |
 
-> All six buffer types can be used together in a channel to handle various needs. For the first three types, multiple modules can be chained to provide more slots. The last three types allow multiple slots within their module parameters, so they need not be chained in a channel.
-> An assertion is placed in the BufferOp builder to ensure that if the buffer type is `ONE_SLOT`, then `NUM_SLOTS` == 1.
+Additional notes on modeling and usage of the buffer types listed above:
+
+- **Equivalent combinations**:  
+  Existing algorithms (FPGA20, FPL22, CostAware) do not distinguish between a single `FIFO_BREAK_DV` and the combination of `ONE_SLOT_BREAK_DV` with `FIFO_BREAK_NONE`, even though the two differ in both timing behavior and area cost.  
+  Specifically, the algorithms treat an `n`-slot `FIFO_BREAK_DV` as equivalent to a `1`-slot `ONE_SLOT_BREAK_DV` followed by an `n-1`-slot `FIFO_BREAK_NONE`.
+
+- **Control granularity**:  
+  In `ONE_SLOT_BREAK_DV`, each slot has its own handshake control, so slots accept or stall inputs independently.  
+  In contrast, all slots in `SHIFT_REG_BREAK_DV` share a single handshake control signal and thus accept or stall inputs together.
+
+- **Composability**:  
+  All six buffer types can be used together in a channel to handle various needs.  
+  - For the first three types (`ONE_SLOT_BREAK_DV`, `ONE_SLOT_BREAK_R`, `ONE_SLOT_BREAK_DVR`), **multiple modules** can be chained to provide more slots.  
+  - For the last three types (`FIFO_BREAK_DV`, `FIFO_BREAK_NONE`, `SHIFT_REG_BREAK_DV`), **multiple slots** are supported within their **module parameters**, so they need not be chained.
+
+- **Builder assertion**:  
+  An assertion is placed in the `BufferOp` builder to ensure that if the buffer type is `ONE_SLOT`, then `NUM_SLOTS == 1`.
 
 ## Mapping MILP Results to Buffer Types
 

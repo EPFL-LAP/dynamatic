@@ -217,4 +217,34 @@ def ControlInterface : OpInterface<"ControlInterface"> {
 
 def HasClock : NativeOpTrait<"HasClock">;
 
+
+def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Handshake operations which have a variable internal delay
+     used in frequency regulation.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Sets the internal delay as a StringAttr named "internal_delay".
+    }], "void", "setInternalDelay", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("internal_delay",
+                   StringAttr::get(op->getContext(), value));
+    }]>,
+    
+    // Return StringAttr instead of StringRef to ensure proper memory allocation.
+    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+    InterfaceMethod<[{
+      Gets the internal delay as a StringAttr named "internal_delay". Defaults to "0.0" if not set.
+    }], "StringAttr", "getInternalDelay", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("internal_delay"))
+        return attr;
+      return StringAttr::get(op->getContext(), "0.0");
+    }]>
+  ];
+}
+
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

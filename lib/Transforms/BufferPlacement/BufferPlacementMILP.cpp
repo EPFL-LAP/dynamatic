@@ -12,6 +12,7 @@
 
 #include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -164,7 +165,8 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     // If the component is combinational (i.e., 0 latency) its output fluid
     // retiming equals its input fluid retiming, otherwise it is different
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency)))
+    if (failed(
+            timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
       latency = 0.0;
     if (latency == 0.0)
       unitVars.retOut = unitVars.retIn;
@@ -245,7 +247,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                    ChannelFilter filter) {
   // Add path constraints for units
   double latency;
-  if (failed(timingDB.getLatency(unit, signalType, latency)))
+  if (failed(timingDB.getLatency(unit, signalType, latency, targetPeriod)))
     latency = 0.0;
 
   if (latency == 0.0) {
@@ -389,12 +391,16 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
 
-    // No throughput constraints on channels going to stores
-    /// TODO: this is from legacy implementation, we should understand why we
-    /// really do this and figure out if it makes sense (@lucas-rami: I don't
-    /// think it does)
-    if (isa<handshake::StoreOp>(dstOp))
+    /// No throughput constraints on channels going to stores which
+    /// are not connected to the LSQ. In the legacy implementation,
+    /// MCStoreOp and LSQStoreOp were used to distinguish between
+    /// stores that are connected to the LSQ and those that are not.
+    /// In the new implementation, we use the MemInterfaceAttr to determine
+    /// whether the StoreOp is connected to the LSQ or not.
+    if (isa<handshake::StoreOp>(dstOp) &&
+        getDialectAttr<MemInterfaceAttr>(dstOp).connectsToLSQ()) {
       continue;
+    }
 
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
@@ -596,7 +602,8 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Operation *unit : cfdfc.units) {
     double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency)) ||
+    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency,
+                                   targetPeriod)) ||
         latency == 0.0)
       continue;
 
@@ -790,6 +797,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << result.numFifoDV << " FifoDV slot(s)\n";
     os << result.numFifoNone << " FifoNone slot(s)\n";
     os << result.numOneSlotDVR << " OneSlotDVR slot(s)\n";
+    os << result.numShiftRegDV << " ShiftRegDV slot(s)\n";
     os.unindent();
     os << "\n";
   }
