@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Instantiation of MLIR Operations at C-Level
 
 This document explains how to use placeholder functions in C to instantiate an MLIR operation within the Handshake dialect.

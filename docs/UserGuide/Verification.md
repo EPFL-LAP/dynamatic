@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 
 # Verifying the Generated Design
 ## C-RTL Cosimulation  
@@ -30,7 +30,20 @@ Contains the results of compiling and running the C program stored as `.dat` fil
 Contains the results of running the HDL simulation of the program in Modelsim/Questa stored as `.dat` files for every output.
 
 #### 6. HLS_VERIFY  
-Contains Modelsim information and a script to compile and run the HDL simulation. It also contains testbench information and the results of the waveform transitions that occured during the simulation stored in a `vsim.wlf` file.
+Contains  
+- Modelsim information 
+    - default settings 
+    - library information to configure the simulator
+- a script to compile and run the HDL simulation.
+- a transcript of all commands run during the simulation. 
+- testbench information 
+    - optimization data
+    - temporary compilation data
+    - temporary message logs
+    - library metadata
+    - library hierarchy and elaboration logic  
+    - dependency listing
+- the results of the waveform transitions that occured during the simulation, stored in a `vsim.wlf` file.
 
 #### 7. report.txt  
 The report file gives information on the HDL simulation in Modelsim/Questa as well as some runtime and clock cycle information. If simulation fails, this file will also contain error logs to helo the user understand the cause of failure.  

@@ -1,3 +1,4 @@
+[Documentation Table of Contents](../../README.md)
 # Backend
 
 This document describes the interconnected behavior of our RTL backend and of the JSON-formatted RTL configuration file, which together bridge the gap between MLIR and synthesizable RTL. There are two main sections in this document.
@@ -30,7 +31,7 @@ In particular, the conversion pass offloads multiple IR analysis/transformation 
 2. identifies precisely the set of standard RTL modules we will need in the final circuit, and
 3. associate a port name to each SSA value use and each SSA result and store it inside the IR to make the RTL emitter's job as minimal as possible.
 
-#### Making memory interfaces explicit
+#### Making Memory Interfaces Explicit
 
 IR at the Handshake level still links MLIR operations representing memory interfaces (e.g., LSQ) inside dataflow circuits to their (implicitly represented) backing memories using the standard `mlir::MemRefType` type, which abstracts the underlying IO that will eventually connect the two together. For example, a Handshake function operating on a single 32-bit-wide integer array of size 64 has the following signature (control signals omitted).
 
@@ -50,7 +51,7 @@ hw.module @func(in %mem_loadData : i32, out mem_loadEn : i1, out mem_loadAddr : 
 
 The single `memref`-typed `mem` argument to the Handshake function is replaced by one module input (`mem_loadData`) and 5 module outputs (`mem_loadEn`, `mem_loadAddr`, `mem_storeEn`, `mem_storeAddr`, and `mem_storeData`) that all have simple types immediately lowerable to RTL. The interface's actual specification (i.e., the composition of the signal bundle that the `memref` lowers to) is a separate concern; shown here is Dynamatic's current memory interface, but it could in practice be any signal bundle that fits one's needs.
 
-#### Identifying necessary modules
+#### Identifying Necessary Modules
 
 In the general case, every MLIR operation inside a Handshake function in the input IR ends up being emitted as an instantiation of a specific RTL module. The mapping between these MLIR operations and the eventual RTL instantiations being one-to-one, this part of the conversion is relatively trivial to implement and think about. One less trivial matter, however, is determining what those instances should be *of*. In other words, which RTL modules need to be instantiated and therefore need be part of the final RTL design.
 
@@ -151,21 +152,21 @@ Importantly, each input operation type defines the set of RTL parameters which c
 > [!IMPORTANT]
 > While the pass itself sets RTL parameters purely according to each operation's structural characteristics, nothing prevents passes up the pipeline to already set arbitrary RTL parameters on MLIR operations. The `HandshakeToHW` conversion pass treats RTL parameters already present in the input IR transparently by considering them on the same level as the structural parameters it itself sets (unless there is a name conflict, in which case it emits a warning). It is then up to the backend's [RTL configuration](#rtl-configuration) to recognize these "extra RTL parameters" and act accordingly (they may be ignored if nothing is done, resulting in a "regular" RTL module being concretized, see the [matching logic](#matching-logic)). For example, a pass up the pipeline may wish to distinguish between two different RTL implementations (say, `A` and `B`) of `handshake.mux` operations in order to gain performance. Such a pass could already tag these operations with an RTL parameter (e.g., `hw.parameters = {IMPLEMENTATION = "A"}`) to carry that information down the pipeline and, with proper support in the backend's RTL configuration, concretize and instantiate the intended RTL module.
 
-#### Port names
+#### Port Names
 
 At the Handshake level, the input and output ports of MLIR operations (in MLIR jargon, their operands and results) do not have names. In keeping with the objective of the `HandshakeToHW` conversion pass to lower the IR to a close-to-RTL representation, the pass associates a port name to each input and output port of each HW-level instance and (external) module operation. These port names will end up as-is in the emitted RTL design (unless explicitly modified by the RTL configuration, see JSON options [`io-kind`](#io-kind), [`io-signals`](#io-signals), and [`io-map`](#io-map)). They are derived through a mix of means depending on the specific input MLIR operation type.
 
-### RTL emission
+### RTL Emission
 
 The RTL emitter picks up the IR that comes out of the `HandshakeToHW` conversion pass and turns it into a synthesizable RTL design. Importantly, the emitter takes as additional argument a list of JSON-formatted RTL configuration files which describe the set of parameterized RTL components it can conretize and instantiate; the [next section](#rtl-configuration) covers in details the configuration file's expected syntax, including all of its options.
 
 After parsing RTL configuration files, the emitter attempts to match each `hw.module.extern` (`hw::HWModuleExternOp`) operation in its input IR to entries in the configuration files using the `hw.name` and `hw.parameters` attributes; the [last section](#matching-logic) describes the matching logic in details. If a matching RTL component is found, then the emitter *concretizes* the RTL module implementation that corresponds to the `hw.module.extern` operation into the final RTL design. This concretization may be as simple as copying a generic RTL implementation of a component to the output directory, or require running an arbitrarily complex RTL generator that will generate a specific implementation of the component that depends on the specific RTL parameter values. RTL configuration files dictate the concretization method for each RTL component they declare. If any `hw.module.extern` operation finds no match in the RTL configuration, RTL emission fails.
 
-Circling back to the multiplexer example, it is possible to define [a single generic RTL multiplexer implementation](../../experimental/data/vhdl/handshake/mux.vhd) that is able to implement all possible combinations of RTL parameter values. Assuming an appropriate RTL configuration, the RTL emitter would simply copy that known generic RTL implementation to the final RTL design if its input IR contained any `hw.module.extern` operation with name `handshake.mux` and valid value for each of the three RTL parameters.
+Circling back to the multiplexer example, it is possible to define [a single generic RTL multiplexer implementation](../../../experimental/data/vhdl/handshake/mux.vhd) that is able to implement all possible combinations of RTL parameter values. Assuming an appropriate RTL configuration, the RTL emitter would simply copy that known generic RTL implementation to the final RTL design if its input IR contained any `hw.module.extern` operation with name `handshake.mux` and valid value for each of the three RTL parameters.
 
 Emitting each `hw.module` (`hw::hwModuleOp`) and `hw.instance` (`hw::InstanceOp`) operation to RTL is relatively straightforward once all external modules are concretized. This translation is almost one-to-one, requires little work, and is HDL-independent beyond syntactic concerns.
 
-## RTL configuration
+## RTL Configuration
 
 An RTL configuration file is made up of a list of JSON objects which each describe a parameterized RTL component along with
 
@@ -173,7 +174,7 @@ An RTL configuration file is made up of a list of JSON objects which each descri
 2. a list of [timing models](#models-format) for the component, each optionally constrained by specific RTL parameter values, and
 3. a list of [options](#options).
 
-### Component description format
+### Component Description Format
 
 Each JSON object describing an RTL component should specify a mandatory `name` key and optional `parameters` and `models` keys.
 
@@ -212,7 +213,7 @@ The mux example described above would look like the following in JSON.
 }
 ```
 
-### Concretization methods
+### Concretization Methods
 
 Finally, each RTL component description must indicate whether the component must be concretized simply by replacing generic entity parameters during instantiation (implying that the component already has a generic RTL implementation with the same number of parameters as declared in the JSON entry), or by generating the component on-demand for specific parameter values using an arbitray generator.
 
@@ -252,7 +253,7 @@ If the mux needed to be generated for each parameter combination, the JSON would
 
 When concretizing a generated component, the backend opaquely issues the provided shell command, replacing known parameter names prefixed by `$` with their actual values (e.g., for the mux, `$SIZE`, `$DATA_WIDTH`, and `$SELECT_WIDTH` would be replaced by their corresponding parameter values). Note that `$OUTPUT_DIR` and `$MODULE_NAME` are [backend parameters](#backend-parameters) which indicate, respectively, the path to the directory where the generator must create a file containing the component's RTL implementation, and the name of the main RTL module that the backend expects the generator to create.
 
-#### Per-parameter concretization method
+#### Per-Parameter Concretization Method
 
 In some situations, it may be desirable to override the backend's concretization-method-dependent behavior on a per-parameter basis. For example, specific RTL parameters of a *generic* component may be useful for matching purposes (see [matching logic](#matching-logic)) but absent in the generic implementation of the RTL module. Conversely, a component *generator* may produce "partially generic" RTL modules requiring specific RTL parameters during instantiation.
 
@@ -278,7 +279,7 @@ Each JSON object describing an RTL component parameter must contain two mandator
 
 Depending on the parameter type, additional key-value pairs constraining the set of allowed values are recognized.
 
-#### unsigned
+#### Unsigned
 
 Unsigned parameters can be range-restricted (by default, any value greater than or equal to 0 is accepted) using the `lb`, `ub`, and `range` key-value pairs, which are all inclusive. Exact matches are possible using the `eq` key-value pair. Finally, `ne` allows to check for differences.
 
@@ -293,7 +294,7 @@ Unsigned parameters can be range-restricted (by default, any value greater than 
 }
 ```
 
-#### string
+#### String
 
 For string parameters, only exact matches/differences are currently supported with `eq` and `ne`.
 
@@ -558,7 +559,7 @@ For example, if the `handshake.mux` components's RTL implementation prefixed all
 > [!WARNING]
 > The backend performs port name remapping before adding [signal-specific suffixes](#io-signals) to port names and before taking into account the [IO kind](#io-kind) for logical port arrays.
 
-## Matching logic
+## Matching Logic
 
 As mentionned, a large part of the RTL emitter's job is to concretize an RTL module for each `hw.module.extern` (`hw::HWModuleExternOp`) operation present in the input IR. It does so by querying the RTL configuration it parsed from RTL configuration files for possible matches. This section gives some pointers as to how the matching logic work.
 

@@ -1,3 +1,4 @@
+[Documentation Table of Contents](../README.md)  
 # Analyzing Output Files
 Running the main commands in Dynamatic creates different directories containing relevant files that can be used by the user for various purposes. By default, Dynamatic creates output and temporary files in an `out/` directory where the C source code is located. This document describes the organization of the `out/` directory when different commands are ran. 
 
@@ -37,7 +38,7 @@ The `simulate` command runs a C/HDL co-simulation and prints the `SUCCESS` messa
 
 The `visualize` command creates an `out/visual` directory where a LOG file is generated from the Modelsim/Questa wlf file created during simulation. The LOG file is converted to DOT and visualized using the Godot game engine.  
 > [!NOTE]
-> The wlf file contains information on simulation, the different signals and their transitions over time  
+> The `vsim.wlf` file contains information on simulation, the different signals and their transitions over time  
 
 ### Synthesize
 > [!IMPORTANT]

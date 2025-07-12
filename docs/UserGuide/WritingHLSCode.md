@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 
 # Writing Hls C Code for Dynamatic
 Before passing your C kernel (function) to Dynamatic for compilation, it is important that you ensure it meets the following guidelines.
@@ -17,13 +17,13 @@ Before passing your C kernel (function) to Dynamatic for compilation, it is impo
 8. [No support for local array declarations](#8-local-array-declarations)
 9. [Data type support](#data-type-support-for-dynamatic)
 
-### **1. Include the Dynamatic integration header**
+### **1. Include the Dynamatic Integration Header**
 
 To be able to compile in Dynamatic, your C files should include the `Integration.h` header that will be a starting point for accessing other relevant Dynamatic libraries at compile time.
 ```
 #include "dynamatic/Integration.h"
 ```
-### **2. Use the CALL_KERNEL macro in the main function**
+### **2. Use the CALL_KERNEL Macro in the Main Function**
 
 The `CALL_KERNEL` macro is available through Dynamatic's integration header. 
 It does two things in the compiler flow:
@@ -33,7 +33,7 @@ It does two things in the compiler flow:
 CALL_KERNEL(func, input_1, input_2, ... , input_n)
 ```
 
-### **3. All functions called by your target function must be inlined**
+### **3. All Functions Called by Your Target Function Must Be Inlined**
 
 The target function is the top level function to be implemented by Dynamatic. 
 ```
@@ -45,7 +45,7 @@ void loop(x) {
     }
 }  // inlined with macro definition.
 ```
-### **4. Recursive calls**  
+### **4. Recursive Calls**  
 Like other HLS tools, Dynamatic does not support recursive function calls because:
 - they are difficult to map to hardware
 - have unpredictable depths and control flow
@@ -59,10 +59,10 @@ Pointers should not be used.  `*(x + 1) = 4;` is invalid. Use regular indexing a
 int x[10]; // fixed sized
 x[1] = 4; // non-pointer indexing
 ```
-### **6. Dynamic memory allocation**
+### **6. Dynamic Memory Allocation**
 Dynamic memory allocation is also disallowed because it's not deterministic enough to allow enough hardware resources to be allocated at compile time.  
 
-### **7. Global variables**  
+### **7. Global Variables**  
 Pass global variables to functions as parameters else they will not be seen by Dynamatic at compilation and yield errors. See appropriate use below.
 
 ```
@@ -74,7 +74,7 @@ int scaler(int scale, int number) // scale is still passed as parameter
 }
 ```
 
-### **8. Local Array declarations**  
+### **8. Local Array Declarations**  
 Local array declaration are not yet supported. Pass all arrays as parameters.  
 
 ```

@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../../README.md)
+
 # Adding Spec Tags to Speculative Region
 
 The **spec tag**, required for speculation, is added as an **extra signal** to operand/result types (e.g., `ChannelType` or `ControlType`).

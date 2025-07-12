@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 # Command Reference
 The Dynamatic shell is an interactive command line-based interface (you can launch it from Dynamatic's top level directory with `./bin/dynamatic` after building Dynamatic) that allows users to interact with Dynamatic and use the different commands available to generate dataflow circuits from C code.
 
@@ -6,7 +6,7 @@ The Dynamatic shell is an interactive command line-based interface (you can laun
 - `help`: Display list of commands.
 - `write-hdl [--hdl <VHDL|Verilog>]`: Convert results from `compile` to a VHDL or Verilog file.
 - `set-vivado-path <path>`: Set the path to the installation directory of Vivado.
-- `simulate`: Simulates the HDL produced by `write-hdl`. **Requires a ModelSim installation!**
+- `simulate`: Simulates the HDL produced by `write-hdl`. **Requires a ModelSim/Questa installation!**
 - `set-fp-units-generator <flopoco|vivado>`: Choose which floating point unit generator to use. See [this section](#floating-point-ips) for more information.
 - `set-clock-period <clk>`: Sets the target clock period in nanoseconds.
 - `set-dynamatic-path <path>`: Set the path of the root (top-level) directory of Dynamatic, so that it can locate various scripts it needs to function. This is not necessary if you run Dynamatic from said directory.

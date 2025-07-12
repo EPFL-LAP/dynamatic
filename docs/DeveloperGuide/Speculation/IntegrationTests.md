@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../../README.md)
+
 # Speculation Integration Tests
 
 The speculation integration tests originate from Haoran's master's thesis.

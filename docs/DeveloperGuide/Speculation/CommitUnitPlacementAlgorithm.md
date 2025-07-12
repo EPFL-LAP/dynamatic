@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../../README.md)
+
 # Commit Unit Placement Algorithm
 
 The placement of commit units is determined by a Depth-First Search (DFS) starting from the Speculator. When the traversal reaches specific operations, it **stops the traversal** and **places a commit unit** in front of these operations:

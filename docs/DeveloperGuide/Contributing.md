@@ -1,10 +1,10 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)  
 
 # Contributing 
 
 Dynamatic welcomes contributions from the open-source community and from students as part of academic projects. We generally follow the LLVM and MLIR community practices, and currently use [GitHub issues and pull requests](#github-issues--pull-requests) to handle bug reports/design proposals and code contributions, respectively. Here are some high-level guidelines (inspired by CIRCT's guidelines):
-- Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../.clang-format)). There are good plugins for common editors like VSCode ([cpptool](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) or [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)) that can be set up to format each file on save, or you can run them manually. This makes code easier to read and understand, and more uniform throughout the codebase.
-- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases, they help in identifying code-smells. 
+- Please use `clang-format` in the LLVM style to format the code (see [`.clang-format`](../../.clang-format)). There are good plugins for common editors like VSCode ([cpptool](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools&ssr=false) or [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)) that can be set up to format each file on save, or you can run them manually. This makes code easier to read and understand, and more uniform throughout the codebase.
+- Please pay attention to warnings from `clang-tidy` (see [`.clang-tidy`](../../.clang-tidy)). Not all necessarily need to be acted upon, but in the majority of cases, they help in identifying code-smells. 
 - Please follow the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html).
 - Please practice [*incremental development*](https://llvm.org/docs/DeveloperPolicy.html#incremental-development), preferring to send a small series of incremental patches rather than large patches. There are other policies in the LLVM Developer Policy document that are worth skimming.
 - Please create an issue if you run into a bug or problem with Dynamatic.
@@ -13,9 +13,9 @@ Dynamatic welcomes contributions from the open-source community and from student
 ## Relevant Documentation
 
 You may find the following documentation useful when contributing to Dynamatic:
-- [Advanced Build Instructions](./AdvancedBuild.md)
-- [Testing](./Testing.md)
-- [Development](./Development.md)
+- [Advanced Build Instructions](../UserGuide/AdvancedBuild.md)
+- [Testing](../DeveloperGuide/Testing.md)
+- [Development](../DeveloperGuide/Development.md)
 
 ## GitHub Issues & Pull requests
 
@@ -24,7 +24,7 @@ The project uses GitHub [issues](https://github.com/features/issues) and [pull r
 - If you intend to contribute a large chunk of code to the project, it may be a good idea to first open a GitHub issue to describe the high-level design of your contribution there and leave it up for discussion. This can only increase the likelihood of your work eventually being merged, as the community will have had a chance to discuss the design before you propose your implementation in a PR (e.g., if the contribution is deemed to large, the community may advise to split it up in several incremental patches). This is especially advisable to first-time contributors to open-source projects and/or compiler development beginners.
 - Use "Squash and Merge" in PRs when they are approved - we don't need the intra-change history in the repository history.
 
-## Experimental work
+## Experimental Work
 
 One of Dynamatic's priority is to keep the repository's `main` branch stable at all times, with a high code quality throughout the project. At the same time, as an academic project we also receive regular code contributions from students with widely different backgrounds and field expertises. These contributions are often part of research-oriented academic projects, and are thus very "experimental" in nature. They will generally result in code that doesn't quite match the standard of quality (less tested, reliable, interoperable) that we expect in the repository. Yet, we still want to keep track of these efforts on the `main` branch to make them visible to and usable by the community, and encourage future contributions to the more experimental parts of the codebase.
 

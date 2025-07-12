@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 
 # Advanced Build Instructions
 ### Table of contents
@@ -14,7 +14,7 @@
 
 ## 1. Gurobi
 
-#### Why do we need Gurobi?
+#### Why Do We Need Gurobi?
 
 Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve performance-related optimization problems ([MILP](https://en.wikipedia.org/wiki/Integer_programming)). Dynamatic is still functional without Gurobi, but the resulting circuits often fail to achieve acceptable performance.
 
@@ -22,7 +22,7 @@ Currently, Dynamatic relies on [Gurobi](https://www.gurobi.com/) to solve perfor
 
 Gurobi is available for Linux [here](https://www.gurobi.com/downloads/gurobi-software/) (log in required). The resulting downloaded file will be gurobiXX.X.X_linux64.tar.gz
 
-#### Obtain a license
+#### Obtain a License
 
 Free academic licenses for Gurobi are available [here](https://www.gurobi.com/academia/academic-program-and-licenses/).
 
@@ -38,7 +38,7 @@ Use the following command to pass your obtained license to Gurobi, which it stor
 ```
 > If you choose a web library, copy the gurobi.lic file provided to your home directory rather than running the command above
 
-#### Configuring your environment
+#### Configuring Your Environment
 
 In addition to adding Gurobi to your path, Dynamatic's CMake requires the GUROBI_HOME environment variable to find headers and libraries. These lines can be added to your shell initiation script, e.g. ~/.bashrc or ~/.zshrc, or used with any other environment setup method.
 
@@ -72,11 +72,10 @@ git fetch --unshallow
 ## 3. Building
 
 This section provides some insights into our custom build script, **build.sh**, located in the repository's top-level folder. The script recognizes a number of flags and arguments that allow you to customize the build process to your needs. The --help flag makes the script print the entire list of available flags/arguments and exit.
->**Warning**
-The script should always be ran from Dynamatic's top-level folder.
->
+> [!NOTE]  
+> The script should always be ran from Dynamatic's top-level folder.  
 
-### General behavior
+### General Behavior
 
 The build script successively builds all parts of the project using CMake and Ninja. In order, it builds
 
@@ -87,7 +86,7 @@ The build script successively builds all parts of the project using CMake and Ni
 
 It creates build folders in the top level directory and in each submodule to run the build tasks from. All files generated during build (libraries, executable binaries, intermediate compilation files) are placed in these folders, which the repository is configured to not track. Additionally, the build script creates a **`bin`** folder in the top-level directory that contains symbolic links to a number of executable binaries built by the superproject and subprojects that Dynamatic users may especially care about.
 
-### Debug or Release mode
+### Debug or Release Mode
 
 The build script builds the entire project in Debug mode by default, which enables assertions in the code and gives you access to runtime debug information that is very useful when working on Dynamatic's code. However, Debug mode increases build time and (especially) build size (the project takes around 60GB once fully built). If you do not care for runtime debug information and/or want Dynamatic to have a smaller footprint on your disk, you can instead build Dynamatic in Release mode by using the `--release` flag when running the build script.
 
@@ -101,7 +100,7 @@ The build script builds the entire project in Debug mode by default, which enabl
 ./build.sh --release
 ```
 
-### Multi-thread builds
+### Multi-Threaded Builds
 
 By default, Ninja builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly. You can customize the maximum number of concurrent threads that are used to build the project using the --threads argument.
 
@@ -122,9 +121,10 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 ./build.sh --llvm-parallel-link-jobs 1
 ```
 
->Note that this flag defaults to a value of 2
+> [!NOTE]
+> This flag defaults to a value of 2
 
-### Forcing CMake re-configuration
+### Forcing CMake Re-Configuration
 
 To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using CMake if it sees that a CMake cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a Debug build to a Release build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake.
 
@@ -133,13 +133,14 @@ To reduce the build script's execution time when re-building the project regular
 ./build.sh --force
 ```
 
->If the CMake configuration of each submodule and of the superproject has not changed since the last build script's invocation and the --force flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script.
+> [!TIP]
+> If the CMake configuration of each submodule and of the superproject has not changed since the last build script's invocation and the --force flag is provided, the script will just take around half a minute more to run than normal but will not fully re-build everything. Therefore it is safe and not too inconvenient to specify the `--force` flag on every invocation of the script.
 
 ## 4. Interactive Dataflow Circuit Visualizer
 
 The repository contains an optionally built tool that allows you to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at visual-dataflow/godot-cpp (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
->**Warning**
-Note that Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in [`.gitmodules`](.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
+> [!NOTE]
+> Godot's C++ bindings only work for a specific major/minor version of the engine. This version is specified in the branch field of the submodule's declaration in [`.gitmodules`](.gitmodules). The version of the engine you download must therefore match the bindings currently tracked by Dynamatic. You can [download any version of Godot from the official archive](https://godotengine.org/download/archive/).
 >
 Due to these extra dependencies, building this tool is opt-in, meaning that
 
@@ -158,7 +159,7 @@ At this point, it becomes possible to open the Godot project (in the `/dynamatic
 
 2. export the Godot project as an executable binary to be able to run it from outside the editor. In addition to having downloaded the Godot engine, at the moment this also requires that the project has been exported manually once from the Godot editor. The Godot documentation details the process [here](https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html#export-menu), which you only need to follow up to and including the part where it asks you to download export templates using the graphical interface. Once they are downloaded for your specific export target, you are now able to automatically build the tool by using the `--export-godot` build script argument and specifying the path to the Godot engine executable you downloaded.
 
-**Quick Steps from Godot tutorial**
+**Quick Steps From Godot Tutorial**
 1. [Download Godot](https://godotengine.org/download/archive/)
 2. Build Dynamatic with `--visual-dataflow` flag
 3. Run Godot (from the directory to which it was downloaded)
@@ -178,13 +179,13 @@ Finally, run the command below to export the Godot project as an executable bina
 ```
 The tool's binary is generated at `visual-dataflow/bin/visual-dataflow` and sym-linked at `bin/visual-dataflow` for convenience. 
 Now, you can visualize the dataflow graphs for your compiled programs with Godot. See [how to use Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md) for more details.
->**Note:**
-Whenever you make a modification to the C++ library or to the Godot project itself, you can simply re-run the above command to recompile everything and re-generate the executable binary for the tool.
->
+> [!NOTE]  
+> Whenever you make a modification to the C++ library or to the Godot project itself, you can simply re-run the above command to recompile everything and re-generate the executable binary for the tool.
+
 ## 5. Enabling the XLS Integration
-The experimental integration with the XLS HLS tool (see [here](../Xls/XlsIntegration.md) for more information) can be enabled by providing the `--experimental-enable-xls` flag to build.sh.
-><span style="color:brown">Warning</span>
-Note that `--experimental-enable-xls`, just like any other cmake-related flags, will only be applied if `./build.sh` configures CMake, which it, by default, will not do if a build folder (with a `CMakeCache.txt`) exists. To enable xls if you already have a local build, you can either force a reconfigure of all projects by providing the `--force` flag, or delete the Dynamatic's `CMakeCache.txt` to only force a reconfigure (and costly rebuild) of Dynamatic:
+The experimental integration with the XLS HLS tool (see [here](../DeveloperGuide/Xls/XlsIntegration.md) for more information) can be enabled by providing the `--experimental-enable-xls` flag to build.sh.
+> [!NOTE]
+> `--experimental-enable-xls`, just like any other cmake-related flags, will only be applied if `./build.sh` configures CMake, which it, by default, will not do if a build folder (with a `CMakeCache.txt`) exists. To enable xls if you already have a local build, you can either force a reconfigure of all projects by providing the `--force` flag, or delete the Dynamatic's `CMakeCache.txt` to only force a reconfigure (and costly rebuild) of Dynamatic:
 >
 ```
 ./build.sh --force --experimental-enable-xls
@@ -194,8 +195,9 @@ rm build/CMakeCache.txt
 ```
 Once enabled, you do not need to provide `./build.sh` with `--experimental-enable-xls` to re-build.
 
-## 6. Modelsim/Questa installation
+## 6. Modelsim/Questa Installation
 Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) (has 32 bit dependencies) or [Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) (64 bit simulator) to run simulations, thus you need to install it before hand. [Download](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) Modelsim or Questa, install it (in a directory with no special access permissions) and add it to path for Dynamatic to be able to run it. Add the following lines to the `.bashrc` file in your home directory to add modelsim to path variables.  
+> [!NOTE]
 > Ensure you write the full path
 ```
 export MODELSIM_HOME=/path/to/modelsim  # path will look like /home/username/intelFPGA/20.1/modelsim_ase
@@ -230,4 +232,5 @@ export LM_LICENSE_FILE=/path/to/license/file     # looks like this "home/usernam
 export MGLS_LICENSE_FILE=/path/to/license/file   # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
 export SALT_LICENSE_SERVER=/path/to/license/file # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"
 ```
+> [!NOTE]
 > You may need only one of the three lines above based on the version of Questa you are using. Refer to the release notes for the version you have installed. Having the three lines poses no issue nonetheless.

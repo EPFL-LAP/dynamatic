@@ -4,17 +4,19 @@
 
 There are currently two ways to setup and use Dynamatic
 
-**1. Build from Source (recommended)**  
+**1. Build From Source (Recommended)**  
 We support building from source on Linux and on Windows (through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install)). See our [Build instructions](#build-instructions) below. Ubuntu 24.04 LTS is officially supported; other apt-based distributions should work as well. Other distributions may also require cosmetic changes to the dependencies you have to install before running Dynamatic.
 
 **2. Use the Provided Virtual Machine**  
 We provide an [Ubuntu-based Virtual Machine](VMSetup.md) (VM) that already has Dynamatic and our dataflow circuit visualizer set up. You can use it to simply follow the tutorial ([Using Dynamatic](../GettingStarted/Tutorials/Introduction/UsingDynamatic.md)) or as a starting point to use/[modify](../DeveloperGuide/CreatingPasses/CreatingPasses.md) Dynamatic in general.  
+> [!NOTE]
 > You will need to install Modelsim or Questa manually to run simulations! Click [here](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) for instructions on installing them.
 
 
 ### Build Instructions
 The following instructions can be used to setup Dynamatic from source.  
->If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](../UserGuide/AdvancedBuild.md#3-building) to learn how to customize the build process to your needs.
+> [!NOTE]
+> If you intend to modify Dynamatic's source code and/or build the interactive dataflow circuit visualizer (recommended for circuit debugging), you can check our [advanced build instructions](../UserGuide/AdvancedBuild.md#3-building) to learn how to customize the build process to your needs.
 
 **1. Install dependencies required by the project**  
 Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), cmake and ninja for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with .dot files, and standard command-line tools like git.
@@ -35,13 +37,14 @@ curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64
 
 Dynamatic utilizes Gurobi to optimize the circuit's performance. Refer to our tutorial for guidance on [how to setup the Gurobi solver](../UserGuide/AdvancedBuild.md#1-gurobi).
 
->While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](../UserGuide/Dependencies.md) section for a better understanding of how the tool works.
+> [!TIP]
+> While this section helps you install the dependencies needed to get started with Dynamatic, you can find a list of dependencies used by Dynamatic in the [dependencies](../UserGuide/Dependencies.md) section for a better understanding of how the tool works.
 
 Finally, Dynamatic uses [Modelsim](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) or [Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) to run simulations, thus you need to [install](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) it before hand and add it to your environment variables.  
 
 Before moving on to the next step, refresh your environment variables in your current terminal to make sure that all newly installed tools are visible in your PATH. Alternatively, open a new terminal and proceed to cloning the project.
 
-**2. Cloning the project and its submodules**  
+**2. Cloning the Project and Its Submodules**  
 Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). You need to clone with the SSH link to be able to push to the repository.
 ```
 # Either clone with SSH... (required for pushing to the repository)
@@ -59,7 +62,7 @@ chmod +x ./build.sh
 ./build.sh --release
 ```
 
-**4. Run the Dynamatic testsuite**  
+**4. Run the Dynamatic Testsuite**  
 After building the project, or at any time during development, you can run Dynamatic's testsuite from the top-level ```build``` folder using ```ninja```.
 ```
 # From the "dynamatic" folder created by the clone command

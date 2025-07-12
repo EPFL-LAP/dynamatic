@@ -3,7 +3,7 @@
 1. [Installation](GettingStarted/InstallDynamatic.md)
 2. [Tutorials](GettingStarted/Tutorials/Tutorials.md)
 3. [Basic Example](GettingStarted/Tutorials/Introduction/Examples.md)
-4. [User Guide](UserGuide)
+4. [User Guide](UserGuide/)
    - [Command Reference](UserGuide/CommandReference.md)
    - [Writing C Code for Dynamatic](UserGuide/WritingHLSCode.md)
    - [Analyzing Output Files](UserGuide/AnalyzingOutputFiles.md)

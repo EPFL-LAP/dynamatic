@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../README.md)
+
 # VM Setup Instructions
 
 We provide a virtual machine (VM) which contains a pre-built/ready-to-use version of our entire toolchain except for Modelsim/Questa which the users must [install themselves](../UserGuide/AdvancedBuild.md#6-modelsimquesta-installation) after setting up the VM. It is very easy to set up on your machine using VirtualBox. You can download the VM image [here](https://drive.google.com/file/d/1s86dzU8jbSSdh13DctS922OKoACgvVD5/view?usp=drive_link). The Dynamatic virtual machine is compatible with VirtualBox 5.2 or higher.

@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../../README.md)
+
 # XLS Integration
 
 ## Overview
@@ -91,7 +93,7 @@ when `DYNAMATIC_ENABLE_XLS` is set.
 This subsystem also features a dedicated test suite that can be run
 using `ninja check-dynamatic-xls`.
 
-### Overcoming LLVM version differences
+### Overcoming LLVM Version Differences
 
 Just like any other dialect, the XLS MLIR dialect consists of Tablegen
 definition (the "ODS") and C++ source files. Both are naturally

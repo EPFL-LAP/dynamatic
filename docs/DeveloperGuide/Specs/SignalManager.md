@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Signal Manager
 
 The signal manager wraps each unit (e.g., `addi`, `buffer`, etc.) and forwards extra signals.

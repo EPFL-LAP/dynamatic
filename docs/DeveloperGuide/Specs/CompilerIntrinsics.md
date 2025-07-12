@@ -1,3 +1,5 @@
+[Documentation Table of Contents](../../README.md)
+
 # Compiler Intrinsics
 
 ## Wait
@@ -42,7 +44,7 @@ handshake.func @pop_and_wait(%queueID: channel<i32>, %start: control) -> channel
 }
 ```
 
-### Creating a data dependency
+### Creating a Data Dependency
 
 We need a way, in the source code, to tell Dynamatic that the second `pop` should always happen after the first has produced its result. One way to enforce this is to create a "fake" data dependency that makes the second use of `queueID` *depend on* `x`, the result of the first `pop`. We propose to represent this using a family of `__wait` compiler intrinsics. The `pop_and_wait` kernel may be rewritten as follows.
 
@@ -58,7 +60,7 @@ int pop_and_wait(int queueID) {
 
 `__wait_int` is a compiler intrinsic---a special function with a reserved name which Dynamatic will give special treatment too during compilation---that expresses the user's desire that its return value (here `queueID`) only becomes valid (in the dataflow sense) when both of its arguments become valid in the corresponding dataflow circuit. The return value's payload inherits the second arguments's (here `queueID`) payload. This effectively creates a data dependency between `x` and `queueID` in between the two `pop`s.
 
-### Intrinsic prototypes
+### Intrinsic Prototypes
 
 Supporting the family of `__wait` compiler intrinsics in source code amounts to adding the following function prototypes once to the main Dynamatic C header (that all kernels should include).
 
@@ -85,7 +87,7 @@ Token     __double_to_token(double x);
 
 The lack of support for function overloading in C forces us to have a collection of functions for all our supported types. The opaque `Token` type and its associated conversion functions (`__*_to_token`) allows us to have a unique type for the first argument of all `__wait` intrinsics, regardless of the payload's type. Without it we would have had to define a `__wait` variant for each type combination in its two arguments or resort to illegal C value casts that either do not compile or yield convoluted IRs. Each `__*_to_token` conversion function in the source code yield a single additional IR operation which can easily be removed during the compilation flow.
 
-### Compiler support
+### Compiler Support
 
 Our example kernel would lower to a very simple IR at the cf (control flow) level.
 

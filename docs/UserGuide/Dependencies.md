@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 
 # Dependencies
 
@@ -8,7 +8,7 @@ Dynamatic uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodu
 
 [Polygeist](https://github.com/llvm/Polygeist) is a C/C++ frontend for MLIR including polyhedral optimizations and parallel optimizations features. Polygeist is thus responsible for the first step of our compilation process, that is taking source code written in C/C++ into the MLIR ecosystem. In particular, we care that our entry point to MLIR is at a very high semantic level, namely, at a level where polyhedral analysis is possible. The latter allows us to easily identify dependencies between memory accesses in source programs in a very accurate manner, which is key to optimizing the allocation of memory interfaces and resources in our elastic circuits down the line. Polygeist is able to emit MLIR code in the [*Affine*](https://mlir.llvm.org/docs/Dialects/Affine/) dialect, which is perfectly suited for this kind of analysis. 
 
-### Working with submodules
+### Working With Submodules
 
 Having a project with submodules means that you have to pay attention to a couple additional things when pulling/pushing code to the project to maintain it in sync with the submodules. If you are unfamiliar with submodules, you can learn more about how to work with them [here](https://git-scm.com/book/en/v2/Git-Tools-Submodules). Below is a very short and incomplete description of how our submodules are managed by our repository as well as a few pointers on how to perform simple git-related tasks in this context.
 

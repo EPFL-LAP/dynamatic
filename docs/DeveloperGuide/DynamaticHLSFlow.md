@@ -1,7 +1,8 @@
+[Documentation Table of Contents](../README.md)
 # Dynamatic's High Level Synthesis Flow
 > Flow script [compile.sh](../../tools/dynamatic/scripts/compile.sh)
 
-## Diagram of the overall compilation flow
+## Diagram of the Overall Compilation Flow
 ![HLS Flow Diagram](Figures/Compilation_flow.svg)
 
 ### Stage 1: Source -> Affine level 

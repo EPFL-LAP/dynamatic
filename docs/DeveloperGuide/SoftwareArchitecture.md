@@ -1,4 +1,4 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 
 # Software architecture
 
@@ -32,3 +32,9 @@ This section is intended to give an overview of the project's directory structur
 ├── build.sh # Build script to build the entire project
 └── CMakeLists.txt # Top level CMake file for building the superproject
 ```
+
+## Software Dependencies  
+See [Dependencies](../UserGuide/Dependencies.md).
+
+## Testing Infrastructure
+See [Testing](../DeveloperGuide/Testing.md)

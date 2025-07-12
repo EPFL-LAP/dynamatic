@@ -1,3 +1,4 @@
+[Documentation Table of Contents](../../README.md)
 # Circuit & Memory Interface
 
 > [!NOTE]
@@ -30,21 +31,21 @@ The inputs of a Dynamatic circuit are made up its [arguments](#arguments--result
 
 A Dynamatic circuit may have 0 or more arguments ($N$ arguments displayed top-left in the figure) which are full dataflow inputs (downstream *data* bus and *valid* wire and uptream *ready* wire). Conversely, a Dynamatic circuit may have 0 or more results ($L$ results displayed bottom-left in the figure) which are full dataflow outputs. Note that the number of arguments and results may be different, and that the data-bus width of each argument input and result output may be different.
 
-### Memory controls
+### Memory Controls
 
 A Dynamatic circuit may interact with 0 or more distinct memory regions. Interactions with each memory region is controlled independently by a pair of control-only ports, a `mem_start` input ($M$ memory control inputs displayed top-right in the figure) and `mem_end` output ($M$ memory control outputs displayed bottom-right in the figure). The `mem_start` input indicates to the Dynamatic circuit that it may start to make accesses to that memory region in the current circuit execution. Conversely, the `mem_end` output indicates that the Dynamatic circuit will not make any more accesses to the memory region in the current circuit execution.
 
 > [!NOTE]
 > The number of distinct memory regions that a Dynamatic circuit instantiates is not a direct function of the source code from which it was synthesized. The compiler is free to make optimizations or transformations as required. For convenience, Dynamatic still offers the option of simply assigning a distinct memory region to each array-typed argument in the source code.
 
-### Ad-hoc memory interfaces
+### Ad-hoc Memory Interfaces
 
 A Dynamatic circuit connects to memory regions through ad-hoc memory interfaces ($M$ memory interfaces displayed right in the figure). These bidirectional ports may be different between memory regions; they carry the load/store requests back and forth between the Dynamatic circuit and the external memory region. Implementors are free to choose the exact signal bundles making up each memory interface.
 
 > [!IMPORTANT]
 > While the specification imposes no restriction on these memory interfaces, it is good practice to always use some kind of *elastic* (e.g., latency-insensitive) interface to guaranteee compatibility with standardized latency-insensitive protocols such as AXI. Note that our current ad-hoc memory interfaces are *not* elastic, which should be fixed in the future.
 
-## Memory interface
+## Memory Interface
 
 While the [ad-hoc memory interfaces](#ad-hoc-memory-interfaces) described above are very flexible by nature, users of Dynamatic circuits are likely to want to connect them to their design using standard memory interfaces and talk to them through standard communication protocols. To fulfill this requirement, Dynamatic should also be able to emit wrappers around its "core dataflow circuits" that simply convert every of its ad-hoc memory interface to a standard interface (such as AXI). The figure below shows how such a wrapper would look like.
 
@@ -52,7 +53,7 @@ While the [ad-hoc memory interfaces](#ad-hoc-memory-interfaces) described above 
 
 The wrapper has exactly the same `start`, `end`, arguments, results, and memory control signals as the Dynamatic circuit it wraps. However, the Dynamatic circuit's ad-hoc memory interfaces (double-sided arrows on the right of the inner box on the figure) get converted on-the-fly to standard memory interfaces (AXI displayed right in the figure). As a sanity check on any ad-hoc interface, it should always be possible and often easy to make load/store requests coming through them compliant with standard communication protocols.
 
-## Internal implementation
+## Internal Implementation
 
 This section hints at how one might implement the proposed interface in Dynamatic circuits. The goal is not to be extremely formal but rather to
 
@@ -67,11 +68,11 @@ The figure below shows a possible internal implementation for Dynamatic circuits
 
 Recall the meaning of the `start` and `end` signals. `start` indicates that the circuit can start executing one time, while `end` indicates that the circuit will eventually complete one execution. Assuming a well-formed circuit that does not deadlock if all its inputs are provided, it follows that if the circuit starts an execution, it will eventually complete it. Therefore, `start` directly feeds into `end`.
 
-### Arguments to results path
+### Arguments to Results Path
 
 The circuit's arguments directly feed into the "internal circuit logic" block which eventually produces the circuit's results. This block simply encapsulates the circuit-specific DFG (data-flow graph). In particular, it includes the circuit's control network which is triggered by the "control synchronizer" shown below the `start` input. This synchronizer, in the simplest case, exists to ensure that only one set of input tokens is "circulating" inside the circuit logic at any given time. The synchronizer determines when the circuit starts an execution by looking at both the `start` input (indicating that we should at some point start executing with new inputs) and at the "exit block reached" signal coming from the circuit (indicating that a potential previous execution of the circuit has completed).
 
-### Memory path
+### Memory Path
 
 The schematic only shows the internal connectivity for a single memory region (`mem2`) for readability purposes. The connectivity for other memory regions may be assumed to be identical.
 

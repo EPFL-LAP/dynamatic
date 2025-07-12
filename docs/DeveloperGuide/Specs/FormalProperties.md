@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Formal Properties Infrastructure
 
 This document describes the infrastructure for supporting formal properties in Dynamatic, focusing on the design decisions, implementation strategy, and intended usage. This infrastructure is used to express circuit-level runtime properties, primarily to enable formal verification via model checking.
@@ -38,7 +39,7 @@ Formal properties are stored in a shared JSON database, with each property entry
 }
 ```
 
-## Adding a new property
+## Adding a New Property
 
 
 The main goal of this infrastructure is to support the integration of as many formal properties as possible, so we have designed the process to be as simple and extensible as possible.
@@ -57,7 +58,7 @@ As is often the case with new properties, this one introduces requirements not p
 > If you decide to implement this or a different approach, please remember to update this documentation accordingly.
 
 
-### Define your derived class
+### Define Your Derived Class
 
 At this stage, you should define all the information needed for downstream tools to fully understand and process the property. It might be difficult at first to determine all the required fields, but that’s okay — you can always revise the class later by adding or removing fields as needed.
 
@@ -90,7 +91,7 @@ private:
 };
 ```
 
-### Implement serialization and deserialization methods
+### Implement Serialization and Deserialization Methods
 
 Serialization and deserialization methods should be easy to implement once the fields for the derived class are decided. For our example they will look like this:
 
@@ -125,7 +126,7 @@ MyNewInvariant::fromJSON(const llvm::json::Value &value, llvm::json::Path path) 
   return prop;
 }
 ```
-### Implement the constructor
+### Implement the Constructor
 
 This is the most important method of your formal porperty class. The contructor is responsible for creating the property and extracting the information from MLIR so that it can be easily assembled by any downstream tool later. For our example the constructur will look like this:
 
@@ -141,7 +142,7 @@ MyNewInvariant::MyNewInvariant(unsigned long id, TAG tag, const Operation& op)
 }
 ```
 
-### Update the `annotate-properties` pass to add your property
+### Update the `annotate-properties` Pass to Add Your Property
 
 Define your annotation function and add it to the `runDynamaticPass` method:
 
@@ -176,7 +177,7 @@ MODULE fork (ins_0, ins_0_valid, outs_0_ready, outs_1_ready)
 ```
 
 
-### Update the backend with your new property
+### Update the Backend With Your New Property
 
 Now it's time to define how the property will be written to the output file. In the `export-rtl.cpp` file we need to modify the `createProperties` function to take into consideration our new properties when reading the database:
 

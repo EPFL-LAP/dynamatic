@@ -1,3 +1,4 @@
+[Documentation Table of Contents](../../README.md)
 # How to Add a New Component
 
 This document explains how to add a new component to Dynamatic.

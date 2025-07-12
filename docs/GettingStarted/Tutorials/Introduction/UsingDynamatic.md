@@ -1,16 +1,16 @@
-[Input-Format](InputFormat.md) <span>&ensp;</span> [Data-Type-Support](DataTypeSupport.md)
+[Documentation Table of Contents](../../../README.md)  
 # Using Dynamatic
->Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](../../README.md).
+> [!NOTE]
+> Before moving forward with this section, ensure that you have installed all necessary dependencies and built Dynamatic. If not, follow the [simple build instructions](../../InstallDynamatic.md).
 
 This section covers:
 - how to use Dynamatic
-- constructs to include and invalid C/C++ features (see [input format](InputFormat.md) and [data type support](DataTypeSupport.md))
+- constructs to include and invalid C/C++ features (see [Writing HLS C Code](../../../UserGuide/WritingHLSCode.md))
 - Dynamatic commands and respective flags.
 
 ## Introduction to Dynamatic
-> <span style="color:brown;">Warning
->
->The virtual machine does not contain an MILP solver (Gurobi). Unfortunately, this will affect the circuits you generate as part of the exercises and you may obtain different results from what the tutorial describes.
+> [!NOTE]  
+> The virtual machine does not contain an MILP solver (Gurobi). Unfortunately, this will affect the circuits you generate as part of the exercises and you may obtain different results from what the tutorial describes.
 
 This tutorial guides you through the
 - compilation of a simple kernel function written in C into an equivalent VHDL design
@@ -20,16 +20,16 @@ This tutorial guides you through the
 The tutorial assumes basic knowledge of dataflow circuits but does not require any insight into MLIR or compilers in general.
 
 Below are some technical details about this tutorial.
-- All resources are located in the repository's [tutorials/Introduction/Ch1](../../tutorials/Introduction/Ch1) folder.
+- All resources are located in the repository's [tutorials/Introduction/Ch1](../../../../tutorials/Introduction/Ch1/) folder.
 - All relative paths mentionned throughout the tutorial are assumed to start at Dynamatic's top-level folder.
 
 This tutorial is divided into the following sections:
-1. [The source code](#the-source-code) | The C kernel function we will transform into a dataflow circuit.
-2. [Using Dynamatic's frontend](#using-dynamatics-frontend) | We use the Dynamatic frontend to compile the C function into an equivalent VHDL design, and functionally verify the latter using Modelsim.
-3. [Visualizing the resulting dataflow circuit](#visualize-the-resulting-datafow-circuit) | We visualize the execution of the generated dataflow circuit on test inputs
+1. [The Source Code](#the-source-code) | The C kernel function we will transform into a dataflow circuit.
+2. [Using Dynamatic's Frontend](#using-dynamatics-frontend) | We use the Dynamatic frontend to compile the C function into an equivalent VHDL design, and functionally verify the latter using Modelsim.
+3. [Visualizing the Resulting Dataflow Circuit](#visualize-the-resulting-datafow-circuit) | We visualize the execution of the generated dataflow circuit on test inputs
 4. [Conclusion](#conclusion) | We reflect on everything we just accomplished
 
-## The source code
+## The C Source Code
 Below is our target C function (the kernel, in Dynamic HLS jargon) for conversion into a dataflow circuit:
 ```
 // The number of loop iterations
@@ -49,9 +49,10 @@ This kernel:
 - multiplies a number by itself at each iteration of a loop from 0 to any number N where the corresponding element of an array equals 0.
 - returns the calculated value after the loop exits. 
 
->This function is purposefully simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
+> [!TIP]
+> This function is purposefully simple so that it corresponds to a small dataflow circuit that will be easier to visually explore later on. Dynamatic is capable of transforming much more complex functions into fast and functional dataflow circuits.
 
-You can find the source code of this function in [tutorials/Introduction/Ch1/loop_multiply.c](../../tutorials/Introduction/Ch1/loop_multiply.c). 
+You can find the source code of this function in [tutorials/Introduction/Ch1/loop_multiply.c](../../../../tutorials/Introduction/Ch1/loop_multiply.c). 
 
 Observe!
 - The `main` function in the file allows one to run the C kernel with user-provided arguments. 
@@ -67,7 +68,7 @@ int main(void) {
 }
 ```
 
-## Using Dynamatic's frontend
+## Using Dynamatic's Frontend
 Dynamatic's frontend is built by the project in `build/bin/dynamatic`, with a symbolic link located at `bin/dynamatic`, which we will be using. In a terminal, from Dynamatic's top-level folder, run the following:
 ```
 ./bin/dynamatic
@@ -83,28 +84,30 @@ This will print the frontend's header and display a prompt where you can start i
 dynamatic> # Input your command here
 ```
 ### `set-src`
-Provide Dynamatic with the path to the C source code file under consideration. Ours is located at [tutorials/Introduction/Ch1/loop_multiply.c](https://github.com/EPFL-LAP/dynamatic/blob/main/tutorials/Introduction/Ch1/loop_multiply.c), thus we input:
+Provide Dynamatic with the path to the C source code file under consideration. Ours is located at [tutorials/Introduction/Ch1/loop_multiply.c](../../../../tutorials/Introduction/Ch1/loop_multiply.c), thus we input:
 ```
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 ```
->The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_multiply`.
+> [!NOTE]
+> The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_multiply`.
 
 ### `compile`
 The first step towards generating the VHDL design is compilation. Here, 
 - the C source goes through our MLIR frontend ([Polygeist](https://github.com/llvm/Polygeist))
 - traverses a pre-defined sequence of transformation and optimization passes that ultimately yield a description of an equivalent dataflow circuit. 
 
-That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../Tutorials/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](../docs/Tutorials/MLIRPrimer.md#dialects). 
->A dialect is simply a collection of logically-connected IR entities like instructions, types, and attributes. 
+That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../../../DeveloperGuide/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](../../../DeveloperGuide/MLIRPrimer.md#dialects). 
+> [!TIP]  
+> A dialect is simply a collection of logically-connected IR entities like instructions, types, and attributes. 
 
 MLIR provides standard dialects for common usecases, while allowing external tools (like Dynamatic) to define custom dialects to model domain-specific semantics. We inherit part of the infrastructure surrounding the Handshake dialect from the [CIRCT project](https://github.com/llvm/circt) (a satellite project of LLVM/MLIR), but have tailored it to our specific usecases.
 
-To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](../../tools/dynamatic/scripts)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
+To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](../../../../tools/dynamatic/scripts/compile.sh)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
 ```
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> compile
 ```
-#### Compile flags
+#### Compile Flags
 The compile flags are all optional and defaulted to no value.  
 `--sharing` enables credit-based resource sharing  
 `--buffer-algorithm` lets the compiler know which **smart buffer** placement algorithm to use. Requires Gurobi to solve MILP problems. There are two available options for this flag:  
@@ -117,7 +120,8 @@ The default for compile is to use the minimum buffering for correctness (simple 
 | --sharing | use credit-based resource shaing|None|
 | --buffer-alogithm | Indicate buffer placement algorithm to use, values are 'on merges' |fpga20, fpl22|
 
->`compile` requires a MILP solver (Gurobi) for smart buffer placement. If you don't have Gurobi, abstain from using the `--buffer-algorithm` flag
+> [!WARNING]
+> `compile` requires a MILP solver (Gurobi) for smart buffer placement. If you don't have Gurobi, abstain from using the `--buffer-algorithm` flag
 
 You should see the following printed on the terminal after running `compile`:
 ```
@@ -155,7 +159,8 @@ dynamatic> write-hdl
 [INFO] Exported RTL (vhdl)
 [INFO] HDL generation succeeded
 ```
->By default, the command generates VHDL implementations. This can be changed to verilog using the `--hdl` flag with the value `verilog`
+> [!NOTE]
+> By default, the command generates VHDL implementations. This can be changed to verilog using the `--hdl` flag with the value `verilog`
 
 Similarly to compile, this creates a folder `out/hdl` with a `loop_multiply.vhd` file and all other `.vhd` files necessary for correct functioning of the circuit. This design can finally be co-simulated along the C function on Modelsim to verify that their behavior matches using the `simulate` command.
 
@@ -195,13 +200,14 @@ dynamatic> exit
 
 Goodbye!
 ```
-If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [tutorials/Introduction/Ch1/frontend-script.dyn](../../tutorials/Introduction/Ch1/frontend-script.dyn). You can replay this whole section by running the following from Dynamatic's top-level folder.
+If you would like to re-run these commands all at once, it is possible to use the frontend in a non-interactive way by writing the sequence of commands you would like to run in a file and referencing it when launching the frontend. One such file has already been created for you at [tutorials/Introduction/Ch1/frontend-script.dyn](../../../../tutorials/Introduction/Ch1/frontend-script.dyn). You can replay this whole section by running the following from Dynamatic's top-level folder.
 ```
 ./bin/dynamatic --run tutorials/Introduction/Ch1/frontend-script.dyn
 ```
 ### `visualize`
->To use the visualize command, you will need to go through the [interactive dataflow visualizer](AdvancedBuild.md#4-interactive-dataflow-circuit-visualizer) section in the Advanced Build section first.
->
+> [!NOTE]  
+> To use the visualize command, you will need to go through the [interactive dataflow visualizer](../../../UserGuide/AdvancedBuild.md#4-interactive-dataflow-circuit-visualizer) section in the Advanced Build section first.  
+
 At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/Introduction/Ch1/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
 
 To launch the visualizer, re-open the frontend, re-set the source with `set-src tutorials/Introduction/Ch1/loop_multiply.c`, and input the `visualize` command.
@@ -221,7 +227,8 @@ dynamatic> exit
 
 Goodbye!
 ```
->We do not have to re-run the previous synthesis steps because the data expected by the `visualize` command is still present on disk in the output folders generated by `compile` and `simulate`.  
+> [!TIP]
+> We do not have to re-run the previous synthesis steps because the data expected by the `visualize` command is still present on disk in the output folders generated by `compile` and `simulate`.  
 
 `visualize` creates a folder `out/visual` next to the source file (in `tutorials/Introduction/Ch1/out/visual`) containing the data expected by the visualizer as input.
 
@@ -238,20 +245,20 @@ During execution of the circuit, each combination of the valid/ready wires (a ch
 - `Transfer` (`valid=1,ready=1`): the producer has put a valid token on the channel which the consumer is ready to consume. The token is transferred.
 
 The nodes each have a unique name inherited from the MLIR-formatted IR that was used to generate the input DOT file to begin with, and are grouped together based on the basic block they belong to. These are the same basic blocks used to represent control-free sequences of instructions in classical compilers. In this example, the original source code had 5 basic blocks, which are transcribed here in 5 labeled rectangular boxes.
->**Tip**  
-Two of these basic blocks represent the start and end of the kernel before and after the loop, respectively. The other 3 hold the loop's logic. Try to identify which is which from the nature of the nodes and from their connections. Consider that the loop may have been slightly transformed by Dynamatic to optimize the resulting circuit.
->
+> [!TIP]  
+> Two of these basic blocks represent the start and end of the kernel before and after the loop, respectively. The other 3 hold the loop's logic. Try to identify which is which from the nature of the nodes and from their connections. Consider that the loop may have been slightly transformed by Dynamatic to optimize the resulting circuit.  
+
 There are several interactive elements at the bottom of the window that you can play with to see data flow through the circuit.
 
 - The horizontal bar spanning the entire window's width is a timeline. Clicking or dragging on it will let you go forward or backward in time.
 - The `Play` button will iterate forward in time at a rate of one cycle per second when clicked. Cliking it again will pause the iteration.
 - As their name indicates, `Prev cycle` and `Next cycle` will move backward or forward in time by one cycle, respectively.
 - The `Cycle: ` textbox lets you enter a cycle number directly, which the visualizer then jumps to.
->**Tip**  
-Observe the circuit executes using the interactive controls at the bottom of the window. On cycle 6, for example, you can see that tokens are transferred on both input channels of `muli0` in `block2`. Try to infer the multiplier's latency by looking at its output channel in the next execution cycles. Then, try to track that output token through the circuit to see where it can end up. Study the execution till you get an understanding of how tokens flow inside the loop and of how the conditional multiplication influences the latency of each loop iteration.
+> [!TIP]  
+> Observe the circuit executes using the interactive controls at the bottom of the window. On cycle 6, for example, you can see that tokens are transferred on both input channels of `muli0` in `block2`. Try to infer the multiplier's latency by looking at its output channel in the next execution cycles. Then, try to track that output token through the circuit to see where it can end up. Study the execution till you get an understanding of how tokens flow inside the loop and of how the conditional multiplication influences the latency of each loop iteration.
 
 ### Conclusion
 Congratulations on reaching the end of this tutorial! You now know how to use Dynamatic to compile C kernels into functional dataflow circuits, visualize these circuits to better understand them to identify potential optimization opportunities.  
-Before moving on to use Dynamatic for your custom programs, kindly refer to the [dressing up your code for dynamatic](../../../UserGuide/WritingHLSCode.md) guide. You can also view a more [detailed example](Examples.md) that uses some of the optional commands not mentioned in this introductory tutorial.
+Before moving on to use Dynamatic for your custom programs, kindly refer to the [Writing HLS C Code](../../../UserGuide/WritingHLSCode.md) guide. You can also view a more [detailed example](Examples.md) that uses some of the optional commands not mentioned in this introductory tutorial.
 
 We are now ready for an introduction to [modiying Dynamatic](ModifyingDynamatic.md). We will identify an optimization opportunity from the previous example and write a small transformation pass in C++ to implement our desired optimization, before finally verifying its behavior using the dataflow visualizer.

@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Type System
 
 > [!NOTE]
@@ -23,7 +24,7 @@ handshake.func @adder(%a: i32, %b: i32, %start: none) -> i32  {
 
 Each `i32`-typed SSA value in this IR represents in fact a dataflow channel with a 32-bit data bus (which should be interpreted as an integer). Also note that control-only dataflow channel (with no data bus) are somewhat special-cased in the current type system by using the standard MLIR `NoneType` (written as `none`) in the IR. While this may be a questionnable design decision in the first place (the `i0` type, which is legal in MLIR, could be conceived as a better choice), it is not fundamentally important for this proposal.
 
-## The problem
+## The Problem
 
 On one hand, implicit dataflow semantics within Handshake functions have the advantage of yielding neat-looking IRs that do not bother to deal with an explicit parametric "dataflow type" repeated everywhere. On the other hand, it also prevents us from mixing regular dataflow channels (downstream data bus, downstream valid wire, and upstream ready wire) with any other kind of signal bundle.
 
@@ -35,9 +36,9 @@ While MLIR attributes attached to operations whose adjacent channels are "specia
 1. MLIR treats custom attribute opaquely, and therefore cannot automatically verify that they make any sense in any given context. We would have to define complex verification logic ourselves and think of verifying IR sanity every time we transform it.
 2. Attributes heavily clutter the IR, making it harder to look at whenever many operations possess (potentially complex) custom attributes. This hinders debuggability since it is sometimes useful to look directly at the serialized IR to understand what a pass inputs or outputs.
 
-## Proposed solution
+## Proposed Solution
 
-### New types
+### New Types
 
 We argue that the only way to obtain the flexibility outlined above is to
 
@@ -69,7 +70,7 @@ handshake.func @adder(%a: channel<i32>, %b: channel<i32>, %start: control) -> ch
 }
 ```
 
-### New operations
+### New Operations
 
 Occasionaly, we will want to unbundle channel-typed SSA values into their individual signals and later recombine the individual components into a single channel-typed SSA value. We propose to introduce two new operations to fulfill this requirement.
 
@@ -86,7 +87,7 @@ We include a simple example below (see the [next subsection](#extra-signal-handl
 %channelAgain = handshake.bundle %control, %data : channel<i32>
 ```
 
-### Extra signal handling
+### Extra Signal Handling
 
 To support the use case where extra signals need to be carried on some dataflow channel (e.g., speculation bits, thread tags), the `handshake::ChannelType` needs to be flexible enough to model an arbitrary number of extra raw data-types (in addition to the "regular" data-type). In order to prepare for future use cases, each extra signal should also be characterized by its direction, either downstream or upstream. Extra signals may also optionally declare unique names to refer themselves by, allowing client code to more easily query for a specifc signal in complex channels.  
 
@@ -159,7 +160,7 @@ Going further, if multiple regions requiring extra signals were ever nested with
 
 In this section we try to alleviate potential concerns with the proposed change and discuss the latter's impact on other parts of Dynamatic.
 
-### Type checking
+### Type Checking
 
 Using MLIR's type system to model the exact nature of each channel in our circuits makes us benefit from MLIR's existing type management and verification infrastructure. We will be able to cleanly define and check for custom type checking rules on each operation type, ensuring that the relationships between operand and result types always makes sense; all the while permitting our operations to handle an infinite number of variations of our parametric types.
 
@@ -177,7 +178,7 @@ For example, the integer addition operation (`handshake.addi`) would check that 
 %addResult = handshake.addi %addOprd1, %addOprd2 : channel<i0>
 ```
 
-### IR complexity
+### IR Complexity
 
 Despite the added complexity introduced by our parametric channel type, the representation of core dataflow components (e.g., merges and branches) would remain structurally identical beyond cosmetic type name changes.
 
@@ -214,11 +215,11 @@ Despite the added complexity introduced by our parametric channel type, the repr
 %muxResult = handshake.mux %index [%muxOprd1, %muxOprd2] : channel<i1>, channel<i32, [i2, i4]>
 ```
 
-### Backend changes
+### Backend Changes
 
 The support for "nonstandard" channels in the IR means that we have to match this support in our RTL backend. Indeed, most current RTL components take the data bus's bitwidth as an RTL parameter. This is no longer sufficient when dataflow channels can carry extra downstream or upstream signals, which must somehow be encoded in the RTL parameters of numerous core dataflow components (e.g., all merge-like and branch-like components). Complex channels will need to become encodable as RTL parameters for the underlying RTL implementations to be concretized correctly. It is basically a given that generic RTL implementations which we largely rely on today will not be sufficient, and that the design change will require us moving to RTL generators for most core dataflow components. Alternatively, we could use a form of [signal composition](#signal-compositon) (see below) to narrow down the amount of channel types our components have to support.
 
-### Signal compositon
+### Signal Compositon
 
 In some instances, it may be useful to compose all of a channel's signals going in the same direction (downstream or upstream) together around operations that do not care about the actual content of their operands' data buses (e.g., all data operands of merge-like and branch-like operations). This would allow us to expose to certain operations "regular" dataflow channels without extra signals; their *exposed data buses* would in fact be constituted of the *actual data buses* plus all extra downstream signals. Just before lowering to HW and then RTL (after applying all Handshake-level transformations and optimizations to the IR), we could run a signal-composition pass that would apply this transformation around specific dataflow components in order to make our backend's life easier.
 

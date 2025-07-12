@@ -1,10 +1,10 @@
-[Table of Contents](../README.md)
+[Documentation Table of Contents](../README.md)
 # Testing Infrastructure
 Dynamatic features unit tests that evaluate the behavior of a small part of the implementation (typically, one compiler pass) against an expected output. All files within the `test` directory with the `.mlir` extension are automatically considered as unit test files. They can be ran/checked all at once by running `ninja check-dynamatic` from a terminal within the top level `build` directory. We use the [`FileCheck`](https://llvm.org/docs/CommandGuide/FileCheck.html) LLVM utility to compare the actual output of the implementation with the expected one.
 
 Dynamatic also contains integration tests that assess the whole flow by going from C to VHDL. Each folder containing C source code inside the `integration-test` directory is a separate integration test.
 
-## Understanding `FileCheck` unit test files
+## Understanding `FileCheck` Unit Test Files
 
 `FileCheck` is an LLVM utility that works by running a user-specified command (typically, a compiler pass through the `dynamatic-opt` tool) on each unit test present in a file and checking the output of the command (printed on stdout) against a pre-generated expected output expressed as a sequence of `CHECK*: ...` assertions. Test files are made up one or more *unit tests* that are each checked independently of the others. Each unit test is considered passed if and only if the output of the command matches the output contained in its associated `CHECK` assertions. The file is considered passed if and only if all unit tests contained within it passed. 
 
@@ -66,17 +66,17 @@ func.func @pushAndDelete(%arg0: i1) -> i32 {
 - Each `func.func` models a standard MLIR function, with its body enclosed between curly brackets, Here, each `func.func` represents a different unit test, since the constant pushing pass operates within the body of a single function at a time.
 - The `CHECK-LABEL`, `CHECK-SAME`, and `CHECK` assertions represent the expected output for each unit test. They use some special syntax and conventions to verify that the output of each unit test is the one we expect while allowing some cosmetic differences between the expected and actual outputs that have no impact on behavior. [`FileCheck`'s documentation](https://llvm.org/docs/CommandGuide/FileCheck.html) explains how each assertion type is handled by the verifier. The section below explains how you can generate these assertions automatically for your own unit tests.
 
-## Creating your own unit tests with `FileCheck`
+## Creating Your Own Unit Tests With `FileCheck`
 
 Unit tests are a very useful way to check the behavior of a specific part of the codebase, for example, a transformation pass. They allow us to verify that the code produces the right result in small, specific, and controlled scenarios that ideally [fully cover](https://en.wikipedia.org/wiki/Code_coverage) the *design under test* (DUT). Furthermore, unit tests are very easy to write and maintain with the `FileCheck` LLVM utility, making them a requirement when contributing non-trivial code to the project. We go into how to write you own unit tests and automatically generate `FileCheck` annotations (i.e., `CHECK` assertions) for them below.
 
-### Writing good unit tests
+### Writing Good Unit Tests
 
 As their name suggests, unit tests are meant to test one *unit* of functionality. Typically, this means that the DUT must be as minimal as possible while remaining practical to analyze (e.g., there is no need to test each individual function). In most cases this translates to testing a single compiler pass in isolation, for example, the constant pushing (`--push-constants`) pass. Each unit test should aim, as much as possible, to evaluate a single behavior of the DUT. Consequently, it is good practice to make unit tests as small as possible for testing for a desired functionality. Doing so makes it easier for future readers to understand (1) what behavior the unit test checks for and (2) where to look in the code if a test starts failing.
 
-**TODO | Formalize list of unit tests to have for a pass, an operation, etc.** 
+**TODO | Formalize List of Unit Tests to Have for a Pass, an Operation, Etc.** 
 
-### Generating `FileCheck` assertions
+### Generating `FileCheck` Assertions
 
 Once you have written your own unit tests, all that remains to do is generate `FileCheck` annotations that will allow the latter to verify that the output of the DUT matches the expected one. Let's take the example test file given above without `FileCheck` annotations as an example and go through the process of generating assertions for its two unit tests. We start from a test file containing only the input code that will go through the constant pushing pass as well as a `// -----` marker to later instruct the Dynamatic optimizer to split the file into separarte MLIR modules in this location.
 
@@ -191,7 +191,7 @@ Once you are confident that the DUT's output is correct on the unit tests, you c
 1. created good unit tests to make sure a part of the codebase works as intended and, 
 2. set up an easy way for you and future developers of Dynamatic to make sure it keeps working as we move forward! 
 
-### A known assertion generation bug
+### A Known Assertion Generation Bug
 
 The assertion generation script (`circt/llvm/mlir/utils/generate-test-checks.py`) sometimes generates `CHECK` assertions that `FileCheck` is then unable to verify, even when running `ninja check-dynamatic` immediately after creating assertions (which, logically, should always verify). The issue arises in some cases with functions of more than two arguments and has a simple formatting fix. For example, consider the following unit test with its associated automatically generated assertions (body assertions skipped for brevity).
 

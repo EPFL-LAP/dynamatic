@@ -1,5 +1,6 @@
-[Table of Contents](../README.md)
+[Documentatio Table of Contents](../README.md)
 
+## Overview: What if I Want to Optimize ...
 1. [Clock frequency](#1-achieving-a-specific-clock-frequency)  
 2. [Area](#2-area)  
 3. [Latency and throughput](#3-latency-and-throughput)  
@@ -10,9 +11,8 @@
     - [Resource sharing of functional units](#resource-sharing-of-functional-units)
 5. [Custom compilation flows](#custom-compilation-flows)  
 
-## Overview: What if I Want to Optimize ...
 
-### 1. Achieving a specific clock frequency  
+### 1. Achieving a Specific Clock Frequency   
 Dynamatic relies on its buffer placement algorithm to regulate the critical path in the design to achieve a specific frequency target. To achieve the desired target, set the period (`set-clock period <value_in_ns>`) and enable the buffer placement algorithm `compile --buffer-algorithm <...>...`
 
 ### 2. Area  
@@ -21,10 +21,8 @@ Circuit area can be optimized using the following compile flags
 - Credit-based resource sharing: `--sharing`
 - Buffer placement :`--buffer-algorithm` with value `fpl22` 
 
-### 3. Latency and throughput
+### 3. Latency and Throughput
 Latency and throughput can be improved using buffer placement with either the `fpga20` or `fpl22` values for the `--buffer-algorithm` compile flag.  
-
-For more details on the optimization tools, see the [optimization tools](../DeveloperGuide/OptimizationTools.md) page.
 
 ## Optimization Algorithms in Dynamatic
 
@@ -49,9 +47,10 @@ achieve a certain initiation interval.
 The naive buffer placement algorithm in Dynamatic, `on-merges`, is used by default. Its strategy is to place buffers on the output channels of all merge-like operations. This creates perfectly valid circuits, but results in poor performance.
 
 For better performance, two more advanced algorithms are implemented, based on the [FPGA'20](https://doi.org/10.1145/3477053) and [FPL'22](https://doi.org/10.1109/FPL57034.2022.00063) papers. They can be chosen by using `compile` in `bin/dynamatic` with the command line option `--buffer-algorithm fpga20` or `--buffer-algorithm fpl22`, respectively.  
->Note that these two algorithms require Gurobi to be installed and detected, otherwise they will not be available!
+> [!NOTE]  
+> These two algorithms require Gurobi to be installed and detected, otherwise they will not be available!
 
-Installation instructions for Gurobi can be found [here](../UserGuide/AdvancedBuild.md#gurobi). A brief high-level overview of these algorithms' strategies is provided below; for more details, see the original publications linked above and [this document](../Specs/Buffering/Buffering.md).
+Installation instructions for Gurobi can be found [here](../UserGuide/AdvancedBuild.md#gurobi). A brief high-level overview of these algorithms' strategies is provided below; for more details, see the original publications linked above and [this document](../DeveloperGuide/Specs/Buffering/Buffering.md).
 
 #### Buffer Placement Algorithm: FPGA'20
 The main idea of the `fpga20` algorithm is to decompose the dataflow circuit into choice-free dataflow circuits (i.e. parts which don't contain any branches). The performance of these CFDFCs can be modeled using an approach based on timed Petri nets (see [Performance Evaluation of Asynchronous Concurrent Systems Using Petri Nets](https://www.computer.org/csdl/journal/ts/1980/05/01702760/13rRUxASuqJ) and [Analysis of asynchronous concurrent systems by timed petri nets](https://dspace.mit.edu/handle/1721.1/13739)).  
@@ -75,7 +74,7 @@ Determining a correct order of accesses within a group can be done easily using 
 > [!WARNING]  
 > A significant area improvement can be achieved by disabling the use of LSQs but this must be used cautiously.
 
-The specifics of LSQ implementation are available in [the corresponding documentation folder.](../LSQ) For more information on the concept itself, [see the original paper.](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2022/06/JosipovicTECS17_AnOutOfOrderLoadStoreQueueForSpatialComputing.pdf)
+The specifics of LSQ implementation are available in [the corresponding documentation folder.](../DeveloperGuide/LSQ) For more information on the concept itself, [see the original paper.](https://dynamo.ethz.ch/wp-content/uploads/sites/22/2022/06/JosipovicTECS17_AnOutOfOrderLoadStoreQueueForSpatialComputing.pdf)
 
 ### Resource Sharing of Functional Units
 

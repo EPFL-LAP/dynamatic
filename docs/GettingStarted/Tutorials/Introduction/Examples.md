@@ -1,4 +1,4 @@
-[Table of Contents](../../../README.md)
+[Documentation Table of Contents](../../../README.md)
 
 # Examples
 ## 1. Binary Search  
@@ -67,15 +67,15 @@ username:~/Dynamatic/dynamatic$ ./bin/dynamatic
 
 dynamatic> 
 ```
-#### Set the path to the C target C file
+#### Set the Path to the C Target C File
 Use the `set-src` command to direct Dynamatic to the file you want to synthesize into RTL
 ```
 dynamatic> set-src integration-test/binary_search/binary_search.c
 ```
-#### Compile the C file to a lower Intermediate Representation
+#### Compile the C File to a Lower Intermediate Representation
 You can choose the **buffer placement algorithm** with the `--buffer-algorithm` flag. For this example, we use `fpga20`, a throughput driven algorithm. 
->Tip  
-If you are not sure which options are available for the compile command, add anything after it and hit enter to see the options e.g compile --
+> [!TIP]  
+> If you are not sure which options are available for the compile command, add anything after it and hit enter to see the options e.g compile --
 ```
 dynamatic> compile --buffer-algorithm fpga20
 [INFO] Compiled source to affine
@@ -99,14 +99,14 @@ dynamatic> compile --buffer-algorithm fpga20
 [INFO] Lowered to HW
 [INFO] Compilation succeeded
 ```
-#### Generate hdl from DOT file
+#### Generate HDL from DOT File
 A dot file is generated near the end of the compile stage (see output above). `write-hdl` converts it into HDL code for your kernel. The default HDL is VHDL. You can choose verilog or vhdl with the `--hdl` flag
 ```
 dynamatic> write-hdl --hdl vhdl
 [INFO] Exported RTL (vhdl)
 [INFO] HDL generation succeeded
 ```
-#### Simulate your circuit
+#### Simulate Your Circuit
 This step simulates the kernel in C and HDL (using modelsim) and compares the results for equality.
 ```
 dynamatic> simulate
@@ -115,7 +115,7 @@ dynamatic> simulate
 [INFO] Launching Modelsim simulation
 [INFO] Simulation succeeded
 ```
-#### Sythesize with vivado
+#### Sythesize With Vivado
 This step is optional. It allows to get more timing and performance related files using vivado. You must have vivado installed.
 ```
 dynamatic> synthesize
@@ -123,10 +123,12 @@ dynamatic> synthesize
 [INFO] Launching Vivado synthesis
 [INFO] Logic synthesis succeeded
 ```
->If this step fails despite you having vivado installed and added to path, `source` the vivado/vitis `settings64.sh` in your shell and try again.  
+> [!NOTE]
+> If this step fails despite you having vivado installed and added to path, `source` the vivado/vitis `settings64.sh` in your shell and try again.  
 
-><span style="color:red;">Warning:</span> Adding the sourcing of the `settings64.sh` to path may hinder future compilations as the vivado compiler varies from the regular clang compiler on your machine
-#### Visualize and simulate your circuit
+> [!WARNING]
+> Adding the sourcing of the `settings64.sh` to path may hinder future compilations as the vivado compiler varies from the regular clang compiler on your machine
+#### Visualize and Simulate Your Circuit
 By running the `visualize` command, the Godot GUI will be launched with your dataflow circuit open, and ready to be played with
 ```
 dynamatic> visualize
@@ -135,5 +137,5 @@ dynamatic> visualize
 [INFO] Launching visualizer...
 ```
 Below is a preview of the circuit in the Godot visualizer
-<img src="img/bin.png" alt="binary search data flow circuit"/>
+<img src="Figures/bin.png" alt="binary search data flow circuit"/>
 The circuit is too broad to capture in one image but you can move around the preview by clicking, holding, and moving your cursor around. Play with the commands to see your circuit in action.

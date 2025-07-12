@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Timing Information and its handling in Dynamatic
 This document explains how Dynamatic stores and uses timing information for hardware operators, providing both conceptual understanding and implementation guidance.
 

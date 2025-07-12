@@ -1,3 +1,4 @@
+[Documtation Table of Contents](../../README.md)  
 # Dataflow Unit Characterization Script Documentation
 
 This document describes how Dynamatic obtains the timing characteristics of the dataflow units. Please check out [this doc](https://github.com/EPFL-LAP/dynamatic/blob/main/docs/Specs/TimingInformation.md) if you are unfamiliar with Dynamatic's timing model. 
