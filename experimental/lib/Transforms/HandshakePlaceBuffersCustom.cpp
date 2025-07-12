@@ -47,7 +47,7 @@ namespace experimental {
 namespace {
 
 struct HandshakePlaceBuffersCustomPass
-    : public dynamatic::experimental::buffer::impl::
+    : public dynamatic::experimental::impl::
           HandshakePlaceBuffersCustomPass<HandshakePlaceBuffersCustomPass> {
   // use auto-generated constructors from base class
   using HandshakePlaceBuffersCustomPass::HandshakePlaceBuffersCustomPass;
