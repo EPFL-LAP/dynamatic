@@ -53,6 +53,8 @@ namespace {
 struct HandshakeSpeculationPass
     : public dynamatic::experimental::impl::
           HandshakeSpeculationBase<HandshakeSpeculationPass> {
+  // use auto-generated constructors
+  using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
   // TableGen Pass Options
   // - std::string jsonPath
