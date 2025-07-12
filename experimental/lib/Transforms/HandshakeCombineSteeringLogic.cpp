@@ -402,7 +402,7 @@ struct CombineBranchesSameSign
   }
 };
 
-  void HandshakeCombineSteeringLogic::runDynamaticPass() override {
+  void HandshakeCombineSteeringLogic::runDynamaticPass() {
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
     GreedyRewriteConfig config;
