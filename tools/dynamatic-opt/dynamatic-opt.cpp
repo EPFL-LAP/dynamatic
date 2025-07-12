@@ -16,6 +16,7 @@
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
 #include "experimental/InitAllPasses.h"
+#include "experimental/ftd/InitAllPasses.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -69,6 +70,8 @@ int main(int argc, char **argv) {
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
   dynamatic::experimental::registerAllPasses();
+  dynamatic::experimental::ftd::registerAllPasses();
+
   registerTestPasses();
 
   // If XLS integration is enabled, register the XLS dialect and passes

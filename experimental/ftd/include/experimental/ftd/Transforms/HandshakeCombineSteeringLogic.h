@@ -18,11 +18,11 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
-std::unique_ptr<dynamatic::DynamaticPass> combineSteeringLogic();
-
+// import auto-generate base class declaration
+// options struct
+// and create function
 #define GEN_PASS_DECL_HANDSHAKECOMBINESTEERINGLOGIC
-#define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
-#include "experimental/Transforms/Passes.h.inc"
+#include "experimental/ftd/Transforms/Passes.h.inc"
 
 } // namespace ftd
 } // namespace experimental

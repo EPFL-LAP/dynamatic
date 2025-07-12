@@ -98,8 +98,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
+
 include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
+
+include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/ftd/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/experimental/ftd/include)
+
 
 add_custom_target(dynamatic-headers)
 set_target_properties(dynamatic-headers PROPERTIES FOLDER "Misc")

@@ -19,6 +19,7 @@ target_link_libraries(dynamatic-opt
   DynamaticLSQSizing
   DynamaticSpeculation
   DynamaticRigidification
+  DynamaticFTDTransforms
   DynamaticFormalPropertyAnnotation
   DynamaticExperimentalResourceSharing
   DynamaticCfToHandshake
