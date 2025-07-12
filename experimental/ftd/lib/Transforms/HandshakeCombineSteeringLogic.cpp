@@ -47,6 +47,9 @@ struct HandshakeCombineSteeringLogicPass
     : public dynamatic::experimental::ftd::impl::
           HandshakeCombineSteeringLogicBase<HandshakeCombineSteeringLogicPass> {
 
+  // use auto-generated constructors
+  using HandshakeCombineSteeringLogicBase::HandshakeCombineSteeringLogicBase;
+
   void runDynamaticPass() override;
 };
 
