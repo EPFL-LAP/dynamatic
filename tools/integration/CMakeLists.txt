@@ -25,11 +25,15 @@ target_link_libraries(
 enable_testing()
 
 include(GoogleTest)
-gtest_discover_tests(integration)
+gtest_discover_tests(
+  integration
+  XML_OUTPUT_DIR ${CMAKE_BINARY_DIR}/tools/integration/results
+)
 
 add_definitions(-DDYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}")
 
-add_custom_target(run-integration-tests
+add_custom_target(
+  run-integration-tests
   COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --output-on-failure
   DEPENDS dynamatic-opt integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
