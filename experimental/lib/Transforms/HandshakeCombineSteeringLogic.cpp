@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
+#include "experimental/ftd/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/AsmState.h"
