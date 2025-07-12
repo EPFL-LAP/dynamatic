@@ -32,6 +32,7 @@ namespace dynamatic {
 namespace experimental {
 namespace ftd {
 
+// import auto-generated base class definition
 #define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
 #include "experimental/ftd/Transforms/Passes.h.inc"
 
