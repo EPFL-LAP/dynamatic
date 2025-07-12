@@ -56,7 +56,7 @@ struct HandshakeSpeculationPass
   // use auto-generated constructors
   using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
-  // Inherited options from TableGen (handled in base):
+  // TableGen Pass Options
   // - std::string jsonPath
   // - bool automatic
 
