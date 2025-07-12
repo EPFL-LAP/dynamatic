@@ -102,8 +102,8 @@ include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
 include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
 include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 
-include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/experimental/ftd/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/experimental/ftd/include)
+include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/ftd/include)
+include_directories(${DYNAMATIC_BINARY_DIR}/ftd/include)
 
 
 add_custom_target(dynamatic-headers)
