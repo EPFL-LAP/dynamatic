@@ -24,7 +24,7 @@ namespace ftd {
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#include "experimental/Transforms/Passes.h.inc"
+#include "experimental/ftd/Transforms/Passes.h.inc"
 
 }
 } // namespace experimental
