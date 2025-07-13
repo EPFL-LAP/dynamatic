@@ -115,8 +115,6 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     modelName = (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
-    llvm::errs() << modelName << "\n";
-    modelName = baseName.str();
   } else {
     modelName = baseName.str();
   }
