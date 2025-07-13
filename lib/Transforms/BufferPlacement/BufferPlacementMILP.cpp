@@ -822,7 +822,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   // Log retimings of all units in all CFDFCs
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
+    os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
     for (auto &[op, unitVars] : cfVars.unitVars) {
       os << getUniqueName(op)
