@@ -11,6 +11,16 @@
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INTERNAL_DELAY", "type": "string" }
+    ],
+    "generator": "echo didnt match",
+    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
     "name": "handshake.addi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
