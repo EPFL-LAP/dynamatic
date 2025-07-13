@@ -430,6 +430,38 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
+class SymbolicStringEnumAttr<string attrName, string summary,
+                             string enumType> :
+  AttrDef<Handshake_Dialect, attrName> {
+  let storageType = "mlir::StringAttr";
+  let returnType = "::dynamatic::handshake::" # enumType;
+
+  let convertFromStorage = "::dynamatic::handshake::symbolize" # enumType #
+                           "($_self.str()).value()";
+  let convertToStorage = "mlir::StringAttr::get($_ctxt, " #
+                         "::dynamatic::handshake::stringify" # enumType #
+                         "($_self))";
+
+  let genAccessors = 1;
+  let genVerify = 1;
+}
+
+def FPUImpl : I64EnumAttr<"FPUImpl2", "", [
+  I64EnumAttrCase<"FLOPOCO", 0>,
+  I64EnumAttrCase<"VIVADO", 1>
+]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+def Handshake_FPUImplAttr : SymbolicStringEnumAttr<
+  "FPUImplAttr", "FPU vendor attribute", "FPUImpl2", "::dynamatic::handshake">;
+
+//===----------------------------------------------------------------------===//
+// FPU Implementation
+//===----------------------------------------------------------------------===//
+
+
+
 def FPUImplEnum : I64EnumAttr<
     "FPUImpl", "",
     [
@@ -437,9 +469,7 @@ def FPUImplEnum : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1, "vivado">
     ]> {
   let cppNamespace = "::dynamatic::handshake";
-  let genSpecializedAttr = 0;
 }
 
-def FPUImplAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "::dynamatic::handshake::FPUImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
