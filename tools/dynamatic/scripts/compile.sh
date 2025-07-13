@@ -178,7 +178,6 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json" \
     > "$F_HANDSHAKE_BUFFERED"
@@ -202,7 +201,6 @@ else
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
