@@ -14,7 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/HandshakeMarkFPUImpl.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 
 using namespace mlir;
 using namespace dynamatic;
