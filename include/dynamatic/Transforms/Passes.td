@@ -286,10 +286,11 @@ def HandshakeMarkFPUImpl : DynamaticPass<"mark-fpu-impl"> {
     to decide how to generate the RTL of these units.
     Defaults to vivado
   }];
-  let options =
- Option<"impl", "impl", "::dynamatic::handshake::FPUImpl",
-  "::dynamatic::handshake::FPUImpl::VIVADO",
-  "Which FPU impl to use (FLOPOCO, VIVADO)">;
+  let options = [
+    Option<"impl", "impl", "::dynamatic::handshake::FPUImpl",
+      "::dynamatic::handshake::FPUImpl::VIVADO",
+      "Which FPU impl to use (FLOPOCO, VIVADO)">;
+  ]
 }
 
 //===----------------------------------------------------------------------===//
