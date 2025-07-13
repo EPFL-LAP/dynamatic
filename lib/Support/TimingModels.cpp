@@ -102,7 +102,7 @@ bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
   return models.insert(std::make_pair(newStringRef, model)).second;
 }
 
-const TimingModel *TimingDatabase::getModel(const std::string opName) const {
+const TimingModel *TimingDatabase::getModel(StringRef opName) const {
   auto it = models.find(opName);
   llvm::errs << opName;
   if (it == models.end())
