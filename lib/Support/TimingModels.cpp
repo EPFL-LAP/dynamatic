@@ -104,7 +104,7 @@ bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
 
 const TimingModel *TimingDatabase::getModel(StringRef opName) const {
   auto it = models.find(opName);
-  llvm::errs << opName;
+  llvm::errs() << opName;
   if (it == models.end())
     return nullptr;
   return &it->second;
