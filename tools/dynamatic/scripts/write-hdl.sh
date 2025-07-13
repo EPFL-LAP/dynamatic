@@ -11,7 +11,6 @@ DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 HDL=$4
-FPUNITS_GEN=$5
 
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
