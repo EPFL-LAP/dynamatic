@@ -15,19 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ENUMS_H
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ENUMS_H
+#ifndef DYNAMATIC_ENUM_HANDSHAKE_HANDSHAKE_ENUMS_H
+#define DYNAMATIC_ENUM_HANDSHAKE_HANDSHAKE_ENUMS_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Dialect.h"
 
-// Pull in the Dialect definition.
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h.inc"
 
 // Pull in all enum type definitions, attributes,
 // and utility function declarations.
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_DIALECT_H
+#endif // DYNAMATIC_ENUM_HANDSHAKE_HANDSHAKE_ENUMS_H
