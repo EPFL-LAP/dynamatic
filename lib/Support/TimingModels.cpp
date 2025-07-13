@@ -97,7 +97,9 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
 }
 
 bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
-  return models.insert(std::make_pair(name, model)).second;
+  auto inserted = ownedNames.insert(name);
+  auto newStringRef = inserted.first->getKey();
+  return models.insert(std::make_pair(newStringRef, model)).second;
 }
 
 const TimingModel *TimingDatabase::getModel(const std::string opName) const {
