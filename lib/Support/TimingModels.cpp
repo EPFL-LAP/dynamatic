@@ -104,7 +104,6 @@ bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
 
 const TimingModel *TimingDatabase::getModel(StringRef opName) const {
   auto it = models.find(opName);
-  llvm::errs() << opName;
   if (it == models.end())
     return nullptr;
   return &it->second;
@@ -115,7 +114,8 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   std::string modelName;
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
-    modelName = (baseName + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    modelName = (baseName + "." + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+    llvm::errs() << modelName << "\n";
   } else {
     modelName = baseName.str();
   }
