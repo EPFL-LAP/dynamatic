@@ -429,7 +429,7 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-def Handshake_FPUImplAttr : StringifyEnumAttr<
+def Handshake_FPUImplAttr : I64EnumAttr<
     "FPUImpl", "",
     [
       I64EnumAttrCase<"FLOPOCO", 0>,
