@@ -437,6 +437,7 @@ def Handshake_FPUImplAttr : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1>,
     ]> {
   let cppNamespace = "::dynamatic::handshake";
+  let stringified = 1;
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
