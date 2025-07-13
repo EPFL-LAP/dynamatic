@@ -4,7 +4,6 @@ use ieee.numeric_std.all;
 entity divf is
   generic (
     DATA_TYPE : integer;
-    INTERNAL_DELAY : integer
   );
   port (
     -- inputs
