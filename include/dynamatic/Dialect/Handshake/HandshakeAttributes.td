@@ -429,12 +429,12 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-def Handshake_FPUImplAttr : I64EnumAttr<
+def Handshake_FPUImplAttr : StringifyEnumAttr<
     "FPUImpl", "",
     [
-      I64EnumAttrCase<"FLOPOCO", 0, "FLOPOCO">,
+      I64EnumAttrCase<"FLOPOCO", 0>,
 
-      I64EnumAttrCase<"VIVADO", 1, "VIVADO">,
+      I64EnumAttrCase<"VIVADO", 1>,
     ]> {
   let cppNamespace = "::dynamatic::handshake";
 }
