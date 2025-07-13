@@ -289,8 +289,8 @@ def HandshakeMarkFPUImpl : DynamaticPass<"mark-fpu-impl"> {
   let options = [
     Option<"impl", "impl", "::dynamatic::handshake::FPUImpl",
       "::dynamatic::handshake::FPUImpl::VIVADO",
-      "Which FPU impl to use (FLOPOCO, VIVADO)">;
-  ]
+      "Which FPU impl to use (FLOPOCO, VIVADO)">
+  ];
 }
 
 //===----------------------------------------------------------------------===//
