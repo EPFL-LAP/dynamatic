@@ -319,7 +319,7 @@ private:
   /// Maps operation names to their timing model.
   DenseMap<StringRef, TimingModel> models;
 
-  llvm::StringSet<> ownedNames;
+  llvm::StringSet<llvm::BumpPtrAllocator> ownedNames;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's
