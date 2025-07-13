@@ -429,18 +429,24 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // Symbolic Enum Base
 //===----------------------------------------------------------------------===//
 
-class SymbolicEnumAttrBase<string enumName> {
-  string parameterPrinter = "$_printer << ::dynamatic::handshake::stringify" # enumName # "($_self)";
-  string parameterParser = [{
-    ::llvm::StringRef keyword;
-    if (::mlir::failed($_parser.parseKeyword(&keyword)))
-      return {};
-    auto val = ::dynamatic::handshake::symbolize} # enumName # R"((keyword);
-    if (!val)
-      return {};
-    return val.value();
-  }];
+
+// Base class for symbolic enums
+class SymbolicEnumAttrBase<string name, string description,
+                           list<I64EnumAttrCase> cases>
+  : EnumAttr<name, description, string, cases> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 1;
+  let useDefaultAttributePrinterParser = 0;
 }
+
+// Your enum definition
+def Handshake_FPUImpl2Attr : SymbolicEnumAttrBase<
+  "FPUImpl", "",
+  [
+    I64EnumAttrCase<"FLOPOCO2", 0, "flopoco">,
+    I64EnumAttrCase<"VIVADO2", 1, "vivado">
+  ]
+>;
 
 //===----------------------------------------------------------------------===//
 // FPU Implementation
