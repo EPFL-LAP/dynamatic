@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ENUM_H
-#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ENUM_H
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_DIALECT_H
+#define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_DIALECT_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Dialect.h"
@@ -29,4 +29,4 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h.inc"
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ENUM_H
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_DIALECT_H
