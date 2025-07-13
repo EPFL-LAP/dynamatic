@@ -45,7 +45,18 @@ public:
 } // namespace
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
+  auto implOpt = symbolizeFPUImpl(this->impl);
+
+  if(!implOpt){
+    emitError(UnknownLoc::get(&getContext()))
+      << "Invalid FPU implementation: expected one of FLOPOCO or VIVADO, but got '" << this->impl << "'";
+    signalPassFailure();
+    return;
+  }
+
+  auto impl = *implOpt;
+
   getOperation()->walk([&](FPUImplInterface fpuImplInterface) {
-    fpuImplInterface.setFPUImpl(this->impl);
+    fpuImplInterface.setFPUImpl(impl);
   });
 }
