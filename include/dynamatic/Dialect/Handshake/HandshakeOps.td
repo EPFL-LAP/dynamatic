@@ -214,46 +214,6 @@ def InstanceOp : Handshake_Op<"instance", [
   }];
 }
 
-
-def Handshake_BufferTypeAttr : I64EnumAttr<
-    "BufferType", "",
-    [
-      /// ONE_SLOT_BREAK_DV: This buffer breaks the D and V signal paths.
-      /// Previously known as a slot of OEHB (Opaque Elastic Half-Buffer),
-      /// it introduces one cycle of latency on the D and V paths.
-      /// It does not break the R signal path and adds no latency on R.
-      I64EnumAttrCase<"ONE_SLOT_BREAK_DV", 0>,
-          
-      /// ONE_SLOT_BREAK_R: This buffer breaks the R signal path.
-      /// Previously known as a slot of TEHB (Transparent Elastic Half-Buffer),
-      /// it introduces one cycle of latency on the R path.
-      /// It does not break the D and V signal path and adds no latency on D and V.
-      I64EnumAttrCase<"ONE_SLOT_BREAK_R", 1>,
-
-      /// FIFO_BREAK_NONE: Previously known as a 'tfifo' (Transparent FIFO),
-      /// this is a FIFO_BREAK_DV with a bypass, adding no latency to any signal paths.
-      /// Its only purpose is to hold tokens.
-      I64EnumAttrCase<"FIFO_BREAK_NONE", 2>,
-
-      /// FIFO_BREAK_DV: This buffer breaks the D and V paths.
-      /// It has multiple slots but, unlike a chain of ONE_SLOT_BREAK_DV buffers,
-      /// its structure cannot be split. It introduces one cycle of latency on the
-      /// D and V paths regardless of the number of slots and has no latency on R.
-      /// It was previously called an 'elastic_fifo_inner'.
-      I64EnumAttrCase<"FIFO_BREAK_DV", 3>,
-
-      /// ONE_SLOT_BREAK_DVR: Each slot of this buffer breaks the D, V, and R signal
-      /// paths and introduces one cycle of latency on all of them.
-      I64EnumAttrCase<"ONE_SLOT_BREAK_DVR", 4>,
-
-      /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
-      /// handshake control signals, causing them to accept or stall inputs
-      /// simultaneously.
-      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>
-    ]> {
-  let cppNamespace = "::dynamatic::handshake";
-}
-
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType
 ]> {
