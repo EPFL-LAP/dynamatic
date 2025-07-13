@@ -97,18 +97,27 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
 }
 
 bool TimingDatabase::insertTimingModel(StringRef name, TimingModel &model) {
-  return models.insert(std::make_pair(OperationName(name, ctx), model)).second;
+  return models.insert(std::make_pair(name, model)).second;
 }
 
-const TimingModel *TimingDatabase::getModel(OperationName opName) const {
+const TimingModel *TimingDatabase::getModel(const std::string opName) const {
   auto it = models.find(opName);
+  llvm::errs << opName;
   if (it == models.end())
     return nullptr;
   return &it->second;
 }
 
 const TimingModel *TimingDatabase::getModel(Operation *op) const {
-  return getModel(op->getName());
+  StringRef baseName = op->getName().getStringRef();
+  std::string modelName;
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    modelName = (baseName + stringifyEnum(fpuImplInterface.getFPUImpl())).str();
+  } else {
+    modelName = baseName.str();
+  }
+  return getModel(modelName);
 }
 
 LogicalResult TimingDatabase::getLatency(
