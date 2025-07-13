@@ -428,8 +428,7 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 //===----------------------------------------------------------------------===//
 // FPU Implementation
 //===----------------------------------------------------------------------===//
-
-// 1. Define the enum cases
+// 1. Define the enum (no C++ generated)
 def FPUImplEnum : I64EnumAttr<
     "FPUImpl", "",
     [
@@ -440,7 +439,7 @@ def FPUImplEnum : I64EnumAttr<
   let genSpecializedAttr = 0;
 }
 
-// 2. Define the attribute type that wraps the enum
+// 2. Wrap it in an EnumAttr, which enables symbolic printing
 def FPUImplAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "FPUImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
