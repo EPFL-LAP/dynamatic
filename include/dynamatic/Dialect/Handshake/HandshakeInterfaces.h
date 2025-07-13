@@ -20,6 +20,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
