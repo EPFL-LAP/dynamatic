@@ -440,6 +440,10 @@ def FPUImplEnum : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1, "vivado">
     ]> {
   let cppNamespace = "::dynamatic::handshake";
+}
+
+def MyAttr : AttrDef<"::dynamatic::handshake", "FPUImpl", []> {
+  let parameters = (ins FPUImplEnum:$value);
   let assemblyFormat = "`<` $value `>`";
 }
 
