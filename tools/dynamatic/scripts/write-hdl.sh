@@ -27,7 +27,7 @@ rm -rf "$HDL_DIR" && mkdir -p "$HDL_DIR"
 # Set the correct config file
 RTL_CONFIG=""
 if [ "$HDL" == "vhdl" ]; then
-  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-$FPUNITS_GEN.json"
+  RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl.json"
 elif [ "$HDL" == "vhdl-beta" ]; then
   RTL_CONFIG="$DYNAMATIC_DIR/data/rtl-config-vhdl-beta.json"
   HDL="vhdl"
