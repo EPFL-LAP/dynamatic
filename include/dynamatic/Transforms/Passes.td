@@ -278,7 +278,7 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
 }
 
 
-def HandshakeMarkFPUImpl : DynamaticPass<"mark-fpu-impl"> {
+def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
   let summary = "Sets the floating point arithmetic unit 'vendor'.";
   let description = [{
     This pass takes a single floating point unit 'vendor' as input and
