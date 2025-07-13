@@ -264,10 +264,8 @@ def FPUImplInterface : OpInterface<"FPUImplInterface"> {
                    FPUImplAttr::get(op->getContext(), value));
     }]>,
 
-    // Return StringAttr instead of StringRef to ensure proper memory allocation.
-    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
     InterfaceMethod<[{
-      Gets the FPU impl. as a FPUImpl named "internal_delay". Defaults to "0.0" if not set.
+      Gets the FPU impl. as a FPUImpl named "fpu_impl". Defaults to "FLOPOCO" if not set.
     }], "FPUImpl", "getFPUImpl", (ins), [{
       Operation *op = $_op.getOperation();
       if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl"))
