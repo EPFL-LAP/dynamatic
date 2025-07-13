@@ -443,8 +443,8 @@ def FPUImplEnum : I64EnumAttr<
 
 // After (pick an integer enum of your choice)
 def FPUImplEnum2 : I64EnumAttr<"FPUImpl2", "", [
-  I64EnumAttrCase<"FLOPOCO", 0>,
-  I64EnumAttrCase<"VIVADO", 1>
+  I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+  I64EnumAttrCase<"VIVADO", 1, "vivado">
 ]> {
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
