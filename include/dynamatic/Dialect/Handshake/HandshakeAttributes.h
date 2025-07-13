@@ -144,6 +144,7 @@ struct DependenceComponent;
 } // namespace affine
 } // namespace mlir
 
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h.inc"
 
