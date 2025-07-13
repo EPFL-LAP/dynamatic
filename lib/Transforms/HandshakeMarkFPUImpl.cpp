@@ -18,6 +18,8 @@
 
 using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::handshake;
+
 
 namespace dynamatic {
 
