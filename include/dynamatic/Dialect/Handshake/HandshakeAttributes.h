@@ -20,7 +20,7 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h.inc"
 
 namespace dynamatic {
 namespace handshake {
