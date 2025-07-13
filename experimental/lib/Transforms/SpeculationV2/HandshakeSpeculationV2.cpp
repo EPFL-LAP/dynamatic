@@ -42,8 +42,8 @@ namespace dynamatic {
 namespace experimental {
 namespace speculationv2 {
 
-/// Implement the base class and auto-generated create functions.
-/// Must be called from the .cpp file to avoid multiple definitions
+// Implement the base class and auto-generated create functions.
+// Must be called from the .cpp file to avoid multiple definitions
 #define GEN_PASS_DEF_HANDSHAKESPECULATIONV2
 #include "experimental/Transforms/Passes.h.inc"
 
@@ -56,7 +56,6 @@ struct HandshakeSpeculationV2Pass
           HandshakeSpeculationV2Base<HandshakeSpeculationV2Pass> {
   using HandshakeSpeculationV2Base<
       HandshakeSpeculationV2Pass>::HandshakeSpeculationV2Base;
-
   void runDynamaticPass() override;
 };
 
@@ -311,7 +310,7 @@ static bool isEligibleForMuxPasserSwap(MuxOp muxOp, Value newSelector,
 /// the select operand and control of the MuxOp and PasserOp.
 /// Returns the PasserOp that was swapped.
 static PasserOp performMuxPasserSwap(MuxOp muxOp, Value newSelector,
-                                     Value newSpecLoopContinue) {
+                                     Value newContinue) {
   auto passerOp =
       dyn_cast<PasserOp>(muxOp.getDataOperands()[1].getDefiningOp());
 
@@ -325,7 +324,7 @@ static PasserOp performMuxPasserSwap(MuxOp muxOp, Value newSelector,
 
   // Update the select operand and control
   muxOp.getSelectOperandMutable()[0].set(newSelector);
-  passerOp.getCtrlMutable()[0].set(newSpecLoopContinue);
+  passerOp.getCtrlMutable()[0].set(newContinue);
 
   // Materialize passer's result for further rewriting.
   materializeValue(passerOp.getResult());
@@ -661,6 +660,10 @@ isEligibleForResolverIntroduction(SpecV2InterpolatorOp interpolator) {
 
   Operation *riOpUpstream = riOp.getOperand().getDefiningOp();
   if (!isa<PasserOp>(riOpUpstream))
+    return false;
+  auto passerOp = cast<PasserOp>(riOpUpstream);
+
+  if (!equalsIndirectly(passerOp.getCtrl(), interpolator.getResult()))
     return false;
 
   // TODO: Confirm the longOperand
