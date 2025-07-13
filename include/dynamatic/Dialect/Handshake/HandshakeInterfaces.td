@@ -261,14 +261,14 @@ def FPUImplInterface : OpInterface<"FPUImplInterface"> {
     }], "void", "setFPUImpl", (ins "FPUImpl":$value), [{
       Operation *op = $_op.getOperation();
       op->setAttr("fpu_impl",
-                  FPUImplAttr::get(op->getContext(), value));
+                  FPUImpl2Attr::get(op->getContext(), value));
     }]>,
 
 InterfaceMethod<[{
       Gets the FPU impl. as a FPUImpl named "fpu_impl". Defaults to "FLOPOCO" if not set.
     }], "FPUImpl", "getFPUImpl", (ins), [{
       Operation *op = $_op.getOperation();
-      if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl")) {
+      if (auto attr = op->getAttrOfType<FPUImpl2Attr>("fpu_impl")) {
         return attr.getValue();
       }
       return FPUImpl::FLOPOCO;
