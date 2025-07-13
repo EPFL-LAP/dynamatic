@@ -445,6 +445,7 @@ def FPUImplEnum : I64EnumAttr<
 def MyAttr : AttrDef<Handshake_Dialect, "FPUImpl", []> {
   let parameters = (ins FPUImplEnum:$value);
   let assemblyFormat = "`<` $value `>`";
+  let mnemonic = "fpu_impl";
 }
 
 
