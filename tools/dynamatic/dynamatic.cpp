@@ -683,7 +683,7 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
   }
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl);
+                 state.getKernelName(), hdl, state.fpUnitsGenerator);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
