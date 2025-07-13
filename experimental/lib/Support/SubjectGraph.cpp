@@ -56,17 +56,22 @@ void BaseSubjectGraph::connectInputNodesHelper(
     ChannelSignals &currentSignals,
     BaseSubjectGraph *moduleBeforeSubjectGraph) {
 
+  auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
+  Value channel;
+
+  if (moduleBeforeSubjectGraph->op != nullptr) 
+    channel = moduleBeforeSubjectGraph->op->getResult(resultNumber);
+  
   // Get the output nodes of the module before the current module, by retrieving
   // the result number.
   ChannelSignals &moduleBeforeOutputNodes =
-      moduleBeforeSubjectGraph->returnOutputNodes(
-          inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph]);
+      moduleBeforeSubjectGraph->returnOutputNodes(resultNumber);
 
   // Connect ready and valid singals. Only 1 bit each.
   Node::connectNodes(moduleBeforeOutputNodes.readySignal,
-                     currentSignals.readySignal);
+                     currentSignals.readySignal, channel);
   Node::connectNodes(currentSignals.validSignal,
-                     moduleBeforeOutputNodes.validSignal);
+                     moduleBeforeOutputNodes.validSignal, channel);
 
   if (isBlackbox) {
     // If the module is a blackbox, we don't connect the data signals.
@@ -77,7 +82,7 @@ void BaseSubjectGraph::connectInputNodesHelper(
     // Connect data signals. Multiple bits.
     for (unsigned int j = 0; j < currentSignals.dataSignals.size(); j++) {
       Node::connectNodes(currentSignals.dataSignals[j],
-                         moduleBeforeOutputNodes.dataSignals[j]);
+                         moduleBeforeOutputNodes.dataSignals[j], channel);
     }
   }
 }
@@ -160,9 +165,6 @@ void BaseSubjectGraph::processNodesWithRules(
         assignSignals(rule.signals, node, nodeName);
         if (rule.renameNode) // change the name of the node if set true
           node->name = uniqueName + "_" + nodeName;
-        if (rule.extraProcessing) // apply extra processing to node if a
-                                  // function is given
-          rule.extraProcessing(node);
       } else if (nodeName.find(".") != std::string::npos ||
                  nodeName.find("dataReg") !=
                      std::string::npos) { // Nodes with "." and "dataReg"
@@ -863,6 +865,7 @@ BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
                                        std::string bufferTypeName)
     : BaseSubjectGraph(), dataWidth(inputDataWidth),
       bufferType(std::move(bufferTypeName)) {
+  op = nullptr; // No MLIR operation associated with this buffer
   // Static buffer count is used to create unique names for buffers. It keeps
   // track of how many new buffers have been created so far.
   static unsigned int bufferCount;

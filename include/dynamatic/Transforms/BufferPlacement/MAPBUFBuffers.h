@@ -63,16 +63,16 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  // Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.
-  double lutDelay;
-  // Maximum LUT input size of the target FPGA.
-  int lutSize;
   // Method for creating acyclic graphs from cyclic dataflow graph. If false,
   // addCutLoopbackBuffers() method is used. If true,
   // findMinimumFeedbackArcSet() method is used.
   bool acyclicType;
   // Big constant value used in MILP constraints
   int bigConstant = 100;
+  // Maximum LUT input size of the target FPGA.
+  int lutSize;
+  // Average delay in nanoseconds for Look-Up Table (LUT) in the target FPGA.
+  double lutDelay;
   // LogicNetwork of the circuit
   experimental::LogicNetwork *blifData;
   // Map that allows quick lookups from leaf to root nodes

@@ -42,7 +42,6 @@ struct NodeProcessingRule {
   std::string pattern;
   ChannelSignals &signals;
   bool renameNode;
-  std::function<void(Node *)> extraProcessing;
 };
 
 /// Base class for all subject graphs. This class represents the subject graph
@@ -53,9 +52,6 @@ struct NodeProcessingRule {
 /// - Unique naming and module type identification
 class BaseSubjectGraph {
 protected:
-  // Operation that the SubjectGraph is based on
-  Operation *op;
-
   // uniqueName is used to generate unique names for the nodes in the BLIF file
   std::string uniqueName;
 
@@ -87,6 +83,9 @@ public:
   // Constructor for a SubjectGraph based on an Operation
   BaseSubjectGraph(Operation *op);
 
+  // Operation that the SubjectGraph is based on
+  Operation *op;
+  
   // The populated maps store channel-specific information that connects
   // SubjectGraphs together. Each SubjectGraph has a position in the vector
   // which determines what type of data it handles (e.g., data, address, index).

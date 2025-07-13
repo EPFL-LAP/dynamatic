@@ -45,8 +45,8 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
-      blifFiles(blifFiles), lutDelay(lutDelay), lutSize(lutSize),
-      acyclicType(acyclicType) {
+      acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
+      blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
@@ -58,8 +58,8 @@ MAPBUFBuffers::MAPBUFBuffers(GRBEnv &env, FuncInfo &funcInfo,
                              Logger &logger, StringRef milpName)
     : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
                           milpName),
-      blifFiles(blifFiles), lutDelay(lutDelay), lutSize(lutSize),
-      acyclicType(acyclicType) {
+      acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
+      blifFiles(blifFiles) {
   if (!unsatisfiable)
     setup();
 }
@@ -137,8 +137,8 @@ const std::map<unsigned int, double> ADD_SUB_DELAYS = {
 const std::map<unsigned int, double> COMPARATOR_DELAYS = {
     {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
 
-double getDelay(const std::map<unsigned int, double> &delayTable,
-                unsigned int bitwidth) {
+static double getDelay(const std::map<unsigned int, double> &delayTable,
+                       unsigned int bitwidth) {
   auto it = delayTable.lower_bound(bitwidth);
   if (it == delayTable.end() || it->first != bitwidth) {
     it = delayTable.upper_bound(bitwidth);
@@ -148,58 +148,45 @@ double getDelay(const std::map<unsigned int, double> &delayTable,
 
 void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   Operation *definingOp = channel.getDefiningOp();
-
-  if (!definingOp) {
-    return;
-  }
-
   std::map<unsigned int, double> delays;
-  std::string constName;
 
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
-  if (isa<handshake::AddIOp>(definingOp) ||
-      isa<handshake::SubIOp>(definingOp)) {
+  if (isa_and_present<handshake::AddIOp>(definingOp) ||
+      isa_and_present<handshake::SubIOp>(definingOp)) {
     delays = ADD_SUB_DELAYS;
-    constName = "add_sub_constraint_";
-  } else if (isa<handshake::CmpIOp>(definingOp)) {
+  } else if (isa_and_present<handshake::CmpIOp>(definingOp)) {
     delays = COMPARATOR_DELAYS;
-    constName = "blackbox_constraint_";
   } else {
     return;
   }
+
+  auto bitwidth =
+      handshake::getHandshakeTypeBitWidth(definingOp->getOperand(0).getType());
+
+  // Components are blackboxed only if their bitwidth is more than 4
+  if (bitwidth <= 4)
+    return;
+
+  double delay = getDelay(delays, bitwidth);
 
   for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 
-    // Skip mapping to blackboxes for operations with bitwidth <= 4.
-    // Components are blackboxed only if their bitwitdh is more than 5
-    unsigned int bitwidth =
-        handshake::getHandshakeTypeBitWidth(inputChannel.getType());
-    if (bitwidth <= 4) {
-      break;
-    }
-
-    ChannelVars &inputChannelVars = vars.channelVars[inputChannel];
-    ChannelVars &outputChannelVars = vars.channelVars[channel];
-
     // Path In variable of the channel that comes after blackbox module (output
     // of blackbox)
     GRBVar &outputPathIn =
-        outputChannelVars.signalVars[SignalType::DATA].path.tIn;
+        vars.channelVars[channel].signalVars[SignalType::DATA].path.tIn;
 
     // Path Out variable of the channel that comes before blackbox module (input
     // of blackbox)
     GRBVar &inputPathOut =
-        inputChannelVars.signalVars[SignalType::DATA].path.tOut;
+        vars.channelVars[inputChannel].signalVars[SignalType::DATA].path.tOut;
 
-    double delay = getDelay(delays, bitwidth);
-      model.addConstr(inputPathOut + delay == outputPathIn,
-                      constName + std::to_string(bitwidth));
     // Delay propagation constraint for blackbox nodes. Delay propagates through
     // input edges to output edges, increasing by delay variable.
     model.addConstr(inputPathOut + delay == outputPathIn,
-                    constName + std::to_string(bitwidth));
+                    "blackbox_constraint_" + std::to_string(bitwidth));
   }
   model.update();
 }
@@ -280,10 +267,9 @@ void MAPBUFBuffers::addCutSelectionConstraints(
 
 // Check if the path from leaf to root has already been computed, if so then
 // return it. If not, return the shortest path by running BFS.
-std::vector<experimental::Node *> getPath(experimental::Node *key,
-                                          experimental::Node *leaf,
-                                          pathMap &leafToRootPaths,
-                                          experimental::LogicNetwork *blif) {
+static std::vector<experimental::Node *>
+getPath(experimental::Node *key, experimental::Node *leaf,
+        pathMap &leafToRootPaths, experimental::LogicNetwork *blif) {
   // Check if this leaf/key pair is already computed
   auto leafKeyPair = std::make_pair(leaf, key);
   if (leafToRootPaths.find(leafKeyPair) != leafToRootPaths.end()) {
@@ -313,80 +299,15 @@ void MAPBUFBuffers::addCutSelectionConflicts(experimental::Node *root,
   path = getPath(root, leaf, leafToRootPaths, blifData);
   // Loop over edges in the path from the leaf to the root.
   for (auto &nodePath : path) {
-    if (nodePath->gurobiVars->bufferVar.has_value()) {
+    if (nodePath->value) {
       // Add the Cut Selection Conflict Constraints. An LUT cannot cover an edge
       // if it is cut by a buffer, as LUTs cannot cover multiple sequential
       // stages. This constraint ensures an edge is either covered by a LUT, or
       // a buffer is inserted on the edge.
-      model.addConstr(1 >= nodePath->gurobiVars->bufferVar.value() +
-                               cutSelectionVar,
+      model.addConstr(1 >= nodePath->gurobiVars->bufferVar + cutSelectionVar,
                       "cut_selection_conflict");
     }
   }
-}
-
-// This function constructs the Gurobi variable name of the channel (which was
-// set in the addChannelVars() function) based on the node name and variable
-// type given.
-std::ostringstream retrieveChannelName(const experimental::Node &node,
-                                       const std::string &variableType) {
-
-  std::string nodeName = node.str();
-  if (!node.isChannelEdge) {
-    return std::ostringstream{nodeName};
-  }
-
-  std::string variableTypeName;
-  if (variableType == "buffer")
-    variableTypeName = "BufPresent_";
-  else if (variableType == "pathIn")
-    variableTypeName = "PathIn_";
-  else if (variableType == "pathOut")
-    variableTypeName = "PathOut_";
-
-  std::stringstream ss(nodeName);
-  std::string token;
-  std::vector<std::string> result;
-
-  while (std::getline(ss, token, '_')) {
-    result.emplace_back(token);
-  }
-
-  const auto lastUnderscore = nodeName.find_last_of('_');
-  // Extracts the portion of the node name before the last underscore.
-  const auto nodeNameBeforeUnderScore = nodeName.substr(0, lastUnderscore);
-  // Extracts the portion of the node name after the last underscore.
-  const auto channelTypeName = nodeName.substr(lastUnderscore + 1);
-
-  std::ostringstream varNameStream;
-  // For valid and ready signals, add it to the beginning
-  if (result.back() == "valid" || result.back() == "ready") {
-    varNameStream << (result.back() == "valid" ? ("valid" + variableTypeName)
-                                               : ("ready" + variableTypeName))
-                  << nodeNameBeforeUnderScore;
-  } else {
-    // For data signals, remove after [, so it removes bit index
-    const auto lastBracket = nodeName.find_last_of('[');
-    const auto nodeNameBeforeBracket = nodeName.substr(0, lastBracket);
-    varNameStream << ("data" + variableTypeName) << nodeNameBeforeBracket;
-  }
-  return varNameStream;
-}
-
-// Checks if a variable with a specific name exists in the Gurobi model.
-std::optional<GRBVar> variableExists(GRBModel &model,
-                                     const std::string &varName) {
-  GRBVar *vars = model.getVars();
-  int numVars = model.get(GRB_IntAttr_NumVars);
-
-  // Loop through all variables and check their names
-  for (int i = 0; i < numVars; i++) {
-    if (vars[i].get(GRB_StringAttr_VarName).find(varName) !=
-        std::string::npos) {
-      return vars[i]; // Variable exists
-    }
-  }
-  return {}; // Variable does not exist
 }
 
 void MAPBUFBuffers::addCutLoopbackBuffers() {
@@ -525,74 +446,43 @@ void MAPBUFBuffers::findMinimumFeedbackArcSet() {
 }
 
 void MAPBUFBuffers::addClockPeriodConstraintsNodes() {
-  // Lambda function to retrieve and search for Gurobi variables.
-  auto retrieveAndSearchGRBVar =
-      [&](const experimental::Node &node,
-          const std::string &variableType) -> std::optional<GRBVar> {
-    std::string channelName = retrieveChannelName(node, variableType).str();
-    return variableExists(model, channelName);
-  };
-
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
-    experimental::MILPVarsSubjectGraph *vars = node->gurobiVars;
-    GRBVar &nodeVarIn = vars->tIn;
-    GRBVar &nodeVarOut = vars->tOut;
-    std::optional<GRBVar> &nodeBufVar = vars->bufferVar;
+    GRBVar &nodeVarIn = node->gurobiVars->tIn;
+    GRBVar &nodeVarOut = node->gurobiVars->tOut;
+    GRBVar &bufVarSignal = node->gurobiVars->bufferVar;
 
-    // If a Subject Graph Edge is also a DFG edge, then Gurobi variables for
-    // it was already created in addChannelVars(). Here, we retrieve those
-    // Gurobi variables by doing a search on the Gurobi variables. If found,
-    // we assign these Gurobi Variables to the nodeVarIn, nodeVarOut and
-    // nodeBufVar, which are member variables of Node Class.
-    if (node->isChannelEdge) {
-      std::optional<GRBVar> pathInVar =
-          retrieveAndSearchGRBVar(*node, "pathIn");
-      std::optional<GRBVar> pathOutVar =
-          retrieveAndSearchGRBVar(*node, "pathOut");
-      std::optional<GRBVar> bufferVar =
-          retrieveAndSearchGRBVar(*node, "buffer");
+    if (Value nodeChannel = node->value) {
+      std::string nodeName = node->str();
+      SignalType signalType =
+          nodeName.find("ready") != std::string::npos   ? SignalType::READY
+          : nodeName.find("valid") != std::string::npos ? SignalType::VALID
+                                                        : SignalType::DATA;
 
-      if (pathInVar.has_value() && pathOutVar.has_value() &&
-          bufferVar.has_value()) {
-        nodeVarIn = pathInVar.value();
-        nodeVarOut = pathOutVar.value();
-        nodeBufVar = bufferVar;
-        continue;
-      }
-    }
+      ChannelSignalVars &signalVars =
+          vars.channelVars[nodeChannel].signalVars[signalType];
 
-    // Create the timing variable for Subject Graph Node. If the node is a
-    // Primary Input, the delay is 0. Also, there is only one timing variable is
-    // needed for these Nodes, therefore nodeVarOut and nodeVarIn are the same.
-    nodeVarIn = model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
-    nodeVarOut = nodeVarIn;
-    if (node->isPrimaryInput()) {
-      model.addConstr(nodeVarIn == 0, "input_delay");
+      nodeVarIn = signalVars.path.tIn;
+      nodeVarOut = signalVars.path.tOut;
+      bufVarSignal = signalVars.bufPresent;
+
+      model.addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+      model.addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+      model.addConstr(nodeVarOut - nodeVarIn + bigConstant * bufVarSignal >= 0,
+                      "buf_delay");
     } else {
-      model.addConstr(nodeVarIn <= targetPeriod, "clock_period_constraint");
+      // Create the timing variable for Subject Graph Node. If the node is a
+      // Primary Input, the delay is 0. Also, there is only one timing variable
+      // is needed for these Nodes, therefore nodeVarOut and nodeVarIn are the
+      // same.
+      nodeVarIn =
+          model.addVar(0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, node->str());
+      nodeVarOut = nodeVarIn;
+      model.addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
+                      node->isPrimaryInput() ? "input_delay"
+                                             : "clock_period_constraint");
     }
-
-    model.update();
   }
-}
-
-void MAPBUFBuffers::addClockPeriodConstraintsChannels(Value channel,
-                                                      SignalType signal) {
-  // Retrieve Gurobi Variables associated with the channel
-  ChannelVars &channelVars = vars.channelVars[channel];
-  ChannelSignalVars &signalVars = channelVars.signalVars[signal];
-  GRBVar &bufVarSignal =
-      vars.channelVars[channel].signalVars[signal].bufPresent;
-  GRBVar &t1 = signalVars.path.tIn;
-  GRBVar &t2 = signalVars.path.tOut;
-
-  // Enforces clock period as upper bound of all timing variables
-  model.addConstr(t1 <= targetPeriod, "pathIn_period");
-  model.addConstr(t2 <= targetPeriod, "pathOut_period");
-  // Delay propagates from edge input to edge output if no buffer is inserted
-  // (bufVarSignal = 0), otherwise (bufVarSignal = 1), it becomes a redundant
-  // constraint since t2 is non-negative
-  model.addConstr(t2 - t1 + bigConstant * bufVarSignal >= 0, "buf_delay");
+  model.update();
 }
 
 void MAPBUFBuffers::addDelayAndCutConflictConstraints(
@@ -674,10 +564,6 @@ void MAPBUFBuffers::setup() {
         !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
       addBufferPresenceConstraints(channel);
       addBufferingGroupConstraints(channel, bufGroups);
-    }
-
-    for (SignalType signal : signals) {
-      addClockPeriodConstraintsChannels(channel, signal);
     }
   }
 
