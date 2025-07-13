@@ -269,7 +269,7 @@ InterfaceMethod<[{
     }], "FPUImpl", "getFPUImpl", (ins), [{
       Operation *op = $_op.getOperation();
       if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl")) {
-        return attr.value();
+        return attr.getValue();
       }
       return FPUImpl::FLOPOCO;
     }]>
