@@ -41,7 +41,9 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_FPU_MARKED="$COMP_DIR/handshake_fpu_marked.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HW="$COMP_DIR/hw.mlir"
@@ -165,6 +167,13 @@ exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
 
 
+echo_info "Testing mark FPU implementation."
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+  --handshake-mark-fpu-impl \
+  > "$F_HANDSHAKE_FPU_MARKED"
+exit_on_fail "Failed to mark FPU impl." "Marked FPU impl"
+
+
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
   BUFFER_PLACEMENT_PASS="credit-based-sharing"
@@ -173,12 +182,12 @@ else
   BUFFER_PLACEMENT_PASS="handshake-place-buffers"
 fi
 
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json" \
     > "$F_HANDSHAKE_BUFFERED"
@@ -202,7 +211,6 @@ else
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --$BUFFER_PLACEMENT_PASS="algorithm=$BUFFER_ALGORITHM frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json target-period=$TARGET_CP timeout=300 dump-logs" \
     > "$F_HANDSHAKE_BUFFERED"
