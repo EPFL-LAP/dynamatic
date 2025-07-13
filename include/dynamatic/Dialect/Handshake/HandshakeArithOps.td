@@ -56,14 +56,17 @@ class Handshake_Arith_FloatBinaryOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Arith_BinaryOp<mnemonic, traits # [
     IsFloatChannel<"lhs">,
     IsFloatChannel<"rhs">,
-    IsFloatChannel<"result">
+    IsFloatChannel<"result">,
+    FPUImplInterface
   ]> {}
 
 class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
-  Handshake_Arith_Op<mnemonic, traits # [SameOperandsAndResultType,
-                                         IsFloatChannel<"operand">,
-                                         IsFloatChannel<"result">]
-> {
+  Handshake_Arith_Op<mnemonic, traits # [
+    SameOperandsAndResultType,
+    IsFloatChannel<"operand">,
+    IsFloatChannel<"result">,
+    FPUImplInterface
+]> {
   let arguments = (ins ChannelType:$operand);
   let results = (outs ChannelType:$result);
 
@@ -190,7 +193,8 @@ def Handshake_CmpFPredicateAttr : I64EnumAttr<
 
 def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
   IsFloatChannel<"lhs">,
-  IsFloatChannel<"rhs">
+  IsFloatChannel<"rhs">,
+  FPUImplInterface
 ]> {
   let summary = "Floating-point comparison.";
  
