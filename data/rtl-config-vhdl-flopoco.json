@@ -11,6 +11,15 @@
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
+    ],
+    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/addf.vhd",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
     "name": "handshake.addi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
