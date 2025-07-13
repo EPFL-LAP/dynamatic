@@ -59,9 +59,9 @@ void BaseSubjectGraph::connectInputNodesHelper(
   auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
   Value channel;
 
-  if (moduleBeforeSubjectGraph->op != nullptr) 
+  if (moduleBeforeSubjectGraph->op != nullptr)
     channel = moduleBeforeSubjectGraph->op->getResult(resultNumber);
-  
+
   // Get the output nodes of the module before the current module, by retrieving
   // the result number.
   ChannelSignals &moduleBeforeOutputNodes =
@@ -221,18 +221,18 @@ void ArithSubjectGraph::processOutOfRuleNodes() {
 
   for (auto &node : blifData->getAllNodes()) {
     std::string nodeName = node->name;
-      if (nodeName.find("result") != std::string::npos &&
-          (node->isInput || node->isOutput)) {
-        assignSignals(resultNodes, node, nodeName);
-        node->name = uniqueName + "_" + nodeName;
-        setBlackboxBool(node);
-      } else if (nodeName.find(".") != std::string::npos ||
-                 nodeName.find("dataReg") !=
-                     std::string::npos) { // Nodes with "." and "dataReg"
-                                          // require unique naming to avoid
-                                          // naming conflicts
-        node->name = (uniqueName + "." + nodeName);
-      }
+    if (nodeName.find("result") != std::string::npos &&
+        (node->isInput || node->isOutput)) {
+      assignSignals(resultNodes, node, nodeName);
+      node->name = uniqueName + "_" + nodeName;
+      setBlackboxBool(node);
+    } else if (nodeName.find(".") != std::string::npos ||
+               nodeName.find("dataReg") !=
+                   std::string::npos) { // Nodes with "." and "dataReg"
+                                        // require unique naming to avoid
+                                        // naming conflicts
+      node->name = (uniqueName + "." + nodeName);
+    }
   }
 }
 
@@ -255,9 +255,8 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // "result" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"lhs", lhsNodes, false},
-      {"rhs", rhsNodes, false}};
+  std::vector<NodeProcessingRule> rules = {{"lhs", lhsNodes, false},
+                                           {"rhs", rhsNodes, false}};
 
   processNodesWithRules(rules);
 }
@@ -426,9 +425,8 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"index", indexNodes, false},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"index", indexNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -496,9 +494,8 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"index", indexNodes, true},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"index", indexNodes, true},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -531,11 +528,10 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  std::vector<NodeProcessingRule> rules = {
-      {"condition", conditionNodes, false},
-      {"data", inputNodes, false},
-      {"true", trueOut, true},
-      {"false", falseOut, true}};
+  std::vector<NodeProcessingRule> rules = {{"condition", conditionNodes, false},
+                                           {"data", inputNodes, false},
+                                           {"true", trueOut, true},
+                                           {"false", falseOut, true}};
 
   processNodesWithRules(rules);
 }
@@ -558,8 +554,7 @@ SourceSubjectGraph::SourceSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // Source module has no attributes
   loadBlifFile({});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -583,10 +578,9 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"addrIn", addrInSignals, false},
-      {"addrOut", addrOutSignals, true},
-      {"dataOut", dataOutSignals, true}};
+  std::vector<NodeProcessingRule> rules = {{"addrIn", addrInSignals, false},
+                                           {"addrOut", addrOutSignals, true},
+                                           {"dataOut", dataOutSignals, true}};
 
   processNodesWithRules(rules);
 }
@@ -613,10 +607,9 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"dataIn", dataInSignals, false},
-      {"addrIn", addrInSignals, false},
-      {"addrOut", addrOutSignals, true}};
+  std::vector<NodeProcessingRule> rules = {{"dataIn", dataInSignals, false},
+                                           {"addrIn", addrInSignals, false},
+                                           {"addrOut", addrOutSignals, true}};
 
   processNodesWithRules(rules);
 }
@@ -643,9 +636,8 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 
   loadBlifFile({dataWidth});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ctrl", controlSignals, false},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"ctrl", controlSignals, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -675,9 +667,8 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 
   loadBlifFile({inputWidth, outputWidth});
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -762,8 +753,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
   // "ins" case does not obey the rules
   processOutOfRuleNodes();
 
-  std::vector<NodeProcessingRule> rules = {
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -793,9 +783,8 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
     loadBlifFile({dataWidth});
   }
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
@@ -834,9 +823,8 @@ void BufferSubjectGraph::initBuffer() {
   experimental::BlifParser parser;
   blifData = parser.parseBlifFile(fullPath);
 
-  std::vector<NodeProcessingRule> rules = {
-      {"ins", inputNodes, false},
-      {"outs", outputNodes, true}};
+  std::vector<NodeProcessingRule> rules = {{"ins", inputNodes, false},
+                                           {"outs", outputNodes, true}};
 
   processNodesWithRules(rules);
 }
