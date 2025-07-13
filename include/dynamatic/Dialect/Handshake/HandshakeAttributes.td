@@ -450,6 +450,6 @@ def MyEnum : I32EnumAttr<"MyEnum", "", [
   let genSpecializedAttr = 0;
 }
 // Define the AttrDef
-def MyEnum : EnumAttr<MyDialect, MyEnum, "my_enum">;
+def MyEnum : EnumAttr<Handshake_Dialect, MyEnum, "my_enum">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
