@@ -3,8 +3,8 @@
     "name": "handshake.addf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string" },
-      { "name": "FPU_IMPL", "type": "string", "generic": false}
+      { "name": "INTERNAL_DELAY", "type": "string", "generic": false},
+      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO", "generic": false}
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
     "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
