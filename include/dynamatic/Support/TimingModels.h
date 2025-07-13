@@ -317,7 +317,9 @@ private:
   MLIRContext *ctx;
 
   /// Maps operation names to their timing model.
-  DenseMap<std::string, TimingModel> models;
+  DenseMap<StringRef, TimingModel> models;
+
+  llvm::StringSet<> ownedNames;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's
