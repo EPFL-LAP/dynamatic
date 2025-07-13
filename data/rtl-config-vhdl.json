@@ -3,7 +3,7 @@
     "name": "handshake.addf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string" },
+      { "name": "INTERNAL_DELAY", "type": "string", "eq": "FLOPOCO"},
       { "name": "FPU_IMPL", "type": "string"}
     ],
     "generator": "echo $FPU_IMPL",
