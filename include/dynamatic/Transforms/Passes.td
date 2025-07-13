@@ -277,6 +277,21 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">];
 }
 
+
+def HandshakeMarkFPUImpl : DynamaticPass<"mark-fpu-impl"> {
+  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+  let description = [{
+    This pass takes a single floating point unit 'vendor' as input and
+    marks every floating point arithmetic operation. This is later used
+    to decide how to generate the RTL of these units.
+    Defaults to vivado
+  }];
+  let options =
+ Option<"impl", "impl", "::dynamatic::handshake::FPUImpl",
+  "::dynamatic::handshake::FPUImpl::VIVADO",
+  "Which FPU impl to use (FLOPOCO, VIVADO)">;
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
