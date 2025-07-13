@@ -1423,15 +1423,15 @@ ConvertBuffer::matchAndRewrite(handshake::BufferOp bufOp, OpAdaptor adaptor,
   uint64_t depth = bufOp.getNumSlots();
 
   switch (bufferOp.getBufferType()) {
-    case BufferType::ONE_SLOT_BREAK_DV:
-    case BufferType::ONE_SLOT_BREAK_DVR:
-    case BufferType::ONE_SLOT_BREAK_R:
-    case BufferType::FIFO_BREAK_DV:
-    case BufferType::FIFO_BREAK_NONE:
-      break;
-    case BufferType::SHIFT_REG_BREAK_DV:
-      bufOp.emitError() << "unknown buffer";
-      return failure();
+  case BufferType::ONE_SLOT_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+  case BufferType::ONE_SLOT_BREAK_R:
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::FIFO_BREAK_NONE:
+    break;
+  case BufferType::SHIFT_REG_BREAK_DV:
+    bufOp.emitError() << "unknown buffer";
+    return failure();
   }
 
   auto newFifoConfig =
