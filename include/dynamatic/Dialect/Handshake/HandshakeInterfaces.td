@@ -257,25 +257,19 @@ def FPUImplInterface : OpInterface<"FPUImplInterface"> {
 
   let methods = [
     InterfaceMethod<[{
-      Sets the FPU Impl. as a string attr named "fpu_impl".
+      Sets the FPU Impl. as a FPUImplAttr attr named "fpu_impl".
     }], "void", "setFPUImpl", (ins "FPUImpl":$value), [{
       Operation *op = $_op.getOperation();
       op->setAttr("fpu_impl",
-                  StringAttr::get(op->getContext(), stringifyEnum(value)));
+                  FPUImplAttr::get(op->getContext(), value));
     }]>,
 
 InterfaceMethod<[{
       Gets the FPU impl. as a FPUImpl named "fpu_impl". Defaults to "FLOPOCO" if not set.
     }], "FPUImpl", "getFPUImpl", (ins), [{
       Operation *op = $_op.getOperation();
-      if (auto attr = op->getAttrOfType<StringAttr>("fpu_impl")) {
-        auto impl = symbolizeFPUImpl(attr.getValue());
-        if (!impl) {
-          op->emitOpError("Unrecognized FPU implementation: ")
-              << attr.getValue();
-          return FPUImpl::FLOPOCO;
-        }
-        return *impl;
+      if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl")) {
+        return attr.value();
       }
       return FPUImpl::FLOPOCO;
     }]>

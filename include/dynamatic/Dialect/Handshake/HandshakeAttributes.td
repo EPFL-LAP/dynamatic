@@ -426,6 +426,23 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 
 
 //===----------------------------------------------------------------------===//
+// Symbolic Enum Base
+//===----------------------------------------------------------------------===//
+
+class SymbolicEnumAttrBase<string enumName> {
+  string parameterPrinter = "$_printer << ::dynamatic::handshake::stringify" # enumName # "($_self)";
+  string parameterParser = [{
+    ::llvm::StringRef keyword;
+    if (::mlir::failed($_parser.parseKeyword(&keyword)))
+      return {};
+    auto val = ::dynamatic::handshake::symbolize} # enumName # R"((keyword);
+    if (!val)
+      return {};
+    return val.value();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
@@ -437,6 +454,8 @@ def Handshake_FPUImplAttr : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1, "vivado">,
     ]> {
   let cppNamespace = "::dynamatic::handshake";
+  let parameterPrinter = SymbolicEnumAttrBase<"FPUImpl">.parameterPrinter;
+  let parameterParser = SymbolicEnumAttrBase<"FPUImpl">.parameterParser;
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
