@@ -3,20 +3,10 @@
     "name": "handshake.addf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string" },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      { "name": "INTERNAL_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
     "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.addf",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/addf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -45,26 +35,9 @@
         "data-lb": 1,
         "extra-eq": 0,
         "generic": true
-      },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/flopoco/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
-    "dependencies": ["join", "flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.cmpf",
-    "parameters": [
-      { "name": "PREDICATE", "type": "string" },
-      {
-        "name": "DATA_TYPE",
-        "type": "dataflow",
-        "data-lb": 1,
-        "extra-eq": 0,
-        "generic": true
-      },
-      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
-    ],
-    "generator": "\"$DYNAMATIC/bin/generators/rtl-cmpf-generator\" \"$DYNAMATIC/data/vhdl/arith/vivado/cmpf.vhd\" \"$OUTPUT_DIR/$MODULE_NAME.vhd\" $MODULE_NAME $PREDICATE",
     "dependencies": ["join", "flopoco_ip_cores"]
   },
   {
@@ -86,20 +59,10 @@
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string" },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      { "name": "INTERNAL_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/divf.vhd",
     "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.divf",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/divf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -154,20 +117,10 @@
     "name": "handshake.mulf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "INTERNAL_DELAY", "type": "string" },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      { "name": "INTERNAL_DELAY", "type": "string" }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/mulf.vhd",
     "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.mulf",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/mulf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
@@ -228,20 +181,9 @@
   {
     "name": "handshake.subf",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/subf.vhd",
-    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
-  },
-  {
-    "name": "handshake.subf",
-    "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
-      { "name": "FPU_IMPL", "type": "string", "eq": "VIVADO"}
-
-    ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/vivado/subf.vhd",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
   {
