@@ -48,8 +48,9 @@ void HandshakeMarkFPUImplPass::runDynamaticPass() {
   auto implOpt = symbolizeFPUImpl(this->impl);
 
   if(!implOpt){
-    emitError(UnknownLoc::get(&getContext()))
-      << "Invalid FPU implementation: expected one of FLOPOCO or VIVADO, but got '" << this->impl << "'";
+    llvm::errs()
+      << "Invalid FPU implementation: expected one of FLOPOCO or VIVADO, but got '"
+      this->impl << "'";
     signalPassFailure();
     return;
   }
