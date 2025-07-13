@@ -454,7 +454,7 @@ def Handshake_FPUImplAttr : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1, "vivado">,
     ]> {
   let cppNamespace = "::dynamatic::handshake";
-  let useDefaultAttributePrinterParser = 0;
+  let genSpecializedAttr = 1;
   let parameterPrinter = SymbolicEnumAttrBase<"FPUImpl">.parameterPrinter;
   let parameterParser = SymbolicEnumAttrBase<"FPUImpl">.parameterParser;
 }
