@@ -440,6 +440,4 @@ def Handshake_FPUImplAttr : I64EnumAttr<
   let genSpecializedAttr = 0;
 }
 
-// def OuterFPUImplAttr : EnumAttr<Handshake_Dialect, Handshake_FPUImplAttr, "FPUImpl">;
-
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
