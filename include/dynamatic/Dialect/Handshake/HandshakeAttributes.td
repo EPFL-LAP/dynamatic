@@ -431,8 +431,6 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-
-
 def FPUImplEnum : I64EnumAttr<
     "FPUImpl", "",
     [
@@ -442,8 +440,20 @@ def FPUImplEnum : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
+
+
+def FPUImplEnum2 : I64EnumAttr<
+    "FPUImpl2", "",
+    [
+      I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
+      I64EnumAttrCase<"VIVADO", 1, "vivado">
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
+}
+
 def MyAttr : AttrDef<Handshake_Dialect, "FPUImplWrapper", []> {
-  let parameters = (ins FPUImplEnum:$value);
+  let parameters = (ins FPUImplEnum2:$value);
   let assemblyFormat = "`<` $value `>`";
   let mnemonic = "fpu_impl";
 }
