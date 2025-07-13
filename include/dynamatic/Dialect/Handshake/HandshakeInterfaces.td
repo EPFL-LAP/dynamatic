@@ -271,7 +271,7 @@ InterfaceMethod<[{
       if (auto attr = op->getAttrOfType<StringAttr>("fpu_impl")) {
         auto impl = symbolizeFPUImpl(attr.getValue());
         if (!impl) {
-          (void)op->emitOpError("Unrecognized FPU implementation: ")
+          op->emitOpError("Unrecognized FPU implementation: ")
               << attr.getValue();
           return FPUImpl::FLOPOCO;
         }
