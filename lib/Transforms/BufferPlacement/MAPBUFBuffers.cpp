@@ -28,7 +28,6 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include <boost/functional/hash/extensions.hpp>
-#include <omp.h>
 #include <string>
 #include <unordered_map>
 
@@ -132,6 +131,21 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
   setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 }
 
+const std::map<unsigned int, double> ADD_SUB_DELAYS = {
+    {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.6}, {16, 0.7}, {32, 1.0}};
+
+const std::map<unsigned int, double> COMPARATOR_DELAYS = {
+    {1, 0.587}, {2, 0.587}, {4, 0.993}, {8, 0.8}, {16, 1.0}, {32, 1.2}};
+
+double getDelay(const std::map<unsigned int, double> &delayTable,
+                unsigned int bitwidth) {
+  auto it = delayTable.lower_bound(bitwidth);
+  if (it == delayTable.end() || it->first != bitwidth) {
+    it = delayTable.upper_bound(bitwidth);
+  }
+  return it != delayTable.end() ? it->second : 0.0;
+}
+
 void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
   Operation *definingOp = channel.getDefiningOp();
 
@@ -139,13 +153,16 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     return;
   }
 
+  std::map<unsigned int, double> delays;
   std::string constName;
 
   // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
   if (isa<handshake::AddIOp>(definingOp) ||
       isa<handshake::SubIOp>(definingOp)) {
+    delays = ADD_SUB_DELAYS;
     constName = "add_sub_constraint_";
   } else if (isa<handshake::CmpIOp>(definingOp)) {
+    delays = COMPARATOR_DELAYS;
     constName = "blackbox_constraint_";
   } else {
     return;
@@ -155,7 +172,8 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     // Looping over the input channels of the blackbox operation
     Value inputChannel = definingOp->getOperand(i);
 
-    // Components are blackboxed only if their bitwitdh is more than 4
+    // Skip mapping to blackboxes for operations with bitwidth <= 4.
+    // Components are blackboxed only if their bitwitdh is more than 5
     unsigned int bitwidth =
         handshake::getHandshakeTypeBitWidth(inputChannel.getType());
     if (bitwidth <= 4) {
@@ -175,10 +193,9 @@ void MAPBUFBuffers::addBlackboxConstraints(Value channel) {
     GRBVar &inputPathOut =
         inputChannelVars.signalVars[SignalType::DATA].path.tOut;
 
-    double delay;
-
-    timingDB.getTotalDelay(definingOp, SignalType::DATA, delay);
-
+    double delay = getDelay(delays, bitwidth);
+      model.addConstr(inputPathOut + delay == outputPathIn,
+                      constName + std::to_string(bitwidth));
     // Delay propagation constraint for blackbox nodes. Delay propagates through
     // input edges to output edges, increasing by delay variable.
     model.addConstr(inputPathOut + delay == outputPathIn,

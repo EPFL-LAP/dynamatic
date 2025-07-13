@@ -136,6 +136,8 @@ private:
   ChannelSignals rhsNodes;
   ChannelSignals resultNodes;
 
+  void processOutOfRuleNodes();
+
 public:
   ArithSubjectGraph(Operation *op);
   void connectInputNodes() override;
