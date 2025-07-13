@@ -438,6 +438,6 @@ def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
 }
-def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "FPLImpl">;
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "fpu_impl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
