@@ -698,8 +698,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
 
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
-    auto delayAttr = fpuImplInterface.getFPUImpl();
-    addString("FPU_IMPL", stringifyEnum(delayAttr));
+    auto impl = fpuImplInterface.getFPUImpl();
+    addString("FPU_IMPL", stringifyEnum(impl));
   }
 }
 
