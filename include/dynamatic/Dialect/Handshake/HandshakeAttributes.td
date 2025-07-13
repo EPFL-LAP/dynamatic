@@ -429,7 +429,7 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-def Handshake_FPUImplAttr : I64EnumAttr<
+def InnerFPUImplAttr : I64EnumAttr<
     "FPUImpl", "",
     [
       I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
@@ -440,6 +440,6 @@ def Handshake_FPUImplAttr : I64EnumAttr<
   let genSpecializedAttr = 0;
 }
 
-def Handshake_FPUImplAttr : EnumAttr<Handshake_Dialect, Handshake_FPUImplAttr, "FPUImpl">;
+def Handshake_FPUImplAttr : EnumAttr<Handshake_Dialect, InnerFPUImplAttr, "FPUImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
