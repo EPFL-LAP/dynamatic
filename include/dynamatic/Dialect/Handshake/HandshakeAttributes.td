@@ -426,29 +426,6 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 
 
 //===----------------------------------------------------------------------===//
-// Symbolic Enum Base
-//===----------------------------------------------------------------------===//
-
-
-// Base class for symbolic enums
-class SymbolicEnumAttrBase<string name, string description,
-                           list<I64EnumAttrCase> cases>
-  : EnumAttr<name, description, i64, cases> {
-  let cppNamespace = "::dynamatic::handshake";
-  let genSpecializedAttr = 1;
-  let useDefaultAttributePrinterParser = 0;
-}
-
-// Your enum definition
-def Handshake_FPUImpl2Attr : SymbolicEnumAttrBase<
-  "FPUImpl", "",
-  [
-    I64EnumAttrCase<"FLOPOCO2", 0, "flopoco">,
-    I64EnumAttrCase<"VIVADO2", 1, "vivado">
-  ]
->;
-
-//===----------------------------------------------------------------------===//
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
@@ -460,6 +437,9 @@ def Handshake_FPUImplAttr : I64EnumAttr<
       I64EnumAttrCase<"VIVADO", 1, "vivado">,
     ]> {
   let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
 }
+
+def Handshake_FPUImplAttr : EnumAttr<Handshake, Handshake_FPUImplAttr, "FPUImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
