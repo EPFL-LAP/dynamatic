@@ -433,7 +433,7 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // Base class for symbolic enums
 class SymbolicEnumAttrBase<string name, string description,
                            list<I64EnumAttrCase> cases>
-  : EnumAttr<name, description, string, cases> {
+  : EnumAttr<name, description, "StringRef", cases> {
   let cppNamespace = "::dynamatic::handshake";
   let genSpecializedAttr = 1;
   let useDefaultAttributePrinterParser = 0;
