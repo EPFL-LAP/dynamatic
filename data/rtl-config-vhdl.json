@@ -4,9 +4,21 @@
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
       { "name": "INTERNAL_DELAY", "type": "string" },
-      { "name": "FPU_IMPL", "type": "string", "eq": "FLOPOCO"}
+      { "name": "FPU_IMPL", "type": "string"}
     ],
-    "generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
+    "generator": "echo $FPU_IMPL",
+    "_generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
+    "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
+    "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
+  },
+  {
+    "name": "handshake.addf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "INTERNAL_DELAY", "type": "string" }
+    ],
+    "generator": "echo no fpu",
+    "_generic": "$DYNAMATIC/data/vhdl/arith/flopoco/addf.vhd",
     "arch-name" : "arch_$DATA_TYPE_$INTERNAL_DELAY",
     "dependencies": ["join", "delay_buffer", "oehb", "flopoco_ip_cores"]
   },
