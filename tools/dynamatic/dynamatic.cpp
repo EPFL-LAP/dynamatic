@@ -514,6 +514,12 @@ CommandResult Help::execute(CommandArguments &args) {
 }
 
 CommandResult SetDynamaticPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+  
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string dynamaticPath = args.positionals.front().str();
@@ -539,6 +545,12 @@ CommandResult SetDynamaticPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetPolygeistPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string polygeistPath = args.positionals.front().str();
@@ -565,6 +577,12 @@ CommandResult SetPolygeistPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetVivadoPath::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid path.\n";
+    return CommandResult::FAIL;
+  }
+
   // Remove the separator at the end of the path if there is one
   StringRef sep = sys::path::get_separator();
   std::string vivadoPath = args.positionals.front().str();
@@ -585,6 +603,12 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 }
 
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
+  // Verify if user entered no input
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n";
+    return CommandResult::FAIL;
+  }
+  
   StringRef generator = args.positionals.front();
   if (generator == "flopoco" || generator == "vivado") {
     state.fpUnitsGenerator = generator.str();
@@ -596,6 +620,12 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
 }
 
 CommandResult SetSrc::execute(CommandArguments &args) {
+  // Verify if source is empty
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Kindly enter a non-empty source\n";
+    return CommandResult::FAIL;
+  }
+
   std::string sourcePath = args.positionals.front().str();
   StringRef srcName = path::filename(sourcePath);
   if (!srcName.ends_with(".c")) {
@@ -611,6 +641,12 @@ CommandResult SetSrc::execute(CommandArguments &args) {
 
 CommandResult SetCP::execute(CommandArguments &args) {
   // Parse the float argument and check if the argument is legal.
+  // Verify is argument is empty
+  if (args.positionals.empty()){
+    llvm::outs() << ERR << "Specified Clock Period is illegal.\n";
+    return CommandResult::FAIL;
+  }
+              
   if (llvm::to_float(args.positionals.front().str(), state.targetCP))
     return CommandResult::SUCCESS;
   llvm::outs() << ERR << "Specified CP = " << args.positionals.front().str()
@@ -868,3 +904,4 @@ int main(int argc, char **argv) {
   }
   return 0;
 }
+
