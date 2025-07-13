@@ -695,6 +695,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
     auto delayAttr = internalDelayInterface.getInternalDelay();
     addParam("INTERNAL_DELAY", delayAttr);
   }
+
+  if (auto fpuImplInterface =
+          llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
+    auto delayAttr = fpuImplInterface.getFPUImpl();
+    addString("FPU_IMPL", stringifyEnum(delayAttr));
+  }
 }
 
 ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {

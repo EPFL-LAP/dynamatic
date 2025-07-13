@@ -247,4 +247,34 @@ def InternalDelayInterface : OpInterface<"InternalDelayInterface"> {
   ];
 }
 
+
+def FPUImplInterface : OpInterface<"FPUImplInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Specifies which "vendor" of floating point units
+     to use
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Sets the FPU Impl. as a FPUImpl named "fpu_impl".
+    }], "void", "setFPUImpl", (ins "FPUImpl":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("fpu_impl",
+                   FPUImplAttr::get(op->getContext(), value));
+    }]>,
+
+    // Return StringAttr instead of StringRef to ensure proper memory allocation.
+    // Using StringRef would result in the default value "0.0" becoming a dangling pointer.
+    InterfaceMethod<[{
+      Gets the FPU impl. as a FPUImpl named "internal_delay". Defaults to "0.0" if not set.
+    }], "FPUImpl", "getFPUImpl", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl"))
+        return attr.getValue();
+      return FPUImpl::FLOPOCO;
+    }]>
+  ];
+}
+
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES
