@@ -431,25 +431,13 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-def FPUImplEnum : I64EnumAttr<
-    "FPUImpl", "",
-    [
-      I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
-      I64EnumAttrCase<"VIVADO", 1, "vivado">
-    ]> {
-  let cppNamespace = "::dynamatic::handshake";
-}
-
-
-// After (pick an integer enum of your choice)
-def FPUImplEnum2 : I64EnumAttr<"FPUImpl2", "", [
+def FPUImplEnum : I64EnumAttr<"FPUImpl", "", [
   I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
   I64EnumAttrCase<"VIVADO", 1, "vivado">
 ]> {
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
 }
-// Define the AttrDef
-def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum2, "my_enum">;
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "FPLImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD

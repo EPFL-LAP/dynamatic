@@ -45,7 +45,7 @@ public:
 } // namespace
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
-  auto implOpt = symbolizeFPUImpl2(this->impl);
+  auto implOpt = symbolizeFPUImpl(this->impl);
 
   if(!implOpt){
     llvm::errs()

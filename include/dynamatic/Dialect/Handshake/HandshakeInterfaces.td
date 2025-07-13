@@ -258,20 +258,20 @@ def FPUImplInterface : OpInterface<"FPUImplInterface"> {
   let methods = [
     InterfaceMethod<[{
       Sets the FPU Impl. as a FPUImplAttr attr named "fpu_impl".
-    }], "void", "setFPUImpl", (ins "FPUImpl2":$value), [{
+    }], "void", "setFPUImpl", (ins "FPUImpl":$value), [{
       Operation *op = $_op.getOperation();
       op->setAttr("fpu_impl",
-                  FPUImpl2Attr::get(op->getContext(), value));
+                  FPUImplAttr::get(op->getContext(), value));
     }]>,
 
 InterfaceMethod<[{
       Gets the FPU impl. as a FPUImpl named "fpu_impl". Defaults to "FLOPOCO" if not set.
-    }], "FPUImpl2", "getFPUImpl", (ins), [{
+    }], "FPUImpl", "getFPUImpl", (ins), [{
       Operation *op = $_op.getOperation();
-      if (auto attr = op->getAttrOfType<FPUImpl2Attr>("fpu_impl")) {
+      if (auto attr = op->getAttrOfType<FPUImplAttr>("fpu_impl")) {
         return attr.getValue();
       }
-      return FPUImpl2::FLOPOCO;
+      return FPUImpl::FLOPOCO;
     }]>
   ];
 }
