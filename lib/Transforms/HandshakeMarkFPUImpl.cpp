@@ -28,7 +28,7 @@ namespace dynamatic {
 
 namespace {
 
-struct HandshakeMarkFPUImplPass:
+struct HandshakeMarkFPUImplPass
     : public dynamatic::impl::HandshakeMarkFPUImplBase<HandshakeMarkFPUImplPass> {
 public:
     using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
