@@ -294,7 +294,6 @@ def Handshake_BufferTypeAttr : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
-
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
   let summary = "Buffering properties of a single channel";
   let description = [{
