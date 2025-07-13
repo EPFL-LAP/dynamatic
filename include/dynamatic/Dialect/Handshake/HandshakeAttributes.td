@@ -442,7 +442,7 @@ def FPUImplEnum : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
-def MyAttr : AttrDef<Handshake_Dialect, "FPUImpl", []> {
+def MyAttr : AttrDef<Handshake_Dialect, "FPUImplWrapper", []> {
   let parameters = (ins FPUImplEnum:$value);
   let assemblyFormat = "`<` $value `>`";
   let mnemonic = "fpu_impl";
