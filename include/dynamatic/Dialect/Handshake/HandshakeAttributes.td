@@ -429,14 +429,18 @@ def LSQDepthAttr : Handshake_Attr<"LSQDepth", "lsqDepth"> {
 // FPU Implementation
 //===----------------------------------------------------------------------===//
 
-def Handshake_FPUImplAttr : I64EnumAttr<
+// 1. Define the enum cases
+def FPUImplEnum : I64EnumAttr<
     "FPUImpl", "",
     [
       I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
-
-      I64EnumAttrCase<"VIVADO", 1, "vivado">,
+      I64EnumAttrCase<"VIVADO", 1, "vivado">
     ]> {
   let cppNamespace = "::dynamatic::handshake";
+  let genSpecializedAttr = 0;
 }
+
+// 2. Define the attribute type that wraps the enum
+def FPUImplAttr : EnumAttr<Handshake_Dialect, FPUImplEnum, "FPUImpl">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
