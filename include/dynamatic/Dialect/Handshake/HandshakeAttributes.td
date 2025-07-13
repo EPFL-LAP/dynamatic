@@ -442,14 +442,14 @@ def FPUImplEnum : I64EnumAttr<
 
 
 // After (pick an integer enum of your choice)
-def MyEnum : I32EnumAttr<"MyEnum", "", [
-  I32EnumAttrCase<"A", 0>,
-  I32EnumAttrCase<"B", 1>
+def FPUImplEnum2 : I64EnumAttr<"FPUImpl2", "", [
+  I64EnumAttrCase<"FLOPOCO", 0>,
+  I64EnumAttrCase<"VIVADO", 1>
 ]> {
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
 }
 // Define the AttrDef
-def MyEnumAttr : EnumAttr<Handshake_Dialect, MyEnum, "my_enum">;
+def FPUImplEnumAttr : EnumAttr<Handshake_Dialect, FPUImplEnum2, "my_enum">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
