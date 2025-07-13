@@ -7,6 +7,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   CostAwareBuffers.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
+  MAPBUFBuffers.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
