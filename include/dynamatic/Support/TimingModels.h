@@ -275,7 +275,7 @@ public:
 
   /// Returns the timing model corresponding to the operation whose name is
   /// passed as argument, if any exists.
-  const TimingModel *getModel(OperationName opName) const;
+  const TimingModel *getModel(StringRef opName) const;
 
   /// Returns the timing model corresponding to the operation, if any exists.
   const TimingModel *getModel(Operation *op) const;
