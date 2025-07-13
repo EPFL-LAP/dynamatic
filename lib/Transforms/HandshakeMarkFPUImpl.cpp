@@ -46,7 +46,6 @@ public:
 
 void HandshakeMarkFPUImplPass::runDynamaticPass() {
   getOperation()->walk([&](FPUImplInterface fpuImplInterface) {
-    fpuImplInterface.emitOpError("some message");
     fpuImplInterface.setFPUImpl(this->impl);
   });
 }
