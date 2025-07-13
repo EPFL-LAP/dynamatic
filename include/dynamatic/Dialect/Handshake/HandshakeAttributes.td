@@ -441,22 +441,15 @@ def FPUImplEnum : I64EnumAttr<
 }
 
 
-
-def FPUImplEnum2 : I64EnumAttr<
-    "FPUImpl2", "",
-    [
-      I64EnumAttrCase<"FLOPOCO", 0, "flopoco">,
-      I64EnumAttrCase<"VIVADO", 1, "vivado">
-    ]> {
-  let cppNamespace = "::dynamatic::handshake";
+// After (pick an integer enum of your choice)
+def MyEnum : I32EnumAttr<"MyEnum", "", [
+  I32EnumAttrCase<"A", 0>,
+  I32EnumAttrCase<"B", 1>
+]> {
+  // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
 }
-
-def MyAttr : AttrDef<Handshake_Dialect, "FPUImplWrapper", []> {
-  let parameters = (ins FPUImplEnum2:$value);
-  let assemblyFormat = "`<` $value `>`";
-  let mnemonic = "fpu_impl";
-}
-
+// Define the AttrDef
+def MyEnum : EnumAttr<MyDialect, MyEnum, "my_enum">;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ATTRIBUTES_TD
