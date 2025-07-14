@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import argparse
+import json
 from pathlib import Path
 
 DYNAMATIC_ROOT = Path(__file__).parent.parent.parent.parent
@@ -284,7 +285,7 @@ def run_test(c_file, n, variable):
         result = subprocess.run([
             DYNAMATIC_OPT_BIN, handshake_speculation,
             "--handshake-set-buffering-properties=version=fpga20",
-            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=8.000 timeout=300 dump-logs"
+            f"--handshake-place-buffers=algorithm=fpga20 frequencies={frequencies} timing-models={timing_model} target-period=20.000 timeout=300 dump-logs"
         ],
             stdout=f,
             stderr=sys.stdout
@@ -311,31 +312,31 @@ def run_test(c_file, n, variable):
         else:
             return fail(id, "Failed to canonicalize Handshake")
 
-    # buffer_json = os.path.join(c_file_dir, "buffer_v2.json")
+    # buffer_json = os.path.join(c_file_dir, "bufferv2.json")
     handshake_export = os.path.join(comp_out_dir, "handshake_export.mlir")
     shutil.copy(handshake_canonicalized, handshake_export)
     # with open(buffer_json, "r") as f:
-    #   buffers = json.load(f)
-    #   buffer_pass_args = []
-    #   for buffer in buffers:
-    #     buffer_pass_args.append(
-    #         "--handshake-placebuffers-custom=" +
-    #         f"pred={buffer['pred']} " +
-    #         f"outid={buffer['outid']} " +
-    #         f"slots={buffer['slots']} " +
-    #         f"type={buffer['type']}")
-    #   with open(handshake_export, "w") as f:
-    #     result = subprocess.run([
-    #         DYNAMATIC_OPT_BIN, handshake_speculation,
-    #         *buffer_pass_args
-    #     ],
-    #         stdout=f,
-    #         stderr=sys.stdout
-    #     )
-    #     if result.returncode == 0:
-    #       print("Exported Handshake")
-    #     else:
-    #       return fail(id, "Failed to export Handshake")
+    #     buffers = json.load(f)
+    #     buffer_pass_args = []
+    #     for buffer in buffers:
+    #         buffer_pass_args.append(
+    #             "--handshake-placebuffers-custom=" +
+    #             f"pred={buffer['pred']} " +
+    #             f"outid={buffer['outid']} " +
+    #             f"slots={buffer['slots']} " +
+    #             f"type={buffer['type']}")
+    #     with open(handshake_export, "w") as f:
+    #         result = subprocess.run([
+    #             DYNAMATIC_OPT_BIN, handshake_canonicalized,
+    #             *buffer_pass_args
+    #         ],
+    #             stdout=f,
+    #             stderr=sys.stdout
+    #         )
+    #         if result.returncode == 0:
+    #             print("Exported Handshake")
+    #         else:
+    #             return fail(id, "Failed to export Handshake")
 
     # Export dot file
     dot = os.path.join(comp_out_dir, f"{kernel_name}.dot")
@@ -432,7 +433,7 @@ def main():
         "--n", type=int, default=3,
         help="Number of iterations to speculate")
     parser.add_argument(
-        "--variable", type=bool, default=False,
+        "--variable", action='store_true',
         help="Run variable speculation")
 
     args = parser.parse_args()
