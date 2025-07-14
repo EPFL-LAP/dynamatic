@@ -605,7 +605,8 @@ CommandResult SetVivadoPath::execute(CommandArguments &args) {
 CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
   // Verify if user entered no input
   if (args.positionals.empty()){
-    llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n";
+    llvm::outs() << ERR << "Kindly enter a valid FP unit generator.\n"
+                << "Options: flopoco, vivado\n";
     return CommandResult::FAIL;
   }
   
