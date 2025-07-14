@@ -27,7 +27,7 @@ Dynamatic uses
 Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), cmake and ninja for building the project, Python (3.6 or newer), a recent JDK (Java Development Kit) for Scala, GraphViz to work with .dot files, and standard command-line tools like git.
 
 On `apt`-based Linux distributions:
-```
+```sh
 apt-get update
 apt-get install clang lld ccache cmake ninja-build python3 openjdk-21-jdk graphviz git curl gzip libreadline-dev
 ```
@@ -36,7 +36,7 @@ Note that you may need super user privileges for any package installation. You c
 `clang`, `lld`, and `ccache` are not strictly required but significantly speed up (re)builds. If you do not wish to install them, call the build script with the --disable-build-opt flag to prevent their usage.
 
 Dynamatic uses RTL generators written in Chisel (a hardware construction language embedded in the high-level programming language Scala) to produce synthesizable RTL designs. You can install Scala using the recommended way with the following command:
-```
+```sh
 curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
 ```
 
@@ -51,7 +51,7 @@ Before moving on to the next step, refresh your environment variables in your cu
 
 **2. Cloning the Project and Its Submodules**  
 Dynamatic depends on a fork of [Polygeist](https://github.com/EPFL-LAP/Polygeist) (C/C++ frontend for MLIR), which itself depends on [LLVM/MLIR](https://github.com/llvm/llvm-project). You need to clone with the SSH link to be able to push to the repository.
-```
+```sh
 # Either clone with SSH... (required for pushing to the repository)
 git clone --recurse-submodules git@github.com:EPFL-LAP/dynamatic.git
 # ...or HTTPS (if you only ever intend to pull from the repository)
@@ -61,7 +61,7 @@ This creates a `dynamatic` folder in your current working directory.
 
 **3. Build the Project**  
 Run the build script from the directory created by the clone command (check out our [advanced build](../UserGuide/AdvancedBuild.md) instructions to see how you can customize the build process and/or build the interactive dataflow visualizer). You may want to check the [build](../UserGuide/AdvancedBuild.md#3-building) section of the advanced build page if you want more options for building such as multi-threaded build which is faster.
-```
+```sh
 cd dynamatic
 chmod +x ./build.sh
 ./build.sh --release
@@ -69,7 +69,7 @@ chmod +x ./build.sh
 
 **4. Run the Dynamatic Testsuite**  
 After building the project, or at any time during development, you can run Dynamatic's testsuite from the top-level ```build``` folder using ```ninja```.
-```
+```sh
 # From the "dynamatic" folder created by the clone command
 cd build
 ninja check-dynamatic

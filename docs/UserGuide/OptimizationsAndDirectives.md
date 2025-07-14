@@ -30,7 +30,7 @@ enable for Dynamatic to achieve the best performance.
 
 For example, the code below:
 
-```
+```c
 int fir(in_int_t di[N], in_int_t idx[N]) {
   int tmp = 0;
   for (unsigned i = 0; i < N; i++)
@@ -84,4 +84,5 @@ compile <...> --sharing
 For implementing floating point operations, Dynamatic uses open-source [FloPoCo](https://flopoco.org/) components. It is possible to use proprietary Xilinx FP units from Vivado. For instructions on how to achieve this, see [the floating point units guide](../DeveloperGuide/Specs/FloatingPointUnits.md). Floating point units can be selected using the `set-fp-units-generator <flopoco|vivado>` command as shown in the [command reference](../UserGuide/CommandReference.md).
 
 ## Custom Compilation Flows  
-Sometimes, for advanced usage, features provided by the `dynamatic` shell are not enough. In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.
+Some other transformations also optimize the circuit, but they are not included in the normal compilation flow.
+In such case, one should invoke components such as `dynamatic-opt` (also located in the `bin` directory) directly. The default compilation flow is implemented in `tools/dynamatic/scripts/compile.sh`; you can use this as a template that you can adjust to your needs.

@@ -30,7 +30,7 @@ This tutorial is divided into the following sections:
 
 ## The C Source Code
 Below is our target C function (the kernel, in Dynamic HLS jargon) for conversion into a dataflow circuit:
-```
+```c
 // The number of loop iterations
 #define N 8
 
@@ -56,7 +56,7 @@ You can find the source code of this function in [tutorials/Introduction/Ch1/loo
 Observe!
 - The `main` function in the file allows one to run the C kernel with user-provided arguments. 
 - The `CALL_KERNEL` macro in `main`'s body calls the kernel while allowing us to automatically run code prior to and/or after the call. This is used during C/VHDL co-verification to automatically write the C function's reference output to a file for comparison with the generated VHDL design's output.
-```
+```c
 int main(void) {
   in_int_t a[N];
   // Initialize a to [0, 1, 0, 1, ...]
@@ -69,7 +69,7 @@ int main(void) {
 
 ## Using Dynamatic's Frontend
 Dynamatic's frontend is built by the project in `build/bin/dynamatic`, with a symbolic link located at `bin/dynamatic`, which we will be using. In a terminal, from Dynamatic's top-level folder, run the following:
-```
+```sh
 ./bin/dynamatic
 ```
 This will print the frontend's header and display a prompt where you can start inputting commands.
@@ -84,7 +84,7 @@ dynamatic> # Input your command here
 ```
 ### `set-src`
 Provide Dynamatic with the path to the C source code file under consideration. Ours is located at [tutorials/Introduction/Ch1/loop_multiply.c](../../../../tutorials/Introduction/Ch1/loop_multiply.c), thus we input:
-```
+```sh
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 ```
 > [!NOTE]
@@ -95,14 +95,14 @@ The first step towards generating the VHDL design is compilation. Here,
 - the C source goes through our MLIR frontend ([Polygeist](https://github.com/llvm/Polygeist))
 - traverses a pre-defined sequence of transformation and optimization passes that ultimately yield a description of an equivalent dataflow circuit. 
 
-That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../../../DeveloperGuide/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](../../../DeveloperGuide/MLIRPrimer.md#dialects). 
+That description takes the form of a human-readable and machine-parsable IR (Intermediate Representation) within the MLIR framework. It represents dataflow components using specially-defined IR instructions (in MLIR jargon, [operations](../../../DeveloperGuide/MLIRPrimer.md#operations)) that are part of the [Handshake dialect](../../../DeveloperGuide/CompilerIntrinsics/MLIRPrimer.md#dialects). 
 > [!TIP]  
 > A dialect is simply a collection of logically-connected IR entities like instructions, types, and attributes. 
 
-MLIR provides standard dialects for common usecases, while allowing external tools (like Dynamatic) to define custom dialects to model domain-specific semantics. We inherit part of the infrastructure surrounding the Handshake dialect from the [CIRCT project](https://github.com/llvm/circt) (a satellite project of LLVM/MLIR), but have tailored it to our specific usecases.
+MLIR provides standard dialects for common usecases, while allowing external tools (like Dynamatic) to define custom dialects to model domain-specific semantics. 
 
 To compile the C function, simply input `compile`. This will call a shell script ([compile.sh](../../../../tools/dynamatic/scripts/compile.sh)) in the background that will iteratively transform the IR into an optimized dataflow circuit, storing intermediate IR forms to disk at multiple points in the process.
-```
+```sh
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 dynamatic> compile
 ```
@@ -123,7 +123,7 @@ The default for compile is to use the minimum buffering for correctness (simple 
 > `compile` requires a MILP solver (Gurobi) for smart buffer placement. If you don't have Gurobi, abstain from using the `--buffer-algorithm` flag
 
 You should see the following printed on the terminal after running `compile`:
-```
+```sh
 ...
 dynamatic> compile
 [INFO] Compiled source to affine
@@ -153,7 +153,7 @@ In addition to the final optimized version of the IR (in `tutorials/Introduction
 
 ### `write-hdl`
 This command converts the `.dot` file generated from compilation to the equivalent hardware description language implementation of our kernel. 
-```
+```sh
 ...
 [INFO] Compilation succeeded
 
@@ -168,7 +168,7 @@ Similarly to compile, this creates a folder `out/hdl` with a `loop_multiply.vhd`
 
 #### `simulate`
 This command generates a testbench from the generated HDL code and feeds it inputs from the `main` function of our C code. It then runs a cosimulation of the C program and VHDL testbench to determine whether they yield the same results.
-```
+```sh
 ...
 [INFO] HDL generation succeeded
 
@@ -194,7 +194,7 @@ The command creates a new folder `out/sim`. In this case, it is located at `tuto
 That's it, you have successfully synthesized your first dataflow circuit from C code and functionally verified it using Dynamatic!
 
 At this point, you can quit the Dynamatic frontend by inputting the exit command:
-```
+```sh
 ...
 [INFO] Simulation succeeded
 
@@ -213,7 +213,7 @@ If you would like to re-run these commands all at once, it is possible to use th
 At the end of the last section, you used the `simulate` command to co-simulate the VHDL design obtained from the compilation flow along with the C source. This process generated a waveform file at `tutorials/Introduction/Ch1/out/sim/HLS_VERIFY/vsim.wlf` containing all state transitions that happened during simulation for all signals. After a simple pre-processing step we will be able to visualize these transitions on a graphical representation of our circuit to get more insights into how our dataflow circuit behaves.
 
 To launch the visualizer, re-open the frontend, re-set the source with `set-src tutorials/Introduction/Ch1/loop_multiply.c`, and input the `visualize` command.
-```
+```sh
 $ ./bin/dynamatic
 ================================================================================
 ============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============

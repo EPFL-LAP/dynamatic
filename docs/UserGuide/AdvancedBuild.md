@@ -30,7 +30,7 @@ To install Gurobi, first extract your downloaded file to your desired installati
 
 Use the following command to pass your obtained license to Gurobi, which it stores in  `~/gurobi.lic`
 
-```
+```sh
 # Replace x's with obtained license
 /opt/gurobiXXXX/linux64/bin/grbgetkey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 
 ```
@@ -40,7 +40,7 @@ Use the following command to pass your obtained license to Gurobi, which it stor
 
 In addition to adding Gurobi to your path, Dynamatic's CMake requires the GUROBI_HOME environment variable to find headers and libraries. These lines can be added to your shell initiation script, e.g. ~/.bashrc or ~/.zshrc, or used with any other environment setup method.
 
-```
+```sh
 # Replace "gurobiXXXX" with the correct version
 export GUROBI_HOME="/opt/gurobiXXXX/linux64"
 export PATH="${GUROBI_HOME}/bin:${PATH}"
@@ -55,14 +55,14 @@ The repository is set up so that Polygeist and LLVM are shallow cloned by defaul
 
 For Polygeist:
 
-```
+```sh
 cd dynamatic/polygeist
 git fetch --unshallow
 ```
 
 For LLVM:
 
-```
+```sh
 cd dynamatic/polygeist/llvm-project
 git fetch --unshallow
 ```
@@ -88,12 +88,12 @@ It creates build folders in the top level directory and in each submodule to run
 
 The build script builds the entire project in Debug mode by default, which enables assertions in the code and gives you access to runtime debug information that is very useful when working on Dynamatic's code. However, Debug mode increases build time and (especially) build size (the project takes around 60GB once fully built). If you do not care for runtime debug information and/or want Dynamatic to have a smaller footprint on your disk, you can instead build Dynamatic in Release mode by using the `--release` flag when running the build script.
 
-```
+```sh
 # Build Dynamatic in Debug mode
 ./build.sh
 ```
 
-```
+```sh
 # Build Dynamatic in Release mode
 ./build.sh --release
 ```
@@ -102,19 +102,19 @@ The build script builds the entire project in Debug mode by default, which enabl
 
 By default, Ninja builds the project by concurrently using at most one thread per logical core on your machine. This can put a lot of strain on your system's CPU and RAM, preventing you from using other applications smoothly. You can customize the maximum number of concurrent threads that are used to build the project using the --threads argument.
 
-```
+```sh
 # Build using at most one thread per logical core on your machine
 ./build.sh
 ```
 
-```
+```sh
 # Build using at most 4 concurrent threads
 ./build.sh --threads 4
 ```
 
 It is also common to run out of RAM especially during linking of LLVM/MLIR. If this is a problem, consider limiting the maximum number of parallel LLVM link jobs to one per 15GB of available RAM, using the --llvm-parallel-link-jobs flag:
 
-```
+```sh
 # Perform at most 1 concurrent LLVM link jobs
 ./build.sh --llvm-parallel-link-jobs 1
 ```
@@ -126,7 +126,7 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 
 To reduce the build script's execution time when re-building the project regularly (which happens during active development), the script does not try to fully reconfigure each submodule or the superproject using CMake if it sees that a CMake cache is already present on your filesystem for each part. This can cause problems if you suddenly decide to change build flags that affect the CMake configuration (e.g., when going from a Debug build to a Release build) as the CMake configuration will not take into account the new configuration. Whenever that happens (or whenever in doubt), provide the `--force` flag to force the build script to re-configure each part of the project using CMake.
 
-```
+```sh
 # Force re-configuration of every submodule and the superproject
 ./build.sh --force
 ```
@@ -185,7 +185,7 @@ The experimental integration with the XLS HLS tool (see [here](../DeveloperGuide
 > [!NOTE]
 > `--experimental-enable-xls`, just like any other cmake-related flags, will only be applied if `./build.sh` configures CMake, which it, by default, will not do if a build folder (with a `CMakeCache.txt`) exists. To enable xls if you already have a local build, you can either force a reconfigure of all projects by providing the `--force` flag, or delete the Dynamatic's `CMakeCache.txt` to only force a reconfigure (and costly rebuild) of Dynamatic:
 >
-```
+```sh
 ./build.sh --force --experimental-enable-xls
 # OR
 rm build/CMakeCache.txt
@@ -197,23 +197,23 @@ Once enabled, you do not need to provide `./build.sh` with `--experimental-enabl
 Dynamatic uses [Modelsim](hhttps://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) (has 32 bit dependencies) or [Questa](https://www.intel.com/content/www/us/en/software-kit/849791/questa-intel-fpgas-standard-edition-software-version-24-1.html) (64 bit simulator) to run simulations, thus you need to install it before hand. [Download](https://www.intel.com/content/www/us/en/software-kit/750666/modelsim-intel-fpgas-standard-edition-software-version-20-1-1.html) Modelsim or Questa, install it (in a directory with no special access permissions) and add it to path for Dynamatic to be able to run it. Add the following lines to the `.bashrc` file in your home directory to add modelsim to path variables.  
 > [!NOTE]
 > Ensure you write the full path
-```
+```sh
 export MODELSIM_HOME=/path/to/modelsim  # path will look like /home/username/intelFPGA/20.1/modelsim_ase
 export PATH="$MODELSIM_HOME/bin:$PATH"  # (adjust the path accordingly)
 ```
 or
-```
+```sh
 export MODELSIM_HOME=/path/to/questa    # path will look like home/username/altera/24.1std/questa_fse/
 export PATH="$MODELSIM_HOME/bin:$PATH"
 ```
 
 In any terminal, `source` .bashrc file and run the `vsim` command to verify that modelsim was added to path properly and runs.
-```
+```sh
 source ~/.bashrc
 vsim
 ```
 If you encounter any issue related to `libXext` (if you installed Modelsim) you may need to install a few more libraries to enable the 32 bit architecture which supports packages needed by Modelsim:
-```
+```sh
 sudo dpkg -add-architecture i386
 sudo apt update
 sudo apt install libxext6:i386 libxft2:i386 libxrender1:i386
@@ -224,7 +224,7 @@ To obtain a license (free or paid):
 - Create an account on Intel's [Self Servicing License Center](https://www.intel.com/content/www/us/en/docs/programmable/683472/22-1/and-software-license.html) page. The page has detailed instructions on how to obtain a license.
 - Request for a license. You will receive an authorization email with instructions on setting up a fixed or floating license (a fixed license suffices). This could take some minutes or up to a few hours.
 - Download the license file and add it to path as shown below
-```
+```sh
 #Questa license set up
 export LM_LICENSE_FILE=/path/to/license/file     # looks like this "home/username/.../LR-240645_License.dat:$LM_LICENSE_FILE"
 export MGLS_LICENSE_FILE=/path/to/license/file   # looks like this "/home/beta-tester/Downloads/LR-240645_License.dat"

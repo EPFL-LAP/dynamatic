@@ -1,5 +1,3 @@
-[Documentation Table of Contents](../README.md)  
-
 # Development
 
 Documentation related to development and tooling.

@@ -3,7 +3,7 @@
 
 To verify the correctness of your circuit after generating it with Dynamatic, the easiest way is to run a simulation.   
 Dynamatic has a cosimulation framework that allows the user to write a testbench in C code. To take advantage of this, you must ensure that you:   
-- Includ the `dynamatic/Integration.h` header
+- Include the `dynamatic/Integration.h` header
 - Create a main function where your test inputs will be instantiated
 - Make a function call to the function under test in the main function using the following syntax: `CALL_KERNEL(<func_name>, <arg1>, <arg2>, ..., <argN>);` . The values of the arguments passed to the function (i.e., `<arg1>, <arg2>, ..., <argN>`) will be used internally by our cosimulation framework as test stimuli.  
 > [!TIP]
